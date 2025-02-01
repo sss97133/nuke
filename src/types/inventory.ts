@@ -15,6 +15,7 @@ export interface VehicleHistoricalData {
     date?: string;
     price?: string;
     source?: string;
+    imageUrl?: string;
   }>;
   modifications?: string[];
   notableHistory?: string;
