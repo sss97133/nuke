@@ -12,9 +12,12 @@ import {
   Wrench, 
   Building2, 
   Terminal,
-  HelpCircle
+  HelpCircle,
+  UserRound,
+  Tree
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { ProfessionalDashboard } from './ProfessionalDashboard';
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -29,7 +32,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       vehicles: "Vehicle fleet management:\n• Register new vehicles\n• Track maintenance\n• View vehicle history\n• Process VIN numbers",
       service: "Service ticket system:\n• Create service requests\n• Track maintenance\n• Set priorities\n• Monitor status",
       garages: "Garage management:\n• Create garages\n• Manage members\n• Track locations\n• Assign vehicles",
-      terminal: "Command terminal:\n• Type 'help' for commands\n• Quick system access\n• Search functionality\n• View system status"
+      terminal: "Command terminal:\n• Type 'help' for commands\n• Quick system access\n• Search functionality\n• View system status",
+      professional: "Professional Dashboard:\n• View skill tree\n• Track achievements\n• Manage profile\n• Monitor progress"
     };
 
     toast({
@@ -96,6 +100,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                   <Building2 className="w-3 h-3" />
                   TAMS-4:GAR
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="professional" 
+                  className="text-tiny h-7 data-[state=active]:border-b data-[state=active]:border-gov-blue font-mono flex items-center gap-2"
+                >
+                  <UserRound className="w-3 h-3" />
+                  TAMS-5:PRO
+                </TabsTrigger>
               </div>
               <div className="flex items-center gap-2 pr-2">
                 <button
@@ -132,6 +143,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
           <TabsContent value="garages">
             <GarageManagement />
+          </TabsContent>
+
+          <TabsContent value="professional">
+            <ProfessionalDashboard />
           </TabsContent>
         </Tabs>
         {children}
