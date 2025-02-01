@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { VinCapture } from "./VinCapture";
 import { supabase } from "@/integrations/supabase/client";
 
 export const VehicleForm = () => {
@@ -15,6 +16,21 @@ export const VehicleForm = () => {
     vin: "",
     notes: "",
   });
+
+  const handleVinData = (data: any) => {
+    const vehicleData = data.data.reduce((acc: any, item: any) => {
+      if (item.Variable === "Make") acc.make = item.Value;
+      if (item.Variable === "Model") acc.model = item.Value;
+      if (item.Variable === "Model Year") acc.year = parseInt(item.Value);
+      if (item.Variable === "VIN") acc.vin = item.Value;
+      return acc;
+    }, {});
+
+    setFormData(prev => ({
+      ...prev,
+      ...vehicleData
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +61,8 @@ export const VehicleForm = () => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white border border-gray-200 p-6">
+      <VinCapture onVinData={handleVinData} />
+      
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="make" className="font-mono text-sm">Make *</Label>
