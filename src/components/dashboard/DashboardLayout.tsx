@@ -44,17 +44,17 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-white font-system">
-      <header className="border-b border-gov-blue bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-8">
-            <div className="flex items-center gap-4">
-              <span className="text-tiny text-gov-blue font-mono">TAMS/v1.0</span>
-              <span className="text-tiny text-gray-600 font-mono">SID:{new Date().getTime()}</span>
+    <div className="min-h-screen bg-[#FFFFFF] font-system">
+      <header className="border-b border-[#000066] bg-[#FFFFFF]">
+        <div className="max-w-7xl mx-auto px-2">
+          <div className="flex justify-between items-center h-6">
+            <div className="flex items-center gap-2">
+              <span className="text-tiny text-[#000066] font-mono">TAMS/v1.0</span>
+              <span className="text-tiny text-[#666666] font-mono">SID:{new Date().getTime()}</span>
             </div>
             <button
               onClick={() => supabase.auth.signOut()}
-              className="px-2 py-0.5 bg-gray-100 text-tiny hover:bg-gray-200 transition-colors border border-gray-400 font-mono"
+              className="px-2 py-0.5 bg-[#C8C8C9] text-tiny hover:bg-[#8A898C] transition-colors border border-[#403E43] font-mono"
             >
               EXIT_SYS
             </button>
@@ -62,63 +62,63 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-        <div className="mb-2 text-tiny font-mono">
-          <span className="text-[#666]">[SYS_MSG]</span>
-          <span className="text-gray-600 ml-2">DATA_COLLECTION_NOTICE_ACTIVE</span>
+      <main className="max-w-7xl mx-auto px-2 py-1">
+        <div className="mb-1 text-tiny font-mono">
+          <span className="text-[#666666]">[SYS_MSG]</span>
+          <span className="text-[#403E43] ml-2">DATA_COLLECTION_NOTICE_ACTIVE</span>
         </div>
 
         <Tabs defaultValue="inventory" className="w-full">
-          <TabsList className="w-full border-b border-gov-blue mb-2 bg-transparent h-7">
+          <TabsList className="w-full border-b border-[#000066] mb-1 bg-transparent h-6">
             <div className="flex justify-between w-full">
               <div className="flex">
                 <TabsTrigger 
                   value="inventory" 
-                  className="text-tiny h-7 data-[state=active]:border-b data-[state=active]:border-gov-blue font-mono flex items-center gap-2"
+                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
                 >
                   <Warehouse className="w-3 h-3" />
                   TAMS-1:INV
                 </TabsTrigger>
                 <TabsTrigger 
                   value="vehicles" 
-                  className="text-tiny h-7 data-[state=active]:border-b data-[state=active]:border-gov-blue font-mono flex items-center gap-2"
+                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
                 >
                   <Car className="w-3 h-3" />
                   TAMS-2:VEH
                 </TabsTrigger>
                 <TabsTrigger 
                   value="service" 
-                  className="text-tiny h-7 data-[state=active]:border-b data-[state=active]:border-gov-blue font-mono flex items-center gap-2"
+                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
                 >
                   <Wrench className="w-3 h-3" />
                   TAMS-3:SVC
                 </TabsTrigger>
                 <TabsTrigger 
                   value="garages" 
-                  className="text-tiny h-7 data-[state=active]:border-b data-[state=active]:border-gov-blue font-mono flex items-center gap-2"
+                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
                 >
                   <Building2 className="w-3 h-3" />
                   TAMS-4:GAR
                 </TabsTrigger>
                 <TabsTrigger 
                   value="professional" 
-                  className="text-tiny h-7 data-[state=active]:border-b data-[state=active]:border-gov-blue font-mono flex items-center gap-2"
+                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
                 >
                   <UserRound className="w-3 h-3" />
                   TAMS-5:PRO
                 </TabsTrigger>
               </div>
-              <div className="flex items-center gap-2 pr-2">
+              <div className="flex items-center gap-2 pr-1">
                 <button
                   onClick={() => showHelp('terminal')}
-                  className="text-tiny text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                  className="text-tiny text-[#666666] hover:text-[#403E43] flex items-center gap-1"
                 >
                   <Terminal className="w-3 h-3" />
                   <span className="hidden sm:inline">CMD Help</span>
                 </button>
                 <button
                   onClick={() => showHelp(document.querySelector('[data-state="active"]')?.getAttribute('value') || 'inventory')}
-                  className="text-tiny text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                  className="text-tiny text-[#666666] hover:text-[#403E43] flex items-center gap-1"
                 >
                   <HelpCircle className="w-3 h-3" />
                   <span className="hidden sm:inline">Section Help</span>
@@ -151,7 +151,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </Tabs>
         {children}
 
-        <footer className="mt-4 text-tiny text-[#666] border-t border-gray-300 pt-2 font-mono">
+        <footer className="mt-2 text-tiny text-[#666666] border-t border-[#403E43] pt-1 font-mono">
           <div className="flex justify-between">
             <span>PRIV_ACT_1974:ACTIVE</span>
             <span>EST_BURDEN:0.5HR</span>
