@@ -5,10 +5,20 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Temporarily bypass authentication by setting a mock session
+  const mockSession = {
+    user: {
+      id: 'temporary-user-id',
+      email: 'temp@example.com'
+    }
+  };
+  
+  const [session, setSession] = useState(mockSession);
+  const [loading, setLoading] = useState(false); // Set to false to skip loading state
   const { toast } = useToast();
 
+  // Comment out authentication logic temporarily
+  /*
   useEffect(() => {
     // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -32,6 +42,7 @@ const Index = () => {
 
     return () => subscription.unsubscribe();
   }, [toast]);
+  */
 
   if (loading) {
     return (
@@ -41,24 +52,7 @@ const Index = () => {
     );
   }
 
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full space-y-8">
-          <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              TAMS Login
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
-              Terminal Access Management System
-            </p>
-          </div>
-          <AuthForm />
-        </div>
-      </div>
-    );
-  }
-
+  // Always render DashboardLayout by removing the session check
   return <DashboardLayout />;
 };
 
