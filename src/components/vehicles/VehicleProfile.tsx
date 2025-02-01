@@ -21,25 +21,6 @@ interface VehicleHistory {
 export const VehicleProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
-Let me help you clean up the display of the historical data in the VehicleProfile component. The issue is that the raw JSON response from the Perplexity API might contain HTML tags or unformatted content. We'll format it properly and display it in a more structured way.
-
-<lov-code>
-Let's update the VehicleProfile component to better format and display the historical data:
-
-<lov-write file_path="src/components/vehicles/VehicleProfile.tsx">
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import type { Vehicle } from "@/types/inventory";
-import { Loader2 } from "lucide-react";
-
-export const VehicleProfile = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
