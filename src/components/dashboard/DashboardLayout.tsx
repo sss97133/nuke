@@ -14,7 +14,7 @@ import {
   Terminal,
   HelpCircle,
   UserRound,
-  Tree
+  Trees
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { ProfessionalDashboard } from './ProfessionalDashboard';

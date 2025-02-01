@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Tree, Trophy, Star } from 'lucide-react';
+import { Trees, Trophy, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const SkillTree = () => {
@@ -53,7 +53,7 @@ export const SkillTree = () => {
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <div className="flex items-center gap-2 mb-6">
-        <Tree className="w-5 h-5 text-blue-600" />
+        <Trees className="w-5 h-5 text-blue-600" />
         <h2 className="text-xl font-semibold">Skill Development Tree</h2>
       </div>
       

@@ -2,7 +2,7 @@ import React from 'react';
 import { SkillTree } from '../skills/SkillTree';
 import { UserProfile } from '../profile/UserProfile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Tree } from 'lucide-react';
+import { UserRound, Trees } from 'lucide-react';
 
 export const ProfessionalDashboard = () => {
   return (
@@ -14,7 +14,7 @@ export const ProfessionalDashboard = () => {
             Profile
           </TabsTrigger>
           <TabsTrigger value="skills" className="flex items-center gap-2">
-            <Tree className="w-4 h-4" />
+            <Trees className="w-4 h-4" />
             Skill Tree
           </TabsTrigger>
         </TabsList>
