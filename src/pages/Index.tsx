@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { useQuery } from "@tanstack/react-query";
 
 const Index = () => {
   const { toast } = useToast();
@@ -13,6 +14,34 @@ const Index = () => {
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch summary data
+  const { data: vehicles } = useQuery({
+    queryKey: ['vehicles'],
+    queryFn: async () => {
+      const { data } = await supabase.from('vehicles').select('*');
+      return data;
+    },
+    enabled: !!session
+  });
+
+  const { data: inventory } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      const { data } = await supabase.from('inventory').select('*');
+      return data;
+    },
+    enabled: !!session
+  });
+
+  const { data: serviceTickets } = useQuery({
+    queryKey: ['service_tickets'],
+    queryFn: async () => {
+      const { data } = await supabase.from('service_tickets').select('*');
+      return data;
+    },
+    enabled: !!session
+  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -192,7 +221,120 @@ const Index = () => {
     );
   }
 
-  return <DashboardLayout />;
+  return (
+    <div className="min-h-screen bg-white font-mono">
+      <header className="border-b border-gov-blue bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-8">
+            <div className="flex items-center gap-4">
+              <span className="text-tiny text-gov-blue">TAMS/v1.0</span>
+              <span className="text-tiny text-gray-600">SID:{new Date().getTime()}</span>
+            </div>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="px-2 py-0.5 bg-gray-100 text-tiny hover:bg-gray-200 transition-colors border border-gray-400"
+            >
+              EXIT_SYS
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <div className="mb-2 text-tiny">
+          <span className="text-[#666]">[SYS_MSG]</span>
+          <span className="text-gray-600 ml-2">TERMINAL_READY</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+          {/* System Status */}
+          <div className="border border-gov-blue p-2">
+            <div className="text-tiny text-[#666] border-b border-gov-blue pb-1 mb-1">
+              SYS_STATUS
+            </div>
+            <div className="grid grid-cols-2 gap-1 text-tiny">
+              <span>CONN:</span>
+              <span className="text-green-600">ACTIVE</span>
+              <span>LATENCY:</span>
+              <span>12ms</span>
+              <span>UPTIME:</span>
+              <span>99.9%</span>
+            </div>
+          </div>
+
+          {/* Vehicle Summary */}
+          <div className="border border-gov-blue p-2">
+            <div className="text-tiny text-[#666] border-b border-gov-blue pb-1 mb-1">
+              VEH_SUMMARY
+            </div>
+            <div className="grid grid-cols-2 gap-1 text-tiny">
+              <span>TOTAL:</span>
+              <span>{vehicles?.length || 0}</span>
+              <span>ACTIVE:</span>
+              <span>{vehicles?.filter(v => !v.notes?.includes('INACTIVE')).length || 0}</span>
+              <span>MAINT:</span>
+              <span>{serviceTickets?.filter(t => t.status === 'pending').length || 0}</span>
+            </div>
+          </div>
+
+          {/* Inventory Summary */}
+          <div className="border border-gov-blue p-2">
+            <div className="text-tiny text-[#666] border-b border-gov-blue pb-1 mb-1">
+              INV_SUMMARY
+            </div>
+            <div className="grid grid-cols-2 gap-1 text-tiny">
+              <span>TOTAL:</span>
+              <span>{inventory?.length || 0}</span>
+              <span>LOW_STOCK:</span>
+              <span>{inventory?.filter(i => i.quantity < 5).length || 0}</span>
+              <span>VAL($):</span>
+              <span>{inventory?.reduce((acc, i) => acc + (i.purchase_price || 0), 0).toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Command Input */}
+          <div className="border border-gov-blue p-2 col-span-full">
+            <div className="flex gap-2 items-center">
+              <span className="text-tiny text-[#666]">CMD:</span>
+              <Input
+                placeholder="ENTER_COMMAND"
+                className="h-7 text-tiny bg-white font-mono"
+              />
+              <Button
+                size="sm"
+                className="h-7 bg-[#283845] hover:bg-[#1a2830] text-white text-tiny"
+              >
+                EXEC
+              </Button>
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="border border-gov-blue p-2 col-span-full">
+            <div className="text-tiny text-[#666] border-b border-gov-blue pb-1 mb-1">
+              RECENT_ACTIVITY
+            </div>
+            <div className="space-y-1">
+              {serviceTickets?.slice(0, 5).map((ticket) => (
+                <div key={ticket.id} className="text-tiny flex justify-between">
+                  <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                  <span className="text-[#666]">{ticket.description.substring(0, 50)}</span>
+                  <span>{ticket.status.toUpperCase()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="text-tiny text-[#666] border-t border-gov-blue mt-4 pt-2">
+          <div className="flex justify-between">
+            <span>LAST_UPDATE: {new Date().toISOString()}</span>
+            <span>MEM_USAGE: 45%</span>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 };
 
 export default Index;
