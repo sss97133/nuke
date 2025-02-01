@@ -7,6 +7,7 @@ import { ServiceTicketList } from "@/components/inventory/ServiceTicketList";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const Index = () => {
   const { toast } = useToast();
@@ -14,6 +15,7 @@ const Index = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -29,18 +31,44 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const formatPhoneNumber = (phone: string) => {
+    // Remove any non-digit characters
+    const cleaned = phone.replace(/\D/g, "");
+    // Add +1 prefix if not present and it's a US number
+    if (cleaned.length === 10) {
+      return `+1${cleaned}`;
+    }
+    // If number already has country code (starts with +), return as is
+    if (phone.startsWith("+")) {
+      return cleaned;
+    }
+    // Default case, just add + prefix
+    return `+${cleaned}`;
+  };
+
   const handleSendOtp = async () => {
     try {
+      setIsLoading(true);
+      const formattedPhone = formatPhoneNumber(phoneNumber);
+      
       const { error } = await supabase.auth.signInWithOtp({
-        phone: phoneNumber,
+        phone: formattedPhone,
       });
 
       if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message,
-        });
+        if (error.message.includes("sms_send_failed")) {
+          toast({
+            variant: "destructive",
+            title: "SMS Service Error",
+            description: "Unable to send SMS. Please try again later or contact support.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: error.message,
+          });
+        }
       } else {
         setShowOtpInput(true);
         toast({
@@ -54,13 +82,18 @@ const Index = () => {
         title: "Error",
         description: "Failed to send OTP",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleVerifyOtp = async () => {
     try {
+      setIsLoading(true);
+      const formattedPhone = formatPhoneNumber(phoneNumber);
+      
       const { error } = await supabase.auth.verifyOtp({
-        phone: phoneNumber,
+        phone: formattedPhone,
         token: otp,
         type: "sms",
       });
@@ -83,6 +116,8 @@ const Index = () => {
         title: "Error",
         description: "Failed to verify OTP",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -97,35 +132,47 @@ const Index = () => {
           <div className="space-y-4">
             <Input
               type="tel"
-              placeholder="Enter phone number"
+              placeholder="Enter phone number (e.g., +1234567890)"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               className="w-full"
+              disabled={isLoading}
             />
             {!showOtpInput ? (
               <Button
                 onClick={handleSendOtp}
                 className="w-full bg-[#283845] text-white font-mono hover:bg-[#1a2830] transition-colors"
+                disabled={isLoading}
               >
-                Send OTP
+                {isLoading ? "Sending..." : "Send OTP"}
               </Button>
             ) : (
               <>
-                <Input
-                  type="text"
-                  placeholder="Enter OTP"
+                <InputOTP
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  className="w-full"
+                  onChange={setOtp}
+                  maxLength={6}
+                  disabled={isLoading}
+                  render={({ slots }) => (
+                    <InputOTPGroup>
+                      {slots.map((slot, index) => (
+                        <InputOTPSlot key={index} {...slot} />
+                      ))}
+                    </InputOTPGroup>
+                  )}
                 />
                 <Button
                   onClick={handleVerifyOtp}
                   className="w-full bg-[#283845] text-white font-mono hover:bg-[#1a2830] transition-colors"
+                  disabled={isLoading || otp.length !== 6}
                 >
-                  Verify OTP
+                  {isLoading ? "Verifying..." : "Verify OTP"}
                 </Button>
               </>
             )}
+            <p className="text-sm text-gray-600">
+              Enter your phone number with country code (e.g., +1 for US numbers)
+            </p>
           </div>
         </div>
       </div>
