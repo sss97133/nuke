@@ -150,21 +150,19 @@ const Index = () => {
               </Button>
             ) : (
               <div className="space-y-4">
-                <div className="flex justify-center">
-                  <InputOTP
-                    value={otp}
-                    onChange={setOtp}
-                    maxLength={6}
-                    disabled={isLoading}
-                    render={({ slots }) => (
-                      <InputOTPGroup className="gap-2">
-                        {slots.map((slot, index) => (
-                          <InputOTPSlot key={index} index={index} />
-                        ))}
-                      </InputOTPGroup>
-                    )}
-                  />
-                </div>
+                <InputOTP
+                  maxLength={6}
+                  value={otp}
+                  onChange={setOtp}
+                  disabled={isLoading}
+                  render={({ slots }) => (
+                    <InputOTPGroup className="gap-2 justify-center">
+                      {slots.map((slot, idx) => (
+                        <InputOTPSlot key={idx} index={idx} />
+                      ))}
+                    </InputOTPGroup>
+                  )}
+                />
                 <Button
                   onClick={handleVerifyOtp}
                   className="w-full bg-[#283845] text-white font-mono hover:bg-[#1a2830] transition-colors"
@@ -224,6 +222,3 @@ const Index = () => {
       </Tabs>
     </div>
   );
-};
-
-export default Index;
