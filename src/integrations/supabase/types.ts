@@ -9,7 +9,122 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      inventory: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          part_number: string | null
+          quantity: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          part_number?: string | null
+          quantity?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          part_number?: string | null
+          quantity?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      service_tickets: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          priority: string
+          status: string
+          updated_at: string
+          user_id: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          priority?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          priority?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_tickets_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicles: {
+        Row: {
+          created_at: string
+          id: string
+          make: string
+          model: string
+          notes: string | null
+          updated_at: string
+          user_id: string | null
+          vin: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          make: string
+          model: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vin?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          make?: string
+          model?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vin?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
