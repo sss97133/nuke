@@ -10,6 +10,17 @@ export interface User {
   createdAt: string;
 }
 
+export interface VehicleHistoricalData {
+  previousSales?: Array<{
+    date?: string;
+    price?: string;
+    source?: string;
+  }>;
+  modifications?: string[];
+  notableHistory?: string;
+  conditionNotes?: string;
+}
+
 export interface Vehicle {
   id: string;
   vin?: string;
@@ -23,7 +34,7 @@ export interface Vehicle {
   updatedBy: string;
   createdAt: string;
   updatedAt: string;
-  historical_data?: any;
+  historical_data?: VehicleHistoricalData | null;
 }
 
 export interface ServiceTicket {

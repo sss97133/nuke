@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import type { Json } from "@/integrations/supabase/types";
+import type { VehicleHistoricalData } from "@/types/inventory";
 
 interface VehicleHistoryProps {
-  historicalData: Json | null;
+  historicalData: VehicleHistoricalData | null;
   onSearch: () => void;
   isSearching: boolean;
 }
@@ -30,8 +30,6 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
     );
   }
 
-  const data = typeof historicalData === 'string' ? JSON.parse(historicalData) : historicalData;
-
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -46,13 +44,13 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
         </Button>
       </div>
 
-      {data.previousSales?.length > 0 && (
+      {historicalData.previousSales && historicalData.previousSales.length > 0 && (
         <div className="bg-white rounded-lg border p-4 shadow-sm">
           <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">
-            Previous Sales History ({data.previousSales.length})
+            Previous Sales History ({historicalData.previousSales.length})
           </h4>
           <div className="space-y-3">
-            {data.previousSales.map((sale: any, index: number) => (
+            {historicalData.previousSales.map((sale, index) => (
               <div key={index} className="bg-gray-50 p-4 rounded-md border">
                 <p className="font-mono text-sm mb-1">
                   <span className="font-semibold">Date:</span> {sale.date || 'N/A'}
@@ -71,33 +69,33 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
         </div>
       )}
 
-      {data.modifications?.length > 0 && (
+      {historicalData.modifications && historicalData.modifications.length > 0 && (
         <div className="bg-white rounded-lg border p-4 shadow-sm">
           <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">
-            Vehicle Modifications ({data.modifications.length})
+            Vehicle Modifications ({historicalData.modifications.length})
           </h4>
           <ul className="list-disc list-inside space-y-2">
-            {data.modifications.map((mod: string, index: number) => (
+            {historicalData.modifications.map((mod, index) => (
               <li key={index} className="font-mono text-sm pl-2">{mod}</li>
             ))}
           </ul>
         </div>
       )}
 
-      {data.notableHistory && (
+      {historicalData.notableHistory && (
         <div className="bg-white rounded-lg border p-4 shadow-sm">
           <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">Notable History</h4>
           <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded-md border">
-            {data.notableHistory}
+            {historicalData.notableHistory}
           </p>
         </div>
       )}
 
-      {data.conditionNotes && (
+      {historicalData.conditionNotes && (
         <div className="bg-white rounded-lg border p-4 shadow-sm">
           <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">Condition Assessment</h4>
           <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded-md border">
-            {data.conditionNotes}
+            {historicalData.conditionNotes}
           </p>
         </div>
       )}
