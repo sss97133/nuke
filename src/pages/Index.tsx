@@ -56,19 +56,26 @@ const Index = () => {
       });
 
       if (error) {
-        if (error.message.includes("sms_send_failed")) {
-          toast({
-            variant: "destructive",
-            title: "SMS Service Error",
-            description: "Unable to send SMS. Please try again later or contact support.",
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: error.message,
-          });
+        let errorMessage = "Failed to send OTP";
+        
+        // Parse the error response if it's a JSON string
+        try {
+          const errorBody = JSON.parse(error.message);
+          if (errorBody.code === "sms_send_failed") {
+            errorMessage = "SMS service is currently unavailable. Please try again later or contact support.";
+            console.error("Detailed error:", errorBody);
+          }
+        } catch {
+          // If error message isn't JSON, use it directly
+          errorMessage = error.message;
         }
+
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: errorMessage,
+        });
+        setShowOtpInput(false);
       } else {
         setShowOtpInput(true);
         toast({
@@ -77,10 +84,11 @@ const Index = () => {
         });
       }
     } catch (error) {
+      console.error("Detailed error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to send OTP",
+        description: "An unexpected error occurred. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -111,6 +119,7 @@ const Index = () => {
         });
       }
     } catch (error) {
+      console.error("Verification error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -142,7 +151,7 @@ const Index = () => {
               <Button
                 onClick={handleSendOtp}
                 className="w-full bg-[#283845] text-white font-mono hover:bg-[#1a2830] transition-colors"
-                disabled={isLoading}
+                disabled={isLoading || !phoneNumber.trim()}
               >
                 {isLoading ? "Sending..." : "Send OTP"}
               </Button>
