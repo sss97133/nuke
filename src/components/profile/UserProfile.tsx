@@ -6,15 +6,28 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
+interface SocialLinks {
+  twitter: string;
+  instagram: string;
+  linkedin: string;
+  github: string;
+}
+
+interface StreamingLinks {
+  twitch: string;
+  youtube: string;
+  tiktok: string;
+}
+
 export const UserProfile = () => {
   const { toast } = useToast();
-  const [socialLinks, setSocialLinks] = useState({
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>({
     twitter: '',
     instagram: '',
     linkedin: '',
     github: ''
   });
-  const [streamingLinks, setStreamingLinks] = useState({
+  const [streamingLinks, setStreamingLinks] = useState<StreamingLinks>({
     twitch: '',
     youtube: '',
     tiktok: ''
@@ -41,12 +54,11 @@ export const UserProfile = () => {
         throw error;
       }
 
-      // Initialize state with existing values
-      if (data.social_links) {
-        setSocialLinks(data.social_links);
+      if (data?.social_links) {
+        setSocialLinks(data.social_links as SocialLinks);
       }
-      if (data.streaming_links) {
-        setStreamingLinks(data.streaming_links);
+      if (data?.streaming_links) {
+        setStreamingLinks(data.streaming_links as StreamingLinks);
       }
       
       return data;
@@ -124,132 +136,130 @@ export const UserProfile = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="bg-sidebar p-6 rounded-lg shadow-lg border border-sidebar-border">
-        <div className="flex items-center gap-6 mb-8">
-          <div className="bg-sidebar-primary/10 p-4 rounded-full">
-            <UserRound className="w-8 h-8 text-sidebar-primary" />
+    <div className="space-y-4 font-system">
+      <div className="bg-[#f3f3f3] p-4 border border-[#000066] shadow-sm">
+        <div className="flex items-start gap-4 mb-6 bg-white p-3 border border-[#999]">
+          <div className="bg-[#eee] p-2 border border-[#ccc]">
+            <UserRound className="w-6 h-6 text-[#000066]" />
           </div>
-          <div>
-            <h2 className="text-2xl font-semibold text-sidebar-foreground">{profile?.full_name}</h2>
-            <p className="text-sidebar-foreground/60">@{profile?.username}</p>
+          <div className="text-left">
+            <h2 className="text-doc font-mono text-[#000066]">{profile?.full_name || 'USER_NAME_NOT_FOUND'}</h2>
+            <p className="text-tiny text-[#555555] font-mono">@{profile?.username || 'username_404'}</p>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-sidebar-accent p-4 rounded-lg border border-sidebar-border">
-            <div className="flex items-center gap-2 mb-3">
-              <Trophy className="w-5 h-5 text-sidebar-primary" />
-              <span className="font-medium text-sidebar-foreground">Role</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+          <div className="bg-white p-3 border border-[#999]">
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="w-4 h-4 text-[#000066]" />
+              <span className="text-tiny font-mono text-[#333333]">ROLE</span>
             </div>
-            <p className="text-sidebar-foreground/80 capitalize">{profile?.user_type}</p>
+            <p className="text-tiny font-mono text-[#555555] uppercase">{profile?.user_type || 'N/A'}</p>
           </div>
           
-          <div className="bg-sidebar-accent p-4 rounded-lg border border-sidebar-border">
-            <div className="flex items-center gap-2 mb-3">
-              <Star className="w-5 h-5 text-sidebar-primary" />
-              <span className="font-medium text-sidebar-foreground">Reputation</span>
+          <div className="bg-white p-3 border border-[#999]">
+            <div className="flex items-center gap-2 mb-2">
+              <Star className="w-4 h-4 text-[#000066]" />
+              <span className="text-tiny font-mono text-[#333333]">REPUTATION_PTS</span>
             </div>
-            <p className="text-sidebar-foreground/80">{profile?.reputation_score} points</p>
+            <p className="text-tiny font-mono text-[#555555]">{profile?.reputation_score || '0'}</p>
           </div>
           
-          <div className="bg-sidebar-accent p-4 rounded-lg border border-sidebar-border">
-            <div className="flex items-center gap-2 mb-3">
-              <Award className="w-5 h-5 text-sidebar-primary" />
-              <span className="font-medium text-sidebar-foreground">Achievements</span>
+          <div className="bg-white p-3 border border-[#999]">
+            <div className="flex items-center gap-2 mb-2">
+              <Award className="w-4 h-4 text-[#000066]" />
+              <span className="text-tiny font-mono text-[#333333]">ACHIEVEMENTS</span>
             </div>
-            <p className="text-sidebar-foreground/80">{achievements?.length || 0} earned</p>
+            <p className="text-tiny font-mono text-[#555555]">{achievements?.length || '0'}_TOTAL</p>
           </div>
         </div>
 
-        {/* Social Media Links Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <LinkIcon className="w-5 h-5 text-sidebar-primary" />
-            <h3 className="text-lg font-semibold text-sidebar-foreground">Social Media Links</h3>
+        <div className="mb-6 bg-white p-3 border border-[#999]">
+          <div className="flex items-center gap-2 mb-3">
+            <LinkIcon className="w-4 h-4 text-[#000066]" />
+            <h3 className="text-tiny font-mono text-[#333333]">SOCIAL_MEDIA_LINKS</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Input
-              placeholder="Twitter URL"
+              placeholder="TWITTER_URL"
               value={socialLinks.twitter}
               onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
-              className="bg-sidebar-accent border-sidebar-border"
+              className="text-tiny font-mono bg-[#f3f3f3] border-[#999]"
             />
             <Input
-              placeholder="Instagram URL"
+              placeholder="INSTAGRAM_URL"
               value={socialLinks.instagram}
               onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
-              className="bg-sidebar-accent border-sidebar-border"
+              className="text-tiny font-mono bg-[#f3f3f3] border-[#999]"
             />
             <Input
-              placeholder="LinkedIn URL"
+              placeholder="LINKEDIN_URL"
               value={socialLinks.linkedin}
               onChange={(e) => setSocialLinks({ ...socialLinks, linkedin: e.target.value })}
-              className="bg-sidebar-accent border-sidebar-border"
+              className="text-tiny font-mono bg-[#f3f3f3] border-[#999]"
             />
             <Input
-              placeholder="GitHub URL"
+              placeholder="GITHUB_URL"
               value={socialLinks.github}
               onChange={(e) => setSocialLinks({ ...socialLinks, github: e.target.value })}
-              className="bg-sidebar-accent border-sidebar-border"
+              className="text-tiny font-mono bg-[#f3f3f3] border-[#999]"
             />
           </div>
           <Button 
             onClick={handleSocialLinksUpdate}
-            className="mt-4 bg-sidebar-primary hover:bg-sidebar-primary/90"
+            className="mt-3 bg-[#000066] hover:bg-[#000044] text-tiny font-mono"
           >
-            Update Social Links
+            UPDATE_SOCIAL_LINKS
           </Button>
         </div>
 
-        {/* Streaming Platform Links Section */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Video className="w-5 h-5 text-sidebar-primary" />
-            <h3 className="text-lg font-semibold text-sidebar-foreground">Streaming Platform Links</h3>
+        <div className="bg-white p-3 border border-[#999]">
+          <div className="flex items-center gap-2 mb-3">
+            <Video className="w-4 h-4 text-[#000066]" />
+            <h3 className="text-tiny font-mono text-[#333333]">STREAMING_PLATFORM_LINKS</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Input
-              placeholder="Twitch URL"
+              placeholder="TWITCH_URL"
               value={streamingLinks.twitch}
               onChange={(e) => setStreamingLinks({ ...streamingLinks, twitch: e.target.value })}
-              className="bg-sidebar-accent border-sidebar-border"
+              className="text-tiny font-mono bg-[#f3f3f3] border-[#999]"
             />
             <Input
-              placeholder="YouTube URL"
+              placeholder="YOUTUBE_URL"
               value={streamingLinks.youtube}
               onChange={(e) => setStreamingLinks({ ...streamingLinks, youtube: e.target.value })}
-              className="bg-sidebar-accent border-sidebar-border"
+              className="text-tiny font-mono bg-[#f3f3f3] border-[#999]"
             />
             <Input
-              placeholder="TikTok URL"
+              placeholder="TIKTOK_URL"
               value={streamingLinks.tiktok}
               onChange={(e) => setStreamingLinks({ ...streamingLinks, tiktok: e.target.value })}
-              className="bg-sidebar-accent border-sidebar-border"
+              className="text-tiny font-mono bg-[#f3f3f3] border-[#999]"
             />
           </div>
           <Button 
             onClick={handleStreamingLinksUpdate}
-            className="mt-4 bg-sidebar-primary hover:bg-sidebar-primary/90"
+            className="mt-3 bg-[#000066] hover:bg-[#000044] text-tiny font-mono"
           >
-            Update Streaming Links
+            UPDATE_STREAMING_LINKS
           </Button>
         </div>
       </div>
 
       {achievements && achievements.length > 0 && (
-        <div className="bg-sidebar p-6 rounded-lg shadow-lg border border-sidebar-border">
-          <h3 className="text-lg font-semibold mb-4 text-sidebar-foreground">Recent Achievements</h3>
-          <div className="space-y-3">
+        <div className="bg-[#f3f3f3] p-4 border border-[#000066] shadow-sm">
+          <h3 className="text-tiny font-mono text-[#333333] mb-3">RECENT_ACHIEVEMENTS</h3>
+          <div className="space-y-2">
             {achievements.map((achievement) => (
               <div 
                 key={achievement.id} 
-                className="flex items-center gap-4 p-4 bg-sidebar-accent rounded-lg border border-sidebar-border hover:border-sidebar-primary/50 transition-colors"
+                className="flex items-center gap-3 p-3 bg-white border border-[#999] hover:border-[#000066] transition-colors"
               >
-                <Award className="w-5 h-5 text-sidebar-primary" />
+                <Award className="w-4 h-4 text-[#000066]" />
                 <div>
-                  <p className="font-medium text-sidebar-foreground">{achievement.achievement_type}</p>
-                  <p className="text-sm text-sidebar-foreground/60">
+                  <p className="text-tiny font-mono text-[#333333]">{achievement.achievement_type}</p>
+                  <p className="text-tiny font-mono text-[#555555]">
                     {new Date(achievement.earned_at).toLocaleDateString()}
                   </p>
                 </div>
