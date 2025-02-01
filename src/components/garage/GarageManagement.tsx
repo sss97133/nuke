@@ -25,8 +25,8 @@ export const GarageManagement = () => {
   const handleCreateGarage = async () => {
     if (!newGarageName.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a garage name",
+        title: "ERR",
+        description: "GARAGE_NAME_REQUIRED",
         variant: "destructive"
       });
       return;
@@ -38,75 +38,85 @@ export const GarageManagement = () => {
 
     if (error) {
       toast({
-        title: "Error",
-        description: "Failed to create garage",
+        title: "ERR",
+        description: "GARAGE_CREATE_FAILED",
         variant: "destructive"
       });
       return;
     }
 
     toast({
-      title: "Success",
-      description: "Garage created successfully"
+      title: "OK",
+      description: "GARAGE_CREATED"
     });
     setNewGarageName("");
     refetch();
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-sm font-mono text-[#283845] tracking-tight uppercase">Garage Management</h2>
-          <p className="text-xs text-[#666] font-mono mt-1">Manage your garages and members</p>
+    <div className="space-y-4 font-mono">
+      <div className="border-b border-[#283845] pb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[#666]">[TAMS]</span>
+          <span className="text-xs text-[#283845]">GARAGE_MGMT_SYS v1.0</span>
         </div>
       </div>
 
-      <div className="flex gap-4 items-end">
-        <div className="flex-1">
-          <Input
-            placeholder="Enter garage name"
-            value={newGarageName}
-            onChange={(e) => setNewGarageName(e.target.value)}
-          />
-        </div>
+      <div className="flex gap-2 items-center bg-[#f8f9fa] p-2 border border-[#283845]">
+        <span className="text-xs text-[#666]">CMD:</span>
+        <Input
+          placeholder="NEW_GARAGE_NAME"
+          value={newGarageName}
+          onChange={(e) => setNewGarageName(e.target.value)}
+          className="h-7 text-xs font-mono bg-white"
+        />
         <Button
           onClick={handleCreateGarage}
-          className="bg-[#283845] hover:bg-[#1a2830] text-white"
+          size="sm"
+          className="h-7 bg-[#283845] hover:bg-[#1a2830] text-white text-xs"
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Garage
+          <Plus className="w-3 h-3 mr-1" />
+          ADD
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
         {garages?.map((garage) => (
           <div
             key={garage.id}
-            className="p-4 border rounded-lg space-y-4 bg-white shadow-sm"
+            className="p-2 border border-[#283845] bg-white text-xs"
           >
-            <div className="flex items-center gap-2">
-              <Building className="w-5 h-5 text-[#283845]" />
-              <h3 className="font-mono text-[#283845]">{garage.name}</h3>
+            <div className="flex items-center gap-2 border-b border-dotted border-[#283845] pb-1">
+              <Building className="w-3 h-3 text-[#283845]" />
+              <span className="text-[#283845] uppercase">{garage.name}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Users className="w-4 h-4" />
-              <span>Members: 0</span>
+            <div className="flex justify-between items-center pt-1">
+              <div className="flex items-center gap-1 text-[#666]">
+                <Users className="w-3 h-3" />
+                <span>MEM:0</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-[10px]"
+                onClick={() => {
+                  toast({
+                    title: "INFO",
+                    description: "MEM_MGMT_COMING_SOON"
+                  });
+                }}
+              >
+                MANAGE
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                toast({
-                  title: "Coming Soon",
-                  description: "Member management will be available soon"
-                });
-              }}
-            >
-              Manage Members
-            </Button>
           </div>
         ))}
+      </div>
+
+      <div className="text-[10px] text-[#666] border-t border-[#283845] pt-2 mt-4">
+        <span>SYS_STATUS: READY</span>
+        <span className="ml-4">MEM_USAGE: LOW</span>
+        <span className="ml-4">LAST_UPDATE: {new Date().toISOString()}</span>
       </div>
     </div>
   );
