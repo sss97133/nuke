@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,10 +23,21 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const apiKey = Deno.env.get('PERPLEXITY_API_KEY');
+  if (!apiKey) {
+    console.error('PERPLEXITY_API_KEY is not set');
+    return new Response(
+      JSON.stringify({ error: 'API key configuration error' }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
   try {
     const { vehicleData } = await req.json() as { vehicleData: VehicleData };
-    
-    console.log('Analyzing vehicle data:', vehicleData);
+    console.log('Analyzing vehicle data:', JSON.stringify(vehicleData, null, 2));
 
     const prompt = `As a classic car expert, analyze this vehicle:
     ${vehicleData.year} ${vehicleData.make} ${vehicleData.model}
@@ -55,10 +66,11 @@ serve(async (req) => {
       }
     }`;
 
+    console.log('Sending request to Perplexity API');
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('PERPLEXITY_API_KEY')}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -79,18 +91,23 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      console.error('Perplexity API error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('Error details:', errorText);
       throw new Error(`Perplexity API error: ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log('Received analysis from Perplexity:', data);
+    console.log('Received analysis from Perplexity:', JSON.stringify(data, null, 2));
 
     let analysis;
     try {
       const content = data.choices[0].message.content;
       analysis = JSON.parse(content);
+      console.log('Parsed analysis:', JSON.stringify(analysis, null, 2));
     } catch (error) {
       console.error('Error parsing AI response:', error);
+      console.error('Raw content:', data.choices[0]?.message?.content);
       throw new Error('Failed to parse vehicle analysis');
     }
 
@@ -102,8 +119,14 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error analyzing vehicle data:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to analyze vehicle data' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ 
+        error: 'Failed to analyze vehicle data',
+        details: error.message 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
     );
   }
 });
