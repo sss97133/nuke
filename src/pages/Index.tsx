@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { MarketDataCollector } from "@/components/market/MarketDataCollector";
 
 const Index = () => {
   const { toast } = useToast();
@@ -179,11 +178,7 @@ const Index = () => {
     );
   }
 
-  return (
-    <DashboardLayout>
-      <MarketDataCollector />
-    </DashboardLayout>
-  );
+  return <DashboardLayout />;
 };
 
 export default Index;
