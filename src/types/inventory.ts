@@ -23,6 +23,7 @@ export interface Vehicle {
   updatedBy: string;
   createdAt: string;
   updatedAt: string;
+  historical_data?: any;
 }
 
 export interface ServiceTicket {

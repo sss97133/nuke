@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import type { Vehicle } from "@/types/inventory";
+import { Loader2 } from "lucide-react";
 
 export const VehicleProfile = () => {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export const VehicleProfile = () => {
   const { toast } = useToast();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     const fetchVehicle = async () => {
@@ -54,13 +56,55 @@ export const VehicleProfile = () => {
         createdBy: data.user_id || '',
         updatedBy: data.user_id || '',
         createdAt: data.created_at,
-        updatedAt: data.updated_at
+        updatedAt: data.updated_at,
+        historical_data: data.historical_data
       });
       setLoading(false);
     };
 
     fetchVehicle();
   }, [id, navigate, toast]);
+
+  const searchVehicleHistory = async () => {
+    if (!vehicle) return;
+    
+    setSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('search-vehicle-history', {
+        body: { vehicleId: vehicle.id }
+      });
+
+      if (error) throw error;
+
+      // Refresh vehicle data to get updated historical_data
+      const { data: updatedVehicle, error: fetchError } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("id", vehicle.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      setVehicle(prev => prev ? {
+        ...prev,
+        historical_data: updatedVehicle.historical_data
+      } : null);
+
+      toast({
+        title: "Success",
+        description: "Vehicle history has been updated",
+      });
+    } catch (error) {
+      console.error('Error searching vehicle history:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search vehicle history. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSearching(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -107,6 +151,31 @@ export const VehicleProfile = () => {
             )}
           </div>
           
+          <div className="pt-4 border-t border-[#283845]">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-mono text-sm text-[#666]">Vehicle History</h3>
+              <Button 
+                onClick={searchVehicleHistory} 
+                disabled={searching}
+                className="font-mono text-sm"
+              >
+                {searching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {searching ? 'Searching...' : 'Search History'}
+              </Button>
+            </div>
+            {vehicle.historical_data ? (
+              <div className="bg-gray-50 p-4 rounded-md">
+                <pre className="font-mono text-sm whitespace-pre-wrap">
+                  {JSON.stringify(vehicle.historical_data, null, 2)}
+                </pre>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground font-mono">
+                No historical data available. Click "Search History" to find information about this vehicle.
+              </p>
+            )}
+          </div>
+
           <div className="pt-4 border-t border-[#283845]">
             <h3 className="font-mono text-sm text-[#666] mb-2">Record Details</h3>
             <p className="text-xs font-mono text-[#666]">
