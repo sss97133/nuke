@@ -4,7 +4,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import type { Vehicle } from "@/types/inventory";
+import type { Vehicle, VehicleHistoricalData } from "@/types/inventory";
 import { VehicleHistory } from "./VehicleHistory";
 import { VehicleDetails } from "./VehicleDetails";
 import { RecordDetails } from "./RecordDetails";
@@ -59,7 +59,7 @@ export const VehicleProfile = () => {
         updatedBy: data.user_id || '',
         createdAt: data.created_at,
         updatedAt: data.updated_at,
-        historical_data: data.historical_data
+        historical_data: data.historical_data as VehicleHistoricalData | null
       });
       setLoading(false);
     };
@@ -87,7 +87,7 @@ export const VehicleProfile = () => {
 
       if (fetchError) throw fetchError;
 
-      const historicalData = updatedVehicle.historical_data;
+      const historicalData = updatedVehicle.historical_data as VehicleHistoricalData;
       
       // Create a summary of what was found
       const summary = [];
