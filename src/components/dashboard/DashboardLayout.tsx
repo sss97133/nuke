@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ProfessionalDashboard } from './ProfessionalDashboard';
+import { supabase } from "@/integrations/supabase/client";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
