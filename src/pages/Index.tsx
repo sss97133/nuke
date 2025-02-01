@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { SystemStatus } from "@/components/dashboard/SystemStatus";
 import { useQuery } from "@tanstack/react-query";
 
 const Index = () => {
@@ -248,19 +249,7 @@ const Index = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {/* System Status */}
-          <div className="border border-gov-blue p-2">
-            <div className="text-tiny text-[#666] border-b border-gov-blue pb-1 mb-1">
-              SYS_STATUS
-            </div>
-            <div className="grid grid-cols-2 gap-1 text-tiny">
-              <span>CONN:</span>
-              <span className="text-green-600">ACTIVE</span>
-              <span>LATENCY:</span>
-              <span>12ms</span>
-              <span>UPTIME:</span>
-              <span>99.9%</span>
-            </div>
-          </div>
+          <SystemStatus />
 
           {/* Vehicle Summary */}
           <div className="border border-gov-blue p-2">
@@ -329,7 +318,7 @@ const Index = () => {
         <div className="text-tiny text-[#666] border-t border-gov-blue mt-4 pt-2">
           <div className="flex justify-between">
             <span>LAST_UPDATE: {new Date().toISOString()}</span>
-            <span>MEM_USAGE: 45%</span>
+            <span>MEM_USAGE: {Math.round(performance.memory?.usedJSHeapSize / 1024 / 1024 || 0)}MB</span>
           </div>
         </div>
       </main>
