@@ -55,32 +55,12 @@ export const UserProfile = () => {
       }
 
       if (data?.social_links) {
-        setSocialLinks(data.social_links as SocialLinks);
+        setSocialLinks(data.social_links as unknown as SocialLinks);
       }
       if (data?.streaming_links) {
-        setStreamingLinks(data.streaming_links as StreamingLinks);
+        setStreamingLinks(data.streaming_links as unknown as StreamingLinks);
       }
       
-      return data;
-    },
-  });
-
-  const { data: achievements } = useQuery({
-    queryKey: ['achievements'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_achievements')
-        .select('*')
-        .order('earned_at', { ascending: false });
-      
-      if (error) {
-        toast({
-          title: 'Error loading achievements',
-          description: error.message,
-          variant: 'destructive',
-        });
-        throw error;
-      }
       return data;
     },
   });
@@ -91,7 +71,9 @@ export const UserProfile = () => {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ social_links: socialLinks })
+      .update({ 
+        social_links: socialLinks as unknown as Record<string, unknown>
+      })
       .eq('id', user.id);
 
     if (error) {
@@ -116,7 +98,9 @@ export const UserProfile = () => {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ streaming_links: streamingLinks })
+      .update({ 
+        streaming_links: streamingLinks as unknown as Record<string, unknown>
+      })
       .eq('id', user.id);
 
     if (error) {
@@ -207,7 +191,7 @@ export const UserProfile = () => {
           </div>
           <Button 
             onClick={handleSocialLinksUpdate}
-            className="mt-3 bg-[#000066] hover:bg-[#000044] text-tiny font-mono"
+            className="mt-3 bg-[#000066] hover:bg-[#000044] text-white text-tiny font-mono"
           >
             UPDATE_SOCIAL_LINKS
           </Button>
@@ -240,7 +224,7 @@ export const UserProfile = () => {
           </div>
           <Button 
             onClick={handleStreamingLinksUpdate}
-            className="mt-3 bg-[#000066] hover:bg-[#000044] text-tiny font-mono"
+            className="mt-3 bg-[#000066] hover:bg-[#000044] text-white text-tiny font-mono"
           >
             UPDATE_STREAMING_LINKS
           </Button>
