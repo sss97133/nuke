@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Calendar, DollarSign, Wrench, Car } from "lucide-react";
+import { useState } from "react";
 import type { VehicleHistoricalData } from "@/types/inventory";
 
 interface VehicleHistoryProps {
@@ -9,6 +10,25 @@ interface VehicleHistoryProps {
 }
 
 export const VehicleHistory = ({ historicalData, onSearch, isSearching }: VehicleHistoryProps) => {
+  const [expandedSections, setExpandedSections] = useState<{
+    sales: boolean;
+    modifications: boolean;
+    history: boolean;
+    condition: boolean;
+  }>({
+    sales: false,
+    modifications: false,
+    history: false,
+    condition: false,
+  });
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   if (!historicalData) {
     return (
       <div className="space-y-4">
@@ -45,58 +65,114 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
       </div>
 
       {historicalData.previousSales && historicalData.previousSales.length > 0 && (
-        <div className="bg-white rounded-lg border p-4 shadow-sm">
-          <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">
-            Previous Sales History ({historicalData.previousSales.length})
-          </h4>
-          <div className="space-y-3">
-            {historicalData.previousSales.map((sale, index) => (
-              <div key={index} className="bg-gray-50 p-4 rounded-md border">
-                <p className="font-mono text-sm mb-1">
-                  <span className="font-semibold">Date:</span> {sale.date || 'N/A'}
-                </p>
-                <p className="font-mono text-sm mb-1">
-                  <span className="font-semibold">Price:</span> {sale.price || 'N/A'}
-                </p>
-                {sale.source && (
-                  <p className="font-mono text-sm">
-                    <span className="font-semibold">Source:</span> {sale.source}
-                  </p>
-                )}
-              </div>
-            ))}
+        <div 
+          className="bg-white rounded-lg border p-4 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+          onClick={() => toggleSection('sales')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-[#283845]" />
+              <h4 className="font-mono text-sm font-semibold text-[#283845]">
+                Previous Sales ({historicalData.previousSales.length})
+              </h4>
+            </div>
+            {expandedSections.sales ? (
+              <ChevronUp className="h-4 w-4 text-[#283845]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[#283845]" />
+            )}
           </div>
+          
+          {expandedSections.sales && (
+            <div className="mt-3 space-y-3">
+              {historicalData.previousSales.map((sale, index) => (
+                <div key={index} className="bg-gray-50 p-3 rounded-md border text-sm font-mono">
+                  {sale.date && <div className="flex items-center gap-2"><Calendar className="h-3 w-3" /> {sale.date}</div>}
+                  {sale.price && <div className="flex items-center gap-2"><DollarSign className="h-3 w-3" /> {sale.price}</div>}
+                  {sale.source && <div className="text-muted-foreground text-xs mt-1">Source: {sale.source}</div>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {historicalData.modifications && historicalData.modifications.length > 0 && (
-        <div className="bg-white rounded-lg border p-4 shadow-sm">
-          <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">
-            Vehicle Modifications ({historicalData.modifications.length})
-          </h4>
-          <ul className="list-disc list-inside space-y-2">
-            {historicalData.modifications.map((mod, index) => (
-              <li key={index} className="font-mono text-sm pl-2">{mod}</li>
-            ))}
-          </ul>
+        <div 
+          className="bg-white rounded-lg border p-4 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+          onClick={() => toggleSection('modifications')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-[#283845]" />
+              <h4 className="font-mono text-sm font-semibold text-[#283845]">
+                Modifications ({historicalData.modifications.length})
+              </h4>
+            </div>
+            {expandedSections.modifications ? (
+              <ChevronUp className="h-4 w-4 text-[#283845]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[#283845]" />
+            )}
+          </div>
+          
+          {expandedSections.modifications && (
+            <ul className="mt-3 space-y-2 list-disc list-inside">
+              {historicalData.modifications.map((mod, index) => (
+                <li key={index} className="font-mono text-sm pl-2">{mod}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
       {historicalData.notableHistory && (
-        <div className="bg-white rounded-lg border p-4 shadow-sm">
-          <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">Notable History</h4>
-          <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded-md border">
-            {historicalData.notableHistory}
-          </p>
+        <div 
+          className="bg-white rounded-lg border p-4 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+          onClick={() => toggleSection('history')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Car className="h-4 w-4 text-[#283845]" />
+              <h4 className="font-mono text-sm font-semibold text-[#283845]">Notable History</h4>
+            </div>
+            {expandedSections.history ? (
+              <ChevronUp className="h-4 w-4 text-[#283845]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[#283845]" />
+            )}
+          </div>
+          
+          {expandedSections.history && (
+            <p className="mt-3 font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md border">
+              {historicalData.notableHistory}
+            </p>
+          )}
         </div>
       )}
 
       {historicalData.conditionNotes && (
-        <div className="bg-white rounded-lg border p-4 shadow-sm">
-          <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">Condition Assessment</h4>
-          <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded-md border">
-            {historicalData.conditionNotes}
-          </p>
+        <div 
+          className="bg-white rounded-lg border p-4 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+          onClick={() => toggleSection('condition')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-[#283845]" />
+              <h4 className="font-mono text-sm font-semibold text-[#283845]">Condition Assessment</h4>
+            </div>
+            {expandedSections.condition ? (
+              <ChevronUp className="h-4 w-4 text-[#283845]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[#283845]" />
+            )}
+          </div>
+          
+          {expandedSections.condition && (
+            <p className="mt-3 font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md border">
+              {historicalData.conditionNotes}
+            </p>
+          )}
         </div>
       )}
     </div>
