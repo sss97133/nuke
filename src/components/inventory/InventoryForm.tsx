@@ -43,9 +43,9 @@ const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => 
 
       if (error) throw error;
 
-      // Check if result is an array and has items
+      // Safely access the classification result
       const detectedLabel = Array.isArray(result) && result.length > 0 
-        ? result[0].label || 'Unknown'
+        ? (result[0] as { label?: string, score?: number }).label || 'Unknown'
         : 'Unknown';
 
       toast({

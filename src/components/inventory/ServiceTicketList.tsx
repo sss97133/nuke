@@ -4,64 +4,49 @@ import { supabase } from "@/lib/supabaseClient";
 import type { ServiceTicket } from "@/types/inventory";
 
 export const ServiceTicketList = () => {
-  const { toast } = useToast();
   const [tickets, setTickets] = useState<ServiceTicket[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    fetchTickets();
-  }, []);
-
-  const fetchTickets = async () => {
-    try {
+    const fetchTickets = async () => {
       const { data, error } = await supabase
         .from("service_tickets")
-        .select("*")
-        .order("createdAt", { ascending: false });
+        .select("*");
 
-      if (error) throw error;
+      if (error) {
+        toast({
+          title: "Error fetching service tickets",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
       setTickets(data || []);
-    } catch (error) {
-      toast({
-        title: "Error fetching service tickets",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  if (loading) {
-    return <div className="text-center p-4">Loading service tickets...</div>;
-  }
+    fetchTickets();
+  }, [toast]);
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-mono text-[#283845] mb-4">Service Tickets</h2>
+    <div className="space-y-4 max-w-4xl mx-auto bg-[#F4F1DE] p-8 border border-[#283845]">
+      <h2 className="text-2xl text-[#283845] uppercase tracking-wider text-center">Service Tickets</h2>
       <div className="grid gap-4">
         {tickets.map((ticket) => (
-          <div
-            key={ticket.id}
-            className="p-4 border border-[#283845] bg-[#F4F1DE]"
-          >
+          <div key={ticket.id} className="p-4 border border-[#283845] bg-white">
             <div className="flex justify-between items-start">
               <h3 className="font-mono text-lg">Ticket #{ticket.id}</h3>
-              <span
-                className={`px-2 py-1 text-xs rounded ${
-                  ticket.status === "completed"
-                    ? "bg-green-100 text-green-800"
-                    : ticket.status === "in-progress"
-                    ? "bg-blue-100 text-blue-800"
-                    : "bg-yellow-100 text-yellow-800"
-                }`}
-              >
-                {ticket.status}
+              <span className={`px-2 py-1 text-xs rounded ${
+                ticket.status === 'completed' ? 'bg-green-100 text-green-800' :
+                ticket.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                ticket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {ticket.status.toUpperCase()}
               </span>
             </div>
             <p className="mt-2">{ticket.description}</p>
-            <div className="mt-2 text-sm text-[#9B2915]">
-              Priority: {ticket.priority}
-            </div>
+            <p className="text-sm text-[#9B2915] mt-2">Priority: {ticket.priority}</p>
           </div>
         ))}
       </div>
