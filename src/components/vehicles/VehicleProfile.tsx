@@ -96,14 +96,34 @@ export const VehicleProfile = () => {
 
       if (fetchError) throw fetchError;
 
+      const historicalData = updatedVehicle.historical_data;
+      
+      // Create a summary of what was found
+      const summary = [];
+      if (historicalData?.previousSales?.length) {
+        summary.push(`${historicalData.previousSales.length} previous sales`);
+      }
+      if (historicalData?.modifications?.length) {
+        summary.push(`${historicalData.modifications.length} modifications`);
+      }
+      if (historicalData?.notableHistory) {
+        summary.push("notable history");
+      }
+      if (historicalData?.conditionNotes) {
+        summary.push("condition notes");
+      }
+
       setVehicle(prev => prev ? {
         ...prev,
-        historical_data: updatedVehicle.historical_data
+        historical_data: historicalData
       } : null);
 
       toast({
-        title: "Success",
-        description: "Vehicle history has been updated",
+        title: "Vehicle History Updated",
+        description: summary.length > 0 
+          ? `Found: ${summary.join(", ")}`
+          : "No significant historical data found for this vehicle",
+        variant: summary.length > 0 ? "default" : "destructive",
       });
     } catch (error) {
       console.error('Error searching vehicle history:', error);
@@ -124,20 +144,22 @@ export const VehicleProfile = () => {
     return (
       <div className="space-y-4">
         {data.previousSales && data.previousSales.length > 0 && (
-          <div>
-            <h4 className="font-mono text-sm font-semibold mb-2">Previous Sales</h4>
-            <div className="space-y-2">
+          <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">
+              Previous Sales History ({data.previousSales.length})
+            </h4>
+            <div className="space-y-3">
               {data.previousSales.map((sale: any, index: number) => (
-                <div key={index} className="bg-gray-50 p-3 rounded-md">
-                  <p className="font-mono text-sm">
-                    Date: {sale.date || 'N/A'}
+                <div key={index} className="bg-gray-50 p-4 rounded-md border">
+                  <p className="font-mono text-sm mb-1">
+                    <span className="font-semibold">Date:</span> {sale.date || 'N/A'}
                   </p>
-                  <p className="font-mono text-sm">
-                    Price: {sale.price || 'N/A'}
+                  <p className="font-mono text-sm mb-1">
+                    <span className="font-semibold">Price:</span> {sale.price || 'N/A'}
                   </p>
                   {sale.source && (
                     <p className="font-mono text-sm">
-                      Source: {sale.source}
+                      <span className="font-semibold">Source:</span> {sale.source}
                     </p>
                   )}
                 </div>
@@ -147,29 +169,31 @@ export const VehicleProfile = () => {
         )}
 
         {data.modifications && data.modifications.length > 0 && (
-          <div>
-            <h4 className="font-mono text-sm font-semibold mb-2">Modifications</h4>
-            <ul className="list-disc list-inside space-y-1">
+          <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">
+              Vehicle Modifications ({data.modifications.length})
+            </h4>
+            <ul className="list-disc list-inside space-y-2">
               {data.modifications.map((mod: string, index: number) => (
-                <li key={index} className="font-mono text-sm">{mod}</li>
+                <li key={index} className="font-mono text-sm pl-2">{mod}</li>
               ))}
             </ul>
           </div>
         )}
 
         {data.notableHistory && (
-          <div>
-            <h4 className="font-mono text-sm font-semibold mb-2">Notable History</h4>
-            <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md">
+          <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">Notable History</h4>
+            <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded-md border">
               {data.notableHistory}
             </p>
           </div>
         )}
 
         {data.conditionNotes && (
-          <div>
-            <h4 className="font-mono text-sm font-semibold mb-2">Condition Notes</h4>
-            <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md">
+          <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">Condition Assessment</h4>
+            <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded-md border">
               {data.conditionNotes}
             </p>
           </div>
