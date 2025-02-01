@@ -39,32 +39,31 @@ serve(async (req) => {
     const { vehicleData } = await req.json() as { vehicleData: VehicleData };
     console.log('Analyzing vehicle data:', JSON.stringify(vehicleData, null, 2));
 
-    const prompt = `As a classic car expert, analyze this vehicle:
-    ${vehicleData.year} ${vehicleData.make} ${vehicleData.model}
-    
-    Historical Data:
-    ${JSON.stringify(vehicleData.historical_data, null, 2)}
-    
-    Provide a detailed market analysis including:
-    1. What makes this vehicle special or unique
-    2. Current market position and value trends
-    3. Comparable sales analysis
-    4. Investment potential
-    5. Key factors affecting value
-    
-    Format the response as JSON with these fields:
+    const prompt = `Analyze this vehicle as a classic car expert and return ONLY a valid JSON object (no additional text) with this exact structure:
     {
-      "marketAnalysis": string (overall market position),
-      "uniqueFeatures": string[] (list of special attributes),
-      "valueFactors": string[] (key elements affecting price),
-      "investmentOutlook": string (future value prediction),
+      "marketAnalysis": "string describing overall market position",
+      "uniqueFeatures": ["array of strings listing special attributes"],
+      "valueFactors": ["array of strings listing key elements affecting price"],
+      "investmentOutlook": "string with future value prediction",
       "priceAnalysis": {
         "estimatedValue": number,
-        "confidence": number,
-        "trendDirection": "up" | "down" | "stable",
-        "comparableSales": Array<{price: number, date: string, notes: string}>
+        "confidence": number between 0 and 1,
+        "trendDirection": "up" or "down" or "stable",
+        "comparableSales": [
+          {
+            "price": number,
+            "date": "YYYY-MM-DD",
+            "notes": "string"
+          }
+        ]
       }
-    }`;
+    }
+
+    For this vehicle:
+    Make: ${vehicleData.make}
+    Model: ${vehicleData.model}
+    Year: ${vehicleData.year}
+    Historical Data: ${JSON.stringify(vehicleData.historical_data || {}, null, 2)}`;
 
     console.log('Sending request to Perplexity API');
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -78,7 +77,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are an expert classic car appraiser with deep knowledge of market trends and vehicle valuations.'
+            content: 'You are a classic car expert. Respond ONLY with the exact JSON structure requested, no additional text or explanations.'
           },
           {
             role: 'user',
@@ -103,8 +102,17 @@ serve(async (req) => {
     let analysis;
     try {
       const content = data.choices[0].message.content;
-      analysis = JSON.parse(content);
+      // Clean the content string to ensure it only contains the JSON object
+      const jsonStr = content.trim().replace(/```json\n?|\n?```/g, '').trim();
+      console.log('Cleaned JSON string:', jsonStr);
+      analysis = JSON.parse(jsonStr);
       console.log('Parsed analysis:', JSON.stringify(analysis, null, 2));
+
+      // Validate the analysis structure
+      if (!analysis.marketAnalysis || !analysis.uniqueFeatures || !analysis.valueFactors || 
+          !analysis.investmentOutlook || !analysis.priceAnalysis) {
+        throw new Error('Invalid analysis structure');
+      }
     } catch (error) {
       console.error('Error parsing AI response:', error);
       console.error('Raw content:', data.choices[0]?.message?.content);
