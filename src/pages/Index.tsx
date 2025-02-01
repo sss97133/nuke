@@ -122,31 +122,41 @@ const Index = () => {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF5]">
-        <div className="text-center space-y-4 w-full max-w-md p-6 border border-gray-200 shadow-sm bg-white">
-          <h1 className="text-2xl font-mono text-[#283845] tracking-tight">
-            Technical Asset Management System
-          </h1>
-          <p className="text-[#666] text-sm font-mono">Authentication Required</p>
-          <div className="space-y-4">
-            <Input
-              type="tel"
-              placeholder="Phone Number (Format: +1234567890)"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="font-mono text-sm"
-              disabled={isLoading}
-            />
+      <div className="min-h-screen flex items-center justify-center bg-paper font-system">
+        <div className="text-center space-y-4 w-full max-w-md p-6 border-2 border-gov-blue bg-white">
+          <div className="border-b-2 border-gov-blue pb-4">
+            <h1 className="text-doc text-gov-blue">
+              FORM SF-AUTH
+            </h1>
+            <p className="text-tiny text-gray-600">
+              TECHNICAL ASSET MANAGEMENT SYSTEM (TAMS) ACCESS REQUEST
+            </p>
+          </div>
+
+          <div className="space-y-4 text-left">
+            <div>
+              <p className="text-tiny mb-2">SECTION 1 - AUTHENTICATION REQUIREMENTS</p>
+              <Input
+                type="tel"
+                placeholder="TELEPHONE NUMBER (Format: +1234567890)"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="font-system text-doc"
+                disabled={isLoading}
+              />
+            </div>
+
             {!showOtpInput ? (
               <Button
                 onClick={handleSendOtp}
-                className="w-full bg-[#283845] text-white font-mono text-sm hover:bg-[#1a2830] transition-colors"
+                className="w-full bg-gov-blue text-white font-system text-doc hover:bg-blue-900 transition-colors"
                 disabled={isLoading || !phoneNumber.trim()}
               >
-                {isLoading ? "Processing..." : "Request Authentication Code"}
+                {isLoading ? "PROCESSING..." : "REQUEST AUTHENTICATION CODE"}
               </Button>
             ) : (
               <div className="space-y-4">
+                <p className="text-tiny">SECTION 2 - VERIFICATION CODE ENTRY</p>
                 <InputOTP
                   maxLength={6}
                   value={otp}
@@ -155,23 +165,27 @@ const Index = () => {
                   render={({ slots }) => (
                     <InputOTPGroup className="gap-2 justify-center">
                       {slots.map((slot, idx) => (
-                        <InputOTPSlot key={idx} index={idx} className="font-mono" />
+                        <InputOTPSlot key={idx} index={idx} className="font-system" />
                       ))}
                     </InputOTPGroup>
                   )}
                 />
                 <Button
                   onClick={handleVerifyOtp}
-                  className="w-full bg-[#283845] text-white font-mono text-sm hover:bg-[#1a2830] transition-colors"
+                  className="w-full bg-gov-blue text-white font-system text-doc hover:bg-blue-900 transition-colors"
                   disabled={isLoading || otp.length !== 6}
                 >
-                  {isLoading ? "Verifying..." : "Verify Authentication Code"}
+                  {isLoading ? "VERIFYING..." : "SUBMIT VERIFICATION CODE"}
                 </Button>
               </div>
             )}
-            <p className="text-xs text-gray-500 font-mono">
-              System requires valid phone number with country code
-            </p>
+          </div>
+
+          <div className="text-tiny text-left text-gray-600 border-t-2 border-gov-blue pt-4">
+            <p>NOTICE:</p>
+            <p>1. Valid telephone number with country code required.</p>
+            <p>2. This is a U.S. Government system. Unauthorized access prohibited.</p>
+            <p>3. All activities may be monitored and recorded.</p>
           </div>
         </div>
       </div>

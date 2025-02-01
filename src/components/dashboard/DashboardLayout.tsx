@@ -11,49 +11,64 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   return (
-    <div className="min-h-screen bg-[#FAFAF5]">
-      <header className="border-b border-gray-200 bg-white">
+    <div className="min-h-screen bg-paper font-system">
+      <header className="border-b-2 border-gov-blue bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-12">
             <div className="flex items-center space-x-4">
-              <h1 className="font-mono text-lg text-[#283845] tracking-tight">TAMS/v1.0</h1>
-              <span className="text-xs text-gray-500 font-mono">Technical Asset Management System</span>
+              <h1 className="text-doc text-gov-blue">
+                TAMS/v1.0 [Technical Asset Management System]
+              </h1>
+              <span className="text-tiny text-gray-600">
+                OMB Control No. 1234-5678
+              </span>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-xs text-gray-500 font-mono">Session Active</span>
+              <span className="text-tiny">Session ID: {new Date().getTime()}</span>
               <button
                 onClick={() => supabase.auth.signOut()}
-                className="px-3 py-1 bg-[#F5F5F5] text-[#333] text-sm font-mono hover:bg-[#E5E5E5] transition-colors border border-gray-200"
+                className="px-2 py-1 bg-gray-100 text-tiny hover:bg-gray-200 transition-colors border border-gray-400"
               >
-                Terminate Session
+                TERMINATE SESSION
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="mb-4 text-tiny">
+          <p>PAPERWORK REDUCTION ACT STATEMENT</p>
+          <p className="text-gray-600">
+            The information collected on this form is required for the proper management of technical assets.
+          </p>
+        </div>
+
         <Tabs defaultValue="inventory" className="w-full">
-          <TabsList className="w-full border-b border-gray-200 mb-6 bg-transparent">
+          <TabsList className="w-full border-b-2 border-gov-blue mb-4 bg-transparent">
             <TabsTrigger 
               value="inventory" 
-              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
+              className="text-doc data-[state=active]:border-b-2 data-[state=active]:border-gov-blue"
             >
-              Inventory Management
+              Form TAMS-1: Inventory Management
             </TabsTrigger>
             <TabsTrigger 
               value="vehicles" 
-              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
+              className="text-doc data-[state=active]:border-b-2 data-[state=active]:border-gov-blue"
             >
-              Vehicle Registry
+              Form TAMS-2: Vehicle Registry
             </TabsTrigger>
             <TabsTrigger 
               value="service" 
-              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
+              className="text-doc data-[state=active]:border-b-2 data-[state=active]:border-gov-blue"
             >
-              Service Records
+              Form TAMS-3: Service Records
             </TabsTrigger>
           </TabsList>
+
+          <div className="text-tiny mb-4 text-gray-600">
+            For assistance with this form, contact the TAMS Help Desk at 1-800-TAMS-HELP
+          </div>
 
           <TabsContent value="inventory">
             <InventoryForm />
@@ -68,6 +83,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </TabsContent>
         </Tabs>
         {children}
+
+        <footer className="mt-8 text-tiny text-gray-600 border-t border-gray-300 pt-4">
+          <p>Privacy Act Notice: The information provided on this form is protected under the Privacy Act of 1974.</p>
+          <p>Burden Hours: Public reporting burden for this collection of information is estimated to average 0.5 hours per response.</p>
+        </footer>
       </main>
     </div>
   );

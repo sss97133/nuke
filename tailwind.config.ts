@@ -60,8 +60,20 @@ export default {
 					accent: 'hsl(var(--sidebar-accent))',
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
+					ring: 'hsl(var(--sidebar-ring))',
+					'gov-blue': '#000066',
+					'gov-link': '#0000EE',
+					'gov-visited': '#551A8B',
+					'paper': '#FFFFF0',
 				}
+			},
+			fontSize: {
+				'xs': ['0.75rem', '1rem'],
+				'tiny': ['0.625rem', '0.875rem'],
+				'doc': ['0.8125rem', '1.25rem'],
+			},
+			fontFamily: {
+				'system': ['Courier New', 'Courier', 'monospace'],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
