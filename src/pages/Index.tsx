@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InventoryForm } from "@/components/inventory/InventoryForm";
 import { VehicleList } from "@/components/inventory/VehicleList";
 import { ServiceTicketList } from "@/components/inventory/ServiceTicketList";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
