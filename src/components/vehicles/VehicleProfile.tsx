@@ -9,6 +9,7 @@ import { VehicleDetails } from "./VehicleDetails";
 import { RecordDetails } from "./RecordDetails";
 import { LoadingState } from "./LoadingState";
 import { VehicleHeader } from "./VehicleHeader";
+import { MarketAnalysis } from "./MarketAnalysis";
 
 export const VehicleProfile = () => {
   const { id } = useParams();
@@ -140,7 +141,7 @@ export const VehicleProfile = () => {
     <div className="container mx-auto p-6 max-w-4xl">
       <Card className="border-[#283845]">
         <VehicleHeader vehicle={vehicle} />
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-8">
           <VehicleDetails vehicle={vehicle} />
           
           <div className="pt-4 border-t border-[#283845]">
@@ -149,6 +150,10 @@ export const VehicleProfile = () => {
               onSearch={searchVehicleHistory}
               isSearching={searching}
             />
+          </div>
+
+          <div className="pt-4 border-t border-[#283845]">
+            <MarketAnalysis vehicleData={vehicle} />
           </div>
 
           <RecordDetails 
