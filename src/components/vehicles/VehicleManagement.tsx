@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { VehicleList } from "@/components/inventory/VehicleList";
 import { VehicleForm } from "./VehicleForm";
-import { MarketDataCollector } from "@/components/market/MarketDataCollector";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const VehicleManagement = () => {
   const [showForm, setShowForm] = useState(false);
@@ -23,22 +21,7 @@ export const VehicleManagement = () => {
         </Button>
       </div>
 
-      {showForm ? (
-        <VehicleForm />
-      ) : (
-        <Tabs defaultValue="list" className="w-full">
-          <TabsList className="w-full mb-4">
-            <TabsTrigger value="list" className="flex-1">Vehicle List</TabsTrigger>
-            <TabsTrigger value="market" className="flex-1">Market Analysis</TabsTrigger>
-          </TabsList>
-          <TabsContent value="list">
-            <VehicleList />
-          </TabsContent>
-          <TabsContent value="market">
-            <MarketDataCollector />
-          </TabsContent>
-        </Tabs>
-      )}
+      {showForm ? <VehicleForm /> : <VehicleList />}
     </div>
   );
 };
