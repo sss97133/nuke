@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import type { ServiceTicket } from "@/types/inventory";
 
 export const ServiceTicketList = () => {

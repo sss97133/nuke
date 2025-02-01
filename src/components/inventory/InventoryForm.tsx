@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { pipeline } from "@huggingface/transformers";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 export const InventoryForm = () => {
   const { toast } = useToast();
@@ -185,3 +185,4 @@ const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => 
     </form>
   );
 };
+
