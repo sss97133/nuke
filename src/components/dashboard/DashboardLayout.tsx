@@ -3,8 +3,13 @@ import { InventoryForm } from "@/components/inventory/InventoryForm";
 import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
 import { supabase } from "@/integrations/supabase/client";
+import { ReactNode } from "react";
 
-export const DashboardLayout = () => {
+interface DashboardLayoutProps {
+  children?: ReactNode;
+}
+
+export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   return (
     <div className="min-h-screen bg-[#FAFAF5]">
       <header className="border-b border-gray-200 bg-white">
@@ -62,6 +67,7 @@ export const DashboardLayout = () => {
             <ServiceManagement />
           </TabsContent>
         </Tabs>
+        {children}
       </main>
     </div>
   );
