@@ -7,6 +7,36 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import type { Vehicle } from "@/types/inventory";
 import { Loader2 } from "lucide-react";
 
+interface VehicleHistory {
+  previousSales?: Array<{
+    date?: string;
+    price?: string;
+    source?: string;
+  }>;
+  modifications?: string[];
+  notableHistory?: string;
+  conditionNotes?: string;
+}
+
+export const VehicleProfile = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+Let me help you clean up the display of the historical data in the VehicleProfile component. The issue is that the raw JSON response from the Perplexity API might contain HTML tags or unformatted content. We'll format it properly and display it in a more structured way.
+
+<lov-code>
+Let's update the VehicleProfile component to better format and display the historical data:
+
+<lov-write file_path="src/components/vehicles/VehicleProfile.tsx">
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import type { Vehicle } from "@/types/inventory";
+import { Loader2 } from "lucide-react";
+
 export const VehicleProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -106,6 +136,67 @@ export const VehicleProfile = () => {
     }
   };
 
+  const renderHistoricalData = () => {
+    if (!vehicle?.historical_data) return null;
+
+    const data = vehicle.historical_data;
+    return (
+      <div className="space-y-4">
+        {data.previousSales && data.previousSales.length > 0 && (
+          <div>
+            <h4 className="font-mono text-sm font-semibold mb-2">Previous Sales</h4>
+            <div className="space-y-2">
+              {data.previousSales.map((sale: any, index: number) => (
+                <div key={index} className="bg-gray-50 p-3 rounded-md">
+                  <p className="font-mono text-sm">
+                    Date: {sale.date || 'N/A'}
+                  </p>
+                  <p className="font-mono text-sm">
+                    Price: {sale.price || 'N/A'}
+                  </p>
+                  {sale.source && (
+                    <p className="font-mono text-sm">
+                      Source: {sale.source}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {data.modifications && data.modifications.length > 0 && (
+          <div>
+            <h4 className="font-mono text-sm font-semibold mb-2">Modifications</h4>
+            <ul className="list-disc list-inside space-y-1">
+              {data.modifications.map((mod: string, index: number) => (
+                <li key={index} className="font-mono text-sm">{mod}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {data.notableHistory && (
+          <div>
+            <h4 className="font-mono text-sm font-semibold mb-2">Notable History</h4>
+            <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md">
+              {data.notableHistory}
+            </p>
+          </div>
+        )}
+
+        {data.conditionNotes && (
+          <div>
+            <h4 className="font-mono text-sm font-semibold mb-2">Condition Notes</h4>
+            <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md">
+              {data.conditionNotes}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -164,11 +255,7 @@ export const VehicleProfile = () => {
               </Button>
             </div>
             {vehicle.historical_data ? (
-              <div className="bg-gray-50 p-4 rounded-md">
-                <pre className="font-mono text-sm whitespace-pre-wrap">
-                  {JSON.stringify(vehicle.historical_data, null, 2)}
-                </pre>
-              </div>
+              renderHistoricalData()
             ) : (
               <p className="text-sm text-muted-foreground font-mono">
                 No historical data available. Click "Search History" to find information about this vehicle.
