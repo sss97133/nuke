@@ -8,6 +8,16 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { SystemStatus } from "@/components/dashboard/SystemStatus";
 import { useQuery } from "@tanstack/react-query";
 
+// Type guard for memory API
+const getMemoryUsage = (): number => {
+  // @ts-ignore - performance.memory exists in Chrome
+  if (performance && performance.memory) {
+    // @ts-ignore - accessing memory property
+    return Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+  }
+  return 0;
+};
+
 const Index = () => {
   const { toast } = useToast();
   const [session, setSession] = useState(null);
@@ -318,7 +328,7 @@ const Index = () => {
         <div className="text-tiny text-[#666] border-t border-gov-blue mt-4 pt-2">
           <div className="flex justify-between">
             <span>LAST_UPDATE: {new Date().toISOString()}</span>
-            <span>MEM_USAGE: {Math.round(performance.memory?.usedJSHeapSize / 1024 / 1024 || 0)}MB</span>
+            <span>MEM_USAGE: {getMemoryUsage()}MB</span>
           </div>
         </div>
       </main>
