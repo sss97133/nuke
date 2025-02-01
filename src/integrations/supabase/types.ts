@@ -145,6 +145,7 @@ export type Database = {
       }
       vehicles: {
         Row: {
+          bulk_upload_batch_id: string | null
           created_at: string
           id: string
           make: string
@@ -153,9 +154,13 @@ export type Database = {
           updated_at: string
           user_id: string | null
           vin: string | null
+          vin_image_url: string | null
+          vin_processing_status: string | null
+          vin_verification_data: Json | null
           year: number
         }
         Insert: {
+          bulk_upload_batch_id?: string | null
           created_at?: string
           id?: string
           make: string
@@ -164,9 +169,13 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           vin?: string | null
+          vin_image_url?: string | null
+          vin_processing_status?: string | null
+          vin_verification_data?: Json | null
           year: number
         }
         Update: {
+          bulk_upload_batch_id?: string | null
           created_at?: string
           id?: string
           make?: string
@@ -175,7 +184,46 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           vin?: string | null
+          vin_image_url?: string | null
+          vin_processing_status?: string | null
+          vin_verification_data?: Json | null
           year?: number
+        }
+        Relationships: []
+      }
+      vin_processing_jobs: {
+        Row: {
+          batch_data: Json | null
+          created_at: string
+          failed_vins: number
+          id: string
+          processed_vins: number
+          status: string
+          total_vins: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          batch_data?: Json | null
+          created_at?: string
+          failed_vins?: number
+          id?: string
+          processed_vins?: number
+          status?: string
+          total_vins?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          batch_data?: Json | null
+          created_at?: string
+          failed_vins?: number
+          id?: string
+          processed_vins?: number
+          status?: string
+          total_vins?: number
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
