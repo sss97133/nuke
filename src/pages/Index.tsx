@@ -149,20 +149,22 @@ const Index = () => {
                 {isLoading ? "Sending..." : "Send OTP"}
               </Button>
             ) : (
-              <>
-                <InputOTP
-                  value={otp}
-                  onChange={setOtp}
-                  maxLength={6}
-                  disabled={isLoading}
-                  render={({ slots }) => (
-                    <InputOTPGroup>
-                      {Array.from({ length: 6 }, (_, i) => (
-                        <InputOTPSlot key={i} index={i} />
-                      ))}
-                    </InputOTPGroup>
-                  )}
-                />
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  <InputOTP
+                    value={otp}
+                    onChange={setOtp}
+                    maxLength={6}
+                    disabled={isLoading}
+                    render={({ slots }) => (
+                      <InputOTPGroup className="gap-2">
+                        {slots.map((slot, index) => (
+                          <InputOTPSlot key={index} index={index} />
+                        ))}
+                      </InputOTPGroup>
+                    )}
+                  />
+                </div>
                 <Button
                   onClick={handleVerifyOtp}
                   className="w-full bg-[#283845] text-white font-mono hover:bg-[#1a2830] transition-colors"
@@ -170,7 +172,7 @@ const Index = () => {
                 >
                   {isLoading ? "Verifying..." : "Verify OTP"}
                 </Button>
-              </>
+              </div>
             )}
             <p className="text-sm text-gray-600">
               Enter your phone number with country code (e.g., +1 for US numbers)

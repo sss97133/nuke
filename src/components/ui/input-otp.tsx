@@ -4,12 +4,6 @@ import { Dot } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-interface OTPSlot {
-  char: string | undefined
-  hasFakeCaret: boolean
-  isActive: boolean
-}
-
 const InputOTP = React.forwardRef<
   React.ElementRef<typeof OTPInput>,
   React.ComponentPropsWithoutRef<typeof OTPInput>
@@ -39,8 +33,8 @@ const InputOTPSlot = React.forwardRef<
   React.ComponentPropsWithoutRef<"div"> & { index: number }
 >(({ index, className, ...props }, ref) => {
   const inputOTPContext = React.useContext(OTPInputContext)
-  const { slots = [], isFocused = false } = inputOTPContext || {}
-  const slot = (slots[index] || {}) as OTPSlot
+  const { slots = [], isFocused, handleChange } = inputOTPContext || {}
+  const slot = slots[index] || {}
 
   return (
     <div
@@ -53,7 +47,7 @@ const InputOTPSlot = React.forwardRef<
       )}
       {...props}
     >
-      {slot.char}
+      {slot.char || ""}
       {slot.hasFakeCaret && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
