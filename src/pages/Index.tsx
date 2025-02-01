@@ -32,17 +32,13 @@ const Index = () => {
   }, []);
 
   const formatPhoneNumber = (phone: string) => {
-    // Remove any non-digit characters
     const cleaned = phone.replace(/\D/g, "");
-    // Add +1 prefix if not present and it's a US number
     if (cleaned.length === 10) {
       return `+1${cleaned}`;
     }
-    // If number already has country code (starts with +), return as is
     if (phone.startsWith("+")) {
       return cleaned;
     }
-    // Default case, just add + prefix
     return `+${cleaned}`;
   };
 
@@ -57,8 +53,6 @@ const Index = () => {
 
       if (error) {
         let errorMessage = "Failed to send OTP";
-        
-        // Parse the error response if it's a JSON string
         try {
           const errorBody = JSON.parse(error.message);
           if (errorBody.code === "sms_send_failed") {
@@ -66,7 +60,6 @@ const Index = () => {
             console.error("Detailed error:", errorBody);
           }
         } catch {
-          // If error message isn't JSON, use it directly
           errorMessage = error.message;
         }
 
@@ -164,8 +157,8 @@ const Index = () => {
                   disabled={isLoading}
                   render={({ slots }) => (
                     <InputOTPGroup>
-                      {slots.map((slot, i) => (
-                        <InputOTPSlot key={i} index={i} {...slot} />
+                      {Array.from({ length: 6 }, (_, i) => (
+                        <InputOTPSlot key={i} index={i} />
                       ))}
                     </InputOTPGroup>
                   )}
@@ -229,6 +222,3 @@ const Index = () => {
       </Tabs>
     </div>
   );
-};
-
-export default Index;
