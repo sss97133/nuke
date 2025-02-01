@@ -22,7 +22,22 @@ export const VehicleList = () => {
         return;
       }
 
-      setVehicles(data || []);
+      // Map the Supabase data to match our frontend types
+      const mappedVehicles: Vehicle[] = (data || []).map(vehicle => ({
+        id: vehicle.id,
+        vin: vehicle.vin || undefined,
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+        notes: vehicle.notes || undefined,
+        images: undefined,
+        createdBy: vehicle.user_id || '',
+        updatedBy: vehicle.user_id || '',
+        createdAt: vehicle.created_at,
+        updatedAt: vehicle.updated_at
+      }));
+
+      setVehicles(mappedVehicles);
     };
 
     fetchVehicles();

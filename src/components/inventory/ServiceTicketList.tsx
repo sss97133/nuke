@@ -22,7 +22,21 @@ export const ServiceTicketList = () => {
         return;
       }
 
-      setTickets(data || []);
+      // Map the Supabase data to match our frontend types
+      const mappedTickets: ServiceTicket[] = (data || []).map(ticket => ({
+        id: ticket.id,
+        vehicleId: ticket.vehicle_id || '',
+        status: ticket.status as ServiceTicket['status'],
+        description: ticket.description,
+        priority: ticket.priority as ServiceTicket['priority'],
+        assignedTo: undefined,
+        createdBy: ticket.user_id || '',
+        updatedBy: ticket.user_id || '',
+        createdAt: ticket.created_at,
+        updatedAt: ticket.updated_at
+      }));
+
+      setTickets(mappedTickets);
     };
 
     fetchTickets();
