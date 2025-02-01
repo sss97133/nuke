@@ -1,13 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { UserRound, Award, Star, Trophy } from 'lucide-react';
+import { UserRound, Award, Star, Trophy, Link as LinkIcon, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export const UserProfile = () => {
   const { toast } = useToast();
+  const [socialLinks, setSocialLinks] = useState({
+    twitter: '',
+    instagram: '',
+    linkedin: '',
+    github: ''
+  });
+  const [streamingLinks, setStreamingLinks] = useState({
+    twitch: '',
+    youtube: '',
+    tiktok: ''
+  });
   
-  const { data: profile } = useQuery({
+  const { data: profile, refetch } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -27,6 +40,15 @@ export const UserProfile = () => {
         });
         throw error;
       }
+
+      // Initialize state with existing values
+      if (data.social_links) {
+        setSocialLinks(data.social_links);
+      }
+      if (data.streaming_links) {
+        setStreamingLinks(data.streaming_links);
+      }
+      
       return data;
     },
   });
@@ -50,6 +72,56 @@ export const UserProfile = () => {
       return data;
     },
   });
+
+  const handleSocialLinksUpdate = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ social_links: socialLinks })
+      .eq('id', user.id);
+
+    if (error) {
+      toast({
+        title: 'Error updating social links',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Social links updated',
+      description: 'Your social media links have been updated successfully.',
+    });
+    refetch();
+  };
+
+  const handleStreamingLinksUpdate = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ streaming_links: streamingLinks })
+      .eq('id', user.id);
+
+    if (error) {
+      toast({
+        title: 'Error updating streaming links',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Streaming links updated',
+      description: 'Your streaming platform links have been updated successfully.',
+    });
+    refetch();
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -88,6 +160,80 @@ export const UserProfile = () => {
             </div>
             <p className="text-sidebar-foreground/80">{achievements?.length || 0} earned</p>
           </div>
+        </div>
+
+        {/* Social Media Links Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <LinkIcon className="w-5 h-5 text-sidebar-primary" />
+            <h3 className="text-lg font-semibold text-sidebar-foreground">Social Media Links</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              placeholder="Twitter URL"
+              value={socialLinks.twitter}
+              onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
+              className="bg-sidebar-accent border-sidebar-border"
+            />
+            <Input
+              placeholder="Instagram URL"
+              value={socialLinks.instagram}
+              onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+              className="bg-sidebar-accent border-sidebar-border"
+            />
+            <Input
+              placeholder="LinkedIn URL"
+              value={socialLinks.linkedin}
+              onChange={(e) => setSocialLinks({ ...socialLinks, linkedin: e.target.value })}
+              className="bg-sidebar-accent border-sidebar-border"
+            />
+            <Input
+              placeholder="GitHub URL"
+              value={socialLinks.github}
+              onChange={(e) => setSocialLinks({ ...socialLinks, github: e.target.value })}
+              className="bg-sidebar-accent border-sidebar-border"
+            />
+          </div>
+          <Button 
+            onClick={handleSocialLinksUpdate}
+            className="mt-4 bg-sidebar-primary hover:bg-sidebar-primary/90"
+          >
+            Update Social Links
+          </Button>
+        </div>
+
+        {/* Streaming Platform Links Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Video className="w-5 h-5 text-sidebar-primary" />
+            <h3 className="text-lg font-semibold text-sidebar-foreground">Streaming Platform Links</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              placeholder="Twitch URL"
+              value={streamingLinks.twitch}
+              onChange={(e) => setStreamingLinks({ ...streamingLinks, twitch: e.target.value })}
+              className="bg-sidebar-accent border-sidebar-border"
+            />
+            <Input
+              placeholder="YouTube URL"
+              value={streamingLinks.youtube}
+              onChange={(e) => setStreamingLinks({ ...streamingLinks, youtube: e.target.value })}
+              className="bg-sidebar-accent border-sidebar-border"
+            />
+            <Input
+              placeholder="TikTok URL"
+              value={streamingLinks.tiktok}
+              onChange={(e) => setStreamingLinks({ ...streamingLinks, tiktok: e.target.value })}
+              className="bg-sidebar-accent border-sidebar-border"
+            />
+          </div>
+          <Button 
+            onClick={handleStreamingLinksUpdate}
+            className="mt-4 bg-sidebar-primary hover:bg-sidebar-primary/90"
+          >
+            Update Streaming Links
+          </Button>
         </div>
       </div>
 

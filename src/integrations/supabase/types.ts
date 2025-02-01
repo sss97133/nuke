@@ -159,6 +159,8 @@ export type Database = {
           full_name: string | null
           id: string
           reputation_score: number | null
+          social_links: Json | null
+          streaming_links: Json | null
           updated_at: string
           user_type: Database["public"]["Enums"]["user_type"] | null
           username: string | null
@@ -169,6 +171,8 @@ export type Database = {
           full_name?: string | null
           id: string
           reputation_score?: number | null
+          social_links?: Json | null
+          streaming_links?: Json | null
           updated_at?: string
           user_type?: Database["public"]["Enums"]["user_type"] | null
           username?: string | null
@@ -179,6 +183,8 @@ export type Database = {
           full_name?: string | null
           id?: string
           reputation_score?: number | null
+          social_links?: Json | null
+          streaming_links?: Json | null
           updated_at?: string
           user_type?: Database["public"]["Enums"]["user_type"] | null
           username?: string | null
