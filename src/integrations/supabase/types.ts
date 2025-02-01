@@ -143,6 +143,56 @@ export type Database = {
           },
         ]
       }
+      vehicle_sales_data: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          listing_url: string | null
+          metadata: Json | null
+          sale_date: string | null
+          sale_price: number | null
+          source: string
+          updated_at: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          listing_url?: string | null
+          metadata?: Json | null
+          sale_date?: string | null
+          sale_price?: number | null
+          source: string
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          listing_url?: string | null
+          metadata?: Json | null
+          sale_date?: string | null
+          sale_price?: number | null
+          source?: string
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_sales_data_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicles: {
         Row: {
           bulk_upload_batch_id: string | null
