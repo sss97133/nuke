@@ -7,10 +7,7 @@ const corsHeaders = {
 };
 
 interface RequestBody {
-  vin?: string;
-  make?: string;
-  model?: string;
-  year?: number;
+  vehicleId: string;
 }
 
 serve(async (req) => {
@@ -20,17 +17,37 @@ serve(async (req) => {
   }
 
   try {
-    const { vin, make, model, year } = await req.json() as RequestBody;
+    const { vehicleId } = await req.json() as RequestBody;
     
-    if (!make || !model || !year) {
+    if (!vehicleId) {
       return new Response(
-        JSON.stringify({ error: 'Missing required vehicle information' }),
+        JSON.stringify({ error: 'Missing vehicle ID' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Fetch vehicle details
+    const { data: vehicle, error: vehicleError } = await supabaseClient
+      .from('vehicles')
+      .select('*')
+      .eq('id', vehicleId)
+      .single();
+
+    if (vehicleError || !vehicle) {
+      return new Response(
+        JSON.stringify({ error: 'Vehicle not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
+    }
+
     // Construct search query
-    const searchQuery = `${year} ${make} ${model} ${vin || ''} history listing sale auction`;
+    const searchQuery = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.vin || ''} history listing sale auction`;
     console.log('Searching for vehicle history with query:', searchQuery);
 
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -77,18 +94,10 @@ serve(async (req) => {
     }
 
     // Update the vehicle record in the database
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     const { error: updateError } = await supabaseClient
       .from('vehicles')
       .update({ historical_data: historicalData })
-      .eq('vin', vin)
-      .eq('make', make)
-      .eq('model', model)
-      .eq('year', year);
+      .eq('id', vehicleId);
 
     if (updateError) {
       console.error('Error updating vehicle history:', updateError);
