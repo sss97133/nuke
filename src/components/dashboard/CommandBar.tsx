@@ -16,29 +16,29 @@ export const CommandBar = () => {
         case "help":
           toast({
             title: "Available Commands",
-            description: `
-              System Commands:
-              help: Show this message
-              status: Show system status
-              clear: Clear command
-              version: Show system version
-
-              Garage Commands:
-              garage list: List all garages
-              garage count: Show total garage count
-
-              Inventory Commands:
-              inv count: Show total inventory count
-              inv search <term>: Search inventory
-
-              Service Commands:
-              ticket list: List recent tickets
-              ticket count: Show total tickets
-
-              Vehicle Commands:
-              vehicle count: Show total vehicles
-              vehicle search <term>: Search vehicles
-            `,
+            description: [
+              "System:",
+              "• help - Show this message",
+              "• status - Show system status",
+              "• clear - Clear command",
+              "• version - Show system version",
+              "",
+              "Garage:",
+              "• garage list - List all garages",
+              "• garage count - Show total garage count",
+              "",
+              "Inventory:",
+              "• inv count - Show total inventory count",
+              "• inv search <term> - Search inventory",
+              "",
+              "Service:",
+              "• ticket list - List recent tickets",
+              "• ticket count - Show total tickets",
+              "",
+              "Vehicle:",
+              "• vehicle count - Show total vehicles",
+              "• vehicle search <term> - Search vehicles"
+            ].join("\n"),
           });
           break;
 
