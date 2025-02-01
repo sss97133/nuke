@@ -147,6 +147,7 @@ export type Database = {
         Row: {
           bulk_upload_batch_id: string | null
           created_at: string
+          historical_data: Json | null
           id: string
           make: string
           model: string
@@ -162,6 +163,7 @@ export type Database = {
         Insert: {
           bulk_upload_batch_id?: string | null
           created_at?: string
+          historical_data?: Json | null
           id?: string
           make: string
           model: string
@@ -177,6 +179,7 @@ export type Database = {
         Update: {
           bulk_upload_batch_id?: string | null
           created_at?: string
+          historical_data?: Json | null
           id?: string
           make?: string
           model?: string
