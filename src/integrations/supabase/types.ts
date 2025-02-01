@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       inventory: {
         Row: {
+          ai_classification: Json | null
           category: string | null
           created_at: string
           id: string
@@ -23,6 +24,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          ai_classification?: Json | null
           category?: string | null
           created_at?: string
           id?: string
@@ -35,6 +37,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          ai_classification?: Json | null
           category?: string | null
           created_at?: string
           id?: string
