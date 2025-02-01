@@ -11,6 +11,15 @@ interface VehicleHistoryProps {
 }
 
 export const VehicleHistory = ({ historicalData, onSearch, isSearching }: VehicleHistoryProps) => {
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+
+  const toggleSection = (section: string) => {
+    setOpenSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   if (!historicalData) {
     return (
       <div className="space-y-4">
@@ -47,7 +56,11 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
       </div>
 
       {historicalData.previousSales && historicalData.previousSales.length > 0 && (
-        <Collapsible className="bg-white rounded-lg border p-4 shadow-sm">
+        <Collapsible 
+          className="bg-white rounded-lg border p-4 shadow-sm"
+          open={openSections['sales']}
+          onOpenChange={() => toggleSection('sales')}
+        >
           <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-[#283845]" />
@@ -55,7 +68,11 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
                 Previous Sales ({historicalData.previousSales.length})
               </h4>
             </div>
-            <ChevronDown className="h-4 w-4 text-[#283845]" />
+            {openSections['sales'] ? (
+              <ChevronUp className="h-4 w-4 text-[#283845]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[#283845]" />
+            )}
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-3">
             {historicalData.previousSales.map((sale, index) => (
@@ -70,7 +87,11 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
       )}
 
       {historicalData.modifications && historicalData.modifications.length > 0 && (
-        <Collapsible className="bg-white rounded-lg border p-4 shadow-sm">
+        <Collapsible 
+          className="bg-white rounded-lg border p-4 shadow-sm"
+          open={openSections['modifications']}
+          onOpenChange={() => toggleSection('modifications')}
+        >
           <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-2">
               <Wrench className="h-4 w-4 text-[#283845]" />
@@ -78,7 +99,11 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
                 Modifications ({historicalData.modifications.length})
               </h4>
             </div>
-            <ChevronDown className="h-4 w-4 text-[#283845]" />
+            {openSections['modifications'] ? (
+              <ChevronUp className="h-4 w-4 text-[#283845]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[#283845]" />
+            )}
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
             <ul className="space-y-2 list-disc list-inside">
@@ -91,13 +116,21 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
       )}
 
       {historicalData.notableHistory && (
-        <Collapsible className="bg-white rounded-lg border p-4 shadow-sm">
+        <Collapsible 
+          className="bg-white rounded-lg border p-4 shadow-sm"
+          open={openSections['history']}
+          onOpenChange={() => toggleSection('history')}
+        >
           <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-2">
               <Car className="h-4 w-4 text-[#283845]" />
               <h4 className="font-mono text-sm font-semibold text-[#283845]">Notable History</h4>
             </div>
-            <ChevronDown className="h-4 w-4 text-[#283845]" />
+            {openSections['history'] ? (
+              <ChevronUp className="h-4 w-4 text-[#283845]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[#283845]" />
+            )}
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
             <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md border">
@@ -108,13 +141,21 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
       )}
 
       {historicalData.conditionNotes && (
-        <Collapsible className="bg-white rounded-lg border p-4 shadow-sm">
+        <Collapsible 
+          className="bg-white rounded-lg border p-4 shadow-sm"
+          open={openSections['condition']}
+          onOpenChange={() => toggleSection('condition')}
+        >
           <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-2">
               <Wrench className="h-4 w-4 text-[#283845]" />
               <h4 className="font-mono text-sm font-semibold text-[#283845]">Condition Assessment</h4>
             </div>
-            <ChevronDown className="h-4 w-4 text-[#283845]" />
+            {openSections['condition'] ? (
+              <ChevronUp className="h-4 w-4 text-[#283845]" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[#283845]" />
+            )}
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
             <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md border">
