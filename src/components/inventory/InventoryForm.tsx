@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { pipeline } from "@huggingface/transformers";
 import { supabase } from "@/integrations/supabase/client";
+import { BasicInformation } from "./form-sections/BasicInformation";
+import { Categorization } from "./form-sections/Categorization";
+import { ProductDetails } from "./form-sections/ProductDetails";
+import { PurchaseMaintenance } from "./form-sections/PurchaseMaintenance";
+import { Location } from "./form-sections/Location";
+import { AdditionalInformation } from "./form-sections/AdditionalInformation";
 
 export const InventoryForm = () => {
   const { toast } = useToast();
@@ -42,7 +44,6 @@ export const InventoryForm = () => {
 
     setIsProcessing(true);
     try {
-      // Process image with HuggingFace
       const classifier = await pipeline(
         "image-classification",
         "onnx-community/mobilenetv4_conv_small.e2400_r224_in1k",
@@ -52,14 +53,12 @@ export const InventoryForm = () => {
       const imageUrl = URL.createObjectURL(file);
       const result = await classifier(imageUrl);
       
-      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from("inventory-images")
         .upload(`${Date.now()}-${file.name}`, file);
 
       if (error) throw error;
 
-      // Safely access the classification result
       const detectedLabel = Array.isArray(result) && result.length > 0 
         ? (result[0] as { label?: string, score?: number }).label || 'Unknown'
         : 'Unknown';
@@ -155,253 +154,67 @@ export const InventoryForm = () => {
         <p className="text-sm text-[#9B2915]">Form ID: {Date.now()}</p>
       </div>
 
-      {/* Basic Information */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-[#283845]">Basic Information</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Item Name *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="partNumber">Part Number</Label>
-            <Input
-              id="partNumber"
-              value={formData.partNumber}
-              onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
+      <BasicInformation
+        name={formData.name}
+        partNumber={formData.partNumber}
+        onNameChange={(value) => setFormData({ ...formData, name: value })}
+        onPartNumberChange={(value) => setFormData({ ...formData, partNumber: value })}
+      />
 
-      {/* Categorization */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-[#283845]">Categorization</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="department">Department</Label>
-            <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="kitchen">Kitchen</SelectItem>
-                <SelectItem value="office">Office</SelectItem>
-                <SelectItem value="it">IT</SelectItem>
-                <SelectItem value="facilities">Facilities</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="subDepartment">Sub-Department</Label>
-            <Input
-              id="subDepartment"
-              value={formData.subDepartment}
-              onChange={(e) => setFormData({ ...formData, subDepartment: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="assetType">Asset Type</Label>
-            <Select value={formData.assetType} onValueChange={(value) => setFormData({ ...formData, assetType: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select asset type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tool">Tool</SelectItem>
-                <SelectItem value="equipment">Equipment</SelectItem>
-                <SelectItem value="furniture">Furniture</SelectItem>
-                <SelectItem value="supplies">Supplies</SelectItem>
-                <SelectItem value="electronics">Electronics</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="condition">Condition</Label>
-            <Select value={formData.condition} onValueChange={(value) => setFormData({ ...formData, condition: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select condition" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="excellent">Excellent</SelectItem>
-                <SelectItem value="good">Good</SelectItem>
-                <SelectItem value="fair">Fair</SelectItem>
-                <SelectItem value="poor">Poor</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+      <Categorization
+        department={formData.department}
+        subDepartment={formData.subDepartment}
+        assetType={formData.assetType}
+        condition={formData.condition}
+        onDepartmentChange={(value) => setFormData({ ...formData, department: value })}
+        onSubDepartmentChange={(value) => setFormData({ ...formData, subDepartment: value })}
+        onAssetTypeChange={(value) => setFormData({ ...formData, assetType: value })}
+        onConditionChange={(value) => setFormData({ ...formData, condition: value })}
+      />
 
-      {/* Product Details */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-[#283845]">Product Details</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="manufacturer">Manufacturer</Label>
-            <Input
-              id="manufacturer"
-              value={formData.manufacturer}
-              onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="modelNumber">Model Number</Label>
-            <Input
-              id="modelNumber"
-              value={formData.modelNumber}
-              onChange={(e) => setFormData({ ...formData, modelNumber: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="serialNumber">Serial Number</Label>
-            <Input
-              id="serialNumber"
-              value={formData.serialNumber}
-              onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity *</Label>
-            <Input
-              id="quantity"
-              type="number"
-              value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
-              required
-            />
-          </div>
-        </div>
-      </div>
+      <ProductDetails
+        manufacturer={formData.manufacturer}
+        modelNumber={formData.modelNumber}
+        serialNumber={formData.serialNumber}
+        quantity={formData.quantity}
+        onManufacturerChange={(value) => setFormData({ ...formData, manufacturer: value })}
+        onModelNumberChange={(value) => setFormData({ ...formData, modelNumber: value })}
+        onSerialNumberChange={(value) => setFormData({ ...formData, serialNumber: value })}
+        onQuantityChange={(value) => setFormData({ ...formData, quantity: value })}
+      />
 
-      {/* Purchase & Maintenance */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-[#283845]">Purchase & Maintenance</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="purchaseDate">Purchase Date</Label>
-            <Input
-              id="purchaseDate"
-              type="date"
-              value={formData.purchaseDate}
-              onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="purchasePrice">Purchase Price</Label>
-            <Input
-              id="purchasePrice"
-              type="number"
-              step="0.01"
-              value={formData.purchasePrice}
-              onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="warrantyExpiration">Warranty Expiration</Label>
-            <Input
-              id="warrantyExpiration"
-              type="date"
-              value={formData.warrantyExpiration}
-              onChange={(e) => setFormData({ ...formData, warrantyExpiration: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="lastMaintenanceDate">Last Maintenance</Label>
-            <Input
-              id="lastMaintenanceDate"
-              type="date"
-              value={formData.lastMaintenanceDate}
-              onChange={(e) => setFormData({ ...formData, lastMaintenanceDate: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="nextMaintenanceDate">Next Maintenance</Label>
-            <Input
-              id="nextMaintenanceDate"
-              type="date"
-              value={formData.nextMaintenanceDate}
-              onChange={(e) => setFormData({ ...formData, nextMaintenanceDate: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
+      <PurchaseMaintenance
+        purchaseDate={formData.purchaseDate}
+        purchasePrice={formData.purchasePrice}
+        warrantyExpiration={formData.warrantyExpiration}
+        lastMaintenanceDate={formData.lastMaintenanceDate}
+        nextMaintenanceDate={formData.nextMaintenanceDate}
+        onPurchaseDateChange={(value) => setFormData({ ...formData, purchaseDate: value })}
+        onPurchasePriceChange={(value) => setFormData({ ...formData, purchasePrice: value })}
+        onWarrantyExpirationChange={(value) => setFormData({ ...formData, warrantyExpiration: value })}
+        onLastMaintenanceDateChange={(value) => setFormData({ ...formData, lastMaintenanceDate: value })}
+        onNextMaintenanceDateChange={(value) => setFormData({ ...formData, nextMaintenanceDate: value })}
+      />
 
-      {/* Location */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-[#283845]">Location</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="building">Building</Label>
-            <Input
-              id="building"
-              value={formData.building}
-              onChange={(e) => setFormData({ ...formData, building: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="floor">Floor</Label>
-            <Input
-              id="floor"
-              value={formData.floor}
-              onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="room">Room</Label>
-            <Input
-              id="room"
-              value={formData.room}
-              onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="shelf">Shelf</Label>
-            <Input
-              id="shelf"
-              value={formData.shelf}
-              onChange={(e) => setFormData({ ...formData, shelf: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="bin">Bin</Label>
-            <Input
-              id="bin"
-              value={formData.bin}
-              onChange={(e) => setFormData({ ...formData, bin: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
+      <Location
+        building={formData.building}
+        floor={formData.floor}
+        room={formData.room}
+        shelf={formData.shelf}
+        bin={formData.bin}
+        onBuildingChange={(value) => setFormData({ ...formData, building: value })}
+        onFloorChange={(value) => setFormData({ ...formData, floor: value })}
+        onRoomChange={(value) => setFormData({ ...formData, room: value })}
+        onShelfChange={(value) => setFormData({ ...formData, shelf: value })}
+        onBinChange={(value) => setFormData({ ...formData, bin: value })}
+      />
 
-      {/* Notes & Image Upload */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-[#283845]">Additional Information</h3>
-        <div className="space-y-2">
-          <Label htmlFor="notes">Notes</Label>
-          <Textarea
-            id="notes"
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="image">Upload Image</Label>
-          <Input
-            id="image"
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            disabled={isProcessing}
-          />
-        </div>
-      </div>
+      <AdditionalInformation
+        notes={formData.notes}
+        onNotesChange={(value) => setFormData({ ...formData, notes: value })}
+        onImageUpload={handleImageUpload}
+        isProcessing={isProcessing}
+      />
 
       <Button
         type="submit"
