@@ -5,6 +5,7 @@ import { UserRound, Award, Star, Trophy, Link as LinkIcon, Video } from 'lucide-
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Json } from '@/integrations/supabase/types';
 
 interface SocialLinks {
   twitter: string;
@@ -17,6 +18,12 @@ interface StreamingLinks {
   twitch: string;
   youtube: string;
   tiktok: string;
+}
+
+interface Achievement {
+  id: string;
+  achievement_type: string;
+  earned_at: string;
 }
 
 export const UserProfile = () => {
@@ -65,6 +72,30 @@ export const UserProfile = () => {
     },
   });
 
+  const { data: achievements } = useQuery({
+    queryKey: ['achievements'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('user_achievements')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('earned_at', { ascending: false });
+      
+      if (error) {
+        toast({
+          title: 'Error loading achievements',
+          description: error.message,
+          variant: 'destructive',
+        });
+        throw error;
+      }
+      return (data || []) as Achievement[];
+    },
+  });
+
   const handleSocialLinksUpdate = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -72,7 +103,7 @@ export const UserProfile = () => {
     const { error } = await supabase
       .from('profiles')
       .update({ 
-        social_links: socialLinks as unknown as Record<string, unknown>
+        social_links: socialLinks as unknown as Json
       })
       .eq('id', user.id);
 
@@ -99,7 +130,7 @@ export const UserProfile = () => {
     const { error } = await supabase
       .from('profiles')
       .update({ 
-        streaming_links: streamingLinks as unknown as Record<string, unknown>
+        streaming_links: streamingLinks as unknown as Json
       })
       .eq('id', user.id);
 
