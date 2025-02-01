@@ -15,26 +15,50 @@ interface NHTSAResponse {
 }
 
 interface ProcessedVehicleData {
-  make: string;
-  model: string;
-  year: string;
-  manufacturer: string;
-  plantCountry: string;
-  vehicleType: string;
-  bodyClass: string;
-  driveType: string;
-  fuelType: string;
-  engineCylinders: string;
-  engineHP: string;
-  transmissionStyle: string;
-  doors: string;
-  safetyRating: string;
-  series: string;
-  trim: string;
+  basic: {
+    make: string;
+    model: string;
+    year: string;
+    manufacturer: string;
+  };
+  manufacturing: {
+    plantCountry: string;
+    plantState?: string;
+    plantCity?: string;
+    manufacturerAddress?: string;
+  };
+  specifications: {
+    engineType?: string;
+    engineCylinders: string;
+    engineHP: string;
+    fuelType: string;
+    transmissionStyle: string;
+    transmissionSpeeds?: string;
+    driveType: string;
+    steeringLocation?: string;
+  };
+  characteristics: {
+    vehicleType: string;
+    bodyClass: string;
+    doors: string;
+    windows?: string;
+    wheelBaseLong?: string;
+    wheelBaseType?: string;
+    trackWidth?: string;
+    grossVehicleWeight?: string;
+    series: string;
+    trim: string;
+  };
+  safety: {
+    safetyRating: string;
+    airBagLocations?: string;
+    antiLockBrakingSystem?: string;
+    tractionControlType?: string;
+    pretensioner?: string;
+  };
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -49,11 +73,9 @@ serve(async (req) => {
     let vinToProcess = vin
 
     if (!vinToProcess && image && image instanceof File) {
-      // Convert image to base64 and process with OCR if no VIN provided
       const buffer = await image.arrayBuffer()
       const base64Image = btoa(String.fromCharCode(...new Uint8Array(buffer)))
 
-      // Use Hugging Face for OCR
       const response = await fetch(
         'https://api-inference.huggingface.co/models/microsoft/trocr-large-printed',
         {
@@ -85,9 +107,8 @@ serve(async (req) => {
       )
     }
 
-    console.log('Fetching NHTSA data for VIN:', vinToProcess)
+    console.log('Fetching extended NHTSA data for VIN:', vinToProcess)
 
-    // Fetch detailed vehicle information from NHTSA
     const nhtsaResponse = await fetch(
       `https://vpic.nhtsa.dot.gov/api/vehicles/decodevinextended/${vinToProcess}?format=json`
     )
@@ -97,26 +118,50 @@ serve(async (req) => {
     }
 
     const nhtsaData: NHTSAResponse = await nhtsaResponse.json()
-    console.log('NHTSA Response received')
+    console.log('NHTSA Response received with', nhtsaData.Results.length, 'fields')
 
-    // Process and structure the NHTSA data
     const processedData: ProcessedVehicleData = {
-      make: findNHTSAValue(nhtsaData.Results, 'Make') || '',
-      model: findNHTSAValue(nhtsaData.Results, 'Model') || '',
-      year: findNHTSAValue(nhtsaData.Results, 'Model Year') || '',
-      manufacturer: findNHTSAValue(nhtsaData.Results, 'Manufacturer Name') || '',
-      plantCountry: findNHTSAValue(nhtsaData.Results, 'Plant Country') || '',
-      vehicleType: findNHTSAValue(nhtsaData.Results, 'Vehicle Type') || '',
-      bodyClass: findNHTSAValue(nhtsaData.Results, 'Body Class') || '',
-      driveType: findNHTSAValue(nhtsaData.Results, 'Drive Type') || '',
-      fuelType: findNHTSAValue(nhtsaData.Results, 'Fuel Type - Primary') || '',
-      engineCylinders: findNHTSAValue(nhtsaData.Results, 'Engine Number of Cylinders') || '',
-      engineHP: findNHTSAValue(nhtsaData.Results, 'Engine Horse Power') || '',
-      transmissionStyle: findNHTSAValue(nhtsaData.Results, 'Transmission Style') || '',
-      doors: findNHTSAValue(nhtsaData.Results, 'Doors') || '',
-      safetyRating: findNHTSAValue(nhtsaData.Results, 'NCSA Note') || '',
-      series: findNHTSAValue(nhtsaData.Results, 'Series') || '',
-      trim: findNHTSAValue(nhtsaData.Results, 'Trim') || '',
+      basic: {
+        make: findNHTSAValue(nhtsaData.Results, 'Make') || '',
+        model: findNHTSAValue(nhtsaData.Results, 'Model') || '',
+        year: findNHTSAValue(nhtsaData.Results, 'Model Year') || '',
+        manufacturer: findNHTSAValue(nhtsaData.Results, 'Manufacturer Name') || '',
+      },
+      manufacturing: {
+        plantCountry: findNHTSAValue(nhtsaData.Results, 'Plant Country') || '',
+        plantState: findNHTSAValue(nhtsaData.Results, 'Plant State'),
+        plantCity: findNHTSAValue(nhtsaData.Results, 'Plant City'),
+        manufacturerAddress: findNHTSAValue(nhtsaData.Results, 'Plant Address'),
+      },
+      specifications: {
+        engineType: findNHTSAValue(nhtsaData.Results, 'Engine Model'),
+        engineCylinders: findNHTSAValue(nhtsaData.Results, 'Engine Number of Cylinders') || '',
+        engineHP: findNHTSAValue(nhtsaData.Results, 'Engine Horse Power') || '',
+        fuelType: findNHTSAValue(nhtsaData.Results, 'Fuel Type - Primary') || '',
+        transmissionStyle: findNHTSAValue(nhtsaData.Results, 'Transmission Style') || '',
+        transmissionSpeeds: findNHTSAValue(nhtsaData.Results, 'Transmission Speeds'),
+        driveType: findNHTSAValue(nhtsaData.Results, 'Drive Type') || '',
+        steeringLocation: findNHTSAValue(nhtsaData.Results, 'Steering Location'),
+      },
+      characteristics: {
+        vehicleType: findNHTSAValue(nhtsaData.Results, 'Vehicle Type') || '',
+        bodyClass: findNHTSAValue(nhtsaData.Results, 'Body Class') || '',
+        doors: findNHTSAValue(nhtsaData.Results, 'Doors') || '',
+        windows: findNHTSAValue(nhtsaData.Results, 'Windows'),
+        wheelBaseLong: findNHTSAValue(nhtsaData.Results, 'Wheel Base Long'),
+        wheelBaseType: findNHTSAValue(nhtsaData.Results, 'Wheel Base Type'),
+        trackWidth: findNHTSAValue(nhtsaData.Results, 'Track Width'),
+        grossVehicleWeight: findNHTSAValue(nhtsaData.Results, 'Gross Vehicle Weight Rating'),
+        series: findNHTSAValue(nhtsaData.Results, 'Series') || '',
+        trim: findNHTSAValue(nhtsaData.Results, 'Trim') || '',
+      },
+      safety: {
+        safetyRating: findNHTSAValue(nhtsaData.Results, 'NCSA Note') || '',
+        airBagLocations: findNHTSAValue(nhtsaData.Results, 'Air Bag Locations'),
+        antiLockBrakingSystem: findNHTSAValue(nhtsaData.Results, 'Anti-lock Braking System (ABS)'),
+        tractionControlType: findNHTSAValue(nhtsaData.Results, 'Traction Control Type'),
+        pretensioner: findNHTSAValue(nhtsaData.Results, 'Pretensioner'),
+      }
     }
 
     console.log('Processed vehicle data:', processedData)
