@@ -73,6 +73,7 @@ export const VehicleProfile = () => {
     
     setSearching(true);
     try {
+      console.log('Searching vehicle history for vehicle:', vehicle.id);
       const { error } = await supabase.functions.invoke('search-vehicle-history', {
         body: { vehicleId: vehicle.id }
       });
