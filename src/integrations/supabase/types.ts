@@ -12,42 +12,93 @@ export type Database = {
       inventory: {
         Row: {
           ai_classification: Json | null
+          asset_type: string | null
+          bin: string | null
+          building: string | null
           category: string | null
+          condition: string | null
           created_at: string
+          department: string | null
+          floor: string | null
           id: string
+          last_maintenance_date: string | null
           location: string | null
+          manufacturer: string | null
+          model_number: string | null
           name: string
+          next_maintenance_date: string | null
           notes: string | null
           part_number: string | null
+          purchase_date: string | null
+          purchase_price: number | null
           quantity: number
+          room: string | null
+          serial_number: string | null
+          shelf: string | null
+          sub_department: string | null
           updated_at: string
           user_id: string | null
+          warranty_expiration: string | null
         }
         Insert: {
           ai_classification?: Json | null
+          asset_type?: string | null
+          bin?: string | null
+          building?: string | null
           category?: string | null
+          condition?: string | null
           created_at?: string
+          department?: string | null
+          floor?: string | null
           id?: string
+          last_maintenance_date?: string | null
           location?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
           name: string
+          next_maintenance_date?: string | null
           notes?: string | null
           part_number?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
           quantity?: number
+          room?: string | null
+          serial_number?: string | null
+          shelf?: string | null
+          sub_department?: string | null
           updated_at?: string
           user_id?: string | null
+          warranty_expiration?: string | null
         }
         Update: {
           ai_classification?: Json | null
+          asset_type?: string | null
+          bin?: string | null
+          building?: string | null
           category?: string | null
+          condition?: string | null
           created_at?: string
+          department?: string | null
+          floor?: string | null
           id?: string
+          last_maintenance_date?: string | null
           location?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
           name?: string
+          next_maintenance_date?: string | null
           notes?: string | null
           part_number?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
           quantity?: number
+          room?: string | null
+          serial_number?: string | null
+          shelf?: string | null
+          sub_department?: string | null
           updated_at?: string
           user_id?: string | null
+          warranty_expiration?: string | null
         }
         Relationships: []
       }
