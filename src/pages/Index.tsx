@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { InventoryForm } from "@/components/inventory/InventoryForm";
-import { VehicleList } from "@/components/inventory/VehicleList";
-import { ServiceTicketList } from "@/components/inventory/ServiceTicketList";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 
 const Index = () => {
   const { toast } = useToast();
@@ -181,60 +178,7 @@ const Index = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#FAFAF5]">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <h1 className="text-lg font-mono text-[#283845] tracking-tight">TAMS/v1.0</h1>
-            <button
-              onClick={() => supabase.auth.signOut()}
-              className="px-3 py-1 bg-[#F5F5F5] text-[#333] text-sm font-mono hover:bg-[#E5E5E5] transition-colors border border-gray-200"
-            >
-              Terminate Session
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="inventory" className="w-full">
-          <TabsList className="w-full border-b border-gray-200 mb-6 bg-transparent">
-            <TabsTrigger 
-              value="inventory" 
-              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
-            >
-              Inventory Management
-            </TabsTrigger>
-            <TabsTrigger 
-              value="vehicles" 
-              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
-            >
-              Vehicle Registry
-            </TabsTrigger>
-            <TabsTrigger 
-              value="service" 
-              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
-            >
-              Service Records
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="inventory">
-            <InventoryForm />
-          </TabsContent>
-
-          <TabsContent value="vehicles">
-            <VehicleList />
-          </TabsContent>
-
-          <TabsContent value="service">
-            <ServiceTicketList />
-          </TabsContent>
-        </Tabs>
-      </main>
-    </div>
-  );
+  return <DashboardLayout />;
 };
 
 export default Index;
