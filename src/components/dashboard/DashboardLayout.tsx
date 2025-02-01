@@ -11,7 +11,7 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   return (
-    <div className="min-h-screen bg-paper font-system">
+    <div className="min-h-screen bg-white font-system">
       <header className="border-b-2 border-gov-blue bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-12">

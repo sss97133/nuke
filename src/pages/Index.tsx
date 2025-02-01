@@ -122,7 +122,7 @@ const Index = () => {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-paper font-system">
+      <div className="min-h-screen flex items-center justify-center bg-white font-system">
         <div className="text-center space-y-4 w-full max-w-md p-6 border-2 border-gov-blue bg-white">
           <div className="border-b-2 border-gov-blue pb-4">
             <h1 className="text-doc text-gov-blue">

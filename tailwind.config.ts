@@ -64,7 +64,6 @@ export default {
 					'gov-blue': '#000066',
 					'gov-link': '#0000EE',
 					'gov-visited': '#551A8B',
-					'paper': '#FFFFF0',
 				}
 			},
 			fontSize: {
@@ -73,7 +72,7 @@ export default {
 				'doc': ['0.8125rem', '1.25rem'],
 			},
 			fontFamily: {
-				'system': ['Courier New', 'Courier', 'monospace'],
+				'system': ['Consolas', 'Monaco', 'Lucida Console', 'monospace'],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -82,20 +81,12 @@ export default {
 			},
 			keyframes: {
 				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+					from: { height: '0' },
+					to: { height: 'var(--radix-accordion-content-height)' }
 				},
 				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
+					from: { height: 'var(--radix-accordion-content-height)' },
+					to: { height: '0' }
 				}
 			},
 			animation: {
