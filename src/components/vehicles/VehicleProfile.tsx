@@ -5,18 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import type { Vehicle } from "@/types/inventory";
-import { Loader2 } from "lucide-react";
-
-interface VehicleHistory {
-  previousSales?: Array<{
-    date?: string;
-    price?: string;
-    source?: string;
-  }>;
-  modifications?: string[];
-  notableHistory?: string;
-  conditionNotes?: string;
-}
+import { VehicleHistory } from "./VehicleHistory";
+import { VehicleDetails } from "./VehicleDetails";
+import { RecordDetails } from "./RecordDetails";
 
 export const VehicleProfile = () => {
   const { id } = useParams();
@@ -137,71 +128,6 @@ export const VehicleProfile = () => {
     }
   };
 
-  const renderHistoricalData = () => {
-    if (!vehicle?.historical_data) return null;
-
-    const data = vehicle.historical_data;
-    return (
-      <div className="space-y-4">
-        {data.previousSales && data.previousSales.length > 0 && (
-          <div className="bg-white rounded-lg border p-4 shadow-sm">
-            <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">
-              Previous Sales History ({data.previousSales.length})
-            </h4>
-            <div className="space-y-3">
-              {data.previousSales.map((sale: any, index: number) => (
-                <div key={index} className="bg-gray-50 p-4 rounded-md border">
-                  <p className="font-mono text-sm mb-1">
-                    <span className="font-semibold">Date:</span> {sale.date || 'N/A'}
-                  </p>
-                  <p className="font-mono text-sm mb-1">
-                    <span className="font-semibold">Price:</span> {sale.price || 'N/A'}
-                  </p>
-                  {sale.source && (
-                    <p className="font-mono text-sm">
-                      <span className="font-semibold">Source:</span> {sale.source}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {data.modifications && data.modifications.length > 0 && (
-          <div className="bg-white rounded-lg border p-4 shadow-sm">
-            <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">
-              Vehicle Modifications ({data.modifications.length})
-            </h4>
-            <ul className="list-disc list-inside space-y-2">
-              {data.modifications.map((mod: string, index: number) => (
-                <li key={index} className="font-mono text-sm pl-2">{mod}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {data.notableHistory && (
-          <div className="bg-white rounded-lg border p-4 shadow-sm">
-            <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">Notable History</h4>
-            <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded-md border">
-              {data.notableHistory}
-            </p>
-          </div>
-        )}
-
-        {data.conditionNotes && (
-          <div className="bg-white rounded-lg border p-4 shadow-sm">
-            <h4 className="font-mono text-sm font-semibold mb-3 text-[#283845]">Condition Assessment</h4>
-            <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded-md border">
-              {data.conditionNotes}
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -231,52 +157,20 @@ export const VehicleProfile = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <h3 className="font-mono text-sm text-[#666]">Vehicle Information</h3>
-              <p className="font-mono">VIN: {vehicle.vin || 'N/A'}</p>
-              <p className="font-mono">Make: {vehicle.make}</p>
-              <p className="font-mono">Model: {vehicle.model}</p>
-              <p className="font-mono">Year: {vehicle.year}</p>
-            </div>
-            {vehicle.notes && (
-              <div className="space-y-2">
-                <h3 className="font-mono text-sm text-[#666]">Notes</h3>
-                <p className="font-mono">{vehicle.notes}</p>
-              </div>
-            )}
-          </div>
+          <VehicleDetails vehicle={vehicle} />
           
           <div className="pt-4 border-t border-[#283845]">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-mono text-sm text-[#666]">Vehicle History</h3>
-              <Button 
-                onClick={searchVehicleHistory} 
-                disabled={searching}
-                className="font-mono text-sm"
-              >
-                {searching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {searching ? 'Searching...' : 'Search History'}
-              </Button>
-            </div>
-            {vehicle.historical_data ? (
-              renderHistoricalData()
-            ) : (
-              <p className="text-sm text-muted-foreground font-mono">
-                No historical data available. Click "Search History" to find information about this vehicle.
-              </p>
-            )}
+            <VehicleHistory 
+              historicalData={vehicle.historical_data}
+              onSearch={searchVehicleHistory}
+              isSearching={searching}
+            />
           </div>
 
-          <div className="pt-4 border-t border-[#283845]">
-            <h3 className="font-mono text-sm text-[#666] mb-2">Record Details</h3>
-            <p className="text-xs font-mono text-[#666]">
-              Created: {new Date(vehicle.createdAt).toLocaleDateString()}
-            </p>
-            <p className="text-xs font-mono text-[#666]">
-              Last Updated: {new Date(vehicle.updatedAt).toLocaleDateString()}
-            </p>
-          </div>
+          <RecordDetails 
+            createdAt={vehicle.createdAt}
+            updatedAt={vehicle.updatedAt}
+          />
         </CardContent>
       </Card>
     </div>
