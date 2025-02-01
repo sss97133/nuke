@@ -47,35 +47,51 @@ export const SkillTree = () => {
   });
 
   if (isLoading) {
-    return <div className="flex items-center justify-center p-8">Loading skill tree...</div>;
+    return (
+      <div className="flex items-center justify-center p-8 text-sidebar-foreground">
+        <Trees className="w-6 h-6 animate-pulse mr-2" />
+        Loading skill tree...
+      </div>
+    );
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
+    <div className="bg-sidebar p-6 rounded-lg shadow-lg border border-sidebar-border">
       <div className="flex items-center gap-2 mb-6">
-        <Trees className="w-5 h-5 text-blue-600" />
-        <h2 className="text-xl font-semibold">Skill Development Tree</h2>
+        <Trees className="w-6 h-6 text-sidebar-primary" />
+        <h2 className="text-xl font-semibold text-sidebar-foreground">Professional Development Tree</h2>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {skills?.map((skill) => (
-          <div
-            key={skill.id}
-            className="border rounded-lg p-4 hover:border-blue-500 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-medium">{skill.name}</h3>
-              {userSkills?.find(us => us.skill_id === skill.id) && (
-                <Trophy className="w-4 h-4 text-yellow-500" />
-              )}
+        {skills?.map((skill) => {
+          const userSkill = userSkills?.find(us => us.skill_id === skill.id);
+          const hasSkill = !!userSkill;
+          
+          return (
+            <div
+              key={skill.id}
+              className={`
+                border rounded-lg p-4 transition-all duration-300
+                ${hasSkill 
+                  ? 'bg-sidebar-primary/10 border-sidebar-primary hover:bg-sidebar-primary/20' 
+                  : 'hover:border-sidebar-primary/50 border-sidebar-border'
+                }
+              `}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-medium text-sidebar-foreground">{skill.name}</h3>
+                {hasSkill && (
+                  <Trophy className="w-4 h-4 text-yellow-500" />
+                )}
+              </div>
+              <p className="text-sm text-sidebar-foreground/80 mb-2">{skill.description}</p>
+              <div className="flex items-center gap-2 text-sm text-sidebar-foreground/60">
+                <Star className={`w-4 h-4 ${hasSkill ? 'text-sidebar-primary' : ''}`} />
+                <span>Level {userSkill?.level || 0}</span>
+              </div>
             </div>
-            <p className="text-sm text-gray-600 mb-2">{skill.description}</p>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Star className="w-4 h-4" />
-              <span>Level {userSkills?.find(us => us.skill_id === skill.id)?.level || 0}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

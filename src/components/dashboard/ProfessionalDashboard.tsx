@@ -6,24 +6,30 @@ import { UserRound, Trees } from 'lucide-react';
 
 export const ProfessionalDashboard = () => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList>
-          <TabsTrigger value="profile" className="flex items-center gap-2">
+        <TabsList className="w-full bg-sidebar-accent border border-sidebar-border">
+          <TabsTrigger 
+            value="profile" 
+            className="flex items-center gap-2 data-[state=active]:bg-sidebar-primary data-[state=active]:text-sidebar-primary-foreground"
+          >
             <UserRound className="w-4 h-4" />
-            Profile
+            Professional Profile
           </TabsTrigger>
-          <TabsTrigger value="skills" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="skills" 
+            className="flex items-center gap-2 data-[state=active]:bg-sidebar-primary data-[state=active]:text-sidebar-primary-foreground"
+          >
             <Trees className="w-4 h-4" />
-            Skill Tree
+            Development Tree
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="profile">
+        <TabsContent value="profile" className="mt-6">
           <UserProfile />
         </TabsContent>
         
-        <TabsContent value="skills">
+        <TabsContent value="skills" className="mt-6">
           <SkillTree />
         </TabsContent>
       </Tabs>
