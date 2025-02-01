@@ -2,7 +2,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InventoryForm } from "@/components/inventory/InventoryForm";
 import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
-import { MarketDataCollector } from "@/components/market/MarketDataCollector";
 import { supabase } from "@/integrations/supabase/client";
 import { ReactNode } from "react";
 
@@ -54,12 +53,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             >
               Service Records
             </TabsTrigger>
-            <TabsTrigger 
-              value="market" 
-              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
-            >
-              Market Analysis
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="inventory">
@@ -72,10 +65,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
           <TabsContent value="service">
             <ServiceManagement />
-          </TabsContent>
-
-          <TabsContent value="market">
-            <MarketDataCollector />
           </TabsContent>
         </Tabs>
         {children}
