@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Loader2, ChevronDown, ChevronUp, Calendar, DollarSign, Wrench, Car } from "lucide-react";
-import { useState } from "react";
+import { Loader2, Calendar, DollarSign, Wrench, Car, Info } from "lucide-react";
 import type { VehicleHistoricalData } from "@/types/inventory";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -25,12 +24,20 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
             {isSearching ? 'Searching...' : 'Search History'}
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground font-mono">
-          No historical data available. Click "Search History" to find information about this vehicle.
-        </p>
+        <div className="bg-gray-50 p-4 rounded-md border">
+          <Info className="h-5 w-5 text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground font-mono">
+            No historical data available. Click "Search History" to discover information about this vehicle.
+          </p>
+        </div>
       </div>
     );
   }
+
+  const hasData = historicalData.previousSales?.length || 
+                  historicalData.modifications?.length || 
+                  historicalData.notableHistory || 
+                  historicalData.conditionNotes;
 
   return (
     <div className="space-y-4">
@@ -46,88 +53,73 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
         </Button>
       </div>
 
-      {historicalData.previousSales && historicalData.previousSales.length > 0 && (
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="sales">
-            <AccordionTrigger className="hover:no-underline">
-              <div className="flex items-center gap-2">
+      {!hasData ? (
+        <div className="bg-gray-50 p-4 rounded-md border">
+          <Info className="h-5 w-5 text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground font-mono">
+            No significant historical data found for this vehicle.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {historicalData.previousSales && historicalData.previousSales.length > 0 && (
+            <div className="bg-white p-4 rounded-lg border shadow-sm">
+              <h4 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-[#283845]" />
-                <span className="font-mono text-sm font-semibold text-[#283845]">
-                  Previous Sales ({historicalData.previousSales.length})
-                </span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
+                Sales History
+              </h4>
               <div className="space-y-3">
                 {historicalData.previousSales.map((sale, index) => (
-                  <div key={index} className="bg-gray-50 p-3 rounded-md border text-sm font-mono">
-                    {sale.date && <div className="flex items-center gap-2"><Calendar className="h-3 w-3" /> {sale.date}</div>}
-                    {sale.price && <div className="flex items-center gap-2"><DollarSign className="h-3 w-3" /> {sale.price}</div>}
+                  <div key={index} className="bg-gray-50 p-3 rounded-md text-sm font-mono">
+                    <div className="flex items-center gap-2 text-[#283845]">
+                      {sale.date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {sale.date}</span>}
+                      {sale.price && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> {sale.price}</span>}
+                    </div>
                     {sale.source && <div className="text-muted-foreground text-xs mt-1">Source: {sale.source}</div>}
                   </div>
                 ))}
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
+            </div>
+          )}
 
-      {historicalData.modifications && historicalData.modifications.length > 0 && (
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="modifications">
-            <AccordionTrigger className="hover:no-underline">
-              <div className="flex items-center gap-2">
+          {historicalData.modifications && historicalData.modifications.length > 0 && (
+            <div className="bg-white p-4 rounded-lg border shadow-sm">
+              <h4 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
                 <Wrench className="h-4 w-4 text-[#283845]" />
-                <span className="font-mono text-sm font-semibold text-[#283845]">
-                  Modifications ({historicalData.modifications.length})
-                </span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
+                Modifications
+              </h4>
               <ul className="space-y-2 list-disc list-inside">
                 {historicalData.modifications.map((mod, index) => (
-                  <li key={index} className="font-mono text-sm pl-2">{mod}</li>
+                  <li key={index} className="font-mono text-sm text-[#283845]">{mod}</li>
                 ))}
               </ul>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
+            </div>
+          )}
 
-      {historicalData.notableHistory && (
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="history">
-            <AccordionTrigger className="hover:no-underline">
-              <div className="flex items-center gap-2">
+          {historicalData.notableHistory && (
+            <div className="bg-white p-4 rounded-lg border shadow-sm">
+              <h4 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
                 <Car className="h-4 w-4 text-[#283845]" />
-                <span className="font-mono text-sm font-semibold text-[#283845]">Notable History</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md border">
+                Notable History
+              </h4>
+              <p className="font-mono text-sm text-[#283845] whitespace-pre-wrap">
                 {historicalData.notableHistory}
               </p>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
+            </div>
+          )}
 
-      {historicalData.conditionNotes && (
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="condition">
-            <AccordionTrigger className="hover:no-underline">
-              <div className="flex items-center gap-2">
+          {historicalData.conditionNotes && (
+            <div className="bg-white p-4 rounded-lg border shadow-sm">
+              <h4 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
                 <Wrench className="h-4 w-4 text-[#283845]" />
-                <span className="font-mono text-sm font-semibold text-[#283845]">Condition Assessment</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <p className="font-mono text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md border">
+                Condition Assessment
+              </h4>
+              <p className="font-mono text-sm text-[#283845] whitespace-pre-wrap">
                 {historicalData.conditionNotes}
               </p>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
