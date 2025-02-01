@@ -20,7 +20,7 @@ export const InventoryForm = () => {
     notes: "",
   });
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -43,9 +43,14 @@ export const InventoryForm = () => {
 
       if (error) throw error;
 
+      // Check if result is an array and has items
+      const detectedLabel = Array.isArray(result) && result.length > 0 
+        ? result[0].label || 'Unknown'
+        : 'Unknown';
+
       toast({
         title: "Image processed successfully",
-        description: `Detected: ${result[0].label}`,
+        description: `Detected: ${detectedLabel}`,
       });
     } catch (error) {
       console.error("Error processing image:", error);
