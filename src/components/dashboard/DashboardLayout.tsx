@@ -4,7 +4,6 @@ import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
 import { GarageManagement } from "@/components/garage/GarageManagement";
 import { CommandBar } from "./CommandBar";
-import { supabase } from "@/integrations/supabase/client";
 import { ReactNode } from "react";
 import { 
   Car, 
@@ -13,10 +12,9 @@ import {
   Building2, 
   Terminal,
   HelpCircle,
-  UserRound,
-  Trees
+  UserRound
 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { ProfessionalDashboard } from './ProfessionalDashboard';
 
 interface DashboardLayoutProps {
@@ -44,17 +42,17 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFFFF] font-system">
-      <header className="border-b border-[#000066] bg-[#FFFFFF]">
-        <div className="max-w-7xl mx-auto px-2">
-          <div className="flex justify-between items-center h-6">
-            <div className="flex items-center gap-2">
-              <span className="text-tiny text-[#000066] font-mono">TAMS/v1.0</span>
-              <span className="text-tiny text-[#666666] font-mono">SID:{new Date().getTime()}</span>
+    <div className="min-h-screen bg-background font-system animate-fade-in">
+      <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex justify-between items-center h-14">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-primary font-mono">TAMS/v1.0</span>
+              <span className="text-sm text-muted-foreground font-mono">SID:{new Date().getTime()}</span>
             </div>
             <button
               onClick={() => supabase.auth.signOut()}
-              className="px-2 py-0.5 bg-[#C8C8C9] text-tiny hover:bg-[#8A898C] transition-colors border border-[#403E43] font-mono"
+              className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-sm transition-colors rounded-md font-mono"
             >
               EXIT_SYS
             </button>
@@ -62,65 +60,65 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-2 py-1">
-        <div className="mb-1 text-tiny font-mono">
-          <span className="text-[#666666]">[SYS_MSG]</span>
-          <span className="text-[#403E43] ml-2">DATA_COLLECTION_NOTICE_ACTIVE</span>
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        <div className="mb-4 text-sm font-mono">
+          <span className="text-muted-foreground">[SYS_MSG]</span>
+          <span className="text-foreground/80 ml-2">DATA_COLLECTION_NOTICE_ACTIVE</span>
         </div>
 
-        <Tabs defaultValue="inventory" className="w-full">
-          <TabsList className="w-full border-b border-[#000066] mb-1 bg-transparent h-6">
+        <Tabs defaultValue="inventory" className="w-full animate-scale-in">
+          <TabsList className="w-full h-12 bg-secondary/20 rounded-lg p-1">
             <div className="flex justify-between w-full">
               <div className="flex">
                 <TabsTrigger 
                   value="inventory" 
-                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
                 >
-                  <Warehouse className="w-3 h-3" />
+                  <Warehouse className="w-4 h-4" />
                   TAMS-1:INV
                 </TabsTrigger>
                 <TabsTrigger 
                   value="vehicles" 
-                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
                 >
-                  <Car className="w-3 h-3" />
+                  <Car className="w-4 h-4" />
                   TAMS-2:VEH
                 </TabsTrigger>
                 <TabsTrigger 
                   value="service" 
-                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
                 >
-                  <Wrench className="w-3 h-3" />
+                  <Wrench className="w-4 h-4" />
                   TAMS-3:SVC
                 </TabsTrigger>
                 <TabsTrigger 
                   value="garages" 
-                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
                 >
-                  <Building2 className="w-3 h-3" />
+                  <Building2 className="w-4 h-4" />
                   TAMS-4:GAR
                 </TabsTrigger>
                 <TabsTrigger 
                   value="professional" 
-                  className="text-tiny h-6 data-[state=active]:border-b data-[state=active]:border-[#000066] font-mono flex items-center gap-1"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
                 >
-                  <UserRound className="w-3 h-3" />
+                  <UserRound className="w-4 h-4" />
                   TAMS-5:PRO
                 </TabsTrigger>
               </div>
-              <div className="flex items-center gap-2 pr-1">
+              <div className="flex items-center gap-4 px-2">
                 <button
                   onClick={() => showHelp('terminal')}
-                  className="text-tiny text-[#666666] hover:text-[#403E43] flex items-center gap-1"
+                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
                 >
-                  <Terminal className="w-3 h-3" />
+                  <Terminal className="w-4 h-4" />
                   <span className="hidden sm:inline">CMD Help</span>
                 </button>
                 <button
                   onClick={() => showHelp(document.querySelector('[data-state="active"]')?.getAttribute('value') || 'inventory')}
-                  className="text-tiny text-[#666666] hover:text-[#403E43] flex items-center gap-1"
+                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
                 >
-                  <HelpCircle className="w-3 h-3" />
+                  <HelpCircle className="w-4 h-4" />
                   <span className="hidden sm:inline">Section Help</span>
                 </button>
               </div>
@@ -129,29 +127,31 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
           <CommandBar />
 
-          <TabsContent value="inventory">
-            <InventoryForm />
-          </TabsContent>
+          <div className="mt-6 space-y-6">
+            <TabsContent value="inventory" className="animate-fade-in">
+              <InventoryForm />
+            </TabsContent>
 
-          <TabsContent value="vehicles">
-            <VehicleManagement />
-          </TabsContent>
+            <TabsContent value="vehicles" className="animate-fade-in">
+              <VehicleManagement />
+            </TabsContent>
 
-          <TabsContent value="service">
-            <ServiceManagement />
-          </TabsContent>
+            <TabsContent value="service" className="animate-fade-in">
+              <ServiceManagement />
+            </TabsContent>
 
-          <TabsContent value="garages">
-            <GarageManagement />
-          </TabsContent>
+            <TabsContent value="garages" className="animate-fade-in">
+              <GarageManagement />
+            </TabsContent>
 
-          <TabsContent value="professional">
-            <ProfessionalDashboard />
-          </TabsContent>
+            <TabsContent value="professional" className="animate-fade-in">
+              <ProfessionalDashboard />
+            </TabsContent>
+          </div>
         </Tabs>
         {children}
 
-        <footer className="mt-2 text-tiny text-[#666666] border-t border-[#403E43] pt-1 font-mono">
+        <footer className="mt-8 text-sm text-muted-foreground border-t border-border/40 pt-4 font-mono">
           <div className="flex justify-between">
             <span>PRIV_ACT_1974:ACTIVE</span>
             <span>EST_BURDEN:0.5HR</span>
