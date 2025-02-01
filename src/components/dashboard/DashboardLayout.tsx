@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InventoryForm } from "@/components/inventory/InventoryForm";
 import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
+import { GarageManagement } from "@/components/garage/GarageManagement";
 import { supabase } from "@/integrations/supabase/client";
 import { ReactNode } from "react";
 
@@ -64,6 +65,12 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             >
               Form TAMS-3: Service Records
             </TabsTrigger>
+            <TabsTrigger 
+              value="garages" 
+              className="text-doc data-[state=active]:border-b-2 data-[state=active]:border-gov-blue"
+            >
+              Form TAMS-4: Garage Management
+            </TabsTrigger>
           </TabsList>
 
           <div className="text-tiny mb-4 text-gray-600">
@@ -80,6 +87,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
           <TabsContent value="service">
             <ServiceManagement />
+          </TabsContent>
+
+          <TabsContent value="garages">
+            <GarageManagement />
           </TabsContent>
         </Tabs>
         {children}

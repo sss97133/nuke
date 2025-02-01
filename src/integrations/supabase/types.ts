@@ -9,6 +9,56 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      garage_members: {
+        Row: {
+          created_at: string
+          garage_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          garage_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          garage_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "garage_members_garage_id_fkey"
+            columns: ["garage_id"]
+            isOneToOne: false
+            referencedRelation: "garages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      garages: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           ai_classification: Json | null
@@ -314,7 +364,16 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role:
+        | "admin"
+        | "user"
+        | "system_admin"
+        | "business_admin"
+        | "moderator"
+        | "expert"
+        | "dealer"
+        | "professional"
+        | "garage_admin"
     }
     CompositeTypes: {
       [_ in never]: never
