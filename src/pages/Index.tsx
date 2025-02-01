@@ -125,28 +125,28 @@ const Index = () => {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F4F1DE]">
-        <div className="text-center space-y-4 w-full max-w-md p-6">
-          <h1 className="text-4xl font-mono text-[#283845]">
-            Automotive Inventory System
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF5]">
+        <div className="text-center space-y-4 w-full max-w-md p-6 border border-gray-200 shadow-sm bg-white">
+          <h1 className="text-2xl font-mono text-[#283845] tracking-tight">
+            Technical Asset Management System
           </h1>
-          <p className="text-[#9B2915]">Please sign in to continue</p>
+          <p className="text-[#666] text-sm font-mono">Authentication Required</p>
           <div className="space-y-4">
             <Input
               type="tel"
-              placeholder="Enter phone number (e.g., +1234567890)"
+              placeholder="Phone Number (Format: +1234567890)"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="w-full"
+              className="font-mono text-sm"
               disabled={isLoading}
             />
             {!showOtpInput ? (
               <Button
                 onClick={handleSendOtp}
-                className="w-full bg-[#283845] text-white font-mono hover:bg-[#1a2830] transition-colors"
+                className="w-full bg-[#283845] text-white font-mono text-sm hover:bg-[#1a2830] transition-colors"
                 disabled={isLoading || !phoneNumber.trim()}
               >
-                {isLoading ? "Sending..." : "Send OTP"}
+                {isLoading ? "Processing..." : "Request Authentication Code"}
               </Button>
             ) : (
               <div className="space-y-4">
@@ -158,22 +158,22 @@ const Index = () => {
                   render={({ slots }) => (
                     <InputOTPGroup className="gap-2 justify-center">
                       {slots.map((slot, idx) => (
-                        <InputOTPSlot key={idx} index={idx} />
+                        <InputOTPSlot key={idx} index={idx} className="font-mono" />
                       ))}
                     </InputOTPGroup>
                   )}
                 />
                 <Button
                   onClick={handleVerifyOtp}
-                  className="w-full bg-[#283845] text-white font-mono hover:bg-[#1a2830] transition-colors"
+                  className="w-full bg-[#283845] text-white font-mono text-sm hover:bg-[#1a2830] transition-colors"
                   disabled={isLoading || otp.length !== 6}
                 >
-                  {isLoading ? "Verifying..." : "Verify OTP"}
+                  {isLoading ? "Verifying..." : "Verify Authentication Code"}
                 </Button>
               </div>
             )}
-            <p className="text-sm text-gray-600">
-              Enter your phone number with country code (e.g., +1 for US numbers)
+            <p className="text-xs text-gray-500 font-mono">
+              System requires valid phone number with country code
             </p>
           </div>
         </div>
@@ -182,44 +182,57 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF5] p-6 font-mono">
-      <header className="mb-8 border-b-2 border-[#283845] pb-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl text-[#283845]">AUTOMOTIVE INVENTORY SYSTEM</h1>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="px-4 py-2 bg-[#9B2915] text-white hover:bg-[#7a1f10] transition-colors"
-          >
-            Sign Out
-          </button>
+    <div className="min-h-screen bg-[#FAFAF5]">
+      <header className="border-b border-gray-200 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <h1 className="text-lg font-mono text-[#283845] tracking-tight">TAMS/v1.0</h1>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="px-3 py-1 bg-[#F5F5F5] text-[#333] text-sm font-mono hover:bg-[#E5E5E5] transition-colors border border-gray-200"
+            >
+              Terminate Session
+            </button>
+          </div>
         </div>
       </header>
 
-      <Tabs defaultValue="inventory" className="w-full">
-        <TabsList className="w-full border-b border-[#283845] mb-4">
-          <TabsTrigger value="inventory" className="font-mono">
-            Inventory
-          </TabsTrigger>
-          <TabsTrigger value="vehicles" className="font-mono">
-            Vehicles
-          </TabsTrigger>
-          <TabsTrigger value="service" className="font-mono">
-            Service Tickets
-          </TabsTrigger>
-        </TabsList>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Tabs defaultValue="inventory" className="w-full">
+          <TabsList className="w-full border-b border-gray-200 mb-6 bg-transparent">
+            <TabsTrigger 
+              value="inventory" 
+              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
+            >
+              Inventory Management
+            </TabsTrigger>
+            <TabsTrigger 
+              value="vehicles" 
+              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
+            >
+              Vehicle Registry
+            </TabsTrigger>
+            <TabsTrigger 
+              value="service" 
+              className="font-mono text-sm data-[state=active]:border-b-2 data-[state=active]:border-[#283845]"
+            >
+              Service Records
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="inventory">
-          <InventoryForm />
-        </TabsContent>
+          <TabsContent value="inventory">
+            <InventoryForm />
+          </TabsContent>
 
-        <TabsContent value="vehicles">
-          <VehicleList />
-        </TabsContent>
+          <TabsContent value="vehicles">
+            <VehicleList />
+          </TabsContent>
 
-        <TabsContent value="service">
-          <ServiceTicketList />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="service">
+            <ServiceTicketList />
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 };
