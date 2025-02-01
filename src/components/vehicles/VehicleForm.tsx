@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { VinCapture } from "./VinCapture";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export const VehicleForm = () => {
   const { toast } = useToast();
@@ -16,26 +22,35 @@ export const VehicleForm = () => {
     vin: "",
     notes: "",
   });
+  const [vinDetails, setVinDetails] = useState<any>(null);
 
   const handleVinData = (data: any) => {
-    const vehicleData = data.data.reduce((acc: any, item: any) => {
-      if (item.Variable === "Make") acc.make = item.Value;
-      if (item.Variable === "Model") acc.model = item.Value;
-      if (item.Variable === "Model Year") acc.year = parseInt(item.Value);
-      if (item.Variable === "VIN") acc.vin = item.Value;
-      return acc;
-    }, {});
+    console.log("Received VIN data:", data);
+    if (data.data) {
+      setVinDetails(data.data);
+      setFormData(prev => ({
+        ...prev,
+        make: data.data.basic.make || "",
+        model: data.data.basic.model || "",
+        year: parseInt(data.data.basic.year) || new Date().getFullYear(),
+        vin: data.vin || "",
+        notes: `Manufacturer: ${data.data.basic.manufacturer || 'N/A'}\nEngine: ${data.data.specifications.engineType || 'N/A'}\nTransmission: ${data.data.specifications.transmissionStyle || 'N/A'}`
+      }));
 
-    setFormData(prev => ({
-      ...prev,
-      ...vehicleData
-    }));
+      toast({
+        title: "VIN Details Retrieved",
+        description: "Vehicle information has been automatically filled.",
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("vehicles").insert([formData]);
+      const { error } = await supabase.from("vehicles").insert([{
+        ...formData,
+        vin_verification_data: vinDetails
+      }]);
 
       if (error) throw error;
 
@@ -50,6 +65,7 @@ export const VehicleForm = () => {
         vin: "",
         notes: "",
       });
+      setVinDetails(null);
     } catch (error) {
       console.error("Error registering vehicle:", error);
       toast({
@@ -105,6 +121,93 @@ export const VehicleForm = () => {
           />
         </div>
       </div>
+
+      {vinDetails && (
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="manufacturing">
+            <AccordionTrigger className="text-sm font-mono">
+              Manufacturing Details
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-semibold">Plant Country:</span> {vinDetails.manufacturing.plantCountry}
+                </div>
+                <div>
+                  <span className="font-semibold">Plant Location:</span> {vinDetails.manufacturing.plantCity}, {vinDetails.manufacturing.plantState}
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="specifications">
+            <AccordionTrigger className="text-sm font-mono">
+              Technical Specifications
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-semibold">Engine:</span> {vinDetails.specifications.engineType}
+                </div>
+                <div>
+                  <span className="font-semibold">Transmission:</span> {vinDetails.specifications.transmissionStyle}
+                </div>
+                <div>
+                  <span className="font-semibold">Drive Type:</span> {vinDetails.specifications.driveType}
+                </div>
+                <div>
+                  <span className="font-semibold">Engine HP:</span> {vinDetails.specifications.engineHP}
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="characteristics">
+            <AccordionTrigger className="text-sm font-mono">
+              Vehicle Characteristics
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-semibold">Body Class:</span> {vinDetails.characteristics.bodyClass}
+                </div>
+                <div>
+                  <span className="font-semibold">Doors:</span> {vinDetails.characteristics.doors}
+                </div>
+                <div>
+                  <span className="font-semibold">Series:</span> {vinDetails.characteristics.series}
+                </div>
+                <div>
+                  <span className="font-semibold">Trim:</span> {vinDetails.characteristics.trim}
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="safety">
+            <AccordionTrigger className="text-sm font-mono">
+              Safety Features
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-semibold">Safety Rating:</span> {vinDetails.safety.safetyRating}
+                </div>
+                <div>
+                  <span className="font-semibold">Airbag Locations:</span> {vinDetails.safety.airBagLocations}
+                </div>
+                <div>
+                  <span className="font-semibold">ABS:</span> {vinDetails.safety.antiLockBrakingSystem}
+                </div>
+                <div>
+                  <span className="font-semibold">Traction Control:</span> {vinDetails.safety.tractionControlType}
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="notes" className="font-mono text-sm">Notes</Label>
         <Textarea
