@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Plus, Users, Building } from "lucide-react";
+import { ImportGarages } from "./ImportGarages";
 
 export const GarageManagement = () => {
   const [newGarageName, setNewGarageName] = useState("");
@@ -78,6 +79,7 @@ export const GarageManagement = () => {
           <Plus className="w-3 h-3 mr-1" />
           ADD
         </Button>
+        <ImportGarages />
       </div>
 
       <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
