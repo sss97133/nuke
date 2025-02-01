@@ -40,21 +40,33 @@ export type Database = {
       }
       garages: {
         Row: {
+          address: string | null
           created_at: string
+          google_place_id: string | null
           id: string
+          location: Json | null
           name: string
+          rating: number | null
           updated_at: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
+          google_place_id?: string | null
           id?: string
+          location?: Json | null
           name: string
+          rating?: number | null
           updated_at?: string
         }
         Update: {
+          address?: string | null
           created_at?: string
+          google_place_id?: string | null
           id?: string
+          location?: Json | null
           name?: string
+          rating?: number | null
           updated_at?: string
         }
         Relationships: []
