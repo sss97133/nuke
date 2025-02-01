@@ -19,7 +19,11 @@ export const ImportGarages = () => {
 
       // Get user's location
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        });
       });
 
       // Show searching toast
@@ -30,8 +34,8 @@ export const ImportGarages = () => {
 
       const { data, error } = await supabase.functions.invoke('search-local-garages', {
         body: {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
           radius: 5000 // 5km radius
         }
       });
@@ -43,12 +47,12 @@ export const ImportGarages = () => {
         description: `Found and imported ${data?.garages?.length || 0} garages`,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Import error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to import garages",
-        variant: "destructive"
+        description: error.message || "Failed to import garages. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setImporting(false);
@@ -59,7 +63,7 @@ export const ImportGarages = () => {
     <Button
       onClick={importGarages}
       size="sm"
-      className="h-7 bg-[#283845] hover:bg-[#1a2830] text-white text-xs"
+      className="h-7 bg-[#283845] hover:bg-[#1a2830] text-white text-xs disabled:opacity-50 disabled:cursor-not-allowed"
       disabled={importing}
     >
       {importing ? (
