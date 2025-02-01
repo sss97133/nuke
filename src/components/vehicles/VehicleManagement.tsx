@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { VehicleList } from "./VehicleList";
+import { VehicleList } from "@/components/inventory/VehicleList";
 import { VehicleForm } from "./VehicleForm";
 import { Button } from "@/components/ui/button";
 

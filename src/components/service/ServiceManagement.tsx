@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ServiceTicketList } from "./ServiceTicketList";
+import { ServiceTicketList } from "@/components/inventory/ServiceTicketList";
 import { ServiceTicketForm } from "./ServiceTicketForm";
 import { Button } from "@/components/ui/button";
 

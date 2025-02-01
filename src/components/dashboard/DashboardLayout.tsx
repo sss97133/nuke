@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InventoryForm } from "@/components/inventory/InventoryForm";
 import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
+import { supabase } from "@/integrations/supabase/client";
 
 export const DashboardLayout = () => {
   return (
