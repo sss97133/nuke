@@ -24,9 +24,9 @@ export interface VehicleHistoricalData {
 export interface Vehicle {
   id: string;
   vin?: string;
-  make?: string;
-  model?: string;
-  year?: number;
+  make: string;
+  model: string;
+  year: number;
   color?: string;
   notes?: string;
   images?: string[];
