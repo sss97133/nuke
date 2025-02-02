@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { pipeline } from "@huggingface/transformers";
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,20 +19,15 @@ serve(async (req) => {
       throw new Error('No image provided')
     }
 
-    // Create image classification pipeline using WebGPU
-    const classifier = await pipeline(
-      "image-classification",
-      "onnx-community/mobilenetv4_conv_small.e2400_r224_in1k",
-      { device: "webgpu" }
-    );
+    const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'))
 
-    // Convert FormData file to URL for the classifier
-    const imageUrl = URL.createObjectURL(imageFile);
-    
-    // Analyze image
-    const results = await classifier(imageUrl);
-    
-    console.log('AI Classification results:', results);
+    // Use a fast and efficient model for object detection
+    const results = await hf.imageClassification({
+      model: 'onnx-community/mobilenetv4_conv_small.e2400_r224_in1k',
+      data: await imageFile.arrayBuffer(),
+    })
+
+    console.log('AI Classification results:', results)
 
     return new Response(
       JSON.stringify({
