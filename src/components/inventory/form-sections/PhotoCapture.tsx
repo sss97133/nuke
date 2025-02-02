@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { QRCode } from "react-qr-code";
+import QRCode from "react-qr-code";
 import { useToast } from "@/components/ui/use-toast";
 
 interface PhotoCaptureProps {
-  onPhotoCapture: (file: File) => void;
+  onPhotoCapture: (file: File) => Promise<void>;
   onSkip: () => void;
 }
 
