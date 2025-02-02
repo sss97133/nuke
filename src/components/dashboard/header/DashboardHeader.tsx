@@ -1,12 +1,23 @@
 import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarShortcut, MenubarTrigger } from "@/components/ui/menubar";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Atom } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
 }
 
 export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center h-6 px-2 bg-secondary border-b border-border shadow-classic">
@@ -107,7 +118,7 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
         <div className="flex items-center gap-2 ml-2">
           <ThemeToggle />
           <span className="text-[10px] text-foreground">Battery: 100%</span>
-          <span className="text-[10px] text-foreground">{new Date().toLocaleTimeString()}</span>
+          <span className="text-[10px] text-foreground">{currentTime}</span>
         </div>
       </div>
     </header>
