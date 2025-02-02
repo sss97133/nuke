@@ -56,7 +56,9 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
       return;
     }
 
-    setComments(data);
+    if (data) {
+      setComments(data as Comment[]);
+    }
   };
 
   const subscribeToComments = () => {
@@ -132,15 +134,15 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
       >
         <div className="flex items-start space-x-4">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={comment.profiles.avatar_url} />
+            <AvatarImage src={comment.profiles?.avatar_url} />
             <AvatarFallback>
-              {comment.profiles.username?.[0]?.toUpperCase() || "U"}
+              {comment.profiles?.username?.[0]?.toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 space-y-1">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">
-                {comment.profiles.username || "Anonymous"}
+                {comment.profiles?.username || "Anonymous"}
               </p>
               <span className="text-xs text-muted-foreground">
                 {formatDistance(new Date(comment.created_at), new Date(), {
@@ -159,22 +161,17 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
                 <Reply className="mr-2 h-4 w-4" />
                 Reply
               </Button>
-              {(async () => {
-                const {
-                  data: { user },
-                } = await supabase.auth.getUser();
-                return user?.id === comment.user_id ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-destructive"
-                    onClick={() => handleDeleteComment(comment.id)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                ) : null;
-              })()}
+              {comment.user_id === supabase.auth.getUser().then(({ data }) => data.user?.id) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-destructive"
+                  onClick={() => handleDeleteComment(comment.id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              )}
             </div>
           </div>
         </div>

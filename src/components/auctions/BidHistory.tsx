@@ -50,7 +50,9 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
       return;
     }
 
-    setBids(data);
+    if (data) {
+      setBids(data as Bid[]);
+    }
   };
 
   const subscribeToBids = () => {
@@ -89,14 +91,14 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
             className="flex items-center space-x-4 p-3 bg-background rounded-lg border animate-fade-in"
           >
             <Avatar className="h-8 w-8">
-              <AvatarImage src={bid.profiles.avatar_url} />
+              <AvatarImage src={bid.profiles?.avatar_url} />
               <AvatarFallback>
-                {bid.profiles.username?.[0]?.toUpperCase() || "U"}
+                {bid.profiles?.username?.[0]?.toUpperCase() || "U"}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
               <p className="text-sm font-medium">
-                {bid.profiles.username || "Anonymous"}
+                {bid.profiles?.username || "Anonymous"}
               </p>
               <p className="text-xs text-muted-foreground">
                 {formatDistance(new Date(bid.created_at), new Date(), {
