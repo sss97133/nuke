@@ -3,22 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
+import { Session } from "@supabase/supabase-js";
 
 const Index = () => {
-  // Temporarily bypass authentication by setting a mock session
-  const mockSession = {
-    user: {
-      id: 'temporary-user-id',
-      email: 'temp@example.com'
-    }
-  };
-  
-  const [session, setSession] = useState(mockSession);
-  const [loading, setLoading] = useState(false); // Set to false to skip loading state
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Comment out authentication logic temporarily
-  /*
   useEffect(() => {
     // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -42,17 +33,30 @@ const Index = () => {
 
     return () => subscription.unsubscribe();
   }, [toast]);
-  */
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-background-dark">
+        <div className="animate-pulse space-y-4 text-center">
+          <div className="h-8 w-32 bg-muted dark:bg-muted-dark rounded mx-auto"></div>
+          <p className="text-muted-foreground dark:text-muted-foreground-dark">
+            Loading...
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Always render DashboardLayout by removing the session check
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-background-dark p-4">
+        <div className="w-full max-w-md">
+          <AuthForm />
+        </div>
+      </div>
+    );
+  }
+
   return <DashboardLayout />;
 };
 
