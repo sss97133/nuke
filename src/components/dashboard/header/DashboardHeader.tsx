@@ -10,36 +10,38 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center h-6 px-2 bg-secondary border-b border-border shadow-classic">
-        <MenubarMenu>
-          <MenubarTrigger className="p-1">
-            <Apple className="h-4 w-4 text-red-500" />
-          </MenubarTrigger>
-          <MenubarContent>
-            <MenubarItem onClick={() => handleMenuAction("about")}>
-              About NUKE
-            </MenubarItem>
-            <MenubarSeparator />
-            <MenubarItem onClick={() => handleMenuAction("preferences")}>
-              System Preferences...
-              <MenubarShortcut>⌘,</MenubarShortcut>
-            </MenubarItem>
-            <MenubarSeparator />
-            <MenubarItem onClick={() => handleMenuAction("sleep")}>
-              Sleep
-            </MenubarItem>
-            <MenubarItem onClick={() => handleMenuAction("restart")}>
-              Restart...
-            </MenubarItem>
-            <MenubarItem onClick={() => handleMenuAction("shutdown")}>
-              Shut Down...
-            </MenubarItem>
-            <MenubarSeparator />
-            <MenubarItem onClick={() => handleMenuAction("exit")}>
-              Log Out
-              <MenubarShortcut>⇧⌘Q</MenubarShortcut>
-            </MenubarItem>
-          </MenubarContent>
-        </MenubarMenu>
+        <Menubar className="border-none bg-transparent">
+          <MenubarMenu>
+            <MenubarTrigger className="p-1">
+              <Apple className="h-4 w-4 text-red-500" />
+            </MenubarTrigger>
+            <MenubarContent>
+              <MenubarItem onClick={() => handleMenuAction("about")}>
+                About NUKE
+              </MenubarItem>
+              <MenubarSeparator />
+              <MenubarItem onClick={() => handleMenuAction("preferences")}>
+                System Preferences...
+                <MenubarShortcut>⌘,</MenubarShortcut>
+              </MenubarItem>
+              <MenubarSeparator />
+              <MenubarItem onClick={() => handleMenuAction("sleep")}>
+                Sleep
+              </MenubarItem>
+              <MenubarItem onClick={() => handleMenuAction("restart")}>
+                Restart...
+              </MenubarItem>
+              <MenubarItem onClick={() => handleMenuAction("shutdown")}>
+                Shut Down...
+              </MenubarItem>
+              <MenubarSeparator />
+              <MenubarItem onClick={() => handleMenuAction("exit")}>
+                Log Out
+                <MenubarShortcut>⇧⌘Q</MenubarShortcut>
+              </MenubarItem>
+            </MenubarContent>
+          </MenubarMenu>
+        </Menubar>
 
         <div className="flex-1">
           <Menubar className="border-none bg-transparent">
