@@ -39,10 +39,10 @@ export const AuctionList = () => {
   const [sortBy, setSortBy] = useState<string>("ending-soon");
   const queryClient = useQueryClient();
 
-  const { data: auctions, isLoading } = useQuery({
+  const { data: auctions, isLoading, error } = useQuery({
     queryKey: ['auctions', sortBy],
     queryFn: async () => {
-      console.log('Fetching auctions data...');
+      console.log('🔍 Fetching auctions with sort:', sortBy);
       let query = supabase
         .from('auctions')
         .select(`
@@ -64,26 +64,30 @@ export const AuctionList = () => {
           break;
       }
 
-      const { data, error } = await query;
+      const { data: response, error: queryError } = await query;
 
-      if (error) {
-        console.error('Error fetching auctions:', error);
-        throw error;
+      if (queryError) {
+        console.error('❌ Error fetching auctions:', queryError);
+        throw queryError;
       }
 
-      console.log('Received auctions data:', data);
-      return data.map((auction: any) => ({
+      console.log('✅ Received auctions data:', response);
+      
+      const formattedData = response?.map((auction: any) => ({
         ...auction,
         _count: {
           auction_bids: auction.auction_bids?.[0]?.count ?? 0,
           auction_comments: auction.auction_comments?.[0]?.count ?? 0
         }
-      })) as Auction[];
+      })) || [];
+
+      console.log('🔄 Formatted auction data:', formattedData);
+      return formattedData as Auction[];
     }
   });
 
   useEffect(() => {
-    console.log('Setting up real-time subscriptions...');
+    console.log('🔌 Setting up real-time subscriptions...');
     
     const auctionChannel = supabase
       .channel('auction_updates')
@@ -95,7 +99,7 @@ export const AuctionList = () => {
           table: 'auctions'
         },
         (payload) => {
-          console.log('Received auction update:', payload);
+          console.log('📢 Received auction update:', payload);
           queryClient.invalidateQueries({ queryKey: ['auctions'] });
           
           if (payload.eventType === 'UPDATE') {
@@ -119,7 +123,7 @@ export const AuctionList = () => {
           table: 'auction_bids'
         },
         (payload) => {
-          console.log('Received new bid:', payload);
+          console.log('💰 Received new bid:', payload);
           queryClient.invalidateQueries({ queryKey: ['auctions'] });
           toast({
             title: "New Bid",
@@ -140,14 +144,14 @@ export const AuctionList = () => {
           table: 'auction_comments'
         },
         (payload) => {
-          console.log('Received comment update:', payload);
+          console.log('💭 Received comment update:', payload);
           queryClient.invalidateQueries({ queryKey: ['auctions'] });
         }
       )
       .subscribe();
 
     return () => {
-      console.log('Cleaning up subscriptions...');
+      console.log('🔌 Cleaning up subscriptions...');
       supabase.removeChannel(auctionChannel);
       supabase.removeChannel(bidChannel);
       supabase.removeChannel(commentChannel);
@@ -155,6 +159,7 @@ export const AuctionList = () => {
   }, [queryClient, toast]);
 
   const handleBidSubmit = async (auctionId: string, amount: number) => {
+    console.log('💸 Submitting bid:', { auctionId, amount });
     const { error } = await supabase
       .from('auction_bids')
       .insert([{
@@ -164,6 +169,7 @@ export const AuctionList = () => {
       }]);
 
     if (error) {
+      console.error('❌ Error placing bid:', error);
       toast({
         title: "Error placing bid",
         description: error.message,
@@ -172,6 +178,7 @@ export const AuctionList = () => {
       return;
     }
 
+    console.log('✅ Bid placed successfully');
     toast({
       title: "Bid placed successfully",
       description: `Your bid of $${amount.toLocaleString()} has been placed.`
@@ -179,6 +186,7 @@ export const AuctionList = () => {
   };
 
   const handleToggleDetails = (auctionId: string) => {
+    console.log('🔄 Toggling details for auction:', auctionId);
     setSelectedAuction(selectedAuction === auctionId ? null : auctionId);
   };
 
@@ -186,6 +194,15 @@ export const AuctionList = () => {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <div className="animate-pulse text-gray-400">Loading auctions...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    console.error('❌ Error in auction list:', error);
+    return (
+      <div className="flex items-center justify-center min-h-[200px] text-red-500">
+        Error loading auctions. Please try again.
       </div>
     );
   }
@@ -213,13 +230,7 @@ export const AuctionList = () => {
         {auctions?.map((auction) => (
           <div key={auction.id} className="space-y-6">
             <AuctionCard
-              auction={{
-                ...auction,
-                _count: {
-                  auction_bids: auction._count.auction_bids,
-                  auction_comments: auction._count.auction_comments
-                }
-              }}
+              auction={auction}
               onBidSubmit={handleBidSubmit}
               onToggleDetails={handleToggleDetails}
               selectedAuction={selectedAuction}
