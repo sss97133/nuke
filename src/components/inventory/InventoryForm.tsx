@@ -17,6 +17,14 @@ export const InventoryForm = () => {
     handleSubmit,
   } = useInventoryForm();
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsProcessing(true);
+    // Process image upload logic here if needed
+    setIsProcessing(false);
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto bg-white border border-gray-200 shadow-sm">
       <div className="border-b border-gray-200 bg-gray-50 p-4">
@@ -90,6 +98,8 @@ export const InventoryForm = () => {
         <AdditionalInformation
           notes={formData.notes}
           onNotesChange={(value) => setFormData({ ...formData, notes: value })}
+          onImageUpload={handleImageUpload}
+          isProcessing={isProcessing}
         />
 
         <ImageProcessing
