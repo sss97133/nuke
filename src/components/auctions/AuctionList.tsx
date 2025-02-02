@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AuctionComments } from "./AuctionComments";
 import { BidHistory } from "./BidHistory";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AuctionCard } from "./AuctionCard";
 import { 
   Select,
@@ -12,8 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Clock, TrendingUp, MessageSquare, Filter } from "lucide-react";
+import { Filter } from "lucide-react";
 
 interface Auction {
   id: string;
@@ -23,12 +22,14 @@ interface Auction {
   reserve_price: number | null;
   end_time: string;
   status: string;
-  bid_count: number;
-  comment_count: number;
   vehicle: {
     make: string;
     model: string;
     year: number;
+  };
+  _count: {
+    auction_bids: number;
+    auction_comments: number;
   };
 }
 
@@ -47,8 +48,8 @@ export const AuctionList = () => {
         .select(`
           *,
           vehicle:vehicles(make, model, year),
-          bid_count:auction_bids(count),
-          comment_count:auction_comments(count)
+          auction_bids(count),
+          auction_comments(count)
         `);
 
       switch (sortBy) {
@@ -73,17 +74,17 @@ export const AuctionList = () => {
       console.log('Received auctions data:', data);
       return data.map((auction: any) => ({
         ...auction,
-        bid_count: auction.bid_count?.[0]?.count ?? 0,
-        comment_count: auction.comment_count?.[0]?.count ?? 0
+        _count: {
+          auction_bids: auction.auction_bids?.[0]?.count ?? 0,
+          auction_comments: auction.auction_comments?.[0]?.count ?? 0
+        }
       })) as Auction[];
     }
   });
 
-  // Subscribe to real-time updates for auctions
   useEffect(() => {
     console.log('Setting up real-time subscriptions...');
     
-    // Channel for auction updates
     const auctionChannel = supabase
       .channel('auction_updates')
       .on(
@@ -108,7 +109,6 @@ export const AuctionList = () => {
       )
       .subscribe();
 
-    // Channel for bid updates
     const bidChannel = supabase
       .channel('bid_updates')
       .on(
@@ -130,7 +130,6 @@ export const AuctionList = () => {
       )
       .subscribe();
 
-    // Channel for comment updates
     const commentChannel = supabase
       .channel('comment_updates')
       .on(
@@ -217,8 +216,8 @@ export const AuctionList = () => {
               auction={{
                 ...auction,
                 _count: {
-                  auction_bids: auction.bid_count,
-                  auction_comments: auction.comment_count
+                  auction_bids: auction._count.auction_bids,
+                  auction_comments: auction._count.auction_comments
                 }
               }}
               onBidSubmit={handleBidSubmit}
