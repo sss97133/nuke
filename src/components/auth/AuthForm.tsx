@@ -94,34 +94,32 @@ export const AuthForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-secondary dark:bg-secondary-dark">
-      <div className="w-full max-w-[400px] mx-4">
-        <ClassicWindow title="Welcome">
-          <div className="space-y-6 px-4">
-            {!showOtpInput ? (
-              <PhoneInput
-                phoneNumber={phoneNumber}
-                setPhoneNumber={setPhoneNumber}
-                onSubmit={handleSendOtp}
-                isLoading={isLoading}
-              />
-            ) : (
-              <OtpInput
-                otp={otp}
-                setOtp={setOtp}
-                onSubmit={handleVerifyOtp}
-                isLoading={isLoading}
-              />
-            )}
-          </div>
+    <div className="w-full max-w-[400px]">
+      <ClassicWindow title="Welcome">
+        <div className="space-y-6">
+          {!showOtpInput ? (
+            <PhoneInput
+              phoneNumber={phoneNumber}
+              setPhoneNumber={setPhoneNumber}
+              onSubmit={handleSendOtp}
+              isLoading={isLoading}
+            />
+          ) : (
+            <OtpInput
+              otp={otp}
+              setOtp={setOtp}
+              onSubmit={handleVerifyOtp}
+              isLoading={isLoading}
+            />
+          )}
 
-          <div className="mt-8 pt-4 border-t border-border dark:border-border-dark">
+          <div className="pt-4 border-t border-border dark:border-border-dark">
             <p className="text-[10px] text-center text-muted-foreground dark:text-muted-foreground-dark">
               Fleet Manager © 2024
             </p>
           </div>
-        </ClassicWindow>
-      </div>
+        </div>
+      </ClassicWindow>
     </div>
   );
 };

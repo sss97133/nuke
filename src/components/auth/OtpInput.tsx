@@ -10,44 +10,38 @@ interface OtpInputProps {
 
 export const OtpInput = ({ otp, setOtp, onSubmit, isLoading }: OtpInputProps) => (
   <div className="space-y-4">
-    <div className="text-center mb-8">
-      <img 
-        src="/placeholder.svg" 
-        alt="Classic Mac Icon" 
-        className="w-20 h-20 mx-auto mb-4 opacity-80"
-      />
+    <div className="text-center">
       <h2 className="text-base font-system mb-1">Enter Code</h2>
       <p className="text-xs text-muted-foreground dark:text-muted-foreground-dark">
         Enter the code sent to your phone
       </p>
     </div>
 
-    <div className="space-y-4">
-      <InputOTP
-        maxLength={6}
-        value={otp}
-        onChange={setOtp}
-        disabled={isLoading}
-        render={({ slots }) => (
-          <InputOTPGroup className="gap-2 justify-center">
-            {slots.map((slot, idx) => (
-              <InputOTPSlot 
-                key={idx}
-                {...slot}
-                index={idx}
-                className="classic-input w-10 h-10 text-center"
-              />
-            ))}
-          </InputOTPGroup>
-        )}
-      />
-      <Button
-        onClick={onSubmit}
-        className="classic-button w-full"
-        disabled={isLoading || otp.length !== 6}
-      >
-        {isLoading ? "Verifying..." : "Sign In"}
-      </Button>
-    </div>
+    <InputOTP
+      maxLength={6}
+      value={otp}
+      onChange={setOtp}
+      disabled={isLoading}
+      render={({ slots }) => (
+        <InputOTPGroup className="gap-2 justify-center">
+          {slots.map((slot, idx) => (
+            <InputOTPSlot 
+              key={idx}
+              {...slot}
+              index={idx}
+              className="classic-input w-10 h-10 text-center"
+            />
+          ))}
+        </InputOTPGroup>
+      )}
+    />
+    
+    <Button
+      onClick={onSubmit}
+      className="classic-button w-full"
+      disabled={isLoading || otp.length !== 6}
+    >
+      {isLoading ? "Verifying..." : "Sign In"}
+    </Button>
   </div>
 );

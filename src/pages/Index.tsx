@@ -11,13 +11,11 @@ const Index = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -36,7 +34,7 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-background-dark">
+      <div className="min-h-screen flex items-center justify-center bg-secondary dark:bg-secondary-dark">
         <div className="animate-pulse space-y-4 text-center">
           <div className="h-8 w-32 bg-muted dark:bg-muted-dark rounded mx-auto"></div>
           <p className="text-muted-foreground dark:text-muted-foreground-dark">
@@ -49,10 +47,8 @@ const Index = () => {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background dark:bg-background-dark p-4">
-        <div className="w-full max-w-md">
-          <AuthForm />
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-secondary dark:bg-secondary-dark">
+        <AuthForm />
       </div>
     );
   }
