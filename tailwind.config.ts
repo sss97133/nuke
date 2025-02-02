@@ -32,7 +32,7 @@ export default {
           dark: '#8E9196',
         },
         background: {
-          DEFAULT: '#EAEAEA',
+          DEFAULT: '#FFFFFF',
           dark: '#1A1F2C',
         },
         foreground: {
@@ -61,7 +61,7 @@ export default {
           DEFAULT: '#F1F1F1',
           foreground: '#666666',
           dark: '#222222',
-          'dark-foreground': '#A1A1AA',
+          'dark-foreground': '#D4D4D4',
         },
         accent: {
           DEFAULT: '#D4D4D4',

@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 92%;
+    --background: 0 0% 100%;
     --foreground: 0 0% 13%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 13%;
@@ -38,7 +38,7 @@
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted-foreground: 240 5% 83%;
     --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
@@ -59,15 +59,21 @@
   }
 
   body.dark {
-    @apply bg-background text-foreground;
+    @apply bg-background-dark text-foreground-dark;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-system tracking-tight;
+    @apply font-system tracking-tight text-foreground dark:text-foreground-dark;
   }
 
   button, input, select, textarea {
-    @apply shadow-classic active:shadow-classic-pressed transition-none dark:shadow-classic-dark dark:active:shadow-classic-pressed-dark;
+    @apply shadow-classic active:shadow-classic-pressed transition-none 
+           dark:shadow-classic-dark dark:active:shadow-classic-pressed-dark
+           text-foreground dark:text-foreground-dark;
+  }
+
+  label {
+    @apply text-foreground dark:text-foreground-dark;
   }
 }
 
@@ -126,6 +132,7 @@
   @apply bg-secondary border border-border shadow-classic 
          hover:bg-accent active:shadow-classic-pressed
          px-4 py-1 text-sm font-system
+         text-foreground dark:text-foreground-dark
          dark:bg-secondary-dark dark:border-border-dark dark:shadow-classic-dark
          dark:hover:bg-accent-dark dark:active:shadow-classic-pressed-dark;
 }
@@ -134,6 +141,7 @@
   @apply bg-white border border-border shadow-classic 
          focus:shadow-classic-pressed focus:outline-none
          px-2 py-1 text-sm font-system
+         text-foreground dark:text-foreground-dark
          dark:bg-background-dark dark:border-border-dark dark:shadow-classic-dark
          dark:focus:shadow-classic-pressed-dark;
 }
