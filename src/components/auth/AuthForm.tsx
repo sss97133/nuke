@@ -97,14 +97,14 @@ export const AuthForm = () => {
     <div className="min-h-screen flex items-center justify-center bg-secondary dark:bg-secondary-dark">
       <div className="w-full max-w-[400px] mx-4">
         <div className="classic-window">
-          {/* Window Title Bar */}
+          {/* Classic MacOS 8 Window Title Bar */}
           <div className="flex items-center justify-between border-b border-border dark:border-border-dark pb-2 mb-6">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-destructive rounded-full" />
               <div className="w-3 h-3 bg-accent rounded-full" />
               <div className="w-3 h-3 bg-muted rounded-full" />
             </div>
-            <div className="text-center text-sm font-system">Welcome to Fleet Manager</div>
+            <div className="text-center text-sm font-system">Welcome</div>
             <div className="w-12" /> {/* Spacer for alignment */}
           </div>
 
@@ -151,7 +151,7 @@ export const AuthForm = () => {
                     alt="Classic Mac Icon" 
                     className="w-20 h-20 mx-auto mb-4 opacity-80"
                   />
-                  <h2 className="text-base font-system mb-1">Enter Verification Code</h2>
+                  <h2 className="text-base font-system mb-1">Enter Code</h2>
                   <p className="text-xs text-muted-foreground dark:text-muted-foreground-dark">
                     Enter the code sent to your phone
                   </p>
