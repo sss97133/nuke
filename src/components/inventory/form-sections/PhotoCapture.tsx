@@ -1,69 +1,82 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import QRCode from "react-qr-code";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2, Upload, Check, X } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface PhotoCaptureProps {
   onPhotoCapture: (file: File) => Promise<void>;
   onSkip: () => void;
+  isProcessing: boolean;
 }
 
-export const PhotoCapture = ({ onPhotoCapture, onSkip }: PhotoCaptureProps) => {
-  const [showQR, setShowQR] = useState(false);
+interface FilePreview {
+  url: string;
+  name: string;
+  size: string;
+}
+
+interface AIClassification {
+  label: string;
+  score: number;
+}
+
+export const PhotoCapture = ({ onPhotoCapture, onSkip, isProcessing }: PhotoCaptureProps) => {
   const { toast } = useToast();
-  const connectionUrl = `${window.location.origin}/mobile-capture?session=${Date.now()}`;
+  const [preview, setPreview] = useState<FilePreview | null>(null);
+  const [aiResults, setAiResults] = useState<AIClassification[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    // Create preview
+    const previewUrl = URL.createObjectURL(file);
+    setPreview({
+      url: previewUrl,
+      name: file.name,
+      size: formatFileSize(file.size)
+    });
+
+    try {
+      // Upload file
       await onPhotoCapture(file);
-      toast({
-        title: "Photo uploaded successfully",
-        description: "You can continue with the inventory form.",
+      
+      // Start AI analysis
+      setIsAnalyzing(true);
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const { data, error } = await supabase.functions.invoke('analyze-inventory-image', {
+        body: formData,
       });
+
+      if (error) throw error;
+
+      setAiResults(data.classifications);
+      
+      toast({
+        title: "Image analyzed successfully",
+        description: "Please review the detected items below.",
+      });
+    } catch (error) {
+      console.error('Error processing image:', error);
+      toast({
+        title: "Error processing image",
+        description: "Please try again or skip this step.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
     }
-  };
-
-  const handleConnectPhone = () => {
-    setShowQR(true);
-    // Create a unique session ID
-    const sessionId = Date.now().toString();
-    const mobileUrl = `${window.location.origin}/mobile-capture?session=${sessionId}`;
-    
-    // Open mobile capture window
-    const mobileWindow = window.open(mobileUrl, 'MobileCapture', 'width=400,height=600');
-    
-    // Listen for messages from mobile window
-    const messageHandler = async (event: MessageEvent) => {
-      if (event.data?.type === 'PHOTO_CAPTURED' && event.data?.photo) {
-        try {
-          const response = await fetch(event.data.photo);
-          const blob = await response.blob();
-          const file = new File([blob], `mobile-capture-${sessionId}.jpg`, { type: 'image/jpeg' });
-          
-          await onPhotoCapture(file);
-          setShowQR(false);
-          
-          toast({
-            title: "Photo captured successfully",
-            description: "You can continue with the inventory form.",
-          });
-          
-          // Clean up
-          window.removeEventListener('message', messageHandler);
-          mobileWindow?.close();
-        } catch (error) {
-          toast({
-            title: "Error capturing photo",
-            description: "Please try again or use file upload instead.",
-            variant: "destructive",
-          });
-        }
-      }
-    };
-
-    window.addEventListener('message', messageHandler);
   };
 
   return (
@@ -75,56 +88,73 @@ export const PhotoCapture = ({ onPhotoCapture, onSkip }: PhotoCaptureProps) => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4 p-6 border rounded-lg bg-muted/50">
-          <h4 className="font-medium">Upload from Device</h4>
+      <div className="grid gap-6">
+        <div className="space-y-4">
           <input
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="w-full"
+            className="hidden"
+            id="photo-upload"
+            disabled={isProcessing || isAnalyzing}
           />
-        </div>
-
-        <div className="space-y-4 p-6 border rounded-lg bg-muted/50">
-          <h4 className="font-medium">Use Smartphone Camera</h4>
-          <Button onClick={handleConnectPhone} className="w-full">
-            Connect Phone
-          </Button>
           
-          {showQR && (
-            <div className="mt-4 p-4 bg-white rounded-lg flex flex-col items-center">
-              <QRCode value={connectionUrl} size={200} />
-              <p className="text-xs text-center mt-2">
-                Scan with your phone's camera
-              </p>
+          <Button
+            onClick={() => document.getElementById('photo-upload')?.click()}
+            disabled={isProcessing || isAnalyzing}
+            className="w-full"
+          >
+            {isProcessing || isAnalyzing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4 mr-2" />
+            )}
+            {isProcessing ? 'Uploading...' : isAnalyzing ? 'Analyzing...' : 'Upload Photo'}
+          </Button>
+
+          {preview && (
+            <div className="p-4 border rounded-lg space-y-4">
+              <div className="aspect-square w-48 mx-auto relative">
+                <img
+                  src={preview.url}
+                  alt="Preview"
+                  className="w-full h-full object-cover rounded-md"
+                />
+              </div>
+              <div className="text-sm space-y-1">
+                <p className="font-medium">{preview.name}</p>
+                <p className="text-muted-foreground">{preview.size}</p>
+              </div>
             </div>
           )}
-        </div>
-      </div>
 
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="outline" className="w-full">
-            Skip for now
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Skip Photo Upload?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You can always add a photo later during the inventory process.
-              Are you sure you want to continue without a photo?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onSkip}>
-              Continue without photo
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          {aiResults.length > 0 && (
+            <Alert>
+              <AlertTitle>AI Detection Results</AlertTitle>
+              <AlertDescription>
+                <div className="mt-2 space-y-2">
+                  {aiResults.map((result, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <span>{result.label}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {(result.score * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={onSkip}
+          disabled={isProcessing || isAnalyzing}
+        >
+          Skip for now
+        </Button>
+      </div>
     </div>
   );
 };

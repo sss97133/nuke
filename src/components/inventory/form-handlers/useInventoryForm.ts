@@ -26,6 +26,7 @@ export interface InventoryFormData {
   shelf: string;
   bin: string;
   photoUrl?: string;
+  aiClassification?: any; // Add this line for AI classification
 }
 
 const initialFormData: InventoryFormData = {
@@ -52,6 +53,7 @@ const initialFormData: InventoryFormData = {
   shelf: "",
   bin: "",
   photoUrl: "",
+  aiClassification: null, // Initialize AI classification
 };
 
 export const useInventoryForm = () => {
@@ -120,6 +122,8 @@ export const useInventoryForm = () => {
           shelf: formData.shelf,
           bin: formData.bin,
           photo_url: formData.photoUrl,
+          ai_classification: formData.aiClassification || null, // Include AI classification in the submission
+          user_id: (await supabase.auth.getUser()).data.user?.id,
         }]);
 
       if (error) throw error;
