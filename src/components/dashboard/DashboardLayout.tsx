@@ -17,6 +17,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ProfessionalDashboard } from './ProfessionalDashboard';
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Menubar,
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarSeparator,
+  MenubarShortcut,
+  MenubarTrigger,
+} from "@/components/ui/menubar";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -24,6 +33,28 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { toast } = useToast();
+
+  const handleMenuAction = (action: string) => {
+    switch (action) {
+      case 'new_vehicle':
+        toast({ title: "Creating new vehicle entry..." });
+        break;
+      case 'new_inventory':
+        toast({ title: "Creating new inventory item..." });
+        break;
+      case 'exit':
+        supabase.auth.signOut();
+        break;
+      case 'about':
+        toast({ 
+          title: "About TAMS",
+          description: "Technical Asset Management System v1.0\nDeveloped with ❤️ using modern web technologies."
+        });
+        break;
+      default:
+        toast({ title: `${action} selected` });
+    }
+  };
 
   const showHelp = (section: string) => {
     const helpText: { [key: string]: string } = {
@@ -46,14 +77,74 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     <div className="min-h-screen bg-background font-system animate-fade-in">
       <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center justify-between h-6 px-2 bg-[#CCCCCC] border-b border-[#8E9196] shadow-classic">
-          <div className="flex items-center space-x-4">
-            <span className="text-xs text-primary">🍎</span>
-            <span className="text-xs font-bold">File</span>
-            <span className="text-xs font-bold">Edit</span>
-            <span className="text-xs font-bold">View</span>
-            <span className="text-xs font-bold">Special</span>
-            <span className="text-xs font-bold">Help</span>
-          </div>
+          <Menubar className="border-none bg-transparent">
+            <MenubarMenu>
+              <MenubarTrigger className="text-xs font-bold">🍎</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger className="text-xs font-bold">File</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem onClick={() => handleMenuAction('new_vehicle')}>
+                  New Vehicle <MenubarShortcut>⌘N</MenubarShortcut>
+                </MenubarItem>
+                <MenubarItem onClick={() => handleMenuAction('new_inventory')}>
+                  New Inventory Item
+                </MenubarItem>
+                <MenubarSeparator />
+                <MenubarItem onClick={() => handleMenuAction('exit')}>
+                  Exit <MenubarShortcut>⌘Q</MenubarShortcut>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger className="text-xs font-bold">Edit</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem onClick={() => handleMenuAction('undo')}>
+                  Undo <MenubarShortcut>⌘Z</MenubarShortcut>
+                </MenubarItem>
+                <MenubarItem onClick={() => handleMenuAction('redo')}>
+                  Redo <MenubarShortcut>⌘⇧Z</MenubarShortcut>
+                </MenubarItem>
+                <MenubarSeparator />
+                <MenubarItem onClick={() => handleMenuAction('preferences')}>
+                  Preferences
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger className="text-xs font-bold">View</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem onClick={() => handleMenuAction('toggle_terminal')}>
+                  Toggle Terminal <MenubarShortcut>⌘T</MenubarShortcut>
+                </MenubarItem>
+                <MenubarItem onClick={() => handleMenuAction('refresh')}>
+                  Refresh <MenubarShortcut>⌘R</MenubarShortcut>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger className="text-xs font-bold">Special</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem onClick={() => handleMenuAction('scan_vin')}>
+                  Scan VIN
+                </MenubarItem>
+                <MenubarItem onClick={() => handleMenuAction('batch_import')}>
+                  Batch Import
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger className="text-xs font-bold">Help</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem onClick={() => handleMenuAction('documentation')}>
+                  Documentation
+                </MenubarItem>
+                <MenubarItem onClick={() => handleMenuAction('about')}>
+                  About TAMS
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+          </Menubar>
           <div className="flex items-center space-x-2">
             <span className="text-[10px] text-primary">Battery: 100%</span>
             <span className="text-[10px] text-primary">{new Date().toLocaleTimeString()}</span>
