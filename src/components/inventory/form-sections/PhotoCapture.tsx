@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import QRCode from "react-qr-code";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface PhotoCaptureProps {
   onPhotoCapture: (file: File) => Promise<void>;
@@ -12,17 +12,53 @@ interface PhotoCaptureProps {
 export const PhotoCapture = ({ onPhotoCapture, onSkip }: PhotoCaptureProps) => {
   const [showQR, setShowQR] = useState(false);
   const { toast } = useToast();
-  const connectionUrl = `https://${window.location.host}/mobile-capture?session=${Date.now()}`;
+  const connectionUrl = `${window.location.origin}/mobile-capture?session=${Date.now()}`;
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      onPhotoCapture(file);
+      await onPhotoCapture(file);
       toast({
         title: "Photo uploaded successfully",
         description: "You can continue with the inventory form.",
       });
     }
+  };
+
+  // Handle mobile capture window
+  const handleConnectPhone = () => {
+    setShowQR(true);
+    // Open a new window for mobile capture
+    const mobileWindow = window.open(connectionUrl, 'MobileCapture', 'width=400,height=600');
+    
+    // Listen for messages from the mobile capture window
+    window.addEventListener('message', async (event) => {
+      if (event.data?.type === 'PHOTO_CAPTURED' && event.data?.photo) {
+        try {
+          // Convert the blob URL to a File object
+          const response = await fetch(event.data.photo);
+          const blob = await response.blob();
+          const file = new File([blob], `mobile-capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          
+          await onPhotoCapture(file);
+          setShowQR(false);
+          
+          toast({
+            title: "Photo captured successfully",
+            description: "You can continue with the inventory form.",
+          });
+          
+          // Close the mobile capture window
+          mobileWindow?.close();
+        } catch (error) {
+          toast({
+            title: "Error capturing photo",
+            description: "Please try again or use file upload instead.",
+            variant: "destructive",
+          });
+        }
+      }
+    });
   };
 
   return (
@@ -47,7 +83,7 @@ export const PhotoCapture = ({ onPhotoCapture, onSkip }: PhotoCaptureProps) => {
 
         <div className="space-y-4 p-6 border rounded-lg bg-muted/50">
           <h4 className="font-medium">Use Smartphone Camera</h4>
-          <Button onClick={() => setShowQR(true)} className="w-full">
+          <Button onClick={handleConnectPhone} className="w-full">
             Connect Phone
           </Button>
           
