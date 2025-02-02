@@ -24,7 +24,6 @@ export const VehicleList = () => {
         return;
       }
 
-      // Map the Supabase data to match our frontend types
       const mappedVehicles: Vehicle[] = (data || []).map(vehicle => ({
         id: vehicle.id,
         vin: vehicle.vin || undefined,
@@ -50,20 +49,48 @@ export const VehicleList = () => {
   };
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto bg-[#F4F1DE] p-8 border border-[#283845]">
-      <h2 className="text-2xl text-[#283845] uppercase tracking-wider text-center">Vehicle List</h2>
-      <div className="grid gap-4">
-        {vehicles.map((vehicle) => (
-          <div
-            key={vehicle.id}
-            onClick={() => handleVehicleClick(vehicle.id)}
-            className="p-4 border border-[#283845] bg-white hover:bg-gray-50 cursor-pointer transition-colors"
-          >
-            <h3 className="font-mono text-lg">{vehicle.make} {vehicle.model} ({vehicle.year})</h3>
-            <p className="text-sm text-[#9B2915]">VIN: {vehicle.vin || 'N/A'}</p>
-            {vehicle.notes && <p className="mt-2 text-sm">{vehicle.notes}</p>}
-          </div>
-        ))}
+    <div className="container mx-auto py-8">
+      <div className="bg-background border border-border rounded-sm shadow-classic">
+        <div className="p-6 border-b border-border">
+          <h2 className="text-2xl font-system text-foreground">Vehicle List</h2>
+        </div>
+        <div className="p-6 space-y-4">
+          {vehicles.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No vehicles found
+            </div>
+          ) : (
+            vehicles.map((vehicle) => (
+              <div
+                key={vehicle.id}
+                onClick={() => handleVehicleClick(vehicle.id)}
+                className="bg-card border border-border shadow-classic hover:bg-accent/50 
+                         cursor-pointer transition-colors p-4 animate-fade-in"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-system mb-1">
+                      {vehicle.make} {vehicle.model} ({vehicle.year})
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      VIN: {vehicle.vin || 'N/A'}
+                    </p>
+                  </div>
+                  {vehicle.notes && (
+                    <div className="bg-muted px-3 py-1 rounded-sm text-xs text-muted-foreground">
+                      Notes
+                    </div>
+                  )}
+                </div>
+                {vehicle.notes && (
+                  <p className="mt-3 text-sm text-muted-foreground border-t border-border pt-3">
+                    {vehicle.notes}
+                  </p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
