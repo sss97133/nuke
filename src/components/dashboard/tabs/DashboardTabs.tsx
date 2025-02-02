@@ -61,20 +61,13 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
               Auctions
             </TabsTrigger>
           </div>
-          <div className="flex items-center gap-2 px-2">
-            <button
-              onClick={() => showHelp('terminal')}
-              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors px-3 py-2"
-            >
-              <Terminal className="w-4 h-4" />
-              <span className="hidden sm:inline">Help</span>
-            </button>
+          <div className="flex items-center mr-2">
             <button
               onClick={() => showHelp(document.querySelector('[data-state="active"]')?.getAttribute('value') || 'inventory')}
-              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors px-3 py-2"
+              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors px-2 py-1"
             >
               <HelpCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">Guide</span>
+              <span className="hidden sm:inline">Help</span>
             </button>
           </div>
         </div>
