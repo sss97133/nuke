@@ -25,20 +25,22 @@ export const PhotoCapture = ({ onPhotoCapture, onSkip }: PhotoCaptureProps) => {
     }
   };
 
-  // Handle mobile capture window
   const handleConnectPhone = () => {
     setShowQR(true);
-    // Open a new window for mobile capture
-    const mobileWindow = window.open(connectionUrl, 'MobileCapture', 'width=400,height=600');
+    // Create a unique session ID
+    const sessionId = Date.now().toString();
+    const mobileUrl = `${window.location.origin}/mobile-capture?session=${sessionId}`;
     
-    // Listen for messages from the mobile capture window
-    window.addEventListener('message', async (event) => {
+    // Open mobile capture window
+    const mobileWindow = window.open(mobileUrl, 'MobileCapture', 'width=400,height=600');
+    
+    // Listen for messages from mobile window
+    const messageHandler = async (event: MessageEvent) => {
       if (event.data?.type === 'PHOTO_CAPTURED' && event.data?.photo) {
         try {
-          // Convert the blob URL to a File object
           const response = await fetch(event.data.photo);
           const blob = await response.blob();
-          const file = new File([blob], `mobile-capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          const file = new File([blob], `mobile-capture-${sessionId}.jpg`, { type: 'image/jpeg' });
           
           await onPhotoCapture(file);
           setShowQR(false);
@@ -48,7 +50,8 @@ export const PhotoCapture = ({ onPhotoCapture, onSkip }: PhotoCaptureProps) => {
             description: "You can continue with the inventory form.",
           });
           
-          // Close the mobile capture window
+          // Clean up
+          window.removeEventListener('message', messageHandler);
           mobileWindow?.close();
         } catch (error) {
           toast({
@@ -58,7 +61,9 @@ export const PhotoCapture = ({ onPhotoCapture, onSkip }: PhotoCaptureProps) => {
           });
         }
       }
-    });
+    };
+
+    window.addEventListener('message', messageHandler);
   };
 
   return (
@@ -88,7 +93,7 @@ export const PhotoCapture = ({ onPhotoCapture, onSkip }: PhotoCaptureProps) => {
           </Button>
           
           {showQR && (
-            <div className="p-4 bg-white rounded-lg">
+            <div className="mt-4 p-4 bg-white rounded-lg flex flex-col items-center">
               <QRCode value={connectionUrl} size={200} />
               <p className="text-xs text-center mt-2">
                 Scan with your phone's camera
