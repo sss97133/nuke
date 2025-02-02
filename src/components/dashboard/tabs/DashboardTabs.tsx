@@ -96,8 +96,8 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
 
         <TabsContent value="auctions" className="animate-fade-in">
           <div className="space-y-6">
-            <CreateAuction />
             <AuctionList />
+            <CreateAuction />
           </div>
         </TabsContent>
       </div>
