@@ -28,6 +28,8 @@ import {
   MenubarShortcut,
   MenubarTrigger,
 } from "@/components/ui/menubar";
+import { AuctionList } from "@/components/auctions/AuctionList";
+import { CreateAuction } from "@/components/auctions/CreateAuction";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -246,6 +248,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                   <UserRound className="w-4 h-4" />
                   TAMS-5:PRO
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="auctions" 
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+                >
+                  <Building2 className="w-4 h-4" />
+                  TAMS-6:AUC
+                </TabsTrigger>
               </div>
               <div className="flex items-center gap-4 px-2">
                 <button
@@ -287,6 +296,13 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
             <TabsContent value="professional" className="animate-fade-in">
               <ProfessionalDashboard />
+            </TabsContent>
+
+            <TabsContent value="auctions" className="animate-fade-in">
+              <div className="space-y-6">
+                <CreateAuction />
+                <AuctionList />
+              </div>
             </TabsContent>
           </div>
         </Tabs>

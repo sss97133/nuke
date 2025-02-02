@@ -9,6 +9,174 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      auction_bids: {
+        Row: {
+          amount: number
+          auction_id: string | null
+          bidder_id: string | null
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          amount: number
+          auction_id?: string | null
+          bidder_id?: string | null
+          created_at?: string | null
+          id?: string
+        }
+        Update: {
+          amount?: number
+          auction_id?: string | null
+          bidder_id?: string | null
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auction_bids_auction_id_fkey"
+            columns: ["auction_id"]
+            isOneToOne: false
+            referencedRelation: "auctions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auctions: {
+        Row: {
+          created_at: string | null
+          current_price: number | null
+          end_time: string
+          id: string
+          reserve_price: number | null
+          seller_id: string | null
+          start_time: string
+          starting_price: number
+          status: string | null
+          updated_at: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_price?: number | null
+          end_time: string
+          id?: string
+          reserve_price?: number | null
+          seller_id?: string | null
+          start_time: string
+          starting_price: number
+          status?: string | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_price?: number | null
+          end_time?: string
+          id?: string
+          reserve_price?: number | null
+          seller_id?: string | null
+          start_time?: string
+          starting_price?: number
+          status?: string | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auctions_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dao_proposals: {
+        Row: {
+          created_at: string | null
+          description: string
+          end_time: string
+          id: string
+          proposer_id: string | null
+          start_time: string
+          status: string | null
+          title: string
+          updated_at: string | null
+          votes_against: number | null
+          votes_for: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          end_time: string
+          id?: string
+          proposer_id?: string | null
+          start_time: string
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          votes_against?: number | null
+          votes_for?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          end_time?: string
+          id?: string
+          proposer_id?: string | null
+          start_time?: string
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          votes_against?: number | null
+          votes_for?: number | null
+        }
+        Relationships: []
+      }
+      derivatives: {
+        Row: {
+          created_at: string | null
+          current_price: number | null
+          expiration_date: string | null
+          id: string
+          status: string | null
+          strike_price: number | null
+          type: string
+          updated_at: string | null
+          vehicle_token_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_price?: number | null
+          expiration_date?: string | null
+          id?: string
+          status?: string | null
+          strike_price?: number | null
+          type: string
+          updated_at?: string | null
+          vehicle_token_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_price?: number | null
+          expiration_date?: string | null
+          id?: string
+          status?: string | null
+          strike_price?: number | null
+          type?: string
+          updated_at?: string | null
+          vehicle_token_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "derivatives_vehicle_token_id_fkey"
+            columns: ["vehicle_token_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       garage_members: {
         Row: {
           created_at: string
@@ -447,6 +615,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "vehicle_sales_data_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_tokens: {
+        Row: {
+          contract_uri: string | null
+          created_at: string | null
+          current_price: number | null
+          id: string
+          metadata: Json | null
+          token_address: string
+          total_supply: number
+          updated_at: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          contract_uri?: string | null
+          created_at?: string | null
+          current_price?: number | null
+          id?: string
+          metadata?: Json | null
+          token_address: string
+          total_supply: number
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          contract_uri?: string | null
+          created_at?: string | null
+          current_price?: number | null
+          id?: string
+          metadata?: Json | null
+          token_address?: string
+          total_supply?: number
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_tokens_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
