@@ -55,7 +55,7 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
     }
 
     if (data) {
-      setBids(data as Bid[]);
+      setBids(data as unknown as Bid[]);
     }
   };
 

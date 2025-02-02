@@ -63,7 +63,7 @@ export const AuctionComments = ({ auctionId }: { auctionId: string }) => {
     }
 
     if (data) {
-      setComments(data as Comment[]);
+      setComments(data as unknown as Comment[]);
     }
   };
 
@@ -186,8 +186,6 @@ export const AuctionComments = ({ auctionId }: { auctionId: string }) => {
     );
   };
 
-  const rootComments = comments.filter((c) => !c.parent_comment_id);
-
   return (
     <div className="space-y-4">
       <div className="flex items-center space-x-2">
@@ -222,7 +220,9 @@ export const AuctionComments = ({ auctionId }: { auctionId: string }) => {
       </div>
 
       <div className="space-y-6">
-        {rootComments.map((comment) => renderComment(comment))}
+        {comments
+          .filter((c) => !c.parent_comment_id)
+          .map((comment) => renderComment(comment))}
       </div>
     </div>
   );
