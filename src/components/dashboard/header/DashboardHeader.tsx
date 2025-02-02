@@ -16,6 +16,19 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
           <Menubar className="border-none bg-transparent">
             <MenubarMenu>
               <MenubarTrigger className="text-xs font-bold">🍎</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem onClick={() => handleMenuAction('about')}>
+                  About TAMS
+                </MenubarItem>
+                <MenubarSeparator />
+                <MenubarItem onClick={() => handleMenuAction('preferences')}>
+                  Preferences <MenubarShortcut>⌘,</MenubarShortcut>
+                </MenubarItem>
+                <MenubarSeparator />
+                <MenubarItem onClick={() => handleMenuAction('exit')}>
+                  Log Out <MenubarShortcut>⌘Q</MenubarShortcut>
+                </MenubarItem>
+              </MenubarContent>
             </MenubarMenu>
             <MenubarMenu>
               <MenubarTrigger className="text-xs font-bold">File</MenubarTrigger>
@@ -25,10 +38,6 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
                 </MenubarItem>
                 <MenubarItem onClick={() => handleMenuAction('new_inventory')}>
                   New Inventory Item
-                </MenubarItem>
-                <MenubarSeparator />
-                <MenubarItem onClick={() => handleMenuAction('exit')}>
-                  Exit <MenubarShortcut>⌘Q</MenubarShortcut>
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
@@ -40,10 +49,6 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
                 </MenubarItem>
                 <MenubarItem onClick={() => handleMenuAction('redo')}>
                   Redo <MenubarShortcut>⌘⇧Z</MenubarShortcut>
-                </MenubarItem>
-                <MenubarSeparator />
-                <MenubarItem onClick={() => handleMenuAction('preferences')}>
-                  Preferences
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
@@ -96,20 +101,6 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
           </button>
           <span className="text-[10px] text-primary">Battery: 100%</span>
           <span className="text-[10px] text-primary">{new Date().toLocaleTimeString()}</span>
-        </div>
-      </div>
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-center h-14">
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-primary font-mono">TAMS/v1.0</span>
-            <span className="text-sm text-muted-foreground font-mono">SID:{new Date().getTime()}</span>
-          </div>
-          <button
-            onClick={() => handleMenuAction('exit')}
-            className="classic-button"
-          >
-            EXIT_SYS
-          </button>
         </div>
       </div>
     </header>
