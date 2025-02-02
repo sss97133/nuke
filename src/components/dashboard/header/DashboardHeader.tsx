@@ -1,6 +1,6 @@
 import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarShortcut, MenubarTrigger } from "@/components/ui/menubar";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { Apple } from "lucide-react";
+import { Atom } from "lucide-react";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
@@ -13,7 +13,7 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
         <Menubar className="border-none bg-transparent">
           <MenubarMenu>
             <MenubarTrigger className="p-1">
-              <Apple className="h-4 w-4 text-red-500" />
+              <Atom className="h-4 w-4 text-red-500" />
             </MenubarTrigger>
             <MenubarContent>
               <MenubarItem onClick={() => handleMenuAction("about")}>
