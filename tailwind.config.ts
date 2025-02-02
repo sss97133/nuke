@@ -19,48 +19,48 @@ export default {
     },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        border: '#8E9196',
+        input: '#C8C8C9',
+        ring: '#555555',
+        background: '#EAEAEA',
+        foreground: '#222222',
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))'
+          DEFAULT: '#333333',
+          foreground: '#FFFFFF'
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))'
+          DEFAULT: '#C8C8C9',
+          foreground: '#222222'
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))'
+          DEFAULT: '#991B1B',
+          foreground: '#FFFFFF'
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))'
+          DEFAULT: '#F1F1F1',
+          foreground: '#666666'
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))'
+          DEFAULT: '#D4D4D4',
+          foreground: '#222222'
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))'
+          DEFAULT: '#FFFFFF',
+          foreground: '#222222'
         },
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))'
+          DEFAULT: '#FFFFFF',
+          foreground: '#222222'
         },
         sidebar: {
-          DEFAULT: 'hsl(var(--sidebar-background))',
-          foreground: 'hsl(var(--sidebar-foreground))',
-          primary: 'hsl(var(--sidebar-primary))',
-          'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-          accent: 'hsl(var(--sidebar-accent))',
-          'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-          border: 'hsl(var(--sidebar-border))',
-          ring: 'hsl(var(--sidebar-ring))',
+          DEFAULT: '#EAEAEA',
+          foreground: '#222222',
+          primary: '#333333',
+          'primary-foreground': '#FFFFFF',
+          accent: '#D4D4D4',
+          'accent-foreground': '#222222',
+          border: '#8E9196',
+          ring: '#555555',
           'gov-blue': '#000066',
           'gov-link': '#0000EE',
           'gov-visited': '#551A8B',
@@ -72,12 +72,16 @@ export default {
         'doc': ['0.8125rem', '1.25rem'],
       },
       fontFamily: {
-        'system': ['Consolas', 'Monaco', 'Lucida Console', 'monospace'],
+        'system': ['Chicago', 'Monaco', 'Consolas', 'monospace'],
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)'
+        lg: '0px',
+        md: '0px',
+        sm: '0px'
+      },
+      boxShadow: {
+        'classic': 'inset 1px 1px 0px #FFFFFF, inset -1px -1px 0px #8E9196',
+        'classic-pressed': 'inset -1px -1px 0px #FFFFFF, inset 1px 1px 0px #8E9196',
       },
       keyframes: {
         'accordion-down': {

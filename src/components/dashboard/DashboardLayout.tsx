@@ -44,7 +44,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background font-system animate-fade-in">
-      <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between items-center h-14">
             <div className="flex items-center space-x-4">
@@ -53,7 +53,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             </div>
             <button
               onClick={() => supabase.auth.signOut()}
-              className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-sm transition-colors rounded-md font-mono"
+              className="classic-button"
             >
               EXIT_SYS
             </button>
@@ -68,40 +68,40 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </div>
 
         <Tabs defaultValue="inventory" className="w-full animate-scale-in">
-          <TabsList className="w-full h-12 bg-secondary/20 rounded-lg p-1">
+          <TabsList className="w-full h-12 bg-background border border-border shadow-classic rounded-none p-1">
             <div className="flex justify-between w-full">
               <div className="flex">
                 <TabsTrigger 
                   value="inventory" 
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
                 >
                   <Warehouse className="w-4 h-4" />
                   TAMS-1:INV
                 </TabsTrigger>
                 <TabsTrigger 
                   value="vehicles" 
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
                 >
                   <Car className="w-4 h-4" />
                   TAMS-2:VEH
                 </TabsTrigger>
                 <TabsTrigger 
                   value="service" 
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
                 >
                   <Wrench className="w-4 h-4" />
                   TAMS-3:SVC
                 </TabsTrigger>
                 <TabsTrigger 
                   value="garages" 
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
                 >
                   <Building2 className="w-4 h-4" />
                   TAMS-4:GAR
                 </TabsTrigger>
                 <TabsTrigger 
                   value="professional" 
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md px-3 py-2 text-sm font-mono flex items-center gap-2"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
                 >
                   <UserRound className="w-4 h-4" />
                   TAMS-5:PRO
@@ -152,7 +152,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </Tabs>
         {children}
 
-        <footer className="mt-8 text-sm text-muted-foreground border-t border-border/40 pt-4 font-mono">
+        <footer className="mt-8 text-sm text-muted-foreground border-t border-border pt-4 font-mono">
           <div className="flex justify-between">
             <span>PRIV_ACT_1974:ACTIVE</span>
             <span>EST_BURDEN:0.5HR</span>
