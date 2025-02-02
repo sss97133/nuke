@@ -1,6 +1,6 @@
 import { Tabs } from "@/components/ui/tabs";
 import { CommandBar } from "./CommandBar";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardHeader } from "./header/DashboardHeader";
@@ -18,6 +18,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showNewVehicleDialog, setShowNewVehicleDialog] = useState(false);
   const [showNewInventoryDialog, setShowNewInventoryDialog] = useState(false);
   const [showAiAssistant, setShowAiAssistant] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const handleMenuAction = (action: string) => {
     switch (action) {
@@ -29,6 +30,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         break;
       case 'toggle_assistant':
         setShowAiAssistant(!showAiAssistant);
+        break;
+      case 'help':
+        setShowHelp(!showHelp);
         break;
       case 'exit':
         if (confirm('Are you sure you want to exit?')) {

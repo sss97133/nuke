@@ -5,14 +5,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistance } from "date-fns";
 import { TrendingUp } from "lucide-react";
 
+interface Profile {
+  username: string | null;
+  avatar_url: string | null;
+}
+
 interface Bid {
   id: string;
   amount: number;
   created_at: string;
-  profiles?: {
-    username: string | null;
-    avatar_url: string | null;
-  } | null;
+  profiles?: Profile | null;
 }
 
 interface BidHistoryProps {
@@ -32,7 +34,9 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
     const { data, error } = await supabase
       .from("auction_bids")
       .select(`
-        *,
+        id,
+        amount,
+        created_at,
         profiles:bidder_id (
           username,
           avatar_url

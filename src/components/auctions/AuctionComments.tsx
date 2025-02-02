@@ -7,16 +7,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatDistance } from "date-fns";
 import { MessageSquare, Reply, Trash2 } from "lucide-react";
 
+interface Profile {
+  username: string | null;
+  avatar_url: string | null;
+}
+
 interface Comment {
   id: string;
   comment: string;
   created_at: string;
   user_id: string;
   parent_comment_id: string | null;
-  profiles?: {
-    username: string | null;
-    avatar_url: string | null;
-  } | null;
+  profiles?: Profile | null;
 }
 
 export const AuctionComments = ({ auctionId }: { auctionId: string }) => {
@@ -38,7 +40,11 @@ export const AuctionComments = ({ auctionId }: { auctionId: string }) => {
     const { data, error } = await supabase
       .from("auction_comments")
       .select(`
-        *,
+        id,
+        comment,
+        created_at,
+        user_id,
+        parent_comment_id,
         profiles:user_id (
           username,
           avatar_url
