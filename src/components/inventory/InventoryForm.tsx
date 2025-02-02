@@ -5,7 +5,7 @@ import { ProductDetails } from "./form-sections/ProductDetails";
 import { PurchaseMaintenance } from "./form-sections/PurchaseMaintenance";
 import { Location } from "./form-sections/Location";
 import { AdditionalInformation } from "./form-sections/AdditionalInformation";
-import { ImageProcessing } from "./form-sections/ImageProcessing";
+import { PhotoCapture } from "./form-sections/PhotoCapture";
 import { useInventoryForm } from "./form-handlers/useInventoryForm";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ interface InventoryFormProps {
 }
 
 const steps = [
+  { title: "Photo", component: PhotoCapture },
   { title: "Basic Information", component: BasicInformation },
   { title: "Categorization", component: Categorization },
   { title: "Product Details", component: ProductDetails },
@@ -30,6 +31,7 @@ export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
     isProcessing,
     setIsProcessing,
     handleSubmit: originalHandleSubmit,
+    handlePhotoUpload,
   } = useInventoryForm();
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -49,6 +51,24 @@ export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
   };
 
   const CurrentStepComponent = steps[currentStep].component;
+
+  const getStepProps = () => {
+    if (currentStep === 0) {
+      return {
+        onPhotoCapture: handlePhotoUpload,
+        onSkip: () => setCurrentStep(1),
+      };
+    }
+    return {
+      ...formData,
+      ...Object.fromEntries(
+        Object.keys(formData).map(key => [
+          `on${key.charAt(0).toUpperCase() + key.slice(1)}Change`,
+          (value: any) => setFormData({ ...formData, [key]: value })
+        ])
+      )
+    };
+  };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -98,15 +118,7 @@ export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
         </div>
 
         <div className="p-6 space-y-6">
-          <CurrentStepComponent
-            {...formData}
-            {...Object.fromEntries(
-              Object.keys(formData).map(key => [
-                `on${key.charAt(0).toUpperCase() + key.slice(1)}Change`,
-                (value: any) => setFormData({ ...formData, [key]: value })
-              ])
-            )}
-          />
+          <CurrentStepComponent {...getStepProps()} />
         </div>
 
         <div className="border-t border-border bg-muted p-4 flex justify-between">

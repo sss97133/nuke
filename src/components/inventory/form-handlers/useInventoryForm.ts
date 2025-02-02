@@ -25,6 +25,7 @@ export interface InventoryFormData {
   room: string;
   shelf: string;
   bin: string;
+  photoUrl?: string;
 }
 
 const initialFormData: InventoryFormData = {
@@ -50,12 +51,45 @@ const initialFormData: InventoryFormData = {
   room: "",
   shelf: "",
   bin: "",
+  photoUrl: "",
 };
 
 export const useInventoryForm = () => {
   const { toast } = useToast();
   const [formData, setFormData] = useState<InventoryFormData>(initialFormData);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const handlePhotoUpload = async (file: File) => {
+    try {
+      setIsProcessing(true);
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${crypto.randomUUID()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('inventory-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('inventory-images')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, photoUrl: publicUrl }));
+      
+      toast({
+        title: "Photo uploaded successfully",
+      });
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      toast({
+        title: "Error uploading photo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +119,7 @@ export const useInventoryForm = () => {
           room: formData.room,
           shelf: formData.shelf,
           bin: formData.bin,
+          photo_url: formData.photoUrl,
         }]);
 
       if (error) throw error;
@@ -109,5 +144,6 @@ export const useInventoryForm = () => {
     isProcessing,
     setIsProcessing,
     handleSubmit,
+    handlePhotoUpload,
   };
 };
