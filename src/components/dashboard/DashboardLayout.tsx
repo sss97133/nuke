@@ -62,7 +62,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background dark:bg-background-dark text-foreground dark:text-foreground-dark font-system animate-fade-in">
+    <div className="min-h-screen bg-background text-foreground dark:bg-background-dark dark:text-foreground-dark font-system">
       <DashboardHeader handleMenuAction={handleMenuAction} />
 
       <FormDialogs
