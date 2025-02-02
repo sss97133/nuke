@@ -115,7 +115,7 @@ export const AuthForm = () => {
 
           <div className="pt-4 border-t border-border dark:border-border-dark">
             <p className="text-[10px] text-center text-muted-foreground dark:text-muted-foreground-dark">
-              Fleet Manager © 2024
+              NUKE © 2024
             </p>
           </div>
         </div>
