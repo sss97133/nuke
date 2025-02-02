@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AuctionComments } from "./AuctionComments";
 import { BidHistory } from "./BidHistory";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AuctionCard } from "./AuctionCard";
 import { 
   Select,
