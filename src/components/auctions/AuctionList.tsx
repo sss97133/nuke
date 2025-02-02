@@ -41,6 +41,7 @@ export const AuctionList = () => {
   const { data: auctions, isLoading } = useQuery({
     queryKey: ['auctions', sortBy],
     queryFn: async () => {
+      console.log('Fetching auctions data...');
       let query = supabase
         .from('auctions')
         .select(`
@@ -64,8 +65,12 @@ export const AuctionList = () => {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching auctions:', error);
+        throw error;
+      }
 
+      console.log('Received auctions data:', data);
       return data.map((auction: any) => ({
         ...auction,
         bid_count: auction.bid_count?.[0]?.count ?? 0,
@@ -76,6 +81,8 @@ export const AuctionList = () => {
 
   // Subscribe to real-time updates for auctions
   useEffect(() => {
+    console.log('Setting up real-time subscriptions...');
+    
     // Channel for auction updates
     const auctionChannel = supabase
       .channel('auction_updates')
@@ -87,6 +94,7 @@ export const AuctionList = () => {
           table: 'auctions'
         },
         (payload) => {
+          console.log('Received auction update:', payload);
           queryClient.invalidateQueries({ queryKey: ['auctions'] });
           
           if (payload.eventType === 'UPDATE') {
@@ -110,7 +118,8 @@ export const AuctionList = () => {
           schema: 'public',
           table: 'auction_bids'
         },
-        () => {
+        (payload) => {
+          console.log('Received new bid:', payload);
           queryClient.invalidateQueries({ queryKey: ['auctions'] });
           toast({
             title: "New Bid",
@@ -131,13 +140,15 @@ export const AuctionList = () => {
           schema: 'public',
           table: 'auction_comments'
         },
-        () => {
+        (payload) => {
+          console.log('Received comment update:', payload);
           queryClient.invalidateQueries({ queryKey: ['auctions'] });
         }
       )
       .subscribe();
 
     return () => {
+      console.log('Cleaning up subscriptions...');
       supabase.removeChannel(auctionChannel);
       supabase.removeChannel(bidChannel);
       supabase.removeChannel(commentChannel);
