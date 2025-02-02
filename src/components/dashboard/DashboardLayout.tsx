@@ -20,6 +20,14 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  const handleShowHelp = (section: string) => {
+    setShowHelp(true);
+    toast({
+      title: `Help for ${section}`,
+      description: `Showing help documentation for ${section}`,
+    });
+  };
+
   const handleMenuAction = (action: string) => {
     switch (action) {
       case 'new_vehicle':
@@ -74,7 +82,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         </div>
 
         <Tabs defaultValue="inventory" className="w-full animate-scale-in">
-          <DashboardTabs showHelp={showHelp} />
+          <DashboardTabs showHelp={handleShowHelp} />
           <CommandBar />
           {children}
         </Tabs>
