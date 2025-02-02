@@ -33,36 +33,25 @@ export const AuthForm = () => {
       });
 
       if (error) {
-        let errorMessage = "Failed to send OTP";
-        try {
-          const errorBody = JSON.parse(error.message);
-          if (errorBody.code === "sms_send_failed") {
-            errorMessage = "SMS service is currently unavailable. Please try again later or contact support.";
-            console.error("Detailed error:", errorBody);
-          }
-        } catch {
-          errorMessage = error.message;
-        }
-
         toast({
           variant: "destructive",
           title: "Error",
-          description: errorMessage,
+          description: error.message,
         });
         setShowOtpInput(false);
       } else {
         setShowOtpInput(true);
         toast({
-          title: "Success",
-          description: "OTP sent to your phone number",
+          title: "Code Sent",
+          description: "Please check your phone for the verification code",
         });
       }
     } catch (error) {
-      console.error("Detailed error:", error);
+      console.error("Error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: "Failed to send verification code. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -88,16 +77,16 @@ export const AuthForm = () => {
         });
       } else {
         toast({
-          title: "Success",
+          title: "Welcome",
           description: "Successfully logged in",
         });
       }
     } catch (error) {
-      console.error("Verification error:", error);
+      console.error("Error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to verify OTP",
+        description: "Failed to verify code. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -105,70 +94,84 @@ export const AuthForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white font-system">
-      <div className="text-center space-y-4 w-full max-w-md p-6 border-2 border-gov-blue bg-white">
-        <div className="border-b-2 border-gov-blue pb-4">
-          <h1 className="text-doc text-gov-blue">
-            FORM SF-AUTH
-          </h1>
-          <p className="text-tiny text-gray-600">
-            TECHNICAL ASSET MANAGEMENT SYSTEM (TAMS) ACCESS REQUEST
-          </p>
-        </div>
-
-        <div className="space-y-4 text-left">
-          <div>
-            <p className="text-tiny mb-2">SECTION 1 - AUTHENTICATION REQUIREMENTS</p>
-            <Input
-              type="tel"
-              placeholder="TELEPHONE NUMBER (Format: +1234567890)"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="font-system text-doc"
-              disabled={isLoading}
-            />
+    <div className="min-h-screen flex items-center justify-center bg-secondary dark:bg-secondary-dark font-system">
+      <div className="w-full max-w-md p-8 space-y-6">
+        <div className="classic-window">
+          <div className="flex items-center justify-between border-b border-border dark:border-border-dark pb-4 mb-6">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-destructive rounded-full" />
+              <div className="w-3 h-3 bg-accent rounded-full" />
+              <div className="w-3 h-3 bg-muted rounded-full" />
+            </div>
+            <h1 className="text-center text-lg font-system">Welcome</h1>
+            <div className="w-20" /> {/* Spacer for alignment */}
           </div>
 
-          {!showOtpInput ? (
-            <Button
-              onClick={handleSendOtp}
-              className="w-full bg-gov-blue text-white font-system text-doc hover:bg-blue-900 transition-colors"
-              disabled={isLoading || !phoneNumber.trim()}
-            >
-              {isLoading ? "PROCESSING..." : "REQUEST AUTHENTICATION CODE"}
-            </Button>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-tiny">SECTION 2 - VERIFICATION CODE ENTRY</p>
-              <InputOTP
-                maxLength={6}
-                value={otp}
-                onChange={setOtp}
-                disabled={isLoading}
-                render={({ slots }) => (
-                  <InputOTPGroup className="gap-2 justify-center">
-                    {slots.map((slot, idx) => (
-                      <InputOTPSlot key={idx} index={idx} className="font-system" />
-                    ))}
-                  </InputOTPGroup>
-                )}
-              />
-              <Button
-                onClick={handleVerifyOtp}
-                className="w-full bg-gov-blue text-white font-system text-doc hover:bg-blue-900 transition-colors"
-                disabled={isLoading || otp.length !== 6}
-              >
-                {isLoading ? "VERIFYING..." : "SUBMIT VERIFICATION CODE"}
-              </Button>
-            </div>
-          )}
-        </div>
+          <div className="space-y-6">
+            {!showOtpInput ? (
+              <>
+                <div className="space-y-2">
+                  <label htmlFor="phone" className="block text-sm">
+                    Enter your phone number to sign in
+                  </label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+1 (555) 555-5555"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="classic-input w-full"
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button
+                  onClick={handleSendOtp}
+                  className="classic-button w-full"
+                  disabled={isLoading || !phoneNumber.trim()}
+                >
+                  {isLoading ? "Sending..." : "Continue"}
+                </Button>
+              </>
+            ) : (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="block text-sm">
+                    Enter the code sent to your phone
+                  </label>
+                  <InputOTP
+                    maxLength={6}
+                    value={otp}
+                    onChange={setOtp}
+                    disabled={isLoading}
+                    render={({ slots }) => (
+                      <InputOTPGroup className="gap-2 justify-center">
+                        {slots.map((slot, idx) => (
+                          <InputOTPSlot 
+                            key={idx} 
+                            {...slot}
+                            className="classic-input w-10 h-10 text-center"
+                          />
+                        ))}
+                      </InputOTPGroup>
+                    )}
+                  />
+                </div>
+                <Button
+                  onClick={handleVerifyOtp}
+                  className="classic-button w-full"
+                  disabled={isLoading || otp.length !== 6}
+                >
+                  {isLoading ? "Verifying..." : "Sign In"}
+                </Button>
+              </div>
+            )}
+          </div>
 
-        <div className="text-tiny text-left text-gray-600 border-t-2 border-gov-blue pt-4">
-          <p>NOTICE:</p>
-          <p>1. Valid telephone number with country code required.</p>
-          <p>2. This is a U.S. Government system. Unauthorized access prohibited.</p>
-          <p>3. All activities may be monitored and recorded.</p>
+          <div className="mt-6 pt-4 border-t border-border dark:border-border-dark">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground-dark text-center">
+              This is a secure login system. Your phone number will be used for authentication only.
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -124,14 +124,14 @@
 
 /* Classic MacOS window styling */
 .classic-window {
-  @apply bg-background border border-border shadow-classic p-4
+  @apply bg-background border border-border shadow-classic p-6
          dark:bg-background-dark dark:border-border-dark dark:shadow-classic-dark;
 }
 
 .classic-button {
   @apply bg-secondary border border-border shadow-classic 
          hover:bg-accent active:shadow-classic-pressed
-         px-4 py-1 text-sm font-system
+         px-4 py-1.5 text-sm font-system
          text-foreground dark:text-foreground-dark
          dark:bg-secondary-dark dark:border-border-dark dark:shadow-classic-dark
          dark:hover:bg-accent-dark dark:active:shadow-classic-pressed-dark;
@@ -140,7 +140,7 @@
 .classic-input {
   @apply bg-white border border-border shadow-classic 
          focus:shadow-classic-pressed focus:outline-none
-         px-2 py-1 text-sm font-system
+         px-3 py-1.5 text-sm font-system
          text-foreground dark:text-foreground-dark
          dark:bg-background-dark dark:border-border-dark dark:shadow-classic-dark
          dark:focus:shadow-classic-pressed-dark;
