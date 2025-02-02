@@ -13,7 +13,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <React.StrictMode>
-    <ThemeProvider defaultTheme="dark">
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />

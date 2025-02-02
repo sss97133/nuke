@@ -1,6 +1,7 @@
 import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarShortcut, MenubarTrigger } from "@/components/ui/menubar";
 import { useTheme } from "next-themes";
 import { Sun, Moon } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
@@ -8,10 +9,20 @@ interface DashboardHeaderProps {
 
 export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex items-center h-6 px-2 bg-[#CCCCCC] border-b border-[#8E9196] shadow-classic">
+      <div className="flex items-center h-6 px-2 bg-secondary border-b border-border shadow-classic dark:bg-secondary-dark dark:border-border-dark dark:shadow-classic-dark">
         <div className="flex-1">
           <Menubar className="border-none bg-transparent">
             <MenubarMenu>
@@ -90,17 +101,17 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
         <div className="flex items-center gap-2 ml-2">
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="p-1 rounded-md hover:bg-accent"
+            className="p-1 rounded-md hover:bg-accent/50 transition-colors"
             aria-label="Toggle theme"
           >
             {theme === "dark" ? (
-              <Sun className="h-4 w-4" />
+              <Sun className="h-4 w-4 text-foreground" />
             ) : (
-              <Moon className="h-4 w-4" />
+              <Moon className="h-4 w-4 text-foreground" />
             )}
           </button>
-          <span className="text-[10px] text-primary">Battery: 100%</span>
-          <span className="text-[10px] text-primary">{new Date().toLocaleTimeString()}</span>
+          <span className="text-[10px] text-foreground">Battery: 100%</span>
+          <span className="text-[10px] text-foreground">{new Date().toLocaleTimeString()}</span>
         </div>
       </div>
     </header>
