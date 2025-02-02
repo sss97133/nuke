@@ -11,6 +11,7 @@ import { useFormSteps } from "./form-handlers/useFormSteps";
 import { ProgressBar } from "./form-components/ProgressBar";
 import { FormHeader } from "./form-components/FormHeader";
 import { FormFooter } from "./form-components/FormFooter";
+import type { InventoryFormData } from "./form-handlers/useInventoryForm";
 
 interface InventoryFormProps {
   onSuccess?: () => void;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { InventoryFormData } from "./useInventoryForm";
+import type { InventoryFormData } from "./useInventoryForm";
 
 interface StepComponent {
   title: string;
@@ -28,18 +28,18 @@ export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData
       case 1: // BasicInformation
         return {
           ...commonProps,
-          name: formData.name,
-          partNumber: formData.partNumber,
+          name: formData.name || "",
+          partNumber: formData.partNumber || "",
           onNameChange: (value: string) => setFormData({ name: value }),
           onPartNumberChange: (value: string) => setFormData({ partNumber: value }),
         };
       case 2: // Categorization
         return {
           ...commonProps,
-          department: formData.department,
-          subDepartment: formData.subDepartment,
-          assetType: formData.assetType,
-          condition: formData.condition,
+          department: formData.department || "",
+          subDepartment: formData.subDepartment || "",
+          assetType: formData.assetType || "",
+          condition: formData.condition || "",
           onDepartmentChange: (value: string) => setFormData({ department: value }),
           onSubDepartmentChange: (value: string) => setFormData({ subDepartment: value }),
           onAssetTypeChange: (value: string) => setFormData({ assetType: value }),
@@ -48,10 +48,10 @@ export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData
       case 3: // ProductDetails
         return {
           ...commonProps,
-          manufacturer: formData.manufacturer,
-          modelNumber: formData.modelNumber,
-          serialNumber: formData.serialNumber,
-          quantity: formData.quantity,
+          manufacturer: formData.manufacturer || "",
+          modelNumber: formData.modelNumber || "",
+          serialNumber: formData.serialNumber || "",
+          quantity: formData.quantity || 0,
           onManufacturerChange: (value: string) => setFormData({ manufacturer: value }),
           onModelNumberChange: (value: string) => setFormData({ modelNumber: value }),
           onSerialNumberChange: (value: string) => setFormData({ serialNumber: value }),
@@ -60,11 +60,11 @@ export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData
       case 4: // PurchaseMaintenance
         return {
           ...commonProps,
-          purchaseDate: formData.purchaseDate,
-          purchasePrice: formData.purchasePrice,
-          warrantyExpiration: formData.warrantyExpiration,
-          lastMaintenanceDate: formData.lastMaintenanceDate,
-          nextMaintenanceDate: formData.nextMaintenanceDate,
+          purchaseDate: formData.purchaseDate || "",
+          purchasePrice: formData.purchasePrice || "",
+          warrantyExpiration: formData.warrantyExpiration || "",
+          lastMaintenanceDate: formData.lastMaintenanceDate || "",
+          nextMaintenanceDate: formData.nextMaintenanceDate || "",
           onPurchaseDateChange: (value: string) => setFormData({ purchaseDate: value }),
           onPurchasePriceChange: (value: string) => setFormData({ purchasePrice: value }),
           onWarrantyExpirationChange: (value: string) => setFormData({ warrantyExpiration: value }),
@@ -74,11 +74,11 @@ export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData
       case 5: // Location
         return {
           ...commonProps,
-          building: formData.building,
-          floor: formData.floor,
-          room: formData.room,
-          shelf: formData.shelf,
-          bin: formData.bin,
+          building: formData.building || "",
+          floor: formData.floor || "",
+          room: formData.room || "",
+          shelf: formData.shelf || "",
+          bin: formData.bin || "",
           onBuildingChange: (value: string) => setFormData({ building: value }),
           onFloorChange: (value: string) => setFormData({ floor: value }),
           onRoomChange: (value: string) => setFormData({ room: value }),
@@ -88,8 +88,8 @@ export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData
       case 6: // AdditionalInformation
         return {
           ...commonProps,
-          notes: formData.notes,
-          category: formData.category,
+          notes: formData.notes || "",
+          category: formData.category || "",
           onNotesChange: (value: string) => setFormData({ notes: value }),
           onCategoryChange: (value: string) => setFormData({ category: value }),
         };
