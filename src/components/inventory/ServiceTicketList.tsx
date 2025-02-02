@@ -22,7 +22,6 @@ export const ServiceTicketList = () => {
         return;
       }
 
-      // Map the Supabase data to match our frontend types
       const mappedTickets: ServiceTicket[] = (data || []).map(ticket => ({
         id: ticket.id,
         vehicleId: ticket.vehicle_id || '',
@@ -43,26 +42,48 @@ export const ServiceTicketList = () => {
   }, [toast]);
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto bg-[#F4F1DE] p-8 border border-[#283845]">
-      <h2 className="text-2xl text-[#283845] uppercase tracking-wider text-center">Service Tickets</h2>
-      <div className="grid gap-4">
-        {tickets.map((ticket) => (
-          <div key={ticket.id} className="p-4 border border-[#283845] bg-white">
-            <div className="flex justify-between items-start">
-              <h3 className="font-mono text-lg">Ticket #{ticket.id}</h3>
-              <span className={`px-2 py-1 text-xs rounded ${
-                ticket.status === 'completed' ? 'bg-green-100 text-green-800' :
-                ticket.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                ticket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {ticket.status.toUpperCase()}
-              </span>
+    <div className="container mx-auto py-8">
+      <div className="bg-background border border-border rounded-sm shadow-classic">
+        <div className="p-6 border-b border-border">
+          <h2 className="text-2xl font-system text-foreground">Service Tickets</h2>
+        </div>
+        <div className="p-6 space-y-4">
+          {tickets.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No service tickets found
             </div>
-            <p className="mt-2">{ticket.description}</p>
-            <p className="text-sm text-[#9B2915] mt-2">Priority: {ticket.priority}</p>
-          </div>
-        ))}
+          ) : (
+            tickets.map((ticket) => (
+              <div
+                key={ticket.id}
+                className="bg-card border border-border shadow-classic hover:bg-accent/50 
+                         transition-colors p-4 animate-fade-in"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-system mb-1">
+                      Ticket #{ticket.id}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Priority: {ticket.priority}
+                    </p>
+                  </div>
+                  <span className={`px-3 py-1 text-xs rounded-sm ${
+                    ticket.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    ticket.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                    ticket.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {ticket.status.toUpperCase()}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground border-t border-border pt-3">
+                  {ticket.description}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
