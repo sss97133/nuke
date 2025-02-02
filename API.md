@@ -1,63 +1,186 @@
-# API Documentation
-
-## Overview
-
-This document outlines the API endpoints and data structures used in the Technical Asset Management System (TAMS).
+# TAMS API Documentation
 
 ## Authentication
 
-All API requests require authentication using Supabase JWT tokens. Include the token in the Authorization header:
+All API endpoints require authentication using a JWT token. Include the token in the Authorization header:
 
 ```
 Authorization: Bearer <your-jwt-token>
+```
+
+## Base URL
+
+```
+https://qkgaybvrernstplzjaam.supabase.co
 ```
 
 ## Endpoints
 
 ### Vehicles
 
-#### GET /vehicles
-Retrieves a list of vehicles.
+#### Get Vehicles
+```http
+GET /rest/v1/vehicles
+```
 
-#### POST /vehicles
-Creates a new vehicle entry.
+Response:
+```json
+[
+  {
+    "id": "uuid",
+    "make": "string",
+    "model": "string",
+    "year": "number",
+    "vin": "string",
+    "notes": "string"
+  }
+]
+```
 
-Request body:
+#### Create Vehicle
+```http
+POST /rest/v1/vehicles
+```
+
+Request Body:
 ```json
 {
   "make": "string",
   "model": "string",
   "year": "number",
-  "vin": "string"
+  "vin": "string",
+  "notes": "string"
 }
 ```
 
 ### Inventory
 
-#### GET /inventory
-Retrieves inventory items.
+#### Get Inventory Items
+```http
+GET /rest/v1/inventory
+```
 
-#### POST /inventory
-Creates a new inventory item.
+Response:
+```json
+[
+  {
+    "id": "uuid",
+    "name": "string",
+    "quantity": "number",
+    "location": "string",
+    "category": "string"
+  }
+]
+```
 
 ### Service Tickets
 
-#### GET /service-tickets
-Retrieves service tickets.
+#### Get Service Tickets
+```http
+GET /rest/v1/service_tickets
+```
 
-#### POST /service-tickets
-Creates a new service ticket.
+Response:
+```json
+[
+  {
+    "id": "uuid",
+    "description": "string",
+    "status": "string",
+    "priority": "string",
+    "vehicle_id": "uuid"
+  }
+]
+```
 
-## Error Handling
+## Edge Functions
 
-The API uses standard HTTP status codes:
-- 200: Success
-- 400: Bad Request
-- 401: Unauthorized
-- 403: Forbidden
-- 404: Not Found
-- 500: Internal Server Error
+### VIN Processing
+```http
+POST /functions/v1/process-vin
+```
 
-## Rate Limiting
+Request Body:
+```json
+{
+  "vin": "string",
+  "image_url": "string"
+}
+```
 
-API requests are limited to 100 requests per minute per user.
+### Market Data Collection
+```http
+GET /functions/v1/crawl-market-data
+```
+
+Query Parameters:
+```
+make: string
+model: string
+year: number
+```
+
+## Real-time Subscriptions
+
+### Service Tickets Updates
+```javascript
+supabase
+  .channel('service_tickets')
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'service_tickets'
+  })
+```
+
+## Error Responses
+
+```json
+{
+  "error": {
+    "code": "number",
+    "message": "string"
+  }
+}
+```
+
+## Rate Limits
+
+- 100 requests per minute per IP
+- 1000 requests per hour per user
+
+## Data Types
+
+### Vehicle
+```typescript
+interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin?: string;
+  notes?: string;
+}
+```
+
+### Inventory Item
+```typescript
+interface InventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  location?: string;
+  category?: string;
+}
+```
+
+### Service Ticket
+```typescript
+interface ServiceTicket {
+  id: string;
+  description: string;
+  status: 'pending' | 'in-progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  vehicle_id?: string;
+}
+```

@@ -1,55 +1,43 @@
 # Contributing to TAMS
 
-Thank you for your interest in contributing to the Technical Asset Management System! This document provides guidelines and instructions for contributing to the project.
+We love your input! We want to make contributing to TAMS as easy and transparent as possible, whether it's:
 
-## Getting Started
+- Reporting a bug
+- Discussing the current state of the code
+- Submitting a fix
+- Proposing new features
+- Becoming a maintainer
 
-1. Fork the repository
-2. Create a new branch for your feature/fix
-3. Make your changes
-4. Submit a pull request
+## Development Process
+All changes happen through pull requests. Pull requests are the best way to propose changes to the codebase.
 
-## Development Setup
+1. Fork the repo and create your branch from `main`.
+2. If you've added code that should be tested, add tests.
+3. If you've changed APIs, update the documentation.
+4. Ensure the test suite passes.
+5. Make sure your code lints.
+6. Issue that pull request!
 
-1. Install dependencies:
-```bash
-npm install
-```
+## Any contributions you make will be under the MIT Software License
+When you submit code changes, your submissions are understood to be under the same [MIT License](http://choosealicense.com/licenses/mit/) that covers the project.
 
-2. Set up environment variables:
-```bash
-cp .env.example .env
-```
+## Report bugs using Github's [issue tracker]
+We use GitHub issues to track public bugs. Report a bug by [opening a new issue]().
 
-3. Start the development server:
-```bash
-npm run dev
-```
+## Write bug reports with detail, background, and sample code
 
-## Code Style
+**Great Bug Reports** tend to have:
 
-- Follow the existing TypeScript and React patterns
-- Use Tailwind CSS for styling
-- Implement responsive designs
-- Write meaningful commit messages
+- A quick summary and/or background
+- Steps to reproduce
+  - Be specific!
+  - Give sample code if you can.
+- What you expected would happen
+- What actually happens
+- Notes (possibly including why you think this might be happening, or stuff you tried that didn't work)
 
-## Testing
+## License
+By contributing, you agree that your contributions will be licensed under its MIT License.
 
-- Write tests for new features
-- Ensure existing tests pass
-- Test across different browsers
-
-## Pull Request Process
-
-1. Update documentation for new features
-2. Add tests if applicable
-3. Ensure the build passes
-4. Get review from maintainers
-
-## Code of Conduct
-
-Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
-
-## Questions?
-
-Feel free to open an issue or contact the maintainers.
+## References
+This document was adapted from the open-source contribution guidelines for [Facebook's Draft](https://github.com/facebook/draft-js/blob/a9316a723f9e918afde44dea68b5f9f39b7d9b00/CONTRIBUTING.md).
