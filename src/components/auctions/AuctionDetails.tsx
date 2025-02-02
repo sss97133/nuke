@@ -22,19 +22,19 @@ export const AuctionDetails = ({
   const reserveMet = hasReserve && currentPrice >= reservePrice!;
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4 p-6 bg-[#1A1F2C] text-white">
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-          <span className="text-sm text-muted-foreground">Current Bid:</span>
+          <span className="text-sm text-gray-400">Current Bid:</span>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold">
+            <span className="text-3xl font-bold text-white">
               ${(currentPrice || startingPrice).toLocaleString()}
             </span>
             {hasReserve && (
               <span
                 className={cn(
                   "inline-flex items-center text-sm font-medium",
-                  reserveMet ? "text-green-500" : "text-amber-500"
+                  reserveMet ? "text-green-400" : "text-amber-400"
                 )}
               >
                 <AlertTriangle className="w-4 h-4 mr-1" />
@@ -44,7 +44,7 @@ export const AuctionDetails = ({
           </div>
         </div>
         <div className="text-right">
-          <div className="flex items-center text-sm text-muted-foreground">
+          <div className="flex items-center text-sm text-gray-400">
             <Clock className="w-4 h-4 mr-1" />
             {timeRemaining}
           </div>

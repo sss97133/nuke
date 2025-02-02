@@ -15,7 +15,7 @@ export const AuctionActions = ({ auctionId, isSelected, onToggle }: AuctionActio
         variant="outline"
         size="sm"
         onClick={() => onToggle(auctionId)}
-        className="flex items-center"
+        className="flex items-center bg-[#2A2F3C] border-[#3A3F4C] text-white hover:bg-[#3A3F4C] hover:text-white"
       >
         <MessageSquare className="mr-2 h-4 w-4" />
         Comments
@@ -24,7 +24,7 @@ export const AuctionActions = ({ auctionId, isSelected, onToggle }: AuctionActio
         variant="outline"
         size="sm"
         onClick={() => onToggle(auctionId)}
-        className="flex items-center"
+        className="flex items-center bg-[#2A2F3C] border-[#3A3F4C] text-white hover:bg-[#3A3F4C] hover:text-white"
       >
         <TrendingUp className="mr-2 h-4 w-4" />
         Bid History

@@ -36,8 +36,8 @@ export const AuctionCard = ({
 
   return (
     <Card className={cn(
-      "overflow-hidden transition-all duration-200",
-      isEnded ? "opacity-75" : "hover:shadow-lg"
+      "bg-[#1A1F2C] border-[#2A2F3C] overflow-hidden transition-all duration-200",
+      isEnded ? "opacity-75" : "hover:border-[#3A3F4C]"
     )}>
       <AuctionGallery
         make={auction.vehicle.make}
@@ -52,7 +52,7 @@ export const AuctionCard = ({
         endTime={auction.end_time}
       />
 
-      <div className="p-6 pt-0 space-y-6">
+      <div className="p-6 pt-0 space-y-6 border-t border-[#2A2F3C]">
         {!isEnded && (
           <BidForm 
             auctionId={auction.id}
