@@ -13,23 +13,23 @@ interface Comment {
   created_at: string;
   user_id: string;
   parent_comment_id: string | null;
-  profiles: {
-    username: string;
-    avatar_url: string;
-  };
+  profiles?: {
+    username: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
-interface AuctionCommentsProps {
-  auctionId: string;
-}
-
-export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
+export const AuctionComments = ({ auctionId }: { auctionId: string }) => {
   const { toast } = useToast();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id ?? null);
+    });
     fetchComments();
     subscribeToComments();
   }, [auctionId]);
@@ -134,7 +134,7 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
       >
         <div className="flex items-start space-x-4">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={comment.profiles?.avatar_url} />
+            <AvatarImage src={comment.profiles?.avatar_url ?? undefined} />
             <AvatarFallback>
               {comment.profiles?.username?.[0]?.toUpperCase() || "U"}
             </AvatarFallback>
@@ -161,7 +161,7 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
                 <Reply className="mr-2 h-4 w-4" />
                 Reply
               </Button>
-              {comment.user_id === supabase.auth.getUser().then(({ data }) => data.user?.id) && (
+              {currentUserId === comment.user_id && (
                 <Button
                   variant="ghost"
                   size="sm"
