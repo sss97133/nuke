@@ -7,6 +7,7 @@ import { DashboardHeader } from "./header/DashboardHeader";
 import { DashboardTabs } from "./tabs/DashboardTabs";
 import { DashboardFooter } from "./footer/DashboardFooter";
 import { FormDialogs } from "./dialogs/FormDialogs";
+import { MendableChat } from "../ai/MendableChat";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -82,6 +83,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         <div className="mb-4 text-sm font-mono">
           <span className="text-muted-foreground">[SYS_MSG]</span>
           <span className="text-foreground/80 ml-2">DATA_COLLECTION_NOTICE_ACTIVE</span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <MendableChat />
         </div>
 
         <Tabs defaultValue="inventory" className="w-full animate-scale-in">
