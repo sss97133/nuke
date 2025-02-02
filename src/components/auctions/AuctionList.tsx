@@ -23,10 +23,8 @@ interface Auction {
   reserve_price: number | null;
   end_time: string;
   status: string;
-  _count?: {
-    auction_bids: number;
-    auction_comments: number;
-  };
+  bid_count: number;
+  comment_count: number;
   vehicle: {
     make: string;
     model: string;
@@ -43,15 +41,14 @@ export const AuctionList = () => {
   const { data: auctions, isLoading } = useQuery({
     queryKey: ['auctions', sortBy],
     queryFn: async () => {
+      // First, get the auctions with vehicle data
       let query = supabase
         .from('auctions')
         .select(`
           *,
           vehicle:vehicles(make, model, year),
-          _count {
-            auction_bids,
-            auction_comments
-          }
+          bid_count:auction_bids(count),
+          comment_count:auction_comments(count)
         `);
 
       // Apply sorting
@@ -70,7 +67,13 @@ export const AuctionList = () => {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as Auction[];
+
+      // Transform the data to match our interface
+      return data.map((auction: any) => ({
+        ...auction,
+        bid_count: auction.bid_count?.[0]?.count ?? 0,
+        comment_count: auction.comment_count?.[0]?.count ?? 0
+      })) as Auction[];
     }
   });
 
@@ -155,7 +158,13 @@ export const AuctionList = () => {
         {auctions?.map((auction) => (
           <div key={auction.id} className="space-y-6">
             <AuctionCard
-              auction={auction}
+              auction={{
+                ...auction,
+                _count: {
+                  auction_bids: auction.bid_count,
+                  auction_comments: auction.comment_count
+                }
+              }}
               onBidSubmit={handleBidSubmit}
               onToggleDetails={handleToggleDetails}
               selectedAuction={selectedAuction}
