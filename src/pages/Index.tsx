@@ -6,11 +6,40 @@ import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
 
 const Index = () => {
-  const [session, setSession] = useState<Session | null>(null);
+  // For development, we'll create a mock session
+  const mockSession: Session = {
+    access_token: "mock_token",
+    token_type: "bearer",
+    expires_in: 3600,
+    refresh_token: "mock_refresh",
+    user: {
+      id: "mock_user_id",
+      aud: "authenticated",
+      role: "authenticated",
+      email: "shkylar@gmail.com",
+      email_confirmed_at: new Date().toISOString(),
+      phone: "",
+      confirmed_at: new Date().toISOString(),
+      last_sign_in_at: new Date().toISOString(),
+      app_metadata: {
+        provider: "email",
+        providers: ["email"],
+      },
+      user_metadata: {},
+      identities: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  const [session, setSession] = useState<Session | null>(mockSession); // Set mock session as default
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Comment out the actual auth check for development
+    /*
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
@@ -30,6 +59,10 @@ const Index = () => {
     });
 
     return () => subscription.unsubscribe();
+    */
+    
+    // Instead, just set loading to false
+    setLoading(false);
   }, [toast]);
 
   if (loading) {
@@ -45,14 +78,7 @@ const Index = () => {
     );
   }
 
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-secondary dark:bg-secondary-dark">
-        <AuthForm />
-      </div>
-    );
-  }
-
+  // Skip the auth form completely
   return <DashboardLayout />;
 };
 
