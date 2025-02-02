@@ -35,6 +35,10 @@ serve(async (req) => {
       })
     })
 
+    if (!response.ok) {
+      throw new Error(`Mendable API returned ${response.status}`)
+    }
+
     const data = await response.json()
     console.log('Mendable response:', data)
 

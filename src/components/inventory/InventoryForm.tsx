@@ -29,11 +29,15 @@ const steps = [
 export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
   const {
     formData,
-    setFormData,
+    setFormData: originalSetFormData,
     isProcessing,
     handleSubmit: originalHandleSubmit,
     handlePhotoUpload,
   } = useInventoryForm();
+
+  const setFormData = (data: Partial<InventoryFormData>) => {
+    originalSetFormData(prev => ({ ...prev, ...data }));
+  };
 
   const { currentStep, setCurrentStep, getStepProps } = useFormSteps(steps, formData);
 
