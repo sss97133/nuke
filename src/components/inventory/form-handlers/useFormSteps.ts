@@ -14,8 +14,8 @@ export const useFormSteps = (steps: StepProps[], formData: InventoryFormData) =>
     isProcessing: boolean,
     setFormData: (data: InventoryFormData) => void
   ) => {
-    // Base props that are shared across components
-    const baseProps = {
+    // Common props shared across all components
+    const commonProps = {
       isProcessing,
     };
 
@@ -23,20 +23,21 @@ export const useFormSteps = (steps: StepProps[], formData: InventoryFormData) =>
     switch (currentStep) {
       case 0: // PhotoCapture
         return {
+          ...commonProps,
           onPhotoCapture: handlePhotoUpload,
           onSkip: () => setCurrentStep(1),
-          isProcessing,
         };
       case 1: // BasicInformation
         return {
+          ...commonProps,
           name: formData.name || "",
           partNumber: formData.partNumber || "",
           onNameChange: (value: string) => setFormData({ ...formData, name: value }),
           onPartNumberChange: (value: string) => setFormData({ ...formData, partNumber: value }),
-          ...baseProps,
         };
       case 2: // Categorization
         return {
+          ...commonProps,
           department: formData.department || "",
           subDepartment: formData.subDepartment || "",
           assetType: formData.assetType || "",
@@ -45,10 +46,10 @@ export const useFormSteps = (steps: StepProps[], formData: InventoryFormData) =>
           onSubDepartmentChange: (value: string) => setFormData({ ...formData, subDepartment: value }),
           onAssetTypeChange: (value: string) => setFormData({ ...formData, assetType: value }),
           onConditionChange: (value: string) => setFormData({ ...formData, condition: value }),
-          ...baseProps,
         };
       case 3: // ProductDetails
         return {
+          ...commonProps,
           manufacturer: formData.manufacturer || "",
           modelNumber: formData.modelNumber || "",
           serialNumber: formData.serialNumber || "",
@@ -57,10 +58,10 @@ export const useFormSteps = (steps: StepProps[], formData: InventoryFormData) =>
           onModelNumberChange: (value: string) => setFormData({ ...formData, modelNumber: value }),
           onSerialNumberChange: (value: string) => setFormData({ ...formData, serialNumber: value }),
           onQuantityChange: (value: number) => setFormData({ ...formData, quantity: value }),
-          ...baseProps,
         };
       case 4: // PurchaseMaintenance
         return {
+          ...commonProps,
           purchaseDate: formData.purchaseDate || "",
           purchasePrice: formData.purchasePrice || "",
           warrantyExpiration: formData.warrantyExpiration || "",
@@ -71,10 +72,10 @@ export const useFormSteps = (steps: StepProps[], formData: InventoryFormData) =>
           onWarrantyExpirationChange: (value: string) => setFormData({ ...formData, warrantyExpiration: value }),
           onLastMaintenanceDateChange: (value: string) => setFormData({ ...formData, lastMaintenanceDate: value }),
           onNextMaintenanceDateChange: (value: string) => setFormData({ ...formData, nextMaintenanceDate: value }),
-          ...baseProps,
         };
       case 5: // Location
         return {
+          ...commonProps,
           building: formData.building || "",
           floor: formData.floor || "",
           room: formData.room || "",
@@ -85,18 +86,16 @@ export const useFormSteps = (steps: StepProps[], formData: InventoryFormData) =>
           onRoomChange: (value: string) => setFormData({ ...formData, room: value }),
           onShelfChange: (value: string) => setFormData({ ...formData, shelf: value }),
           onBinChange: (value: string) => setFormData({ ...formData, bin: value }),
-          ...baseProps,
         };
       case 6: // AdditionalInformation
         return {
+          ...commonProps,
           notes: formData.notes || "",
           onNotesChange: (value: string) => setFormData({ ...formData, notes: value }),
           onImageUpload: handlePhotoUpload,
-          isProcessing,
-          ...baseProps,
         };
       default:
-        return baseProps;
+        return commonProps;
     }
   };
 
