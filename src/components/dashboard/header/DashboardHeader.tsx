@@ -1,12 +1,14 @@
 import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarShortcut, MenubarTrigger } from "@/components/ui/menubar";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useTheme } from "next-themes";
+import { Sun, Moon } from "lucide-react";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
 }
 
 export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
+  const { theme, setTheme } = useTheme();
+
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center h-6 px-2 bg-[#CCCCCC] border-b border-[#8E9196] shadow-classic">
@@ -81,6 +83,17 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
           </Menubar>
         </div>
         <div className="flex items-center gap-2 ml-2">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="p-1 rounded-md hover:bg-accent"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+          </button>
           <span className="text-[10px] text-primary">Battery: 100%</span>
           <span className="text-[10px] text-primary">{new Date().toLocaleTimeString()}</span>
         </div>
@@ -92,7 +105,7 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
             <span className="text-sm text-muted-foreground font-mono">SID:{new Date().getTime()}</span>
           </div>
           <button
-            onClick={() => supabase.auth.signOut()}
+            onClick={() => handleMenuAction('exit')}
             className="classic-button"
           >
             EXIT_SYS
