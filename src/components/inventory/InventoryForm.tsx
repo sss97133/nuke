@@ -7,10 +7,21 @@ import { Location } from "./form-sections/Location";
 import { AdditionalInformation } from "./form-sections/AdditionalInformation";
 import { ImageProcessing } from "./form-sections/ImageProcessing";
 import { useInventoryForm } from "./form-handlers/useInventoryForm";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface InventoryFormProps {
   onSuccess?: () => void;
 }
+
+const steps = [
+  { title: "Basic Information", component: BasicInformation },
+  { title: "Categorization", component: Categorization },
+  { title: "Product Details", component: ProductDetails },
+  { title: "Purchase & Maintenance", component: PurchaseMaintenance },
+  { title: "Location", component: Location },
+  { title: "Additional Information", component: AdditionalInformation },
+];
 
 export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
   const {
@@ -21,111 +32,106 @@ export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
     handleSubmit: originalHandleSubmit,
   } = useInventoryForm();
 
+  const [currentStep, setCurrentStep] = useState(0);
+
   const handleSubmit = async (e: React.FormEvent) => {
-    await originalHandleSubmit(e);
-    onSuccess?.();
+    e.preventDefault();
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      await originalHandleSubmit(e);
+      onSuccess?.();
+    }
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setIsProcessing(true);
-    // Process image upload logic here if needed
-    setIsProcessing(false);
+  const handleBack = () => {
+    setCurrentStep(Math.max(0, currentStep - 1));
   };
+
+  const CurrentStepComponent = steps[currentStep].component;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto bg-white border border-gray-200 shadow-sm">
-      <div className="border-b border-gray-200 bg-gray-50 p-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-sm font-mono text-[#283845] tracking-tight uppercase">Technical Asset Documentation</h2>
-            <p className="text-xs text-[#666] font-mono mt-1">Reference: {Date.now()}</p>
-          </div>
-          <div className="text-xs text-[#666] font-mono">
-            {new Date().toISOString().split('T')[0]}
-          </div>
+    <div className="max-w-4xl mx-auto">
+      {/* Progress Bar */}
+      <div className="mb-8">
+        <div className="flex justify-between mb-2">
+          {steps.map((step, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentStep(index)}
+              className={cn(
+                "text-sm font-mono transition-colors",
+                index === currentStep
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground"
+              )}
+            >
+              {step.title}
+            </button>
+          ))}
+        </div>
+        <div className="h-2 bg-secondary rounded-full">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-300"
+            style={{
+              width: `${((currentStep + 1) / steps.length) * 100}%`,
+            }}
+          />
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
-        <BasicInformation
-          name={formData.name}
-          partNumber={formData.partNumber}
-          onNameChange={(value) => setFormData({ ...formData, name: value })}
-          onPartNumberChange={(value) => setFormData({ ...formData, partNumber: value })}
-        />
+      <form onSubmit={handleSubmit} className="space-y-6 bg-background border border-border p-6 shadow-classic">
+        <div className="border-b border-border bg-muted p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-sm font-mono text-foreground tracking-tight uppercase">
+                {steps[currentStep].title}
+              </h2>
+              <p className="text-xs text-muted-foreground font-mono mt-1">
+                Step {currentStep + 1} of {steps.length}
+              </p>
+            </div>
+            <div className="text-xs text-muted-foreground font-mono">
+              {new Date().toISOString().split('T')[0]}
+            </div>
+          </div>
+        </div>
 
-        <Categorization
-          department={formData.department}
-          subDepartment={formData.subDepartment}
-          assetType={formData.assetType}
-          condition={formData.condition}
-          onDepartmentChange={(value) => setFormData({ ...formData, department: value })}
-          onSubDepartmentChange={(value) => setFormData({ ...formData, subDepartment: value })}
-          onAssetTypeChange={(value) => setFormData({ ...formData, assetType: value })}
-          onConditionChange={(value) => setFormData({ ...formData, condition: value })}
-        />
+        <div className="p-6 space-y-6">
+          <CurrentStepComponent
+            {...formData}
+            {...Object.fromEntries(
+              Object.keys(formData).map(key => [
+                `on${key.charAt(0).toUpperCase() + key.slice(1)}Change`,
+                (value: any) => setFormData({ ...formData, [key]: value })
+              ])
+            )}
+          />
+        </div>
 
-        <ProductDetails
-          manufacturer={formData.manufacturer}
-          modelNumber={formData.modelNumber}
-          serialNumber={formData.serialNumber}
-          quantity={formData.quantity}
-          onManufacturerChange={(value) => setFormData({ ...formData, manufacturer: value })}
-          onModelNumberChange={(value) => setFormData({ ...formData, modelNumber: value })}
-          onSerialNumberChange={(value) => setFormData({ ...formData, serialNumber: value })}
-          onQuantityChange={(value) => setFormData({ ...formData, quantity: value })}
-        />
-
-        <PurchaseMaintenance
-          purchaseDate={formData.purchaseDate}
-          purchasePrice={formData.purchasePrice}
-          warrantyExpiration={formData.warrantyExpiration}
-          lastMaintenanceDate={formData.lastMaintenanceDate}
-          nextMaintenanceDate={formData.nextMaintenanceDate}
-          onPurchaseDateChange={(value) => setFormData({ ...formData, purchaseDate: value })}
-          onPurchasePriceChange={(value) => setFormData({ ...formData, purchasePrice: value })}
-          onWarrantyExpirationChange={(value) => setFormData({ ...formData, warrantyExpiration: value })}
-          onLastMaintenanceDateChange={(value) => setFormData({ ...formData, lastMaintenanceDate: value })}
-          onNextMaintenanceDateChange={(value) => setFormData({ ...formData, nextMaintenanceDate: value })}
-        />
-
-        <Location
-          building={formData.building}
-          floor={formData.floor}
-          room={formData.room}
-          shelf={formData.shelf}
-          bin={formData.bin}
-          onBuildingChange={(value) => setFormData({ ...formData, building: value })}
-          onFloorChange={(value) => setFormData({ ...formData, floor: value })}
-          onRoomChange={(value) => setFormData({ ...formData, room: value })}
-          onShelfChange={(value) => setFormData({ ...formData, shelf: value })}
-          onBinChange={(value) => setFormData({ ...formData, bin: value })}
-        />
-
-        <AdditionalInformation
-          notes={formData.notes}
-          onNotesChange={(value) => setFormData({ ...formData, notes: value })}
-          onImageUpload={handleImageUpload}
-          isProcessing={isProcessing}
-        />
-
-        <ImageProcessing
-          isProcessing={isProcessing}
-          setIsProcessing={setIsProcessing}
-        />
-      </div>
-
-      <div className="border-t border-gray-200 bg-gray-50 p-4">
-        <Button
-          type="submit"
-          className="w-full bg-[#283845] hover:bg-[#1a2830] text-white font-mono text-sm"
-          disabled={isProcessing}
-        >
-          {isProcessing ? "Processing Submission..." : "Submit Technical Documentation"}
-        </Button>
-      </div>
-    </form>
+        <div className="border-t border-border bg-muted p-4 flex justify-between">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleBack}
+            disabled={currentStep === 0}
+            className="font-mono text-sm"
+          >
+            Back
+          </Button>
+          <Button
+            type="submit"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-sm"
+            disabled={isProcessing}
+          >
+            {isProcessing
+              ? "Processing..."
+              : currentStep === steps.length - 1
+              ? "Submit"
+              : "Next"}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
