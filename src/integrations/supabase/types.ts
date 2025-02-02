@@ -41,6 +41,51 @@ export type Database = {
           },
         ]
       }
+      auction_comments: {
+        Row: {
+          auction_id: string | null
+          comment: string
+          created_at: string | null
+          id: string
+          parent_comment_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          auction_id?: string | null
+          comment: string
+          created_at?: string | null
+          id?: string
+          parent_comment_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          auction_id?: string | null
+          comment?: string
+          created_at?: string | null
+          id?: string
+          parent_comment_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auction_comments_auction_id_fkey"
+            columns: ["auction_id"]
+            isOneToOne: false
+            referencedRelation: "auctions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auction_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "auction_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auctions: {
         Row: {
           created_at: string | null

@@ -57,7 +57,7 @@ export const CreateAuction = () => {
   };
 
   return (
-    <Card className="p-4">
+    <Card className="p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <Label htmlFor="vehicleId">Vehicle ID</Label>
