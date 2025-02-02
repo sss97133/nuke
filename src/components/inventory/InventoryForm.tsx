@@ -8,14 +8,23 @@ import { AdditionalInformation } from "./form-sections/AdditionalInformation";
 import { ImageProcessing } from "./form-sections/ImageProcessing";
 import { useInventoryForm } from "./form-handlers/useInventoryForm";
 
-export const InventoryForm = () => {
+interface InventoryFormProps {
+  onSuccess?: () => void;
+}
+
+export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
   const {
     formData,
     setFormData,
     isProcessing,
     setIsProcessing,
-    handleSubmit,
+    handleSubmit: originalHandleSubmit,
   } = useInventoryForm();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    await originalHandleSubmit(e);
+    onSuccess?.();
+  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
