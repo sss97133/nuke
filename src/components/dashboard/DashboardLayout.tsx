@@ -1,10 +1,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { InventoryForm } from "@/components/inventory/InventoryForm";
+import { VehicleForm } from "@/components/vehicles/VehicleForm";
 import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
 import { GarageManagement } from "@/components/garage/GarageManagement";
 import { CommandBar } from "./CommandBar";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { 
   Car, 
   Warehouse, 
@@ -33,17 +35,21 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { toast } = useToast();
+  const [showNewVehicleDialog, setShowNewVehicleDialog] = useState(false);
+  const [showNewInventoryDialog, setShowNewInventoryDialog] = useState(false);
 
   const handleMenuAction = (action: string) => {
     switch (action) {
       case 'new_vehicle':
-        toast({ title: "Creating new vehicle entry..." });
+        setShowNewVehicleDialog(true);
         break;
       case 'new_inventory':
-        toast({ title: "Creating new inventory item..." });
+        setShowNewInventoryDialog(true);
         break;
       case 'exit':
-        supabase.auth.signOut();
+        if (confirm('Are you sure you want to exit?')) {
+          supabase.auth.signOut();
+        }
         break;
       case 'about':
         toast({ 
@@ -51,8 +57,17 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           description: "Technical Asset Management System v1.0\nDeveloped with ❤️ using modern web technologies."
         });
         break;
+      case 'preferences':
+        toast({ 
+          title: "Preferences",
+          description: "Preferences dialog will be implemented soon."
+        });
+        break;
       default:
-        toast({ title: `${action} selected` });
+        toast({ 
+          title: `${action} selected`,
+          description: "This feature will be implemented soon."
+        });
     }
   };
 
@@ -167,6 +182,24 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </div>
         </div>
       </header>
+
+      <Dialog open={showNewVehicleDialog} onOpenChange={setShowNewVehicleDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add New Vehicle</DialogTitle>
+          </DialogHeader>
+          <VehicleForm onSuccess={() => setShowNewVehicleDialog(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showNewInventoryDialog} onOpenChange={setShowNewInventoryDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add New Inventory Item</DialogTitle>
+          </DialogHeader>
+          <InventoryForm onSuccess={() => setShowNewInventoryDialog(false)} />
+        </DialogContent>
+      </Dialog>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="mb-4 text-sm font-mono">
