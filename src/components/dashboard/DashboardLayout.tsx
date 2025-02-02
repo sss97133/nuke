@@ -45,6 +45,20 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   return (
     <div className="min-h-screen bg-background font-system animate-fade-in">
       <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center justify-between h-6 px-2 bg-[#CCCCCC] border-b border-[#8E9196] shadow-classic">
+          <div className="flex items-center space-x-4">
+            <span className="text-xs text-primary">🍎</span>
+            <span className="text-xs font-bold">File</span>
+            <span className="text-xs font-bold">Edit</span>
+            <span className="text-xs font-bold">View</span>
+            <span className="text-xs font-bold">Special</span>
+            <span className="text-xs font-bold">Help</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-[10px] text-primary">Battery: 100%</span>
+            <span className="text-[10px] text-primary">{new Date().toLocaleTimeString()}</span>
+          </div>
+        </div>
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between items-center h-14">
             <div className="flex items-center space-x-4">
