@@ -18,7 +18,7 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
               <MenubarTrigger className="text-xs font-bold">🍎</MenubarTrigger>
               <MenubarContent>
                 <MenubarItem onClick={() => handleMenuAction('about')}>
-                  About TAMS
+                  About Fleet Manager
                 </MenubarItem>
                 <MenubarSeparator />
                 <MenubarItem onClick={() => handleMenuAction('preferences')}>
@@ -81,7 +81,7 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
                   Documentation
                 </MenubarItem>
                 <MenubarItem onClick={() => handleMenuAction('about')}>
-                  About TAMS
+                  About Fleet Manager
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
