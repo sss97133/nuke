@@ -62,7 +62,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background font-system animate-fade-in">
+    <div className="min-h-screen bg-background dark:bg-background-dark text-foreground dark:text-foreground-dark font-system animate-fade-in">
       <DashboardHeader handleMenuAction={handleMenuAction} />
 
       <FormDialogs
@@ -72,7 +72,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         setShowNewInventoryDialog={setShowNewInventoryDialog}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 bg-background dark:bg-background-dark">
         <div className="grid grid-cols-1 gap-4">
           {showAiAssistant && (
             <div className="fixed bottom-4 right-4 w-96 z-50">
