@@ -34,6 +34,36 @@
     
     --radius: 0;
   }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+  }
 }
 
 @layer base {
@@ -45,12 +75,16 @@
     @apply bg-background text-foreground font-system antialiased;
   }
 
+  body.dark {
+    @apply bg-background-dark text-foreground-dark;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-system tracking-tight;
   }
 
   button, input, select, textarea {
-    @apply shadow-classic active:shadow-classic-pressed transition-none;
+    @apply shadow-classic active:shadow-classic-pressed transition-none dark:shadow-classic-dark dark:active:shadow-classic-pressed-dark;
   }
 }
 
@@ -60,11 +94,12 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-secondary border border-border;
+  @apply bg-secondary border border-border dark:bg-secondary-dark dark:border-border-dark;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-accent border border-border shadow-classic hover:bg-accent/90;
+  @apply bg-accent border border-border shadow-classic hover:bg-accent/90 
+         dark:bg-accent-dark dark:border-border-dark dark:shadow-classic-dark dark:hover:bg-accent-dark/90;
 }
 
 /* Animation utilities */
@@ -100,17 +135,22 @@
 
 /* Classic MacOS window styling */
 .classic-window {
-  @apply bg-background border border-border shadow-classic p-4;
+  @apply bg-background border border-border shadow-classic p-4
+         dark:bg-background-dark dark:border-border-dark dark:shadow-classic-dark;
 }
 
 .classic-button {
   @apply bg-secondary border border-border shadow-classic 
          hover:bg-accent active:shadow-classic-pressed
-         px-4 py-1 text-sm font-system;
+         px-4 py-1 text-sm font-system
+         dark:bg-secondary-dark dark:border-border-dark dark:shadow-classic-dark
+         dark:hover:bg-accent-dark dark:active:shadow-classic-pressed-dark;
 }
 
 .classic-input {
   @apply bg-white border border-border shadow-classic 
          focus:shadow-classic-pressed focus:outline-none
-         px-2 py-1 text-sm font-system;
+         px-2 py-1 text-sm font-system
+         dark:bg-background-dark dark:border-border-dark dark:shadow-classic-dark
+         dark:focus:shadow-classic-pressed-dark;
 }
