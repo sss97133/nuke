@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { MessageSquare, Reply } from "lucide-react";
 
 interface Profile {
   username: string;
@@ -92,14 +94,14 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
 
     return (
       <div key={comment.id} className="space-y-4">
-        <div className="flex items-start space-x-4">
-          <Avatar>
+        <div className="flex items-start space-x-4 group hover:bg-accent/50 p-2 rounded-lg transition-colors">
+          <Avatar className="h-8 w-8">
             <AvatarImage src={profile.avatar_url} />
             <AvatarFallback>{profile.username[0]}</AvatarFallback>
           </Avatar>
           <div className="flex-1 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-semibold">{profile.username}</span>
+              <span className="font-medium">{profile.username}</span>
               <span className="text-sm text-muted-foreground">
                 {formatDistanceToNow(new Date(comment.created_at), {
                   addSuffix: true,
@@ -111,7 +113,9 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
               variant="ghost"
               size="sm"
               onClick={() => handleReply(comment.id)}
+              className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity"
             >
+              <Reply className="w-4 h-4 mr-1" />
               Reply
             </Button>
           </div>
@@ -127,7 +131,12 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-card p-4 rounded-lg border">
+      <h3 className="text-lg font-semibold flex items-center">
+        <MessageSquare className="w-5 h-5 mr-2" />
+        Comments
+      </h3>
+      
       <div className="flex items-center space-x-2">
         <Textarea
           value={newComment}
@@ -137,23 +146,28 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
               ? "Write a reply..."
               : "Write a comment about this auction..."
           }
-          className="flex-1"
+          className="flex-1 resize-none"
+          rows={2}
         />
-        <Button onClick={handleSubmitComment}>
-          {replyTo ? "Reply" : "Comment"}
-        </Button>
-        {replyTo && (
-          <Button variant="ghost" onClick={() => setReplyTo(null)}>
-            Cancel
+        <div className="flex flex-col space-y-2">
+          <Button onClick={handleSubmitComment}>
+            {replyTo ? "Reply" : "Comment"}
           </Button>
-        )}
+          {replyTo && (
+            <Button variant="ghost" onClick={() => setReplyTo(null)}>
+              Cancel
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-6">
-        {comments
-          .filter((c) => !c.parent_comment_id)
-          .map((comment) => renderComment(comment))}
-      </div>
+      <ScrollArea className="h-[300px] pr-4">
+        <div className="space-y-6">
+          {comments
+            .filter((c) => !c.parent_comment_id)
+            .map((comment) => renderComment(comment))}
+        </div>
+      </ScrollArea>
     </div>
   );
 };

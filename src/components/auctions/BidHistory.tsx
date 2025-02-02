@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { DollarSign } from "lucide-react";
 
 interface Profile {
   username: string;
@@ -25,7 +27,6 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
   useEffect(() => {
     fetchBids();
     
-    // Subscribe to new bids
     const channel = supabase
       .channel('auction_bids')
       .on(
@@ -73,31 +74,39 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Bid History</h3>
-      <div className="space-y-4">
-        {bids.map((bid) => {
-          const profile = bid.profiles || { username: 'Unknown', avatar_url: '' };
-          
-          return (
-            <div key={bid.id} className="flex items-center space-x-4">
-              <Avatar>
-                <AvatarImage src={profile.avatar_url} />
-                <AvatarFallback>{profile.username[0]}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">{profile.username}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
-                  </span>
+    <div className="space-y-4 bg-card p-4 rounded-lg border">
+      <h3 className="text-lg font-semibold flex items-center">
+        <TrendingUp className="w-5 h-5 mr-2" />
+        Bid History
+      </h3>
+      <ScrollArea className="h-[300px] pr-4">
+        <div className="space-y-4">
+          {bids.map((bid) => {
+            const profile = bid.profiles || { username: 'Unknown', avatar_url: '' };
+            
+            return (
+              <div key={bid.id} className="flex items-center space-x-4 group hover:bg-accent/50 p-2 rounded-lg transition-colors">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile.avatar_url} />
+                  <AvatarFallback>{profile.username[0]}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{profile.username}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                  <p className="text-sm flex items-center text-primary">
+                    <DollarSign className="w-4 h-4 mr-1" />
+                    {bid.amount.toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-sm">Bid amount: ${bid.amount}</p>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </ScrollArea>
     </div>
   );
 };
