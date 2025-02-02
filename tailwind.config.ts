@@ -72,7 +72,7 @@ export default {
         'doc': ['0.8125rem', '1.25rem'],
       },
       fontFamily: {
-        'system': ['Chicago', 'Monaco', 'Consolas', 'monospace'],
+        'system': ['Apple Symbols', 'Monaco', 'Consolas', 'monospace'],
       },
       borderRadius: {
         lg: '0px',
