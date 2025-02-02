@@ -1,151 +1,21 @@
-import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-import { pipeline } from "@huggingface/transformers";
-import { supabase } from "@/integrations/supabase/client";
 import { BasicInformation } from "./form-sections/BasicInformation";
 import { Categorization } from "./form-sections/Categorization";
 import { ProductDetails } from "./form-sections/ProductDetails";
 import { PurchaseMaintenance } from "./form-sections/PurchaseMaintenance";
 import { Location } from "./form-sections/Location";
 import { AdditionalInformation } from "./form-sections/AdditionalInformation";
+import { ImageProcessing } from "./form-sections/ImageProcessing";
+import { useInventoryForm } from "./form-handlers/useInventoryForm";
 
 export const InventoryForm = () => {
-  const { toast } = useToast();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    partNumber: "",
-    quantity: 0,
-    category: "",
-    notes: "",
-    department: "",
-    subDepartment: "",
-    assetType: "",
-    condition: "",
-    manufacturer: "",
-    modelNumber: "",
-    serialNumber: "",
-    purchaseDate: "",
-    purchasePrice: "",
-    warrantyExpiration: "",
-    lastMaintenanceDate: "",
-    nextMaintenanceDate: "",
-    building: "",
-    floor: "",
-    room: "",
-    shelf: "",
-    bin: "",
-  });
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsProcessing(true);
-    try {
-      const classifier = await pipeline(
-        "image-classification",
-        "onnx-community/mobilenetv4_conv_small.e2400_r224_in1k",
-        { device: "webgpu" }
-      );
-
-      const imageUrl = URL.createObjectURL(file);
-      const result = await classifier(imageUrl);
-      
-      const { data, error } = await supabase.storage
-        .from("inventory-images")
-        .upload(`${Date.now()}-${file.name}`, file);
-
-      if (error) throw error;
-
-      const detectedLabel = Array.isArray(result) && result.length > 0 
-        ? (result[0] as { label?: string, score?: number }).label || 'Unknown'
-        : 'Unknown';
-
-      toast({
-        title: "Image processed successfully",
-        description: `Detected: ${detectedLabel}`,
-      });
-    } catch (error) {
-      console.error("Error processing image:", error);
-      toast({
-        title: "Error processing image",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const { data, error } = await supabase
-        .from("inventory")
-        .insert([{
-          name: formData.name,
-          part_number: formData.partNumber,
-          quantity: formData.quantity,
-          category: formData.category,
-          notes: formData.notes,
-          department: formData.department,
-          sub_department: formData.subDepartment,
-          asset_type: formData.assetType,
-          condition: formData.condition,
-          manufacturer: formData.manufacturer,
-          model_number: formData.modelNumber,
-          serial_number: formData.serialNumber,
-          purchase_date: formData.purchaseDate || null,
-          purchase_price: formData.purchasePrice ? parseFloat(formData.purchasePrice) : null,
-          warranty_expiration: formData.warrantyExpiration || null,
-          last_maintenance_date: formData.lastMaintenanceDate || null,
-          next_maintenance_date: formData.nextMaintenanceDate || null,
-          building: formData.building,
-          floor: formData.floor,
-          room: formData.room,
-          shelf: formData.shelf,
-          bin: formData.bin,
-        }]);
-
-      if (error) throw error;
-
-      toast({
-        title: "Item added successfully",
-      });
-      
-      setFormData({
-        name: "",
-        partNumber: "",
-        quantity: 0,
-        category: "",
-        notes: "",
-        department: "",
-        subDepartment: "",
-        assetType: "",
-        condition: "",
-        manufacturer: "",
-        modelNumber: "",
-        serialNumber: "",
-        purchaseDate: "",
-        purchasePrice: "",
-        warrantyExpiration: "",
-        lastMaintenanceDate: "",
-        nextMaintenanceDate: "",
-        building: "",
-        floor: "",
-        room: "",
-        shelf: "",
-        bin: "",
-      });
-    } catch (error) {
-      console.error("Error adding item:", error);
-      toast({
-        title: "Error adding item",
-        variant: "destructive",
-      });
-    }
-  };
+  const {
+    formData,
+    setFormData,
+    isProcessing,
+    setIsProcessing,
+    handleSubmit,
+  } = useInventoryForm();
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto bg-white border border-gray-200 shadow-sm">
@@ -220,8 +90,11 @@ export const InventoryForm = () => {
         <AdditionalInformation
           notes={formData.notes}
           onNotesChange={(value) => setFormData({ ...formData, notes: value })}
-          onImageUpload={handleImageUpload}
+        />
+
+        <ImageProcessing
           isProcessing={isProcessing}
+          setIsProcessing={setIsProcessing}
         />
       </div>
 
