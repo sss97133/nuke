@@ -53,24 +53,12 @@ export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
   const CurrentStepComponent = steps[currentStep].component;
 
   const getStepProps = () => {
-    if (currentStep === 0) {
-      return {
-        onPhotoCapture: handlePhotoUpload,
-        onSkip: () => setCurrentStep(1),
-      } as const;
-    }
-
-    const commonProps = {
-      ...formData,
-      ...Object.fromEntries(
-        Object.keys(formData).map(key => [
-          `on${key.charAt(0).toUpperCase() + key.slice(1)}Change`,
-          (value: any) => setFormData({ ...formData, [key]: value })
-        ])
-      )
-    };
-
     switch (currentStep) {
+      case 0:
+        return {
+          onPhotoCapture: handlePhotoUpload,
+          onSkip: () => setCurrentStep(1),
+        };
       case 1:
         return {
           name: formData.name,
@@ -134,7 +122,7 @@ export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
           isProcessing,
         };
       default:
-        return commonProps;
+        return {};
     }
   };
 
