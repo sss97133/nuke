@@ -41,7 +41,6 @@ export const AuctionList = () => {
   const { data: auctions, isLoading } = useQuery({
     queryKey: ['auctions', sortBy],
     queryFn: async () => {
-      // First, get the auctions with vehicle data
       let query = supabase
         .from('auctions')
         .select(`
@@ -51,7 +50,6 @@ export const AuctionList = () => {
           comment_count:auction_comments(count)
         `);
 
-      // Apply sorting
       switch (sortBy) {
         case "ending-soon":
           query = query.order('end_time', { ascending: true });
@@ -68,7 +66,6 @@ export const AuctionList = () => {
 
       if (error) throw error;
 
-      // Transform the data to match our interface
       return data.map((auction: any) => ({
         ...auction,
         bid_count: auction.bid_count?.[0]?.count ?? 0,
@@ -77,9 +74,10 @@ export const AuctionList = () => {
     }
   });
 
-  // Subscribe to real-time updates
+  // Subscribe to real-time updates for auctions
   useEffect(() => {
-    const channel = supabase
+    // Channel for auction updates
+    const auctionChannel = supabase
       .channel('auction_updates')
       .on(
         'postgres_changes',
@@ -88,6 +86,51 @@ export const AuctionList = () => {
           schema: 'public',
           table: 'auctions'
         },
+        (payload) => {
+          queryClient.invalidateQueries({ queryKey: ['auctions'] });
+          
+          if (payload.eventType === 'UPDATE') {
+            toast({
+              title: "Auction Updated",
+              description: "New bid or update received",
+              variant: "default",
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Channel for bid updates
+    const bidChannel = supabase
+      .channel('bid_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'auction_bids'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['auctions'] });
+          toast({
+            title: "New Bid",
+            description: "A new bid has been placed",
+            variant: "default",
+          });
+        }
+      )
+      .subscribe();
+
+    // Channel for comment updates
+    const commentChannel = supabase
+      .channel('comment_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auction_comments'
+        },
         () => {
           queryClient.invalidateQueries({ queryKey: ['auctions'] });
         }
@@ -95,9 +138,11 @@ export const AuctionList = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(auctionChannel);
+      supabase.removeChannel(bidChannel);
+      supabase.removeChannel(commentChannel);
     };
-  }, [queryClient]);
+  }, [queryClient, toast]);
 
   const handleBidSubmit = async (auctionId: string, amount: number) => {
     const { error } = await supabase
