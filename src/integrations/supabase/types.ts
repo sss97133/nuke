@@ -534,6 +534,51 @@ export type Database = {
         }
         Relationships: []
       }
+      live_streams: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          ended_at: string | null
+          id: string
+          settings: Json | null
+          started_at: string | null
+          status: string | null
+          stream_key: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          ended_at?: string | null
+          id?: string
+          settings?: Json | null
+          started_at?: string | null
+          status?: string | null
+          stream_key?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          viewer_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          ended_at?: string | null
+          id?: string
+          settings?: Json | null
+          started_at?: string | null
+          status?: string | null
+          stream_key?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          viewer_count?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -846,6 +891,76 @@ export type Database = {
           prerequisites?: string[] | null
         }
         Relationships: []
+      }
+      stream_comments: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          stream_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          stream_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          stream_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_comments_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stream_tips: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          message: string | null
+          recipient_id: string
+          sender_id: string
+          stream_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          recipient_id: string
+          sender_id: string
+          stream_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          recipient_id?: string
+          sender_id?: string
+          stream_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stream_tips_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       studio_configurations: {
         Row: {
