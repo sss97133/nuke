@@ -6,6 +6,86 @@ interface StepComponent {
   component: React.ComponentType<any>;
 }
 
+interface CommonProps {
+  isProcessing: boolean;
+}
+
+interface PhotoCaptureProps extends CommonProps {
+  onPhotoCapture: (file: File) => Promise<void>;
+  onSkip: () => void;
+}
+
+interface BasicInformationProps extends CommonProps {
+  name: string;
+  partNumber: string;
+  onNameChange: (value: string) => void;
+  onPartNumberChange: (value: string) => void;
+}
+
+interface CategorizationProps extends CommonProps {
+  department: string;
+  subDepartment: string;
+  assetType: string;
+  condition: string;
+  onDepartmentChange: (value: string) => void;
+  onSubDepartmentChange: (value: string) => void;
+  onAssetTypeChange: (value: string) => void;
+  onConditionChange: (value: string) => void;
+}
+
+interface ProductDetailsProps extends CommonProps {
+  manufacturer: string;
+  modelNumber: string;
+  serialNumber: string;
+  quantity: number;
+  onManufacturerChange: (value: string) => void;
+  onModelNumberChange: (value: string) => void;
+  onSerialNumberChange: (value: string) => void;
+  onQuantityChange: (value: number) => void;
+}
+
+interface PurchaseMaintenanceProps extends CommonProps {
+  purchaseDate: string;
+  purchasePrice: string;
+  warrantyExpiration: string;
+  lastMaintenanceDate: string;
+  nextMaintenanceDate: string;
+  onPurchaseDateChange: (value: string) => void;
+  onPurchasePriceChange: (value: string) => void;
+  onWarrantyExpirationChange: (value: string) => void;
+  onLastMaintenanceDateChange: (value: string) => void;
+  onNextMaintenanceDateChange: (value: string) => void;
+}
+
+interface LocationProps extends CommonProps {
+  building: string;
+  floor: string;
+  room: string;
+  shelf: string;
+  bin: string;
+  onBuildingChange: (value: string) => void;
+  onFloorChange: (value: string) => void;
+  onRoomChange: (value: string) => void;
+  onShelfChange: (value: string) => void;
+  onBinChange: (value: string) => void;
+}
+
+interface AdditionalInformationProps extends CommonProps {
+  notes: string;
+  category: string;
+  onNotesChange: (value: string) => void;
+  onCategoryChange: (value: string) => void;
+}
+
+type StepProps = 
+  | PhotoCaptureProps 
+  | BasicInformationProps 
+  | CategorizationProps 
+  | ProductDetailsProps 
+  | PurchaseMaintenanceProps 
+  | LocationProps 
+  | AdditionalInformationProps;
+
 export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData) => {
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -13,7 +93,7 @@ export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData
     handlePhotoUpload: (file: File) => Promise<void>,
     isProcessing: boolean,
     setFormData: (data: Partial<InventoryFormData>) => void
-  ) => {
+  ): StepProps => {
     const commonProps = {
       isProcessing,
     };

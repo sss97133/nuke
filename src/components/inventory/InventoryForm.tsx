@@ -17,7 +17,12 @@ interface InventoryFormProps {
   onSuccess?: () => void;
 }
 
-const steps = [
+type StepComponent = {
+  title: string;
+  component: React.ComponentType<any>;
+};
+
+const steps: StepComponent[] = [
   { title: "Photo", component: PhotoCapture },
   { title: "Basic Information", component: BasicInformation },
   { title: "Categorization", component: Categorization },
