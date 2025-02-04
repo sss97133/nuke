@@ -11,9 +11,9 @@ export interface AddMemberFormProps {
   onSuccess?: () => void;
 }
 
-type FormValues = {
+interface FormValues {
   email: string;
-};
+}
 
 export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormValues>();
@@ -25,7 +25,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
         .from('profiles')
         .select('id')
         .eq('email', data.email)
-        .single();
+        .maybeSingle();
 
       if (userError || !userData) {
         throw new Error('User not found');

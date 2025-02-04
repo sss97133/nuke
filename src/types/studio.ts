@@ -1,26 +1,32 @@
+import { Json } from '@/integrations/supabase/types';
+
 export interface WorkspaceDimensions {
   width: number;
   height: number;
   length: number;
 }
 
+export interface PTZTrackPosition {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface PTZTrack {
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
+  position: PTZTrackPosition;
   length: number;
   speed: number;
   coneAngle: number;
 }
 
+export interface PTZPlanes {
+  walls: any[];
+  ceiling: Record<string, any>;
+}
+
 export interface PTZConfigurations {
   tracks: PTZTrack[];
-  planes: {
-    walls: any[];
-    ceiling: Record<string, any>;
-  };
+  planes: PTZPlanes;
   roboticArms: any[];
 }
 

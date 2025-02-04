@@ -13,7 +13,7 @@ import { AudioControls } from './controls/AudioControls';
 import { StreamingControls } from './controls/StreamingControls';
 import { PTZControls } from './controls/PTZControls';
 import { RecordingControls } from './controls/RecordingControls';
-import type { StudioConfigurationType, WorkspaceDimensions } from '@/types/studio';
+import type { StudioConfigurationType, WorkspaceDimensions, PTZConfigurations } from '@/types/studio';
 
 export const StudioConfiguration = () => {
   const [dimensions, setDimensions] = useState<WorkspaceDimensions>({
@@ -37,30 +37,34 @@ export const StudioConfiguration = () => {
         .from('studio_configurations')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      const workspaceDimensions = data.workspace_dimensions as WorkspaceDimensions || {
+      const workspaceDimensions = data?.workspace_dimensions as WorkspaceDimensions || {
         width: 0,
         height: 0,
         length: 0
       };
 
-      const ptzConfig = data.ptz_configurations || {
+      const ptzConfig = data?.ptz_configurations as PTZConfigurations || {
         tracks: [],
         planes: { walls: [], ceiling: {} },
         roboticArms: []
       };
 
       const config: StudioConfigurationType = {
-        ...data,
+        id: data?.id || '',
+        user_id: user.id,
+        name: data?.name || '',
         workspace_dimensions: workspaceDimensions,
         ptz_configurations: ptzConfig,
-        camera_config: data.camera_config || {},
-        audio_config: data.audio_config || {},
-        lighting_config: data.lighting_config || {},
-        fixed_cameras: data.fixed_cameras || { positions: [] }
+        camera_config: data?.camera_config || {},
+        audio_config: data?.audio_config || {},
+        lighting_config: data?.lighting_config || {},
+        fixed_cameras: data?.fixed_cameras || { positions: [] },
+        created_at: data?.created_at || new Date().toISOString(),
+        updated_at: data?.updated_at || new Date().toISOString()
       };
 
       return config;

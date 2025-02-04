@@ -44,10 +44,12 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
       const { error } = await supabase
         .from('studio_configurations')
         .insert({
-          user_id: (await supabase.auth.getUser()).data.user?.id,
           name: 'Default Configuration',
           workspace_dimensions: dimensions,
           ptz_configurations: {
