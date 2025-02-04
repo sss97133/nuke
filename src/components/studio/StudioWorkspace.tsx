@@ -79,7 +79,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.4, humanHeight/3, 8);
       const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-      body.position.y = humanHeight/3/2;
+      body.position.y = humanHeight/6; // Half of body height
       human.add(body);
 
       // Head (1/6 of total height)
@@ -109,25 +109,59 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
 
     createHuman();
 
+    // Create PTZ camera
+    if (ptzTracks && ptzTracks.length > 0) {
+      const ptzGroup = new THREE.Group();
+      
+      // Camera body
+      const cameraBody = new THREE.BoxGeometry(0.5, 0.5, 0.8);
+      const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+      const cameraMesh = new THREE.Mesh(cameraBody, cameraMaterial);
+      
+      // Camera cone
+      const coneHeight = dimensions.length / 2;
+      const coneGeometry = new THREE.ConeGeometry(
+        Math.tan((ptzTracks[0].coneAngle * Math.PI) / 180) * coneHeight,
+        coneHeight,
+        32
+      );
+      const coneMaterial = new THREE.MeshPhongMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.3
+      });
+      const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+      cone.rotation.x = -Math.PI / 2;
+      cone.position.z = coneHeight / 2;
+      
+      ptzGroup.add(cameraMesh);
+      ptzGroup.add(cone);
+      
+      // Position PTZ camera
+      ptzGroup.position.set(
+        ptzTracks[0].position.x,
+        ptzTracks[0].position.y,
+        ptzTracks[0].position.z
+      );
+      
+      scene.add(ptzGroup);
+      ptzCameraRef.current = ptzGroup;
+    }
+
     // Animation loop
     const animate = () => {
-      timeRef.current += 0.005; // Slower movement
+      timeRef.current += 0.005;
       
       if (humanRef.current) {
-        // Random walk pattern
         const walkRadius = Math.min(dimensions.length, dimensions.width) / 2 - 2;
         humanRef.current.position.x = Math.sin(timeRef.current) * walkRadius;
         humanRef.current.position.z = Math.cos(timeRef.current * 0.7) * walkRadius;
-        
-        // Add slight bobbing motion for walking while maintaining ground contact
-        humanRef.current.position.y = Math.sin(timeRef.current * 4) * 0.1;
+        humanRef.current.position.y = Math.abs(Math.sin(timeRef.current * 4) * 0.1);
       }
 
       if (ptzCameraRef.current && humanRef.current) {
-        // Make PTZ camera track human
         ptzCameraRef.current.lookAt(humanRef.current.position);
         
-        // Move PTZ camera along track
         if (ptzTracks[0]) {
           const track = ptzTracks[0];
           const trackPosition = Math.sin(timeRef.current * track.speed) * (track.length / 2);
@@ -178,7 +212,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     objectsRef.current.forEach(obj => sceneRef.current?.remove(obj));
     objectsRef.current = [];
 
-    // Add room geometry and labels
+    // Add room geometry
     const roomGeometry = new THREE.BoxGeometry(
       dimensions.width,
       dimensions.height,
@@ -192,69 +226,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     sceneRef.current.add(line);
     objectsRef.current.push(line);
 
-    // Add text labels for each plane
-    const createLabel = (text: string, position: THREE.Vector3, rotation?: THREE.Euler) => {
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      if (!context) return;
-      
-      canvas.width = 256;
-      canvas.height = 128;
-      
-      context.fillStyle = '#000000';
-      context.font = 'Bold 40px Arial';
-      context.fillText(text, 10, 64);
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        side: THREE.DoubleSide
-      });
-      
-      const geometry = new THREE.PlaneGeometry(2, 1);
-      const label = new THREE.Mesh(geometry, material);
-      label.position.copy(position);
-      if (rotation) {
-        label.rotation.copy(rotation);
-      }
-      sceneRef.current.add(label);
-      objectsRef.current.push(label);
-    };
-
-    // Add labels for each plane
-    createLabel(
-      'Floor',
-      new THREE.Vector3(0, -dimensions.height/2 + 0.1, 0),
-      new THREE.Euler(-Math.PI/2, 0, 0)
-    );
-    createLabel(
-      'Ceiling',
-      new THREE.Vector3(0, dimensions.height/2 - 0.1, 0),
-      new THREE.Euler(Math.PI/2, 0, 0)
-    );
-    createLabel(
-      'Back Wall',
-      new THREE.Vector3(0, 0, dimensions.length/2 - 0.1),
-      new THREE.Euler(0, 0, 0)
-    );
-    createLabel(
-      'Front Wall',
-      new THREE.Vector3(0, 0, -dimensions.length/2 + 0.1),
-      new THREE.Euler(0, Math.PI, 0)
-    );
-    createLabel(
-      'Left Wall',
-      new THREE.Vector3(-dimensions.width/2 + 0.1, 0, 0),
-      new THREE.Euler(0, Math.PI/2, 0)
-    );
-    createLabel(
-      'Right Wall',
-      new THREE.Vector3(dimensions.width/2 - 0.1, 0, 0),
-      new THREE.Euler(0, -Math.PI/2, 0)
-    );
-
-  }, [dimensions, ptzTracks]); // Update when dimensions or PTZ tracks change
+  }, [dimensions, ptzTracks]);
 
   return (
     <div 
