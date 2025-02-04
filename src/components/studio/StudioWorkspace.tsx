@@ -70,37 +70,39 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     directionalLight.position.set(1, 1, 1);
     scene.add(directionalLight);
 
-    // Create human figure
+    // Create human figure (6 feet tall = 1.83 meters)
     const createHuman = () => {
       const human = new THREE.Group();
+      const humanHeight = 6;
       
-      // Body
-      const bodyGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 8);
+      // Body (1/3 of total height)
+      const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.4, humanHeight/3, 8);
       const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-      body.position.y = 0.5;
+      body.position.y = humanHeight/3/2;
       human.add(body);
 
-      // Head
-      const headGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+      // Head (1/6 of total height)
+      const headGeometry = new THREE.SphereGeometry(0.4, 8, 8);
       const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffcc99 });
       const head = new THREE.Mesh(headGeometry, headMaterial);
-      head.position.y = 1.2;
+      head.position.y = humanHeight/3 + 0.4;
       human.add(head);
 
-      // Legs
-      const legGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
+      // Legs (1/2 of total height)
+      const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, humanHeight/2, 8);
       const legMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
       
       const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-      leftLeg.position.set(0.1, -0.3, 0);
+      leftLeg.position.set(0.3, humanHeight/4, 0);
       human.add(leftLeg);
       
       const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-      rightLeg.position.set(-0.1, -0.3, 0);
+      rightLeg.position.set(-0.3, humanHeight/4, 0);
       human.add(rightLeg);
 
-      human.position.y = 1;
+      // Position at floor level
+      human.position.y = humanHeight/2;
       scene.add(human);
       humanRef.current = human;
     };
@@ -109,12 +111,16 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
 
     // Animation loop
     const animate = () => {
-      timeRef.current += 0.01;
+      timeRef.current += 0.005; // Slower movement
       
       if (humanRef.current) {
-        // Move human back and forth
-        const walkRadius = dimensions.length / 2 - 1;
+        // Random walk pattern
+        const walkRadius = Math.min(dimensions.length, dimensions.width) / 2 - 2;
         humanRef.current.position.x = Math.sin(timeRef.current) * walkRadius;
+        humanRef.current.position.z = Math.cos(timeRef.current * 0.7) * walkRadius;
+        
+        // Add slight bobbing motion for walking
+        humanRef.current.position.y = 3 + Math.sin(timeRef.current * 4) * 0.1;
       }
 
       if (ptzCameraRef.current && humanRef.current) {
@@ -221,8 +227,9 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
         opacity: 0.2
       });
       const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-      cone.rotation.x = Math.PI / 2;
-      cone.position.z = coneHeight / 2;
+      // Rotate cone to point forward from camera
+      cone.rotation.x = -Math.PI / 2;
+      cone.position.z = -coneHeight/2;
       ptzGroup.add(cone);
 
       ptzGroup.position.set(track.position.x, track.position.y, track.position.z);
