@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { CameraControls } from './controls/CameraControls';
 import { AudioControls } from './controls/AudioControls';
 import { StreamingControls } from './controls/StreamingControls';
+import { PTZControls } from './controls/PTZControls';
+import { RecordingControls } from './controls/RecordingControls';
 import type { StudioConfigurationType } from '@/types/studio';
 
 export const StudioConfiguration = () => {
@@ -25,7 +27,7 @@ export const StudioConfiguration = () => {
   const [selectedCamera, setSelectedCamera] = useState<number | null>(null);
   const [audioLevel, setAudioLevel] = useState([50]);
 
-  const { data: studioConfig } = useQuery<StudioConfigurationType>({
+  const { data: studioConfig } = useQuery({
     queryKey: ['studioConfig'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -39,11 +41,13 @@ export const StudioConfiguration = () => {
 
       if (error) throw error;
 
-      // Transform the JSON data into the correct type
       return {
         ...data,
         workspace_dimensions: data.workspace_dimensions as StudioConfigurationType['workspace_dimensions'],
-        ptz_configurations: data.ptz_configurations as StudioConfigurationType['ptz_configurations']
+        ptz_configurations: data.ptz_configurations as StudioConfigurationType['ptz_configurations'],
+        camera_config: data.camera_config as Record<string, any> | null,
+        audio_config: data.audio_config as Record<string, any> | null,
+        lighting_config: data.lighting_config as Record<string, any> | null,
       };
     }
   });
@@ -67,7 +71,7 @@ export const StudioConfiguration = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="preview" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 mb-4">
+        <TabsList className="grid w-full grid-cols-7 mb-4">
           <TabsTrigger value="preview" className="flex items-center gap-2">
             <Video className="w-4 h-4" />
             Live Preview
@@ -75,6 +79,10 @@ export const StudioConfiguration = () => {
           <TabsTrigger value="cameras" className="flex items-center gap-2">
             <Camera className="w-4 h-4" />
             Cameras
+          </TabsTrigger>
+          <TabsTrigger value="ptz" className="flex items-center gap-2">
+            <Layout className="w-4 h-4" />
+            PTZ Controls
           </TabsTrigger>
           <TabsTrigger value="audio" className="flex items-center gap-2">
             <Mic2 className="w-4 h-4" />
@@ -84,9 +92,9 @@ export const StudioConfiguration = () => {
             <Radio className="w-4 h-4" />
             Streaming
           </TabsTrigger>
-          <TabsTrigger value="distribution" className="flex items-center gap-2">
-            <Share2 className="w-4 h-4" />
-            Distribution
+          <TabsTrigger value="recording" className="flex items-center gap-2">
+            <Video className="w-4 h-4" />
+            Recording
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
@@ -145,12 +153,20 @@ export const StudioConfiguration = () => {
           <CameraControls />
         </TabsContent>
 
+        <TabsContent value="ptz">
+          <PTZControls />
+        </TabsContent>
+
         <TabsContent value="audio">
           <AudioControls audioLevel={audioLevel} setAudioLevel={setAudioLevel} />
         </TabsContent>
 
         <TabsContent value="streaming">
           <StreamingControls />
+        </TabsContent>
+
+        <TabsContent value="recording">
+          <RecordingControls />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
