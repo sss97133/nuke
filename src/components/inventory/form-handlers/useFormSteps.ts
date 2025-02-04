@@ -165,7 +165,7 @@ export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData
           onShelfChange: (value: string) => setFormData({ shelf: value }),
           onBinChange: (value: string) => setFormData({ bin: value }),
         };
-      case 6: // AdditionalInformation
+      default: // AdditionalInformation (case 6)
         return {
           ...commonProps,
           notes: formData.notes || "",
@@ -173,8 +173,6 @@ export const useFormSteps = (steps: StepComponent[], formData: InventoryFormData
           onNotesChange: (value: string) => setFormData({ notes: value }),
           onCategoryChange: (value: string) => setFormData({ category: value }),
         };
-      default:
-        return commonProps;
     }
   };
 
