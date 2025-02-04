@@ -1,11 +1,7 @@
 import React, { useState } from 'react';
-import { StudioWorkspace } from './StudioWorkspace';
-import { StudioConfigForm } from './StudioConfigForm';
-import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Camera, Video, Settings, Layout, Mic2, Radio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CameraControls } from './controls/CameraControls';
@@ -13,7 +9,10 @@ import { AudioControls } from './controls/AudioControls';
 import { StreamingControls } from './controls/StreamingControls';
 import { PTZControls } from './controls/PTZControls';
 import { RecordingControls } from './controls/RecordingControls';
-import type { StudioConfigurationType, WorkspaceDimensions, PTZConfigurations } from '@/types/studio';
+import { PreviewSection } from './sections/PreviewSection';
+import { SettingsSection } from './sections/SettingsSection';
+import { ControlButtons } from './sections/ControlButtons';
+import type { WorkspaceDimensions } from '@/types/studio';
 
 export const StudioConfiguration = () => {
   const [dimensions, setDimensions] = useState<WorkspaceDimensions>({
@@ -41,33 +40,23 @@ export const StudioConfiguration = () => {
 
       if (error) throw error;
 
-      const workspaceDimensions = (data?.workspace_dimensions || {
-        width: 0,
-        height: 0,
-        length: 0
-      }) as WorkspaceDimensions;
-
-      const ptzConfig = (data?.ptz_configurations || {
-        tracks: [],
-        planes: { walls: [], ceiling: {} },
-        roboticArms: []
-      }) as PTZConfigurations;
-
-      const config: StudioConfigurationType = {
+      return {
         id: data?.id || '',
         user_id: user.id,
         name: data?.name || '',
-        workspace_dimensions: workspaceDimensions,
-        ptz_configurations: ptzConfig,
-        camera_config: (data?.camera_config || {}) as Record<string, any>,
-        audio_config: (data?.audio_config || {}) as Record<string, any>,
-        lighting_config: (data?.lighting_config || {}) as Record<string, any>,
-        fixed_cameras: (data?.fixed_cameras || { positions: [] }) as { positions: any[] },
+        workspace_dimensions: data?.workspace_dimensions as WorkspaceDimensions || dimensions,
+        ptz_configurations: data?.ptz_configurations || {
+          tracks: [],
+          planes: { walls: [], ceiling: {} },
+          roboticArms: []
+        },
+        camera_config: data?.camera_config || {},
+        audio_config: data?.audio_config || {},
+        lighting_config: data?.lighting_config || {},
+        fixed_cameras: data?.fixed_cameras || { positions: [] },
         created_at: data?.created_at || new Date().toISOString(),
         updated_at: data?.updated_at || new Date().toISOString()
       };
-
-      return config;
     }
   });
 
@@ -121,51 +110,18 @@ export const StudioConfiguration = () => {
           </TabsTrigger>
         </TabsList>
 
-        <div className="flex gap-4 mb-6">
-          <Button 
-            variant={isRecording ? "destructive" : "default"}
-            onClick={handleRecordingToggle}
-            className="w-32"
-          >
-            {isRecording ? "Stop Recording" : "Start Recording"}
-          </Button>
-          <Button 
-            variant={isStreaming ? "destructive" : "default"}
-            onClick={handleStreamingToggle}
-            className="w-32"
-          >
-            {isStreaming ? "End Stream" : "Go Live"}
-          </Button>
-        </div>
+        <ControlButtons
+          isRecording={isRecording}
+          isStreaming={isStreaming}
+          onRecordingToggle={handleRecordingToggle}
+          onStreamingToggle={handleStreamingToggle}
+        />
 
         <TabsContent value="preview" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {[1, 2, 3, 4].map((cameraId) => (
-              <Card 
-                key={cameraId}
-                className={`p-4 cursor-pointer transition-all ${
-                  selectedCamera === cameraId ? 'ring-2 ring-primary' : ''
-                }`}
-                onClick={() => {
-                  setSelectedCamera(cameraId);
-                  toast({
-                    title: "Camera Selected",
-                    description: `Switched to camera ${cameraId}`,
-                  });
-                }}
-              >
-                <div className="aspect-video bg-muted flex items-center justify-center">
-                  <p className="text-muted-foreground">Camera {cameraId} Feed</p>
-                </div>
-                <div className="mt-2 flex justify-between items-center">
-                  <span className="text-sm font-medium">PTZ Camera {cameraId}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {selectedCamera === cameraId ? 'Selected' : 'Click to select'}
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
+          <PreviewSection
+            selectedCamera={selectedCamera}
+            setSelectedCamera={setSelectedCamera}
+          />
         </TabsContent>
 
         <TabsContent value="cameras">
@@ -189,31 +145,11 @@ export const StudioConfiguration = () => {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Studio Configuration</h2>
-              <StudioConfigForm 
-                onUpdate={(data) => {
-                  setDimensions({
-                    length: Number(data.length),
-                    width: Number(data.width),
-                    height: Number(data.height),
-                  });
-                }}
-                initialData={{ 
-                  dimensions, 
-                  ptzTracks: studioConfig?.ptz_configurations?.tracks || []
-                }}
-              />
-            </Card>
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Workspace Preview</h2>
-              <StudioWorkspace 
-                dimensions={dimensions} 
-                ptzTracks={studioConfig?.ptz_configurations?.tracks || []}
-              />
-            </Card>
-          </div>
+          <SettingsSection
+            dimensions={dimensions}
+            setDimensions={setDimensions}
+            ptzTracks={studioConfig?.ptz_configurations?.tracks || []}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -47,20 +47,18 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      const configData = {
-        user_id: user.id,
-        name: 'Default Configuration',
-        workspace_dimensions: dimensions,
-        ptz_configurations: {
-          tracks: ptzTracks,
-          planes: { walls: [], ceiling: {} },
-          roboticArms: []
-        }
-      };
-
       const { error } = await supabase
         .from('studio_configurations')
-        .insert([configData]);
+        .insert({
+          user_id: user.id,
+          name: 'Default Configuration',
+          workspace_dimensions: dimensions,
+          ptz_configurations: JSON.stringify({
+            tracks: ptzTracks,
+            planes: { walls: [], ceiling: {} },
+            roboticArms: []
+          })
+        });
 
       if (error) throw error;
 
