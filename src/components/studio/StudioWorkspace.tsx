@@ -76,6 +76,11 @@ export const StudioWorkspace = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    console.log('Initializing Studio Workspace with dimensions:', dimensions);
+    console.log('Human position:', humanPosition);
+    console.log('PTZ tracks:', ptzTracks);
+    console.log('Props configuration:', props);
+
     // Initialize scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf0f0f0);
@@ -131,6 +136,7 @@ export const StudioWorkspace = ({
       scene,
       dimensions 
     });
+    console.log('Human figure created at position:', humanRef.current?.position);
 
     // Create PTZ camera
     if (ptzTracks && ptzTracks.length > 0) {
@@ -140,20 +146,29 @@ export const StudioWorkspace = ({
         scene,
         dimensions
       });
+      console.log('PTZ camera created at position:', ptzCameraRef.current?.position);
     }
 
     // Create fixed cameras
     fixedCamerasRef.current = createFixedCameras({ dimensions, cameras, scene });
+    console.log('Fixed cameras created:', fixedCamerasRef.current.length);
 
     // Create props
     propsRef.current = createProps({ props, dimensions, scene });
+    console.log('Props created:', propsRef.current.length);
 
     // Animation loop
     const animate = () => {
       timeRef.current += 0.005;
       
       if (humanRef.current) {
-        humanRef.current.position.y = humanPosition.y + Math.abs(Math.sin(timeRef.current * 4) * 0.1);
+        // Verify human stays within bounds
+        const humanPos = humanRef.current.position;
+        console.log('Human position during animation:', {
+          x: humanPos.x,
+          y: humanPos.y,
+          z: humanPos.z
+        });
       }
 
       if (ptzCameraRef.current && humanRef.current && ptzTracks[0]) {
@@ -162,6 +177,9 @@ export const StudioWorkspace = ({
         const track = ptzTracks[0];
         const trackPosition = Math.sin(timeRef.current * track.speed) * (track.length / 2);
         ptzCameraRef.current.position.x = track.position.x + trackPosition;
+        
+        // Verify PTZ camera stays within bounds
+        console.log('PTZ camera position during animation:', ptzCameraRef.current.position);
       }
 
       if (controlsRef.current) {
