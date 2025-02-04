@@ -59,8 +59,8 @@ export const VehicleProfile = () => {
         images: undefined,
         createdBy: data.user_id || '',
         updatedBy: data.user_id || '',
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
         historical_data: data.historical_data as VehicleHistoricalData | null
       });
       setLoading(false);
@@ -157,8 +157,8 @@ export const VehicleProfile = () => {
           </div>
 
           <RecordDetails 
-            createdAt={vehicle.createdAt}
-            updatedAt={vehicle.updatedAt}
+            createdAt={vehicle.created_at}
+            updatedAt={vehicle.updated_at}
           />
         </CardContent>
       </Card>
