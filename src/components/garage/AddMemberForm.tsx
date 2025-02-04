@@ -1,21 +1,20 @@
-import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { AddGarageMemberProps } from '@/types/garage';
+import type { AddGarageMemberProps } from '@/types/garage';
 
-type FormData = {
+type FormValues = {
   email: string;
 };
 
 export const AddMemberForm = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
-  const { register, handleSubmit, reset } = useForm<FormData>();
+  const { register, handleSubmit, reset } = useForm<FormValues>();
   const { toast } = useToast();
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: FormValues) => {
     try {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
