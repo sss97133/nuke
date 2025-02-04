@@ -53,7 +53,7 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
       }
 
       if (data) {
-        setMessages(data as ChatMessage[]);
+        setMessages(data as unknown as ChatMessage[]);
       }
     };
 
