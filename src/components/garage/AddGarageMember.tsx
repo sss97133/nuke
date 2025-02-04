@@ -12,7 +12,7 @@ import { UserPlus } from 'lucide-react';
 
 interface AddGarageMemberProps {
   garageId: string;
-  onMemberAdded?: () => void;
+  onMemberAdded: () => void;
 }
 
 export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
@@ -28,7 +28,7 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
         <DialogHeader>
           <DialogTitle>Add Garage Member</DialogTitle>
         </DialogHeader>
-        <AddMemberForm garageId={garageId} onMemberAdded={onMemberAdded} />
+        <AddMemberForm garageId={garageId} onSuccess={onMemberAdded} />
       </DialogContent>
     </Dialog>
   );

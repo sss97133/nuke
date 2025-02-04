@@ -28,15 +28,19 @@ export const StudioConfiguration = () => {
   const { data: studioConfig } = useQuery({
     queryKey: ['studioConfig'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+      
       const { data, error } = await supabase
         .from('studio_configurations')
         .select('*')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
       return data;
-    }
+    },
+    retry: false
   });
 
   const handleRecordingToggle = () => {
