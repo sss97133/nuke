@@ -8,14 +8,14 @@ import { useToast } from '@/hooks/use-toast';
 
 interface AddMemberFormProps {
   garageId: string;
-  onMemberAdded?: () => void;  // Changed from onSuccess to onMemberAdded
+  onSuccess?: () => void;
 }
 
 interface FormData {
   email: string;
 }
 
-export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
+export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
@@ -46,7 +46,7 @@ export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) =
       });
 
       reset();
-      if (onMemberAdded) onMemberAdded();  // Changed from onSuccess to onMemberAdded
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast({
         title: 'Error',

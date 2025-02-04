@@ -218,17 +218,8 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       ptzGroup.add(cameraMesh);
 
       // Camera cone (field of view)
-      // Calculate cone height based on room dimensions
-      const maxDistance = Math.min(
-        Math.abs(dimensions.length / 2 - track.position.z),
-        Math.abs(-dimensions.length / 2 - track.position.z),
-        Math.abs(dimensions.width / 2 - track.position.x),
-        Math.abs(-dimensions.width / 2 - track.position.x),
-        Math.abs(dimensions.height / 2 - track.position.y),
-        Math.abs(-dimensions.height / 2 - track.position.y)
-      );
-      
-      const coneHeight = maxDistance * 2; // Double the distance to ensure proper clipping
+      const maxDistance = Math.max(dimensions.length, dimensions.width) * 2; // Extend beyond room
+      const coneHeight = maxDistance;
       const coneRadius = Math.tan((track.coneAngle * Math.PI) / 180) * coneHeight;
       const coneGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 32);
       const coneMaterial = new THREE.MeshPhongMaterial({ 
