@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Mic2, Radio, Settings, Users, Monitor, Brain, ThumbsUp, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { PodcastAnalytics } from './PodcastAnalytics';
 
 interface GuestInfo {
   name: string;
@@ -128,6 +129,9 @@ export const PodcastingStudio = () => {
           </div>
         </Card>
       </div>
+
+      {/* Analytics and Engagement Section */}
+      <PodcastAnalytics episodeId="mock-episode-id" />
 
       {/* Detailed Information Tabs */}
       <Tabs defaultValue="guests" className="w-full">
