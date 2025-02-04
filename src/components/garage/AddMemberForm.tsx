@@ -10,11 +10,15 @@ export interface AddMemberFormProps {
   onMemberAdded?: () => void;
 }
 
+interface FormData {
+  email: string;
+}
+
 export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
-  const onSubmit = async (data: { email: string }) => {
+  const onSubmit = async (data: FormData) => {
     try {
       const { data: user, error: userError } = await supabase
         .from('profiles')
