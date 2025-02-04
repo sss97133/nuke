@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { FireCrawl } from "@mendable/firecrawl-js";
+import { FireCrawl } from "https://esm.sh/@mendable/firecrawl-js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
