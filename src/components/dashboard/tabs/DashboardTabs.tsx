@@ -24,7 +24,7 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
               value="home" 
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
-              <Home className="w-4 h-4" />
+              <Terminal className="w-4 h-4" />
               Home
             </TabsTrigger>
             <TabsTrigger 
@@ -90,37 +90,31 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
       </TabsList>
 
       <div className="mt-6 space-y-6">
-        <TabsContent value="home" className="animate-fade-in">
+        <TabsContent value="home">
           <Home />
         </TabsContent>
-        <TabsContent value="inventory" className="animate-fade-in">
+        <TabsContent value="inventory">
           <InventoryForm />
         </TabsContent>
-
-        <TabsContent value="vehicles" className="animate-fade-in">
+        <TabsContent value="vehicles">
           <VehicleManagement />
         </TabsContent>
-
-        <TabsContent value="service" className="animate-fade-in">
+        <TabsContent value="service">
           <ServiceManagement />
         </TabsContent>
-
-        <TabsContent value="garages" className="animate-fade-in">
+        <TabsContent value="garages">
           <GarageManagement />
         </TabsContent>
-
-        <TabsContent value="professional" className="animate-fade-in">
+        <TabsContent value="professional">
           <ProfessionalDashboard />
         </TabsContent>
-
-        <TabsContent value="auctions" className="animate-fade-in">
+        <TabsContent value="auctions">
           <div className="space-y-6">
             <AuctionList />
             <CreateAuction />
           </div>
         </TabsContent>
-
-        <TabsContent value="studio" className="animate-fade-in">
+        <TabsContent value="studio">
           <StudioConfiguration />
         </TabsContent>
       </div>

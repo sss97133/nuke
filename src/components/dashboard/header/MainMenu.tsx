@@ -1,5 +1,5 @@
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
-import { FileIcon, Settings, Layout, Tool, PanelLeft, HelpCircle } from "lucide-react";
+import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle } from "lucide-react";
 
 interface MainMenuProps {
   handleMenuAction: (action: string) => void;
