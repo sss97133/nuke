@@ -10,6 +10,7 @@ import { RecordingControls } from './controls/RecordingControls';
 import { PreviewSection } from './sections/PreviewSection';
 import { SettingsSection } from './sections/SettingsSection';
 import { ControlButtons } from './sections/ControlButtons';
+import { PodcastingStudio } from './podcasting/PodcastingStudio';
 import { useStudioConfig } from '@/hooks/useStudioConfig';
 import type { WorkspaceDimensions } from '@/types/studio';
 
@@ -48,7 +49,7 @@ export const StudioConfiguration = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="preview" className="w-full">
-        <TabsList className="grid w-full grid-cols-7 mb-4">
+        <TabsList className="grid w-full grid-cols-8 mb-4">
           <TabsTrigger value="preview" className="flex items-center gap-2">
             <Video className="w-4 h-4" />
             Live Preview
@@ -72,6 +73,10 @@ export const StudioConfiguration = () => {
           <TabsTrigger value="recording" className="flex items-center gap-2">
             <Video className="w-4 h-4" />
             Recording
+          </TabsTrigger>
+          <TabsTrigger value="podcasting" className="flex items-center gap-2">
+            <Mic2 className="w-4 h-4" />
+            Podcasting
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
@@ -113,11 +118,15 @@ export const StudioConfiguration = () => {
           <RecordingControls />
         </TabsContent>
 
+        <TabsContent value="podcasting">
+          <PodcastingStudio />
+        </TabsContent>
+
         <TabsContent value="settings" className="space-y-4">
           <SettingsSection
             dimensions={dimensions}
             setDimensions={setDimensions}
-            ptzTracks={studioConfig?.ptz_configurations.tracks || []}
+            ptzTracks={studioConfig?.ptz_configurations?.tracks || []}
           />
         </TabsContent>
       </Tabs>

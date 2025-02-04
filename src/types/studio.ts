@@ -1,6 +1,3 @@
-import { Json } from '@/integrations/supabase/types';
-import { isRecord } from './json';
-
 export interface WorkspaceDimensions {
   width: number;
   height: number;
@@ -31,46 +28,46 @@ export interface PTZConfigurations {
   roboticArms: any[];
 }
 
-export interface StudioConfigurationType {
-  id: string;
-  user_id: string;
+export interface StudioConfiguration {
+  id?: string;
   name: string;
-  workspace_dimensions: WorkspaceDimensions;
-  ptz_configurations: PTZConfigurations;
-  camera_config: Record<string, any>;
-  audio_config: Record<string, any>;
-  lighting_config: Record<string, any>;
-  fixed_cameras: { positions: any[] };
-  created_at: string;
-  updated_at: string;
+  workspace_dimensions?: WorkspaceDimensions;
+  ptz_configurations?: PTZConfigurations;
+  camera_config?: Record<string, any>;
+  audio_config?: Record<string, any>;
+  lighting_config?: Record<string, any>;
+  fixed_cameras?: {
+    positions: any[];
+  };
 }
 
-export interface StudioDimensionsProps {
-  dimensions: WorkspaceDimensions;
-  onUpdate: (dimensions: WorkspaceDimensions) => void;
+export interface PodcastEpisode {
+  id: string;
+  title: string;
+  description?: string;
+  recordingDate: Date;
+  duration?: number;
+  audioUrl?: string;
+  status: 'draft' | 'recording' | 'editing' | 'published';
 }
 
-export interface PTZConfigurationProps {
-  ptzTracks: PTZTrack[];
-  onUpdate: (tracks: PTZTrack[]) => void;
-}
-
-export const isWorkspaceDimensions = (json: Json | null): json is WorkspaceDimensions => {
-  if (!isRecord(json)) return false;
+export const isWorkspaceDimensions = (value: unknown): value is WorkspaceDimensions => {
+  if (typeof value !== 'object' || value === null) return false;
+  const dims = value as Record<string, unknown>;
   return (
-    typeof json.width === 'number' &&
-    typeof json.height === 'number' &&
-    typeof json.length === 'number'
+    typeof dims.width === 'number' &&
+    typeof dims.height === 'number' &&
+    typeof dims.length === 'number'
   );
 };
 
-export const isPTZConfigurations = (json: Json | null): json is PTZConfigurations => {
-  if (!isRecord(json)) return false;
+export const isPTZConfigurations = (value: unknown): value is PTZConfigurations => {
+  if (typeof value !== 'object' || value === null) return false;
+  const config = value as Record<string, unknown>;
   return (
-    Array.isArray(json.tracks) &&
-    isRecord(json.planes) &&
-    Array.isArray(json.planes.walls) &&
-    isRecord(json.planes.ceiling) &&
-    Array.isArray(json.roboticArms)
+    Array.isArray(config.tracks) &&
+    typeof config.planes === 'object' &&
+    config.planes !== null &&
+    Array.isArray(config.roboticArms)
   );
 };
