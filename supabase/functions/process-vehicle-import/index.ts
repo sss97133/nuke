@@ -12,28 +12,37 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🔄 Processing vehicle import request...');
+    
     const { data, fileType } = await req.json();
     const apiKey = Deno.env.get('PERPLEXITY_API_KEY');
 
     if (!apiKey) {
+      console.error('❌ PERPLEXITY_API_KEY is not configured');
       throw new Error('PERPLEXITY_API_KEY is not configured');
     }
+
+    console.log(`📄 Processing ${fileType} data...`);
+    console.log('📊 Raw data sample:', JSON.stringify(data).substring(0, 200) + '...');
 
     // Normalize the data using Perplexity AI
     const prompt = `Analyze and normalize this vehicle data to match this structure:
     {
-      make: string,
-      model: string,
-      year: number,
-      vin?: string,
-      notes?: string
+      make: string (required),
+      model: string (required),
+      year: number (required),
+      vin?: string (optional),
+      notes?: string (optional)
     }
     
     Raw data: ${JSON.stringify(data)}
     File type: ${fileType}
     
-    Return ONLY a JSON array of normalized vehicles. Each vehicle must have at least make, model, and year.`;
+    Return ONLY a JSON array of normalized vehicles. Each vehicle must have at least make, model, and year.
+    Do not include any explanatory text, just the JSON array.`;
 
+    console.log('🤖 Sending request to Perplexity API...');
+    
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
@@ -57,16 +66,45 @@ serve(async (req) => {
       }),
     });
 
+    if (!response.ok) {
+      console.error('❌ Perplexity API error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('Error details:', errorText);
+      throw new Error(`Perplexity API error: ${response.statusText}`);
+    }
+
     const aiResponse = await response.json();
-    console.log('AI Response:', aiResponse);
+    console.log('✅ Received response from Perplexity API');
 
     let normalizedData;
     try {
       const content = aiResponse.choices[0].message.content;
-      normalizedData = JSON.parse(content.trim());
+      // Clean the content string to ensure it only contains the JSON array
+      const jsonStr = content.trim().replace(/```json\n?|\n?```/g, '').trim();
+      console.log('🔍 Cleaned JSON string:', jsonStr);
+      normalizedData = JSON.parse(jsonStr);
+      
+      // Validate the normalized data
+      if (!Array.isArray(normalizedData)) {
+        throw new Error('Response is not an array');
+      }
+      
+      normalizedData.forEach((vehicle, index) => {
+        if (!vehicle.make || !vehicle.model || !vehicle.year) {
+          throw new Error(`Vehicle at index ${index} is missing required fields`);
+        }
+        if (typeof vehicle.year !== 'number') {
+          throw new Error(`Vehicle at index ${index} has invalid year type`);
+        }
+      });
+      
+      console.log('✅ Successfully normalized vehicle data');
+      console.log('📊 Sample of normalized data:', JSON.stringify(normalizedData[0]));
+      
     } catch (error) {
-      console.error('Error parsing AI response:', error);
-      throw new Error('Failed to normalize vehicle data');
+      console.error('❌ Error parsing AI response:', error);
+      console.error('Raw content:', aiResponse.choices[0]?.message?.content);
+      throw new Error('Failed to parse normalized vehicle data');
     }
 
     return new Response(
@@ -75,9 +113,12 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error processing import:', error);
+    console.error('❌ Error processing vehicle import:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: 'Failed to normalize vehicle data',
+        details: error.message 
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
