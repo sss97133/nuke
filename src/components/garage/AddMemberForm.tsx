@@ -31,12 +31,14 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
         throw new Error('User not found');
       }
 
+      const newMember = {
+        user_id: users.id,
+        garage_id: garageId,
+      };
+
       const { error } = await supabase
         .from('garage_members')
-        .insert([{ 
-          user_id: users.id, 
-          garage_id: garageId 
-        }]);
+        .insert([newMember]);
 
       if (error) throw error;
 

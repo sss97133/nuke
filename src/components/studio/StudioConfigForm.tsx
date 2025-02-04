@@ -5,8 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { StudioDimensions } from './form/StudioDimensions';
 import { PTZConfiguration } from './form/PTZConfiguration';
-import { toJson } from '@/types/studio';
-import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
+import { toJson } from '@/types/json';
+import type { WorkspaceDimensions, PTZTrack, PTZConfigurations } from '@/types/studio';
 
 interface StudioConfigFormProps {
   onUpdate: (data: {
@@ -48,17 +48,19 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
+      const ptzConfig: PTZConfigurations = {
+        tracks: ptzTracks,
+        planes: { walls: [], ceiling: {} },
+        roboticArms: []
+      };
+
       const { error } = await supabase
         .from('studio_configurations')
         .insert({
           user_id: user.id,
           name: 'Default Configuration',
           workspace_dimensions: toJson(dimensions),
-          ptz_configurations: toJson({
-            tracks: ptzTracks,
-            planes: { walls: [], ceiling: {} },
-            roboticArms: []
-          })
+          ptz_configurations: toJson(ptzConfig)
         });
 
       if (error) throw error;

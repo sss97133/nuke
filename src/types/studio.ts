@@ -1,4 +1,5 @@
 import { Json } from '@/integrations/supabase/types';
+import { isRecord } from './json';
 
 export interface WorkspaceDimensions {
   width: number;
@@ -54,22 +55,22 @@ export interface PTZConfigurationProps {
   onUpdate: (tracks: PTZTrack[]) => void;
 }
 
-export const isWorkspaceDimensions = (json: Json | null): json is Record<string, number> => {
-  if (typeof json !== 'object' || !json) return false;
-  const dims = json as Record<string, unknown>;
+export const isWorkspaceDimensions = (json: Json | null): json is WorkspaceDimensions => {
+  if (!isRecord(json)) return false;
   return (
-    typeof dims.width === 'number' &&
-    typeof dims.height === 'number' &&
-    typeof dims.length === 'number'
+    typeof json.width === 'number' &&
+    typeof json.height === 'number' &&
+    typeof json.length === 'number'
   );
 };
 
-export const isPTZConfigurations = (json: Json | null): json is Record<string, any> => {
-  if (typeof json !== 'object' || !json) return false;
-  const config = json as Record<string, unknown>;
-  return Array.isArray(config.tracks);
-};
-
-export const toJson = (obj: unknown): Json => {
-  return JSON.parse(JSON.stringify(obj));
+export const isPTZConfigurations = (json: Json | null): json is PTZConfigurations => {
+  if (!isRecord(json)) return false;
+  return (
+    Array.isArray(json.tracks) &&
+    isRecord(json.planes) &&
+    Array.isArray(json.planes.walls) &&
+    isRecord(json.planes.ceiling) &&
+    Array.isArray(json.roboticArms)
+  );
 };
