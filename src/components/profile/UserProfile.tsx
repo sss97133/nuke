@@ -10,7 +10,7 @@ import { AchievementsList } from './AchievementsList';
 import { TeamSection } from './TeamSection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserRound, Users, Trophy } from 'lucide-react';
-import { SocialLinks, StreamingLinks } from '@/types/profile';
+import { SocialLinks, StreamingLinks, toSocialLinks, toStreamingLinks, toJson } from '@/types/profile';
 
 export const UserProfile = () => {
   const { toast } = useToast();
@@ -48,37 +48,13 @@ export const UserProfile = () => {
       }
 
       if (data?.social_links) {
-        setSocialLinks(data.social_links as SocialLinks);
+        setSocialLinks(toSocialLinks(data.social_links));
       }
       if (data?.streaming_links) {
-        setStreamingLinks(data.streaming_links as StreamingLinks);
+        setStreamingLinks(toStreamingLinks(data.streaming_links));
       }
       
       return data;
-    },
-  });
-
-  const { data: achievements } = useQuery({
-    queryKey: ['achievements'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-      
-      const { data, error } = await supabase
-        .from('user_achievements')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('earned_at', { ascending: false });
-      
-      if (error) {
-        toast({
-          title: 'Error loading achievements',
-          description: error.message,
-          variant: 'destructive',
-        });
-        throw error;
-      }
-      return data || [];
     },
   });
 
@@ -88,7 +64,7 @@ export const UserProfile = () => {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ social_links: socialLinks })
+      .update({ social_links: toJson(socialLinks) })
       .eq('id', user.id);
 
     if (error) {
@@ -113,7 +89,7 @@ export const UserProfile = () => {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ streaming_links: streamingLinks })
+      .update({ streaming_links: toJson(streamingLinks) })
       .eq('id', user.id);
 
     if (error) {
