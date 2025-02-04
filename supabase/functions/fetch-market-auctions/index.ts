@@ -41,7 +41,7 @@ async function retryWithBackoff(
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
@@ -56,30 +56,33 @@ serve(async (req) => {
     console.log('Starting to fetch auction data from multiple sources...')
     const sources = [
       {
-        url: 'https://bringatrailer.com/auctions/live/',
+        url: 'https://bringatrailer.com/auctions/',
         patterns: [
           '.auction-list-item',
           '.auction-title',
           '.current-bid',
-          '.auction-image'
+          '.auction-image',
+          '.auction-end-time'
         ]
       },
       {
-        url: 'https://carsandbids.com',
+        url: 'https://carsandbids.com/auctions',
         patterns: [
           '.auction-card',
           '.auction-title',
           '.current-bid',
-          '.auction-image'
+          '.auction-image',
+          '.time-remaining'
         ]
       },
       {
-        url: 'https://www.hagerty.com/marketplace',
+        url: 'https://www.hagerty.com/marketplace/inventory',
         patterns: [
           '.vehicle-card',
           '.vehicle-title',
           '.price',
-          '.vehicle-image'
+          '.vehicle-image',
+          '.listing-date'
         ]
       }
     ]
@@ -94,7 +97,9 @@ serve(async (req) => {
           return await firecrawl.crawlUrl(source.url, {
             limit: 5, // Reduced from 10 to avoid rate limits
             scrapeOptions: {
-              patterns: source.patterns
+              patterns: source.patterns,
+              waitForSelector: '.auction-list-item, .auction-card, .vehicle-card',
+              timeout: 10000
             }
           })
         });
@@ -104,9 +109,11 @@ serve(async (req) => {
           
           const extractedData = response.data
             .map(item => {
+              // Enhanced regex patterns for better data extraction
               const yearMatch = item.content.match(/\b(19|20)\d{2}\b/)
-              const priceMatch = item.content.match(/\$[\d,]+/)
-              const makeModelMatch = item.content.match(/(\w+)\s+(\w+)/)
+              const priceMatch = item.content.match(/\$[\d,]+(?:\.\d{2})?/)
+              const makeModelMatch = item.content.match(/(?:19|20)\d{2}\s+([A-Za-z-]+)\s+([A-Za-z0-9-]+)/)
+              const endTimeMatch = item.content.match(/Ends\s+(\w+\s+\d+(?:st|nd|rd|th)?\s+\d+:\d+\s*(?:AM|PM|am|pm))/i)
               
               if (yearMatch && priceMatch && makeModelMatch) {
                 return {
@@ -116,6 +123,7 @@ serve(async (req) => {
                   price: parseFloat(priceMatch[0].replace(/[$,]/g, '')),
                   url: item.url || source.url,
                   source: sourceName,
+                  endTime: endTimeMatch ? new Date(endTimeMatch[1]).toISOString() : undefined,
                   imageUrl: item.images?.[0]
                 }
               }
@@ -140,42 +148,7 @@ serve(async (req) => {
       }
     }
 
-    // If no results were found, return sample data
-    if (results.length === 0) {
-      console.log('No live auctions found, returning sample data...')
-      results.push(
-        {
-          make: "Porsche",
-          model: "911",
-          year: 1973,
-          price: 150000,
-          url: "https://bringatrailer.com/listing/1973-porsche-911",
-          source: "bringatrailer",
-          endTime: new Date(Date.now() + 86400000).toISOString(),
-          imageUrl: "https://images.unsplash.com/photo-1580274455191-1c62238fa333?w=800"
-        },
-        {
-          make: "BMW",
-          model: "M3",
-          year: 1988,
-          price: 75000,
-          url: "https://carsandbids.com/auctions/bmw-m3-e30",
-          source: "carsandbids",
-          endTime: new Date(Date.now() + 172800000).toISOString(),
-          imageUrl: "https://images.unsplash.com/photo-1580274455191-1c62238fa333?w=800"
-        },
-        {
-          make: "Ferrari",
-          model: "Testarossa",
-          year: 1989,
-          price: 200000,
-          url: "https://www.hagerty.com/marketplace/1989-ferrari-testarossa",
-          source: "hagerty",
-          imageUrl: "https://images.unsplash.com/photo-1580274455191-1c62238fa333?w=800"
-        }
-      )
-    }
-
+    // If no results were found, return empty array instead of sample data
     return new Response(
       JSON.stringify({
         success: true,
