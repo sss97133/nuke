@@ -24,17 +24,18 @@ export interface VehicleHistoricalData {
 
 export interface Vehicle {
   id: string;
-  vin?: string;
   make: string;
   model: string;
   year: number;
-  color?: string;
+  vin?: string;
   notes?: string;
-  images?: string[];
-  createdBy: string;
-  updatedBy: string;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
+  user_id?: string;
+  vin_image_url?: string;
+  vin_processing_status?: string;
+  vin_verification_data?: any;
+  bulk_upload_batch_id?: string;
   historical_data?: VehicleHistoricalData | null;
 }
 
