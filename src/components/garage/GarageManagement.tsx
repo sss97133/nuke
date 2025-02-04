@@ -9,16 +9,16 @@ import { ImportGarages } from "./ImportGarages";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 
-type GarageMember = {
+interface GarageMember {
   user_id: string;
 }
 
-type Garage = {
+interface Garage {
   id: string;
   name: string;
   address: string | null;
   rating: number | null;
-  garage_members: GarageMember[] | null;
+  garage_members: GarageMember[];
 }
 
 export const GarageManagement = () => {
@@ -56,15 +56,10 @@ export const GarageManagement = () => {
 
       const { data, error } = await supabase
         .from('garages')
-        .select(`
-          *,
-          garage_members (
-            user_id
-          )
-        `);
+        .select('*, garage_members (user_id)');
       
       if (error) throw error;
-      return data as Garage[];
+      return (data || []) as Garage[];
     },
     enabled: !!userLocation
   });
@@ -132,13 +127,13 @@ export const GarageManagement = () => {
       return;
     }
 
-    const { data: profiles, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id')
       .eq('email', newMemberEmail)
       .maybeSingle();
 
-    if (profileError || !profiles) {
+    if (profileError || !profile) {
       toast({
         title: "Error",
         description: "User not found",
@@ -151,7 +146,7 @@ export const GarageManagement = () => {
       .from('garage_members')
       .insert([{ 
         garage_id: garageId,
-        user_id: profiles.id
+        user_id: profile.id
       }]);
 
     if (error) {
