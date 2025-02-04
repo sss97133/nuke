@@ -348,6 +348,7 @@ export type Database = {
           next_maintenance_date: string | null
           notes: string | null
           part_number: string | null
+          photo_url: string | null
           purchase_date: string | null
           purchase_price: number | null
           quantity: number
@@ -378,6 +379,7 @@ export type Database = {
           next_maintenance_date?: string | null
           notes?: string | null
           part_number?: string | null
+          photo_url?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
           quantity?: number
@@ -408,6 +410,7 @@ export type Database = {
           next_maintenance_date?: string | null
           notes?: string | null
           part_number?: string | null
+          photo_url?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
           quantity?: number
