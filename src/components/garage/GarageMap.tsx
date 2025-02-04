@@ -63,16 +63,28 @@ export const GarageMap = () => {
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
-    
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [-74.5, 40],
-      zoom: 9
-    });
+    const initializeMap = async () => {
+      const { data: { secret: mapboxToken } } = await supabase
+        .functions.invoke('get-mapbox-token');
 
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      if (!mapboxToken) {
+        console.error('Mapbox token not found');
+        return;
+      }
+
+      mapboxgl.accessToken = mapboxToken;
+      
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [-74.5, 40],
+        zoom: 9
+      });
+
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    };
+
+    initializeMap();
 
     return () => {
       map.current?.remove();
