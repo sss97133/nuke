@@ -1,9 +1,16 @@
-import type { Database } from "@/integrations/supabase/types";
-
-export type Profile = Database['public']['Tables']['profiles']['Row'];
-export type GarageMember = Database['public']['Tables']['garage_members']['Row'];
-
 export interface AddGarageMemberProps {
   garageId: string;
   onMemberAdded: () => void;
 }
+
+export type Profile = {
+  id: string;
+  email?: string;
+};
+
+export type GarageMember = {
+  id: string;
+  user_id: string;
+  garage_id: string;
+  created_at: string;
+};

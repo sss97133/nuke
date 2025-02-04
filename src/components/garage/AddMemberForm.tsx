@@ -20,7 +20,6 @@ export const AddMemberForm = ({ garageId, onMemberAdded }: AddGarageMemberProps)
         .from('profiles')
         .select('id')
         .eq('email', email)
-        .limit(1)
         .maybeSingle();
 
       if (profileError) {
