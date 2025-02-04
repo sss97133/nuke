@@ -7,19 +7,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
+import { Plus, Minus } from 'lucide-react';
+
+interface PTZTrack {
+  x: number;
+  y: number;
+  z: number;
+  length: number;
+  speed: number;
+  coneAngle: number;
+}
 
 interface FormData {
   length: number;
   width: number;
   height: number;
-  ptzTracks: {
-    x: number;
-    y: number;
-    z: number;
-    length: number;
-    speed: number;
-    coneAngle: number;
-  }[];
+  ptzTracks: PTZTrack[];
 }
 
 interface StudioConfigFormProps {
@@ -49,13 +52,20 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
       length: initialData?.dimensions.length || 30,
       width: initialData?.dimensions.width || 20,
       height: initialData?.dimensions.height || 16,
-      ptzTracks: [{
-        x: initialData?.ptzTracks[0]?.position.x || 0,
-        y: initialData?.ptzTracks[0]?.position.y || 8,
-        z: initialData?.ptzTracks[0]?.position.z || 0,
-        length: initialData?.ptzTracks[0]?.length || 10,
-        speed: initialData?.ptzTracks[0]?.speed || 1,
-        coneAngle: initialData?.ptzTracks[0]?.coneAngle || 45,
+      ptzTracks: initialData?.ptzTracks.length ? initialData.ptzTracks.map(track => ({
+        x: track.position.x,
+        y: track.position.y,
+        z: track.position.z,
+        length: track.length,
+        speed: track.speed,
+        coneAngle: track.coneAngle,
+      })) : [{
+        x: 0,
+        y: 8,
+        z: 0,
+        length: 10,
+        speed: 1,
+        coneAngle: 45,
       }],
     },
   });
@@ -68,6 +78,23 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
       onUpdate(formData);
     }
   }, [formData, onUpdate]);
+
+  const addTrack = () => {
+    const currentTracks = watch('ptzTracks');
+    setValue('ptzTracks', [...currentTracks, {
+      x: 0,
+      y: 8,
+      z: 0,
+      length: 10,
+      speed: 1,
+      coneAngle: 45,
+    }]);
+  };
+
+  const removeTrack = (index: number) => {
+    const currentTracks = watch('ptzTracks');
+    setValue('ptzTracks', currentTracks.filter((_, i) => i !== index));
+  };
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -147,66 +174,89 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         </TabsContent>
 
         <TabsContent value="ptz" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="ptz-x">Track X Position</Label>
-              <Input
-                id="ptz-x"
-                type="number"
-                {...register('ptzTracks.0.x', { required: true })}
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ptz-y">Track Y Position</Label>
-              <Input
-                id="ptz-y"
-                type="number"
-                {...register('ptzTracks.0.y', { required: true })}
-                placeholder="8"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ptz-z">Track Z Position</Label>
-              <Input
-                id="ptz-z"
-                type="number"
-                {...register('ptzTracks.0.z', { required: true })}
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ptz-length">Track Length</Label>
-              <Input
-                id="ptz-length"
-                type="number"
-                {...register('ptzTracks.0.length', { required: true, min: 1 })}
-                placeholder="10"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ptz-speed">Camera Movement Speed</Label>
-              <Slider
-                id="ptz-speed"
-                min={0.1}
-                max={5}
-                step={0.1}
-                defaultValue={[formData.ptzTracks[0].speed]}
-                onValueChange={(value) => setValue('ptzTracks.0.speed', value[0])}
-              />
-            </div>
-            <div>
-              <Label htmlFor="ptz-cone">Camera Cone Angle (degrees)</Label>
-              <Slider
-                id="ptz-cone"
-                min={10}
-                max={120}
-                step={5}
-                defaultValue={[formData.ptzTracks[0].coneAngle]}
-                onValueChange={(value) => setValue('ptzTracks.0.coneAngle', value[0])}
-              />
-            </div>
+          <div className="flex justify-end">
+            <Button 
+              type="button" 
+              onClick={addTrack}
+              className="mb-4"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Track
+            </Button>
           </div>
+          
+          {formData.ptzTracks.map((track, index) => (
+            <div key={index} className="border p-4 rounded-lg mb-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Track {index + 1}</h3>
+                {index > 0 && (
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    onClick={() => removeTrack(index)}
+                    size="sm"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Track X Position</Label>
+                  <Input
+                    type="number"
+                    {...register(`ptzTracks.${index}.x`, { required: true })}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <Label>Track Y Position</Label>
+                  <Input
+                    type="number"
+                    {...register(`ptzTracks.${index}.y`, { required: true })}
+                    placeholder="8"
+                  />
+                </div>
+                <div>
+                  <Label>Track Z Position</Label>
+                  <Input
+                    type="number"
+                    {...register(`ptzTracks.${index}.z`, { required: true })}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <Label>Track Length</Label>
+                  <Input
+                    type="number"
+                    {...register(`ptzTracks.${index}.length`, { required: true, min: 1 })}
+                    placeholder="10"
+                  />
+                </div>
+                <div>
+                  <Label>Camera Movement Speed</Label>
+                  <Slider
+                    min={0.1}
+                    max={5}
+                    step={0.1}
+                    defaultValue={[track.speed]}
+                    onValueChange={(value) => setValue(`ptzTracks.${index}.speed`, value[0])}
+                  />
+                </div>
+                <div>
+                  <Label>Camera Cone Angle (degrees)</Label>
+                  <Slider
+                    min={10}
+                    max={120}
+                    step={5}
+                    defaultValue={[track.coneAngle]}
+                    onValueChange={(value) => setValue(`ptzTracks.${index}.coneAngle`, value[0])}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
         </TabsContent>
       </Tabs>
       

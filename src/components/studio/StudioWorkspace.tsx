@@ -27,8 +27,8 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const objectsRef = useRef<THREE.Object3D[]>([]);
+  const ptzCamerasRef = useRef<THREE.Group[]>([]);
   const humanRef = useRef<THREE.Group | null>(null);
-  const ptzCameraRef = useRef<THREE.Group | null>(null);
   const animationFrameRef = useRef<number>();
   const timeRef = useRef<number>(0);
 
@@ -75,21 +75,21 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       const human = new THREE.Group();
       const humanHeight = 6;
       
-      // Body (1/3 of total height)
+      // Body
       const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.4, humanHeight/3, 8);
       const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
       body.position.y = humanHeight/3/2;
       human.add(body);
 
-      // Head (1/6 of total height)
+      // Head
       const headGeometry = new THREE.SphereGeometry(0.4, 8, 8);
       const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffcc99 });
       const head = new THREE.Mesh(headGeometry, headMaterial);
       head.position.y = humanHeight/3 + 0.4;
       human.add(head);
 
-      // Legs (1/2 of total height)
+      // Legs
       const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, humanHeight/2, 8);
       const legMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
       
@@ -101,7 +101,6 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       rightLeg.position.set(-0.3, humanHeight/4, 0);
       human.add(rightLeg);
 
-      // Position at ground level
       human.position.y = 0;
       scene.add(human);
       humanRef.current = human;
@@ -111,29 +110,23 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
 
     // Animation loop
     const animate = () => {
-      timeRef.current += 0.005; // Slower movement
+      timeRef.current += 0.005;
       
       if (humanRef.current) {
-        // Random walk pattern
         const walkRadius = Math.min(dimensions.length, dimensions.width) / 2 - 2;
         humanRef.current.position.x = Math.sin(timeRef.current) * walkRadius;
         humanRef.current.position.z = Math.cos(timeRef.current * 0.7) * walkRadius;
-        
-        // Add slight bobbing motion for walking while maintaining ground contact
         humanRef.current.position.y = Math.sin(timeRef.current * 4) * 0.1;
       }
 
-      if (ptzCameraRef.current && humanRef.current) {
-        // Make PTZ camera track human
-        ptzCameraRef.current.lookAt(humanRef.current.position);
-        
-        // Move PTZ camera along track
-        if (ptzTracks[0]) {
-          const track = ptzTracks[0];
+      ptzCamerasRef.current.forEach((ptzCamera, index) => {
+        if (ptzCamera && humanRef.current && ptzTracks[index]) {
+          ptzCamera.lookAt(humanRef.current.position);
+          const track = ptzTracks[index];
           const trackPosition = Math.sin(timeRef.current * track.speed) * (track.length / 2);
-          ptzCameraRef.current.position.x = track.position.x + trackPosition;
+          ptzCamera.position.x = track.position.x + trackPosition;
         }
-      }
+      });
 
       if (controlsRef.current) {
         controlsRef.current.update();
@@ -158,7 +151,6 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     };
     window.addEventListener('resize', handleResize);
 
-    // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
       if (rendererRef.current && containerRef.current) {
@@ -168,15 +160,18 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, []); // Only run once on mount
+  }, [dimensions]);
 
-  // Update scene when dimensions or PTZ tracks change
   useEffect(() => {
     if (!sceneRef.current) return;
 
     // Remove old objects
     objectsRef.current.forEach(obj => sceneRef.current?.remove(obj));
     objectsRef.current = [];
+    
+    // Clear old PTZ cameras
+    ptzCamerasRef.current.forEach(camera => sceneRef.current?.remove(camera));
+    ptzCamerasRef.current = [];
 
     // Add room geometry
     const roomGeometry = new THREE.BoxGeometry(
@@ -218,7 +213,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       ptzGroup.add(cameraMesh);
 
       // Camera cone (field of view)
-      const maxDistance = Math.max(dimensions.length, dimensions.width) * 2; // Extend beyond room
+      const maxDistance = Math.max(dimensions.length, dimensions.width) * 2;
       const coneHeight = maxDistance;
       const coneRadius = Math.tan((track.coneAngle * Math.PI) / 180) * coneHeight;
       const coneGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 32);
@@ -229,7 +224,6 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       });
       const cone = new THREE.Mesh(coneGeometry, coneMaterial);
       
-      // Position cone with base at camera center, pointing forward
       cone.rotation.x = -Math.PI / 2;
       cone.position.z = coneHeight/2;
       ptzGroup.add(cone);
@@ -237,10 +231,10 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       ptzGroup.position.set(track.position.x, track.position.y, track.position.z);
       sceneRef.current?.add(ptzGroup);
       objectsRef.current.push(ptzGroup);
-      ptzCameraRef.current = ptzGroup;
+      ptzCamerasRef.current.push(ptzGroup);
     });
 
-  }, [dimensions, ptzTracks]); // Update when dimensions or PTZ tracks change
+  }, [dimensions, ptzTracks]);
 
   return (
     <div 
