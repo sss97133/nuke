@@ -4,18 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
-interface AddMemberFormProps {
+export interface AddMemberFormProps {
   garageId: string;
   onSuccess?: () => void;
+  onMemberAdded?: () => void;
 }
 
 interface FormData {
   email: string;
 }
 
-export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
+export const AddMemberForm = ({ garageId, onSuccess, onMemberAdded }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
@@ -61,6 +62,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
       
       reset();
       if (onSuccess) onSuccess();
+      if (onMemberAdded) onMemberAdded();
     } catch (error) {
       toast({
         title: 'Error',

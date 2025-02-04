@@ -23,7 +23,11 @@ export const StudioConfigForm = () => {
         .insert({
           user_id: (await supabase.auth.getUser()).data.user?.id,
           name: 'Default Configuration',
-          workspace_dimensions: data
+          workspace_dimensions: {
+            length: data.length,
+            width: data.width,
+            height: data.height
+          }
         });
 
       if (error) throw error;
