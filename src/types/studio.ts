@@ -49,6 +49,21 @@ export interface PodcastEpisode {
   duration?: number;
   audioUrl?: string;
   status: 'draft' | 'recording' | 'editing' | 'published';
+  guestInfo?: {
+    name: string;
+    role: string;
+    connectionQuality: number;
+    audioLatency: number;
+  }[];
+  technicalInfo?: {
+    cameras: {
+      id: number;
+      name: string;
+      status: 'active' | 'standby';
+      latency: number;
+    }[];
+    audioLevels: number[];
+  };
 }
 
 export const isWorkspaceDimensions = (value: unknown): value is WorkspaceDimensions => {
