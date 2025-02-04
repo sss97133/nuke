@@ -40,16 +40,15 @@ export const ServiceTicketForm = () => {
     }
 
     try {
-      const { error } = await supabase.from("service_tickets").insert([
-        {
-          vehicle_id: selectedVehicle.id,
-          description,
-          service_type: serviceType,
-          parts_used: parts,
-          status: "pending",
-          priority: "medium", // This would be based on vehicle priority in a real implementation
-        },
-      ]);
+      const { error } = await supabase.from("service_tickets").insert({
+        vehicle_id: selectedVehicle.id,
+        description,
+        service_type: serviceType,
+        parts_used: parts,
+        status: "pending",
+        priority: "medium", // This would be based on vehicle priority in a real implementation
+        user_id: (await supabase.auth.getUser()).data.user?.id
+      });
 
       if (error) throw error;
 

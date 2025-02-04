@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,26 +29,40 @@ export const VehicleSelection = ({ onVehicleSelect, onShowNewVehicle }: VehicleS
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const { toast } = useToast();
 
-  const fetchVehicles = async () => {
-    const { data, error } = await supabase
-      .from("vehicles")
-      .select("*");
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      const { data, error } = await supabase
+        .from("vehicles")
+        .select("*");
 
-    if (error) {
-      toast({
-        title: "Error fetching vehicles",
-        description: error.message,
-        variant: "destructive",
-      });
-      return;
-    }
+      if (error) {
+        toast({
+          title: "Error fetching vehicles",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
 
-    setVehicles(data || []);
-  };
+      const mappedVehicles: Vehicle[] = (data || []).map(vehicle => ({
+        id: vehicle.id,
+        vin: vehicle.vin || undefined,
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+        notes: vehicle.notes || undefined,
+        images: undefined,
+        createdBy: vehicle.user_id || '',
+        updatedBy: vehicle.user_id || '',
+        createdAt: vehicle.created_at,
+        updatedAt: vehicle.updated_at
+      }));
 
-  useState(() => {
+      setVehicles(mappedVehicles);
+    };
+
     fetchVehicles();
-  }, []);
+  }, [toast]);
 
   const handleSelect = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle);
