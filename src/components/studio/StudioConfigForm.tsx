@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Slider } from '@/components/ui/slider';
 
 interface FormData {
   length: number;
@@ -16,6 +17,8 @@ interface FormData {
     y: number;
     z: number;
     length: number;
+    speed: number;
+    coneAngle: number;
   }[];
 }
 
@@ -34,12 +37,14 @@ interface StudioConfigFormProps {
         z: number;
       };
       length: number;
+      speed: number;
+      coneAngle: number;
     }[];
   };
 }
 
 export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProps) => {
-  const { register, handleSubmit, watch } = useForm<FormData>({
+  const { register, handleSubmit, watch, setValue } = useForm<FormData>({
     defaultValues: {
       length: initialData?.dimensions.length || 30,
       width: initialData?.dimensions.width || 20,
@@ -49,15 +54,15 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         y: initialData?.ptzTracks[0]?.position.y || 8,
         z: initialData?.ptzTracks[0]?.position.z || 0,
         length: initialData?.ptzTracks[0]?.length || 10,
+        speed: initialData?.ptzTracks[0]?.speed || 1,
+        coneAngle: initialData?.ptzTracks[0]?.coneAngle || 45,
       }],
     },
   });
   const { toast } = useToast();
 
-  // Watch all form fields for changes
   const formData = watch();
 
-  // Update preview whenever form values change
   useEffect(() => {
     if (onUpdate) {
       onUpdate(formData);
@@ -79,7 +84,9 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
           ptz_configurations: {
             tracks: data.ptzTracks.map(track => ({
               position: { x: track.x, y: track.y, z: track.z },
-              length: track.length
+              length: track.length,
+              speed: track.speed,
+              coneAngle: track.coneAngle
             }))
           }
         });
@@ -140,7 +147,7 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         </TabsContent>
 
         <TabsContent value="ptz" className="space-y-4">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="ptz-x">Track X Position</Label>
               <Input
@@ -156,7 +163,7 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
                 id="ptz-y"
                 type="number"
                 {...register('ptzTracks.0.y', { required: true })}
-                placeholder="0"
+                placeholder="8"
               />
             </div>
             <div>
@@ -175,6 +182,28 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
                 type="number"
                 {...register('ptzTracks.0.length', { required: true, min: 1 })}
                 placeholder="10"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ptz-speed">Camera Movement Speed</Label>
+              <Slider
+                id="ptz-speed"
+                min={0.1}
+                max={5}
+                step={0.1}
+                defaultValue={[formData.ptzTracks[0].speed]}
+                onValueChange={(value) => setValue('ptzTracks.0.speed', value[0])}
+              />
+            </div>
+            <div>
+              <Label htmlFor="ptz-cone">Camera Cone Angle (degrees)</Label>
+              <Slider
+                id="ptz-cone"
+                min={10}
+                max={120}
+                step={5}
+                defaultValue={[formData.ptzTracks[0].coneAngle]}
+                onValueChange={(value) => setValue('ptzTracks.0.coneAngle', value[0])}
               />
             </div>
           </div>
