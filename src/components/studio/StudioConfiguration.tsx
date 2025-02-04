@@ -13,7 +13,7 @@ import { AudioControls } from './controls/AudioControls';
 import { StreamingControls } from './controls/StreamingControls';
 import { PTZControls } from './controls/PTZControls';
 import { RecordingControls } from './controls/RecordingControls';
-import type { StudioConfigurationType, WorkspaceDimensions, PTZConfigurations } from '@/types/studio';
+import type { StudioConfigurationType, WorkspaceDimensions } from '@/types/studio';
 
 export const StudioConfiguration = () => {
   const [dimensions, setDimensions] = useState<WorkspaceDimensions>({
@@ -41,23 +41,23 @@ export const StudioConfiguration = () => {
 
       if (error) throw error;
 
-      // Ensure the data matches our expected types
+      // Parse and validate the data with proper type assertions
+      const workspaceDimensions = typeof data.workspace_dimensions === 'object' ? 
+        data.workspace_dimensions as WorkspaceDimensions : 
+        { width: 0, height: 0, length: 0 };
+
+      const ptzConfig = typeof data.ptz_configurations === 'object' ? 
+        data.ptz_configurations : 
+        { tracks: [], planes: { walls: [], ceiling: {} }, roboticArms: [] };
+
       const parsedConfig: StudioConfigurationType = {
         ...data,
-        workspace_dimensions: data.workspace_dimensions as WorkspaceDimensions || {
-          width: 0,
-          height: 0,
-          length: 0
-        },
-        ptz_configurations: data.ptz_configurations as PTZConfigurations || {
-          tracks: [],
-          planes: { walls: [], ceiling: {} },
-          roboticArms: []
-        },
-        camera_config: data.camera_config as Record<string, any> || null,
-        audio_config: data.audio_config as Record<string, any> || null,
-        lighting_config: data.lighting_config as Record<string, any> || null,
-        fixed_cameras: data.fixed_cameras as { positions: any[] } || { positions: [] }
+        workspace_dimensions: workspaceDimensions,
+        ptz_configurations: ptzConfig,
+        camera_config: data.camera_config || {},
+        audio_config: data.audio_config || {},
+        lighting_config: data.lighting_config || {},
+        fixed_cameras: data.fixed_cameras || { positions: [] }
       };
 
       return parsedConfig;

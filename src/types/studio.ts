@@ -17,11 +17,11 @@ export interface WorkspaceDimensions {
 
 export interface PTZConfigurations {
   tracks: PTZTrack[];
-  planes?: {
+  planes: {
     walls: any[];
     ceiling: Record<string, any>;
   };
-  roboticArms?: any[];
+  roboticArms: any[];
 }
 
 export interface StudioConfigurationType {
@@ -30,10 +30,10 @@ export interface StudioConfigurationType {
   name: string;
   workspace_dimensions: WorkspaceDimensions;
   ptz_configurations: PTZConfigurations;
-  camera_config: Record<string, any> | null;
-  audio_config: Record<string, any> | null;
-  lighting_config: Record<string, any> | null;
-  fixed_cameras: { positions: any[] } | null;
+  camera_config: Record<string, any>;
+  audio_config: Record<string, any>;
+  lighting_config: Record<string, any>;
+  fixed_cameras: { positions: any[] };
   created_at: string;
   updated_at: string;
 }
