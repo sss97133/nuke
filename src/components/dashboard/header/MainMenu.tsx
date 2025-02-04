@@ -20,9 +20,6 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           <MenubarItem onClick={() => handleMenuAction('studio_config')}>
             Studio Configuration
           </MenubarItem>
-          <MenubarItem onClick={() => handleMenuAction('studio_config_v2')}>
-            Studio Configuration v2
-          </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('exit')}>
             Exit

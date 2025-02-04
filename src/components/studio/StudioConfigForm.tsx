@@ -1,37 +1,17 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { DimensionsSection } from './config/DimensionsSection';
-import { CameraConfigSection } from './config/CameraConfigSection';
-import { PTZConfigSection } from './config/PTZConfigSection';
-import { HumanPositionSection } from './config/HumanPositionSection';
-import { PropsSection } from './config/PropsSection';
+import { Slider } from '@/components/ui/slider';
 
 interface FormData {
   length: number;
   width: number;
   height: number;
-  humanPosition: {
-    x: number;
-    y: number;
-    z: number;
-  };
-  cameras: {
-    frontWall: boolean;
-    backWall: boolean;
-    leftWall: boolean;
-    rightWall: boolean;
-    ceiling: boolean;
-    showCone: boolean;
-  };
-  props: {
-    toolBox: boolean;
-    carLift: boolean;
-    car: boolean;
-  };
   ptzTracks: {
     x: number;
     y: number;
@@ -49,24 +29,6 @@ interface StudioConfigFormProps {
       length: number;
       width: number;
       height: number;
-    };
-    humanPosition?: {
-      x: number;
-      y: number;
-      z: number;
-    };
-    cameras?: {
-      frontWall: boolean;
-      backWall: boolean;
-      leftWall: boolean;
-      rightWall: boolean;
-      ceiling: boolean;
-      showCone: boolean;
-    };
-    props?: {
-      toolBox: boolean;
-      carLift: boolean;
-      car: boolean;
     };
     ptzTracks: {
       position: {
@@ -87,20 +49,6 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
       length: initialData?.dimensions.length || 30,
       width: initialData?.dimensions.width || 20,
       height: initialData?.dimensions.height || 16,
-      humanPosition: initialData?.humanPosition || { x: 0, y: 0, z: 0 },
-      cameras: initialData?.cameras || {
-        frontWall: false,
-        backWall: false,
-        leftWall: false,
-        rightWall: false,
-        ceiling: false,
-        showCone: true,
-      },
-      props: initialData?.props || {
-        toolBox: false,
-        carLift: false,
-        car: false,
-      },
       ptzTracks: [{
         x: initialData?.ptzTracks[0]?.position.x || 0,
         y: initialData?.ptzTracks[0]?.position.y || 8,
@@ -158,90 +106,107 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
     }
   };
 
-  const handleCameraChange = (key: string, value: boolean) => {
-    setValue(`cameras.${key}` as any, value);
-  };
-
-  const handlePropsChange = (key: string, value: boolean) => {
-    setValue(`props.${key}` as any, value);
-  };
-
-  const handleHumanMove = (direction: 'left' | 'right' | 'forward' | 'backward' | 'up' | 'down') => {
-    const step = 1;
-    const currentPosition = formData.humanPosition;
-    
-    switch (direction) {
-      case 'left':
-        setValue('humanPosition.x', currentPosition.x - step);
-        break;
-      case 'right':
-        setValue('humanPosition.x', currentPosition.x + step);
-        break;
-      case 'forward':
-        setValue('humanPosition.z', currentPosition.z - step);
-        break;
-      case 'backward':
-        setValue('humanPosition.z', currentPosition.z + step);
-        break;
-      case 'up':
-        setValue('humanPosition.y', currentPosition.y + step);
-        break;
-      case 'down':
-        setValue('humanPosition.y', Math.max(0, currentPosition.y - step));
-        break;
-    }
-  };
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Tabs defaultValue="dimensions" className="w-full">
         <TabsList>
           <TabsTrigger value="dimensions">Room Dimensions</TabsTrigger>
-          <TabsTrigger value="cameras">Cameras</TabsTrigger>
           <TabsTrigger value="ptz">PTZ Configuration</TabsTrigger>
-          <TabsTrigger value="human">Human Position</TabsTrigger>
-          <TabsTrigger value="props">Props</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="dimensions">
-          <DimensionsSection register={register} />
-        </TabsContent>
-
-        <TabsContent value="cameras">
-          <CameraConfigSection 
-            cameras={formData.cameras}
-            onCameraChange={handleCameraChange}
-          />
-        </TabsContent>
-
-        <TabsContent value="ptz">
-          <PTZConfigSection
-            register={register}
-            ptzTrack={formData.ptzTracks[0]}
-            onSpeedChange={(value) => setValue('ptzTracks.0.speed', value[0])}
-            onConeAngleChange={(value) => setValue('ptzTracks.0.coneAngle', value[0])}
-          />
-        </TabsContent>
-
-        <TabsContent value="human">
-          <div className="space-y-4">
-            <HumanPositionSection register={register} />
-            <div className="grid grid-cols-3 gap-2 mt-4">
-              <Button type="button" onClick={() => handleHumanMove('left')}>Left</Button>
-              <Button type="button" onClick={() => handleHumanMove('forward')}>Forward</Button>
-              <Button type="button" onClick={() => handleHumanMove('right')}>Right</Button>
-              <Button type="button" onClick={() => handleHumanMove('up')}>Up</Button>
-              <Button type="button" onClick={() => handleHumanMove('backward')}>Backward</Button>
-              <Button type="button" onClick={() => handleHumanMove('down')}>Down</Button>
+        <TabsContent value="dimensions" className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="length">Length (ft)</Label>
+              <Input
+                id="length"
+                type="number"
+                {...register('length', { required: true, min: 0 })}
+                placeholder="30"
+              />
+            </div>
+            <div>
+              <Label htmlFor="width">Width (ft)</Label>
+              <Input
+                id="width"
+                type="number"
+                {...register('width', { required: true, min: 0 })}
+                placeholder="20"
+              />
+            </div>
+            <div>
+              <Label htmlFor="height">Height (ft)</Label>
+              <Input
+                id="height"
+                type="number"
+                {...register('height', { required: true, min: 0 })}
+                placeholder="16"
+              />
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="props">
-          <PropsSection 
-            props={formData.props}
-            onPropsChange={handlePropsChange}
-          />
+        <TabsContent value="ptz" className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="ptz-x">Track X Position</Label>
+              <Input
+                id="ptz-x"
+                type="number"
+                {...register('ptzTracks.0.x', { required: true })}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ptz-y">Track Y Position</Label>
+              <Input
+                id="ptz-y"
+                type="number"
+                {...register('ptzTracks.0.y', { required: true })}
+                placeholder="8"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ptz-z">Track Z Position</Label>
+              <Input
+                id="ptz-z"
+                type="number"
+                {...register('ptzTracks.0.z', { required: true })}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ptz-length">Track Length</Label>
+              <Input
+                id="ptz-length"
+                type="number"
+                {...register('ptzTracks.0.length', { required: true, min: 1 })}
+                placeholder="10"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ptz-speed">Camera Movement Speed</Label>
+              <Slider
+                id="ptz-speed"
+                min={0.1}
+                max={5}
+                step={0.1}
+                defaultValue={[formData.ptzTracks[0].speed]}
+                onValueChange={(value) => setValue('ptzTracks.0.speed', value[0])}
+              />
+            </div>
+            <div>
+              <Label htmlFor="ptz-cone">Camera Cone Angle (degrees)</Label>
+              <Slider
+                id="ptz-cone"
+                min={10}
+                max={120}
+                step={5}
+                defaultValue={[formData.ptzTracks[0].coneAngle]}
+                onValueChange={(value) => setValue('ptzTracks.0.coneAngle', value[0])}
+              />
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
       

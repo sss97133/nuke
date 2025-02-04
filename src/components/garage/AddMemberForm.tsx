@@ -1,16 +1,21 @@
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { AddGarageMemberProps } from '@/types/garage';
 
-type FormData = {
+interface AddMemberFormProps {
+  garageId: string;
+  onSuccess?: () => void;
+}
+
+interface FormData {
   email: string;
-};
+}
 
-export const AddMemberForm = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
+export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
@@ -41,7 +46,7 @@ export const AddMemberForm = ({ garageId, onMemberAdded }: AddGarageMemberProps)
       });
 
       reset();
-      onMemberAdded();
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast({
         title: 'Error',
