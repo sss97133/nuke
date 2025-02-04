@@ -10,6 +10,7 @@ import { FormDialogs } from "./dialogs/FormDialogs";
 import { MendableChat } from "../ai/MendableChat";
 import { useNavigate } from "react-router-dom";
 import { StudioConfiguration } from "../studio/StudioConfiguration";
+import { StudioWorkspace } from "../studio/StudioWorkspace";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -23,6 +24,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showStudioConfig, setShowStudioConfig] = useState(false);
+  const [showStudioConfigV1, setShowStudioConfigV1] = useState(false);
 
   const handleShowHelp = (section: string) => {
     setShowHelp(true);
@@ -80,6 +82,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         break;
       case 'studio_config':
         setShowStudioConfig(true);
+        setShowStudioConfigV1(false);
+        break;
+      case 'studio_config_v1':
+        setShowStudioConfigV1(true);
+        setShowStudioConfig(false);
         break;
       default:
         toast({ 
@@ -94,7 +101,19 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <DashboardHeader handleMenuAction={handleMenuAction} />
       
       <main className="flex-1 p-6">
-        {showStudioConfig ? (
+        {showStudioConfigV1 ? (
+          <div className="w-full h-[600px]">
+            <StudioWorkspace 
+              dimensions={{ length: 30, width: 20, height: 16 }}
+              ptzTracks={[{
+                position: { x: 0, y: 8, z: 0 },
+                length: 10,
+                speed: 1,
+                coneAngle: 45
+              }]}
+            />
+          </div>
+        ) : showStudioConfig ? (
           <StudioConfiguration />
         ) : (
           <>
