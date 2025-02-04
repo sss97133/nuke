@@ -991,6 +991,48 @@ export type Database = {
         }
         Relationships: []
       }
+      verified_locations: {
+        Row: {
+          approved_by: string | null
+          bin: string | null
+          building: string | null
+          created_at: string
+          created_by: string | null
+          floor: string | null
+          id: string
+          room: string | null
+          shelf: string | null
+          status: Database["public"]["Enums"]["location_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          bin?: string | null
+          building?: string | null
+          created_at?: string
+          created_by?: string | null
+          floor?: string | null
+          id?: string
+          room?: string | null
+          shelf?: string | null
+          status?: Database["public"]["Enums"]["location_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          bin?: string | null
+          building?: string | null
+          created_at?: string
+          created_by?: string | null
+          floor?: string | null
+          id?: string
+          room?: string | null
+          shelf?: string | null
+          status?: Database["public"]["Enums"]["location_status"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vin_processing_jobs: {
         Row: {
           batch_data: Json | null
@@ -1050,6 +1092,7 @@ export type Database = {
         | "dealer"
         | "professional"
         | "garage_admin"
+      location_status: "pending" | "approved" | "rejected"
       skill_category:
         | "mechanical"
         | "electrical"
