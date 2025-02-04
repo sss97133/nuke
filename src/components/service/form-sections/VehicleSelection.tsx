@@ -23,17 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Vehicle } from "@/types/inventory";
-
-const carBrands = [
-  "Acura", "Alfa Romeo", "Aston Martin", "Audi", "Bentley", "BMW", "Bugatti",
-  "Buick", "Cadillac", "Chevrolet", "Chrysler", "Citroën", "Dodge", "Ferrari",
-  "Fiat", "Ford", "Genesis", "GMC", "Honda", "Hyundai", "Infiniti", "Jaguar",
-  "Jeep", "Kia", "Lamborghini", "Land Rover", "Lexus", "Lincoln", "Lotus",
-  "Maserati", "Mazda", "McLaren", "Mercedes-Benz", "Mini", "Mitsubishi",
-  "Nissan", "Pagani", "Peugeot", "Porsche", "Ram", "Renault", "Rolls-Royce",
-  "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo"
-];
+import type { Vehicle, VehicleHistoricalData } from "@/types/inventory";
 
 const departments = [
   "mechanical",
@@ -66,10 +56,6 @@ export const VehicleSelection = ({
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const { toast } = useToast();
 
-  const filteredBrands = carBrands.filter(brand => 
-    brand.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
@@ -81,7 +67,13 @@ export const VehicleSelection = ({
           throw error;
         }
 
-        setVehicles(data || []);
+        // Transform the data to ensure historical_data is properly typed
+        const transformedData = (data || []).map(vehicle => ({
+          ...vehicle,
+          historical_data: vehicle.historical_data as VehicleHistoricalData | null
+        }));
+
+        setVehicles(transformedData);
       } catch (error: any) {
         toast({
           title: "Error",
