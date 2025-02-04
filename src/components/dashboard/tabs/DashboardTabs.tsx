@@ -3,7 +3,7 @@ import { Terminal, Car, Warehouse, Wrench, Building2, UserRound, Video, Gavel } 
 import { InventoryForm } from "@/components/inventory/InventoryForm";
 import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
-import { GarageManagement } from "@/components/garage/GarageManagement";
+import { MapManagement } from "@/components/map/MapManagement";
 import { ProfessionalDashboard } from "@/components/dashboard/ProfessionalDashboard";
 import { AuctionList } from "@/components/auctions/AuctionList";
 import { CreateAuction } from "@/components/auctions/CreateAuction";
@@ -94,7 +94,7 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
           <ServiceManagement />
         </TabsContent>
         <TabsContent value="garages">
-          <GarageManagement />
+          <MapManagement />
         </TabsContent>
         <TabsContent value="professional">
           <ProfessionalDashboard />

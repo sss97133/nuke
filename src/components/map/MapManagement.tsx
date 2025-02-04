@@ -1,11 +1,11 @@
-import { GarageList } from "./GarageList";
-import { GarageMap } from "./GarageMap";
+import { LocationsList } from "./LocationsList";
+import { MapView } from "./MapView";
 
-export const GarageManagement = () => {
+export const MapManagement = () => {
   return (
     <div className="space-y-6">
-      <GarageMap />
-      <GarageList />
+      <MapView />
+      <LocationsList />
     </div>
   );
 };
