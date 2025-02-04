@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { LoadingState } from './LoadingState';
 import { SkillHeader } from './SkillHeader';
 import { SkillCategory } from './SkillCategory';
+import { AIToolsPanel } from './ai/AIToolsPanel';
 
 export const SkillTree = () => {
   const { toast } = useToast();
@@ -73,7 +74,7 @@ export const SkillTree = () => {
     const userSkill = userSkills?.find(us => us.skill_id === skillId);
     const level = userSkill?.level || 0;
     const exp = userSkill?.experience_points || 0;
-    const nextLevelExp = (level + 1) * 1000; // Example progression
+    const nextLevelExp = (level + 1) * 1000;
     const progress = (exp / nextLevelExp) * 100;
     
     return {
@@ -86,10 +87,12 @@ export const SkillTree = () => {
   };
 
   return (
-    <div className="bg-background p-6 rounded-lg shadow-lg border border-border animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       <SkillHeader totalProgress={calculateTotalProgress()} />
       
-      <div className="space-y-12">
+      <AIToolsPanel />
+      
+      <div className="space-y-12 mt-8">
         {skillsByCategory && Object.entries(skillsByCategory).map(([category, categorySkills]: [string, any]) => (
           <SkillCategory
             key={category}
