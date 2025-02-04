@@ -11,7 +11,7 @@ type Garage = {
   address: string | null;
 };
 
-export const GarageMap = () => {
+export const MapView = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<{ [key: string]: mapboxgl.Marker }>({});
