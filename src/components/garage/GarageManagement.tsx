@@ -1,6 +1,7 @@
 import { ImportGarages } from "./ImportGarages";
 import { CreateGarage } from "./CreateGarage";
 import { GarageList } from "./GarageList";
+import { GarageMap } from "./GarageMap";
 
 export const GarageManagement = () => {
   return (
@@ -10,6 +11,8 @@ export const GarageManagement = () => {
         <ImportGarages />
       </div>
 
+      <GarageMap />
+      
       <GarageList />
     </div>
   );
