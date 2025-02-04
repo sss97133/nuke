@@ -11,12 +11,6 @@ import { MendableChat } from "../ai/MendableChat";
 import { useNavigate } from "react-router-dom";
 import { StudioConfiguration } from "../studio/StudioConfiguration";
 import { StudioWorkspace } from "../studio/StudioWorkspace";
-import { Card } from "../ui/card";
-import { PTZControls } from "../studio/controls/PTZControls";
-import { CameraControls } from "../studio/controls/CameraControls";
-import { AudioControls } from "../studio/controls/AudioControls";
-import { StreamingControls } from "../studio/controls/StreamingControls";
-import { RecordingControls } from "../studio/controls/RecordingControls";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -31,7 +25,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showHelp, setShowHelp] = useState(false);
   const [showStudioConfig, setShowStudioConfig] = useState(false);
   const [showStudioConfigV1, setShowStudioConfigV1] = useState(false);
-  const [audioLevel, setAudioLevel] = useState([50]);
 
   const handleShowHelp = (section: string) => {
     setShowHelp(true);
@@ -109,29 +102,16 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       
       <main className="flex-1 p-6">
         {showStudioConfigV1 ? (
-          <div className="grid grid-cols-3 gap-6">
-            <div className="col-span-2">
-              <Card className="p-4">
-                <div className="w-full h-[600px]">
-                  <StudioWorkspace 
-                    dimensions={{ length: 30, width: 20, height: 16 }}
-                    ptzTracks={[{
-                      position: { x: 0, y: 8, z: 0 },
-                      length: 10,
-                      speed: 1,
-                      coneAngle: 45
-                    }]}
-                  />
-                </div>
-              </Card>
-            </div>
-            <div className="space-y-6">
-              <PTZControls />
-              <CameraControls />
-              <AudioControls audioLevel={audioLevel} setAudioLevel={setAudioLevel} />
-              <StreamingControls />
-              <RecordingControls />
-            </div>
+          <div className="w-full h-[600px]">
+            <StudioWorkspace 
+              dimensions={{ length: 30, width: 20, height: 16 }}
+              ptzTracks={[{
+                position: { x: 0, y: 8, z: 0 },
+                length: 10,
+                speed: 1,
+                coneAngle: 45
+              }]}
+            />
           </div>
         ) : showStudioConfig ? (
           <StudioConfiguration />
