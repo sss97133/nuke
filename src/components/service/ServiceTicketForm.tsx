@@ -8,6 +8,7 @@ import { ServiceParts } from "./form-sections/ServiceParts";
 import { VehicleForm } from "../vehicles/VehicleForm";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { Vehicle } from "@/types/inventory";
+import type { Database } from "@/integrations/supabase/types";
 
 interface Part {
   name: string;
@@ -40,15 +41,21 @@ export const ServiceTicketForm = () => {
     }
 
     try {
-      const { error } = await supabase.from("service_tickets").insert({
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const serviceTicket: Database['public']['Tables']['service_tickets']['Insert'] = {
         vehicle_id: selectedVehicle.id,
         description,
-        service_type: serviceType,
+        service_type: serviceType as Database['public']['Enums']['service_type'],
         parts_used: parts,
-        status: "pending",
-        priority: "medium", // This would be based on vehicle priority in a real implementation
-        user_id: (await supabase.auth.getUser()).data.user?.id
-      });
+        status: 'pending',
+        priority: 'medium', // This would be based on vehicle priority in a real implementation
+        user_id: user?.id
+      };
+
+      const { error } = await supabase
+        .from('service_tickets')
+        .insert(serviceTicket);
 
       if (error) throw error;
 
