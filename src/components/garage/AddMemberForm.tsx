@@ -11,11 +11,11 @@ export interface AddMemberFormProps {
   onMemberAdded?: () => void;
 }
 
-interface FormData {
+type FormData = {
   email: string;
 }
 
-export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
+export const AddMemberForm: React.FC<AddMemberFormProps> = ({ garageId, onMemberAdded }) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
