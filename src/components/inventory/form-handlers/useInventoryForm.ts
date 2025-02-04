@@ -26,7 +26,7 @@ export interface InventoryFormData {
   shelf: string;
   bin: string;
   photoUrl?: string;
-  aiClassification?: any; // Add this line for AI classification
+  aiClassification?: any;
 }
 
 const initialFormData: InventoryFormData = {
@@ -53,7 +53,7 @@ const initialFormData: InventoryFormData = {
   shelf: "",
   bin: "",
   photoUrl: "",
-  aiClassification: null, // Initialize AI classification
+  aiClassification: null,
 };
 
 export const useInventoryForm = () => {
@@ -95,6 +95,19 @@ export const useInventoryForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Get the current user's session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to add inventory items",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from("inventory")
@@ -122,8 +135,8 @@ export const useInventoryForm = () => {
           shelf: formData.shelf,
           bin: formData.bin,
           photo_url: formData.photoUrl,
-          ai_classification: formData.aiClassification || null, // Include AI classification in the submission
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+          ai_classification: formData.aiClassification || null,
+          user_id: session.user.id, // Explicitly set the user_id
         }]);
 
       if (error) throw error;
