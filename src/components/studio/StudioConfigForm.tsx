@@ -49,7 +49,8 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
 
       const { error } = await supabase
         .from('studio_configurations')
-        .insert({
+        .insert([{
+          user_id: user.id,
           name: 'Default Configuration',
           workspace_dimensions: dimensions,
           ptz_configurations: {
@@ -57,7 +58,7 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
             planes: { walls: [], ceiling: {} },
             roboticArms: []
           }
-        });
+        }]);
 
       if (error) throw error;
 

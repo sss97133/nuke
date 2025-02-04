@@ -41,17 +41,17 @@ export const StudioConfiguration = () => {
 
       if (error) throw error;
 
-      const workspaceDimensions = data?.workspace_dimensions as WorkspaceDimensions || {
+      const workspaceDimensions = (data?.workspace_dimensions || {
         width: 0,
         height: 0,
         length: 0
-      };
+      }) as WorkspaceDimensions;
 
-      const ptzConfig = data?.ptz_configurations as PTZConfigurations || {
+      const ptzConfig = (data?.ptz_configurations || {
         tracks: [],
         planes: { walls: [], ceiling: {} },
         roboticArms: []
-      };
+      }) as PTZConfigurations;
 
       const config: StudioConfigurationType = {
         id: data?.id || '',
@@ -59,10 +59,10 @@ export const StudioConfiguration = () => {
         name: data?.name || '',
         workspace_dimensions: workspaceDimensions,
         ptz_configurations: ptzConfig,
-        camera_config: data?.camera_config || {},
-        audio_config: data?.audio_config || {},
-        lighting_config: data?.lighting_config || {},
-        fixed_cameras: data?.fixed_cameras || { positions: [] },
+        camera_config: (data?.camera_config || {}) as Record<string, any>,
+        audio_config: (data?.audio_config || {}) as Record<string, any>,
+        lighting_config: (data?.lighting_config || {}) as Record<string, any>,
+        fixed_cameras: (data?.fixed_cameras || { positions: [] }) as { positions: any[] },
         created_at: data?.created_at || new Date().toISOString(),
         updated_at: data?.updated_at || new Date().toISOString()
       };

@@ -32,7 +32,7 @@ export interface PTZConfigurations {
 
 export interface StudioConfigurationType {
   id: string;
-  user_id: string | null;
+  user_id: string;
   name: string;
   workspace_dimensions: WorkspaceDimensions;
   ptz_configurations: PTZConfigurations;
