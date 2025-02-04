@@ -24,7 +24,7 @@ export const VehicleList = () => {
         return;
       }
 
-      setVehicles(data || []);
+      setVehicles(data as Vehicle[] || []);
     };
 
     fetchVehicles();

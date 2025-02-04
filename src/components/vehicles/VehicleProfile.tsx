@@ -49,20 +49,7 @@ export const VehicleProfile = () => {
         return;
       }
 
-      setVehicle({
-        id: data.id,
-        vin: data.vin || undefined,
-        make: data.make,
-        model: data.model,
-        year: data.year,
-        notes: data.notes || undefined,
-        images: undefined,
-        createdBy: data.user_id || '',
-        updatedBy: data.user_id || '',
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        historical_data: data.historical_data as VehicleHistoricalData | null
-      });
+      setVehicle(data as Vehicle);
       setLoading(false);
     };
 
