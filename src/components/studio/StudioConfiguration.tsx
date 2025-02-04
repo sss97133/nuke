@@ -38,9 +38,14 @@ export const StudioConfiguration = () => {
         .single();
 
       if (error) throw error;
-      return data;
-    },
-    retry: false
+
+      // Transform the JSON data into the correct type
+      return {
+        ...data,
+        workspace_dimensions: data.workspace_dimensions as StudioConfigurationType['workspace_dimensions'],
+        ptz_configurations: data.ptz_configurations as StudioConfigurationType['ptz_configurations']
+      };
+    }
   });
 
   const handleRecordingToggle = () => {

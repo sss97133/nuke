@@ -9,21 +9,31 @@ export interface PTZTrack {
   coneAngle: number;
 }
 
+export interface WorkspaceDimensions {
+  length: number;
+  width: number;
+  height: number;
+}
+
+export interface PTZConfigurations {
+  tracks: PTZTrack[];
+  planes?: {
+    walls: any[];
+    ceiling: Record<string, any>;
+  };
+  roboticArms?: any[];
+}
+
 export interface StudioConfigurationType {
   id: string;
-  user_id: string;
+  user_id: string | null;
   name: string;
-  workspace_dimensions: {
-    length: number;
-    width: number;
-    height: number;
-  };
-  ptz_configurations: {
-    tracks: PTZTrack[];
-  };
-  camera_config: Record<string, any>;
-  audio_config: Record<string, any>;
-  lighting_config: Record<string, any>;
+  workspace_dimensions: WorkspaceDimensions;
+  ptz_configurations: PTZConfigurations;
+  camera_config: Record<string, any> | null;
+  audio_config: Record<string, any> | null;
+  lighting_config: Record<string, any> | null;
+  fixed_cameras: { positions: any[] } | null;
   created_at: string;
   updated_at: string;
 }

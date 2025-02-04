@@ -3,10 +3,10 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-interface AddMemberFormProps {
+export interface AddMemberFormProps {
   garageId: string;
   onSuccess?: () => void;
 }
@@ -28,31 +28,14 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
         .single();
 
       if (userError || !userData) {
-        toast({
-          title: 'Error',
-          description: 'User not found',
-          variant: 'destructive',
-        });
-        return;
+        throw new Error('User not found');
       }
 
       const { error: memberError } = await supabase
         .from('garage_members')
-        .insert([
-          {
-            garage_id: garageId,
-            user_id: userData.id,
-          },
-        ]);
+        .insert({ user_id: userData.id, garage_id: garageId });
 
-      if (memberError) {
-        toast({
-          title: 'Error',
-          description: 'Failed to add member',
-          variant: 'destructive',
-        });
-        return;
-      }
+      if (memberError) throw memberError;
 
       toast({
         title: 'Success',
@@ -60,13 +43,11 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
       });
 
       reset();
-      if (onSuccess) {
-        onSuccess();
-      }
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred',
+        description: 'Failed to add member',
         variant: 'destructive',
       });
     }
@@ -80,7 +61,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
           id="email"
           type="email"
           {...register('email', { required: true })}
-          placeholder="Enter member email"
+          placeholder="Enter member's email"
         />
       </div>
       <Button type="submit">Add Member</Button>
