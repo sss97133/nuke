@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 type Garage = {
   id: string;
@@ -15,6 +16,7 @@ export const GarageMap = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<{ [key: string]: mapboxgl.Marker }>({});
   const [garages, setGarages] = useState<Garage[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchGarages = async () => {
@@ -64,24 +66,36 @@ export const GarageMap = () => {
     if (!mapContainer.current) return;
 
     const initializeMap = async () => {
-      const { data: { secret: mapboxToken } } = await supabase
-        .functions.invoke('get-mapbox-token');
+      try {
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        
+        if (error || !data?.secret) {
+          toast({
+            title: "Error",
+            description: "Failed to initialize map. Please try again later.",
+            variant: "destructive"
+          });
+          return;
+        }
 
-      if (!mapboxToken) {
-        console.error('Mapbox token not found');
-        return;
+        mapboxgl.accessToken = data.secret;
+        
+        map.current = new mapboxgl.Map({
+          container: mapContainer.current,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [-74.5, 40],
+          zoom: 9
+        });
+
+        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      } catch (error) {
+        console.error('Map initialization error:', error);
+        toast({
+          title: "Error",
+          description: "Failed to initialize map. Please try again later.",
+          variant: "destructive"
+        });
       }
-
-      mapboxgl.accessToken = mapboxToken;
-      
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
-        center: [-74.5, 40],
-        zoom: 9
-      });
-
-      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
     };
 
     initializeMap();
@@ -89,7 +103,7 @@ export const GarageMap = () => {
     return () => {
       map.current?.remove();
     };
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (!map.current) return;

@@ -15,10 +15,6 @@ interface FormData {
   email: string;
 }
 
-interface Profile {
-  id: string;
-}
-
 export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();

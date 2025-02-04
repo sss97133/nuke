@@ -35,7 +35,10 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
       const { data, error } = await supabase
         .from('stream_comments')
         .select(`
-          *,
+          id,
+          message,
+          created_at,
+          user_id,
           profiles:user_id (
             username,
             avatar_url
@@ -50,7 +53,7 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
       }
 
       if (data) {
-        setMessages(data as ChatMessage[]);
+        setMessages(data as unknown as ChatMessage[]);
       }
     };
 
