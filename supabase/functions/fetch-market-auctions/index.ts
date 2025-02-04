@@ -17,6 +17,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Exponential backoff retry function
+async function retryWithBackoff(
+  fn: () => Promise<any>,
+  retries = 3,
+  baseDelay = 1000,
+): Promise<any> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error?.statusCode === 429 && retries > 0) {
+      const waitTime = baseDelay * Math.pow(2, 3 - retries);
+      console.log(`Rate limited, waiting ${waitTime}ms before retry. Retries left: ${retries}`);
+      await delay(waitTime);
+      return retryWithBackoff(fn, retries - 1, baseDelay);
+    }
+    throw error;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -64,47 +86,57 @@ serve(async (req) => {
     
     const results: AuctionData[] = []
     
+    // Process sources sequentially to avoid rate limits
     for (const source of sources) {
       console.log(`Crawling ${source.url}...`)
       try {
-        const response = await firecrawl.crawlUrl(source.url, {
-          limit: 10,
-          scrapeOptions: {
-            patterns: source.patterns
-          }
-        })
+        const response = await retryWithBackoff(async () => {
+          return await firecrawl.crawlUrl(source.url, {
+            limit: 5, // Reduced from 10 to avoid rate limits
+            scrapeOptions: {
+              patterns: source.patterns
+            }
+          })
+        });
         
         if (response.success) {
           const sourceName = new URL(source.url).hostname.replace('www.', '').split('.')[0]
           
-          // Extract data from the crawled content using regex patterns
-          const extractedData = response.data.map(item => {
-            const yearMatch = item.content.match(/\b(19|20)\d{2}\b/)
-            const priceMatch = item.content.match(/\$[\d,]+/)
-            const makeModelMatch = item.content.match(/(\w+)\s+(\w+)/)
-            
-            if (yearMatch && priceMatch && makeModelMatch) {
-              return {
-                make: makeModelMatch[1],
-                model: makeModelMatch[2],
-                year: parseInt(yearMatch[0]),
-                price: parseFloat(priceMatch[0].replace(/[$,]/g, '')),
-                url: item.url || source.url,
-                source: sourceName,
-                imageUrl: item.images?.[0]
+          const extractedData = response.data
+            .map(item => {
+              const yearMatch = item.content.match(/\b(19|20)\d{2}\b/)
+              const priceMatch = item.content.match(/\$[\d,]+/)
+              const makeModelMatch = item.content.match(/(\w+)\s+(\w+)/)
+              
+              if (yearMatch && priceMatch && makeModelMatch) {
+                return {
+                  make: makeModelMatch[1],
+                  model: makeModelMatch[2],
+                  year: parseInt(yearMatch[0]),
+                  price: parseFloat(priceMatch[0].replace(/[$,]/g, '')),
+                  url: item.url || source.url,
+                  source: sourceName,
+                  imageUrl: item.images?.[0]
+                }
               }
-            }
-            return null
-          }).filter(Boolean)
+              return null
+            })
+            .filter(Boolean)
           
           results.push(...extractedData)
           console.log(`Successfully extracted ${extractedData.length} auctions from ${sourceName}`)
+          
+          // Add delay between sources to avoid rate limits
+          await delay(2000)
         } else {
           console.error(`Failed to crawl ${source.url}:`, response)
         }
       } catch (error) {
         console.error(`Error crawling ${source.url}:`, error)
-        // Continue with other sources even if one fails
+        if (error?.statusCode === 429) {
+          console.log('Rate limit reached, skipping remaining sources')
+          break
+        }
       }
     }
 
