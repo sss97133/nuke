@@ -56,7 +56,7 @@ export const SkillTree = () => {
     return (
       <div className="flex items-center justify-center p-8 text-sidebar-foreground">
         <Gauge className="w-6 h-6 animate-spin mr-2" />
-        Loading development wheel...
+        Loading developometer...
       </div>
     );
   }
@@ -74,7 +74,7 @@ export const SkillTree = () => {
     <div className="bg-sidebar p-6 rounded-lg shadow-lg border border-sidebar-border">
       <div className="flex items-center gap-2 mb-6">
         <Gauge className="w-6 h-6 text-sidebar-primary animate-pulse" />
-        <h2 className="text-xl font-semibold text-sidebar-foreground">Development Wheel</h2>
+        <h2 className="text-xl font-semibold text-sidebar-foreground">Developometer</h2>
       </div>
       
       <div className="space-y-8">
