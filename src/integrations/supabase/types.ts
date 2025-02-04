@@ -222,6 +222,50 @@ export type Database = {
           },
         ]
       }
+      development_goals: {
+        Row: {
+          ai_recommendations: Json | null
+          created_at: string | null
+          description: string | null
+          id: string
+          status: string | null
+          target_date: string | null
+          title: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ai_recommendations?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          status?: string | null
+          target_date?: string | null
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ai_recommendations?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          status?: string | null
+          target_date?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       garage_members: {
         Row: {
           created_at: string

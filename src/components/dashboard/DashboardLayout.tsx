@@ -8,6 +8,7 @@ import { DashboardTabs } from "./tabs/DashboardTabs";
 import { DashboardFooter } from "./footer/DashboardFooter";
 import { FormDialogs } from "./dialogs/FormDialogs";
 import { MendableChat } from "../ai/MendableChat";
+import { useNavigate } from "react-router-dom";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -15,6 +16,7 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [showNewVehicleDialog, setShowNewVehicleDialog] = useState(false);
   const [showNewInventoryDialog, setShowNewInventoryDialog] = useState(false);
   const [showAiAssistant, setShowAiAssistant] = useState(false);
@@ -46,6 +48,27 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         if (confirm('Are you sure you want to exit?')) {
           supabase.auth.signOut();
         }
+        break;
+      case 'professional_dashboard':
+        toast({
+          title: "Professional Dashboard",
+          description: "Opening professional dashboard...",
+        });
+        navigate('/professional');
+        break;
+      case 'skill_management':
+        toast({
+          title: "Skill Management",
+          description: "Opening skill management...",
+        });
+        navigate('/skills');
+        break;
+      case 'achievements':
+        toast({
+          title: "Achievements",
+          description: "Opening achievements...",
+        });
+        navigate('/achievements');
         break;
       case 'preferences':
         toast({ 
