@@ -1,8 +1,9 @@
 import React from 'react';
 import { SkillTree } from '../skills/SkillTree';
 import { UserProfile } from '../profile/UserProfile';
+import { CertificationsList } from '../certifications/CertificationsList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Trees } from 'lucide-react';
+import { UserRound, Trees, BadgeCheck } from 'lucide-react';
 
 export const ProfessionalDashboard = () => {
   return (
@@ -23,6 +24,13 @@ export const ProfessionalDashboard = () => {
             <Trees className="w-4 h-4" />
             Development Tree
           </TabsTrigger>
+          <TabsTrigger 
+            value="certifications" 
+            className="flex items-center gap-2 data-[state=active]:bg-sidebar-primary data-[state=active]:text-sidebar-primary-foreground"
+          >
+            <BadgeCheck className="w-4 h-4" />
+            Certifications
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="profile" className="mt-6">
@@ -31,6 +39,10 @@ export const ProfessionalDashboard = () => {
         
         <TabsContent value="skills" className="mt-6">
           <SkillTree />
+        </TabsContent>
+
+        <TabsContent value="certifications" className="mt-6">
+          <CertificationsList />
         </TabsContent>
       </Tabs>
     </div>

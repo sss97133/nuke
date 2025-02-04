@@ -136,6 +136,39 @@ export type Database = {
           },
         ]
       }
+      certifications: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          issuing_authority: string
+          name: string
+          required_skills: string[] | null
+          updated_at: string
+          validity_period: unknown | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          issuing_authority: string
+          name: string
+          required_skills?: string[] | null
+          updated_at?: string
+          validity_period?: unknown | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          issuing_authority?: string
+          name?: string
+          required_skills?: string[] | null
+          updated_at?: string
+          validity_period?: unknown | null
+        }
+        Relationships: []
+      }
       content_analytics: {
         Row: {
           content_id: string | null
@@ -888,6 +921,60 @@ export type Database = {
           },
         ]
       }
+      user_certifications: {
+        Row: {
+          certification_id: string | null
+          completed_at: string | null
+          created_at: string
+          evidence_urls: string[] | null
+          expires_at: string | null
+          id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["certification_status"] | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          certification_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          evidence_urls?: string[] | null
+          expires_at?: string | null
+          id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["certification_status"] | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          certification_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          evidence_urls?: string[] | null
+          expires_at?: string | null
+          id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["certification_status"] | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_certifications_certification_id_fkey"
+            columns: ["certification_id"]
+            isOneToOne: false
+            referencedRelation: "certifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_certifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_interactions: {
         Row: {
           created_at: string
@@ -1235,6 +1322,7 @@ export type Database = {
         | "dealer"
         | "professional"
         | "garage_admin"
+      certification_status: "pending" | "in_progress" | "completed" | "expired"
       location_status: "pending" | "approved" | "rejected"
       service_type:
         | "routine_maintenance"
