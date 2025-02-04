@@ -9,13 +9,14 @@ interface ProgressBarProps {
 export const ProgressBar = ({ steps, currentStep, onStepClick }: ProgressBarProps) => {
   return (
     <div className="mb-8">
-      <div className="flex justify-between items-center mb-2 px-1">
+      <div className="grid grid-cols-7 gap-1 mb-2">
         {steps.map((step, index) => (
           <button
             key={index}
             onClick={() => onStepClick(index)}
             className={cn(
-              "text-tiny max-w-[80px] truncate hover:text-clip hover:overflow-visible transition-colors px-1",
+              "text-tiny text-center transition-colors px-1 py-0.5",
+              "hover:bg-accent rounded",
               index === currentStep
                 ? "text-foreground font-semibold"
                 : "text-muted-foreground"
