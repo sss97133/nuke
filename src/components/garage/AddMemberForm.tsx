@@ -6,20 +6,20 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-export interface AddMemberFormProps {
+type AddMemberFormProps = {
   garageId: string;
   onMemberAdded?: () => void;
 }
 
-type FormData = {
+type FormValues = {
   email: string;
 }
 
 export const AddMemberForm: React.FC<AddMemberFormProps> = ({ garageId, onMemberAdded }) => {
-  const { register, handleSubmit, reset } = useForm<FormData>();
+  const { register, handleSubmit, reset } = useForm<FormValues>();
   const { toast } = useToast();
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: FormValues) => {
     try {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
