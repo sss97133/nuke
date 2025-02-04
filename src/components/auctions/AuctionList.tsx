@@ -59,10 +59,17 @@ export const AuctionList = () => {
         .from('auctions')
         .select(`
           *,
-          vehicle:vehicles(make, model, year),
+          vehicles (
+            id,
+            make,
+            model,
+            year
+          ),
           auction_bids(count),
           auction_comments(count)
-        `);
+        `)
+        .eq('status', 'active')
+        .gt('end_time', new Date().toISOString());
 
       switch (sortBy) {
         case "ending-soon":
@@ -87,6 +94,7 @@ export const AuctionList = () => {
       
       const formattedData = response?.map((auction: any) => ({
         ...auction,
+        vehicle: auction.vehicles,
         _count: {
           auction_bids: auction.auction_bids?.[0]?.count ?? 0,
           auction_comments: auction.auction_comments?.[0]?.count ?? 0
@@ -94,24 +102,8 @@ export const AuctionList = () => {
       })) || [];
 
       console.log('🔄 Formatted auction data:', formattedData);
-      return formattedData as Auction[];
+      return formattedData;
     }
-  });
-
-  const { data: externalAuctions, isLoading: isLoadingExternal } = useQuery({
-    queryKey: ['external-auctions'],
-    queryFn: async () => {
-      console.log('🔍 Fetching external auctions...');
-      const response = await supabase.functions.invoke('fetch-market-auctions');
-      
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to fetch external auctions');
-      }
-
-      console.log('✅ Received external auctions:', response.data.data);
-      return response.data.data as ExternalAuction[];
-    },
-    refetchInterval: 5 * 60 * 1000 // Refetch every 5 minutes
   });
 
   useEffect(() => {
@@ -201,7 +193,7 @@ export const AuctionList = () => {
     setSelectedAuction(selectedAuction === auctionId ? null : auctionId);
   };
 
-  if (isLoading || isLoadingExternal) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <div className="animate-pulse text-gray-400">Loading auctions...</div>
