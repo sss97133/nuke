@@ -6,11 +6,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Camera, Video, Settings, Layout, Mic2, Radio, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CameraControls } from './controls/CameraControls';
+import { AudioControls } from './controls/AudioControls';
+import { StreamingControls } from './controls/StreamingControls';
+import type { StudioConfigurationType } from '@/types/studio';
 
 export const StudioConfiguration = () => {
   const [dimensions, setDimensions] = useState({
@@ -24,8 +25,7 @@ export const StudioConfiguration = () => {
   const [selectedCamera, setSelectedCamera] = useState<number | null>(null);
   const [audioLevel, setAudioLevel] = useState([50]);
 
-  // Fetch studio configuration
-  const { data: studioConfig } = useQuery({
+  const { data: studioConfig } = useQuery<StudioConfigurationType>({
     queryKey: ['studioConfig'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -136,83 +136,16 @@ export const StudioConfiguration = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="audio" className="space-y-4">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Audio Controls</h3>
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label>Master Volume</Label>
-                <Slider
-                  value={audioLevel}
-                  onValueChange={setAudioLevel}
-                  max={100}
-                  step={1}
-                />
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Noise Reduction</Label>
-                  <Switch />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Echo Cancellation</Label>
-                  <Switch />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Auto Gain</Label>
-                  <Switch />
-                </div>
-              </div>
-            </div>
-          </Card>
+        <TabsContent value="cameras">
+          <CameraControls />
         </TabsContent>
 
-        <TabsContent value="streaming" className="space-y-4">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Streaming Settings</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>YouTube</Label>
-                <Switch />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Twitch</Label>
-                <Switch />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Facebook Live</Label>
-                <Switch />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Custom RTMP</Label>
-                <Switch />
-              </div>
-            </div>
-          </Card>
+        <TabsContent value="audio">
+          <AudioControls audioLevel={audioLevel} setAudioLevel={setAudioLevel} />
         </TabsContent>
 
-        <TabsContent value="distribution" className="space-y-4">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Content Distribution</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Auto-publish to YouTube</Label>
-                <Switch />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Auto-publish to Podcast Platforms</Label>
-                <Switch />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Social Media Scheduling</Label>
-                <Switch />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Generate Clips</Label>
-                <Switch />
-              </div>
-            </div>
-          </Card>
+        <TabsContent value="streaming">
+          <StreamingControls />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
@@ -229,7 +162,7 @@ export const StudioConfiguration = () => {
                 }}
                 initialData={{ 
                   dimensions, 
-                  ptzTracks: studioConfig?.ptz_configurations?.tracks || [] 
+                  ptzTracks: studioConfig?.ptz_configurations?.tracks || []
                 }}
               />
             </Card>
