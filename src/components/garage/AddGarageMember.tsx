@@ -25,17 +25,17 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
     
     setIsLoading(true);
     try {
-      const { data: profiles, error: profileError } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', email)
-        .single<Profile>();
+        .single();
 
       if (profileError) {
         throw new Error('User not found');
       }
 
-      if (!profiles) {
+      if (!profile) {
         throw new Error('No profile found');
       }
 
@@ -43,7 +43,7 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
         .from('garage_members')
         .insert({
           garage_id: garageId,
-          user_id: profiles.id
+          user_id: profile.id
         });
 
       if (memberError) {
