@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 interface StudioWorkspaceProps {
   dimensions: {
@@ -24,6 +24,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const objectsRef = useRef<THREE.Object3D[]>([]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -54,42 +55,6 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controlsRef.current = controls;
-
-    // Add room geometry
-    const roomGeometry = new THREE.BoxGeometry(
-      dimensions.width,
-      dimensions.height,
-      dimensions.length
-    );
-    const edges = new THREE.EdgesGeometry(roomGeometry);
-    const line = new THREE.LineSegments(
-      edges,
-      new THREE.LineBasicMaterial({ color: 0x000000 })
-    );
-    scene.add(line);
-
-    // Add grid helper
-    const gridHelper = new THREE.GridHelper(Math.max(dimensions.width, dimensions.length), 10);
-    gridHelper.position.y = -dimensions.height / 2;
-    scene.add(gridHelper);
-
-    // Add PTZ tracks
-    ptzTracks.forEach(track => {
-      const trackGeometry = new THREE.BoxGeometry(0.2, 0.2, track.length);
-      const trackMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-      const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
-      
-      trackMesh.position.set(track.position.x, track.position.y, track.position.z);
-      scene.add(trackMesh);
-
-      // Add a camera model at the track start
-      const cameraGeometry = new THREE.ConeGeometry(0.5, 1, 8);
-      const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-      const cameraMesh = new THREE.Mesh(cameraGeometry, cameraMaterial);
-      cameraMesh.position.set(track.position.x, track.position.y, track.position.z);
-      cameraMesh.rotation.x = Math.PI / 2;
-      scene.add(cameraMesh);
-    });
 
     // Add lighting
     const ambientLight = new THREE.AmbientLight(0x404040);
@@ -127,7 +92,57 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
         containerRef.current.removeChild(renderer.domElement);
       }
     };
-  }, [dimensions, ptzTracks]);
+  }, []); // Only run once on mount
+
+  // Update scene when dimensions or PTZ tracks change
+  useEffect(() => {
+    if (!sceneRef.current) return;
+
+    // Remove old objects
+    objectsRef.current.forEach(obj => sceneRef.current?.remove(obj));
+    objectsRef.current = [];
+
+    // Add room geometry
+    const roomGeometry = new THREE.BoxGeometry(
+      dimensions.width,
+      dimensions.height,
+      dimensions.length
+    );
+    const edges = new THREE.EdgesGeometry(roomGeometry);
+    const line = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({ color: 0x000000 })
+    );
+    sceneRef.current.add(line);
+    objectsRef.current.push(line);
+
+    // Add grid helper
+    const gridHelper = new THREE.GridHelper(Math.max(dimensions.width, dimensions.length), 10);
+    gridHelper.position.y = -dimensions.height / 2;
+    sceneRef.current.add(gridHelper);
+    objectsRef.current.push(gridHelper);
+
+    // Add PTZ tracks
+    ptzTracks.forEach(track => {
+      const trackGeometry = new THREE.BoxGeometry(0.2, 0.2, track.length);
+      const trackMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+      const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+      
+      trackMesh.position.set(track.position.x, track.position.y, track.position.z);
+      sceneRef.current?.add(trackMesh);
+      objectsRef.current.push(trackMesh);
+
+      // Add a camera model at the track start
+      const cameraGeometry = new THREE.ConeGeometry(0.5, 1, 8);
+      const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+      const cameraMesh = new THREE.Mesh(cameraGeometry, cameraMaterial);
+      cameraMesh.position.set(track.position.x, track.position.y, track.position.z);
+      cameraMesh.rotation.x = Math.PI / 2;
+      sceneRef.current?.add(cameraMesh);
+      objectsRef.current.push(cameraMesh);
+    });
+
+  }, [dimensions, ptzTracks]); // Update when dimensions or PTZ tracks change
 
   return (
     <div 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,48 @@ interface FormData {
   }[];
 }
 
-export const StudioConfigForm = () => {
-  const { register, handleSubmit } = useForm<FormData>();
+interface StudioConfigFormProps {
+  onUpdate: (data: FormData) => void;
+  initialData?: {
+    dimensions: {
+      length: number;
+      width: number;
+      height: number;
+    };
+    ptzTracks: {
+      position: {
+        x: number;
+        y: number;
+        z: number;
+      };
+      length: number;
+    }[];
+  };
+}
+
+export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProps) => {
+  const { register, handleSubmit, watch } = useForm<FormData>({
+    defaultValues: {
+      length: initialData?.dimensions.length || 30,
+      width: initialData?.dimensions.width || 20,
+      height: initialData?.dimensions.height || 16,
+      ptzTracks: [{
+        x: initialData?.ptzTracks[0]?.position.x || 0,
+        y: initialData?.ptzTracks[0]?.position.y || 8,
+        z: initialData?.ptzTracks[0]?.position.z || 0,
+        length: initialData?.ptzTracks[0]?.length || 10,
+      }],
+    },
+  });
   const { toast } = useToast();
+
+  // Watch all form fields for changes
+  const formData = watch();
+
+  // Update preview whenever form values change
+  useEffect(() => {
+    onUpdate(formData);
+  }, [formData, onUpdate]);
 
   const onSubmit = async (data: FormData) => {
     try {
