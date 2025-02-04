@@ -6,13 +6,6 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, UserPlus } from "lucide-react";
 
-interface Profile {
-  id: string;
-  username?: string | null;
-  full_name?: string | null;
-  avatar_url?: string | null;
-}
-
 interface AddGarageMemberProps {
   garageId: string;
   onMemberAdded: () => void;

@@ -42,6 +42,10 @@ export const GarageCard = ({ garage }: GarageCardProps) => {
     queryClient.invalidateQueries({ queryKey: ['garages'] });
   };
 
+  const handleMemberAdded = () => {
+    queryClient.invalidateQueries({ queryKey: ['garages'] });
+  };
+
   return (
     <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -78,7 +82,7 @@ export const GarageCard = ({ garage }: GarageCardProps) => {
           <Users className="w-4 h-4" />
           <span>Members: {garage.garage_members?.length || 0}</span>
         </div>
-        <AddGarageMember garageId={garage.id} />
+        <AddGarageMember garageId={garage.id} onMemberAdded={handleMemberAdded} />
       </div>
     </Card>
   );
