@@ -5,11 +5,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, UserPlus } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
 
 interface AddGarageMemberProps {
   garageId: string;
   onMemberAdded: () => void;
 }
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
   const [email, setEmail] = useState("");
@@ -26,7 +29,7 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
         .from('profiles')
         .select('id')
         .eq('email', email)
-        .single();
+        .single<Profile>();
 
       if (profileError) {
         throw new Error('User not found');
