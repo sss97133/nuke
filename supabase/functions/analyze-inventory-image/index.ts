@@ -39,7 +39,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error analyzing image:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'An unexpected error occurred', details: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
