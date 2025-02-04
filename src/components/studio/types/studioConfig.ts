@@ -4,6 +4,18 @@ export interface TrackMovement {
   phase: number;
 }
 
+export interface PTZTrack {
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  length: number;
+  speed: number;
+  coneAngle: number;
+  movement: TrackMovement;
+}
+
 export interface StudioConfigV2 {
   dimensions: {
     length: number;
@@ -28,15 +40,5 @@ export interface StudioConfigV2 {
     carLift: boolean;
     car: boolean;
   };
-  ptzTracks: {
-    position: {
-      x: number;
-      y: number;
-      z: number;
-    };
-    length: number;
-    speed: number;
-    coneAngle: number;
-    movement: TrackMovement;
-  }[];
+  ptzTracks: PTZTrack[];
 }

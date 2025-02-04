@@ -74,14 +74,21 @@ export const useStudioConfig = () => {
 
       if (data) {
         const workspaceDimensions = data.workspace_dimensions as StudioConfigV2['dimensions'];
-        const cameraConfig = data.camera_config as StudioConfigV2['cameras'];
         const ptzConfig = data.ptz_configurations as { tracks: StudioConfigV2['ptzTracks'] };
+        const cameraConfig = data.camera_config as StudioConfigV2['cameras'] & { props: StudioConfigV2['props'] };
 
         setConfig({
-          dimensions: workspaceDimensions,
-          humanPosition: { x: 0, y: 0, z: 0 },
-          cameras: cameraConfig,
-          props: cameraConfig.props || defaultConfig.props,
+          dimensions: workspaceDimensions || defaultConfig.dimensions,
+          humanPosition: defaultConfig.humanPosition,
+          cameras: {
+            frontWall: cameraConfig?.frontWall || false,
+            backWall: cameraConfig?.backWall || false,
+            leftWall: cameraConfig?.leftWall || false,
+            rightWall: cameraConfig?.rightWall || false,
+            ceiling: cameraConfig?.ceiling || false,
+            showCone: cameraConfig?.showCone ?? true,
+          },
+          props: cameraConfig?.props || defaultConfig.props,
           ptzTracks: ptzConfig?.tracks || defaultConfig.ptzTracks
         });
       }
