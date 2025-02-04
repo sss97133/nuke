@@ -12,7 +12,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Filter } from "lucide-react";
+import { Filter, Globe } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+interface ExternalAuction {
+  make: string;
+  model: string;
+  year: number;
+  price: number;
+  url: string;
+  source: string;
+  endTime?: string;
+}
 
 interface Auction {
   id: string;
@@ -84,6 +95,23 @@ export const AuctionList = () => {
       console.log('🔄 Formatted auction data:', formattedData);
       return formattedData as Auction[];
     }
+  });
+
+  const { data: externalAuctions, isLoading: isLoadingExternal } = useQuery({
+    queryKey: ['external-auctions'],
+    queryFn: async () => {
+      console.log('🔍 Fetching external auctions...');
+      const response = await fetch('https://qkgaybvrernstplzjaam.functions.supabase.co/fetch-market-auctions');
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch external auctions');
+      }
+
+      console.log('✅ Received external auctions:', data.data);
+      return data.data as ExternalAuction[];
+    },
+    refetchInterval: 5 * 60 * 1000 // Refetch every 5 minutes
   });
 
   useEffect(() => {
@@ -190,7 +218,7 @@ export const AuctionList = () => {
     setSelectedAuction(selectedAuction === auctionId ? null : auctionId);
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingExternal) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <div className="animate-pulse text-gray-400">Loading auctions...</div>
@@ -226,31 +254,85 @@ export const AuctionList = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {auctions?.map((auction) => (
-          <div key={auction.id} className="space-y-6">
-            <AuctionCard
-              auction={auction}
-              onBidSubmit={handleBidSubmit}
-              onToggleDetails={handleToggleDetails}
-              selectedAuction={selectedAuction}
-            />
-            
-            {selectedAuction === auction.id && (
-              <div className="space-y-6 animate-fade-in">
-                <div className="grid gap-6">
-                  <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C]">
-                    <BidHistory auctionId={auction.id} />
+      <Tabs defaultValue="local" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="local">Local Auctions</TabsTrigger>
+          <TabsTrigger value="external">
+            <Globe className="w-4 h-4 mr-2" />
+            External Auctions
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="local">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {auctions?.map((auction) => (
+              <div key={auction.id} className="space-y-6">
+                <AuctionCard
+                  auction={auction}
+                  onBidSubmit={handleBidSubmit}
+                  onToggleDetails={handleToggleDetails}
+                  selectedAuction={selectedAuction}
+                />
+                
+                {selectedAuction === auction.id && (
+                  <div className="space-y-6 animate-fade-in">
+                    <div className="grid gap-6">
+                      <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C]">
+                        <BidHistory auctionId={auction.id} />
+                      </div>
+                      <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C]">
+                        <AuctionComments auctionId={auction.id} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C]">
-                    <AuctionComments auctionId={auction.id} />
-                  </div>
-                </div>
+                )}
               </div>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        </TabsContent>
+
+        <TabsContent value="external">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {externalAuctions?.map((auction, index) => (
+              <a 
+                key={index}
+                href={auction.url}
+                target="_blank"
+                rel="noopener noreferrer" 
+                className="block transition-all duration-200 hover:scale-105"
+              >
+                <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C] p-6 space-y-4">
+                  <div>
+                    <h3 className="text-xl font-semibold">
+                      {auction.year} {auction.make} {auction.model}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Source: {auction.source}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-baseline justify-between">
+                    <div>
+                      <span className="text-3xl font-bold">
+                        ${auction.price.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-muted-foreground ml-2">
+                        current bid
+                      </span>
+                    </div>
+                  </div>
+
+                  {auction.endTime && (
+                    <p className="text-sm text-muted-foreground">
+                      Ends: {new Date(auction.endTime).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </a>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
