@@ -6,15 +6,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { AddGarageMemberProps } from '@/types/garage';
 
-interface FormValues {
+type FormData = {
   email: string;
-}
+};
 
 export const AddMemberForm = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
-  const { register, handleSubmit, reset } = useForm<FormValues>();
+  const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = async (data: FormData) => {
     try {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
