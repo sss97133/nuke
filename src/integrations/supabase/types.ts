@@ -650,31 +650,52 @@ export type Database = {
       }
       service_tickets: {
         Row: {
+          completion_date: string | null
           created_at: string
           description: string
+          diagnostic_results: string | null
           id: string
+          labor_hours: number | null
+          parts_used: Json | null
           priority: string
+          service_date: string | null
+          service_type: Database["public"]["Enums"]["service_type"] | null
           status: string
+          technician_notes: string | null
           updated_at: string
           user_id: string | null
           vehicle_id: string | null
         }
         Insert: {
+          completion_date?: string | null
           created_at?: string
           description: string
+          diagnostic_results?: string | null
           id?: string
+          labor_hours?: number | null
+          parts_used?: Json | null
           priority?: string
+          service_date?: string | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
           status?: string
+          technician_notes?: string | null
           updated_at?: string
           user_id?: string | null
           vehicle_id?: string | null
         }
         Update: {
+          completion_date?: string | null
           created_at?: string
           description?: string
+          diagnostic_results?: string | null
           id?: string
+          labor_hours?: number | null
+          parts_used?: Json | null
           priority?: string
+          service_date?: string | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
           status?: string
+          technician_notes?: string | null
           updated_at?: string
           user_id?: string | null
           vehicle_id?: string | null
@@ -1096,6 +1117,13 @@ export type Database = {
         | "professional"
         | "garage_admin"
       location_status: "pending" | "approved" | "rejected"
+      service_type:
+        | "routine_maintenance"
+        | "repair"
+        | "inspection"
+        | "modification"
+        | "emergency"
+        | "recall"
       skill_category:
         | "mechanical"
         | "electrical"
