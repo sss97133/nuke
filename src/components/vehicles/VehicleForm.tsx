@@ -5,6 +5,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Check, ChevronsUpDown } from "lucide-react"
+import { cn } from "@/lib/utils";
+import { useState } from "react";
+
+const carBrands = [
+  "Acura", "Alfa Romeo", "Aston Martin", "Audi", "Bentley", "BMW", "Bugatti",
+  "Buick", "Cadillac", "Chevrolet", "Chrysler", "Citroën", "Dodge", "Ferrari",
+  "Fiat", "Ford", "Genesis", "GMC", "Honda", "Hyundai", "Infiniti", "Jaguar",
+  "Jeep", "Kia", "Lamborghini", "Land Rover", "Lexus", "Lincoln", "Lotus",
+  "Maserati", "Mazda", "McLaren", "Mercedes-Benz", "Mini", "Mitsubishi",
+  "Nissan", "Pagani", "Peugeot", "Porsche", "Ram", "Renault", "Rolls-Royce",
+  "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo"
+];
 
 interface VehicleFormProps {
   onSuccess?: () => void;
@@ -13,6 +38,8 @@ interface VehicleFormProps {
 export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState("");
 
   const onSubmit = async (data: any) => {
     try {
@@ -20,7 +47,7 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
         .from('vehicles')
         .insert([
           {
-            make: data.make,
+            make: selectedBrand || data.make,
             model: data.model,
             year: parseInt(data.year),
             vin: data.vin,
@@ -50,7 +77,44 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
         <Label htmlFor="make">Make</Label>
-        <Input id="make" {...register("make", { required: true })} />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between"
+            >
+              {selectedBrand || "Select brand..."}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-full p-0">
+            <Command>
+              <CommandInput placeholder="Search brand..." />
+              <CommandEmpty>No brand found.</CommandEmpty>
+              <CommandGroup className="max-h-60 overflow-auto">
+                {carBrands.map((brand) => (
+                  <CommandItem
+                    key={brand}
+                    onSelect={(currentValue) => {
+                      setSelectedBrand(currentValue === selectedBrand ? "" : brand);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedBrand === brand ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {brand}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </Command>
+          </PopoverContent>
+        </Popover>
         {errors.make && <span className="text-red-500">This field is required</span>}
       </div>
 
