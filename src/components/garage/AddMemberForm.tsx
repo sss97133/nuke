@@ -2,43 +2,35 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-interface AddMemberFormProps {
+export interface AddMemberFormProps {
   garageId: string;
-  onSuccess?: () => void;
+  onMemberAdded?: () => void;
 }
 
-interface FormData {
-  email: string;
-}
-
-export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
-  const { register, handleSubmit, reset } = useForm<FormData>();
+export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
+  const { register, handleSubmit, reset } = useForm();
   const { toast } = useToast();
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: { email: string }) => {
     try {
-      const { data: userData, error: userError } = await supabase
+      const { data: user, error: userError } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', data.email)
         .single();
 
-      if (userError || !userData) {
+      if (userError || !user) {
         throw new Error('User not found');
       }
 
-      const { error: memberError } = await supabase
+      const { error } = await supabase
         .from('garage_members')
-        .insert({
-          user_id: userData.id,
-          garage_id: garageId
-        });
+        .insert({ garage_id: garageId, user_id: user.id });
 
-      if (memberError) throw memberError;
+      if (error) throw error;
 
       toast({
         title: 'Success',
@@ -46,7 +38,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
       });
 
       reset();
-      if (onSuccess) onSuccess();
+      if (onMemberAdded) onMemberAdded();
     } catch (error) {
       toast({
         title: 'Error',
@@ -58,15 +50,12 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div>
-        <Label htmlFor="email">Member Email</Label>
-        <Input
-          id="email"
-          type="email"
-          {...register('email', { required: true })}
-          placeholder="Enter member email"
-        />
-      </div>
+      <Input
+        {...register('email')}
+        type="email"
+        placeholder="Member's email"
+        required
+      />
       <Button type="submit">Add Member</Button>
     </form>
   );

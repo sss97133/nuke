@@ -1,23 +1,26 @@
-import { useState } from "react";
+import React from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { UserPlus } from "lucide-react";
-import { AddMemberForm } from "./AddMemberForm";
-import type { AddGarageMemberProps } from "@/types/garage";
+import { AddMemberForm } from './AddMemberForm';
+import { UserPlus } from 'lucide-react';
+
+interface AddGarageMemberProps {
+  garageId: string;
+  onMemberAdded?: () => void;
+}
 
 export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleMemberAdded = () => {
-    onMemberAdded();
-    setIsOpen(false);
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <UserPlus className="h-4 w-4 mr-2" />
+        <Button variant="outline" className="w-full">
+          <UserPlus className="w-4 h-4 mr-2" />
           Add Member
         </Button>
       </DialogTrigger>
@@ -25,7 +28,7 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
         <DialogHeader>
           <DialogTitle>Add Garage Member</DialogTitle>
         </DialogHeader>
-        <AddMemberForm garageId={garageId} onMemberAdded={handleMemberAdded} />
+        <AddMemberForm garageId={garageId} onMemberAdded={onMemberAdded} />
       </DialogContent>
     </Dialog>
   );
