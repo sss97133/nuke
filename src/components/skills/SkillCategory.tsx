@@ -2,11 +2,13 @@ import React from 'react';
 import { Star } from 'lucide-react';
 import { SkillCard } from './SkillCard';
 
+type SkillCategory = 'mechanical' | 'electrical' | 'bodywork' | 'diagnostics' | 'restoration' | 'customization';
+
 interface Skill {
   id: string;
   name: string;
   description: string;
-  category: string;
+  category: SkillCategory;
   prerequisites?: string[];
 }
 

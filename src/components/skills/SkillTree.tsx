@@ -7,11 +7,13 @@ import { SkillHeader } from './SkillHeader';
 import { SkillCategory } from './SkillCategory';
 import { AIToolsPanel } from './ai/AIToolsPanel';
 
+type SkillCategory = 'mechanical' | 'electrical' | 'bodywork' | 'diagnostics' | 'restoration' | 'customization';
+
 interface Skill {
   id: string;
   name: string;
   description: string;
-  category: string;
+  category: SkillCategory;
   prerequisites?: string[];
 }
 
