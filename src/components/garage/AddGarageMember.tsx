@@ -11,6 +11,11 @@ type AddGarageMemberProps = {
   garageId: string;
 };
 
+type Profile = {
+  id: string;
+  email?: string;
+};
+
 export const AddGarageMember = ({ garageId }: AddGarageMemberProps) => {
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const { toast } = useToast();
@@ -30,7 +35,7 @@ export const AddGarageMember = ({ garageId }: AddGarageMemberProps) => {
       .from('profiles')
       .select('id')
       .eq('email', newMemberEmail)
-      .maybeSingle();
+      .single();
 
     if (profileError || !profile) {
       toast({
