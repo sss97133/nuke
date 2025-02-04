@@ -1,4 +1,5 @@
-import FirecrawlApp from '@mendable/firecrawl-js'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import FirecrawlApp from 'https://esm.sh/@mendable/firecrawl-js'
 
 interface AuctionData {
   make: string;
@@ -16,7 +17,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -24,12 +25,13 @@ Deno.serve(async (req) => {
   try {
     const apiKey = Deno.env.get('FIRECRAWL_API_KEY')
     if (!apiKey) {
+      console.error('Firecrawl API key not configured')
       throw new Error('Firecrawl API key not configured')
     }
 
     const firecrawl = new FirecrawlApp({ apiKey })
     
-    // Define auction sources with their specific selectors
+    console.log('Starting to fetch auction data from multiple sources...')
     const sources = [
       {
         url: 'https://bringatrailer.com/auctions/live/',
@@ -65,7 +67,6 @@ Deno.serve(async (req) => {
       }
     ]
     
-    console.log('Starting to fetch auction data from multiple sources...')
     const results: AuctionData[] = []
     
     for (const source of sources) {
