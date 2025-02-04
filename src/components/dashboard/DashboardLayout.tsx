@@ -9,6 +9,7 @@ import { DashboardFooter } from "./footer/DashboardFooter";
 import { FormDialogs } from "./dialogs/FormDialogs";
 import { MendableChat } from "../ai/MendableChat";
 import { useNavigate } from "react-router-dom";
+import { StudioConfiguration } from "../studio/StudioConfiguration";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -21,6 +22,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showNewInventoryDialog, setShowNewInventoryDialog] = useState(false);
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showStudioConfig, setShowStudioConfig] = useState(false);
 
   const handleShowHelp = (section: string) => {
     setShowHelp(true);
@@ -76,6 +78,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           description: "Preferences dialog will be implemented soon."
         });
         break;
+      case 'studio_config':
+        setShowStudioConfig(true);
+        break;
       default:
         toast({ 
           title: `${action} selected`,
@@ -89,28 +94,34 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <DashboardHeader handleMenuAction={handleMenuAction} />
       
       <main className="flex-1 p-6">
-        <FormDialogs
-          showNewVehicleDialog={showNewVehicleDialog}
-          setShowNewVehicleDialog={setShowNewVehicleDialog}
-          showNewInventoryDialog={showNewInventoryDialog}
-          setShowNewInventoryDialog={setShowNewInventoryDialog}
-        />
+        {showStudioConfig ? (
+          <StudioConfiguration />
+        ) : (
+          <>
+            <FormDialogs
+              showNewVehicleDialog={showNewVehicleDialog}
+              setShowNewVehicleDialog={setShowNewVehicleDialog}
+              showNewInventoryDialog={showNewInventoryDialog}
+              setShowNewInventoryDialog={setShowNewInventoryDialog}
+            />
 
-        <div className="grid grid-cols-1 gap-4">
-          {showAiAssistant && (
-            <div className="fixed bottom-4 right-4 w-96 z-50">
-              <MendableChat />
+            <div className="grid grid-cols-1 gap-4">
+              {showAiAssistant && (
+                <div className="fixed bottom-4 right-4 w-96 z-50">
+                  <MendableChat />
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <Tabs defaultValue="inventory" className="w-full animate-scale-in">
-          <DashboardTabs showHelp={handleShowHelp} />
-          <CommandBar />
-          {children}
-        </Tabs>
+            <Tabs defaultValue="inventory" className="w-full animate-scale-in">
+              <DashboardTabs showHelp={handleShowHelp} />
+              <CommandBar />
+              {children}
+            </Tabs>
 
-        <DashboardFooter />
+            <DashboardFooter />
+          </>
+        )}
       </main>
     </div>
   );

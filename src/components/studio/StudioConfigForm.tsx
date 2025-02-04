@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface FormData {
   length: number;
@@ -20,12 +20,11 @@ export const StudioConfigForm = () => {
     try {
       const { error } = await supabase
         .from('studio_configurations')
-        .upsert([
-          {
-            user_id: (await supabase.auth.getUser()).data.user?.id,
-            workspace_dimensions: data,
-          },
-        ]);
+        .insert({
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          name: 'Default Configuration',
+          workspace_dimensions: data
+        });
 
       if (error) throw error;
 
