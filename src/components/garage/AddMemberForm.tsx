@@ -5,18 +5,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { AddGarageMemberProps } from '@/types/garage';
 
-type AddMemberFormProps = {
+interface AddMemberFormProps {
   garageId: string;
   onMemberAdded: () => void;
-};
+}
+
+interface FormData {
+  email: string;
+}
 
 export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
-  const { register, handleSubmit, reset } = useForm<{ email: string }>();
+  const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
-  const onSubmit = async (data: { email: string }) => {
+  const onSubmit = async (data: FormData) => {
     try {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
