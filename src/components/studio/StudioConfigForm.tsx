@@ -52,12 +52,12 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         .insert({
           user_id: user.id,
           name: 'Default Configuration',
-          workspace_dimensions: dimensions,
-          ptz_configurations: JSON.stringify({
+          workspace_dimensions: dimensions as Record<string, number>,
+          ptz_configurations: {
             tracks: ptzTracks,
             planes: { walls: [], ceiling: {} },
             roboticArms: []
-          })
+          }
         });
 
       if (error) throw error;
