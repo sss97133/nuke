@@ -54,7 +54,7 @@ export interface PTZConfigurationProps {
   onUpdate: (tracks: PTZTrack[]) => void;
 }
 
-export const isWorkspaceDimensions = (json: Json | null): json is Record<string, number> => {
+export const isWorkspaceDimensions = (json: Json | null): json is WorkspaceDimensions => {
   if (typeof json !== 'object' || !json) return false;
   const dims = json as Record<string, unknown>;
   return (
@@ -64,8 +64,12 @@ export const isWorkspaceDimensions = (json: Json | null): json is Record<string,
   );
 };
 
-export const isPTZConfigurations = (json: Json | null): json is Record<string, any> => {
+export const isPTZConfigurations = (json: Json | null): json is PTZConfigurations => {
   if (typeof json !== 'object' || !json) return false;
   const config = json as Record<string, unknown>;
   return Array.isArray(config.tracks);
+};
+
+export const toJson = <T extends object>(obj: T): Json => {
+  return JSON.parse(JSON.stringify(obj));
 };

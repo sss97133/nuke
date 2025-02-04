@@ -33,7 +33,10 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
 
       const { error } = await supabase
         .from('garage_members')
-        .insert({ user_id: users.id, garage_id: garageId });
+        .insert([{ 
+          user_id: users.id, 
+          garage_id: garageId 
+        }]);
 
       if (error) throw error;
 

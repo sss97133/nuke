@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { StudioDimensions } from './form/StudioDimensions';
 import { PTZConfiguration } from './form/PTZConfiguration';
+import { toJson } from '@/types/studio';
 import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
 
 interface StudioConfigFormProps {
@@ -52,21 +53,12 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         .insert({
           user_id: user.id,
           name: 'Default Configuration',
-          workspace_dimensions: {
-            width: dimensions.width,
-            height: dimensions.height,
-            length: dimensions.length
-          },
-          ptz_configurations: {
-            tracks: ptzTracks.map(track => ({
-              position: track.position,
-              length: track.length,
-              speed: track.speed,
-              coneAngle: track.coneAngle
-            })),
+          workspace_dimensions: toJson(dimensions),
+          ptz_configurations: toJson({
+            tracks: ptzTracks,
             planes: { walls: [], ceiling: {} },
             roboticArms: []
-          }
+          })
         });
 
       if (error) throw error;

@@ -41,17 +41,19 @@ export const StudioConfiguration = () => {
 
       if (error) throw error;
 
-      const workspaceDims = isWorkspaceDimensions(data?.workspace_dimensions) 
-        ? data.workspace_dimensions as WorkspaceDimensions
-        : dimensions;
+      let workspaceDims = dimensions;
+      if (data?.workspace_dimensions && isWorkspaceDimensions(data.workspace_dimensions)) {
+        workspaceDims = data.workspace_dimensions;
+      }
 
-      const ptzConfig = isPTZConfigurations(data?.ptz_configurations)
-        ? data.ptz_configurations
-        : {
-            tracks: [],
-            planes: { walls: [], ceiling: {} },
-            roboticArms: []
-          };
+      let ptzConfig = {
+        tracks: [],
+        planes: { walls: [], ceiling: {} },
+        roboticArms: []
+      };
+      if (data?.ptz_configurations && isPTZConfigurations(data.ptz_configurations)) {
+        ptzConfig = data.ptz_configurations;
+      }
 
       return {
         id: data?.id || '',
