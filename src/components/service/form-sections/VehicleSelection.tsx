@@ -43,7 +43,11 @@ const departments = [
   "detailing",
   "parts",
   "specialty",
-  "quick_service"
+  "quick_service",
+  "metal_work",
+  "paint_and_body",
+  "upholstery",
+  "wiring"
 ];
 
 interface VehicleSelectionProps {
