@@ -36,28 +36,28 @@ serve(async (req) => {
       {
         url: 'https://bringatrailer.com/auctions/live/',
         patterns: [
-          'div.auction-item',
-          'h3:contains("year")',
-          'span.price',
-          'img.auction-image'
+          '.auction-list-item',
+          '.auction-title',
+          '.current-bid',
+          '.auction-image'
         ]
       },
       {
         url: 'https://carsandbids.com',
         patterns: [
-          'div.auction-card',
-          'h2:contains("year")',
-          'div.current-bid',
-          'img.main-image'
+          '.auction-card',
+          '.auction-title',
+          '.current-bid',
+          '.auction-image'
         ]
       },
       {
         url: 'https://www.hagerty.com/marketplace',
         patterns: [
-          'div.vehicle-listing',
-          'h3:contains("year")',
-          'div.price',
-          'img.vehicle-image'
+          '.vehicle-card',
+          '.vehicle-title',
+          '.price',
+          '.vehicle-image'
         ]
       }
     ]
@@ -70,7 +70,6 @@ serve(async (req) => {
         const response = await firecrawl.crawlUrl(source.url, {
           limit: 10,
           scrapeOptions: {
-            formats: ['markdown', 'html'],
             patterns: source.patterns
           }
         })
@@ -90,7 +89,7 @@ serve(async (req) => {
                 model: makeModelMatch[2],
                 year: parseInt(yearMatch[0]),
                 price: parseFloat(priceMatch[0].replace(/[$,]/g, '')),
-                url: item.url,
+                url: item.url || source.url,
                 source: sourceName,
                 imageUrl: item.images?.[0]
               }
