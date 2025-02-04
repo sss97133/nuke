@@ -136,6 +136,42 @@ export type Database = {
           },
         ]
       }
+      automotive_locations: {
+        Row: {
+          contact_info: Json | null
+          created_at: string
+          id: string
+          location: Json
+          name: string
+          rating: number | null
+          type: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          contact_info?: Json | null
+          created_at?: string
+          id?: string
+          location: Json
+          name: string
+          rating?: number | null
+          type: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          contact_info?: Json | null
+          created_at?: string
+          id?: string
+          location?: Json
+          name?: string
+          rating?: number | null
+          type?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       certifications: {
         Row: {
           created_at: string
@@ -1291,9 +1327,13 @@ export type Database = {
           created_at: string
           historical_data: Json | null
           id: string
+          location: Json | null
           make: string
           model: string
           notes: string | null
+          source: string | null
+          source_url: string | null
+          status: string | null
           updated_at: string
           user_id: string | null
           vin: string | null
@@ -1307,9 +1347,13 @@ export type Database = {
           created_at?: string
           historical_data?: Json | null
           id?: string
+          location?: Json | null
           make: string
           model: string
           notes?: string | null
+          source?: string | null
+          source_url?: string | null
+          status?: string | null
           updated_at?: string
           user_id?: string | null
           vin?: string | null
@@ -1323,9 +1367,13 @@ export type Database = {
           created_at?: string
           historical_data?: Json | null
           id?: string
+          location?: Json | null
           make?: string
           model?: string
           notes?: string | null
+          source?: string | null
+          source_url?: string | null
+          status?: string | null
           updated_at?: string
           user_id?: string | null
           vin?: string | null
