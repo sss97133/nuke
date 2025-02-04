@@ -189,7 +189,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       edges,
       new THREE.LineBasicMaterial({ color: 0x000000 })
     );
-    scene.add(line);
+    sceneRef.current.add(line);
     objectsRef.current.push(line);
 
     // Add text labels for each plane
@@ -218,7 +218,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       if (rotation) {
         label.rotation.copy(rotation);
       }
-      scene.add(label);
+      sceneRef.current.add(label);
       objectsRef.current.push(label);
     };
 
