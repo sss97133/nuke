@@ -819,31 +819,40 @@ export type Database = {
           audio_config: Json | null
           camera_config: Json | null
           created_at: string
+          fixed_cameras: Json | null
           id: string
           lighting_config: Json | null
           name: string
+          ptz_configurations: Json | null
           updated_at: string
           user_id: string | null
+          workspace_dimensions: Json | null
         }
         Insert: {
           audio_config?: Json | null
           camera_config?: Json | null
           created_at?: string
+          fixed_cameras?: Json | null
           id?: string
           lighting_config?: Json | null
           name: string
+          ptz_configurations?: Json | null
           updated_at?: string
           user_id?: string | null
+          workspace_dimensions?: Json | null
         }
         Update: {
           audio_config?: Json | null
           camera_config?: Json | null
           created_at?: string
+          fixed_cameras?: Json | null
           id?: string
           lighting_config?: Json | null
           name?: string
+          ptz_configurations?: Json | null
           updated_at?: string
           user_id?: string | null
+          workspace_dimensions?: Json | null
         }
         Relationships: []
       }
