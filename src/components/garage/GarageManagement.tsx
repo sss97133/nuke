@@ -4,13 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Users, Building, MapPin, Star, Trash2, Edit, UserPlus } from "lucide-react";
+import { Building, MapPin, Star, Trash2, UserPlus, Users } from "lucide-react";
 import { ImportGarages } from "./ImportGarages";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card } from "@/components/ui/card";
 
 export const GarageManagement = () => {
   const [newGarageName, setNewGarageName] = useState("");
-  const [selectedGarage, setSelectedGarage] = useState<any>(null);
   const [showMemberDialog, setShowMemberDialog] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -48,11 +48,7 @@ export const GarageManagement = () => {
         .select(`
           *,
           garage_members (
-            user_id,
-            profiles (
-              full_name,
-              avatar_url
-            )
+            user_id
           )
         `);
       
@@ -125,7 +121,6 @@ export const GarageManagement = () => {
       return;
     }
 
-    // First get the user ID from the profiles table
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
       .select('id')
@@ -167,93 +162,72 @@ export const GarageManagement = () => {
   };
 
   return (
-    <div className="space-y-4 font-mono">
-      <div className="border-b border-border pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">[TAMS]</span>
-          <span className="text-xs text-foreground">GARAGE_MGMT_SYS v1.0</span>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+        <div className="flex items-center gap-4">
+          <Input
+            placeholder="New Garage Name"
+            value={newGarageName}
+            onChange={(e) => setNewGarageName(e.target.value)}
+            className="w-64"
+          />
+          <Button
+            onClick={handleCreateGarage}
+            variant="default"
+            size="sm"
+          >
+            Add Garage
+          </Button>
         </div>
-      </div>
-
-      <div className="flex gap-2 items-center bg-muted p-2 border border-border">
-        <span className="text-xs text-muted-foreground">CMD:</span>
-        <Input
-          placeholder="NEW_GARAGE_NAME"
-          value={newGarageName}
-          onChange={(e) => setNewGarageName(e.target.value)}
-          className="h-7 text-xs font-mono bg-background"
-        />
-        <Button
-          onClick={handleCreateGarage}
-          size="sm"
-          className="h-7 text-xs"
-        >
-          <Plus className="w-3 h-3 mr-1" />
-          ADD
-        </Button>
         <ImportGarages />
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {garages?.map((garage) => (
-          <div
+          <Card
             key={garage.id}
-            className="p-2 border border-border bg-background text-xs animate-fade-in"
+            className="p-4 space-y-4"
           >
-            <div className="flex items-center justify-between border-b border-dotted border-border pb-1">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Building className="w-3 h-3 text-foreground" />
-                <span className="text-foreground uppercase">{garage.name}</span>
+                <Building className="w-5 h-5 text-muted-foreground" />
+                <h3 className="font-semibold">{garage.name}</h3>
               </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0"
-                  onClick={() => setSelectedGarage(garage)}
-                >
-                  <Edit className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 text-destructive"
-                  onClick={() => handleDeleteGarage(garage.id)}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteGarage(garage.id)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
             </div>
-            
+
             {garage.address && (
-              <div className="flex items-center gap-1 text-muted-foreground mt-1">
-                <MapPin className="w-3 h-3" />
-                <span className="truncate">{garage.address}</span>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="w-4 h-4" />
+                <span>{garage.address}</span>
               </div>
             )}
-            
+
             {garage.rating && (
-              <div className="flex items-center gap-1 text-muted-foreground mt-1">
-                <Star className="w-3 h-3" />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Star className="w-4 h-4" />
                 <span>{garage.rating} / 5</span>
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-1">
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Users className="w-3 h-3" />
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="w-4 h-4" />
                 <span>Members: {garage.garage_members?.length || 0}</span>
               </div>
-              
-              <Dialog open={showMemberDialog} onOpenChange={setShowMemberDialog}>
+
+              <Dialog>
                 <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 text-[10px]"
-                  >
-                    <UserPlus className="w-3 h-3 mr-1" />
-                    ADD MEMBER
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    Add Member
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -276,14 +250,13 @@ export const GarageManagement = () => {
                 </DialogContent>
               </Dialog>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
-      <div className="text-[10px] text-muted-foreground border-t border-border pt-2 mt-4">
-        <span>SYS_STATUS: {userLocation ? 'READY' : 'WAITING_FOR_LOCATION'}</span>
-        <span className="ml-4">LOCATION: {userLocation ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : 'UNKNOWN'}</span>
-        <span className="ml-4">LAST_UPDATE: {new Date().toISOString()}</span>
+      <div className="text-xs text-muted-foreground border-t pt-4">
+        <span>Location: {userLocation ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : 'Detecting...'}</span>
+        <span className="ml-4">Last Update: {new Date().toLocaleTimeString()}</span>
       </div>
     </div>
   );
