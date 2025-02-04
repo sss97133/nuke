@@ -20,7 +20,6 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
   const handleAddMember = async () => {
     setIsLoading(true);
     try {
-      // First find the user by email
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id')
@@ -31,7 +30,6 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
         throw new Error('User not found');
       }
 
-      // Add the user as a garage member
       const { error: memberError } = await supabase
         .from('garage_members')
         .insert({
