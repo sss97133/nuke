@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+type SkillCategory = 'mechanical' | 'electrical' | 'bodywork' | 'diagnostics' | 'restoration' | 'customization';
+
 interface SkillStatus {
   level: number;
   exp: number;
@@ -22,6 +24,7 @@ interface SkillCardProps {
     id: string;
     name: string;
     description: string;
+    category: SkillCategory;
     prerequisites?: string[];
   };
   status: SkillStatus;

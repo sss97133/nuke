@@ -7,6 +7,20 @@ import { SkillHeader } from './SkillHeader';
 import { SkillCategory } from './SkillCategory';
 import { AIToolsPanel } from './ai/AIToolsPanel';
 
+interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  prerequisites?: string[];
+}
+
+interface UserSkill {
+  skill_id: string;
+  level: number;
+  experience_points: number;
+}
+
 export const SkillTree = () => {
   const { toast } = useToast();
   
@@ -29,7 +43,7 @@ export const SkillTree = () => {
         throw error;
       }
       console.log('Skills fetched:', data);
-      return data;
+      return data as Skill[];
     },
   });
 
@@ -51,7 +65,7 @@ export const SkillTree = () => {
         throw error;
       }
       console.log('User skills fetched:', data);
-      return data;
+      return data as UserSkill[];
     },
   });
 
@@ -68,7 +82,7 @@ export const SkillTree = () => {
   }
 
   // Group skills by category
-  const skillsByCategory = skills?.reduce((acc: any, skill) => {
+  const skillsByCategory = skills?.reduce((acc: Record<string, Skill[]>, skill) => {
     if (!acc[skill.category]) {
       acc[skill.category] = [];
     }
@@ -115,7 +129,7 @@ export const SkillTree = () => {
       <AIToolsPanel />
       
       <div className="space-y-12 mt-8">
-        {skillsByCategory && Object.entries(skillsByCategory).map(([category, categorySkills]: [string, any]) => (
+        {skillsByCategory && Object.entries(skillsByCategory).map(([category, categorySkills]) => (
           <SkillCategory
             key={category}
             category={category}
