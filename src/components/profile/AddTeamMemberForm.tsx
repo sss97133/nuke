@@ -17,15 +17,17 @@ interface AddTeamMemberFormProps {
   onSuccess?: () => void;
 }
 
+type MemberType = 'employee' | 'contractor' | 'intern' | 'partner' | 'collaborator';
+
 interface FormData {
   email: string;
-  memberType: string;
+  memberType: MemberType;
   department?: string;
   position?: string;
 }
 
 export const AddTeamMemberForm = ({ onSuccess }: AddTeamMemberFormProps) => {
-  const { register, handleSubmit, reset } = useForm<FormData>();
+  const { register, handleSubmit, reset, setValue } = useForm<FormData>();
   const { toast } = useToast();
 
   const onSubmit = async (data: FormData) => {
@@ -42,12 +44,12 @@ export const AddTeamMemberForm = ({ onSuccess }: AddTeamMemberFormProps) => {
 
       const { error } = await supabase
         .from('team_members')
-        .insert([{
+        .insert({
           profile_id: profile.id,
           member_type: data.memberType,
           department: data.department,
           position: data.position,
-        }]);
+        });
 
       if (error) throw error;
 
@@ -81,7 +83,7 @@ export const AddTeamMemberForm = ({ onSuccess }: AddTeamMemberFormProps) => {
 
       <div>
         <Label htmlFor="memberType">Member Type</Label>
-        <Select {...register('memberType', { required: true })}>
+        <Select onValueChange={(value: MemberType) => setValue('memberType', value)}>
           <SelectTrigger>
             <SelectValue placeholder="Select member type" />
           </SelectTrigger>

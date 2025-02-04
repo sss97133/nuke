@@ -10,16 +10,17 @@ import { AchievementsList } from './AchievementsList';
 import { TeamSection } from './TeamSection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserRound, Users, Trophy } from 'lucide-react';
+import { SocialLinks, StreamingLinks } from '@/types/profile';
 
 export const UserProfile = () => {
   const { toast } = useToast();
-  const [socialLinks, setSocialLinks] = useState({
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>({
     twitter: '',
     instagram: '',
     linkedin: '',
     github: ''
   });
-  const [streamingLinks, setStreamingLinks] = useState({
+  const [streamingLinks, setStreamingLinks] = useState<StreamingLinks>({
     twitch: '',
     youtube: '',
     tiktok: ''
@@ -47,10 +48,10 @@ export const UserProfile = () => {
       }
 
       if (data?.social_links) {
-        setSocialLinks(data.social_links);
+        setSocialLinks(data.social_links as SocialLinks);
       }
       if (data?.streaming_links) {
-        setStreamingLinks(data.streaming_links);
+        setStreamingLinks(data.streaming_links as StreamingLinks);
       }
       
       return data;
