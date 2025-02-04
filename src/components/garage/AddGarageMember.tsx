@@ -18,6 +18,8 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
   const { toast } = useToast();
 
   const handleAddMember = async () => {
+    if (!email) return;
+    
     setIsLoading(true);
     try {
       const { data: profiles, error: profileError } = await supabase
@@ -47,10 +49,10 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
       onMemberAdded();
       setIsOpen(false);
       setEmail("");
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An error occurred',
         variant: "destructive"
       });
     } finally {
