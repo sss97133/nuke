@@ -39,7 +39,7 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
           message,
           created_at,
           user_id,
-          profiles:user_id (
+          profiles:profiles (
             username,
             avatar_url
           )
@@ -53,7 +53,7 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
       }
 
       if (data) {
-        setMessages(data as unknown as ChatMessage[]);
+        setMessages(data as ChatMessage[]);
       }
     };
 
