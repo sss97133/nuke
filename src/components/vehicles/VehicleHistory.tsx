@@ -1,7 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Loader2, Calendar, DollarSign, Wrench, Car, Info } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { VehicleHistoricalData } from "@/types/inventory";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { NoHistoryMessage } from "./history/NoHistoryMessage";
+import { SalesHistory } from "./history/SalesHistory";
+import { ModificationsList } from "./history/ModificationsList";
+import { HistorySection } from "./history/HistorySection";
 
 interface VehicleHistoryProps {
   historicalData: VehicleHistoricalData | null;
@@ -9,7 +12,11 @@ interface VehicleHistoryProps {
   isSearching: boolean;
 }
 
-export const VehicleHistory = ({ historicalData, onSearch, isSearching }: VehicleHistoryProps) => {
+export const VehicleHistory = ({ 
+  historicalData, 
+  onSearch, 
+  isSearching 
+}: VehicleHistoryProps) => {
   if (!historicalData) {
     return (
       <div className="space-y-4">
@@ -24,12 +31,7 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
             {isSearching ? 'Searching...' : 'Search History'}
           </Button>
         </div>
-        <div className="bg-gray-50 p-4 rounded-md border">
-          <Info className="h-5 w-5 text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground font-mono">
-            No historical data available. Click "Search History" to discover information about this vehicle.
-          </p>
-        </div>
+        <NoHistoryMessage />
       </div>
     );
   }
@@ -38,6 +40,10 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
                   historicalData.modifications?.length || 
                   historicalData.notableHistory || 
                   historicalData.conditionNotes;
+
+  if (!hasData) {
+    return <NoHistoryMessage />;
+  }
 
   return (
     <div className="space-y-4">
@@ -53,74 +59,29 @@ export const VehicleHistory = ({ historicalData, onSearch, isSearching }: Vehicl
         </Button>
       </div>
 
-      {!hasData ? (
-        <div className="bg-gray-50 p-4 rounded-md border">
-          <Info className="h-5 w-5 text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground font-mono">
-            No significant historical data found for this vehicle.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {historicalData.previousSales && historicalData.previousSales.length > 0 && (
-            <div className="bg-white p-4 rounded-lg border shadow-sm">
-              <h4 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-[#283845]" />
-                Sales History
-              </h4>
-              <div className="space-y-3">
-                {historicalData.previousSales.map((sale, index) => (
-                  <div key={index} className="bg-gray-50 p-3 rounded-md text-sm font-mono">
-                    <div className="flex items-center gap-2 text-[#283845]">
-                      {sale.date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {sale.date}</span>}
-                      {sale.price && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> {sale.price}</span>}
-                    </div>
-                    {sale.source && <div className="text-muted-foreground text-xs mt-1">Source: {sale.source}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      <div className="grid gap-4">
+        {historicalData.previousSales?.length > 0 && (
+          <SalesHistory sales={historicalData.previousSales} />
+        )}
 
-          {historicalData.modifications && historicalData.modifications.length > 0 && (
-            <div className="bg-white p-4 rounded-lg border shadow-sm">
-              <h4 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
-                <Wrench className="h-4 w-4 text-[#283845]" />
-                Modifications
-              </h4>
-              <ul className="space-y-2 list-disc list-inside">
-                {historicalData.modifications.map((mod, index) => (
-                  <li key={index} className="font-mono text-sm text-[#283845]">{mod}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+        {historicalData.modifications?.length > 0 && (
+          <ModificationsList modifications={historicalData.modifications} />
+        )}
 
-          {historicalData.notableHistory && (
-            <div className="bg-white p-4 rounded-lg border shadow-sm">
-              <h4 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
-                <Car className="h-4 w-4 text-[#283845]" />
-                Notable History
-              </h4>
-              <p className="font-mono text-sm text-[#283845] whitespace-pre-wrap">
-                {historicalData.notableHistory}
-              </p>
-            </div>
-          )}
+        {historicalData.notableHistory && (
+          <HistorySection 
+            title="Notable History"
+            content={historicalData.notableHistory}
+          />
+        )}
 
-          {historicalData.conditionNotes && (
-            <div className="bg-white p-4 rounded-lg border shadow-sm">
-              <h4 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
-                <Wrench className="h-4 w-4 text-[#283845]" />
-                Condition Assessment
-              </h4>
-              <p className="font-mono text-sm text-[#283845] whitespace-pre-wrap">
-                {historicalData.conditionNotes}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+        {historicalData.conditionNotes && (
+          <HistorySection 
+            title="Condition Assessment"
+            content={historicalData.conditionNotes}
+          />
+        )}
+      </div>
     </div>
   );
 };
