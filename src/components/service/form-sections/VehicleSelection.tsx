@@ -27,38 +27,46 @@ export const VehicleSelection = ({ onVehicleSelect, onShowNewVehicle }: VehicleS
   const [open, setOpen] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchVehicles = async () => {
-      const { data, error } = await supabase
-        .from("vehicles")
-        .select("*");
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from("vehicles")
+          .select("*");
 
-      if (error) {
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          const mappedVehicles: Vehicle[] = data.map(vehicle => ({
+            id: vehicle.id,
+            vin: vehicle.vin || undefined,
+            make: vehicle.make,
+            model: vehicle.model,
+            year: vehicle.year,
+            notes: vehicle.notes || undefined,
+            images: undefined,
+            createdBy: vehicle.user_id || '',
+            updatedBy: vehicle.user_id || '',
+            createdAt: vehicle.created_at,
+            updatedAt: vehicle.updated_at
+          }));
+          setVehicles(mappedVehicles);
+        }
+      } catch (error: any) {
         toast({
           title: "Error fetching vehicles",
           description: error.message,
           variant: "destructive",
         });
-        return;
+      } finally {
+        setIsLoading(false);
       }
-
-      const mappedVehicles: Vehicle[] = (data || []).map(vehicle => ({
-        id: vehicle.id,
-        vin: vehicle.vin || undefined,
-        make: vehicle.make,
-        model: vehicle.model,
-        year: vehicle.year,
-        notes: vehicle.notes || undefined,
-        images: undefined,
-        createdBy: vehicle.user_id || '',
-        updatedBy: vehicle.user_id || '',
-        createdAt: vehicle.created_at,
-        updatedAt: vehicle.updated_at
-      }));
-
-      setVehicles(mappedVehicles);
     };
 
     fetchVehicles();
@@ -80,10 +88,15 @@ export const VehicleSelection = ({ onVehicleSelect, onShowNewVehicle }: VehicleS
               role="combobox"
               aria-expanded={open}
               className="w-[300px] justify-between"
+              disabled={isLoading}
             >
-              {selectedVehicle ? 
-                `${selectedVehicle.year} ${selectedVehicle.make} ${selectedVehicle.model}` : 
-                "Select vehicle..."}
+              {isLoading ? (
+                "Loading vehicles..."
+              ) : selectedVehicle ? (
+                `${selectedVehicle.year} ${selectedVehicle.make} ${selectedVehicle.model}`
+              ) : (
+                "Select vehicle..."
+              )}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
