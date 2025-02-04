@@ -1,5 +1,5 @@
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Terminal, Car, Warehouse, Wrench, Building2, UserRound, Video, Gavel } from "lucide-react";
+import { Terminal, Car, Warehouse, Wrench, Map, UserRound, Video, Gavel } from "lucide-react";
 import { InventoryForm } from "@/components/inventory/InventoryForm";
 import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
@@ -52,8 +52,8 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
               value="garages" 
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
-              <Building2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Garages</span>
+              <Map className="w-4 h-4" />
+              <span className="hidden sm:inline">Map</span>
             </TabsTrigger>
             <TabsTrigger 
               value="professional" 
