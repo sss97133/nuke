@@ -19,7 +19,7 @@ interface ChatMessage {
   profiles?: {
     username: string | null;
     avatar_url: string | null;
-  } | null;
+  };
 }
 
 export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) => {
@@ -39,7 +39,7 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
           message,
           created_at,
           user_id,
-          profiles:profiles (
+          profiles:user_id (
             username,
             avatar_url
           )

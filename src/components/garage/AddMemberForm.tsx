@@ -15,9 +15,9 @@ interface FormData {
   email: string;
 }
 
-interface Profile {
+type Profile = {
   id: string;
-}
+};
 
 export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
