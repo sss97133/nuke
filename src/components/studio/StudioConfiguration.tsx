@@ -3,22 +3,14 @@ import { StudioWorkspace } from './StudioWorkspace';
 import { StudioConfigForm } from './StudioConfigForm';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Camera, Video, Settings, Layout } from 'lucide-react';
+import { Camera, Video, Settings, Layout, Mic2, Radio, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-interface FormData {
-  length: number;
-  width: number;
-  height: number;
-  ptzTracks: {
-    x: number;
-    y: number;
-    z: number;
-    length: number;
-    speed: number;
-    coneAngle: number;
-  }[];
-}
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export const StudioConfiguration = () => {
   const [dimensions, setDimensions] = useState({
@@ -27,64 +19,65 @@ export const StudioConfiguration = () => {
     height: 16,
   });
   const { toast } = useToast();
-
-  const [ptzTracks, setPtzTracks] = useState([
-    {
-      position: { x: 0, y: 8, z: 0 },
-      length: 10,
-      speed: 1,
-      coneAngle: 45
-    }
-  ]);
-
+  const [isRecording, setIsRecording] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<number | null>(null);
+  const [audioLevel, setAudioLevel] = useState([50]);
 
-  const handleConfigUpdate = (data: FormData) => {
-    setDimensions({
-      length: Number(data.length) || 30,
-      width: Number(data.width) || 20,
-      height: Number(data.height) || 16,
-    });
+  // Fetch studio configuration
+  const { data: studioConfig } = useQuery({
+    queryKey: ['studioConfig'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('studio_configurations')
+        .select('*')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
 
-    if (data.ptzTracks?.[0]) {
-      setPtzTracks([
-        {
-          position: {
-            x: Number(data.ptzTracks[0].x) || 0,
-            y: Number(data.ptzTracks[0].y) || 8,
-            z: Number(data.ptzTracks[0].z) || 0,
-          },
-          length: Number(data.ptzTracks[0].length) || 10,
-          speed: Number(data.ptzTracks[0].speed) || 1,
-          coneAngle: Number(data.ptzTracks[0].coneAngle) || 45,
-        },
-      ]);
+      if (error) throw error;
+      return data;
     }
+  });
+
+  const handleRecordingToggle = () => {
+    setIsRecording(!isRecording);
+    toast({
+      title: isRecording ? "Recording Stopped" : "Recording Started",
+      description: isRecording ? "Your session has been saved" : "Recording to local storage",
+    });
   };
 
-  const handleCameraSelect = (index: number) => {
-    setSelectedCamera(index);
+  const handleStreamingToggle = () => {
+    setIsStreaming(!isStreaming);
     toast({
-      title: "Camera Selected",
-      description: `Switched to camera ${index + 1}`,
+      title: isStreaming ? "Stream Ended" : "Stream Started",
+      description: isStreaming ? "Your stream has ended" : "Going live on configured platforms",
     });
   };
 
   return (
     <div className="space-y-6">
       <Tabs defaultValue="preview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4">
+        <TabsList className="grid w-full grid-cols-6 mb-4">
           <TabsTrigger value="preview" className="flex items-center gap-2">
             <Video className="w-4 h-4" />
             Live Preview
           </TabsTrigger>
           <TabsTrigger value="cameras" className="flex items-center gap-2">
             <Camera className="w-4 h-4" />
-            Camera Controls
+            Cameras
           </TabsTrigger>
-          <TabsTrigger value="workspace" className="flex items-center gap-2">
-            <Layout className="w-4 h-4" />
-            3D Workspace
+          <TabsTrigger value="audio" className="flex items-center gap-2">
+            <Mic2 className="w-4 h-4" />
+            Audio
+          </TabsTrigger>
+          <TabsTrigger value="streaming" className="flex items-center gap-2">
+            <Radio className="w-4 h-4" />
+            Streaming
+          </TabsTrigger>
+          <TabsTrigger value="distribution" className="flex items-center gap-2">
+            <Share2 className="w-4 h-4" />
+            Distribution
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
@@ -92,23 +85,46 @@ export const StudioConfiguration = () => {
           </TabsTrigger>
         </TabsList>
 
+        <div className="flex gap-4 mb-6">
+          <Button 
+            variant={isRecording ? "destructive" : "default"}
+            onClick={handleRecordingToggle}
+            className="w-32"
+          >
+            {isRecording ? "Stop Recording" : "Start Recording"}
+          </Button>
+          <Button 
+            variant={isStreaming ? "destructive" : "default"}
+            onClick={handleStreamingToggle}
+            className="w-32"
+          >
+            {isStreaming ? "End Stream" : "Go Live"}
+          </Button>
+        </div>
+
         <TabsContent value="preview" className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            {ptzTracks.map((_, index) => (
+            {[1, 2, 3, 4].map((cameraId) => (
               <Card 
-                key={index}
+                key={cameraId}
                 className={`p-4 cursor-pointer transition-all ${
-                  selectedCamera === index ? 'ring-2 ring-primary' : ''
+                  selectedCamera === cameraId ? 'ring-2 ring-primary' : ''
                 }`}
-                onClick={() => handleCameraSelect(index)}
+                onClick={() => {
+                  setSelectedCamera(cameraId);
+                  toast({
+                    title: "Camera Selected",
+                    description: `Switched to camera ${cameraId}`,
+                  });
+                }}
               >
                 <div className="aspect-video bg-muted flex items-center justify-center">
-                  <p className="text-muted-foreground">Camera {index + 1} Feed</p>
+                  <p className="text-muted-foreground">Camera {cameraId} Feed</p>
                 </div>
                 <div className="mt-2 flex justify-between items-center">
-                  <span className="text-sm font-medium">PTZ Camera {index + 1}</span>
+                  <span className="text-sm font-medium">PTZ Camera {cameraId}</span>
                   <span className="text-xs text-muted-foreground">
-                    {selectedCamera === index ? 'Selected' : 'Click to select'}
+                    {selectedCamera === cameraId ? 'Selected' : 'Click to select'}
                   </span>
                 </div>
               </Card>
@@ -116,86 +132,111 @@ export const StudioConfiguration = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="cameras" className="space-y-4">
+        <TabsContent value="audio" className="space-y-4">
           <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Camera Controls</h3>
-            {selectedCamera !== null ? (
+            <h3 className="text-lg font-semibold mb-4">Audio Controls</h3>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label>Master Volume</Label>
+                <Slider
+                  value={audioLevel}
+                  onValueChange={setAudioLevel}
+                  max={100}
+                  step={1}
+                />
+              </div>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Pan/Tilt Controls</h4>
-                    <div className="aspect-square bg-muted rounded-full"></div>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Zoom Controls</h4>
-                    <div className="h-full bg-muted rounded-lg"></div>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <Label>Noise Reduction</Label>
+                  <Switch />
                 </div>
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Presets</h4>
-                  <div className="flex gap-2">
-                    {[1, 2, 3].map((preset) => (
-                      <button
-                        key={preset}
-                        className="px-4 py-2 bg-secondary hover:bg-secondary/80 rounded"
-                      >
-                        Preset {preset}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex items-center justify-between">
+                  <Label>Echo Cancellation</Label>
+                  <Switch />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Auto Gain</Label>
+                  <Switch />
                 </div>
               </div>
-            ) : (
-              <p className="text-muted-foreground">Select a camera to control</p>
-            )}
+            </div>
           </Card>
         </TabsContent>
 
-        <TabsContent value="workspace" className="space-y-4">
+        <TabsContent value="streaming" className="space-y-4">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Streaming Settings</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>YouTube</Label>
+                <Switch />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Twitch</Label>
+                <Switch />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Facebook Live</Label>
+                <Switch />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Custom RTMP</Label>
+                <Switch />
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="distribution" className="space-y-4">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Content Distribution</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>Auto-publish to YouTube</Label>
+                <Switch />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Auto-publish to Podcast Platforms</Label>
+                <Switch />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Social Media Scheduling</Label>
+                <Switch />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Generate Clips</Label>
+                <Switch />
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="p-6">
               <h2 className="text-lg font-semibold mb-4">Studio Configuration</h2>
               <StudioConfigForm 
-                onUpdate={handleConfigUpdate} 
+                onUpdate={(data) => {
+                  setDimensions({
+                    length: Number(data.length),
+                    width: Number(data.width),
+                    height: Number(data.height),
+                  });
+                }}
                 initialData={{ 
                   dimensions, 
-                  ptzTracks 
-                }} 
+                  ptzTracks: studioConfig?.ptz_configurations?.tracks || [] 
+                }}
               />
             </Card>
             <Card className="p-6">
               <h2 className="text-lg font-semibold mb-4">Workspace Preview</h2>
-              <StudioWorkspace dimensions={dimensions} ptzTracks={ptzTracks} />
+              <StudioWorkspace 
+                dimensions={dimensions} 
+                ptzTracks={studioConfig?.ptz_configurations?.tracks || []}
+              />
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-4">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Camera Settings</h3>
-            {selectedCamera !== null ? (
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Video Settings</h4>
-                  <div className="space-y-2">
-                    <div>Resolution: 1920x1080</div>
-                    <div>Framerate: 60fps</div>
-                    <div>Bitrate: 5000kbps</div>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Network Settings</h4>
-                  <div className="space-y-2">
-                    <div>IP: 192.168.1.100</div>
-                    <div>Protocol: RTSP</div>
-                    <div>Port: 554</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground">Select a camera to view settings</p>
-            )}
-          </Card>
         </TabsContent>
       </Tabs>
     </div>
