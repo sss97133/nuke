@@ -73,6 +73,10 @@ export const StudioWorkspace = ({
   const animationFrameRef = useRef<number>();
   const timeRef = useRef<number>(0);
 
+  // Add refs for human movement
+  const targetPositionRef = useRef(new THREE.Vector3(0, 0, 0));
+  const movementTimeoutRef = useRef<number>();
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -130,9 +134,9 @@ export const StudioWorkspace = ({
     scene.add(line);
     objectsRef.current.push(line);
 
-    // Create human figure
+    // Create human figure - ensure it starts at floor level
     humanRef.current = createHumanFigure({ 
-      position: humanPosition, 
+      position: { ...humanPosition, y: 0 }, // Force y to 0
       scene,
       dimensions 
     });
@@ -157,28 +161,58 @@ export const StudioWorkspace = ({
     propsRef.current = createProps({ props, dimensions, scene });
     console.log('Props created:', propsRef.current.length);
 
+    // Function to generate new random target position within room bounds
+    const generateNewTarget = () => {
+      const halfWidth = dimensions.width / 2;
+      const halfLength = dimensions.length / 2;
+      
+      targetPositionRef.current.set(
+        Math.random() * dimensions.width - halfWidth,
+        0, // Always on floor
+        Math.random() * dimensions.length - halfLength
+      );
+
+      // Schedule next target update
+      movementTimeoutRef.current = window.setTimeout(generateNewTarget, Math.random() * 5000 + 3000);
+    };
+
+    // Initial target position
+    generateNewTarget();
+
     // Animation loop
     const animate = () => {
       timeRef.current += 0.005;
       
       if (humanRef.current) {
-        // Verify human stays within bounds
-        const humanPos = humanRef.current.position;
+        // Move human figure towards target position
+        const currentPos = humanRef.current.position;
+        const targetPos = targetPositionRef.current;
+        
+        // Calculate movement step (lerp)
+        currentPos.x += (targetPos.x - currentPos.x) * 0.02;
+        currentPos.z += (targetPos.z - currentPos.z) * 0.02;
+        currentPos.y = 0; // Always on floor
+
+        // Constrain within room bounds
+        currentPos.x = Math.max(-dimensions.width/2 + 1, Math.min(dimensions.width/2 - 1, currentPos.x));
+        currentPos.z = Math.max(-dimensions.length/2 + 1, Math.min(dimensions.length/2 - 1, currentPos.z));
+
         console.log('Human position during animation:', {
-          x: humanPos.x,
-          y: humanPos.y,
-          z: humanPos.z
+          x: currentPos.x,
+          y: currentPos.y,
+          z: currentPos.z
         });
       }
 
       if (ptzCameraRef.current && humanRef.current && ptzTracks[0]) {
+        // Make PTZ camera look at human
         ptzCameraRef.current.lookAt(humanRef.current.position);
         
         const track = ptzTracks[0];
+        // Smooth oscillation along track
         const trackPosition = Math.sin(timeRef.current * track.speed) * (track.length / 2);
         ptzCameraRef.current.position.x = track.position.x + trackPosition;
         
-        // Verify PTZ camera stays within bounds
         console.log('PTZ camera position during animation:', ptzCameraRef.current.position);
       }
 
@@ -213,6 +247,9 @@ export const StudioWorkspace = ({
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (movementTimeoutRef.current) {
+        clearTimeout(movementTimeoutRef.current);
       }
     };
   }, [dimensions, humanPosition, cameras, props, ptzTracks]);
