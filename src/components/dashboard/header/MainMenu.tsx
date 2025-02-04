@@ -17,6 +17,9 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
             New Inventory
           </MenubarItem>
           <MenubarSeparator />
+          <MenubarItem onClick={() => handleMenuAction('studio_config')}>
+            Studio Configuration
+          </MenubarItem>
           <MenubarItem onClick={() => handleMenuAction('studio_config_v1')}>
             Studio Configuration (v1)
           </MenubarItem>
@@ -33,6 +36,9 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           <MenubarItem onClick={() => handleMenuAction('preferences')}>
             Preferences
           </MenubarItem>
+          <MenubarItem onClick={() => handleMenuAction('toggle_assistant')}>
+            Toggle AI Assistant
+          </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
       
@@ -48,6 +54,10 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           <MenubarItem onClick={() => handleMenuAction('achievements')}>
             Achievements
           </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => handleMenuAction('toggle_theme')}>
+            Toggle Theme
+          </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
       
@@ -59,6 +69,10 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           </MenubarItem>
           <MenubarItem onClick={() => handleMenuAction('help')}>
             Documentation
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => handleMenuAction('about')}>
+            About
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>

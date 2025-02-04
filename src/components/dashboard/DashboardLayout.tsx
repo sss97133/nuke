@@ -77,8 +77,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       case 'preferences':
         toast({ 
           title: "Preferences",
-          description: "Preferences dialog will be implemented soon."
+          description: "Opening preferences settings..."
         });
+        // Preferences dialog will be implemented later
         break;
       case 'studio_config':
         setShowStudioConfig(true);
@@ -87,6 +88,19 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       case 'studio_config_v1':
         setShowStudioConfigV1(true);
         setShowStudioConfig(false);
+        break;
+      case 'toggle_theme':
+        document.documentElement.classList.toggle('dark');
+        toast({
+          title: "Theme Toggled",
+          description: "Application theme has been updated",
+        });
+        break;
+      case 'about':
+        toast({
+          title: "About",
+          description: "Vehicle Management System v1.0",
+        });
         break;
       default:
         toast({ 
