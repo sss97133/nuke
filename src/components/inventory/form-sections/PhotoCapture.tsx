@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, Scan } from "lucide-react";
 import { AIResults } from "./photo-capture/AIResults";
 import { ImagePreview } from "./photo-capture/ImagePreview";
 import { usePhotoCapture } from "./photo-capture/usePhotoCapture";
@@ -16,6 +16,7 @@ export const PhotoCapture = ({ onPhotoCapture, onSkip, isProcessing }: PhotoCapt
     aiResults,
     isAnalyzing,
     handleFileChange,
+    handleSmartScan,
   } = usePhotoCapture(onPhotoCapture);
 
   return (
@@ -38,21 +39,52 @@ export const PhotoCapture = ({ onPhotoCapture, onSkip, isProcessing }: PhotoCapt
             disabled={isProcessing || isAnalyzing}
           />
           
-          <Button
-            onClick={() => document.getElementById('photo-upload')?.click()}
-            disabled={isProcessing || isAnalyzing}
-            className="w-full"
-          >
-            {isProcessing || isAnalyzing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Upload className="w-4 h-4 mr-2" />
-            )}
-            {isProcessing ? 'Uploading...' : isAnalyzing ? 'Analyzing...' : 'Upload Photo'}
-          </Button>
+          <div className="space-y-4">
+            <Button
+              onClick={() => document.getElementById('photo-upload')?.click()}
+              disabled={isProcessing || isAnalyzing}
+              className="w-full"
+            >
+              {isProcessing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4 mr-2" />
+              )}
+              {isProcessing ? 'Uploading...' : 'Upload Photo'}
+            </Button>
 
-          <ImagePreview preview={preview} />
-          <AIResults results={aiResults} />
+            {preview && (
+              <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                <div className="flex items-center space-x-3">
+                  <img 
+                    src={preview.url} 
+                    alt="Preview" 
+                    className="w-12 h-12 object-cover rounded"
+                  />
+                  <div className="text-sm">
+                    <p className="font-medium truncate">{preview.name}</p>
+                    <p className="text-muted-foreground">{preview.size}</p>
+                  </div>
+                </div>
+                
+                <Button
+                  onClick={handleSmartScan}
+                  disabled={isAnalyzing}
+                  variant="secondary"
+                  size="sm"
+                >
+                  {isAnalyzing ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Scan className="w-4 h-4 mr-2" />
+                  )}
+                  {isAnalyzing ? 'Scanning...' : 'Smart Scan'}
+                </Button>
+              </div>
+            )}
+
+            <AIResults results={aiResults} />
+          </div>
         </div>
 
         <Button

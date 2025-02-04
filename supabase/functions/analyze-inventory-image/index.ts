@@ -13,23 +13,14 @@ serve(async (req) => {
   }
 
   try {
-    const formData = await req.formData()
-    const file = formData.get('image')
-
-    if (!file) {
-      throw new Error('No image provided')
-    }
+    const { imageUrl } = await req.json()
 
     const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'))
     
-    // Convert File to Blob for HuggingFace
-    const arrayBuffer = await file.arrayBuffer()
-    const blob = new Blob([arrayBuffer], { type: file.type })
-
     console.log('Analyzing image with HuggingFace...')
     const result = await hf.imageClassification({
       model: 'google/vit-base-patch16-224',
-      data: blob,
+      data: imageUrl,
     })
 
     console.log('Analysis result:', result)

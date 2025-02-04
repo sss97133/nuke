@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FilePreview {
   url: string;
@@ -29,6 +29,7 @@ export const usePhotoCapture = (onPhotoCapture: (file: File) => Promise<void>) =
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Create preview
     const previewUrl = URL.createObjectURL(file);
     setPreview({
       url: previewUrl,
@@ -39,27 +40,42 @@ export const usePhotoCapture = (onPhotoCapture: (file: File) => Promise<void>) =
     try {
       await onPhotoCapture(file);
       
-      setIsAnalyzing(true);
-      const formData = new FormData();
-      formData.append('image', file);
+      toast({
+        title: "Photo uploaded successfully",
+        description: "You can now proceed with smart scan or continue with manual entry.",
+      });
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      toast({
+        title: "Error uploading photo",
+        description: "Please try again or skip this step.",
+        variant: "destructive",
+      });
+    }
+  };
 
+  const handleSmartScan = async () => {
+    if (!preview) return;
+
+    setIsAnalyzing(true);
+    try {
       const { data, error } = await supabase.functions.invoke('analyze-inventory-image', {
-        body: formData,
+        body: { imageUrl: preview.url }
       });
 
       if (error) throw error;
 
-      setAiResults(data.classifications);
+      setAiResults(data.classifications || []);
       
       toast({
         title: "Image analyzed successfully",
-        description: "Please review the detected items below.",
+        description: "Review the suggested information in the next step.",
       });
     } catch (error) {
-      console.error('Error processing image:', error);
+      console.error("Error analyzing image:", error);
       toast({
-        title: "Error processing image",
-        description: "Please try again or skip this step.",
+        title: "Error analyzing image",
+        description: "Please try again or proceed with manual entry.",
         variant: "destructive",
       });
     } finally {
@@ -72,5 +88,6 @@ export const usePhotoCapture = (onPhotoCapture: (file: File) => Promise<void>) =
     aiResults,
     isAnalyzing,
     handleFileChange,
+    handleSmartScan,
   };
 };
