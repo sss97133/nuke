@@ -6,7 +6,7 @@ import { LoadingState } from './LoadingState';
 import { SkillHeader } from './SkillHeader';
 import { SkillCategory } from './SkillCategory';
 import { AIToolsPanel } from './ai/AIToolsPanel';
-import { Skill, SkillStatus } from '@/types/skills';
+import { Skill, SkillStatus, UserSkill } from '@/types/skills';
 
 export const SkillTree = () => {
   const { toast } = useToast();
