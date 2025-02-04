@@ -28,8 +28,12 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
         .eq('email', email)
         .single();
 
-      if (profileError || !profiles) {
+      if (profileError) {
         throw new Error('User not found');
+      }
+
+      if (!profiles) {
+        throw new Error('No profile found');
       }
 
       const { error: memberError } = await supabase
@@ -39,7 +43,9 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
           user_id: profiles.id
         });
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        throw memberError;
+      }
 
       toast({
         title: "Success",
