@@ -18,6 +18,16 @@ import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Vehicle } from "@/types/inventory";
 
+const carBrands = [
+  "Acura", "Alfa Romeo", "Aston Martin", "Audi", "Bentley", "BMW", "Bugatti",
+  "Buick", "Cadillac", "Chevrolet", "Chrysler", "Citroën", "Dodge", "Ferrari",
+  "Fiat", "Ford", "Genesis", "GMC", "Honda", "Hyundai", "Infiniti", "Jaguar",
+  "Jeep", "Kia", "Lamborghini", "Land Rover", "Lexus", "Lincoln", "Lotus",
+  "Maserati", "Mazda", "McLaren", "Mercedes-Benz", "Mini", "Mitsubishi",
+  "Nissan", "Pagani", "Peugeot", "Porsche", "Ram", "Renault", "Rolls-Royce",
+  "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo"
+];
+
 interface VehicleSelectionProps {
   onVehicleSelect: (vehicle: Vehicle | null) => void;
   onShowNewVehicle: () => void;
@@ -28,7 +38,12 @@ export const VehicleSelection = ({ onVehicleSelect, onShowNewVehicle }: VehicleS
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+
+  const filteredBrands = carBrands.filter(brand => 
+    brand.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   useEffect(() => {
     const fetchVehicles = async () => {
@@ -102,7 +117,11 @@ export const VehicleSelection = ({ onVehicleSelect, onShowNewVehicle }: VehicleS
           </PopoverTrigger>
           <PopoverContent className="w-[300px] p-0">
             <Command>
-              <CommandInput placeholder="Search vehicles..." />
+              <CommandInput 
+                placeholder="Search vehicles..." 
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
               <CommandEmpty>No vehicle found.</CommandEmpty>
               <CommandGroup className="max-h-[200px] overflow-y-auto">
                 {vehicles.map((vehicle) => (
