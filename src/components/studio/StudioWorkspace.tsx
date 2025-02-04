@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createHumanFigure } from './workspace/HumanFigure';
 import { createPTZCamera } from './workspace/PTZCamera';
 import { createFixedCameras } from './workspace/FixedCameras';
+import { createProps } from './workspace/Props';
 
 interface StudioWorkspaceProps {
   dimensions: {
@@ -23,6 +24,11 @@ interface StudioWorkspaceProps {
     rightWall: boolean;
     ceiling: boolean;
     showCone: boolean;
+  };
+  props?: {
+    toolBox: boolean;
+    carLift: boolean;
+    car: boolean;
   };
   ptzTracks?: {
     position: {
@@ -47,6 +53,11 @@ export const StudioWorkspace = ({
     ceiling: false,
     showCone: true,
   },
+  props = {
+    toolBox: false,
+    carLift: false,
+    car: false,
+  },
   ptzTracks = [] 
 }: StudioWorkspaceProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +69,7 @@ export const StudioWorkspace = ({
   const humanRef = useRef<THREE.Group | null>(null);
   const ptzCameraRef = useRef<THREE.Group | null>(null);
   const fixedCamerasRef = useRef<THREE.Group[]>([]);
+  const propsRef = useRef<THREE.Group[]>([]);
   const animationFrameRef = useRef<number>();
   const timeRef = useRef<number>(0);
 
@@ -128,6 +140,9 @@ export const StudioWorkspace = ({
     // Create fixed cameras
     fixedCamerasRef.current = createFixedCameras({ dimensions, cameras, scene });
 
+    // Create props
+    propsRef.current = createProps({ props, dimensions, scene });
+
     // Animation loop
     const animate = () => {
       timeRef.current += 0.005;
@@ -177,7 +192,7 @@ export const StudioWorkspace = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [dimensions, humanPosition, cameras, ptzTracks]);
+  }, [dimensions, humanPosition, cameras, props, ptzTracks]);
 
   return (
     <div 

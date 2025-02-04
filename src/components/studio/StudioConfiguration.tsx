@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StudioWorkspace } from './StudioWorkspace';
 import { StudioConfigForm } from './StudioConfigForm';
 import { Card } from '@/components/ui/card';
@@ -19,6 +19,11 @@ interface FormData {
     rightWall: boolean;
     ceiling: boolean;
     showCone: boolean;
+  };
+  props: {
+    toolBox: boolean;
+    carLift: boolean;
+    car: boolean;
   };
   ptzTracks: {
     x: number;
@@ -52,6 +57,12 @@ export const StudioConfiguration = () => {
     showCone: true,
   });
 
+  const [props, setProps] = useState({
+    toolBox: false,
+    carLift: false,
+    car: false,
+  });
+
   const [ptzTracks, setPtzTracks] = useState([
     {
       position: { x: 0, y: 8, z: 0 },
@@ -75,6 +86,7 @@ export const StudioConfiguration = () => {
     });
 
     setCameras(data.cameras);
+    setProps(data.props);
 
     if (data.ptzTracks?.[0]) {
       setPtzTracks([
@@ -103,6 +115,7 @@ export const StudioConfiguration = () => {
               dimensions, 
               humanPosition,
               cameras,
+              props,
               ptzTracks 
             }} 
           />
@@ -113,6 +126,7 @@ export const StudioConfiguration = () => {
             dimensions={dimensions}
             humanPosition={humanPosition}
             cameras={cameras}
+            props={props}
             ptzTracks={ptzTracks}
           />
         </Card>

@@ -8,6 +8,7 @@ import { DimensionsSection } from './config/DimensionsSection';
 import { CameraConfigSection } from './config/CameraConfigSection';
 import { PTZConfigSection } from './config/PTZConfigSection';
 import { HumanPositionSection } from './config/HumanPositionSection';
+import { PropsSection } from './config/PropsSection';
 
 interface FormData {
   length: number;
@@ -25,6 +26,11 @@ interface FormData {
     rightWall: boolean;
     ceiling: boolean;
     showCone: boolean;
+  };
+  props: {
+    toolBox: boolean;
+    carLift: boolean;
+    car: boolean;
   };
   ptzTracks: {
     x: number;
@@ -57,6 +63,11 @@ interface StudioConfigFormProps {
       ceiling: boolean;
       showCone: boolean;
     };
+    props?: {
+      toolBox: boolean;
+      carLift: boolean;
+      car: boolean;
+    };
     ptzTracks: {
       position: {
         x: number;
@@ -84,6 +95,11 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         rightWall: false,
         ceiling: false,
         showCone: true,
+      },
+      props: initialData?.props || {
+        toolBox: false,
+        carLift: false,
+        car: false,
       },
       ptzTracks: [{
         x: initialData?.ptzTracks[0]?.position.x || 0,
@@ -146,6 +162,36 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
     setValue(`cameras.${key}` as any, value);
   };
 
+  const handlePropsChange = (key: string, value: boolean) => {
+    setValue(`props.${key}` as any, value);
+  };
+
+  const handleHumanMove = (direction: 'left' | 'right' | 'forward' | 'backward' | 'up' | 'down') => {
+    const step = 1;
+    const currentPosition = formData.humanPosition;
+    
+    switch (direction) {
+      case 'left':
+        setValue('humanPosition.x', currentPosition.x - step);
+        break;
+      case 'right':
+        setValue('humanPosition.x', currentPosition.x + step);
+        break;
+      case 'forward':
+        setValue('humanPosition.z', currentPosition.z - step);
+        break;
+      case 'backward':
+        setValue('humanPosition.z', currentPosition.z + step);
+        break;
+      case 'up':
+        setValue('humanPosition.y', currentPosition.y + step);
+        break;
+      case 'down':
+        setValue('humanPosition.y', Math.max(0, currentPosition.y - step));
+        break;
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Tabs defaultValue="dimensions" className="w-full">
@@ -154,6 +200,7 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
           <TabsTrigger value="cameras">Cameras</TabsTrigger>
           <TabsTrigger value="ptz">PTZ Configuration</TabsTrigger>
           <TabsTrigger value="human">Human Position</TabsTrigger>
+          <TabsTrigger value="props">Props</TabsTrigger>
         </TabsList>
         
         <TabsContent value="dimensions">
@@ -177,7 +224,24 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         </TabsContent>
 
         <TabsContent value="human">
-          <HumanPositionSection register={register} />
+          <div className="space-y-4">
+            <HumanPositionSection register={register} />
+            <div className="grid grid-cols-3 gap-2 mt-4">
+              <Button type="button" onClick={() => handleHumanMove('left')}>Left</Button>
+              <Button type="button" onClick={() => handleHumanMove('forward')}>Forward</Button>
+              <Button type="button" onClick={() => handleHumanMove('right')}>Right</Button>
+              <Button type="button" onClick={() => handleHumanMove('up')}>Up</Button>
+              <Button type="button" onClick={() => handleHumanMove('backward')}>Backward</Button>
+              <Button type="button" onClick={() => handleHumanMove('down')}>Down</Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="props">
+          <PropsSection 
+            props={formData.props}
+            onPropsChange={handlePropsChange}
+          />
         </TabsContent>
       </Tabs>
       
