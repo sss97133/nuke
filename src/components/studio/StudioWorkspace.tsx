@@ -126,14 +126,19 @@ export const StudioWorkspace = ({
     objectsRef.current.push(line);
 
     // Create human figure
-    humanRef.current = createHumanFigure({ position: humanPosition, scene });
+    humanRef.current = createHumanFigure({ 
+      position: humanPosition, 
+      scene,
+      dimensions 
+    });
 
     // Create PTZ camera
     if (ptzTracks && ptzTracks.length > 0) {
       ptzCameraRef.current = createPTZCamera({ 
         track: ptzTracks[0], 
         showCone: cameras.showCone,
-        scene 
+        scene,
+        dimensions
       });
     }
 
