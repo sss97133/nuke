@@ -8,6 +8,7 @@ import { ProfessionalDashboard } from "@/components/dashboard/ProfessionalDashbo
 import { AuctionList } from "@/components/auctions/AuctionList";
 import { CreateAuction } from "@/components/auctions/CreateAuction";
 import { StudioConfiguration } from "@/components/studio/StudioConfiguration";
+import { Home } from "@/components/dashboard/Home";
 
 interface DashboardTabsProps {
   showHelp: (section: string) => void;
@@ -19,6 +20,13 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
       <TabsList className="w-full h-12 bg-background border border-border shadow-classic rounded-none p-1">
         <div className="flex justify-between w-full">
           <div className="flex gap-1">
+            <TabsTrigger 
+              value="home" 
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+            >
+              <Home className="w-4 h-4" />
+              Home
+            </TabsTrigger>
             <TabsTrigger 
               value="inventory" 
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
@@ -82,6 +90,9 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
       </TabsList>
 
       <div className="mt-6 space-y-6">
+        <TabsContent value="home" className="animate-fade-in">
+          <Home />
+        </TabsContent>
         <TabsContent value="inventory" className="animate-fade-in">
           <InventoryForm />
         </TabsContent>
