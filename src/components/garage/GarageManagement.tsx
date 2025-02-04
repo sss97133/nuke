@@ -56,7 +56,7 @@ export const GarageManagement = () => {
 
       const { data, error } = await supabase
         .from('garages')
-        .select('*, garage_members (user_id)');
+        .select('*, garage_members!inner (user_id)');
       
       if (error) throw error;
       return (data || []) as Garage[];
