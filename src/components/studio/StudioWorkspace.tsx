@@ -178,7 +178,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     objectsRef.current.forEach(obj => sceneRef.current?.remove(obj));
     objectsRef.current = [];
 
-    // Add room geometry
+    // Add room geometry and labels
     const roomGeometry = new THREE.BoxGeometry(
       dimensions.width,
       dimensions.height,
@@ -189,56 +189,70 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       edges,
       new THREE.LineBasicMaterial({ color: 0x000000 })
     );
-    sceneRef.current.add(line);
+    scene.add(line);
     objectsRef.current.push(line);
 
-    // Add grid helper
-    const gridHelper = new THREE.GridHelper(Math.max(dimensions.width, dimensions.length), 10);
-    gridHelper.position.y = -dimensions.height / 2;
-    sceneRef.current.add(gridHelper);
-    objectsRef.current.push(gridHelper);
-
-    // Add PTZ tracks and cameras
-    ptzTracks.forEach(track => {
-      // Track
-      const trackGeometry = new THREE.BoxGeometry(track.length, 0.2, 0.2);
-      const trackMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-      const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
-      trackMesh.position.set(track.position.x, track.position.y, track.position.z);
-      sceneRef.current?.add(trackMesh);
-      objectsRef.current.push(trackMesh);
-
-      // PTZ Camera group
-      const ptzGroup = new THREE.Group();
+    // Add text labels for each plane
+    const createLabel = (text: string, position: THREE.Vector3, rotation?: THREE.Euler) => {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) return;
       
-      // Camera body
-      const cameraGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-      const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-      const cameraMesh = new THREE.Mesh(cameraGeometry, cameraMaterial);
-      ptzGroup.add(cameraMesh);
-
-      // Camera cone (field of view)
-      const maxDistance = Math.max(dimensions.length, dimensions.width) * 2; // Extend beyond room
-      const coneHeight = maxDistance;
-      const coneRadius = Math.tan((track.coneAngle * Math.PI) / 180) * coneHeight;
-      const coneGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 32);
-      const coneMaterial = new THREE.MeshPhongMaterial({ 
-        color: 0xff0000,
+      canvas.width = 256;
+      canvas.height = 128;
+      
+      context.fillStyle = '#000000';
+      context.font = 'Bold 40px Arial';
+      context.fillText(text, 10, 64);
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
         transparent: true,
-        opacity: 0.2
+        side: THREE.DoubleSide
       });
-      const cone = new THREE.Mesh(coneGeometry, coneMaterial);
       
-      // Position cone with base at camera center, pointing forward
-      cone.rotation.x = -Math.PI / 2;
-      cone.position.z = coneHeight/2;
-      ptzGroup.add(cone);
+      const geometry = new THREE.PlaneGeometry(2, 1);
+      const label = new THREE.Mesh(geometry, material);
+      label.position.copy(position);
+      if (rotation) {
+        label.rotation.copy(rotation);
+      }
+      scene.add(label);
+      objectsRef.current.push(label);
+    };
 
-      ptzGroup.position.set(track.position.x, track.position.y, track.position.z);
-      sceneRef.current?.add(ptzGroup);
-      objectsRef.current.push(ptzGroup);
-      ptzCameraRef.current = ptzGroup;
-    });
+    // Add labels for each plane
+    createLabel(
+      'Floor',
+      new THREE.Vector3(0, -dimensions.height/2 + 0.1, 0),
+      new THREE.Euler(-Math.PI/2, 0, 0)
+    );
+    createLabel(
+      'Ceiling',
+      new THREE.Vector3(0, dimensions.height/2 - 0.1, 0),
+      new THREE.Euler(Math.PI/2, 0, 0)
+    );
+    createLabel(
+      'Back Wall',
+      new THREE.Vector3(0, 0, dimensions.length/2 - 0.1),
+      new THREE.Euler(0, 0, 0)
+    );
+    createLabel(
+      'Front Wall',
+      new THREE.Vector3(0, 0, -dimensions.length/2 + 0.1),
+      new THREE.Euler(0, Math.PI, 0)
+    );
+    createLabel(
+      'Left Wall',
+      new THREE.Vector3(-dimensions.width/2 + 0.1, 0, 0),
+      new THREE.Euler(0, Math.PI/2, 0)
+    );
+    createLabel(
+      'Right Wall',
+      new THREE.Vector3(dimensions.width/2 - 0.1, 0, 0),
+      new THREE.Euler(0, -Math.PI/2, 0)
+    );
 
   }, [dimensions, ptzTracks]); // Update when dimensions or PTZ tracks change
 
