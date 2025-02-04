@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createHumanFigure } from './workspace/HumanFigure';
 import { createFixedCameras } from './workspace/FixedCameras';
 import { createProps } from './workspace/Props';
 import { useHumanMovement } from './workspace/HumanMovement';
 import { useCameraSystem } from './workspace/CameraSystem';
-import { PTZTrack } from './types';
+import type { PTZTrack } from './types';
 
 interface StudioWorkspaceProps {
   dimensions: {
@@ -62,7 +62,7 @@ export const StudioWorkspace = ({
   const ptzCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const fixedCamerasRef = useRef<THREE.Group[]>([]);
   const propsRef = useRef<THREE.Group[]>([]);
-  const objectsRef = useRef<THREE.Object3D[]>([]);
+  const objectsRef = useRef<(THREE.Mesh | THREE.GridHelper)[]>([]);
   const animationFrameRef = useRef<number>();
   const timeRef = useRef<number>(0);
 
@@ -146,11 +146,13 @@ export const StudioWorkspace = ({
       }
 
       objectsRef.current.forEach(obj => {
-        obj.geometry?.dispose();
-        if (Array.isArray(obj.material)) {
-          obj.material.forEach(mat => mat.dispose());
-        } else if (obj.material) {
-          obj.material.dispose();
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry?.dispose();
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach(mat => mat.dispose());
+          } else if (obj.material) {
+            obj.material.dispose();
+          }
         }
       });
 

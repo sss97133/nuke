@@ -1,11 +1,12 @@
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 export const useHumanMovement = (
   dimensions: { width: number; length: number },
   humanRef: React.MutableRefObject<THREE.Group | null>
 ) => {
-  const targetPositionRef = React.useRef(new THREE.Vector3(0, 0, 0));
-  const movementTimeoutRef = React.useRef<number>();
+  const targetPositionRef = useRef(new THREE.Vector3(0, 0, 0));
+  const movementTimeoutRef = useRef<number>();
 
   const generateNewTarget = () => {
     const halfWidth = dimensions.width / 2;
@@ -34,7 +35,7 @@ export const useHumanMovement = (
     currentPos.z = Math.max(-dimensions.length/2 + 1, Math.min(dimensions.length/2 - 1, currentPos.z));
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     generateNewTarget();
     return () => {
       if (movementTimeoutRef.current) {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PTZTrack } from '../types';
+import type { PTZTrack } from '../types';
 
 export const useCameraSystem = (
   ptzCameraRef: React.MutableRefObject<THREE.PerspectiveCamera | null>,

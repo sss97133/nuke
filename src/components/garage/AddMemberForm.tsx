@@ -6,9 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { AddGarageMemberProps } from '@/types/garage';
 
-type FormValues = {
+interface FormValues {
   email: string;
-};
+}
 
 export const AddMemberForm = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
   const { register, handleSubmit, reset } = useForm<FormValues>();
