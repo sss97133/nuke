@@ -12,7 +12,8 @@ import { RecordingControls } from './controls/RecordingControls';
 import { PreviewSection } from './sections/PreviewSection';
 import { SettingsSection } from './sections/SettingsSection';
 import { ControlButtons } from './sections/ControlButtons';
-import type { WorkspaceDimensions, PTZConfigurations, isWorkspaceDimensions, isPTZConfigurations } from '@/types/studio';
+import { isWorkspaceDimensions, isPTZConfigurations } from '@/types/studio';
+import type { WorkspaceDimensions } from '@/types/studio';
 
 export const StudioConfiguration = () => {
   const [dimensions, setDimensions] = useState<WorkspaceDimensions>({
@@ -40,20 +41,24 @@ export const StudioConfiguration = () => {
 
       if (error) throw error;
 
+      const workspaceDims = isWorkspaceDimensions(data?.workspace_dimensions) 
+        ? data.workspace_dimensions as WorkspaceDimensions
+        : dimensions;
+
+      const ptzConfig = isPTZConfigurations(data?.ptz_configurations)
+        ? data.ptz_configurations
+        : {
+            tracks: [],
+            planes: { walls: [], ceiling: {} },
+            roboticArms: []
+          };
+
       return {
         id: data?.id || '',
         user_id: user.id,
         name: data?.name || '',
-        workspace_dimensions: isWorkspaceDimensions(data?.workspace_dimensions) 
-          ? data.workspace_dimensions 
-          : dimensions,
-        ptz_configurations: isPTZConfigurations(data?.ptz_configurations)
-          ? data.ptz_configurations
-          : {
-              tracks: [],
-              planes: { walls: [], ceiling: {} },
-              roboticArms: []
-            },
+        workspace_dimensions: workspaceDims,
+        ptz_configurations: ptzConfig,
         camera_config: data?.camera_config || {},
         audio_config: data?.audio_config || {},
         lighting_config: data?.lighting_config || {},

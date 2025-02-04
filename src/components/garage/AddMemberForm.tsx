@@ -6,36 +6,36 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-export interface AddMemberFormProps {
+interface AddMemberFormProps {
   garageId: string;
   onSuccess?: () => void;
 }
 
-interface FormValues {
+interface FormData {
   email: string;
 }
 
 export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
-  const { register, handleSubmit, reset } = useForm<FormValues>();
+  const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = async (data: FormData) => {
     try {
-      const { data: userData, error: userError } = await supabase
+      const { data: users, error: userError } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', data.email)
-        .maybeSingle();
+        .single();
 
-      if (userError || !userData) {
+      if (userError || !users) {
         throw new Error('User not found');
       }
 
-      const { error: memberError } = await supabase
+      const { error } = await supabase
         .from('garage_members')
-        .insert([{ user_id: userData.id, garage_id: garageId }]);
+        .insert({ user_id: users.id, garage_id: garageId });
 
-      if (memberError) throw memberError;
+      if (error) throw error;
 
       toast({
         title: 'Success',
@@ -47,7 +47,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to add member',
+        description: error instanceof Error ? error.message : 'Failed to add member',
         variant: 'destructive',
       });
     }

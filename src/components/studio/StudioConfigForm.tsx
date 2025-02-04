@@ -52,9 +52,18 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         .insert({
           user_id: user.id,
           name: 'Default Configuration',
-          workspace_dimensions: dimensions as Record<string, number>,
+          workspace_dimensions: {
+            width: dimensions.width,
+            height: dimensions.height,
+            length: dimensions.length
+          },
           ptz_configurations: {
-            tracks: ptzTracks,
+            tracks: ptzTracks.map(track => ({
+              position: track.position,
+              length: track.length,
+              speed: track.speed,
+              coneAngle: track.coneAngle
+            })),
             planes: { walls: [], ceiling: {} },
             roboticArms: []
           }
