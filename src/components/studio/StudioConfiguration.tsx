@@ -7,6 +7,19 @@ interface FormData {
   length: number;
   width: number;
   height: number;
+  humanPosition: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  cameras: {
+    frontWall: boolean;
+    backWall: boolean;
+    leftWall: boolean;
+    rightWall: boolean;
+    ceiling: boolean;
+    showCone: boolean;
+  };
   ptzTracks: {
     x: number;
     y: number;
@@ -24,6 +37,21 @@ export const StudioConfiguration = () => {
     height: 16,
   });
 
+  const [humanPosition, setHumanPosition] = useState({
+    x: 0,
+    y: 0,
+    z: 0,
+  });
+
+  const [cameras, setCameras] = useState({
+    frontWall: false,
+    backWall: false,
+    leftWall: false,
+    rightWall: false,
+    ceiling: false,
+    showCone: true,
+  });
+
   const [ptzTracks, setPtzTracks] = useState([
     {
       position: { x: 0, y: 8, z: 0 },
@@ -39,6 +67,14 @@ export const StudioConfiguration = () => {
       width: Number(data.width) || 20,
       height: Number(data.height) || 16,
     });
+
+    setHumanPosition({
+      x: Number(data.humanPosition.x) || 0,
+      y: Number(data.humanPosition.y) || 0,
+      z: Number(data.humanPosition.z) || 0,
+    });
+
+    setCameras(data.cameras);
 
     if (data.ptzTracks?.[0]) {
       setPtzTracks([
@@ -65,13 +101,20 @@ export const StudioConfiguration = () => {
             onUpdate={handleConfigUpdate} 
             initialData={{ 
               dimensions, 
+              humanPosition,
+              cameras,
               ptzTracks 
             }} 
           />
         </Card>
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">Workspace Preview</h2>
-          <StudioWorkspace dimensions={dimensions} ptzTracks={ptzTracks} />
+          <StudioWorkspace 
+            dimensions={dimensions}
+            humanPosition={humanPosition}
+            cameras={cameras}
+            ptzTracks={ptzTracks}
+          />
         </Card>
       </div>
     </div>
