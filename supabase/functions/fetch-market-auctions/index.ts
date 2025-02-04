@@ -45,39 +45,35 @@ const SOURCES: AuctionSource[] = [
       '.time-remaining'
     ],
     sourceName: 'carsandbids'
-  },
-  {
-    url: 'https://www.hagerty.com/marketplace/inventory',
-    patterns: [
-      '.vehicle-card',
-      '.vehicle-title',
-      '.price',
-      '.vehicle-image',
-      '.listing-date'
-    ],
-    sourceName: 'hagerty'
   }
 ];
 
 const extractAuctionData = (content: string, url: string, sourceName: string, images?: string[]): ExtractedAuction | null => {
-  const yearMatch = content.match(/\b(19|20)\d{2}\b/);
-  const priceMatch = content.match(/\$[\d,]+(?:\.\d{2})?/);
-  const makeModelMatch = content.match(/(?:19|20)\d{2}\s+([A-Za-z-]+)\s+([A-Za-z0-9-]+)/);
-  const endTimeMatch = content.match(/Ends\s+(\w+\s+\d+(?:st|nd|rd|th)?\s+\d+:\d+\s*(?:AM|PM|am|pm))/i);
+  try {
+    console.log('Extracting data from content:', content.substring(0, 100));
+    
+    const yearMatch = content.match(/\b(19|20)\d{2}\b/);
+    const priceMatch = content.match(/\$[\d,]+(?:\.\d{2})?/);
+    const makeModelMatch = content.match(/(?:19|20)\d{2}\s+([A-Za-z-]+)\s+([A-Za-z0-9-]+)/);
+    const endTimeMatch = content.match(/Ends\s+(\w+\s+\d+(?:st|nd|rd|th)?\s+\d+:\d+\s*(?:AM|PM|am|pm))/i);
 
-  if (yearMatch && priceMatch && makeModelMatch) {
-    return {
-      year: parseInt(yearMatch[0]),
-      make: makeModelMatch[1],
-      model: makeModelMatch[2],
-      price: parseFloat(priceMatch[0].replace(/[$,]/g, '')),
-      url: url,
-      source: sourceName,
-      endTime: endTimeMatch ? new Date(endTimeMatch[1]).toISOString() : undefined,
-      imageUrl: images?.[0]
-    };
+    if (yearMatch && priceMatch && makeModelMatch) {
+      return {
+        year: parseInt(yearMatch[0]),
+        make: makeModelMatch[1],
+        model: makeModelMatch[2],
+        price: parseFloat(priceMatch[0].replace(/[$,]/g, '')),
+        url: url,
+        source: sourceName,
+        endTime: endTimeMatch ? new Date(endTimeMatch[1]).toISOString() : undefined,
+        imageUrl: images?.[0]
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error extracting auction data:', error);
+    return null;
   }
-  return null;
 };
 
 const crawlSource = async (source: AuctionSource, firecrawl: FireCrawl): Promise<ExtractedAuction[]> => {
@@ -87,7 +83,7 @@ const crawlSource = async (source: AuctionSource, firecrawl: FireCrawl): Promise
       limit: 5,
       scrapeOptions: {
         patterns: source.patterns,
-        waitForSelector: '.auction-list-item, .auction-card, .vehicle-card',
+        waitForSelector: '.auction-list-item, .auction-card',
         timeout: 10000
       }
     });
@@ -104,8 +100,14 @@ const crawlSource = async (source: AuctionSource, firecrawl: FireCrawl): Promise
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      }
+    });
   }
 
   try {
@@ -142,7 +144,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : 'Failed to fetch auction data'
       }),
       {
         status: 500,
