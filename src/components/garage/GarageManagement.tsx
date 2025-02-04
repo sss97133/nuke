@@ -9,17 +9,17 @@ import { ImportGarages } from "./ImportGarages";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 
-interface GarageMember {
+type GarageMember = {
   user_id: string;
-}
+};
 
-interface Garage {
+type Garage = {
   id: string;
   name: string;
   address: string | null;
   rating: number | null;
   garage_members: GarageMember[];
-}
+};
 
 export const GarageManagement = () => {
   const [newGarageName, setNewGarageName] = useState("");
@@ -56,7 +56,15 @@ export const GarageManagement = () => {
 
       const { data, error } = await supabase
         .from('garages')
-        .select('*, garage_members!inner (user_id)');
+        .select(`
+          id,
+          name,
+          address,
+          rating,
+          garage_members (
+            user_id
+          )
+        `);
       
       if (error) throw error;
       return (data || []) as Garage[];
