@@ -9,9 +9,20 @@ import { ImportGarages } from "./ImportGarages";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 
+type GarageMember = {
+  user_id: string;
+}
+
+type Garage = {
+  id: string;
+  name: string;
+  address: string | null;
+  rating: number | null;
+  garage_members: GarageMember[] | null;
+}
+
 export const GarageManagement = () => {
   const [newGarageName, setNewGarageName] = useState("");
-  const [showMemberDialog, setShowMemberDialog] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { toast } = useToast();
@@ -43,7 +54,7 @@ export const GarageManagement = () => {
     queryFn: async () => {
       if (!userLocation) return [];
 
-      const { data: garages, error } = await supabase
+      const { data, error } = await supabase
         .from('garages')
         .select(`
           *,
@@ -53,7 +64,7 @@ export const GarageManagement = () => {
         `);
       
       if (error) throw error;
-      return garages;
+      return data as Garage[];
     },
     enabled: !!userLocation
   });
@@ -125,7 +136,7 @@ export const GarageManagement = () => {
       .from('profiles')
       .select('id')
       .eq('email', newMemberEmail)
-      .single();
+      .maybeSingle();
 
     if (profileError || !profiles) {
       toast({
@@ -157,7 +168,6 @@ export const GarageManagement = () => {
       description: "Member added successfully"
     });
     setNewMemberEmail("");
-    setShowMemberDialog(false);
     refetch();
   };
 
