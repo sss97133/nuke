@@ -136,6 +136,83 @@ export type Database = {
           },
         ]
       }
+      content_analytics: {
+        Row: {
+          content_id: string | null
+          created_at: string
+          engagement_metrics: Json | null
+          id: string
+          platform_metrics: Json | null
+          updated_at: string
+          views: number | null
+        }
+        Insert: {
+          content_id?: string | null
+          created_at?: string
+          engagement_metrics?: Json | null
+          id?: string
+          platform_metrics?: Json | null
+          updated_at?: string
+          views?: number | null
+        }
+        Update: {
+          content_id?: string | null
+          created_at?: string
+          engagement_metrics?: Json | null
+          id?: string
+          platform_metrics?: Json | null
+          updated_at?: string
+          views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_analytics_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "content_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_schedules: {
+        Row: {
+          content_type: string
+          created_at: string
+          distribution_channels: Json | null
+          id: string
+          metadata: Json | null
+          scheduled_time: string
+          status: string | null
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          distribution_channels?: Json | null
+          id?: string
+          metadata?: Json | null
+          scheduled_time: string
+          status?: string | null
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          distribution_channels?: Json | null
+          id?: string
+          metadata?: Json | null
+          scheduled_time?: string
+          status?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       dao_proposals: {
         Row: {
           created_at: string | null
@@ -734,6 +811,39 @@ export type Database = {
           id?: string
           name?: string
           prerequisites?: string[] | null
+        }
+        Relationships: []
+      }
+      studio_configurations: {
+        Row: {
+          audio_config: Json | null
+          camera_config: Json | null
+          created_at: string
+          id: string
+          lighting_config: Json | null
+          name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          audio_config?: Json | null
+          camera_config?: Json | null
+          created_at?: string
+          id?: string
+          lighting_config?: Json | null
+          name: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          audio_config?: Json | null
+          camera_config?: Json | null
+          created_at?: string
+          id?: string
+          lighting_config?: Json | null
+          name?: string
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
