@@ -43,17 +43,20 @@ const departments = [
 interface VehicleSelectionProps {
   onVehicleSelect: (vehicle: Vehicle | null) => void;
   onShowNewVehicle: () => void;
+  onDepartmentChange: (department: string) => void;
+  selectedDepartment: string;
 }
 
 export const VehicleSelection = ({
   onVehicleSelect,
   onShowNewVehicle,
+  onDepartmentChange,
+  selectedDepartment,
 }: VehicleSelectionProps) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -99,14 +102,14 @@ export const VehicleSelection = ({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">Department</label>
-          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+          <Select value={selectedDepartment} onValueChange={onDepartmentChange}>
             <SelectTrigger>
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
               {departments.map((dept) => (
                 <SelectItem key={dept} value={dept}>
-                  {dept.charAt(0).toUpperCase() + dept.slice(1).replace('_', ' ')}
+                  {dept.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                 </SelectItem>
               ))}
             </SelectContent>

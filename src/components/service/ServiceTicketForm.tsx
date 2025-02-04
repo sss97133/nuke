@@ -27,6 +27,7 @@ export const ServiceTicketForm = () => {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [description, setDescription] = useState("");
   const [serviceType, setServiceType] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
   const [parts, setParts] = useState<Part[]>([]);
   const { toast } = useToast();
 
@@ -49,7 +50,7 @@ export const ServiceTicketForm = () => {
         service_type: serviceType as Database['public']['Enums']['service_type'],
         parts_used: parts as unknown as Database['public']['Tables']['service_tickets']['Insert']['parts_used'],
         status: 'pending',
-        priority: 'medium', // This would be based on vehicle priority in a real implementation
+        priority: 'medium',
         user_id: user?.id
       };
 
@@ -68,6 +69,7 @@ export const ServiceTicketForm = () => {
       setSelectedVehicle(null);
       setDescription("");
       setServiceType("");
+      setSelectedDepartment("");
       setParts([]);
       setCurrentStep(0);
     } catch (error: any) {
@@ -98,6 +100,8 @@ export const ServiceTicketForm = () => {
           <VehicleSelection
             onVehicleSelect={setSelectedVehicle}
             onShowNewVehicle={() => setShowNewVehicle(true)}
+            onDepartmentChange={setSelectedDepartment}
+            selectedDepartment={selectedDepartment}
           />
         );
       case 1:
@@ -105,6 +109,7 @@ export const ServiceTicketForm = () => {
           <ServiceDetails
             description={description}
             serviceType={serviceType}
+            selectedDepartment={selectedDepartment}
             onDescriptionChange={setDescription}
             onServiceTypeChange={setServiceType}
           />
