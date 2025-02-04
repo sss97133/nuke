@@ -28,9 +28,20 @@ export const TippingInterface = ({ streamId, recipientId }: TippingInterfaceProp
     setIsProcessing(true);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: 'Error',
+          description: 'You must be logged in to send tips',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const { error } = await supabase.from('stream_tips').insert({
         stream_id: streamId,
         recipient_id: recipientId,
+        sender_id: user.id,
         amount: Number(amount),
         message: message.trim(),
       });

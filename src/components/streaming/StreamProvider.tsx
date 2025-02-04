@@ -36,12 +36,16 @@ export const StreamProvider = ({ children }: { children: React.ReactNode }) => {
 
   const startStream = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('live_streams')
         .insert({
           title: 'New Stream',
           status: 'live',
           started_at: new Date().toISOString(),
+          user_id: user.id
         })
         .select()
         .single();

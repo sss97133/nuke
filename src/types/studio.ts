@@ -86,3 +86,13 @@ export const isPTZConfigurations = (value: unknown): value is PTZConfigurations 
     Array.isArray(config.roboticArms)
   );
 };
+
+export interface PTZConfigurationProps {
+  ptzTracks: PTZTrack[];
+  onUpdate: (tracks: PTZTrack[]) => void;
+}
+
+export interface StudioDimensionsProps {
+  dimensions: WorkspaceDimensions;
+  onUpdate: (dimensions: WorkspaceDimensions) => void;
+}

@@ -29,6 +29,9 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
 
   useEffect(() => {
     const fetchMessages = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
       const { data, error } = await supabase
         .from('stream_comments')
         .select(`
@@ -46,7 +49,7 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
         return;
       }
 
-      setMessages(data || []);
+      setMessages(data as ChatMessage[]);
     };
 
     fetchMessages();
@@ -76,9 +79,20 @@ export const StreamChat = ({ streamId, isStreamer = false }: StreamChatProps) =>
     if (!newMessage.trim()) return;
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: 'Error',
+          description: 'You must be logged in to send messages',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const { error } = await supabase.from('stream_comments').insert({
         stream_id: streamId,
         message: newMessage.trim(),
+        user_id: user.id
       });
 
       if (error) throw error;
