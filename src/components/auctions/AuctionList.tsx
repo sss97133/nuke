@@ -15,17 +15,6 @@ import {
 import { Filter, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface ExternalAuction {
-  make: string;
-  model: string;
-  year: number;
-  price: number;
-  url: string;
-  source: string;
-  endTime?: string;
-  imageUrl?: string;
-}
-
 interface Auction {
   id: string;
   vehicle_id: string;
@@ -268,53 +257,9 @@ export const AuctionList = () => {
 
         <TabsContent value="external">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {externalAuctions?.map((auction, index) => (
-              <a 
-                key={index}
-                href={auction.url}
-                target="_blank"
-                rel="noopener noreferrer" 
-                className="block transition-all duration-200 hover:scale-105"
-              >
-                <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C] p-6 space-y-4">
-                  {auction.imageUrl && (
-                    <div className="aspect-video rounded-lg overflow-hidden">
-                      <img 
-                        src={auction.imageUrl} 
-                        alt={`${auction.year} ${auction.make} ${auction.model}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  
-                  <div>
-                    <h3 className="text-xl font-semibold">
-                      {auction.year} {auction.make} {auction.model}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Source: {auction.source}
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-baseline justify-between">
-                    <div>
-                      <span className="text-3xl font-bold">
-                        ${auction.price.toLocaleString()}
-                      </span>
-                      <span className="text-sm text-muted-foreground ml-2">
-                        current bid
-                      </span>
-                    </div>
-                  </div>
-
-                  {auction.endTime && (
-                    <p className="text-sm text-muted-foreground">
-                      Ends: {new Date(auction.endTime).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              </a>
-            ))}
+            <div className="col-span-full text-center text-muted-foreground">
+              External auctions are temporarily unavailable
+            </div>
           </div>
         </TabsContent>
       </Tabs>

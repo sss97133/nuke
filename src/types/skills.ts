@@ -15,3 +15,14 @@ export interface SkillStatus {
   isComplete: boolean;
   hasStarted: boolean;
 }
+
+export interface UserSkill {
+  id: string;
+  user_id: string;
+  skill_id: string;
+  level: number;
+  experience_points: number;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
