@@ -8,9 +8,17 @@ interface StudioWorkspaceProps {
     width: number;
     height: number;
   };
+  ptzTracks?: {
+    position: {
+      x: number;
+      y: number;
+      z: number;
+    };
+    length: number;
+  }[];
 }
 
-export const StudioWorkspace = ({ dimensions }: StudioWorkspaceProps) => {
+export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -65,6 +73,24 @@ export const StudioWorkspace = ({ dimensions }: StudioWorkspaceProps) => {
     gridHelper.position.y = -dimensions.height / 2;
     scene.add(gridHelper);
 
+    // Add PTZ tracks
+    ptzTracks.forEach(track => {
+      const trackGeometry = new THREE.BoxGeometry(0.2, 0.2, track.length);
+      const trackMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+      const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+      
+      trackMesh.position.set(track.position.x, track.position.y, track.position.z);
+      scene.add(trackMesh);
+
+      // Add a camera model at the track start
+      const cameraGeometry = new THREE.ConeGeometry(0.5, 1, 8);
+      const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+      const cameraMesh = new THREE.Mesh(cameraGeometry, cameraMaterial);
+      cameraMesh.position.set(track.position.x, track.position.y, track.position.z);
+      cameraMesh.rotation.x = Math.PI / 2;
+      scene.add(cameraMesh);
+    });
+
     // Add lighting
     const ambientLight = new THREE.AmbientLight(0x404040);
     scene.add(ambientLight);
@@ -101,7 +127,7 @@ export const StudioWorkspace = ({ dimensions }: StudioWorkspaceProps) => {
         containerRef.current.removeChild(renderer.domElement);
       }
     };
-  }, [dimensions]);
+  }, [dimensions, ptzTracks]);
 
   return (
     <div 
