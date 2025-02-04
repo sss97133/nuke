@@ -12,13 +12,21 @@ export const useHumanMovement = (
     const halfWidth = dimensions.width / 2;
     const halfLength = dimensions.length / 2;
     
+    // More controlled movement - smaller steps
+    const currentPos = humanRef.current?.position || new THREE.Vector3();
+    const maxStep = 5; // Maximum distance to move
+    
+    const newX = currentPos.x + (Math.random() * 2 - 1) * maxStep;
+    const newZ = currentPos.z + (Math.random() * 2 - 1) * maxStep;
+    
     targetPositionRef.current.set(
-      Math.random() * dimensions.width - halfWidth,
+      Math.max(-halfWidth + 1, Math.min(halfWidth - 1, newX)),
       0,
-      Math.random() * dimensions.length - halfLength
+      Math.max(-halfLength + 1, Math.min(halfLength - 1, newZ))
     );
 
-    movementTimeoutRef.current = window.setTimeout(generateNewTarget, Math.random() * 5000 + 3000);
+    // Longer interval between movements
+    movementTimeoutRef.current = window.setTimeout(generateNewTarget, 5000 + Math.random() * 3000);
   };
 
   const updateHumanPosition = () => {
@@ -27,10 +35,13 @@ export const useHumanMovement = (
     const currentPos = humanRef.current.position;
     const targetPos = targetPositionRef.current;
     
-    currentPos.x += (targetPos.x - currentPos.x) * 0.02;
-    currentPos.z += (targetPos.z - currentPos.z) * 0.02;
+    // Slower, more controlled movement
+    const speed = 0.01;
+    currentPos.x += (targetPos.x - currentPos.x) * speed;
+    currentPos.z += (targetPos.z - currentPos.z) * speed;
     currentPos.y = 0;
 
+    // Ensure we stay within bounds
     currentPos.x = Math.max(-dimensions.width/2 + 1, Math.min(dimensions.width/2 - 1, currentPos.x));
     currentPos.z = Math.max(-dimensions.length/2 + 1, Math.min(dimensions.length/2 - 1, currentPos.z));
   };

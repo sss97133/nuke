@@ -105,10 +105,10 @@ export const StudioConfiguration = () => {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6 bg-background">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Studio Configuration</h2>
+        <Card className="p-6 bg-card">
+          <h2 className="text-lg font-semibold mb-4 text-foreground">Studio Configuration</h2>
           <StudioConfigForm 
             onUpdate={handleConfigUpdate} 
             initialData={{ 
@@ -120,8 +120,8 @@ export const StudioConfiguration = () => {
             }} 
           />
         </Card>
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Workspace Preview</h2>
+        <Card className="p-6 bg-card">
+          <h2 className="text-lg font-semibold mb-4 text-foreground">Workspace Preview</h2>
           <StudioWorkspace 
             dimensions={dimensions}
             humanPosition={humanPosition}
