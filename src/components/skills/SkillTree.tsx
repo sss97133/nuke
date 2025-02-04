@@ -6,22 +6,7 @@ import { LoadingState } from './LoadingState';
 import { SkillHeader } from './SkillHeader';
 import { SkillCategory } from './SkillCategory';
 import { AIToolsPanel } from './ai/AIToolsPanel';
-
-type SkillCategory = 'mechanical' | 'electrical' | 'bodywork' | 'diagnostics' | 'restoration' | 'customization';
-
-interface Skill {
-  id: string;
-  name: string;
-  description: string;
-  category: SkillCategory;
-  prerequisites?: string[];
-}
-
-interface UserSkill {
-  skill_id: string;
-  level: number;
-  experience_points: number;
-}
+import { Skill, SkillStatus } from '@/types/skills';
 
 export const SkillTree = () => {
   const { toast } = useToast();

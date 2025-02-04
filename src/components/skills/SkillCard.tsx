@@ -8,25 +8,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-
-type SkillCategory = 'mechanical' | 'electrical' | 'bodywork' | 'diagnostics' | 'restoration' | 'customization';
-
-interface SkillStatus {
-  level: number;
-  exp: number;
-  progress: number;
-  isComplete: boolean;
-  hasStarted: boolean;
-}
+import { Skill, SkillStatus } from '@/types/skills';
 
 interface SkillCardProps {
-  skill: {
-    id: string;
-    name: string;
-    description: string;
-    category: SkillCategory;
-    prerequisites?: string[];
-  };
+  skill: Skill;
   status: SkillStatus;
 }
 

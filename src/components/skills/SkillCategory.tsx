@@ -1,24 +1,7 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import { SkillCard } from './SkillCard';
-
-type SkillCategory = 'mechanical' | 'electrical' | 'bodywork' | 'diagnostics' | 'restoration' | 'customization';
-
-interface Skill {
-  id: string;
-  name: string;
-  description: string;
-  category: SkillCategory;
-  prerequisites?: string[];
-}
-
-interface SkillStatus {
-  level: number;
-  exp: number;
-  progress: number;
-  isComplete: boolean;
-  hasStarted: boolean;
-}
+import { Skill, SkillStatus } from '@/types/skills';
 
 interface SkillCategoryProps {
   category: string;
