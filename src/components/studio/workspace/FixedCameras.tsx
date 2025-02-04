@@ -1,4 +1,3 @@
-import React from 'react';
 import * as THREE from 'three';
 
 interface FixedCamerasProps {
@@ -21,7 +20,7 @@ interface FixedCamerasProps {
 export const createFixedCameras = ({ dimensions, cameras, scene }: FixedCamerasProps) => {
   const cameraGroups: THREE.Group[] = [];
 
-  const createCamera = (position: THREE.Vector3, lookAt: THREE.Vector3) => {
+  const createCamera = (position: THREE.Vector3, lookAt: THREE.Vector3, wallNormal: THREE.Vector3) => {
     const cameraGroup = new THREE.Group();
     
     // Camera body
@@ -32,7 +31,7 @@ export const createFixedCameras = ({ dimensions, cameras, scene }: FixedCamerasP
     
     // Camera cone
     if (cameras.showCone) {
-      const coneHeight = dimensions.length / 4;
+      const coneHeight = Math.min(dimensions.length, dimensions.width) / 4;
       const coneGeometry = new THREE.ConeGeometry(
         Math.tan((45 * Math.PI) / 180) * coneHeight,
         coneHeight,
@@ -44,45 +43,69 @@ export const createFixedCameras = ({ dimensions, cameras, scene }: FixedCamerasP
         opacity: 0.3
       });
       const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-      cone.rotation.x = -Math.PI / 2;
-      cone.position.z = coneHeight / 2;
+      
+      // Align cone with wall normal
+      const quaternion = new THREE.Quaternion();
+      quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), wallNormal);
+      cone.setRotationFromQuaternion(quaternion);
+      
       cameraGroup.add(cone);
     }
 
     cameraGroup.position.copy(position);
     cameraGroup.lookAt(lookAt);
+    
+    // Ensure camera and cone stay within room bounds
+    const box = new THREE.Box3().setFromObject(cameraGroup);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    
     scene.add(cameraGroup);
     cameraGroups.push(cameraGroup);
   };
 
+  // Front wall camera
   if (cameras.frontWall) {
     createCamera(
-      new THREE.Vector3(0, dimensions.height * 0.8, dimensions.length / 2),
-      new THREE.Vector3(0, dimensions.height * 0.4, 0)
+      new THREE.Vector3(0, dimensions.height * 0.8, dimensions.length / 2 - 0.5),
+      new THREE.Vector3(0, dimensions.height * 0.4, 0),
+      new THREE.Vector3(0, 0, -1)
     );
   }
+
+  // Back wall camera
   if (cameras.backWall) {
     createCamera(
-      new THREE.Vector3(0, dimensions.height * 0.8, -dimensions.length / 2),
-      new THREE.Vector3(0, dimensions.height * 0.4, 0)
+      new THREE.Vector3(0, dimensions.height * 0.8, -dimensions.length / 2 + 0.5),
+      new THREE.Vector3(0, dimensions.height * 0.4, 0),
+      new THREE.Vector3(0, 0, 1)
     );
   }
+
+  // Left wall camera
   if (cameras.leftWall) {
     createCamera(
-      new THREE.Vector3(-dimensions.width / 2, dimensions.height * 0.8, 0),
-      new THREE.Vector3(0, dimensions.height * 0.4, 0)
+      new THREE.Vector3(-dimensions.width / 2 + 0.5, dimensions.height * 0.8, 0),
+      new THREE.Vector3(0, dimensions.height * 0.4, 0),
+      new THREE.Vector3(1, 0, 0)
     );
   }
+
+  // Right wall camera
   if (cameras.rightWall) {
     createCamera(
-      new THREE.Vector3(dimensions.width / 2, dimensions.height * 0.8, 0),
-      new THREE.Vector3(0, dimensions.height * 0.4, 0)
+      new THREE.Vector3(dimensions.width / 2 - 0.5, dimensions.height * 0.8, 0),
+      new THREE.Vector3(0, dimensions.height * 0.4, 0),
+      new THREE.Vector3(-1, 0, 0)
     );
   }
+
+  // Ceiling camera
   if (cameras.ceiling) {
     createCamera(
-      new THREE.Vector3(0, dimensions.height, 0),
-      new THREE.Vector3(0, 0, 0)
+      new THREE.Vector3(0, dimensions.height - 0.5, 0),
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, -1, 0)
     );
   }
 

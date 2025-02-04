@@ -1,4 +1,3 @@
-import React from 'react';
 import * as THREE from 'three';
 
 interface PTZCameraProps {
@@ -14,10 +13,20 @@ interface PTZCameraProps {
   };
   showCone: boolean;
   scene: THREE.Scene;
+  dimensions: {
+    length: number;
+    width: number;
+    height: number;
+  };
 }
 
-export const createPTZCamera = ({ track, showCone, scene }: PTZCameraProps) => {
+export const createPTZCamera = ({ track, showCone, scene, dimensions }: PTZCameraProps) => {
   const ptzGroup = new THREE.Group();
+  
+  // Constrain track position to walls
+  const x = Math.max(-dimensions.width/2, Math.min(dimensions.width/2, track.position.x));
+  const y = Math.max(0, Math.min(dimensions.height, track.position.y));
+  const z = Math.max(-dimensions.length/2, Math.min(dimensions.length/2, track.position.z));
   
   // Track
   const trackGeometry = new THREE.BoxGeometry(track.length, 0.2, 0.2);
@@ -34,7 +43,8 @@ export const createPTZCamera = ({ track, showCone, scene }: PTZCameraProps) => {
   
   // Camera cone
   if (showCone) {
-    const coneHeight = track.length / 2;
+    const maxConeLength = Math.min(dimensions.length, dimensions.width) / 2;
+    const coneHeight = Math.min(track.length / 2, maxConeLength);
     const coneGeometry = new THREE.ConeGeometry(
       Math.tan((track.coneAngle * Math.PI) / 180) * coneHeight,
       coneHeight,
@@ -52,7 +62,7 @@ export const createPTZCamera = ({ track, showCone, scene }: PTZCameraProps) => {
   }
   
   // Position PTZ camera
-  ptzGroup.position.set(track.position.x, track.position.y, track.position.z);
+  ptzGroup.position.set(x, y, z);
   scene.add(ptzGroup);
   
   return ptzGroup;

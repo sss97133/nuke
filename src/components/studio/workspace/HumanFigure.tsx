@@ -1,12 +1,16 @@
-import React from 'react';
 import * as THREE from 'three';
 
 interface HumanFigureProps {
   position: { x: number; y: number; z: number };
   scene: THREE.Scene;
+  dimensions: {
+    length: number;
+    width: number;
+    height: number;
+  };
 }
 
-export const createHumanFigure = ({ position, scene }: HumanFigureProps) => {
+export const createHumanFigure = ({ position, scene, dimensions }: HumanFigureProps) => {
   const human = new THREE.Group();
   const humanHeight = 6;
   
@@ -36,8 +40,12 @@ export const createHumanFigure = ({ position, scene }: HumanFigureProps) => {
   rightLeg.position.set(-0.3, humanHeight/4, 0);
   human.add(rightLeg);
 
-  // Position at specified coordinates
-  human.position.set(position.x, position.y, position.z);
+  // Constrain position within room bounds
+  const x = Math.max(-dimensions.width/2 + 1, Math.min(dimensions.width/2 - 1, position.x));
+  const y = Math.max(0, Math.min(dimensions.height - humanHeight, position.y));
+  const z = Math.max(-dimensions.length/2 + 1, Math.min(dimensions.length/2 - 1, position.z));
+  
+  human.position.set(x, y, z);
   scene.add(human);
   
   return human;
