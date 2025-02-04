@@ -2,39 +2,57 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-export interface AddMemberFormProps {
+interface AddMemberFormProps {
   garageId: string;
-  onMemberAdded?: () => void;
+  onSuccess?: () => void;
 }
 
 interface FormData {
   email: string;
 }
 
-export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
+export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
   const onSubmit = async (data: FormData) => {
     try {
-      const { data: user, error: userError } = await supabase
+      const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', data.email)
         .single();
 
-      if (userError || !user) {
-        throw new Error('User not found');
+      if (userError || !userData) {
+        toast({
+          title: 'Error',
+          description: 'User not found',
+          variant: 'destructive',
+        });
+        return;
       }
 
-      const { error } = await supabase
+      const { error: memberError } = await supabase
         .from('garage_members')
-        .insert({ garage_id: garageId, user_id: user.id });
+        .insert([
+          {
+            garage_id: garageId,
+            user_id: userData.id,
+          },
+        ]);
 
-      if (error) throw error;
+      if (memberError) {
+        toast({
+          title: 'Error',
+          description: 'Failed to add member',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       toast({
         title: 'Success',
@@ -42,11 +60,13 @@ export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) =
       });
 
       reset();
-      if (onMemberAdded) onMemberAdded();
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to add member',
+        description: 'An unexpected error occurred',
         variant: 'destructive',
       });
     }
@@ -54,12 +74,15 @@ export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) =
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <Input
-        {...register('email')}
-        type="email"
-        placeholder="Member's email"
-        required
-      />
+      <div>
+        <Label htmlFor="email">Member Email</Label>
+        <Input
+          id="email"
+          type="email"
+          {...register('email', { required: true })}
+          placeholder="Enter member email"
+        />
+      </div>
       <Button type="submit">Add Member</Button>
     </form>
   );
