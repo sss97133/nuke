@@ -10,15 +10,17 @@ import { AIToolsPanel } from './ai/AIToolsPanel';
 export const SkillTree = () => {
   const { toast } = useToast();
   
-  const { data: skills, isLoading } = useQuery({
+  const { data: skills, isLoading, error } = useQuery({
     queryKey: ['skills'],
     queryFn: async () => {
+      console.log('Fetching skills...');
       const { data, error } = await supabase
         .from('skills')
         .select('*')
         .order('category');
       
       if (error) {
+        console.error('Error fetching skills:', error);
         toast({
           title: 'Error loading skills',
           description: error.message,
@@ -26,18 +28,21 @@ export const SkillTree = () => {
         });
         throw error;
       }
+      console.log('Skills fetched:', data);
       return data;
     },
   });
 
-  const { data: userSkills } = useQuery({
+  const { data: userSkills, error: userSkillsError } = useQuery({
     queryKey: ['user-skills'],
     queryFn: async () => {
+      console.log('Fetching user skills...');
       const { data, error } = await supabase
         .from('user_skills')
         .select('*');
       
       if (error) {
+        console.error('Error fetching user skills:', error);
         toast({
           title: 'Error loading user skills',
           description: error.message,
@@ -45,9 +50,18 @@ export const SkillTree = () => {
         });
         throw error;
       }
+      console.log('User skills fetched:', data);
       return data;
     },
   });
+
+  if (error || userSkillsError) {
+    toast({
+      title: 'Error',
+      description: 'Failed to load skills data. Please try again.',
+      variant: 'destructive',
+    });
+  }
 
   if (isLoading) {
     return <LoadingState />;
@@ -85,6 +99,14 @@ export const SkillTree = () => {
       hasStarted: level > 0
     };
   };
+
+  if (!skills?.length) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-muted-foreground">No skills found. Please check back later.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
