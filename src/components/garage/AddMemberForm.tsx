@@ -1,25 +1,25 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-type AddMemberFormProps = {
+interface AddMemberFormProps {
   garageId: string;
-  onMemberAdded?: () => void;
-};
+  onSuccess?: () => void;
+}
 
-type FormValues = {
+interface FormData {
   email: string;
-};
+}
 
-export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
-  const { register, handleSubmit, reset } = useForm<FormValues>();
+export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
+  const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = async (data: FormData) => {
     try {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
@@ -28,22 +28,17 @@ export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) =
         .single();
 
       if (userError || !userData) {
-        toast({
-          title: 'Error',
-          description: 'User not found',
-          variant: 'destructive',
-        });
-        return;
+        throw new Error('User not found');
       }
 
-      const { error } = await supabase
+      const { error: memberError } = await supabase
         .from('garage_members')
         .insert({
           user_id: userData.id,
-          garage_id: garageId,
+          garage_id: garageId
         });
 
-      if (error) throw error;
+      if (memberError) throw memberError;
 
       toast({
         title: 'Success',
@@ -51,9 +46,7 @@ export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) =
       });
 
       reset();
-      if (onMemberAdded) {
-        onMemberAdded();
-      }
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast({
         title: 'Error',

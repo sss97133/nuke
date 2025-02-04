@@ -12,6 +12,8 @@ interface FormData {
     y: number;
     z: number;
     length: number;
+    speed: number;
+    coneAngle: number;
   }[];
 }
 
@@ -25,7 +27,9 @@ export const StudioConfiguration = () => {
   const [ptzTracks, setPtzTracks] = useState([
     {
       position: { x: 0, y: 8, z: 0 },
-      length: 10
+      length: 10,
+      speed: 1,
+      coneAngle: 45
     }
   ]);
 
@@ -45,6 +49,8 @@ export const StudioConfiguration = () => {
             z: Number(data.ptzTracks[0].z) || 0,
           },
           length: Number(data.ptzTracks[0].length) || 10,
+          speed: Number(data.ptzTracks[0].speed) || 1,
+          coneAngle: Number(data.ptzTracks[0].coneAngle) || 45,
         },
       ]);
     }
