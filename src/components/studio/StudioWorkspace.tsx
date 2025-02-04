@@ -8,6 +8,19 @@ interface StudioWorkspaceProps {
     width: number;
     height: number;
   };
+  humanPosition?: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  cameras?: {
+    frontWall: boolean;
+    backWall: boolean;
+    leftWall: boolean;
+    rightWall: boolean;
+    ceiling: boolean;
+    showCone: boolean;
+  };
   ptzTracks?: {
     position: {
       x: number;
@@ -20,7 +33,19 @@ interface StudioWorkspaceProps {
   }[];
 }
 
-export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceProps) => {
+export const StudioWorkspace = ({ 
+  dimensions, 
+  humanPosition = { x: 0, y: 0, z: 0 },
+  cameras = {
+    frontWall: false,
+    backWall: false,
+    leftWall: false,
+    rightWall: false,
+    ceiling: false,
+    showCone: true,
+  },
+  ptzTracks = [] 
+}: StudioWorkspaceProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -29,6 +54,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
   const objectsRef = useRef<THREE.Object3D[]>([]);
   const humanRef = useRef<THREE.Group | null>(null);
   const ptzCameraRef = useRef<THREE.Group | null>(null);
+  const fixedCamerasRef = useRef<THREE.Group[]>([]);
   const animationFrameRef = useRef<number>();
   const timeRef = useRef<number>(0);
 
@@ -70,26 +96,30 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     directionalLight.position.set(1, 1, 1);
     scene.add(directionalLight);
 
-    // Create human figure (6 feet tall = 1.83 meters)
+    // Create human figure (6 feet tall)
     const createHuman = () => {
+      if (humanRef.current) {
+        scene.remove(humanRef.current);
+      }
+
       const human = new THREE.Group();
       const humanHeight = 6;
       
-      // Body (1/3 of total height)
+      // Body
       const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.4, humanHeight/3, 8);
       const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-      body.position.y = humanHeight/6; // Half of body height
+      body.position.y = humanHeight/6;
       human.add(body);
 
-      // Head (1/6 of total height)
+      // Head
       const headGeometry = new THREE.SphereGeometry(0.4, 8, 8);
       const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffcc99 });
       const head = new THREE.Mesh(headGeometry, headMaterial);
       head.position.y = humanHeight/3 + 0.4;
       human.add(head);
 
-      // Legs (1/2 of total height)
+      // Legs
       const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, humanHeight/2, 8);
       const legMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
       
@@ -101,8 +131,8 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       rightLeg.position.set(-0.3, humanHeight/4, 0);
       human.add(rightLeg);
 
-      // Position at ground level
-      human.position.y = 0;
+      // Position at specified coordinates
+      human.position.set(humanPosition.x, humanPosition.y, humanPosition.z);
       scene.add(human);
       humanRef.current = human;
     };
@@ -110,63 +140,146 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     createHuman();
 
     // Create PTZ camera
-    if (ptzTracks && ptzTracks.length > 0) {
-      const ptzGroup = new THREE.Group();
-      
-      // Camera body
-      const cameraBody = new THREE.BoxGeometry(0.5, 0.5, 0.8);
-      const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-      const cameraMesh = new THREE.Mesh(cameraBody, cameraMaterial);
-      
-      // Camera cone
-      const coneHeight = dimensions.length / 2;
-      const coneGeometry = new THREE.ConeGeometry(
-        Math.tan((ptzTracks[0].coneAngle * Math.PI) / 180) * coneHeight,
-        coneHeight,
-        32
-      );
-      const coneMaterial = new THREE.MeshPhongMaterial({
-        color: 0xffff00,
-        transparent: true,
-        opacity: 0.3
-      });
-      const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-      cone.rotation.x = -Math.PI / 2;
-      cone.position.z = coneHeight / 2;
-      
-      ptzGroup.add(cameraMesh);
-      ptzGroup.add(cone);
-      
-      // Position PTZ camera
-      ptzGroup.position.set(
-        ptzTracks[0].position.x,
-        ptzTracks[0].position.y,
-        ptzTracks[0].position.z
-      );
-      
-      scene.add(ptzGroup);
-      ptzCameraRef.current = ptzGroup;
-    }
+    const createPTZCamera = () => {
+      if (ptzCameraRef.current) {
+        scene.remove(ptzCameraRef.current);
+      }
+
+      if (ptzTracks && ptzTracks.length > 0) {
+        const track = ptzTracks[0];
+        const ptzGroup = new THREE.Group();
+        
+        // Track
+        const trackGeometry = new THREE.BoxGeometry(track.length, 0.2, 0.2);
+        const trackMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+        const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+        trackMesh.position.x = track.length / 2;
+        ptzGroup.add(trackMesh);
+        
+        // Camera body
+        const cameraBody = new THREE.BoxGeometry(0.5, 0.5, 0.8);
+        const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+        const cameraMesh = new THREE.Mesh(cameraBody, cameraMaterial);
+        ptzGroup.add(cameraMesh);
+        
+        // Camera cone (if enabled)
+        if (cameras.showCone) {
+          const coneHeight = dimensions.length / 2;
+          const coneGeometry = new THREE.ConeGeometry(
+            Math.tan((track.coneAngle * Math.PI) / 180) * coneHeight,
+            coneHeight,
+            32
+          );
+          const coneMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffff00,
+            transparent: true,
+            opacity: 0.3
+          });
+          const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+          cone.rotation.x = -Math.PI / 2;
+          cone.position.z = coneHeight / 2;
+          ptzGroup.add(cone);
+        }
+        
+        // Position PTZ camera
+        ptzGroup.position.set(track.position.x, track.position.y, track.position.z);
+        scene.add(ptzGroup);
+        ptzCameraRef.current = ptzGroup;
+      }
+    };
+
+    createPTZCamera();
+
+    // Create fixed cameras
+    const createFixedCameras = () => {
+      // Remove existing fixed cameras
+      fixedCamerasRef.current.forEach(camera => scene.remove(camera));
+      fixedCamerasRef.current = [];
+
+      const createCamera = (position: THREE.Vector3, lookAt: THREE.Vector3) => {
+        const cameraGroup = new THREE.Group();
+        
+        // Camera body
+        const cameraBody = new THREE.BoxGeometry(0.5, 0.5, 0.8);
+        const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+        const cameraMesh = new THREE.Mesh(cameraBody, cameraMaterial);
+        cameraGroup.add(cameraMesh);
+        
+        // Camera cone
+        if (cameras.showCone) {
+          const coneHeight = dimensions.length / 4;
+          const coneGeometry = new THREE.ConeGeometry(
+            Math.tan((45 * Math.PI) / 180) * coneHeight,
+            coneHeight,
+            32
+          );
+          const coneMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffff00,
+            transparent: true,
+            opacity: 0.3
+          });
+          const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+          cone.rotation.x = -Math.PI / 2;
+          cone.position.z = coneHeight / 2;
+          cameraGroup.add(cone);
+        }
+
+        cameraGroup.position.copy(position);
+        cameraGroup.lookAt(lookAt);
+        scene.add(cameraGroup);
+        fixedCamerasRef.current.push(cameraGroup);
+      };
+
+      // Add cameras based on configuration
+      if (cameras.frontWall) {
+        createCamera(
+          new THREE.Vector3(0, dimensions.height * 0.8, dimensions.length / 2),
+          new THREE.Vector3(0, dimensions.height * 0.4, 0)
+        );
+      }
+      if (cameras.backWall) {
+        createCamera(
+          new THREE.Vector3(0, dimensions.height * 0.8, -dimensions.length / 2),
+          new THREE.Vector3(0, dimensions.height * 0.4, 0)
+        );
+      }
+      if (cameras.leftWall) {
+        createCamera(
+          new THREE.Vector3(-dimensions.width / 2, dimensions.height * 0.8, 0),
+          new THREE.Vector3(0, dimensions.height * 0.4, 0)
+        );
+      }
+      if (cameras.rightWall) {
+        createCamera(
+          new THREE.Vector3(dimensions.width / 2, dimensions.height * 0.8, 0),
+          new THREE.Vector3(0, dimensions.height * 0.4, 0)
+        );
+      }
+      if (cameras.ceiling) {
+        createCamera(
+          new THREE.Vector3(0, dimensions.height, 0),
+          new THREE.Vector3(0, 0, 0)
+        );
+      }
+    };
+
+    createFixedCameras();
 
     // Animation loop
     const animate = () => {
       timeRef.current += 0.005;
       
       if (humanRef.current) {
-        const walkRadius = Math.min(dimensions.length, dimensions.width) / 2 - 2;
-        humanRef.current.position.x = Math.sin(timeRef.current) * walkRadius;
-        humanRef.current.position.z = Math.cos(timeRef.current * 0.7) * walkRadius;
-        humanRef.current.position.y = Math.abs(Math.sin(timeRef.current * 4) * 0.1);
+        // Add slight bobbing motion
+        humanRef.current.position.y = humanPosition.y + Math.abs(Math.sin(timeRef.current * 4) * 0.1);
       }
 
-      if (ptzCameraRef.current && humanRef.current) {
+      if (ptzCameraRef.current && humanRef.current && ptzTracks[0]) {
         ptzCameraRef.current.lookAt(humanRef.current.position);
         
-        if (ptzTracks[0]) {
-          const track = ptzTracks[0];
-          const trackPosition = Math.sin(timeRef.current * track.speed) * (track.length / 2);
-          ptzCameraRef.current.position.x = track.position.x + trackPosition;
-        }
+        const track = ptzTracks[0];
+        const trackPosition = Math.sin(timeRef.current * track.speed) * (track.length / 2);
+        ptzCameraRef.current.position.x = track.position.x + trackPosition;
       }
 
       if (controlsRef.current) {
@@ -202,7 +315,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, []); // Only run once on mount
+  }, [dimensions, humanPosition, cameras, ptzTracks]); // Re-run when these props change
 
   // Update scene when dimensions or PTZ tracks change
   useEffect(() => {

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -12,6 +13,19 @@ interface FormData {
   length: number;
   width: number;
   height: number;
+  humanPosition: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  cameras: {
+    frontWall: boolean;
+    backWall: boolean;
+    leftWall: boolean;
+    rightWall: boolean;
+    ceiling: boolean;
+    showCone: boolean;
+  };
   ptzTracks: {
     x: number;
     y: number;
@@ -29,6 +43,19 @@ interface StudioConfigFormProps {
       length: number;
       width: number;
       height: number;
+    };
+    humanPosition?: {
+      x: number;
+      y: number;
+      z: number;
+    };
+    cameras?: {
+      frontWall: boolean;
+      backWall: boolean;
+      leftWall: boolean;
+      rightWall: boolean;
+      ceiling: boolean;
+      showCone: boolean;
     };
     ptzTracks: {
       position: {
@@ -49,6 +76,15 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
       length: initialData?.dimensions.length || 30,
       width: initialData?.dimensions.width || 20,
       height: initialData?.dimensions.height || 16,
+      humanPosition: initialData?.humanPosition || { x: 0, y: 0, z: 0 },
+      cameras: initialData?.cameras || {
+        frontWall: false,
+        backWall: false,
+        leftWall: false,
+        rightWall: false,
+        ceiling: false,
+        showCone: true,
+      },
       ptzTracks: [{
         x: initialData?.ptzTracks[0]?.position.x || 0,
         y: initialData?.ptzTracks[0]?.position.y || 8,
@@ -111,7 +147,9 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
       <Tabs defaultValue="dimensions" className="w-full">
         <TabsList>
           <TabsTrigger value="dimensions">Room Dimensions</TabsTrigger>
+          <TabsTrigger value="cameras">Cameras</TabsTrigger>
           <TabsTrigger value="ptz">PTZ Configuration</TabsTrigger>
+          <TabsTrigger value="human">Human Position</TabsTrigger>
         </TabsList>
         
         <TabsContent value="dimensions" className="space-y-4">
@@ -141,6 +179,59 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
                 type="number"
                 {...register('height', { required: true, min: 0 })}
                 placeholder="16"
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="cameras" className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="frontWall">Front Wall Camera</Label>
+              <Switch
+                id="frontWall"
+                checked={formData.cameras.frontWall}
+                onCheckedChange={(checked) => setValue('cameras.frontWall', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="backWall">Back Wall Camera</Label>
+              <Switch
+                id="backWall"
+                checked={formData.cameras.backWall}
+                onCheckedChange={(checked) => setValue('cameras.backWall', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="leftWall">Left Wall Camera</Label>
+              <Switch
+                id="leftWall"
+                checked={formData.cameras.leftWall}
+                onCheckedChange={(checked) => setValue('cameras.leftWall', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="rightWall">Right Wall Camera</Label>
+              <Switch
+                id="rightWall"
+                checked={formData.cameras.rightWall}
+                onCheckedChange={(checked) => setValue('cameras.rightWall', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="ceiling">Ceiling Camera</Label>
+              <Switch
+                id="ceiling"
+                checked={formData.cameras.ceiling}
+                onCheckedChange={(checked) => setValue('cameras.ceiling', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="showCone">Show Camera Cones</Label>
+              <Switch
+                id="showCone"
+                checked={formData.cameras.showCone}
+                onCheckedChange={(checked) => setValue('cameras.showCone', checked)}
               />
             </div>
           </div>
@@ -204,6 +295,38 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
                 step={5}
                 defaultValue={[formData.ptzTracks[0].coneAngle]}
                 onValueChange={(value) => setValue('ptzTracks.0.coneAngle', value[0])}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="human" className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="human-x">X Position</Label>
+              <Input
+                id="human-x"
+                type="number"
+                {...register('humanPosition.x', { required: true })}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <Label htmlFor="human-y">Y Position</Label>
+              <Input
+                id="human-y"
+                type="number"
+                {...register('humanPosition.y', { required: true })}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <Label htmlFor="human-z">Z Position</Label>
+              <Input
+                id="human-z"
+                type="number"
+                {...register('humanPosition.z', { required: true })}
+                placeholder="0"
               />
             </div>
           </div>
