@@ -1,3 +1,9 @@
+export interface WorkspaceDimensions {
+  width: number;
+  height: number;
+  length: number;
+}
+
 export interface PTZTrack {
   position: {
     x: number;
@@ -7,12 +13,6 @@ export interface PTZTrack {
   length: number;
   speed: number;
   coneAngle: number;
-}
-
-export interface WorkspaceDimensions {
-  width: number;
-  height: number;
-  length: number;
 }
 
 export interface PTZConfigurations {
@@ -36,4 +36,14 @@ export interface StudioConfigurationType {
   fixed_cameras: { positions: any[] };
   created_at: string;
   updated_at: string;
+}
+
+export interface StudioDimensionsProps {
+  dimensions: WorkspaceDimensions;
+  onUpdate: (dimensions: WorkspaceDimensions) => void;
+}
+
+export interface PTZConfigurationProps {
+  ptzTracks: PTZTrack[];
+  onUpdate: (tracks: PTZTrack[]) => void;
 }

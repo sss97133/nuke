@@ -41,16 +41,19 @@ export const StudioConfiguration = () => {
 
       if (error) throw error;
 
-      // Parse and validate the data with proper type assertions
-      const workspaceDimensions = typeof data.workspace_dimensions === 'object' ? 
-        data.workspace_dimensions as WorkspaceDimensions : 
-        { width: 0, height: 0, length: 0 };
+      const workspaceDimensions = data.workspace_dimensions as WorkspaceDimensions || {
+        width: 0,
+        height: 0,
+        length: 0
+      };
 
-      const ptzConfig = typeof data.ptz_configurations === 'object' ? 
-        data.ptz_configurations : 
-        { tracks: [], planes: { walls: [], ceiling: {} }, roboticArms: [] };
+      const ptzConfig = data.ptz_configurations || {
+        tracks: [],
+        planes: { walls: [], ceiling: {} },
+        roboticArms: []
+      };
 
-      const parsedConfig: StudioConfigurationType = {
+      const config: StudioConfigurationType = {
         ...data,
         workspace_dimensions: workspaceDimensions,
         ptz_configurations: ptzConfig,
@@ -60,7 +63,7 @@ export const StudioConfiguration = () => {
         fixed_cameras: data.fixed_cameras || { positions: [] }
       };
 
-      return parsedConfig;
+      return config;
     }
   });
 
