@@ -47,7 +47,7 @@ export const ServiceTicketForm = () => {
         vehicle_id: selectedVehicle.id,
         description,
         service_type: serviceType as Database['public']['Enums']['service_type'],
-        parts_used: parts,
+        parts_used: parts as unknown as Database['public']['Tables']['service_tickets']['Insert']['parts_used'],
         status: 'pending',
         priority: 'medium', // This would be based on vehicle priority in a real implementation
         user_id: user?.id
