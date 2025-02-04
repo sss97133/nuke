@@ -101,8 +101,8 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       rightLeg.position.set(-0.3, humanHeight/4, 0);
       human.add(rightLeg);
 
-      // Position at floor level
-      human.position.y = humanHeight/2;
+      // Position at ground level
+      human.position.y = 0;
       scene.add(human);
       humanRef.current = human;
     };
@@ -119,8 +119,8 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
         humanRef.current.position.x = Math.sin(timeRef.current) * walkRadius;
         humanRef.current.position.z = Math.cos(timeRef.current * 0.7) * walkRadius;
         
-        // Add slight bobbing motion for walking
-        humanRef.current.position.y = 3 + Math.sin(timeRef.current * 4) * 0.1;
+        // Add slight bobbing motion for walking while maintaining ground contact
+        humanRef.current.position.y = Math.sin(timeRef.current * 4) * 0.1;
       }
 
       if (ptzCameraRef.current && humanRef.current) {
@@ -218,7 +218,8 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       ptzGroup.add(cameraMesh);
 
       // Camera cone (field of view)
-      const coneHeight = 5;
+      const maxDistance = Math.max(dimensions.length, dimensions.width) * 2; // Extend beyond room
+      const coneHeight = maxDistance;
       const coneRadius = Math.tan((track.coneAngle * Math.PI) / 180) * coneHeight;
       const coneGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 32);
       const coneMaterial = new THREE.MeshPhongMaterial({ 
@@ -227,9 +228,9 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
         opacity: 0.2
       });
       const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-      // Rotate cone to point forward from camera
-      cone.rotation.x = -Math.PI / 2;
-      cone.position.z = -coneHeight/2;
+      // Position cone with vertex at camera center, pointing forward
+      cone.rotation.x = Math.PI / 2;
+      cone.position.z = coneHeight / 2;
       ptzGroup.add(cone);
 
       ptzGroup.position.set(track.position.x, track.position.y, track.position.z);
