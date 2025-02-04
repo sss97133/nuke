@@ -19,59 +19,59 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
     <>
       <TabsList className="w-full h-12 bg-background border border-border shadow-classic rounded-none p-1">
         <div className="flex justify-between w-full">
-          <div className="flex gap-1">
+          <div className="grid grid-cols-8 w-full gap-1">
             <TabsTrigger 
               value="home" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <Terminal className="w-4 h-4" />
               <span className="hidden sm:inline">Home</span>
             </TabsTrigger>
             <TabsTrigger 
               value="inventory" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <Warehouse className="w-4 h-4" />
               <span className="hidden sm:inline">Inventory</span>
             </TabsTrigger>
             <TabsTrigger 
               value="vehicles" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <Car className="w-4 h-4" />
               <span className="hidden sm:inline">Vehicles</span>
             </TabsTrigger>
             <TabsTrigger 
               value="service" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <Wrench className="w-4 h-4" />
               <span className="hidden sm:inline">Service</span>
             </TabsTrigger>
             <TabsTrigger 
               value="garages" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <Building2 className="w-4 h-4" />
               <span className="hidden sm:inline">Garages</span>
             </TabsTrigger>
             <TabsTrigger 
               value="professional" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <UserRound className="w-4 h-4" />
               <span className="hidden sm:inline">Professional</span>
             </TabsTrigger>
             <TabsTrigger 
               value="auctions" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <Building2 className="w-4 h-4" />
               <span className="hidden sm:inline">Auctions</span>
             </TabsTrigger>
             <TabsTrigger 
               value="studio" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <Video className="w-4 h-4" />
               <span className="hidden sm:inline">Studio</span>
