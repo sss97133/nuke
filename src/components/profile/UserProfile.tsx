@@ -58,6 +58,30 @@ export const UserProfile = () => {
     },
   });
 
+  const { data: achievements } = useQuery({
+    queryKey: ['achievements'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('user_achievements')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('earned_at', { ascending: false });
+      
+      if (error) {
+        toast({
+          title: 'Error loading achievements',
+          description: error.message,
+          variant: 'destructive',
+        });
+        throw error;
+      }
+      return data || [];
+    },
+  });
+
   const handleSocialLinksUpdate = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
