@@ -3,7 +3,7 @@ import { StudioWorkspace } from './StudioWorkspace';
 import { StudioConfigForm } from './StudioConfigForm';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Camera, Video, Settings, Layout, Mic2, Radio, Share2 } from 'lucide-react';
+import { Camera, Video, Settings, Layout, Mic2, Radio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
@@ -13,10 +13,10 @@ import { AudioControls } from './controls/AudioControls';
 import { StreamingControls } from './controls/StreamingControls';
 import { PTZControls } from './controls/PTZControls';
 import { RecordingControls } from './controls/RecordingControls';
-import type { StudioConfigurationType } from '@/types/studio';
+import type { StudioConfigurationType, WorkspaceDimensions, PTZConfigurations } from '@/types/studio';
 
 export const StudioConfiguration = () => {
-  const [dimensions, setDimensions] = useState({
+  const [dimensions, setDimensions] = useState<WorkspaceDimensions>({
     length: 30,
     width: 20,
     height: 16,
@@ -43,12 +43,12 @@ export const StudioConfiguration = () => {
 
       return {
         ...data,
-        workspace_dimensions: data.workspace_dimensions as StudioConfigurationType['workspace_dimensions'],
-        ptz_configurations: data.ptz_configurations as StudioConfigurationType['ptz_configurations'],
+        workspace_dimensions: data.workspace_dimensions as WorkspaceDimensions,
+        ptz_configurations: data.ptz_configurations as PTZConfigurations,
         camera_config: data.camera_config as Record<string, any> | null,
         audio_config: data.audio_config as Record<string, any> | null,
         lighting_config: data.lighting_config as Record<string, any> | null,
-      };
+      } as StudioConfigurationType;
     }
   });
 
