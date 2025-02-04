@@ -10,7 +10,7 @@ type Garage = {
   address: string | null;
 };
 
-const GarageMap = () => {
+export const GarageMap = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<{ [key: string]: mapboxgl.Marker }>({});
@@ -24,7 +24,17 @@ const GarageMap = () => {
         .not('location', 'is', null);
       
       if (data) {
-        setGarages(data);
+        // Convert the JSON location data to our Garage type
+        const formattedGarages: Garage[] = data.map(garage => ({
+          id: garage.id,
+          name: garage.name,
+          location: garage.location ? {
+            lat: (garage.location as any).lat,
+            lng: (garage.location as any).lng
+          } : null,
+          address: garage.address
+        }));
+        setGarages(formattedGarages);
       }
     };
 
@@ -117,5 +127,3 @@ const GarageMap = () => {
     </div>
   );
 };
-
-export default GarageMap;
