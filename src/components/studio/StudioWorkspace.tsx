@@ -228,9 +228,10 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
         opacity: 0.2
       });
       const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-      // Position cone with vertex at camera center, pointing forward
-      cone.rotation.x = Math.PI / 2;
-      cone.position.z = coneHeight / 2;
+      
+      // Position cone with base at camera center, pointing forward
+      cone.rotation.x = -Math.PI / 2;
+      cone.position.z = coneHeight/2;
       ptzGroup.add(cone);
 
       ptzGroup.position.set(track.position.x, track.position.y, track.position.z);
