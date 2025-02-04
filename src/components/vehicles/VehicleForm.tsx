@@ -90,13 +90,14 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-full p-0">
-            <Command>
+            <Command shouldFilter={false}>
               <CommandInput placeholder="Search brand..." />
               <CommandEmpty>No brand found.</CommandEmpty>
-              <CommandGroup className="max-h-60 overflow-auto">
+              <CommandGroup>
                 {carBrands.map((brand) => (
                   <CommandItem
                     key={brand}
+                    value={brand}
                     onSelect={(currentValue) => {
                       setSelectedBrand(currentValue === selectedBrand ? "" : brand);
                       setOpen(false);
