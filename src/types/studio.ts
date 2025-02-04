@@ -10,9 +10,9 @@ export interface PTZTrack {
 }
 
 export interface WorkspaceDimensions {
-  length: number;
   width: number;
   height: number;
+  length: number;
 }
 
 export interface PTZConfigurations {

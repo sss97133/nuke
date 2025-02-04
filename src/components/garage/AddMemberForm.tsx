@@ -11,9 +11,9 @@ export interface AddMemberFormProps {
   onSuccess?: () => void;
 }
 
-type FormData = {
+interface FormData {
   email: string;
-};
+}
 
 export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();

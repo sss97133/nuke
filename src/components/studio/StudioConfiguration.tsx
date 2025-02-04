@@ -41,14 +41,23 @@ export const StudioConfiguration = () => {
 
       if (error) throw error;
 
+      // Ensure the data matches our expected types
       const parsedConfig: StudioConfigurationType = {
         ...data,
-        workspace_dimensions: data.workspace_dimensions as WorkspaceDimensions,
-        ptz_configurations: data.ptz_configurations as PTZConfigurations,
-        camera_config: data.camera_config,
-        audio_config: data.audio_config,
-        lighting_config: data.lighting_config,
-        fixed_cameras: data.fixed_cameras,
+        workspace_dimensions: data.workspace_dimensions as WorkspaceDimensions || {
+          width: 0,
+          height: 0,
+          length: 0
+        },
+        ptz_configurations: data.ptz_configurations as PTZConfigurations || {
+          tracks: [],
+          planes: { walls: [], ceiling: {} },
+          roboticArms: []
+        },
+        camera_config: data.camera_config as Record<string, any> || null,
+        audio_config: data.audio_config as Record<string, any> || null,
+        lighting_config: data.lighting_config as Record<string, any> || null,
+        fixed_cameras: data.fixed_cameras as { positions: any[] } || { positions: [] }
       };
 
       return parsedConfig;
