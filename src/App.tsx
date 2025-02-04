@@ -14,16 +14,14 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <React.StrictMode>
+  <BrowserRouter>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <TooltipProvider>
-          <Toaster />
-          <Index />
-        </TooltipProvider>
-      </BrowserRouter>
+      <TooltipProvider>
+        <Toaster />
+        <Index />
+      </TooltipProvider>
     </QueryClientProvider>
-  </React.StrictMode>
+  </BrowserRouter>
 );
 
 export default App;
