@@ -1,97 +1,100 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { Loader2, UserPlus } from "lucide-react";
 
-type AddGarageMemberProps = {
-  garageId: string;
-};
-
-type Profile = {
+interface Profile {
   id: string;
-  email?: string;
-};
+  username?: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
+}
 
-export const AddGarageMember = ({ garageId }: AddGarageMemberProps) => {
-  const [newMemberEmail, setNewMemberEmail] = useState("");
+interface AddGarageMemberProps {
+  garageId: string;
+  onMemberAdded: () => void;
+}
+
+export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const handleAddMember = async () => {
-    if (!newMemberEmail.trim()) {
+    setIsLoading(true);
+    try {
+      // First find the user by email
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (profileError || !profiles) {
+        throw new Error('User not found');
+      }
+
+      // Add the user as a garage member
+      const { error: memberError } = await supabase
+        .from('garage_members')
+        .insert({
+          garage_id: garageId,
+          user_id: profiles.id
+        });
+
+      if (memberError) throw memberError;
+
+      toast({
+        title: "Success",
+        description: "Member added successfully"
+      });
+      
+      onMemberAdded();
+      setIsOpen(false);
+      setEmail("");
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Member email is required",
+        description: error.message,
         variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', newMemberEmail)
-      .single();
-
-    if (profileError || !profile) {
-      toast({
-        title: "Error",
-        description: "User not found",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const { error } = await supabase
-      .from('garage_members')
-      .insert([{ 
-        garage_id: garageId,
-        user_id: profile.id
-      }]);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add member",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    toast({
-      title: "Success",
-      description: "Member added successfully"
-    });
-    setNewMemberEmail("");
-    queryClient.invalidateQueries({ queryKey: ['garages'] });
   };
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <UserPlus className="w-4 h-4" />
+        <Button variant="outline" size="sm">
+          <UserPlus className="h-4 w-4 mr-2" />
           Add Member
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Member</DialogTitle>
+          <DialogTitle>Add Garage Member</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 pt-4">
-          <Input
-            placeholder="Member Email"
-            value={newMemberEmail}
-            onChange={(e) => setNewMemberEmail(e.target.value)}
-          />
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter member's email"
+            />
+          </div>
           <Button 
             onClick={handleAddMember}
+            disabled={isLoading || !email}
             className="w-full"
           >
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Add Member
           </Button>
         </div>

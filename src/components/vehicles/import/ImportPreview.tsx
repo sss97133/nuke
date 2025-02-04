@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Vehicle } from "@/types/inventory";
+import type { Vehicle } from "@/types/inventory";
 import { Loader2 } from "lucide-react";
 
 interface ImportPreviewProps {
@@ -27,12 +27,21 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
   const handleImport = async () => {
     setIsImporting(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const vehiclesToInsert = editedVehicles.map(vehicle => ({
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+        vin: vehicle.vin,
+        notes: vehicle.notes,
+        user_id: user?.id,
+        historical_data: vehicle.historical_data ? JSON.stringify(vehicle.historical_data) : null
+      }));
+
       const { error } = await supabase
         .from('vehicles')
-        .insert(editedVehicles.map(vehicle => ({
-          ...vehicle,
-          user_id: (await supabase.auth.getUser()).data.user?.id
-        })));
+        .insert(vehiclesToInsert);
 
       if (error) throw error;
 
@@ -115,9 +124,7 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
           onClick={handleImport}
           disabled={isImporting}
         >
-          {isImporting ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : null}
+          {isImporting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
           Import {editedVehicles.length} Vehicles
         </Button>
       </div>

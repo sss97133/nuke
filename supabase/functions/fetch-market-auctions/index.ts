@@ -1,155 +1,58 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { FireCrawl } from "https://esm.sh/@mendable/firecrawl-js";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface AuctionSource {
-  url: string;
-  patterns: string[];
-  sourceName: string;
 }
-
-interface ExtractedAuction {
-  make: string;
-  model: string;
-  year: number;
-  price: number;
-  url: string;
-  source: string;
-  endTime?: string;
-  imageUrl?: string;
-}
-
-const SOURCES: AuctionSource[] = [
-  {
-    url: 'https://bringatrailer.com/auctions/',
-    patterns: [
-      '.auction-list-item',
-      '.auction-title',
-      '.current-bid',
-      '.auction-image',
-      '.auction-end-time'
-    ],
-    sourceName: 'bringatrailer'
-  },
-  {
-    url: 'https://carsandbids.com/auctions',
-    patterns: [
-      '.auction-card',
-      '.auction-title',
-      '.current-bid',
-      '.auction-image',
-      '.time-remaining'
-    ],
-    sourceName: 'carsandbids'
-  }
-];
-
-const extractAuctionData = (content: string, url: string, sourceName: string, images?: string[]): ExtractedAuction | null => {
-  try {
-    console.log('Extracting data from content:', content.substring(0, 100));
-    
-    const yearMatch = content.match(/\b(19|20)\d{2}\b/);
-    const priceMatch = content.match(/\$[\d,]+(?:\.\d{2})?/);
-    const makeModelMatch = content.match(/(?:19|20)\d{2}\s+([A-Za-z-]+)\s+([A-Za-z0-9-]+)/);
-    const endTimeMatch = content.match(/Ends\s+(\w+\s+\d+(?:st|nd|rd|th)?\s+\d+:\d+\s*(?:AM|PM|am|pm))/i);
-
-    if (yearMatch && priceMatch && makeModelMatch) {
-      return {
-        year: parseInt(yearMatch[0]),
-        make: makeModelMatch[1],
-        model: makeModelMatch[2],
-        price: parseFloat(priceMatch[0].replace(/[$,]/g, '')),
-        url: url,
-        source: sourceName,
-        endTime: endTimeMatch ? new Date(endTimeMatch[1]).toISOString() : undefined,
-        imageUrl: images?.[0]
-      };
-    }
-    return null;
-  } catch (error) {
-    console.error('Error extracting auction data:', error);
-    return null;
-  }
-};
-
-const crawlSource = async (source: AuctionSource, firecrawl: FireCrawl): Promise<ExtractedAuction[]> => {
-  try {
-    console.log(`Crawling ${source.sourceName}...`);
-    const response = await firecrawl.crawlUrl(source.url, {
-      limit: 5,
-      scrapeOptions: {
-        patterns: source.patterns,
-        waitForSelector: '.auction-list-item, .auction-card',
-        timeout: 10000
-      }
-    });
-
-    return response.data
-      .map(item => extractAuctionData(item.content, item.url || source.url, source.sourceName, item.images))
-      .filter((item): item is ExtractedAuction => item !== null);
-  } catch (error) {
-    console.error(`Error crawling ${source.url}:`, error);
-    return [];
-  }
-};
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      headers: corsHeaders
-    });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    console.log('Starting to fetch auction data from multiple sources...');
-    const firecrawl = new FireCrawl(Deno.env.get('FIRECRAWL_API_KEY')!);
-    const results: ExtractedAuction[] = [];
-
-    for (const source of SOURCES) {
-      try {
-        const sourceResults = await crawlSource(source, firecrawl);
-        results.push(...sourceResults);
-        
-        // Add delay between sources to avoid rate limits
-        await delay(1000);
-      } catch (error) {
-        console.error(`Error processing source ${source.sourceName}:`, error);
-      }
-    }
+    // This is a mock response for now - you can integrate with real auction APIs later
+    const mockData = {
+      data: [
+        {
+          make: "Toyota",
+          model: "Supra",
+          year: 1994,
+          price: 45000,
+          url: "https://example.com/auction/1",
+          source: "Example Auctions",
+          endTime: new Date(Date.now() + 86400000).toISOString(),
+          imageUrl: "https://example.com/supra.jpg"
+        },
+        {
+          make: "Nissan",
+          model: "Skyline",
+          year: 1999,
+          price: 55000,
+          url: "https://example.com/auction/2",
+          source: "Example Auctions",
+          endTime: new Date(Date.now() + 172800000).toISOString(),
+          imageUrl: "https://example.com/skyline.jpg"
+        }
+      ]
+    };
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        data: results
-      }),
-      {
-        headers: {
+      JSON.stringify(mockData),
+      { 
+        headers: { 
           ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
+          'Content-Type': 'application/json'
+        }
       }
-    );
+    )
   } catch (error) {
-    console.error('Error fetching auction data:', error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch auction data'
-      }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
+      JSON.stringify({ error: error.message }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
       }
-    );
+    )
   }
-});
+})
