@@ -1,5 +1,5 @@
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Terminal, HelpCircle, Car, Warehouse, Wrench, Building2, UserRound } from "lucide-react";
+import { Terminal, HelpCircle, Car, Warehouse, Wrench, Building2, UserRound, Video } from "lucide-react";
 import { InventoryForm } from "@/components/inventory/InventoryForm";
 import { VehicleManagement } from "@/components/vehicles/VehicleManagement";
 import { ServiceManagement } from "@/components/service/ServiceManagement";
@@ -7,6 +7,7 @@ import { GarageManagement } from "@/components/garage/GarageManagement";
 import { ProfessionalDashboard } from "@/components/dashboard/ProfessionalDashboard";
 import { AuctionList } from "@/components/auctions/AuctionList";
 import { CreateAuction } from "@/components/auctions/CreateAuction";
+import { StudioConfiguration } from "@/components/studio/StudioConfiguration";
 
 interface DashboardTabsProps {
   showHelp: (section: string) => void;
@@ -60,6 +61,13 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
               <Building2 className="w-4 h-4" />
               Auctions
             </TabsTrigger>
+            <TabsTrigger 
+              value="studio" 
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
+            >
+              <Video className="w-4 h-4" />
+              Studio
+            </TabsTrigger>
           </div>
           <div className="flex items-center mr-2">
             <button
@@ -99,6 +107,10 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
             <AuctionList />
             <CreateAuction />
           </div>
+        </TabsContent>
+
+        <TabsContent value="studio" className="animate-fade-in">
+          <StudioConfiguration />
         </TabsContent>
       </div>
     </>
