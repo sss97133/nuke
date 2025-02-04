@@ -2,8 +2,9 @@ import { Calendar, DollarSign } from "lucide-react";
 
 interface Sale {
   date?: string;
-  price?: number;
+  price?: string;  // Changed from number to string to match VehicleHistoricalData
   source?: string;
+  imageUrl?: string;  // Added to match VehicleHistoricalData
 }
 
 interface SalesHistoryProps {
@@ -24,6 +25,11 @@ export const SalesHistory = ({ sales }: SalesHistoryProps) => (
             {sale.price && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> {sale.price}</span>}
           </div>
           {sale.source && <div className="text-muted-foreground text-xs mt-1">Source: {sale.source}</div>}
+          {sale.imageUrl && (
+            <div className="mt-2">
+              <img src={sale.imageUrl} alt="Sale listing" className="rounded-md max-h-32 object-cover" />
+            </div>
+          )}
         </div>
       ))}
     </div>
