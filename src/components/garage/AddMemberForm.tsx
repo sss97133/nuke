@@ -1,83 +1,87 @@
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import type { AddGarageMemberProps } from "@/types/garage";
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
-export const AddMemberForm = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
-  const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+interface AddMemberFormProps {
+  garageId: string;
+  onSuccess?: () => void;
+}
+
+interface FormData {
+  email: string;
+}
+
+export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
+  const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
-  const handleAddMember = async () => {
-    if (!email) return;
-    
-    setIsLoading(true);
+  const onSubmit = async (data: FormData) => {
     try {
-      const { data: profile, error: profileError } = await supabase
+      const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('email', email)
-        .maybeSingle();
+        .eq('email', data.email)
+        .single();
 
-      if (profileError) {
-        throw new Error('User not found');
-      }
-
-      if (!profile) {
-        throw new Error('No profile found');
+      if (userError || !userData) {
+        toast({
+          title: 'Error',
+          description: 'User not found',
+          variant: 'destructive',
+        });
+        return;
       }
 
       const { error: memberError } = await supabase
         .from('garage_members')
-        .insert({
-          garage_id: garageId,
-          user_id: profile.id
-        });
+        .insert([
+          {
+            user_id: userData.id,
+            garage_id: garageId,
+          },
+        ]);
 
       if (memberError) {
-        throw memberError;
+        toast({
+          title: 'Error',
+          description: 'Failed to add member',
+          variant: 'destructive',
+        });
+        return;
       }
 
       toast({
-        title: "Success",
-        description: "Member added successfully"
+        title: 'Success',
+        description: 'Member added successfully',
       });
       
-      onMemberAdded();
-      setEmail("");
+      reset();
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: "destructive"
+        title: 'Error',
+        description: 'An unexpected error occurred',
+        variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
-        <label className="text-sm font-medium">Email</label>
+        <Label htmlFor="email">Member Email</Label>
         <Input
+          id="email"
           type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter member's email"
+          {...register('email', { required: true })}
+          placeholder="Enter member email"
         />
       </div>
-      <Button 
-        onClick={handleAddMember}
-        disabled={isLoading || !email}
-        className="w-full"
-      >
-        {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-        Add Member
-      </Button>
-    </div>
+      <Button type="submit">Add Member</Button>
+    </form>
   );
 };
