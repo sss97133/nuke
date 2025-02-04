@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { StudioConfigV2 } from './StudioConfigurationV2';
+import type { StudioConfigV2 } from './types/studioConfig';
 
 interface StudioConfigFormV2Props {
   onUpdate: (config: StudioConfigV2) => void;
@@ -26,7 +26,7 @@ export const StudioConfigFormV2 = ({ onUpdate, initialConfig }: StudioConfigForm
 
   const handleTrackMovementChange = (
     trackIndex: number,
-    field: keyof typeof formData.ptzTracks[0]['movement'],
+    field: keyof StudioConfigV2['ptzTracks'][0]['movement'],
     value: any
   ) => {
     const updatedTracks = [...formData.ptzTracks];
