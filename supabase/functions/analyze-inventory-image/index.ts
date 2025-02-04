@@ -1,48 +1,48 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('file');
+    const formData = await req.formData()
+    const file = formData.get('image')
 
     if (!file) {
-      return new Response(
-        JSON.stringify({ error: 'No file uploaded' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+      throw new Error('No image provided')
     }
 
-    // Here you would typically:
-    // 1. Upload the file to Supabase Storage
-    // 2. Call an OCR service to extract text from the receipt
-    // 3. Parse the extracted text for relevant information
+    const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'))
+    
+    // Convert File to Blob for HuggingFace
+    const arrayBuffer = await file.arrayBuffer()
+    const blob = new Blob([arrayBuffer], { type: file.type })
 
-    // For now, we'll return mock data
-    const mockReceiptData = {
-      purchaseDate: new Date().toISOString().split('T')[0],
-      purchasePrice: "99.99",
-    };
+    console.log('Analyzing image with HuggingFace...')
+    const result = await hf.imageClassification({
+      model: 'google/vit-base-patch16-224',
+      data: blob,
+    })
+
+    console.log('Analysis result:', result)
 
     return new Response(
-      JSON.stringify({ data: mockReceiptData }),
+      JSON.stringify({ classifications: result }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
+    )
   } catch (error) {
+    console.error('Error analyzing image:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+    )
   }
-});
+})
