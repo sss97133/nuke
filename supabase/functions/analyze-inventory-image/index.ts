@@ -14,9 +14,17 @@ serve(async (req) => {
   try {
     const { imageUrl } = await req.json()
 
+    if (!imageUrl) {
+      return new Response(
+        JSON.stringify({ error: 'No image URL provided' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+
+    console.log('Analyzing image:', imageUrl)
+
     const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'))
     
-    console.log('Analyzing image with HuggingFace...')
     const result = await hf.imageClassification({
       model: 'google/vit-base-patch16-224',
       data: imageUrl,
