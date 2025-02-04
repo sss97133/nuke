@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { createHumanFigure } from './workspace/HumanFigure';
+import { createPTZCamera } from './workspace/PTZCamera';
+import { createFixedCameras } from './workspace/FixedCameras';
 
 interface StudioWorkspaceProps {
   dimensions: {
@@ -96,181 +99,40 @@ export const StudioWorkspace = ({
     directionalLight.position.set(1, 1, 1);
     scene.add(directionalLight);
 
-    // Create human figure (6 feet tall)
-    const createHuman = () => {
-      if (humanRef.current) {
-        scene.remove(humanRef.current);
-      }
+    // Create room geometry
+    const roomGeometry = new THREE.BoxGeometry(
+      dimensions.width,
+      dimensions.height,
+      dimensions.length
+    );
+    const edges = new THREE.EdgesGeometry(roomGeometry);
+    const line = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({ color: 0x000000 })
+    );
+    scene.add(line);
+    objectsRef.current.push(line);
 
-      const human = new THREE.Group();
-      const humanHeight = 6;
-      
-      // Body
-      const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.4, humanHeight/3, 8);
-      const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
-      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-      body.position.y = humanHeight/6;
-      human.add(body);
-
-      // Head
-      const headGeometry = new THREE.SphereGeometry(0.4, 8, 8);
-      const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffcc99 });
-      const head = new THREE.Mesh(headGeometry, headMaterial);
-      head.position.y = humanHeight/3 + 0.4;
-      human.add(head);
-
-      // Legs
-      const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, humanHeight/2, 8);
-      const legMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
-      
-      const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-      leftLeg.position.set(0.3, humanHeight/4, 0);
-      human.add(leftLeg);
-      
-      const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-      rightLeg.position.set(-0.3, humanHeight/4, 0);
-      human.add(rightLeg);
-
-      // Position at specified coordinates
-      human.position.set(humanPosition.x, humanPosition.y, humanPosition.z);
-      scene.add(human);
-      humanRef.current = human;
-    };
-
-    createHuman();
+    // Create human figure
+    humanRef.current = createHumanFigure({ position: humanPosition, scene });
 
     // Create PTZ camera
-    const createPTZCamera = () => {
-      if (ptzCameraRef.current) {
-        scene.remove(ptzCameraRef.current);
-      }
-
-      if (ptzTracks && ptzTracks.length > 0) {
-        const track = ptzTracks[0];
-        const ptzGroup = new THREE.Group();
-        
-        // Track
-        const trackGeometry = new THREE.BoxGeometry(track.length, 0.2, 0.2);
-        const trackMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-        const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
-        trackMesh.position.x = track.length / 2;
-        ptzGroup.add(trackMesh);
-        
-        // Camera body
-        const cameraBody = new THREE.BoxGeometry(0.5, 0.5, 0.8);
-        const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-        const cameraMesh = new THREE.Mesh(cameraBody, cameraMaterial);
-        ptzGroup.add(cameraMesh);
-        
-        // Camera cone (if enabled)
-        if (cameras.showCone) {
-          const coneHeight = dimensions.length / 2;
-          const coneGeometry = new THREE.ConeGeometry(
-            Math.tan((track.coneAngle * Math.PI) / 180) * coneHeight,
-            coneHeight,
-            32
-          );
-          const coneMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffff00,
-            transparent: true,
-            opacity: 0.3
-          });
-          const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-          cone.rotation.x = -Math.PI / 2;
-          cone.position.z = coneHeight / 2;
-          ptzGroup.add(cone);
-        }
-        
-        // Position PTZ camera
-        ptzGroup.position.set(track.position.x, track.position.y, track.position.z);
-        scene.add(ptzGroup);
-        ptzCameraRef.current = ptzGroup;
-      }
-    };
-
-    createPTZCamera();
+    if (ptzTracks && ptzTracks.length > 0) {
+      ptzCameraRef.current = createPTZCamera({ 
+        track: ptzTracks[0], 
+        showCone: cameras.showCone,
+        scene 
+      });
+    }
 
     // Create fixed cameras
-    const createFixedCameras = () => {
-      // Remove existing fixed cameras
-      fixedCamerasRef.current.forEach(camera => scene.remove(camera));
-      fixedCamerasRef.current = [];
-
-      const createCamera = (position: THREE.Vector3, lookAt: THREE.Vector3) => {
-        const cameraGroup = new THREE.Group();
-        
-        // Camera body
-        const cameraBody = new THREE.BoxGeometry(0.5, 0.5, 0.8);
-        const cameraMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-        const cameraMesh = new THREE.Mesh(cameraBody, cameraMaterial);
-        cameraGroup.add(cameraMesh);
-        
-        // Camera cone
-        if (cameras.showCone) {
-          const coneHeight = dimensions.length / 4;
-          const coneGeometry = new THREE.ConeGeometry(
-            Math.tan((45 * Math.PI) / 180) * coneHeight,
-            coneHeight,
-            32
-          );
-          const coneMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffff00,
-            transparent: true,
-            opacity: 0.3
-          });
-          const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-          cone.rotation.x = -Math.PI / 2;
-          cone.position.z = coneHeight / 2;
-          cameraGroup.add(cone);
-        }
-
-        cameraGroup.position.copy(position);
-        cameraGroup.lookAt(lookAt);
-        scene.add(cameraGroup);
-        fixedCamerasRef.current.push(cameraGroup);
-      };
-
-      // Add cameras based on configuration
-      if (cameras.frontWall) {
-        createCamera(
-          new THREE.Vector3(0, dimensions.height * 0.8, dimensions.length / 2),
-          new THREE.Vector3(0, dimensions.height * 0.4, 0)
-        );
-      }
-      if (cameras.backWall) {
-        createCamera(
-          new THREE.Vector3(0, dimensions.height * 0.8, -dimensions.length / 2),
-          new THREE.Vector3(0, dimensions.height * 0.4, 0)
-        );
-      }
-      if (cameras.leftWall) {
-        createCamera(
-          new THREE.Vector3(-dimensions.width / 2, dimensions.height * 0.8, 0),
-          new THREE.Vector3(0, dimensions.height * 0.4, 0)
-        );
-      }
-      if (cameras.rightWall) {
-        createCamera(
-          new THREE.Vector3(dimensions.width / 2, dimensions.height * 0.8, 0),
-          new THREE.Vector3(0, dimensions.height * 0.4, 0)
-        );
-      }
-      if (cameras.ceiling) {
-        createCamera(
-          new THREE.Vector3(0, dimensions.height, 0),
-          new THREE.Vector3(0, 0, 0)
-        );
-      }
-    };
-
-    createFixedCameras();
+    fixedCamerasRef.current = createFixedCameras({ dimensions, cameras, scene });
 
     // Animation loop
     const animate = () => {
       timeRef.current += 0.005;
       
       if (humanRef.current) {
-        // Add slight bobbing motion
         humanRef.current.position.y = humanPosition.y + Math.abs(Math.sin(timeRef.current * 4) * 0.1);
       }
 
@@ -315,31 +177,7 @@ export const StudioWorkspace = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [dimensions, humanPosition, cameras, ptzTracks]); // Re-run when these props change
-
-  // Update scene when dimensions or PTZ tracks change
-  useEffect(() => {
-    if (!sceneRef.current) return;
-
-    // Remove old objects
-    objectsRef.current.forEach(obj => sceneRef.current?.remove(obj));
-    objectsRef.current = [];
-
-    // Add room geometry
-    const roomGeometry = new THREE.BoxGeometry(
-      dimensions.width,
-      dimensions.height,
-      dimensions.length
-    );
-    const edges = new THREE.EdgesGeometry(roomGeometry);
-    const line = new THREE.LineSegments(
-      edges,
-      new THREE.LineBasicMaterial({ color: 0x000000 })
-    );
-    sceneRef.current.add(line);
-    objectsRef.current.push(line);
-
-  }, [dimensions, ptzTracks]);
+  }, [dimensions, humanPosition, cameras, ptzTracks]);
 
   return (
     <div 
