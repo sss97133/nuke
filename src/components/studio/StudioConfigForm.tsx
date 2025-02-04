@@ -59,7 +59,9 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
 
   // Update preview whenever form values change
   useEffect(() => {
-    onUpdate(formData);
+    if (onUpdate) {
+      onUpdate(formData);
+    }
   }, [formData, onUpdate]);
 
   const onSubmit = async (data: FormData) => {

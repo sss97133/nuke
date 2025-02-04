@@ -3,6 +3,18 @@ import { StudioWorkspace } from './StudioWorkspace';
 import { StudioConfigForm } from './StudioConfigForm';
 import { Card } from '@/components/ui/card';
 
+interface FormData {
+  length: number;
+  width: number;
+  height: number;
+  ptzTracks: {
+    x: number;
+    y: number;
+    z: number;
+    length: number;
+  }[];
+}
+
 export const StudioConfiguration = () => {
   const [dimensions, setDimensions] = useState({
     length: 30,
@@ -17,7 +29,7 @@ export const StudioConfiguration = () => {
     }
   ]);
 
-  const handleConfigUpdate = (data: any) => {
+  const handleConfigUpdate = (data: FormData) => {
     setDimensions({
       length: Number(data.length) || 30,
       width: Number(data.width) || 20,
@@ -43,7 +55,13 @@ export const StudioConfiguration = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">Studio Configuration</h2>
-          <StudioConfigForm onUpdate={handleConfigUpdate} initialData={{ dimensions, ptzTracks }} />
+          <StudioConfigForm 
+            onUpdate={handleConfigUpdate} 
+            initialData={{ 
+              dimensions, 
+              ptzTracks 
+            }} 
+          />
         </Card>
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">Workspace Preview</h2>

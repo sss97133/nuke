@@ -1,14 +1,13 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export interface AddMemberFormProps {
   garageId: string;
-  onSuccess?: () => void;
   onMemberAdded?: () => void;
 }
 
@@ -16,7 +15,7 @@ interface FormData {
   email: string;
 }
 
-export const AddMemberForm = ({ garageId, onSuccess, onMemberAdded }: AddMemberFormProps) => {
+export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
@@ -37,36 +36,28 @@ export const AddMemberForm = ({ garageId, onSuccess, onMemberAdded }: AddMemberF
         return;
       }
 
-      const { error: memberError } = await supabase
+      const { error } = await supabase
         .from('garage_members')
-        .insert([
-          {
-            user_id: userData.id,
-            garage_id: garageId,
-          },
-        ]);
-
-      if (memberError) {
-        toast({
-          title: 'Error',
-          description: 'Failed to add member',
-          variant: 'destructive',
+        .insert({
+          user_id: userData.id,
+          garage_id: garageId,
         });
-        return;
-      }
+
+      if (error) throw error;
 
       toast({
         title: 'Success',
         description: 'Member added successfully',
       });
-      
+
       reset();
-      if (onSuccess) onSuccess();
-      if (onMemberAdded) onMemberAdded();
+      if (onMemberAdded) {
+        onMemberAdded();
+      }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred',
+        description: 'Failed to add member',
         variant: 'destructive',
       });
     }
