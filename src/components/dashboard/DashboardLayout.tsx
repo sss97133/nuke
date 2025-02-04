@@ -10,7 +10,6 @@ import { FormDialogs } from "./dialogs/FormDialogs";
 import { MendableChat } from "../ai/MendableChat";
 import { useNavigate } from "react-router-dom";
 import { StudioConfiguration } from "../studio/StudioConfiguration";
-import { StudioConfigurationV2 } from "../studio/StudioConfigurationV2";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -24,7 +23,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showStudioConfig, setShowStudioConfig] = useState(false);
-  const [showStudioConfigV2, setShowStudioConfigV2] = useState(false);
 
   const handleShowHelp = (section: string) => {
     setShowHelp(true);
@@ -82,11 +80,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         break;
       case 'studio_config':
         setShowStudioConfig(true);
-        setShowStudioConfigV2(false);
-        break;
-      case 'studio_config_v2':
-        setShowStudioConfig(false);
-        setShowStudioConfigV2(true);
         break;
       default:
         toast({ 
@@ -103,8 +96,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <main className="flex-1 p-6">
         {showStudioConfig ? (
           <StudioConfiguration />
-        ) : showStudioConfigV2 ? (
-          <StudioConfigurationV2 />
         ) : (
           <>
             <FormDialogs
