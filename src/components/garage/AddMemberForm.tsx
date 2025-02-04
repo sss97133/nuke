@@ -5,17 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AddGarageMemberProps } from '@/types/garage';
 
-interface AddMemberFormProps {
-  garageId: string;
-  onMemberAdded: () => void;
-}
-
-interface FormData {
+type FormData = {
   email: string;
-}
+};
 
-export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
+export const AddMemberForm = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
