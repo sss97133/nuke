@@ -34,11 +34,14 @@ export const Categorization = ({
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="maintenance">Maintenance</SelectItem>
-              <SelectItem value="kitchen">Kitchen</SelectItem>
-              <SelectItem value="office">Office</SelectItem>
-              <SelectItem value="it">IT</SelectItem>
-              <SelectItem value="facilities">Facilities</SelectItem>
+              <SelectItem value="mechanical">Mechanical Service</SelectItem>
+              <SelectItem value="bodywork">Body & Paint</SelectItem>
+              <SelectItem value="diagnostics">Diagnostics & Electronics</SelectItem>
+              <SelectItem value="tires">Tire & Wheel Service</SelectItem>
+              <SelectItem value="detailing">Detailing & Aesthetics</SelectItem>
+              <SelectItem value="parts">Parts & Inventory</SelectItem>
+              <SelectItem value="specialty">Specialty Services</SelectItem>
+              <SelectItem value="quick_service">Quick Service</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -59,9 +62,11 @@ export const Categorization = ({
             <SelectContent>
               <SelectItem value="tool">Tool</SelectItem>
               <SelectItem value="equipment">Equipment</SelectItem>
-              <SelectItem value="furniture">Furniture</SelectItem>
-              <SelectItem value="supplies">Supplies</SelectItem>
-              <SelectItem value="electronics">Electronics</SelectItem>
+              <SelectItem value="diagnostic">Diagnostic Equipment</SelectItem>
+              <SelectItem value="consumable">Consumable</SelectItem>
+              <SelectItem value="spare_part">Spare Part</SelectItem>
+              <SelectItem value="specialty_tool">Specialty Tool</SelectItem>
+              <SelectItem value="safety">Safety Equipment</SelectItem>
             </SelectContent>
           </Select>
         </div>
