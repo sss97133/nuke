@@ -2,23 +2,24 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Json } from '@/integrations/supabase/types';
 import { UserProfileHeader } from './UserProfileHeader';
 import { UserMetrics } from './UserMetrics';
 import { SocialLinksForm } from './SocialLinksForm';
 import { StreamingLinksForm } from './StreamingLinksForm';
 import { AchievementsList } from './AchievementsList';
-import { SocialLinks, StreamingLinks } from './types';
+import { TeamSection } from './TeamSection';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UserRound, Users, Trophy } from 'lucide-react';
 
 export const UserProfile = () => {
   const { toast } = useToast();
-  const [socialLinks, setSocialLinks] = useState<SocialLinks>({
+  const [socialLinks, setSocialLinks] = useState({
     twitter: '',
     instagram: '',
     linkedin: '',
     github: ''
   });
-  const [streamingLinks, setStreamingLinks] = useState<StreamingLinks>({
+  const [streamingLinks, setStreamingLinks] = useState({
     twitch: '',
     youtube: '',
     tiktok: ''
@@ -46,10 +47,10 @@ export const UserProfile = () => {
       }
 
       if (data?.social_links) {
-        setSocialLinks(data.social_links as unknown as SocialLinks);
+        setSocialLinks(data.social_links);
       }
       if (data?.streaming_links) {
-        setStreamingLinks(data.streaming_links as unknown as StreamingLinks);
+        setStreamingLinks(data.streaming_links);
       }
       
       return data;
@@ -86,9 +87,7 @@ export const UserProfile = () => {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ 
-        social_links: socialLinks as unknown as Json
-      })
+      .update({ social_links: socialLinks })
       .eq('id', user.id);
 
     if (error) {
@@ -113,9 +112,7 @@ export const UserProfile = () => {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ 
-        streaming_links: streamingLinks as unknown as Json
-      })
+      .update({ streaming_links: streamingLinks })
       .eq('id', user.id);
 
     if (error) {
@@ -135,8 +132,8 @@ export const UserProfile = () => {
   };
 
   return (
-    <div className="space-y-4 font-system">
-      <div className="bg-[#f3f3f3] p-4 border border-[#000066] shadow-sm">
+    <div className="space-y-4">
+      <div className="bg-background p-4 border rounded-lg shadow-sm">
         <UserProfileHeader 
           fullName={profile?.full_name} 
           username={profile?.username} 
@@ -147,23 +144,48 @@ export const UserProfile = () => {
           reputationScore={profile?.reputation_score}
           achievementsCount={achievements?.length || 0}
         />
-        
-        <SocialLinksForm 
-          socialLinks={socialLinks}
-          onSocialLinksChange={setSocialLinks}
-          onSubmit={handleSocialLinksUpdate}
-        />
-        
-        <StreamingLinksForm 
-          streamingLinks={streamingLinks}
-          onStreamingLinksChange={setStreamingLinks}
-          onSubmit={handleStreamingLinksUpdate}
-        />
-      </div>
 
-      {achievements && achievements.length > 0 && (
-        <AchievementsList achievements={achievements} />
-      )}
+        <Tabs defaultValue="profile" className="w-full mt-6">
+          <TabsList>
+            <TabsTrigger value="profile" className="flex items-center gap-2">
+              <UserRound className="w-4 h-4" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="team" className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Team
+            </TabsTrigger>
+            <TabsTrigger value="achievements" className="flex items-center gap-2">
+              <Trophy className="w-4 h-4" />
+              Achievements
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="profile" className="space-y-4 mt-4">
+            <SocialLinksForm 
+              socialLinks={socialLinks}
+              onSocialLinksChange={setSocialLinks}
+              onSubmit={handleSocialLinksUpdate}
+            />
+            
+            <StreamingLinksForm 
+              streamingLinks={streamingLinks}
+              onStreamingLinksChange={setStreamingLinks}
+              onSubmit={handleStreamingLinksUpdate}
+            />
+          </TabsContent>
+
+          <TabsContent value="team" className="mt-4">
+            <TeamSection />
+          </TabsContent>
+
+          <TabsContent value="achievements" className="mt-4">
+            {achievements && achievements.length > 0 && (
+              <AchievementsList achievements={achievements} />
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 };

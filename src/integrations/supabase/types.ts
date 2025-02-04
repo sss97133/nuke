@@ -1040,6 +1040,53 @@ export type Database = {
         }
         Relationships: []
       }
+      team_members: {
+        Row: {
+          created_at: string | null
+          department: string | null
+          end_date: string | null
+          id: string
+          member_type: Database["public"]["Enums"]["team_member_type"]
+          position: string | null
+          profile_id: string | null
+          start_date: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          department?: string | null
+          end_date?: string | null
+          id?: string
+          member_type: Database["public"]["Enums"]["team_member_type"]
+          position?: string | null
+          profile_id?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          department?: string | null
+          end_date?: string | null
+          id?: string
+          member_type?: Database["public"]["Enums"]["team_member_type"]
+          position?: string | null
+          profile_id?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_achievements: {
         Row: {
           achievement_data: Json | null
@@ -1501,6 +1548,12 @@ export type Database = {
         | "diagnostics"
         | "restoration"
         | "customization"
+      team_member_type:
+        | "employee"
+        | "contractor"
+        | "intern"
+        | "partner"
+        | "collaborator"
       user_type: "viewer" | "professional"
     }
     CompositeTypes: {
