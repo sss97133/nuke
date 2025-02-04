@@ -8,6 +8,7 @@ interface AuctionData {
   url: string;
   source: string;
   endTime?: string;
+  imageUrl?: string;
 }
 
 const corsHeaders = {
@@ -28,40 +29,77 @@ Deno.serve(async (req) => {
 
     const firecrawl = new FirecrawlApp({ apiKey })
     
-    // Crawl multiple auction sites
-    const sites = [
-      'https://bringatrailer.com/auctions/live/',
-      'https://carsandbids.com'
+    // Define auction sources with their specific selectors
+    const sources = [
+      {
+        url: 'https://bringatrailer.com/auctions/live/',
+        selectors: {
+          make: '.auction-title h3',
+          model: '.auction-subtitle',
+          year: '.auction-year',
+          price: '.current-bid',
+          endTime: '.auction-end-time',
+          imageUrl: '.auction-image img'
+        }
+      },
+      {
+        url: 'https://carsandbids.com',
+        selectors: {
+          make: '.vehicle-make',
+          model: '.vehicle-model',
+          year: '.vehicle-year',
+          price: '.current-bid',
+          endTime: '.end-time',
+          imageUrl: '.main-image img'
+        }
+      },
+      {
+        url: 'https://www.hagerty.com/marketplace',
+        selectors: {
+          make: '.vehicle-make',
+          model: '.vehicle-model',
+          year: '.vehicle-year',
+          price: '.asking-price',
+          imageUrl: '.vehicle-image img'
+        }
+      }
     ]
     
-    const results = []
+    console.log('Starting to fetch auction data from multiple sources...')
+    const results: AuctionData[] = []
     
-    for (const site of sites) {
-      console.log(`Crawling ${site}...`)
-      const response = await firecrawl.crawlUrl(site, {
-        limit: 10,
-        scrapeOptions: {
-          formats: ['markdown', 'html'],
-          selectors: {
-            make: '.vehicle-make',
-            model: '.vehicle-model', 
-            year: '.vehicle-year',
-            price: '.current-bid',
-            endTime: '.auction-end-time'
+    for (const source of sources) {
+      console.log(`Crawling ${source.url}...`)
+      try {
+        const response = await firecrawl.crawlUrl(source.url, {
+          limit: 10,
+          scrapeOptions: {
+            formats: ['markdown', 'html'],
+            selectors: source.selectors
           }
+        })
+        
+        if (response.success) {
+          const sourceName = new URL(source.url).hostname.replace('www.', '').split('.')[0]
+          
+          const processedData = response.data
+            .filter(item => item.make && item.model && item.year && item.price)
+            .map(item => ({
+              make: String(item.make).trim(),
+              model: String(item.model).trim(),
+              year: parseInt(String(item.year).replace(/\D/g, '')),
+              price: parseFloat(String(item.price).replace(/[$,]/g, '')),
+              url: item.url,
+              source: sourceName,
+              endTime: item.endTime ? new Date(item.endTime).toISOString() : undefined,
+              imageUrl: item.imageUrl
+            }))
+          
+          results.push(...processedData)
+          console.log(`Successfully fetched ${processedData.length} auctions from ${sourceName}`)
         }
-      })
-      
-      if (response.success) {
-        results.push(...response.data.map((item: any) => ({
-          make: item.make,
-          model: item.model,
-          year: parseInt(item.year),
-          price: parseFloat(item.price.replace(/[$,]/g, '')),
-          url: item.url,
-          source: new URL(site).hostname,
-          endTime: item.endTime
-        })))
+      } catch (error) {
+        console.error(`Error crawling ${source.url}:`, error)
       }
     }
 

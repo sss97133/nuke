@@ -23,6 +23,7 @@ interface ExternalAuction {
   url: string;
   source: string;
   endTime?: string;
+  imageUrl?: string;
 }
 
 interface Auction {
@@ -101,15 +102,14 @@ export const AuctionList = () => {
     queryKey: ['external-auctions'],
     queryFn: async () => {
       console.log('🔍 Fetching external auctions...');
-      const response = await fetch('https://qkgaybvrernstplzjaam.functions.supabase.co/fetch-market-auctions');
-      const data = await response.json();
+      const response = await supabase.functions.invoke('fetch-market-auctions');
       
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch external auctions');
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Failed to fetch external auctions');
       }
 
-      console.log('✅ Received external auctions:', data.data);
-      return data.data as ExternalAuction[];
+      console.log('✅ Received external auctions:', response.data.data);
+      return response.data.data as ExternalAuction[];
     },
     refetchInterval: 5 * 60 * 1000 // Refetch every 5 minutes
   });
@@ -162,27 +162,10 @@ export const AuctionList = () => {
       )
       .subscribe();
 
-    const commentChannel = supabase
-      .channel('comment_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'auction_comments'
-        },
-        (payload) => {
-          console.log('💭 Received comment update:', payload);
-          queryClient.invalidateQueries({ queryKey: ['auctions'] });
-        }
-      )
-      .subscribe();
-
     return () => {
       console.log('🔌 Cleaning up subscriptions...');
       supabase.removeChannel(auctionChannel);
       supabase.removeChannel(bidChannel);
-      supabase.removeChannel(commentChannel);
     };
   }, [queryClient, toast]);
 
@@ -302,6 +285,16 @@ export const AuctionList = () => {
                 className="block transition-all duration-200 hover:scale-105"
               >
                 <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C] p-6 space-y-4">
+                  {auction.imageUrl && (
+                    <div className="aspect-video rounded-lg overflow-hidden">
+                      <img 
+                        src={auction.imageUrl} 
+                        alt={`${auction.year} ${auction.make} ${auction.model}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  
                   <div>
                     <h3 className="text-xl font-semibold">
                       {auction.year} {auction.make} {auction.model}
