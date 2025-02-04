@@ -40,6 +40,11 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredBrands = carBrands.filter(brand => 
+    brand.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const onSubmit = async (data: any) => {
     try {
@@ -90,16 +95,20 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-full p-0">
-            <Command shouldFilter={false}>
-              <CommandInput placeholder="Search brand..." />
+            <Command>
+              <CommandInput 
+                placeholder="Search brand..." 
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
               <CommandEmpty>No brand found.</CommandEmpty>
-              <CommandGroup>
-                {carBrands.map((brand) => (
+              <CommandGroup className="max-h-[200px] overflow-y-auto">
+                {filteredBrands.map((brand) => (
                   <CommandItem
                     key={brand}
                     value={brand}
-                    onSelect={(currentValue) => {
-                      setSelectedBrand(currentValue === selectedBrand ? "" : brand);
+                    onSelect={() => {
+                      setSelectedBrand(brand === selectedBrand ? "" : brand);
                       setOpen(false);
                     }}
                   >
