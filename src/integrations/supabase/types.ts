@@ -460,6 +460,191 @@ export type Database = {
         }
         Relationships: []
       }
+      project_collaborators: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_collaborators_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_tasks: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string | null
+          project_id: string
+          status: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          project_id: string
+          status?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          project_id?: string
+          status?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_updates: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          project_id: string
+          update_type: string
+          user_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          project_id: string
+          update_type: string
+          user_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          project_id?: string
+          update_type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_updates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          actual_completion_date: string | null
+          budget: number | null
+          client_data: Json | null
+          created_at: string
+          current_spend: number | null
+          description: string | null
+          id: string
+          metadata: Json | null
+          priority: string | null
+          social_media_schedule: Json | null
+          sponsorship_data: Json | null
+          start_date: string | null
+          status: string | null
+          target_completion_date: string | null
+          title: string
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          actual_completion_date?: string | null
+          budget?: number | null
+          client_data?: Json | null
+          created_at?: string
+          current_spend?: number | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          priority?: string | null
+          social_media_schedule?: Json | null
+          sponsorship_data?: Json | null
+          start_date?: string | null
+          status?: string | null
+          target_completion_date?: string | null
+          title: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          actual_completion_date?: string | null
+          budget?: number | null
+          client_data?: Json | null
+          created_at?: string
+          current_spend?: number | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          priority?: string | null
+          social_media_schedule?: Json | null
+          sponsorship_data?: Json | null
+          start_date?: string | null
+          status?: string | null
+          target_completion_date?: string | null
+          title?: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_tickets: {
         Row: {
           created_at: string
