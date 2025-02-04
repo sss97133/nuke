@@ -34,6 +34,17 @@ interface Auction {
   };
 }
 
+interface ExternalAuction {
+  make: string;
+  model: string;
+  year: number;
+  price: number;
+  url: string;
+  source: string;
+  endTime?: string;
+  imageUrl?: string;
+}
+
 export const AuctionList = () => {
   const { toast } = useToast();
   const [selectedAuction, setSelectedAuction] = useState<string | null>(null);
@@ -150,6 +161,23 @@ export const AuctionList = () => {
     };
   }, [queryClient, toast]);
 
+  const { data: externalAuctions, isLoading: isLoadingExternal } = useQuery({
+    queryKey: ['external-auctions'],
+    queryFn: async () => {
+      console.log('🔍 Fetching external auctions...');
+      const { data, error } = await supabase.functions.invoke('fetch-market-auctions');
+      
+      if (error) {
+        console.error('❌ Error fetching external auctions:', error);
+        throw error;
+      }
+
+      console.log('✅ Received external auctions:', data);
+      return data.data as ExternalAuction[];
+    },
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+  });
+
   const handleBidSubmit = async (auctionId: string, amount: number) => {
     console.log('💸 Submitting bid:', { auctionId, amount });
     const { error } = await supabase
@@ -257,9 +285,55 @@ export const AuctionList = () => {
 
         <TabsContent value="external">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="col-span-full text-center text-muted-foreground">
-              External auctions are temporarily unavailable
-            </div>
+            {isLoadingExternal ? (
+              <div className="col-span-full text-center text-muted-foreground">
+                Loading external auctions...
+              </div>
+            ) : externalAuctions && externalAuctions.length > 0 ? (
+              externalAuctions.map((auction, index) => (
+                <div key={`${auction.source}-${index}`} className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C] overflow-hidden">
+                  {auction.imageUrl && (
+                    <div className="aspect-video relative">
+                      <img 
+                        src={auction.imageUrl} 
+                        alt={`${auction.year} ${auction.make} ${auction.model}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <h3 className="text-xl font-semibold">
+                      {auction.year} {auction.make} {auction.model}
+                    </h3>
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      Source: {auction.source}
+                    </div>
+                    <div className="mt-4">
+                      <span className="text-2xl font-bold">
+                        ${auction.price.toLocaleString()}
+                      </span>
+                      {auction.endTime && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          Ends: {new Date(auction.endTime).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                    <a
+                      href={auction.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                    >
+                      View Auction
+                    </a>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center text-muted-foreground">
+                No external auctions found
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
