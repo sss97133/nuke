@@ -9,13 +9,13 @@ import { useToast } from '@/hooks/use-toast';
 type AddMemberFormProps = {
   garageId: string;
   onMemberAdded?: () => void;
-}
+};
 
 type FormValues = {
   email: string;
-}
+};
 
-export const AddMemberForm: React.FC<AddMemberFormProps> = ({ garageId, onMemberAdded }) => {
+export const AddMemberForm = ({ garageId, onMemberAdded }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormValues>();
   const { toast } = useToast();
 

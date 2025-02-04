@@ -24,7 +24,6 @@ export const GarageMap = () => {
         .not('location', 'is', null);
       
       if (data) {
-        // Convert the JSON location data to our Garage type
         const formattedGarages: Garage[] = data.map(garage => ({
           id: garage.id,
           name: garage.name,
@@ -40,7 +39,6 @@ export const GarageMap = () => {
 
     fetchGarages();
 
-    // Subscribe to garage changes
     const channel = supabase
       .channel('garage-changes')
       .on(
@@ -52,7 +50,7 @@ export const GarageMap = () => {
         },
         (payload) => {
           console.log('Garage update:', payload);
-          fetchGarages(); // Refresh garages when changes occur
+          fetchGarages();
         }
       )
       .subscribe();
@@ -65,17 +63,15 @@ export const GarageMap = () => {
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // Initialize map
-    mapboxgl.accessToken = process.env.VITE_MAPBOX_TOKEN || '';
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
-      center: [-74.5, 40], // Default center
+      center: [-74.5, 40],
       zoom: 9
     });
 
-    // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
     return () => {
@@ -83,15 +79,12 @@ export const GarageMap = () => {
     };
   }, []);
 
-  // Update markers when garages change
   useEffect(() => {
     if (!map.current) return;
 
-    // Remove existing markers
     Object.values(markersRef.current).forEach(marker => marker.remove());
     markersRef.current = {};
 
-    // Add new markers
     garages.forEach(garage => {
       if (garage.location) {
         const popup = new mapboxgl.Popup({ offset: 25 })
@@ -109,7 +102,6 @@ export const GarageMap = () => {
       }
     });
 
-    // Fit bounds to markers if there are any
     if (garages.length > 0) {
       const bounds = new mapboxgl.LngLatBounds();
       garages.forEach(garage => {
