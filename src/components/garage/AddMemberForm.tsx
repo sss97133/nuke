@@ -15,30 +15,32 @@ interface FormData {
   email: string;
 }
 
+interface Profile {
+  id: string;
+}
+
 export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
   const { toast } = useToast();
 
   const onSubmit = async (data: FormData) => {
     try {
-      const { data: users, error: userError } = await supabase
+      const { data: profiles, error: userError } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', data.email)
         .single();
 
-      if (userError || !users) {
+      if (userError || !profiles) {
         throw new Error('User not found');
       }
 
-      const newMember = {
-        user_id: users.id,
-        garage_id: garageId,
-      };
-
       const { error } = await supabase
         .from('garage_members')
-        .insert([newMember]);
+        .insert([{
+          user_id: profiles.id,
+          garage_id: garageId,
+        }]);
 
       if (error) throw error;
 
