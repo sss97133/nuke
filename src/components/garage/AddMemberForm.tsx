@@ -11,9 +11,9 @@ interface AddMemberFormProps {
   onSuccess?: () => void;
 }
 
-type FormData = {
+interface FormData {
   email: string;
-};
+}
 
 export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
@@ -21,6 +21,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
 
   const onSubmit = async (data: FormData) => {
     try {
+      // First find the user by email
       const { data: profile, error: userError } = await supabase
         .from('profiles')
         .select('id')
@@ -31,6 +32,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
         throw new Error('User not found');
       }
 
+      // Then add them as a garage member
       const { error } = await supabase
         .from('garage_members')
         .insert({
