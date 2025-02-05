@@ -9,6 +9,12 @@ import {
   Calendar, Video, Award, TrendingUp 
 } from "lucide-react";
 
+interface FeedItem {
+  type: 'vehicle' | 'inventory' | 'service' | 'auction';
+  data: any;
+  date: string;
+}
+
 export const Home = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -54,11 +60,27 @@ export const Home = () => {
       ]);
 
       // Combine and sort by date
-      const allItems = [
-        ...(vehicles.data || []).map(v => ({ type: 'vehicle', data: v, date: v.created_at })),
-        ...(inventory.data || []).map(i => ({ type: 'inventory', data: i, date: i.created_at })),
-        ...(services.data || []).map(s => ({ type: 'service', data: s, date: s.created_at })),
-        ...(auctions.data || []).map(a => ({ type: 'auction', data: a, date: a.created_at }))
+      const allItems: FeedItem[] = [
+        ...(vehicles.data || []).map(v => ({ 
+          type: 'vehicle' as const, 
+          data: v, 
+          date: v.created_at 
+        })),
+        ...(inventory.data || []).map(i => ({ 
+          type: 'inventory' as const, 
+          data: i, 
+          date: i.created_at 
+        })),
+        ...(services.data || []).map(s => ({ 
+          type: 'service' as const, 
+          data: s, 
+          date: s.created_at 
+        })),
+        ...(auctions.data || []).map(a => ({ 
+          type: 'auction' as const, 
+          data: a, 
+          date: a.created_at 
+        }))
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       return allItems;
@@ -71,6 +93,21 @@ export const Home = () => {
       title: `Viewing ${section}`,
       description: `Navigating to ${section} details`,
     });
+  };
+
+  const getFeedItemContent = (item: FeedItem) => {
+    switch (item.type) {
+      case 'vehicle':
+        return `New vehicle added: ${item.data.make} ${item.data.model}`;
+      case 'inventory':
+        return `Inventory updated: ${item.data.name}`;
+      case 'service':
+        return `Service ticket: ${item.data.description || 'No description'}`;
+      case 'auction':
+        return `New auction: ${item.data.title || 'Untitled auction'}`;
+      default:
+        return 'Unknown update';
+    }
   };
 
   return (
@@ -144,12 +181,7 @@ export const Home = () => {
               {item.type === 'service' && <Wrench className="h-4 w-4" />}
               {item.type === 'auction' && <TrendingUp className="h-4 w-4" />}
               <div>
-                <p className="text-sm">
-                  {item.type === 'vehicle' && `New vehicle added: ${item.data.make} ${item.data.model}`}
-                  {item.type === 'inventory' && `Inventory updated: ${item.data.name}`}
-                  {item.type === 'service' && `Service ticket: ${item.data.description}`}
-                  {item.type === 'auction' && `New auction: ${item.data.title}`}
-                </p>
+                <p className="text-sm">{getFeedItemContent(item)}</p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(item.date).toLocaleString()}
                 </p>
