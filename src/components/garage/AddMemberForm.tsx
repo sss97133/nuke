@@ -16,7 +16,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
