@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   Activity, AlertCircle, CheckCircle2, Clock, MessageCircle, 
-  Heart, DollarSign, Map, Video, Coins 
+  Heart, DollarSign, Map, Video, Coins, Settings 
 } from "lucide-react";
 import { useState } from "react";
 
@@ -89,7 +89,7 @@ export const ActivityFeed = () => {
   const getItemIcon = (type: string) => {
     switch (type) {
       case 'service':
-        return <Wrench className="w-4 h-4 text-blue-500" />;
+        return <Settings className="w-4 h-4 text-blue-500" />;
       case 'location':
         return <Map className="w-4 h-4 text-green-500" />;
       case 'studio':
@@ -174,7 +174,7 @@ export const ActivityFeed = () => {
             <div className="flex items-center justify-between text-sm p-2 hover:bg-accent/50 rounded-md transition-colors">
               <div className="flex items-center gap-3">
                 <Avatar className="w-8 h-8">
-                  <img src={item.profiles?.avatar_url} alt={item.profiles?.username} />
+                  <AvatarImage src={item.profiles?.avatar_url} alt={item.profiles?.username} />
                 </Avatar>
                 <div>
                   <div className="flex items-center gap-2">
