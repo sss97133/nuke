@@ -5,11 +5,11 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-interface AddMemberFormProps {
+type AddMemberFormProps = {
   garageId: string;
   onSuccess?: () => void;
   onCancel?: () => void;
-}
+};
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
   const [email, setEmail] = useState('');
