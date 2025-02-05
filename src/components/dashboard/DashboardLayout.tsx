@@ -25,7 +25,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showHelp, setShowHelp] = useState(false);
   const [showStudioConfig, setShowStudioConfig] = useState(false);
   const [showStudioConfigV1, setShowStudioConfigV1] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
   const [showActivityPanel, setShowActivityPanel] = useState(true);
 
   const handleShowHelp = (section: string) => {
@@ -122,13 +121,6 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           description: "Application theme has been updated",
         });
         break;
-      case 'toggle_sidebar':
-        setShowSidebar(!showSidebar);
-        toast({
-          title: "Sidebar Toggled",
-          description: `Sidebar is now ${!showSidebar ? 'visible' : 'hidden'}`,
-        });
-        break;
       case 'toggle_activity':
         setShowActivityPanel(!showActivityPanel);
         toast({
@@ -181,7 +173,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     <div className="min-h-screen bg-background text-foreground dark:bg-background-dark dark:text-foreground-dark font-system">
       <DashboardHeader handleMenuAction={handleMenuAction} />
       
-      <main className={`flex-1 p-6 ${showSidebar ? 'ml-64' : ''}`}>
+      <main className="flex-1 p-6">
         {showStudioConfigV1 ? (
           <div className="w-full h-[600px]">
             <StudioWorkspace 
