@@ -4,12 +4,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Profile } from '@/types/profile';
+import { Database } from '@/integrations/supabase/types';
 
 type AddMemberFormProps = {
   garageId: string;
   onSuccess?: () => void;
   onCancel?: () => void;
+};
+
+type ProfileResponse = {
+  id: string;
 };
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
@@ -35,7 +39,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
       const { error: memberError } = await supabase
         .from('garage_members')
         .insert([
-          { garage_id: garageId, user_id: userData.id }
+          { garage_id: garageId, user_id: (userData as ProfileResponse).id }
         ]);
 
       if (memberError) {
