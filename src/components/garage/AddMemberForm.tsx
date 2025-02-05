@@ -30,7 +30,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
         .from('profiles')
         .select('id')
         .eq('email', data.email)
-        .maybeSingle<ProfileData>();
+        .single();
 
       if (!userProfile) {
         throw new Error('User not found');
