@@ -10,6 +10,11 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+interface Profile {
+  username: string;
+  avatar_url: string;
+}
+
 interface FeedItem {
   id: string;
   user_id: string;
@@ -18,10 +23,7 @@ interface FeedItem {
   content: string;
   metadata: any;
   created_at: string;
-  profiles?: {
-    username: string;
-    avatar_url: string;
-  };
+  profile?: Profile;
 }
 
 interface FeedInteraction {
@@ -46,7 +48,7 @@ export const ActivityFeed = () => {
         .from('feed_items')
         .select(`
           *,
-          profiles:user_id (
+          profile:user_id (
             username,
             avatar_url
           )
@@ -174,12 +176,12 @@ export const ActivityFeed = () => {
             <div className="flex items-center justify-between text-sm p-2 hover:bg-accent/50 rounded-md transition-colors">
               <div className="flex items-center gap-3">
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src={item.profiles?.avatar_url} alt={item.profiles?.username} />
+                  <AvatarImage src={item.profile?.avatar_url} alt={item.profile?.username} />
                 </Avatar>
                 <div>
                   <div className="flex items-center gap-2">
                     {getItemIcon(item.item_type)}
-                    <span className="font-medium">{item.profiles?.username}</span>
+                    <span className="font-medium">{item.profile?.username}</span>
                   </div>
                   <p className="text-muted-foreground">{item.content}</p>
                   <span className="text-xs text-muted-foreground">
