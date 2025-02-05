@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Database } from '@/integrations/supabase/types';
 
 interface AddMemberFormProps {
   garageId: string;
@@ -14,6 +15,8 @@ interface AddMemberFormProps {
 interface FormData {
   email: string;
 }
+
+type ProfileResponse = Pick<Database['public']['Tables']['profiles']['Row'], 'id'>;
 
 export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const { register, handleSubmit, reset } = useForm<FormData>();
@@ -26,7 +29,7 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
         .from('profiles')
         .select('id')
         .eq('email', data.email)
-        .maybeSingle();
+        .maybeSingle<ProfileResponse>();
 
       if (!userProfile) {
         throw new Error('User not found');
