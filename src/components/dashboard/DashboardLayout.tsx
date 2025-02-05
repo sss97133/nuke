@@ -24,7 +24,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showStudioConfig, setShowStudioConfig] = useState(false);
-  const [showStudioConfigV1, setShowStudioConfigV1] = useState(false);
+  const [showWorkspacePreview, setShowWorkspacePreview] = useState(true);
   const [showActivityPanel, setShowActivityPanel] = useState(true);
 
   const handleShowHelp = (section: string) => {
@@ -108,11 +108,14 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         break;
       case 'studio_config':
         setShowStudioConfig(true);
-        setShowStudioConfigV1(false);
+        setShowWorkspacePreview(true);
         break;
-      case 'studio_config_v1':
-        setShowStudioConfigV1(true);
-        setShowStudioConfig(false);
+      case 'toggle_workspace':
+        setShowWorkspacePreview(!showWorkspacePreview);
+        toast({
+          title: "Workspace Preview Toggled",
+          description: `Workspace preview is now ${!showWorkspacePreview ? 'visible' : 'hidden'}`,
+        });
         break;
       case 'toggle_theme':
         document.documentElement.classList.toggle('dark');
@@ -174,20 +177,23 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <DashboardHeader handleMenuAction={handleMenuAction} />
       
       <main className="flex-1 p-6">
-        {showStudioConfigV1 ? (
-          <div className="w-full h-[600px]">
-            <StudioWorkspace 
-              dimensions={{ length: 30, width: 20, height: 16 }}
-              ptzTracks={[{
-                position: { x: 0, y: 8, z: 0 },
-                length: 10,
-                speed: 1,
-                coneAngle: 45
-              }]}
-            />
-          </div>
-        ) : showStudioConfig ? (
-          <StudioConfiguration />
+        {showStudioConfig ? (
+          <>
+            <StudioConfiguration />
+            {showWorkspacePreview && (
+              <div className="mt-6 w-full h-[600px]">
+                <StudioWorkspace 
+                  dimensions={{ length: 30, width: 20, height: 16 }}
+                  ptzTracks={[{
+                    position: { x: 0, y: 8, z: 0 },
+                    length: 10,
+                    speed: 1,
+                    coneAngle: 45
+                  }]}
+                />
+              </div>
+            )}
+          </>
         ) : (
           <>
             <FormDialogs
