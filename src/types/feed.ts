@@ -8,7 +8,11 @@ export interface FeedItem {
   content: string;
   metadata: any;
   created_at: string;
-  profile: Profile | null;
+  updated_at: string;
+  profile: {
+    username: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 export interface FeedInteraction {
