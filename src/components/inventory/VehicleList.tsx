@@ -11,9 +11,21 @@ export const VehicleList = () => {
 
   useEffect(() => {
     const fetchVehicles = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to view vehicles",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase
         .from("vehicles")
-        .select("*");
+        .select("*")
+        .eq('user_id', user.id);
 
       if (error) {
         toast({

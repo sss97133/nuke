@@ -1,13 +1,11 @@
 import { Car, Package, Wrench, MessageSquare, Star, Activity, User } from "lucide-react";
 
-type ItemType = 'vehicle' | 'inventory' | 'service' | 'comment' | 'achievement' | 'profile' | string;
-
-interface FeedItemIconProps {
-  type: ItemType;
+export interface FeedItemIconProps {
+  itemType: string;
 }
 
-export const FeedItemIcon = ({ type }: FeedItemIconProps) => {
-  switch (type) {
+export const FeedItemIcon = ({ itemType }: FeedItemIconProps) => {
+  switch (itemType) {
     case 'vehicle':
       return <Car className="w-4 h-4" />;
     case 'inventory':
