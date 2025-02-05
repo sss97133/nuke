@@ -1,5 +1,3 @@
-import { Profile } from "./profile";
-
 export interface FeedItem {
   id: string;
   user_id: string;

@@ -1,13 +1,17 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { FeedItemIcon } from "./FeedItemIcon";
-import { Profile } from "@/types/profile";
+
+interface FeedItemProfile {
+  username: string | null;
+  avatar_url: string | null;
+}
 
 interface FeedItemProps {
   id: string;
   content: string;
   itemType: string;
   createdAt: string;
-  profile: Profile | null;
+  profile: FeedItemProfile | null;
   selected: boolean;
   onSelect: (id: string) => void;
   children?: React.ReactNode;
