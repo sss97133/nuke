@@ -412,6 +412,77 @@ export type Database = {
           },
         ]
       }
+      feed_interactions: {
+        Row: {
+          amount: number | null
+          content: string | null
+          created_at: string | null
+          feed_item_id: string | null
+          id: string
+          interaction_type: string
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          content?: string | null
+          created_at?: string | null
+          feed_item_id?: string | null
+          id?: string
+          interaction_type: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          content?: string | null
+          created_at?: string | null
+          feed_item_id?: string | null
+          id?: string
+          interaction_type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_interactions_feed_item_id_fkey"
+            columns: ["feed_item_id"]
+            isOneToOne: false
+            referencedRelation: "feed_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feed_items: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          id: string
+          item_id: string
+          item_type: string
+          metadata: Json | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          item_id: string
+          item_type: string
+          metadata?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          item_id?: string
+          item_type?: string
+          metadata?: Json | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       garage_members: {
         Row: {
           created_at: string
