@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ClassicWindow } from "./ClassicWindow";
 import { PhoneInput } from "./PhoneInput";
 import { OtpInput } from "./OtpInput";
+import { Button } from "@/components/ui/button";
 
 export const AuthForm = () => {
   const { toast } = useToast();
@@ -23,6 +24,30 @@ export const AuthForm = () => {
       return cleaned;
     }
     return `+${cleaned}`;
+  };
+
+  const handleLogout = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      toast({
+        title: "Logged out",
+        description: "Successfully logged out",
+      });
+      
+      navigate('/login');
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSendOtp = async () => {
@@ -130,6 +155,14 @@ export const AuthForm = () => {
           )}
 
           <div className="pt-4 border-t border-border dark:border-border-dark">
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              disabled={isLoading}
+              className="w-full mb-4"
+            >
+              {isLoading ? "Logging out..." : "Logout"}
+            </Button>
             <p className="text-[10px] text-center text-muted-foreground dark:text-muted-foreground-dark">
               NUKE © 2024
             </p>
