@@ -25,6 +25,8 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [showHelp, setShowHelp] = useState(false);
   const [showStudioConfig, setShowStudioConfig] = useState(false);
   const [showStudioConfigV1, setShowStudioConfigV1] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [showActivityPanel, setShowActivityPanel] = useState(true);
 
   const handleShowHelp = (section: string) => {
     setShowHelp(true);
@@ -34,13 +36,33 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     });
   };
 
-  const handleMenuAction = (action: string) => {
+  const handleMenuAction = async (action: string) => {
     switch (action) {
+      case 'new_project':
+        navigate('/projects/new');
+        break;
       case 'new_vehicle':
         setShowNewVehicleDialog(true);
         break;
       case 'new_inventory':
         setShowNewInventoryDialog(true);
+        break;
+      case 'import':
+        navigate('/import');
+        break;
+      case 'export':
+        // Download current data as JSON
+        const { data: exportData } = await supabase
+          .from('vehicles')
+          .select('*')
+          .eq('user_id', supabase.auth.getUser());
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'export.json';
+        a.click();
         break;
       case 'toggle_assistant':
         setShowAiAssistant(!showAiAssistant);
@@ -50,36 +72,21 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         break;
       case 'exit':
         if (confirm('Are you sure you want to exit?')) {
-          supabase.auth.signOut();
+          await supabase.auth.signOut();
+          navigate('/login');
         }
         break;
       case 'professional_dashboard':
-        toast({
-          title: "Professional Dashboard",
-          description: "Opening professional dashboard...",
-        });
         navigate('/professional');
         break;
       case 'skill_management':
-        toast({
-          title: "Skill Management",
-          description: "Opening skill management...",
-        });
         navigate('/skills');
         break;
       case 'achievements':
-        toast({
-          title: "Achievements",
-          description: "Opening achievements...",
-        });
         navigate('/achievements');
         break;
       case 'preferences':
-        toast({ 
-          title: "Preferences",
-          description: "Opening preferences settings..."
-        });
-        // Preferences dialog will be implemented later
+        navigate('/settings');
         break;
       case 'studio_config':
         setShowStudioConfig(true);
@@ -96,6 +103,47 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           description: "Application theme has been updated",
         });
         break;
+      case 'toggle_sidebar':
+        setShowSidebar(!showSidebar);
+        toast({
+          title: "Sidebar Toggled",
+          description: `Sidebar is now ${!showSidebar ? 'visible' : 'hidden'}`,
+        });
+        break;
+      case 'toggle_activity':
+        setShowActivityPanel(!showActivityPanel);
+        toast({
+          title: "Activity Panel Toggled",
+          description: `Activity panel is now ${!showActivityPanel ? 'visible' : 'hidden'}`,
+        });
+        break;
+      case 'inventory_view':
+        navigate('/inventory');
+        break;
+      case 'service_view':
+        navigate('/service');
+        break;
+      case 'vin_scanner':
+        navigate('/vin-scanner');
+        break;
+      case 'market_analysis':
+        navigate('/market-analysis');
+        break;
+      case 'studio_workspace':
+        navigate('/studio');
+        break;
+      case 'streaming_setup':
+        navigate('/streaming');
+        break;
+      case 'documentation':
+        window.open('/docs', '_blank');
+        break;
+      case 'keyboard_shortcuts':
+        toast({
+          title: "Keyboard Shortcuts",
+          description: "⌘K - Open Command Bar\n⌘/ - Toggle Help\n⌘B - Toggle Sidebar",
+        });
+        break;
       case 'about':
         toast({
           title: "About",
@@ -103,9 +151,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         });
         break;
       default:
-        toast({ 
+        toast({
           title: `${action} selected`,
-          description: "This feature will be implemented soon."
+          description: "This feature will be implemented soon.",
         });
     }
   };
@@ -114,7 +162,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     <div className="min-h-screen bg-background text-foreground dark:bg-background-dark dark:text-foreground-dark font-system">
       <DashboardHeader handleMenuAction={handleMenuAction} />
       
-      <main className="flex-1 p-6">
+      <main className={`flex-1 p-6 ${showSidebar ? 'ml-64' : ''}`}>
         {showStudioConfigV1 ? (
           <div className="w-full h-[600px]">
             <StudioWorkspace 
@@ -152,9 +200,11 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               {children}
             </Tabs>
 
-            <div className="mt-6">
-              <ActivityFeed />
-            </div>
+            {showActivityPanel && (
+              <div className="mt-6">
+                <ActivityFeed />
+              </div>
+            )}
           </>
         )}
       </main>
