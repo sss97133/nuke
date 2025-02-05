@@ -20,9 +20,30 @@ const STEPS = [
   { id: 'skills', title: 'Skills & Interests' }
 ];
 
+type UserType = 'viewer' | 'professional';
+
+interface FormData {
+  fullName: string;
+  username: string;
+  avatarUrl: string;
+  userType: UserType;
+  socialLinks: {
+    twitter: string;
+    instagram: string;
+    linkedin: string;
+    github: string;
+  };
+  streamingLinks: {
+    twitch: string;
+    youtube: string;
+    tiktok: string;
+  };
+  skills: string[];
+}
+
 export const OnboardingWizard = () => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     fullName: '',
     username: '',
     avatarUrl: '',
@@ -38,13 +59,13 @@ export const OnboardingWizard = () => {
       youtube: '',
       tiktok: ''
     },
-    skills: [] as string[]
+    skills: []
   });
   
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const updateFormData = (field: string, value: any) => {
+  const updateFormData = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 

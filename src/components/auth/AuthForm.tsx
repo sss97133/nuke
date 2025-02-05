@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ClassicWindow } from "./ClassicWindow";
@@ -7,6 +8,7 @@ import { OtpInput } from "./OtpInput";
 
 export const AuthForm = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -63,7 +65,7 @@ export const AuthForm = () => {
       setIsLoading(true);
       const formattedPhone = formatPhoneNumber(phoneNumber);
       
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         phone: formattedPhone,
         token: otp,
         type: "sms",
@@ -76,10 +78,24 @@ export const AuthForm = () => {
           description: error.message,
         });
       } else {
+        // Check if this is a new user by querying their profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', data.user?.id)
+          .single();
+
         toast({
           title: "Welcome",
           description: "Successfully logged in",
         });
+
+        // If no username is set, redirect to onboarding
+        if (!profile?.username) {
+          navigate('/onboarding');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (error) {
       console.error("Error:", error);
