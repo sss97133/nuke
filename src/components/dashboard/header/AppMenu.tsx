@@ -32,7 +32,7 @@ export const AppMenu = ({ handleMenuAction }: AppMenuProps) => {
             Shut Down...
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem onClick={() => handleMenuAction("exit")}>
+          <MenubarItem onClick={() => handleMenuAction("logout")}>
             Log Out
             <MenubarShortcut>⇧⌘Q</MenubarShortcut>
           </MenubarItem>
