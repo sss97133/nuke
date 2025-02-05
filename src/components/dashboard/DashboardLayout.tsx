@@ -51,18 +51,37 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         navigate('/import');
         break;
       case 'export':
-        // Download current data as JSON
-        const { data: exportData } = await supabase
-          .from('vehicles')
-          .select('*')
-          .eq('user_id', supabase.auth.getUser());
-        
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'export.json';
-        a.click();
+        try {
+          const { data: user } = await supabase.auth.getUser();
+          if (!user?.user?.id) {
+            throw new Error('User not authenticated');
+          }
+          
+          const { data: exportData, error } = await supabase
+            .from('vehicles')
+            .select('*')
+            .eq('user_id', user.user.id);
+            
+          if (error) throw error;
+          
+          const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'export.json';
+          a.click();
+          
+          toast({
+            title: "Export Successful",
+            description: "Your data has been exported successfully",
+          });
+        } catch (error) {
+          toast({
+            title: "Export Failed",
+            description: error instanceof Error ? error.message : "Failed to export data",
+            variant: "destructive",
+          });
+        }
         break;
       case 'toggle_assistant':
         setShowAiAssistant(!showAiAssistant);

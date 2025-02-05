@@ -1,40 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import {
-  Car,
-  Package,
-  Tool,
-  MessageSquare,
-  Star,
-  Activity,
-  User,
-} from "lucide-react";
 import { useState } from "react";
-
-interface Profile {
-  username: string | null;
-  avatar_url: string | null;
-}
-
-interface FeedItem {
-  id: string;
-  user_id: string;
-  item_type: string;
-  item_id: string;
-  content: string;
-  metadata: any;
-  created_at: string;
-  profile: Profile | null;
-}
-
-interface FeedInteraction {
-  id: string;
-  feed_item_id: string;
-  interaction_type: string;
-  content?: string;
-  created_at: string;
-}
+import { FeedItem as FeedItemType, FeedInteraction } from "@/types/feed";
+import { FeedItem } from "./feed/FeedItem";
+import { FeedInteractions } from "./feed/FeedInteractions";
 
 export const ActivityFeed = () => {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
@@ -55,7 +24,7 @@ export const ActivityFeed = () => {
         .limit(10);
 
       if (error) throw error;
-      return data as FeedItem[];
+      return data as FeedItemType[];
     },
   });
 
@@ -75,25 +44,6 @@ export const ActivityFeed = () => {
     },
     enabled: !!selectedItem,
   });
-
-  const getItemIcon = (type: string) => {
-    switch (type) {
-      case 'vehicle':
-        return <Car className="w-4 h-4" />;
-      case 'inventory':
-        return <Package className="w-4 h-4" />;
-      case 'service':
-        return <Tool className="w-4 h-4" />;
-      case 'comment':
-        return <MessageSquare className="w-4 h-4" />;
-      case 'achievement':
-        return <Star className="w-4 h-4" />;
-      case 'profile':
-        return <User className="w-4 h-4" />;
-      default:
-        return <Activity className="w-4 h-4" />;
-    }
-  };
 
   if (isLoading) {
     return (
@@ -127,42 +77,20 @@ export const ActivityFeed = () => {
 
       <div className="space-y-4">
         {feedItems?.map((item) => (
-          <div
+          <FeedItem
             key={item.id}
-            className="rounded-lg border bg-card text-card-foreground shadow-sm"
-            onClick={() => setSelectedItem(item.id)}
+            id={item.id}
+            content={item.content}
+            itemType={item.item_type}
+            createdAt={item.created_at}
+            profile={item.profile}
+            selected={selectedItem === item.id}
+            onSelect={setSelectedItem}
           >
-            <div className="flex items-center justify-between text-sm p-2 hover:bg-accent/50 rounded-md transition-colors">
-              <div className="flex items-center gap-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarImage src={item.profile?.avatar_url || undefined} alt={item.profile?.username || undefined} />
-                </Avatar>
-                <div>
-                  <div className="flex items-center gap-2">
-                    {getItemIcon(item.item_type)}
-                    <span className="font-medium">{item.profile?.username || 'Anonymous'}</span>
-                  </div>
-                  <p className="text-muted-foreground">{item.content}</p>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(item.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {selectedItem === item.id && interactions && interactions.length > 0 && (
-              <div className="border-t p-2 space-y-2">
-                {interactions.map((interaction) => (
-                  <div key={interaction.id} className="text-sm pl-12">
-                    <p className="text-muted-foreground">{interaction.content}</p>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(interaction.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            {interactions && interactions.length > 0 && (
+              <FeedInteractions interactions={interactions} />
             )}
-          </div>
+          </FeedItem>
         ))}
       </div>
     </div>
