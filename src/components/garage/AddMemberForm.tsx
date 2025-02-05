@@ -46,7 +46,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         description: 'Member added successfully',
       });
 
-      onSuccess?.();
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast({
         variant: 'destructive',
