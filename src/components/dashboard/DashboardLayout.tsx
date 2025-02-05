@@ -109,6 +109,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       case 'studio_config':
         setShowStudioConfig(true);
         setShowWorkspacePreview(true);
+        toast({
+          title: "Studio Configuration",
+          description: "Opening studio configuration panel",
+        });
         break;
       case 'toggle_workspace':
         setShowWorkspacePreview(!showWorkspacePreview);
