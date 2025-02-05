@@ -13,13 +13,7 @@ export const ActivityFeed = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('feed_items')
-        .select(`
-          *,
-          profile:profiles!feed_items_user_id_fkey (
-            username,
-            avatar_url
-          )
-        `)
+        .select('*, profile:profiles(username, avatar_url)')
         .order('created_at', { ascending: false })
         .limit(10);
 
