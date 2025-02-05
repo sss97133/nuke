@@ -22,25 +22,25 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
   const onSubmit = async (data: FormData) => {
     try {
       // First find the user by email
-      const { data: profile, error: userError } = await supabase
+      const { data: userProfile } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', data.email)
-        .single();
+        .maybeSingle();
 
-      if (userError || !profile) {
+      if (!userProfile) {
         throw new Error('User not found');
       }
 
       // Then add them as a garage member
-      const { error } = await supabase
+      const { error: memberError } = await supabase
         .from('garage_members')
         .insert({
-          user_id: profile.id,
+          user_id: userProfile.id,
           garage_id: garageId,
         });
 
-      if (error) throw error;
+      if (memberError) throw memberError;
 
       toast({
         title: 'Success',
