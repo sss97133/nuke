@@ -11,9 +11,10 @@ interface AddMemberFormProps {
   onCancel?: () => void;
 }
 
-type ProfileData = {
+interface ProfileResponse {
   id: string;
-};
+  email?: string;
+}
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
   const [email, setEmail] = useState('');
@@ -38,7 +39,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
       const { error: memberError } = await supabase
         .from('garage_members')
         .insert([
-          { garage_id: garageId, user_id: (userData as ProfileData).id }
+          { garage_id: garageId, user_id: (userData as ProfileResponse).id }
         ]);
 
       if (memberError) {
