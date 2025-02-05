@@ -1,10 +1,7 @@
+import React from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { FeedItemIcon } from "./FeedItemIcon";
-
-interface FeedItemProfile {
-  username: string | null;
-  avatar_url: string | null;
-}
+import { FeedItemProfile } from "@/types/feed";
 
 interface FeedItemProps {
   id: string;
@@ -29,29 +26,38 @@ export const FeedItem = ({
 }: FeedItemProps) => {
   return (
     <div
-      className="rounded-lg border bg-card text-card-foreground shadow-sm"
+      className={`p-4 border rounded-lg mb-4 cursor-pointer transition-colors ${
+        selected ? 'bg-accent' : 'hover:bg-accent/50'
+      }`}
       onClick={() => onSelect(id)}
     >
-      <div className="flex items-center justify-between text-sm p-2 hover:bg-accent/50 rounded-md transition-colors">
-        <div className="flex items-center gap-3">
-          <Avatar className="w-8 h-8">
-            <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.username || undefined} />
-            <AvatarFallback>{profile?.username?.slice(0, 2).toUpperCase() || 'AN'}</AvatarFallback>
-          </Avatar>
-          <div>
-            <div className="flex items-center gap-2">
-              <FeedItemIcon type={itemType} />
-              <span className="font-medium">{profile?.username || 'Anonymous'}</span>
-            </div>
-            <p className="text-muted-foreground">{content}</p>
-            <span className="text-xs text-muted-foreground">
-              {new Date(createdAt).toLocaleDateString()}
+      <div className="flex items-start space-x-4">
+        <Avatar>
+          <AvatarImage src={profile?.avatar_url || undefined} />
+          <AvatarFallback>
+            {profile?.username?.slice(0, 2).toUpperCase() || 'U'}
+          </AvatarFallback>
+        </Avatar>
+        
+        <div className="flex-1 space-y-1">
+          <div className="flex items-center space-x-2">
+            <span className="font-medium">
+              {profile?.username || 'Anonymous'}
             </span>
+            <FeedItemIcon itemType={itemType} />
           </div>
+          
+          <p className="text-sm text-muted-foreground">{content}</p>
+          
+          <div className="flex items-center space-x-2">
+            <time className="text-xs text-muted-foreground">
+              {new Date(createdAt).toLocaleDateString()}
+            </time>
+          </div>
+          
+          {children}
         </div>
       </div>
-
-      {selected && children}
     </div>
   );
 };
