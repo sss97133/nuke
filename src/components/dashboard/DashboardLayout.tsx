@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardHeader } from "./header/DashboardHeader";
 import { DashboardTabs } from "./tabs/DashboardTabs";
-import { DashboardFooter } from "./footer/DashboardFooter";
+import { ActivityFeed } from "./ActivityFeed";
 import { FormDialogs } from "./dialogs/FormDialogs";
 import { MendableChat } from "../ai/MendableChat";
 import { useNavigate } from "react-router-dom";
@@ -152,7 +152,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               {children}
             </Tabs>
 
-            <DashboardFooter />
+            <div className="mt-6">
+              <ActivityFeed />
+            </div>
           </>
         )}
       </main>
