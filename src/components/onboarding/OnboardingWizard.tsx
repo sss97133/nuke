@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Card } from '@/components/ui/card';
 import { BasicInfoStep } from './steps/BasicInfoStep';
 import { ProfilePictureStep } from './steps/ProfilePictureStep';
 import { UserTypeStep } from './steps/UserTypeStep';
 import { LinksStep } from './steps/LinksStep';
 import { SkillsStep } from './steps/SkillsStep';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { OnboardingProgress } from './components/OnboardingProgress';
+import { OnboardingNavigation } from './components/OnboardingNavigation';
+import { useOnboardingForm } from './hooks/useOnboardingForm';
 
 const STEPS = [
   { id: 'basic-info', title: 'Basic Information' },
@@ -20,54 +17,9 @@ const STEPS = [
   { id: 'skills', title: 'Skills & Interests' }
 ];
 
-type UserType = 'viewer' | 'professional';
-
-interface FormData {
-  fullName: string;
-  username: string;
-  avatarUrl: string;
-  userType: UserType;
-  socialLinks: {
-    twitter: string;
-    instagram: string;
-    linkedin: string;
-    github: string;
-  };
-  streamingLinks: {
-    twitch: string;
-    youtube: string;
-    tiktok: string;
-  };
-  skills: string[];
-}
-
 export const OnboardingWizard = () => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<FormData>({
-    fullName: '',
-    username: '',
-    avatarUrl: '',
-    userType: 'viewer',
-    socialLinks: {
-      twitter: '',
-      instagram: '',
-      linkedin: '',
-      github: ''
-    },
-    streamingLinks: {
-      twitch: '',
-      youtube: '',
-      tiktok: ''
-    },
-    skills: []
-  });
-  
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const updateFormData = (field: keyof FormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const { formData, updateFormData, handleComplete } = useOnboardingForm();
 
   const handleNext = () => {
     if (currentStep < STEPS.length - 1) {
@@ -78,40 +30,6 @@ export const OnboardingWizard = () => {
   const handleBack = () => {
     if (currentStep > 0) {
       setCurrentStep(prev => prev - 1);
-    }
-  };
-
-  const handleComplete = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: formData.fullName,
-          username: formData.username,
-          avatar_url: formData.avatarUrl,
-          user_type: formData.userType,
-          social_links: formData.socialLinks,
-          streaming_links: formData.streamingLinks
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Profile Updated',
-        description: 'Your profile has been successfully set up!',
-      });
-
-      navigate('/dashboard');
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update profile. Please try again.',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -172,37 +90,22 @@ export const OnboardingWizard = () => {
           </p>
         </div>
 
-        <Progress
-          value={(currentStep / (STEPS.length - 1)) * 100}
-          className="h-2"
+        <OnboardingProgress
+          currentStep={currentStep}
+          totalSteps={STEPS.length}
         />
 
         <div className="min-h-[300px]">
           {renderStep()}
         </div>
 
-        <div className="flex justify-between pt-4">
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            disabled={currentStep === 0}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-
-          {currentStep === STEPS.length - 1 ? (
-            <Button onClick={handleComplete}>
-              <Check className="mr-2 h-4 w-4" />
-              Complete
-            </Button>
-          ) : (
-            <Button onClick={handleNext}>
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        <OnboardingNavigation
+          currentStep={currentStep}
+          totalSteps={STEPS.length}
+          onNext={handleNext}
+          onBack={handleBack}
+          onComplete={handleComplete}
+        />
       </Card>
     </div>
   );
