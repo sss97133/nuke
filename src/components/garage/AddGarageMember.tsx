@@ -16,11 +16,18 @@ interface AddGarageMemberProps {
 }
 
 export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProps) => {
+  const [open, setOpen] = React.useState(false);
+
+  const handleSuccess = () => {
+    onMemberAdded();
+    setOpen(false);
+  };
+
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full">
-          <UserPlus className="w-4 h-4 mr-2" />
+        <Button variant="outline" size="sm" className="gap-2">
+          <UserPlus className="w-4 h-4" />
           Add Member
         </Button>
       </DialogTrigger>
@@ -28,7 +35,11 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
         <DialogHeader>
           <DialogTitle>Add Garage Member</DialogTitle>
         </DialogHeader>
-        <AddMemberForm garageId={garageId} onSuccess={onMemberAdded} />
+        <AddMemberForm 
+          garageId={garageId} 
+          onSuccess={handleSuccess}
+          onCancel={() => setOpen(false)}
+        />
       </DialogContent>
     </Dialog>
   );

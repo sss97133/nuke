@@ -21,25 +21,27 @@ export const GarageCard = ({ garage }: GarageCardProps) => {
   const queryClient = useQueryClient();
 
   const handleDeleteGarage = async () => {
-    const { error } = await supabase
-      .from('garages')
-      .delete()
-      .eq('id', garage.id);
+    try {
+      const { error } = await supabase
+        .from('garages')
+        .delete()
+        .eq('id', garage.id);
 
-    if (error) {
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Garage deleted successfully"
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['garages'] });
+    } catch (error) {
       toast({
         title: "Error",
         description: "Failed to delete garage",
         variant: "destructive"
       });
-      return;
     }
-
-    toast({
-      title: "Success",
-      description: "Garage deleted successfully"
-    });
-    queryClient.invalidateQueries({ queryKey: ['garages'] });
   };
 
   const handleMemberAdded = () => {
@@ -57,7 +59,7 @@ export const GarageCard = ({ garage }: GarageCardProps) => {
           variant="ghost"
           size="sm"
           onClick={handleDeleteGarage}
-          className="text-destructive hover:text-destructive"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           <Trash2 className="w-4 h-4" />
         </Button>

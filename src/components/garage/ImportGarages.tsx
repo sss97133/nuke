@@ -11,13 +11,11 @@ export const ImportGarages = () => {
   const importGarages = async () => {
     setImporting(true);
     try {
-      // First show a toast to indicate we're requesting location
       toast({
         title: "Location Required",
         description: "Please allow location access to import nearby garages",
       });
 
-      // Get user's location
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
@@ -26,7 +24,6 @@ export const ImportGarages = () => {
         });
       });
 
-      // Show searching toast
       toast({
         title: "Searching",
         description: "Looking for garages within 5km...",
