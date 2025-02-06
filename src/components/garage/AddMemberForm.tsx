@@ -13,7 +13,7 @@ interface AddMemberFormProps {
 
 type Profile = {
   id: string;
-  email?: string | null;
+  email: string | null;
 }
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
@@ -26,6 +26,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
     setIsLoading(true);
 
     try {
+      // First, find the user by email
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
@@ -36,6 +37,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         throw new Error('User not found');
       }
 
+      // Then, add them as a garage member
       const { error: memberError } = await supabase
         .from('garage_members')
         .insert([
