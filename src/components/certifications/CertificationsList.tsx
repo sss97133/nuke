@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CertificationCard } from './CertificationCard';
 import { useToast } from '@/hooks/use-toast';
-import { Trophy, Star, TrendingUp, Eye, EyeOff, Users } from 'lucide-react';
+import { Trophy, Star, TrendingUp, Eye, EyeOff, Users, GitBranch, GitPullRequest } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 
 export const CertificationsList = () => {
   const { toast } = useToast();
@@ -40,6 +41,20 @@ export const CertificationsList = () => {
     },
   });
 
+  const handleCreateCertification = () => {
+    toast({
+      title: "Create New Certification",
+      description: "Opening certification creation wizard...",
+    });
+  };
+
+  const handleForkCertification = () => {
+    toast({
+      title: "Fork Certification",
+      description: "Select a certification to fork...",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
@@ -50,15 +65,13 @@ export const CertificationsList = () => {
     );
   }
 
-  // Calculate achievement stats
   const totalCerts = certifications?.length || 0;
   const completedCerts = certifications?.filter(c => c.status === 'completed').length || 0;
   const inProgressCerts = certifications?.filter(c => c.status === 'in_progress').length || 0;
-  const viewerCount = Math.floor(Math.random() * 500); // Simulated viewer count
+  const viewerCount = Math.floor(Math.random() * 500);
 
   return (
     <div className="space-y-6">
-      {/* Mode Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
@@ -76,7 +89,7 @@ export const CertificationsList = () => {
               ) : (
                 <>
                   <Eye className="w-4 h-4" />
-                  Sponsor Mode
+                  Public Mode
                 </>
               )}
             </Label>
@@ -88,17 +101,36 @@ export const CertificationsList = () => {
             </div>
           )}
         </div>
-        <div className="flex items-center space-x-2">
-          <Switch
-            checked={showStats}
-            onCheckedChange={setShowStats}
-            id="show-stats"
-          />
-          <Label htmlFor="show-stats">Show Stats</Label>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+            onClick={handleCreateCertification}
+          >
+            <GitBranch className="w-4 h-4" />
+            New Certification
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+            onClick={handleForkCertification}
+          >
+            <GitPullRequest className="w-4 h-4" />
+            Fork Existing
+          </Button>
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={showStats}
+              onCheckedChange={setShowStats}
+              id="show-stats"
+            />
+            <Label htmlFor="show-stats">Show Stats</Label>
+          </div>
         </div>
       </div>
 
-      {/* Achievement Stats */}
       {showStats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="p-4 flex items-center space-x-4">
@@ -120,14 +152,13 @@ export const CertificationsList = () => {
           <Card className="p-4 flex items-center space-x-4">
             <Star className="w-8 h-8 text-purple-500" />
             <div>
-              <p className="text-sm text-muted-foreground">Total Points</p>
+              <p className="text-sm text-muted-foreground">Skill Score</p>
               <p className="text-2xl font-bold">{totalCerts * 100}</p>
             </div>
           </Card>
         </div>
       )}
 
-      {/* Certifications Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {certifications?.map((cert) => (
           <CertificationCard
@@ -139,6 +170,9 @@ export const CertificationsList = () => {
             progress={cert.status === 'in_progress' ? 50 : undefined}
             expiresAt={cert.expires_at}
             isGhostMode={isGhostMode}
+            skillScore={Math.floor(Math.random() * 1000)}
+            forks={Math.floor(Math.random() * 50)}
+            contributors={Math.floor(Math.random() * 20)}
           />
         ))}
       </div>

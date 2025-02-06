@@ -1,5 +1,5 @@
 import React from 'react';
-import { BadgeCheck, Clock, FileText, Star, Trophy, TrendingUp, Users, Heart } from 'lucide-react';
+import { BadgeCheck, Clock, FileText, Star, Trophy, TrendingUp, Users, Heart, GitFork, GitPullRequest, Eye, EyeOff } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import {
   Card,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 interface CertificationCardProps {
   name: string;
@@ -19,6 +20,9 @@ interface CertificationCardProps {
   progress?: number;
   expiresAt?: string;
   isGhostMode?: boolean;
+  skillScore?: number;
+  forks?: number;
+  contributors?: number;
 }
 
 export const CertificationCard = ({
@@ -29,6 +33,9 @@ export const CertificationCard = ({
   progress = 0,
   expiresAt,
   isGhostMode = false,
+  skillScore = 0,
+  forks = 0,
+  contributors = 0,
 }: CertificationCardProps) => {
   const { toast } = useToast();
   const [likes, setLikes] = React.useState(Math.floor(Math.random() * 100));
@@ -38,6 +45,20 @@ export const CertificationCard = ({
     toast({
       title: "Sponsorship Request",
       description: "Thank you for your interest! Sponsorship feature coming soon.",
+    });
+  };
+
+  const handleFork = () => {
+    toast({
+      title: "Fork Certification",
+      description: "Creating a new branch of this certification path...",
+    });
+  };
+
+  const handleContribute = () => {
+    toast({
+      title: "Contribute",
+      description: "Opening contribution guidelines...",
     });
   };
 
@@ -53,21 +74,35 @@ export const CertificationCard = ({
     <Card className="w-full hover:shadow-lg transition-shadow">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">
-            {isGhostMode ? `Anonymous_${Math.floor(Math.random() * 1000)}` : name}
-          </CardTitle>
-          {status === 'completed' && (
-            <div className="flex items-center gap-2">
-              <BadgeCheck className="w-6 h-6 text-green-500" />
-              <Trophy className="w-6 h-6 text-yellow-500" />
-            </div>
-          )}
-          {status === 'in_progress' && (
-            <div className="flex items-center gap-2">
-              <Clock className="w-6 h-6 text-blue-500 animate-pulse" />
-              <TrendingUp className="w-6 h-6 text-blue-500" />
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg font-semibold">
+              {isGhostMode ? `Anonymous_${Math.floor(Math.random() * 1000)}` : name}
+            </CardTitle>
+            {status === 'completed' && (
+              <Badge variant="default" className="bg-green-500">
+                Verified
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {isGhostMode ? (
+              <EyeOff className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <Eye className="w-4 h-4 text-muted-foreground" />
+            )}
+            {status === 'completed' && (
+              <>
+                <BadgeCheck className="w-6 h-6 text-green-500" />
+                <Trophy className="w-6 h-6 text-yellow-500" />
+              </>
+            )}
+            {status === 'in_progress' && (
+              <>
+                <Clock className="w-6 h-6 text-blue-500 animate-pulse" />
+                <TrendingUp className="w-6 h-6 text-blue-500" />
+              </>
+            )}
+          </div>
         </div>
         <CardDescription className="flex items-center gap-2">
           <Star className="w-4 h-4 text-yellow-500" />
@@ -94,30 +129,57 @@ export const CertificationCard = ({
           )}
           
           {!isGhostMode && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Button 
-                  variant="ghost" 
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="flex items-center gap-2"
+                    onClick={handleLike}
+                  >
+                    <Heart className="w-4 h-4" />
+                    {likes}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-2"
+                    onClick={handleFork}
+                  >
+                    <GitFork className="w-4 h-4" />
+                    {forks}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-2"
+                    onClick={handleContribute}
+                  >
+                    <GitPullRequest className="w-4 h-4" />
+                    {contributors}
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
                   size="sm"
-                  className="flex items-center gap-2"
-                  onClick={handleLike}
+                  onClick={handleSponsor}
                 >
-                  <Heart className="w-4 h-4" />
-                  {likes}
+                  Sponsor
                 </Button>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              </div>
+              
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  {viewers}
+                  {viewers} watching
+                </div>
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4" />
+                  Skill Score: {skillScore}
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSponsor}
-              >
-                Sponsor
-              </Button>
-            </div>
+            </>
           )}
           
           {expiresAt && (
