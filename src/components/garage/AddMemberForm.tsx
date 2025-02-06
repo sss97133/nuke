@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import React from 'react';
+import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,44 +9,47 @@ import { supabase } from '@/integrations/supabase/client';
 interface AddMemberFormProps {
   garageId: string;
   onSuccess?: () => void;
-  onCancel?: () => void;
 }
 
-type Profile = {
-  id: string;
-  email: string | null;
-}
+type FormData = {
+  email: string;
+};
 
-export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-
+  const onSubmit = async (data: FormData) => {
     try {
-      // First, find the user by email
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('email', email)
+        .eq('email', data.email)
         .single();
 
       if (userError || !userData) {
-        throw new Error('User not found');
+        toast({
+          title: 'User not found',
+          description: 'Please check the email address and try again',
+          variant: 'destructive',
+        });
+        return;
       }
 
-      // Then, add them as a garage member
       const { error: memberError } = await supabase
         .from('garage_members')
-        .insert([
-          { garage_id: garageId, user_id: userData.id }
-        ]);
+        .insert({
+          garage_id: garageId,
+          user_id: userData.id,
+        });
 
       if (memberError) {
-        throw memberError;
+        toast({
+          title: 'Error adding member',
+          description: memberError.message,
+          variant: 'destructive',
+        });
+        return;
       }
 
       toast({
@@ -53,51 +57,32 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         description: 'Member added successfully',
       });
 
-      setEmail('');
-      if (onSuccess) onSuccess();
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
       toast({
-        variant: 'destructive',
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to add member',
+        description: 'Failed to add member',
+        variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="email">Email Address</Label>
+        <Label htmlFor="email">Email</Label>
         <Input
           id="email"
           type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter member's email"
-          required
+          {...register('email', { required: true })}
         />
-      </div>
-      
-      <div className="flex justify-end space-x-2">
-        {onCancel && (
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={onCancel}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
+        {errors.email && (
+          <span className="text-sm text-red-500">Email is required</span>
         )}
-        <Button 
-          type="submit" 
-          disabled={isLoading}
-        >
-          {isLoading ? 'Adding...' : 'Add Member'}
-        </Button>
       </div>
+      <Button type="submit">Add Member</Button>
     </form>
   );
 };
