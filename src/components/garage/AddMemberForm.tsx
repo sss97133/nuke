@@ -9,13 +9,14 @@ import { supabase } from '@/integrations/supabase/client';
 interface AddMemberFormProps {
   garageId: string;
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 type FormData = {
   email: string;
 };
 
-export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
+export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
   const { toast } = useToast();
 
@@ -82,7 +83,14 @@ export const AddMemberForm = ({ garageId, onSuccess }: AddMemberFormProps) => {
           <span className="text-sm text-red-500">Email is required</span>
         )}
       </div>
-      <Button type="submit">Add Member</Button>
+      <div className="flex justify-end gap-2">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit">Add Member</Button>
+      </div>
     </form>
   );
 };

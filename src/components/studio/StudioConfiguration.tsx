@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { StudioConfigForm } from './StudioConfigForm';
 import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
+import { toJson } from '@/types/json';
 
 export const StudioConfiguration = () => {
   const { toast } = useToast();
@@ -21,18 +22,24 @@ export const StudioConfiguration = () => {
     ptzTracks: PTZTrack[];
   }) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
       const { error } = await supabase
         .from('studio_configurations')
         .upsert({
+          user_id: user.id,
           name: 'Default Configuration',
-          workspace_dimensions: {
+          workspace_dimensions: toJson({
             length: data.length,
             width: data.width,
             height: data.height
-          },
-          ptz_configurations: {
-            tracks: data.ptzTracks
-          }
+          }),
+          ptz_configurations: toJson({
+            tracks: data.ptzTracks,
+            planes: { walls: [], ceiling: {} },
+            roboticArms: []
+          })
         });
 
       if (error) throw error;
