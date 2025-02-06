@@ -182,10 +182,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       
       <main className="flex-1 p-6">
         {showStudioConfig ? (
-          <>
+          <div className="space-y-6">
             <StudioConfiguration />
             {showWorkspacePreview && (
-              <div className="mt-6 w-full h-[600px]">
+              <div className="mt-6 w-full h-[600px] border border-border rounded-lg shadow-classic">
                 <StudioWorkspace 
                   dimensions={{ length: 30, width: 20, height: 16 }}
                   ptzTracks={[{
@@ -197,7 +197,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 />
               </div>
             )}
-          </>
+          </div>
         ) : (
           <>
             <FormDialogs
