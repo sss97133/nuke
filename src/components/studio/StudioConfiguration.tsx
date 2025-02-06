@@ -1,135 +1,216 @@
 import React, { useState } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Camera, Video, Settings, Layout, Mic2, Radio } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { CameraControls } from './controls/CameraControls';
-import { AudioControls } from './controls/AudioControls';
-import { StreamingControls } from './controls/StreamingControls';
-import { PTZControls } from './controls/PTZControls';
-import { RecordingControls } from './controls/RecordingControls';
-import { PreviewSection } from './sections/PreviewSection';
-import { SettingsSection } from './sections/SettingsSection';
-import { ControlButtons } from './sections/ControlButtons';
-import { PodcastingStudio } from './podcasting/PodcastingStudio';
-import { useStudioConfig } from '@/hooks/useStudioConfig';
-import type { WorkspaceDimensions } from '@/types/studio';
-
-const defaultDimensions: WorkspaceDimensions = {
-  length: 30,
-  width: 20,
-  height: 16,
-};
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Camera, Mic, Lightbulb, Save, Plus } from 'lucide-react';
+import { StudioWorkspace } from './StudioWorkspace';
 
 export const StudioConfiguration = () => {
-  const [dimensions, setDimensions] = useState<WorkspaceDimensions>(defaultDimensions);
   const { toast } = useToast();
-  const [isRecording, setIsRecording] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedCamera, setSelectedCamera] = useState<number | null>(null);
-  const [audioLevel, setAudioLevel] = useState([50]);
+  const [dimensions, setDimensions] = useState({
+    length: 30,
+    width: 20,
+    height: 16
+  });
 
-  const { data: studioConfig } = useStudioConfig(defaultDimensions);
+  const [ptzTracks, setPtzTracks] = useState([{
+    position: { x: 0, y: 8, z: 0 },
+    length: 10,
+    speed: 1,
+    coneAngle: 45
+  }]);
 
-  const handleRecordingToggle = () => {
-    setIsRecording(!isRecording);
-    toast({
-      title: isRecording ? "Recording Stopped" : "Recording Started",
-      description: isRecording ? "Your session has been saved" : "Recording to local storage",
-    });
+  const { data: config, isLoading } = useQuery({
+    queryKey: ['studio-config'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('studio_configurations')
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error fetching studio config:', error);
+        toast({
+          title: 'Error loading configuration',
+          description: error.message,
+          variant: 'destructive',
+        });
+        throw error;
+      }
+
+      return data;
+    },
+  });
+
+  const handleSave = async () => {
+    try {
+      const { error } = await supabase
+        .from('studio_configurations')
+        .upsert({
+          workspace_dimensions: dimensions,
+          ptz_configurations: {
+            tracks: ptzTracks
+          }
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Configuration Saved',
+        description: 'Your studio settings have been updated.',
+      });
+    } catch (error) {
+      console.error('Error saving config:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save configuration',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleStreamingToggle = () => {
-    setIsStreaming(!isStreaming);
-    toast({
-      title: isStreaming ? "Stream Ended" : "Stream Started",
-      description: isStreaming ? "Your stream has ended" : "Going live on configured platforms",
-    });
+  const addPTZTrack = () => {
+    setPtzTracks([...ptzTracks, {
+      position: { x: 0, y: 8, z: 0 },
+      length: 10,
+      speed: 1,
+      coneAngle: 45
+    }]);
   };
+
+  if (isLoading) {
+    return <div>Loading configuration...</div>;
+  }
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="preview" className="w-full">
-        <TabsList className="grid w-full grid-cols-8 mb-4">
-          <TabsTrigger value="preview" className="flex items-center gap-2">
-            <Video className="w-4 h-4" />
-            Live Preview
-          </TabsTrigger>
-          <TabsTrigger value="cameras" className="flex items-center gap-2">
-            <Camera className="w-4 h-4" />
-            Cameras
-          </TabsTrigger>
-          <TabsTrigger value="ptz" className="flex items-center gap-2">
-            <Layout className="w-4 h-4" />
-            PTZ Controls
-          </TabsTrigger>
-          <TabsTrigger value="audio" className="flex items-center gap-2">
-            <Mic2 className="w-4 h-4" />
-            Audio
-          </TabsTrigger>
-          <TabsTrigger value="streaming" className="flex items-center gap-2">
-            <Radio className="w-4 h-4" />
-            Streaming
-          </TabsTrigger>
-          <TabsTrigger value="recording" className="flex items-center gap-2">
-            <Video className="w-4 h-4" />
-            Recording
-          </TabsTrigger>
-          <TabsTrigger value="podcasting" className="flex items-center gap-2">
-            <Mic2 className="w-4 h-4" />
-            Podcasting
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Settings
-          </TabsTrigger>
-        </TabsList>
+      <Card className="p-6">
+        <h2 className="text-2xl font-bold mb-4">Studio Configuration</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Camera className="w-5 h-5" />
+              Workspace Dimensions
+            </h3>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Length (ft)</Label>
+                <Input
+                  type="number"
+                  value={dimensions.length}
+                  onChange={(e) => setDimensions({
+                    ...dimensions,
+                    length: Number(e.target.value)
+                  })}
+                />
+              </div>
+              <div>
+                <Label>Width (ft)</Label>
+                <Input
+                  type="number"
+                  value={dimensions.width}
+                  onChange={(e) => setDimensions({
+                    ...dimensions,
+                    width: Number(e.target.value)
+                  })}
+                />
+              </div>
+              <div>
+                <Label>Height (ft)</Label>
+                <Input
+                  type="number"
+                  value={dimensions.height}
+                  onChange={(e) => setDimensions({
+                    ...dimensions,
+                    height: Number(e.target.value)
+                  })}
+                />
+              </div>
+            </div>
+          </div>
 
-        <ControlButtons
-          isRecording={isRecording}
-          isStreaming={isStreaming}
-          onRecordingToggle={handleRecordingToggle}
-          onStreamingToggle={handleStreamingToggle}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Camera className="w-5 h-5" />
+                PTZ Camera Tracks
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addPTZTrack}
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Track
+              </Button>
+            </div>
+
+            {ptzTracks.map((track, index) => (
+              <div key={index} className="space-y-2 border p-4 rounded-lg">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>Length (ft)</Label>
+                    <Input
+                      type="number"
+                      value={track.length}
+                      onChange={(e) => {
+                        const newTracks = [...ptzTracks];
+                        newTracks[index].length = Number(e.target.value);
+                        setPtzTracks(newTracks);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label>Speed</Label>
+                    <Input
+                      type="number"
+                      value={track.speed}
+                      onChange={(e) => {
+                        const newTracks = [...ptzTracks];
+                        newTracks[index].speed = Number(e.target.value);
+                        setPtzTracks(newTracks);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label>Cone Angle (°)</Label>
+                    <Input
+                      type="number"
+                      value={track.coneAngle}
+                      onChange={(e) => {
+                        const newTracks = [...ptzTracks];
+                        newTracks[index].coneAngle = Number(e.target.value);
+                        setPtzTracks(newTracks);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <Button onClick={handleSave} className="flex items-center gap-2">
+            <Save className="w-4 h-4" />
+            Save Configuration
+          </Button>
+        </div>
+      </Card>
+
+      <div className="w-full h-[600px] border border-border rounded-lg shadow-classic">
+        <StudioWorkspace 
+          dimensions={dimensions}
+          ptzTracks={ptzTracks}
         />
-
-        <TabsContent value="preview" className="space-y-4">
-          <PreviewSection
-            selectedCamera={selectedCamera}
-            setSelectedCamera={setSelectedCamera}
-          />
-        </TabsContent>
-
-        <TabsContent value="cameras">
-          <CameraControls />
-        </TabsContent>
-
-        <TabsContent value="ptz">
-          <PTZControls />
-        </TabsContent>
-
-        <TabsContent value="audio">
-          <AudioControls audioLevel={audioLevel} setAudioLevel={setAudioLevel} />
-        </TabsContent>
-
-        <TabsContent value="streaming">
-          <StreamingControls />
-        </TabsContent>
-
-        <TabsContent value="recording">
-          <RecordingControls />
-        </TabsContent>
-
-        <TabsContent value="podcasting">
-          <PodcastingStudio />
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-4">
-          <SettingsSection
-            dimensions={dimensions}
-            setDimensions={setDimensions}
-            ptzTracks={studioConfig?.ptz_configurations?.tracks || []}
-          />
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 };
