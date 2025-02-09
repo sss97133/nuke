@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,13 +43,17 @@ export const StudioConfiguration = () => {
           })
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating studio configuration:', error);
+        throw error;
+      }
 
       toast({
         title: 'Success',
         description: 'Studio configuration updated successfully',
       });
     } catch (error) {
+      console.error('Error:', error);
       toast({
         title: 'Error',
         description: 'Failed to update studio configuration',

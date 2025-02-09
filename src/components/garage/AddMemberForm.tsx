@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -12,15 +13,15 @@ interface AddMemberFormProps {
   onCancel?: () => void;
 }
 
-type FormData = {
+type FormInputs = {
   email: string;
 };
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
+  const { register, handleSubmit, formState: { errors } } = useForm<FormInputs>();
   const { toast } = useToast();
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: FormInputs) => {
     try {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
