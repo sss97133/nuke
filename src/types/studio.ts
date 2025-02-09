@@ -1,3 +1,4 @@
+
 export interface WorkspaceDimensions {
   width: number;
   height: number;
@@ -41,29 +42,14 @@ export interface StudioConfiguration {
   };
 }
 
-export interface PodcastEpisode {
-  id: string;
-  title: string;
-  description?: string;
-  recordingDate: Date;
-  duration?: number;
-  audioUrl?: string;
-  status: 'draft' | 'recording' | 'editing' | 'published';
-  guestInfo?: {
-    name: string;
-    role: string;
-    connectionQuality: number;
-    audioLatency: number;
-  }[];
-  technicalInfo?: {
-    cameras: {
-      id: number;
-      name: string;
-      status: 'active' | 'standby';
-      latency: number;
-    }[];
-    audioLevels: number[];
-  };
+export interface PTZConfigurationProps {
+  ptzTracks: PTZTrack[];
+  onUpdate: (tracks: PTZTrack[]) => void;
+}
+
+export interface StudioDimensionsProps {
+  dimensions: WorkspaceDimensions;
+  onUpdate: (dimensions: WorkspaceDimensions) => void;
 }
 
 export const isWorkspaceDimensions = (value: unknown): value is WorkspaceDimensions => {
@@ -87,12 +73,3 @@ export const isPTZConfigurations = (value: unknown): value is PTZConfigurations 
   );
 };
 
-export interface PTZConfigurationProps {
-  ptzTracks: PTZTrack[];
-  onUpdate: (tracks: PTZTrack[]) => void;
-}
-
-export interface StudioDimensionsProps {
-  dimensions: WorkspaceDimensions;
-  onUpdate: (dimensions: WorkspaceDimensions) => void;
-}

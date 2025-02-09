@@ -1,12 +1,10 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { StudioDimensions } from './form/StudioDimensions';
 import { PTZConfiguration } from './form/PTZConfiguration';
-import { toJson } from '@/types/json';
-import type { WorkspaceDimensions, PTZTrack, PTZConfigurations } from '@/types/studio';
+import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
 
 interface StudioConfigFormProps {
   onUpdate: (data: {
@@ -33,55 +31,19 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
       coneAngle: 45,
     }]
   );
-  const { toast } = useToast();
 
-  React.useEffect(() => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     onUpdate({
       ...dimensions,
       ptzTracks,
     });
-  }, [dimensions, ptzTracks, onUpdate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
-
-      const ptzConfig: PTZConfigurations = {
-        tracks: ptzTracks,
-        planes: { walls: [], ceiling: {} },
-        roboticArms: []
-      };
-
-      const { error } = await supabase
-        .from('studio_configurations')
-        .insert({
-          user_id: user.id,
-          name: 'Default Configuration',
-          workspace_dimensions: toJson(dimensions),
-          ptz_configurations: toJson(ptzConfig)
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Studio configuration updated successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update studio configuration',
-        variant: 'destructive',
-      });
-    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Tabs defaultValue="dimensions" className="w-full">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="dimensions">Room Dimensions</TabsTrigger>
           <TabsTrigger value="ptz">PTZ Configuration</TabsTrigger>
         </TabsList>
@@ -95,7 +57,10 @@ export const StudioConfigForm = ({ onUpdate, initialData }: StudioConfigFormProp
         </TabsContent>
       </Tabs>
       
-      <Button type="submit">Save Configuration</Button>
+      <div className="flex justify-end">
+        <Button type="submit">Save Configuration</Button>
+      </div>
     </form>
   );
 };
+
