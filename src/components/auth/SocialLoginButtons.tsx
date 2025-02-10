@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Github, Facebook } from "lucide-react";
+import { Github } from "lucide-react";
 import { Provider } from "@supabase/supabase-js";
 
 interface SocialLoginButtonsProps {
@@ -55,9 +55,15 @@ export const SocialLoginButtons = ({ onSocialLogin, isLoading }: SocialLoginButt
         disabled={isLoading}
         className="w-full"
       >
-        <Facebook className="mr-2 h-4 w-4" />
+        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M12.002 0a12 12 0 0 0-1.88 23.85V16.36H7.268v-3.51h2.854V10.1c0-2.842 1.694-4.41 4.274-4.41 1.237 0 2.528.22 2.528.22v2.79H15.54c-1.404 0-1.84.875-1.84 1.774v2.13h3.13l-.5 3.51h-2.63v7.49A12 12 0 0 0 12.002 0Z"
+          />
+        </svg>
         Continue with Meta
       </Button>
     </>
   );
 };
+
