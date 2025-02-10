@@ -9,8 +9,8 @@ interface ProgressBarProps {
 
 export const ProgressBar = ({ steps, currentStep, onStepClick }: ProgressBarProps) => {
   return (
-    <div className="mb-8">
-      <div className="flex justify-between items-center mb-4">
+    <div className="mb-6">
+      <div className="flex justify-between items-center relative mb-8">
         {steps.map((step, index) => {
           const isActive = index === currentStep;
           const isPast = index < currentStep;
@@ -19,30 +19,25 @@ export const ProgressBar = ({ steps, currentStep, onStepClick }: ProgressBarProp
             <button
               key={index}
               onClick={() => onStepClick(index)}
-              className={cn(
-                "relative flex flex-col items-center group",
-                "transition-colors duration-200 ease-in-out"
-              )}
+              className="relative flex flex-col items-center group"
             >
               {/* Step circle */}
               <div 
                 className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center mb-2",
-                  "border-2 transition-colors duration-200",
-                  isActive && "border-primary bg-primary text-primary-foreground",
-                  !isActive && isPast && "border-muted-foreground bg-muted-foreground text-primary-foreground",
-                  !isActive && !isPast && "border-muted bg-background text-muted-foreground"
+                  "w-2 h-2 rounded-full mb-3",
+                  "transition-all duration-200 ease-out",
+                  isActive && "w-3 h-3 bg-primary",
+                  !isActive && isPast && "bg-primary/60",
+                  !isActive && !isPast && "bg-muted-foreground/30"
                 )}
-              >
-                {index + 1}
-              </div>
+              />
               
               {/* Step label */}
               <span 
                 className={cn(
-                  "absolute -bottom-6 text-xs tracking-wide whitespace-nowrap",
-                  "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
-                  isActive ? "text-primary" : "text-muted-foreground"
+                  "text-[11px] font-medium tracking-tight absolute -bottom-6",
+                  "transition-colors duration-200",
+                  isActive ? "text-primary" : "text-muted-foreground/70"
                 )}
               >
                 {step.title}
@@ -52,25 +47,15 @@ export const ProgressBar = ({ steps, currentStep, onStepClick }: ProgressBarProp
               {index < steps.length - 1 && (
                 <div 
                   className={cn(
-                    "absolute top-4 left-full w-full h-0.5 -translate-y-1/2",
-                    isPast ? "bg-muted-foreground" : "bg-muted"
+                    "absolute top-[5px] left-[10px] h-[1px]",
+                    isPast ? "bg-primary/60" : "bg-muted-foreground/30"
                   )}
-                  style={{ width: "calc(100% - 2rem)" }}
+                  style={{ width: "calc(100% + 1.5rem)" }}
                 />
               )}
             </button>
           );
         })}
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-1 bg-muted rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary transition-all duration-300 ease-in-out"
-          style={{
-            width: `${((currentStep + 1) / steps.length) * 100}%`,
-          }}
-        />
       </div>
     </div>
   );
