@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +18,6 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Handle initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         console.log("[useAuth] Initial session found:", session);
@@ -27,7 +25,6 @@ export const useAuth = () => {
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[useAuth] Auth state changed:", event, session ? "Session exists" : "No session");
       
@@ -91,7 +88,6 @@ export const useAuth = () => {
         }
 
         if (data?.user) {
-          // Create initial profile
           const { error: profileError } = await supabase
             .from('profiles')
             .insert([
@@ -148,6 +144,39 @@ export const useAuth = () => {
     }
   };
 
+  const handleForgotPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?reset=true`,
+      });
+
+      if (error) {
+        console.error("[useAuth] Password reset error:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message
+        });
+        return;
+      }
+
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Please check your email for password reset instructions"
+      });
+    } catch (error) {
+      console.error("[useAuth] Unexpected password reset error:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to send password reset email. Please try again."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSocialLogin = async (provider: Provider) => {
     console.log("[useAuth] Initiating social login with provider:", provider);
     await socialLogin(provider);
@@ -182,5 +211,6 @@ export const useAuth = () => {
     handlePhoneLogin: phoneLogin,
     verifyOtp: verifyPhoneOtp,
     handleEmailLogin,
+    handleForgotPassword,
   };
 };
