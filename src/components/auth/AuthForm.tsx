@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ClassicWindow } from "./ClassicWindow";
@@ -101,13 +100,13 @@ export const AuthForm = () => {
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(false)}
-                  className="text-sm text-blue-500 hover:underline"
+                  className="text-blue-500 hover:underline"
                 >
                   Back to login
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-center space-x-4 py-2">
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
@@ -161,4 +160,3 @@ export const AuthForm = () => {
     </div>
   );
 };
-
