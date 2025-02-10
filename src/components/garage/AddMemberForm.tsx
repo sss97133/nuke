@@ -65,13 +65,13 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
       }
 
       // Check if user exists
-      const { data: userData, error: userError2 } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', data.email)
-        .maybeSingle<ProfileResult>();
+        .single();
 
-      if (userError2) {
+      if (profileError) {
         toast({
           title: 'Error',
           description: 'Failed to check user existence',
@@ -80,7 +80,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         return;
       }
 
-      if (!userData) {
+      if (!profile) {
         toast({
           title: 'User not found',
           description: 'No user found with this email address',
@@ -94,7 +94,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         .from('garage_members')
         .select('id')
         .eq('garage_id', garageId)
-        .eq('user_id', userData.id)
+        .eq('user_id', profile.id)
         .maybeSingle();
 
       if (memberCheckError) {
@@ -120,7 +120,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         .from('garage_members')
         .insert({
           garage_id: garageId,
-          user_id: userData.id,
+          user_id: profile.id,
         });
 
       if (insertError) {
