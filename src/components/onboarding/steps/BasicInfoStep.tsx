@@ -4,21 +4,32 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 interface BasicInfoStepProps {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   username: string;
   onUpdate: (field: string, value: string) => void;
 }
 
-export const BasicInfoStep = ({ fullName, username, onUpdate }: BasicInfoStepProps) => {
+export const BasicInfoStep = ({ firstName, lastName, username, onUpdate }: BasicInfoStepProps) => {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="fullName">Full Name</Label>
+        <Label htmlFor="firstName">First Name</Label>
         <Input
-          id="fullName"
-          placeholder="Enter your full name"
-          value={fullName}
-          onChange={(e) => onUpdate('fullName', e.target.value)}
+          id="firstName"
+          placeholder="Enter your first name"
+          value={firstName}
+          onChange={(e) => onUpdate('firstName', e.target.value)}
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="lastName">Last Name</Label>
+        <Input
+          id="lastName"
+          placeholder="Enter your last name"
+          value={lastName}
+          onChange={(e) => onUpdate('lastName', e.target.value)}
         />
       </div>
       
@@ -34,3 +45,4 @@ export const BasicInfoStep = ({ fullName, username, onUpdate }: BasicInfoStepPro
     </div>
   );
 };
+

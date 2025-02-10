@@ -39,7 +39,8 @@ export const OnboardingWizard = () => {
       case 0:
         return (
           <BasicInfoStep
-            fullName={formData.fullName}
+            firstName={formData.firstName}
+            lastName={formData.lastName}
             username={formData.username}
             onUpdate={updateFormData}
           />
@@ -111,3 +112,4 @@ export const OnboardingWizard = () => {
     </div>
   );
 };
+

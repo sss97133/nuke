@@ -7,7 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 export type UserType = 'viewer' | 'professional';
 
 export interface OnboardingFormData {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   username: string;
   avatarUrl: string;
   userType: UserType;
@@ -27,7 +28,8 @@ export interface OnboardingFormData {
 
 export const useOnboardingForm = () => {
   const [formData, setFormData] = useState<OnboardingFormData>({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     username: '',
     avatarUrl: '',
     userType: 'viewer',
@@ -60,7 +62,8 @@ export const useOnboardingForm = () => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: formData.fullName,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
           username: formData.username,
           avatar_url: formData.avatarUrl,
           user_type: formData.userType,
@@ -92,3 +95,4 @@ export const useOnboardingForm = () => {
     handleComplete
   };
 };
+

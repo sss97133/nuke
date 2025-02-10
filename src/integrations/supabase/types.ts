@@ -953,9 +953,11 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          first_name: string | null
           full_name: string | null
           home_location: Json | null
           id: string
+          last_name: string | null
           onboarding_completed: boolean | null
           onboarding_step: number | null
           reputation_score: number | null
@@ -969,9 +971,11 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          first_name?: string | null
           full_name?: string | null
           home_location?: Json | null
           id: string
+          last_name?: string | null
           onboarding_completed?: boolean | null
           onboarding_step?: number | null
           reputation_score?: number | null
@@ -985,9 +989,11 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          first_name?: string | null
           full_name?: string | null
           home_location?: Json | null
           id?: string
+          last_name?: string | null
           onboarding_completed?: boolean | null
           onboarding_step?: number | null
           reputation_score?: number | null
