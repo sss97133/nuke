@@ -9,6 +9,94 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_actions: {
+        Row: {
+          action_data: Json
+          action_type: string
+          agent_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          status: string | null
+        }
+        Insert: {
+          action_data: Json
+          action_type: string
+          agent_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          status?: string | null
+        }
+        Update: {
+          action_data?: Json
+          action_type?: string
+          agent_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_actions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agents: {
+        Row: {
+          agent_type: string
+          behavior_config: Json | null
+          created_at: string | null
+          id: string
+          last_action_at: string | null
+          metadata: Json | null
+          name: string
+          personality: string | null
+          profile_id: string | null
+          role: string
+          status: string | null
+        }
+        Insert: {
+          agent_type: string
+          behavior_config?: Json | null
+          created_at?: string | null
+          id?: string
+          last_action_at?: string | null
+          metadata?: Json | null
+          name: string
+          personality?: string | null
+          profile_id?: string | null
+          role: string
+          status?: string | null
+        }
+        Update: {
+          agent_type?: string
+          behavior_config?: Json | null
+          created_at?: string | null
+          id?: string
+          last_action_at?: string | null
+          metadata?: Json | null
+          name?: string
+          personality?: string | null
+          profile_id?: string | null
+          role?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agents_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       algorithm_preferences: {
         Row: {
           content_weights: Json | null
