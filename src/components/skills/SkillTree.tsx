@@ -13,48 +13,44 @@ import { Skill, SkillStatus, UserSkill } from '@/types/skills';
 export const SkillTree = () => {
   const { toast } = useToast();
   
+  // Mock data for demonstration
+  const mockSkills: Skill[] = [
+    { id: '1', name: 'Engine Repair', category: 'mechanical', description: 'Advanced engine repair techniques' },
+    { id: '2', name: 'Transmission', category: 'mechanical', description: 'Transmission maintenance and repair' },
+    { id: '3', name: 'Circuit Diagnosis', category: 'electrical', description: 'Electrical system diagnosis' },
+    { id: '4', name: 'Battery Systems', category: 'electrical', description: 'Battery and charging systems' },
+    { id: '5', name: 'Paint Finishing', category: 'bodywork', description: 'Professional paint finishing' },
+    { id: '6', name: 'Panel Repair', category: 'bodywork', description: 'Body panel repair and alignment' },
+    { id: '7', name: 'OBD Analysis', category: 'diagnostics', description: 'OBD system analysis' },
+    { id: '8', name: 'Parts Restoration', category: 'restoration', description: 'Vintage parts restoration' },
+    { id: '9', name: 'Custom Fabrication', category: 'customization', description: 'Custom parts fabrication' },
+  ];
+
+  const mockUserSkills: UserSkill[] = [
+    { id: 'us1', skill_id: '1', level: 4, experience_points: 3500 },
+    { id: 'us2', skill_id: '2', level: 3, experience_points: 2500 },
+    { id: 'us3', skill_id: '3', level: 5, experience_points: 5000 },
+    { id: 'us4', skill_id: '4', level: 2, experience_points: 1500 },
+    { id: 'us5', skill_id: '5', level: 4, experience_points: 3800 },
+    { id: 'us6', skill_id: '6', level: 1, experience_points: 800 },
+    { id: 'us7', skill_id: '7', level: 3, experience_points: 2700 },
+    { id: 'us8', skill_id: '8', level: 2, experience_points: 1600 },
+    { id: 'us9', skill_id: '9', level: 5, experience_points: 5000 },
+  ];
+
   const { data: skills, isLoading, error } = useQuery({
     queryKey: ['skills'],
     queryFn: async () => {
-      console.log('Fetching skills...');
-      const { data, error } = await supabase
-        .from('skills')
-        .select('*')
-        .order('category');
-      
-      if (error) {
-        console.error('Error fetching skills:', error);
-        toast({
-          title: 'Error loading skills',
-          description: error.message,
-          variant: 'destructive',
-        });
-        throw error;
-      }
-      console.log('Skills fetched:', data);
-      return data as Skill[];
+      // For demo, return mock data instead of fetching
+      return mockSkills;
     },
   });
 
   const { data: userSkills, error: userSkillsError } = useQuery({
     queryKey: ['user-skills'],
     queryFn: async () => {
-      console.log('Fetching user skills...');
-      const { data, error } = await supabase
-        .from('user_skills')
-        .select('*');
-      
-      if (error) {
-        console.error('Error fetching user skills:', error);
-        toast({
-          title: 'Error loading user skills',
-          description: error.message,
-          variant: 'destructive',
-        });
-        throw error;
-      }
-      console.log('User skills fetched:', data);
-      return data as UserSkill[];
+      // For demo, return mock data instead of fetching
+      return mockUserSkills;
     },
   });
 
@@ -137,3 +133,4 @@ export const SkillTree = () => {
     </div>
   );
 };
+
