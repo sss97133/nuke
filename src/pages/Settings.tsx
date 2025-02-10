@@ -1,15 +1,14 @@
 
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
+import { NotificationSettings } from "@/components/settings/NotificationSettings";
+import { AutoSaveSettings } from "@/components/settings/AutoSaveSettings";
+import { DataManagement } from "@/components/settings/DataManagement";
 
 export const Settings = () => {
-  const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
@@ -30,7 +29,7 @@ export const Settings = () => {
         .select('*')
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
@@ -38,9 +37,7 @@ export const Settings = () => {
         setNotificationsEnabled(preferences.notifications_enabled);
         setAutoSaveEnabled(preferences.auto_save_enabled);
         setCompactViewEnabled(preferences.compact_view_enabled);
-        setTheme(preferences.theme);
       } else {
-        // Create default preferences if none exist
         await supabase.from('user_preferences').insert({
           user_id: user.id,
           notifications_enabled: true,
@@ -114,7 +111,6 @@ export const Settings = () => {
       setNotificationsEnabled(true);
       setAutoSaveEnabled(true);
       setCompactViewEnabled(false);
-      setTheme('system');
       
       toast({
         title: "Preferences Reset",
@@ -142,7 +138,6 @@ export const Settings = () => {
 
       if (error) throw error;
 
-      // Reload preferences to create new default ones
       await loadUserPreferences();
 
       toast({
@@ -168,74 +163,34 @@ export const Settings = () => {
       <h1 className="text-3xl font-bold">System Preferences</h1>
       
       <Card className="p-6 space-y-6">
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold">Appearance</h2>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="theme">Dark Mode</Label>
-            <Switch
-              id="theme"
-              checked={theme === 'dark'}
-              onCheckedChange={(checked) => {
-                const newTheme = checked ? 'dark' : 'light';
-                setTheme(newTheme);
-                savePreferences({ theme: newTheme });
-              }}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="compact">Compact View</Label>
-            <Switch
-              id="compact"
-              checked={compactViewEnabled}
-              onCheckedChange={(checked) => {
-                setCompactViewEnabled(checked);
-                savePreferences({ compact_view_enabled: checked });
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold">Notifications</h2>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="notifications">Enable Notifications</Label>
-            <Switch
-              id="notifications"
-              checked={notificationsEnabled}
-              onCheckedChange={(checked) => {
-                setNotificationsEnabled(checked);
-                savePreferences({ notifications_enabled: checked });
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold">Auto-Save</h2>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="autosave">Enable Auto-Save</Label>
-            <Switch
-              id="autosave"
-              checked={autoSaveEnabled}
-              onCheckedChange={(checked) => {
-                setAutoSaveEnabled(checked);
-                savePreferences({ auto_save_enabled: checked });
-              }}
-            />
-          </div>
-        </div>
+        <AppearanceSettings
+          compactViewEnabled={compactViewEnabled}
+          onCompactViewChange={(checked) => {
+            setCompactViewEnabled(checked);
+            savePreferences({ compact_view_enabled: checked });
+          }}
+        />
+        <NotificationSettings
+          notificationsEnabled={notificationsEnabled}
+          onNotificationsChange={(checked) => {
+            setNotificationsEnabled(checked);
+            savePreferences({ notifications_enabled: checked });
+          }}
+        />
+        <AutoSaveSettings
+          autoSaveEnabled={autoSaveEnabled}
+          onAutoSaveChange={(checked) => {
+            setAutoSaveEnabled(checked);
+            savePreferences({ auto_save_enabled: checked });
+          }}
+        />
       </Card>
 
-      <Card className="p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Data Management</h2>
-        <div className="space-x-4">
-          <Button variant="outline" onClick={handleResetPreferences}>
-            Reset to Defaults
-          </Button>
-          <Button variant="destructive" onClick={handleClearData}>
-            Clear All Data
-          </Button>
-        </div>
+      <Card className="p-6">
+        <DataManagement
+          onResetPreferences={handleResetPreferences}
+          onClearData={handleClearData}
+        />
       </Card>
     </div>
   );
