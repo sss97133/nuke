@@ -6,49 +6,22 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
-import { Route, Routes, useNavigate } from "react-router-dom";
+import { Route, Routes, useNavigate, Navigate } from "react-router-dom";
 
 const Index = () => {
-  // For development, we'll create a mock session
-  const mockSession: Session = {
-    access_token: "mock_token",
-    token_type: "bearer",
-    expires_in: 3600,
-    refresh_token: "mock_refresh",
-    user: {
-      id: "mock_user_id",
-      aud: "authenticated",
-      role: "authenticated",
-      email: "shkylar@gmail.com",
-      email_confirmed_at: new Date().toISOString(),
-      phone: "",
-      confirmed_at: new Date().toISOString(),
-      last_sign_in_at: new Date().toISOString(),
-      app_metadata: {
-        provider: "email",
-        providers: ["email"],
-      },
-      user_metadata: {},
-      identities: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
-  };
-
-  const [session, setSession] = useState<Session | null>(mockSession);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Comment out the actual auth check for development
-    /*
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
+    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -59,15 +32,12 @@ const Index = () => {
           description: "Please log in again to continue.",
           variant: "destructive",
         });
+        navigate('/login');
       }
     });
 
     return () => subscription.unsubscribe();
-    */
-    
-    // Instead, just set loading to false
-    setLoading(false);
-  }, [toast]);
+  }, [toast, navigate]);
 
   if (loading) {
     return (
@@ -84,8 +54,27 @@ const Index = () => {
 
   return (
     <Routes>
-      <Route path="/onboarding" element={<OnboardingWizard />} />
-      <Route path="/*" element={<DashboardLayout />} />
+      {/* Public routes */}
+      <Route 
+        path="/login" 
+        element={
+          session ? <Navigate to="/dashboard" replace /> : <AuthForm />
+        } 
+      />
+
+      {/* Protected routes */}
+      <Route 
+        path="/onboarding" 
+        element={
+          session ? <OnboardingWizard /> : <Navigate to="/login" replace />
+        } 
+      />
+      <Route 
+        path="/*" 
+        element={
+          session ? <DashboardLayout /> : <Navigate to="/login" replace />
+        } 
+      />
     </Routes>
   );
 };
