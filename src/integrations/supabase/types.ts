@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      algorithm_preferences: {
+        Row: {
+          content_weights: Json | null
+          created_at: string | null
+          geographic_radius_km: number | null
+          id: string
+          market_alert_threshold: number | null
+          notification_preferences: Json | null
+          preferred_categories: string[] | null
+          professional_interests: string[] | null
+          technical_level_preference: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content_weights?: Json | null
+          created_at?: string | null
+          geographic_radius_km?: number | null
+          id?: string
+          market_alert_threshold?: number | null
+          notification_preferences?: Json | null
+          preferred_categories?: string[] | null
+          professional_interests?: string[] | null
+          technical_level_preference?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content_weights?: Json | null
+          created_at?: string | null
+          geographic_radius_km?: number | null
+          id?: string
+          market_alert_threshold?: number | null
+          notification_preferences?: Json | null
+          preferred_categories?: string[] | null
+          professional_interests?: string[] | null
+          technical_level_preference?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       auction_bids: {
         Row: {
           amount: number
@@ -412,6 +454,44 @@ export type Database = {
           },
         ]
       }
+      engagement_metrics: {
+        Row: {
+          created_at: string | null
+          feed_item_id: string
+          id: string
+          interaction_type: string
+          interaction_weight: number | null
+          user_id: string
+          view_duration_seconds: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          feed_item_id: string
+          id?: string
+          interaction_type: string
+          interaction_weight?: number | null
+          user_id: string
+          view_duration_seconds?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          feed_item_id?: string
+          id?: string
+          interaction_type?: string
+          interaction_weight?: number | null
+          user_id?: string
+          view_duration_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_metrics_feed_item_id_fkey"
+            columns: ["feed_item_id"]
+            isOneToOne: false
+            referencedRelation: "feed_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feed_interactions: {
         Row: {
           amount: number | null
@@ -454,30 +534,51 @@ export type Database = {
         Row: {
           content: string | null
           created_at: string | null
+          expiration_time: string | null
+          geographic_relevance: Json | null
           id: string
+          importance: Database["public"]["Enums"]["feed_importance"] | null
           item_id: string
           item_type: string
+          market_impact_score: number | null
           metadata: Json | null
+          relevance_score: number | null
+          technical_level: number | null
+          trending_score: number | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           content?: string | null
           created_at?: string | null
+          expiration_time?: string | null
+          geographic_relevance?: Json | null
           id?: string
+          importance?: Database["public"]["Enums"]["feed_importance"] | null
           item_id: string
           item_type: string
+          market_impact_score?: number | null
           metadata?: Json | null
+          relevance_score?: number | null
+          technical_level?: number | null
+          trending_score?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           content?: string | null
           created_at?: string | null
+          expiration_time?: string | null
+          geographic_relevance?: Json | null
           id?: string
+          importance?: Database["public"]["Enums"]["feed_importance"] | null
           item_id?: string
           item_type?: string
+          market_impact_score?: number | null
           metadata?: Json | null
+          relevance_score?: number | null
+          technical_level?: number | null
+          trending_score?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -1645,6 +1746,7 @@ export type Database = {
         | "professional"
         | "garage_admin"
       certification_status: "pending" | "in_progress" | "completed" | "expired"
+      feed_importance: "low" | "medium" | "high" | "urgent"
       location_status: "pending" | "approved" | "rejected"
       service_type:
         | "routine_maintenance"
