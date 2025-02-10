@@ -18,11 +18,13 @@ const Index = () => {
   useEffect(() => {
     // Handle the OAuth callback
     const handleAuthCallback = async () => {
+      console.log("Handling auth callback");
       const searchParams = new URLSearchParams(window.location.search);
       const code = searchParams.get('code');
       
       if (code) {
         try {
+          console.log("Exchanging code for session");
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
             console.error("Error exchanging code for session:", error);
@@ -31,13 +33,15 @@ const Index = () => {
               description: error.message,
               variant: "destructive",
             });
+            navigate('/login');
           } else if (data.session) {
-            console.log("Successfully authenticated");
+            console.log("Successfully authenticated, session:", data.session);
             setSession(data.session);
             navigate('/dashboard');
           }
         } catch (error) {
           console.error("Error in auth callback:", error);
+          navigate('/login');
         }
       }
     };
@@ -48,7 +52,7 @@ const Index = () => {
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Initial session:", session ? "Found" : "None");
+      console.log("Initial session check:", session ? "Found" : "None");
       setSession(session);
       setLoading(false);
     });
@@ -59,12 +63,8 @@ const Index = () => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("Auth state changed:", _event, session ? "Session exists" : "No session");
       setSession(session);
-      if (!session) {
-        toast({
-          title: "Session Expired",
-          description: "Please log in again to continue.",
-          variant: "destructive",
-        });
+      
+      if (!session && location.pathname !== '/login' && location.pathname !== '/auth/callback') {
         navigate('/login');
       }
     });

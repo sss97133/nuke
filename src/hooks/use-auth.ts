@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -12,10 +13,16 @@ export const useAuth = () => {
   const handleSocialLogin = async (provider: Provider) => {
     try {
       setIsLoading(true);
+      console.log("Starting OAuth flow with provider:", provider);
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         }
       });
 
@@ -27,7 +34,7 @@ export const useAuth = () => {
           description: error.message,
         });
       } else {
-        console.log("OAuth initiated:", data);
+        console.log("OAuth initiated successfully:", data);
       }
     } catch (error) {
       console.error("Auth error:", error);
