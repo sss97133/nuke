@@ -20,6 +20,7 @@ export const useSocialAuth = () => {
           (event.source as Window).close();
         }
 
+        // Get the current session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -31,8 +32,20 @@ export const useSocialAuth = () => {
           });
         } else if (session) {
           console.log("[useSocialAuth] Session established:", session);
-          // Redirect will be handled by useAuth hook
-          window.location.href = '/onboarding';
+          
+          // After successful auth, check if user has a profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', session.user.id)
+            .single();
+
+          // Only redirect to onboarding if no profile exists
+          if (!profile?.username) {
+            window.location.href = '/onboarding';
+          } else {
+            window.location.href = '/dashboard';
+          }
         }
       }
     };
