@@ -1,28 +1,29 @@
 
 import React from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-interface AddMemberFormProps {
+type AddMemberFormProps = {
   garageId: string;
   onSuccess?: () => void;
   onCancel?: () => void;
-}
+};
 
-type FormValues = {
+type FormData = {
   email: string;
 };
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
-  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>();
+  const { register, handleSubmit, formState } = useForm<FormData>();
   const { toast } = useToast();
 
-  const onSubmit: SubmitHandler<FormValues> = async (data) => {
+  const handleFormSubmit = async (data: FormData) => {
     try {
+      // Find user by email
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
@@ -38,6 +39,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         return;
       }
 
+      // Add garage member
       const { error: memberError } = await supabase
         .from('garage_members')
         .insert({
@@ -59,9 +61,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         description: 'Member added successfully',
       });
 
-      if (onSuccess) {
-        onSuccess();
-      }
+      onSuccess?.();
     } catch (error) {
       toast({
         title: 'Error',
@@ -72,7 +72,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -80,10 +80,11 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
           type="email"
           {...register('email', { required: true })}
         />
-        {errors.email && (
+        {formState.errors.email && (
           <span className="text-sm text-red-500">Email is required</span>
         )}
       </div>
+
       <div className="flex justify-end gap-2">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
