@@ -130,16 +130,7 @@ export const AuthForm = () => {
 
           {!showForgotPassword && (
             <>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
+              <Separator className="my-4" />
 
               <SocialLoginButtons 
                 onSocialLogin={handleSocialLogin}
@@ -147,25 +138,15 @@ export const AuthForm = () => {
               />
 
               <Separator className="my-4" />
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with phone
-                  </span>
-                </div>
-              </div>
 
-              {!showOtpInput ? (
-                <PhoneInput
-                  phoneNumber={phoneNumber}
-                  setPhoneNumber={setPhoneNumber}
-                  onSubmit={handleSendOtp}
-                  isLoading={isLoading}
-                />
-              ) : (
+              <PhoneInput
+                phoneNumber={phoneNumber}
+                setPhoneNumber={setPhoneNumber}
+                onSubmit={handleSendOtp}
+                isLoading={isLoading}
+              />
+
+              {showOtpInput && (
                 <OtpInput
                   otp={otp}
                   setOtp={setOtp}
@@ -185,3 +166,4 @@ export const AuthForm = () => {
     </div>
   );
 };
+
