@@ -14,14 +14,11 @@ export const useAuth = () => {
       setIsLoading(true);
       console.log("[useAuth] Starting OAuth flow with provider:", provider);
       
-      const redirectTo = `${window.location.origin}/auth/callback`;
-      console.log("[useAuth] Redirect URL:", redirectTo);
-
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: provider,
+        provider,
         options: {
-          redirectTo,
-          scopes: provider === 'github' ? 'read:user user:email' : undefined
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'read:user user:email'
         }
       });
 
@@ -33,7 +30,7 @@ export const useAuth = () => {
           description: error.message,
         });
       } else {
-        console.log("[useAuth] OAuth initiated:", data);
+        console.log("[useAuth] OAuth initiated successfully:", data);
       }
     } catch (error) {
       console.error("[useAuth] Auth error:", error);
