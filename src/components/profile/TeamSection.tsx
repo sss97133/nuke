@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TeamMemberCard } from './TeamMemberCard';
@@ -7,10 +7,29 @@ import { Button } from '@/components/ui/button';
 import { Plus, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
 
 export const TeamSection = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to view team members",
+          variant: "destructive",
+        });
+        navigate('/login');
+      }
+    };
+    
+    checkAuth();
+  }, [navigate, toast]);
+
   const { data: currentUser } = useQuery({
     queryKey: ['current-user'],
     queryFn: async () => {
