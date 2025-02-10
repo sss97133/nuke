@@ -4,11 +4,18 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Provider } from "@supabase/supabase-js";
+import { useSocialAuth } from "./use-social-auth";
+import { usePhoneAuth } from "./use-phone-auth";
 
 export const useAuth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+  const { handleSocialLogin: socialLogin, isLoading: isSocialLoading } = useSocialAuth();
+  const { 
+    handlePhoneLogin: phoneLogin, 
+    verifyOtp: verifyPhoneOtp,
+    isLoading: isPhoneLoading 
+  } = usePhoneAuth();
 
   useEffect(() => {
     // Handle initial session
@@ -35,67 +42,8 @@ export const useAuth = () => {
     };
   }, [navigate]);
 
-  const handleSocialLogin = async (provider: Provider) => {
-    try {
-      setIsLoading(true);
-      console.log("[useAuth] Starting OAuth flow with provider:", provider);
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: 'read:user user:email',
-          skipBrowserRedirect: true // This prevents automatic redirect
-        }
-      });
-
-      if (error) {
-        console.error("[useAuth] OAuth error details:", {
-          message: error.message,
-          status: error.status,
-          name: error.name,
-          stack: error.stack
-        });
-        toast({
-          variant: "destructive",
-          title: "Authentication Error",
-          description: `${error.message} (Status: ${error.status})`,
-        });
-      } else {
-        console.log("[useAuth] OAuth response data:", data);
-        console.log("[useAuth] Provider URL:", data?.url);
-        
-        // Open popup window for authentication
-        if (data?.url) {
-          const width = 600;
-          const height = 800;
-          const left = window.screenX + (window.outerWidth - width) / 2;
-          const top = window.screenY + (window.outerHeight - height) / 2;
-          
-          window.open(
-            data.url,
-            'Login',
-            `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
-          );
-        }
-      }
-    } catch (error) {
-      console.error("[useAuth] Unexpected error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to sign in. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleLogout = async () => {
     try {
-      setIsLoading(true);
-      console.log("[useAuth] Starting logout process");
-      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
@@ -117,100 +65,14 @@ export const useAuth = () => {
         title: "Error",
         description: "Failed to log out. Please try again.",
       });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePhoneLogin = async (formattedPhone: string) => {
-    try {
-      setIsLoading(true);
-      
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-      });
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message,
-        });
-        return false;
-      } else {
-        toast({
-          title: "Code Sent",
-          description: "Please check your phone for the verification code",
-        });
-        return true;
-      }
-    } catch (error) {
-      console.error("Phone auth error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to send verification code. Please try again.",
-      });
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const verifyOtp = async (formattedPhone: string, otp: string) => {
-    try {
-      setIsLoading(true);
-      
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token: otp,
-        type: "sms",
-      });
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message,
-        });
-        return false;
-      } else {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', data.user?.id)
-          .single();
-
-        toast({
-          title: "Welcome",
-          description: "Successfully logged in",
-        });
-
-        if (!profile?.username) {
-          navigate('/onboarding');
-        } else {
-          navigate('/dashboard');
-        }
-        return true;
-      }
-    } catch (error) {
-      console.error("OTP verification error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to verify code. Please try again.",
-      });
-      return false;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return {
-    isLoading,
-    handleSocialLogin,
+    isLoading: isSocialLoading || isPhoneLoading,
+    handleSocialLogin: socialLogin,
     handleLogout,
-    handlePhoneLogin,
-    verifyOtp
+    handlePhoneLogin: phoneLogin,
+    verifyOtp: verifyPhoneOtp
   };
 };
