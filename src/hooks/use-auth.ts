@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -17,10 +16,6 @@ export const useAuth = () => {
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
         }
       });
 
@@ -32,7 +27,7 @@ export const useAuth = () => {
           description: error.message,
         });
       } else {
-        console.log("OAuth success:", data);
+        console.log("OAuth initiated:", data);
       }
     } catch (error) {
       console.error("Auth error:", error);

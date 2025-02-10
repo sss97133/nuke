@@ -17,19 +17,33 @@ const Index = () => {
 
   useEffect(() => {
     // Handle the OAuth callback
-    if (location.hash && location.hash.includes("access_token")) {
-      console.log("Found access token in URL hash");
-      const params = new URLSearchParams(location.hash.substring(1));
-      if (params.get("error")) {
-        console.error("OAuth error in URL:", params.get("error"));
-        toast({
-          title: "Authentication Error",
-          description: params.get("error_description") || "Failed to authenticate",
-          variant: "destructive",
-        });
-      } else {
-        console.log("OAuth success, token found");
+    const handleAuthCallback = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get('code');
+      
+      if (code) {
+        try {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error("Error exchanging code for session:", error);
+            toast({
+              title: "Authentication Error",
+              description: error.message,
+              variant: "destructive",
+            });
+          } else if (data.session) {
+            console.log("Successfully authenticated");
+            setSession(data.session);
+            navigate('/dashboard');
+          }
+        } catch (error) {
+          console.error("Error in auth callback:", error);
+        }
       }
+    };
+
+    if (location.pathname === '/auth/callback') {
+      handleAuthCallback();
     }
 
     // Get initial session
