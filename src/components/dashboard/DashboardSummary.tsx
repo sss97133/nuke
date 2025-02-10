@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SystemStatus } from "./SystemStatus";
@@ -11,10 +12,10 @@ export const DashboardSummary = () => {
     }
   });
 
-  const { data: inventory } = useQuery({
-    queryKey: ['inventory'],
+  const { data: assets } = useQuery({
+    queryKey: ['assets'],
     queryFn: async () => {
-      const { data } = await supabase.from('inventory').select('*');
+      const { data } = await supabase.from('assets').select('*');
       return data;
     }
   });
@@ -46,18 +47,18 @@ export const DashboardSummary = () => {
         </div>
       </div>
 
-      {/* Inventory Summary */}
+      {/* Asset Summary */}
       <div className="border border-gov-blue p-2">
         <div className="text-tiny text-[#666] border-b border-gov-blue pb-1 mb-1">
-          INV_SUMMARY
+          ASSET_SUMMARY
         </div>
         <div className="grid grid-cols-2 gap-1 text-tiny">
           <span>TOTAL:</span>
-          <span>{inventory?.length || 0}</span>
-          <span>LOW_STOCK:</span>
-          <span>{inventory?.filter(i => i.quantity < 5).length || 0}</span>
+          <span>{assets?.length || 0}</span>
+          <span>LOW_QTY:</span>
+          <span>{assets?.filter(i => (i.quantity || 0) < 5).length || 0}</span>
           <span>VAL($):</span>
-          <span>{inventory?.reduce((acc, i) => acc + (i.purchase_price || 0), 0).toFixed(2)}</span>
+          <span>{assets?.reduce((acc, i) => acc + (Number(i.purchase_price) || 0), 0).toFixed(2)}</span>
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -27,9 +28,9 @@ export const CommandBar = () => {
               "• garage list - List all garages",
               "• garage count - Show total garage count",
               "",
-              "Inventory:",
-              "• inv count - Show total inventory count",
-              "• inv search <term> - Search inventory",
+              "Assets:",
+              "• asset count - Show total asset count",
+              "• asset search <term> - Search assets",
               "",
               "Service:",
               "• ticket list - List recent tickets",
@@ -65,25 +66,25 @@ export const CommandBar = () => {
           }
           break;
 
-        case "inv":
+        case "asset":
           if (args[0] === "count") {
             const { count } = await supabase
-              .from('inventory')
+              .from('assets')
               .select('*', { count: 'exact', head: true });
             
             toast({
-              title: "Inventory Count",
+              title: "Asset Count",
               description: `Total items: ${count}`,
             });
           } else if (args[0] === "search" && args[1]) {
             const { data: items } = await supabase
-              .from('inventory')
+              .from('assets')
               .select('name')
               .ilike('name', `%${args[1]}%`)
               .limit(5);
             
             toast({
-              title: "Inventory Search Results",
+              title: "Asset Search Results",
               description: items?.map(item => item.name).join("\n") || "No items found",
             });
           }
@@ -140,7 +141,7 @@ export const CommandBar = () => {
           const counts = await Promise.all([
             supabase.from('vehicles').select('*', { count: 'exact', head: true }),
             supabase.from('service_tickets').select('*', { count: 'exact', head: true }),
-            supabase.from('inventory').select('*', { count: 'exact', head: true }),
+            supabase.from('assets').select('*', { count: 'exact', head: true }),
           ]);
           
           toast({
@@ -148,7 +149,7 @@ export const CommandBar = () => {
             description: `
               Vehicles: ${counts[0].count}
               Tickets: ${counts[1].count}
-              Inventory: ${counts[2].count}
+              Assets: ${counts[2].count}
               All systems operational
             `,
           });

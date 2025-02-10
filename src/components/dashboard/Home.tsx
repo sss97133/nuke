@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 interface FeedItem {
-  type: 'vehicle' | 'inventory' | 'service' | 'auction';
+  type: 'vehicle' | 'asset' | 'service' | 'auction';
   data: any;
   date: string;
 }
@@ -29,10 +29,10 @@ export const Home = () => {
     }
   });
 
-  const { data: inventory } = useQuery({
-    queryKey: ['inventory'],
+  const { data: assets } = useQuery({
+    queryKey: ['assets'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('inventory').select('*');
+      const { data, error } = await supabase.from('assets').select('*');
       if (error) throw error;
       return data;
     }
@@ -52,9 +52,9 @@ export const Home = () => {
     queryKey: ['feed'],
     queryFn: async () => {
       // Fetch multiple data sources for feed
-      const [vehicles, inventory, services, auctions] = await Promise.all([
+      const [vehicles, assets, services, auctions] = await Promise.all([
         supabase.from('vehicles').select('*').order('created_at', { ascending: false }).limit(5),
-        supabase.from('inventory').select('*').order('created_at', { ascending: false }).limit(5),
+        supabase.from('assets').select('*').order('created_at', { ascending: false }).limit(5),
         supabase.from('service_tickets').select('*').order('created_at', { ascending: false }).limit(5),
         supabase.from('auctions').select('*').order('created_at', { ascending: false }).limit(5)
       ]);
@@ -66,8 +66,8 @@ export const Home = () => {
           data: v, 
           date: v.created_at 
         })),
-        ...(inventory.data || []).map(i => ({ 
-          type: 'inventory' as const, 
+        ...(assets.data || []).map(i => ({ 
+          type: 'asset' as const, 
           data: i, 
           date: i.created_at 
         })),
@@ -99,8 +99,8 @@ export const Home = () => {
     switch (item.type) {
       case 'vehicle':
         return `New vehicle added: ${item.data.make} ${item.data.model}`;
-      case 'inventory':
-        return `Inventory updated: ${item.data.name}`;
+      case 'asset':
+        return `Asset updated: ${item.data.name}`;
       case 'service':
         return `Service ticket: ${item.data.description || 'No description'}`;
       case 'auction':
@@ -128,13 +128,13 @@ export const Home = () => {
 
         <Card 
           className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-          onClick={() => handleCardClick('inventory')}
+          onClick={() => handleCardClick('assets')}
         >
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4" />
-            <h3 className="text-sm font-medium">Inventory Items</h3>
+            <h3 className="text-sm font-medium">Asset Items</h3>
           </div>
-          <p className="mt-2 text-2xl font-bold">{inventory?.length || 0}</p>
+          <p className="mt-2 text-2xl font-bold">{assets?.length || 0}</p>
           <p className="text-xs text-muted-foreground">Click to view details</p>
         </Card>
 
@@ -177,7 +177,7 @@ export const Home = () => {
           {feedItems?.slice(0, 5).map((item, index) => (
             <div key={index} className="flex items-center gap-4 p-2 hover:bg-accent/50 rounded-sm cursor-pointer">
               {item.type === 'vehicle' && <Car className="h-4 w-4" />}
-              {item.type === 'inventory' && <Package className="h-4 w-4" />}
+              {item.type === 'asset' && <Package className="h-4 w-4" />}
               {item.type === 'service' && <Wrench className="h-4 w-4" />}
               {item.type === 'auction' && <TrendingUp className="h-4 w-4" />}
               <div>
