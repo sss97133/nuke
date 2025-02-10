@@ -12,9 +12,14 @@ export const useSocialAuth = () => {
     // Listen for the message from the popup
     const handleMessage = async (event: MessageEvent) => {
       // Verify origin for security
-      if (event.origin !== window.location.origin) return;
+      if (event.origin !== window.location.origin) {
+        console.error("[useSocialAuth] Origin mismatch:", event.origin);
+        return;
+      }
 
       if (event.data?.type === 'supabase:auth:callback') {
+        console.log("[useSocialAuth] Received callback message:", event.data);
+        
         // Close any existing popups
         if (event.source && 'close' in event.source) {
           (event.source as Window).close();
@@ -30,22 +35,39 @@ export const useSocialAuth = () => {
             title: "Authentication Error",
             description: error.message
           });
-        } else if (session) {
-          console.log("[useSocialAuth] Session established:", session);
-          
-          // After successful auth, check if user has a profile
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', session.user.id)
-            .single();
+          return;
+        }
 
-          // Only redirect to onboarding if no profile exists
-          if (!profile?.username) {
-            window.location.href = '/onboarding';
-          } else {
-            window.location.href = '/dashboard';
-          }
+        if (!session) {
+          console.error("[useSocialAuth] No session found after callback");
+          toast({
+            variant: "destructive",
+            title: "Authentication Error",
+            description: "Failed to establish session"
+          });
+          return;
+        }
+
+        console.log("[useSocialAuth] Session established:", session);
+        
+        // After successful auth, check if user has a profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error("[useSocialAuth] Profile error:", profileError);
+        }
+
+        // Only redirect to onboarding if no profile exists
+        if (!profile?.username) {
+          console.log("[useSocialAuth] No profile found, redirecting to onboarding");
+          window.location.href = '/onboarding';
+        } else {
+          console.log("[useSocialAuth] Profile found, redirecting to dashboard");
+          window.location.href = '/dashboard';
         }
       }
     };
@@ -74,19 +96,38 @@ export const useSocialAuth = () => {
           title: "Authentication Error",
           description: error.message
         });
-      } else if (data?.url) {
-        console.log("[useSocialAuth] Opening OAuth URL:", data.url);
-        
-        const width = 600;
-        const height = 800;
-        const left = window.screenX + (window.outerWidth - width) / 2;
-        const top = window.screenY + (window.outerHeight - height) / 2;
-        
-        window.open(
-          data.url,
-          'Login',
-          `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
-        );
+        return;
+      }
+
+      if (!data?.url) {
+        console.error("[useSocialAuth] No OAuth URL returned");
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: "Failed to start authentication process"
+        });
+        return;
+      }
+
+      console.log("[useSocialAuth] Opening OAuth URL:", data.url);
+      
+      const width = 600;
+      const height = 800;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const popup = window.open(
+        data.url,
+        'Login',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
+      );
+
+      if (!popup) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Pop-up was blocked. Please allow pop-ups for this site."
+        });
       }
     } catch (error) {
       console.error("[useSocialAuth] Unexpected error:", error);
