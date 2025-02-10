@@ -956,7 +956,10 @@ export type Database = {
           full_name: string | null
           home_location: Json | null
           id: string
+          onboarding_completed: boolean | null
+          onboarding_step: number | null
           reputation_score: number | null
+          skills: string[] | null
           social_links: Json | null
           streaming_links: Json | null
           updated_at: string
@@ -969,7 +972,10 @@ export type Database = {
           full_name?: string | null
           home_location?: Json | null
           id: string
+          onboarding_completed?: boolean | null
+          onboarding_step?: number | null
           reputation_score?: number | null
+          skills?: string[] | null
           social_links?: Json | null
           streaming_links?: Json | null
           updated_at?: string
@@ -982,7 +988,10 @@ export type Database = {
           full_name?: string | null
           home_location?: Json | null
           id?: string
+          onboarding_completed?: boolean | null
+          onboarding_step?: number | null
           reputation_score?: number | null
+          skills?: string[] | null
           social_links?: Json | null
           streaming_links?: Json | null
           updated_at?: string
