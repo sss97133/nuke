@@ -14,17 +14,23 @@ export const useAuth = () => {
     try {
       setIsLoading(true);
       console.log("Starting OAuth flow with provider:", provider);
-      console.log("Current URL:", window.location.href);
-      console.log("Redirect URL:", `${window.location.origin}/auth/callback`);
+      
+      // Get the current URL without any query parameters
+      const baseUrl = window.location.origin;
+      const redirectTo = `${baseUrl}/auth/callback`;
+      
+      console.log("Base URL:", baseUrl);
+      console.log("Redirect URL:", redirectTo);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
           },
+          scopes: provider === 'github' ? 'read:user user:email' : undefined
         }
       });
 
@@ -42,7 +48,7 @@ export const useAuth = () => {
         });
       } else {
         console.log("OAuth success response:", data);
-        // No navigation here - let the callback handle it
+        // Let the callback handle navigation
       }
     } catch (error) {
       console.error("Auth error full details:", error);
