@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export const AuthForm = () => {
-  const { isLoading, handleSocialLogin, handleLogout, handlePhoneLogin, verifyOtp, handleEmailLogin, handleForgotPassword } = useAuth();
+  const { isLoading, handleSocialLogin, handlePhoneLogin, verifyOtp, handleEmailLogin, handleForgotPassword } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -157,10 +157,7 @@ export const AuthForm = () => {
             </>
           )}
 
-          <AuthFooter 
-            onLogout={handleLogout}
-            isLoading={isLoading}
-          />
+          <AuthFooter />
         </div>
       </ClassicWindow>
     </div>
