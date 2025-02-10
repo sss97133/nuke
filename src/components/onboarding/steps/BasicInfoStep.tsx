@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -11,6 +11,16 @@ interface BasicInfoStepProps {
 }
 
 export const BasicInfoStep = ({ firstName, lastName, username, onUpdate }: BasicInfoStepProps) => {
+  useEffect(() => {
+    // Generate username when first or last name changes
+    if (firstName || lastName) {
+      const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const baseUsername = `${firstName.toLowerCase()}${lastName.toLowerCase()}${randomSuffix}`;
+      const generatedUsername = baseUsername.replace(/[^a-z0-9]/g, '');
+      onUpdate('username', generatedUsername);
+    }
+  }, [firstName, lastName, onUpdate]);
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -34,12 +44,13 @@ export const BasicInfoStep = ({ firstName, lastName, username, onUpdate }: Basic
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="username">Username</Label>
+        <Label htmlFor="username">Username (can be changed in settings)</Label>
         <Input
           id="username"
-          placeholder="Choose a username"
+          placeholder="Username will be auto-generated"
           value={username}
-          onChange={(e) => onUpdate('username', e.target.value)}
+          disabled
+          className="bg-muted"
         />
       </div>
     </div>
