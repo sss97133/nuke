@@ -1,9 +1,12 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { Route, Routes, useNavigate } from "react-router-dom";
 
 const Index = () => {
   // For development, we'll create a mock session
@@ -33,9 +36,10 @@ const Index = () => {
     expires_at: Math.floor(Date.now() / 1000) + 3600,
   };
 
-  const [session, setSession] = useState<Session | null>(mockSession); // Set mock session as default
+  const [session, setSession] = useState<Session | null>(mockSession);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Comment out the actual auth check for development
@@ -78,8 +82,12 @@ const Index = () => {
     );
   }
 
-  // Skip the auth form completely
-  return <DashboardLayout />;
+  return (
+    <Routes>
+      <Route path="/onboarding" element={<OnboardingWizard />} />
+      <Route path="/*" element={<DashboardLayout />} />
+    </Routes>
+  );
 };
 
 export default Index;
