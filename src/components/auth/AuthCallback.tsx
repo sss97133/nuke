@@ -21,7 +21,17 @@ export const AuthCallback = () => {
           title: "Authentication Error",
           description: error.message
         });
-        navigate('/login');
+        
+        // If we're in a popup, send error to parent and close
+        if (window.opener) {
+          window.opener.postMessage(
+            { type: 'supabase:auth:callback', error },
+            window.location.origin
+          );
+          window.close();
+        } else {
+          navigate('/login');
+        }
         return;
       }
 
@@ -35,35 +45,53 @@ export const AuthCallback = () => {
           .eq('id', session.user.id)
           .single();
 
-        if (!profile?.username) {
-          // Extract GitHub profile data from user metadata
-          const metadata = session.user.user_metadata;
-          console.log("[AuthCallback] User metadata:", metadata);
+        // Extract GitHub profile data from user metadata
+        const metadata = session.user.user_metadata;
+        console.log("[AuthCallback] User metadata:", metadata);
 
-          // Store GitHub data in localStorage for onboarding
-          if (metadata) {
-            localStorage.setItem('onboarding_data', JSON.stringify({
-              firstName: metadata.name ? metadata.name.split(' ')[0] : '',
-              lastName: metadata.name ? metadata.name.split(' ').slice(1).join(' ') : '',
-              avatarUrl: metadata.avatar_url || '',
-              email: session.user.email || '',
-              username: metadata.user_name || metadata.preferred_username || '',
-              socialLinks: {
-                github: metadata.user_name ? `https://github.com/${metadata.user_name}` : '',
-                twitter: '',
-                instagram: '',
-                linkedin: ''
-              }
-            }));
-          }
-          
-          navigate('/onboarding');
+        // Store GitHub data in localStorage for onboarding
+        if (metadata) {
+          localStorage.setItem('onboarding_data', JSON.stringify({
+            firstName: metadata.name ? metadata.name.split(' ')[0] : '',
+            lastName: metadata.name ? metadata.name.split(' ').slice(1).join(' ') : '',
+            avatarUrl: metadata.avatar_url || '',
+            email: session.user.email || '',
+            username: metadata.user_name || metadata.preferred_username || '',
+            socialLinks: {
+              github: metadata.user_name ? `https://github.com/${metadata.user_name}` : '',
+              twitter: '',
+              instagram: '',
+              linkedin: ''
+            }
+          }));
+        }
+
+        // If we're in a popup, send success to parent and close
+        if (window.opener) {
+          window.opener.postMessage(
+            { type: 'supabase:auth:callback', session },
+            window.location.origin
+          );
+          window.close();
         } else {
-          navigate('/dashboard');
+          // Direct navigation if not in popup
+          if (!profile?.username) {
+            navigate('/onboarding');
+          } else {
+            navigate('/dashboard');
+          }
         }
       } else {
         console.log("[AuthCallback] No session found");
-        navigate('/login');
+        if (window.opener) {
+          window.opener.postMessage(
+            { type: 'supabase:auth:callback', error: 'No session found' },
+            window.location.origin
+          );
+          window.close();
+        } else {
+          navigate('/login');
+        }
       }
     };
 
@@ -78,3 +106,4 @@ export const AuthCallback = () => {
     </div>
   );
 };
+
