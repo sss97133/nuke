@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -15,7 +14,6 @@ export const useAuth = () => {
       setIsLoading(true);
       console.log("[useAuth] Starting OAuth flow with provider:", provider);
       
-      // Use the origin for the callback URL
       const redirectTo = `${window.location.origin}/auth/callback`;
       console.log("[useAuth] Redirect URL:", redirectTo);
 
@@ -23,11 +21,7 @@ export const useAuth = () => {
         provider: provider,
         options: {
           redirectTo,
-          // Required scopes for GitHub
           scopes: provider === 'github' ? 'read:user user:email' : undefined,
-          queryParams: provider === 'github' ? {
-            redirect_uri: redirectTo,
-          } : undefined
         }
       });
 
