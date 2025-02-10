@@ -20,11 +20,6 @@ export const useSocialAuth = () => {
       if (event.data?.type === 'supabase:auth:callback') {
         console.log("[useSocialAuth] Received callback message:", event.data);
         
-        // Close any existing popups
-        if (event.source && 'close' in event.source) {
-          (event.source as Window).close();
-        }
-
         // Get the current session
         const { data: { session }, error } = await supabase.auth.getSession();
         

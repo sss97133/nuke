@@ -67,6 +67,8 @@ export const AuthCallback = () => {
             { type: 'supabase:auth:callback', session },
             window.location.origin
           );
+          // Close the popup after sending the message
+          window.close();
         } else {
           console.log("[AuthCallback] Direct navigation");
           // Direct navigation if not in popup
@@ -91,6 +93,7 @@ export const AuthCallback = () => {
             { type: 'supabase:auth:callback', error },
             window.location.origin
           );
+          window.close();
         } else {
           navigate('/login');
         }
