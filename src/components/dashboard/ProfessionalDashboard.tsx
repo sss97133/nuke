@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { SkillTree } from '../skills/SkillTree';
 import { UserProfile } from '../profile/UserProfile';
 import { CertificationsList } from '../certifications/CertificationsList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Trees, BadgeCheck } from 'lucide-react';
+import { UserRound, BadgeCheck } from 'lucide-react';
+import { QuantumIcon } from './quantum/QuantumIcon';
 
 export const ProfessionalDashboard = () => {
   return (
@@ -21,7 +23,7 @@ export const ProfessionalDashboard = () => {
             value="skills" 
             className="flex items-center gap-2 data-[state=active]:bg-sidebar-primary data-[state=active]:text-sidebar-primary-foreground"
           >
-            <Trees className="w-4 h-4" />
+            <QuantumIcon className="w-4 h-4" />
             Development Tree
           </TabsTrigger>
           <TabsTrigger 
