@@ -10,6 +10,7 @@ export interface OnboardingFormData {
   firstName: string;
   lastName: string;
   username: string;
+  email: string;
   avatarUrl: string;
   userType: UserType;
   socialLinks: {
@@ -31,6 +32,7 @@ export const useOnboardingForm = () => {
     firstName: '',
     lastName: '',
     username: '',
+    email: '',
     avatarUrl: '',
     userType: 'viewer',
     socialLinks: {

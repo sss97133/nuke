@@ -46,6 +46,7 @@ export const AuthCallback = () => {
               firstName: metadata.name ? metadata.name.split(' ')[0] : '',
               lastName: metadata.name ? metadata.name.split(' ').slice(1).join(' ') : '',
               avatarUrl: metadata.avatar_url || '',
+              email: session.user.email || '',
               username: metadata.user_name || metadata.preferred_username || '',
               socialLinks: {
                 github: metadata.user_name ? `https://github.com/${metadata.user_name}` : '',

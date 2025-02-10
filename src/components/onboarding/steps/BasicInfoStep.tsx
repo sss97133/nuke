@@ -2,15 +2,18 @@
 import React, { useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ProfilePreview } from './ProfilePreview';
 
 interface BasicInfoStepProps {
   firstName: string;
   lastName: string;
   username: string;
+  email: string;
+  avatarUrl: string;
   onUpdate: (field: string, value: string) => void;
 }
 
-export const BasicInfoStep = ({ firstName, lastName, username, onUpdate }: BasicInfoStepProps) => {
+export const BasicInfoStep = ({ firstName, lastName, username, email, avatarUrl, onUpdate }: BasicInfoStepProps) => {
   useEffect(() => {
     // Generate username when first or last name changes
     if (firstName || lastName) {
@@ -23,6 +26,14 @@ export const BasicInfoStep = ({ firstName, lastName, username, onUpdate }: Basic
 
   return (
     <div className="space-y-4">
+      <ProfilePreview
+        firstName={firstName}
+        lastName={lastName}
+        username={username}
+        email={email}
+        avatarUrl={avatarUrl}
+      />
+      
       <div className="space-y-2">
         <Label htmlFor="firstName">First Name</Label>
         <Input
@@ -53,7 +64,17 @@ export const BasicInfoStep = ({ firstName, lastName, username, onUpdate }: Basic
           className="bg-muted"
         />
       </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          value={email}
+          disabled
+          className="bg-muted"
+        />
+      </div>
     </div>
   );
 };
-
