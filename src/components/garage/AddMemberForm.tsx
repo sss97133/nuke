@@ -64,12 +64,12 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         return;
       }
 
-      // Check if user exists
+      // Check if user exists using maybeSingle to handle no results gracefully
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', data.email)
-        .single();
+        .maybeSingle<ProfileResult>();
 
       if (profileError) {
         toast({
