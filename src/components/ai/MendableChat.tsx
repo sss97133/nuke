@@ -1,3 +1,4 @@
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,18 +19,25 @@ export const MendableChat = () => {
     setIsLoading(true)
     try {
       const { data, error } = await supabase.functions.invoke('query-mendable', {
-        body: { query }
+        body: { query: query.trim() }
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase function error:', error)
+        throw new Error(error.message)
+      }
 
-      setResponse(data.answer || data.message)
+      if (!data?.answer) {
+        throw new Error('No answer received from AI')
+      }
+
+      setResponse(data.answer)
       setQuery("")
     } catch (error) {
       console.error('Error querying Mendable:', error)
       toast({
         title: "Error",
-        description: "Failed to get response from AI. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to get response from AI. Please try again.",
         variant: "destructive"
       })
     } finally {

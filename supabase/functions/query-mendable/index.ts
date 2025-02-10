@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -21,29 +22,37 @@ serve(async (req) => {
 
     console.log('Querying Mendable with:', query)
     
-    const response = await fetch('https://api.mendable.ai/v1/query', {
+    // Updated to latest Mendable API endpoint
+    const response = await fetch('https://api.mendable.ai/v1/newConversation', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        query,
-        history: [], // Optional chat history
+        messages: [{
+          role: "user",
+          content: query
+        }],
         temperature: 0.7,
+        model: "gpt-4", // Using GPT-4 as default model
         stream: false
       })
     })
 
     if (!response.ok) {
+      console.error('Mendable API error:', response.status, await response.text())
       throw new Error(`Mendable API returned ${response.status}`)
     }
 
     const data = await response.json()
     console.log('Mendable response:', data)
 
+    // Updated response structure based on new Mendable API
+    const answer = data.answer || data.choices?.[0]?.message?.content || data.message
+
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify({ answer }),
       { 
         headers: { 
           ...corsHeaders,
@@ -54,7 +63,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in query-mendable:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error instanceof Error ? error.stack : undefined 
+      }),
       { 
         status: 500,
         headers: { 
