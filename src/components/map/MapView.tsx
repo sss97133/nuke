@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -32,15 +33,30 @@ export const MapView = () => {
   const markersRef = useRef<{ [key: string]: mapboxgl.Marker }>({});
   const [garages, setGarages] = useState<Garage[]>([]);
   const [filters, setFilters] = useState<MapFilter[]>(initialFilters);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { toast } = useToast();
+
+  // Fetch user's home location
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('home_location')
+        .single();
+
+      if (profile?.home_location) {
+        setUserLocation(profile.home_location);
+      }
+    };
+
+    fetchUserLocation();
+  }, []);
 
   const handleFilterChange = (id: string, enabled: boolean) => {
     setFilters(filters.map(filter => 
       filter.id === id ? { ...filter, enabled } : filter
     ));
     
-    // Here you would implement the logic to show/hide markers based on the filter
-    // This is just a placeholder for now - you'll need to implement the actual filtering
     toast({
       title: `${enabled ? 'Showing' : 'Hiding'} ${id.replace(/_/g, ' ')}`,
       description: "Filter settings updated",
@@ -109,14 +125,27 @@ export const MapView = () => {
 
         mapboxgl.accessToken = data.secret;
         
+        const initialCenter = userLocation || { lng: -74.5, lat: 40 };
+        
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
           style: 'mapbox://styles/mapbox/streets-v12',
-          center: [-74.5, 40],
-          zoom: 9
+          center: [initialCenter.lng, initialCenter.lat],
+          zoom: userLocation ? 12 : 9
         });
 
         map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+        // Add user location marker if available
+        if (userLocation) {
+          const popup = new mapboxgl.Popup({ offset: 25 })
+            .setHTML('<h3 class="font-bold">Home Base</h3>');
+
+          new mapboxgl.Marker({ color: '#FF0000' })
+            .setLngLat([userLocation.lng, userLocation.lat])
+            .setPopup(popup)
+            .addTo(map.current);
+        }
       } catch (error) {
         console.error('Map initialization error:', error);
         toast({
@@ -132,7 +161,7 @@ export const MapView = () => {
     return () => {
       map.current?.remove();
     };
-  }, [toast]);
+  }, [toast, userLocation]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -164,9 +193,12 @@ export const MapView = () => {
           bounds.extend([garage.location.lng, garage.location.lat]);
         }
       });
+      if (userLocation) {
+        bounds.extend([userLocation.lng, userLocation.lat]);
+      }
       map.current.fitBounds(bounds, { padding: 50 });
     }
-  }, [garages]);
+  }, [garages, userLocation]);
 
   return (
     <div className="space-y-4">
@@ -180,3 +212,4 @@ export const MapView = () => {
     </div>
   );
 };
+

@@ -800,6 +800,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           full_name: string | null
+          home_location: Json | null
           id: string
           reputation_score: number | null
           social_links: Json | null
@@ -812,6 +813,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
+          home_location?: Json | null
           id: string
           reputation_score?: number | null
           social_links?: Json | null
@@ -824,6 +826,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
+          home_location?: Json | null
           id?: string
           reputation_score?: number | null
           social_links?: Json | null
