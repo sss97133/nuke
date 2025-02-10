@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,49 @@ export const MapView = () => {
   const garages = useGarages();
   const map = useMapInitialization(mapContainer, userLocation);
   useMapMarkers(map, garages, userLocation);
+
+  // Effect to search for nearby garages when user location is available
+  useEffect(() => {
+    const searchNearbyGarages = async () => {
+      if (!userLocation) return;
+
+      try {
+        const { data, error } = await supabase.functions.invoke('search-local-garages', {
+          body: {
+            lat: userLocation.lat,
+            lng: userLocation.lng,
+            radius: 5000 // 5km radius
+          }
+        });
+
+        if (error) {
+          console.error('Error searching garages:', error);
+          toast({
+            title: "Error",
+            description: "Failed to find nearby automotive shops",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        if (data?.success) {
+          toast({
+            title: "Success",
+            description: `Found ${data.garages.length} nearby automotive shops`,
+          });
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        toast({
+          title: "Error",
+          description: "Failed to search for nearby shops",
+          variant: "destructive"
+        });
+      }
+    };
+
+    searchNearbyGarages();
+  }, [userLocation, toast]);
 
   const handleFilterChange = (id: string, enabled: boolean) => {
     setFilters(filters.map(filter => 
