@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,24 +7,24 @@ export interface InventoryFormData {
   partNumber: string;
   quantity: number;
   category?: string;
-  notes?: string;  // Changed to optional
-  department: string;
-  subDepartment: string;
-  assetType: string;
-  condition: string;
-  manufacturer: string;
-  modelNumber: string;
-  serialNumber: string;
-  purchaseDate: string;
-  purchasePrice: string;
-  warrantyExpiration: string;
-  lastMaintenanceDate: string;
-  nextMaintenanceDate: string;
-  building: string;
-  floor: string;
-  room: string;
-  shelf: string;
-  bin: string;
+  notes?: string;
+  department?: string;
+  subDepartment?: string;
+  assetType?: string;
+  condition?: string;
+  manufacturer?: string;
+  modelNumber?: string;
+  serialNumber?: string;
+  purchaseDate?: string;
+  purchasePrice?: string;
+  warrantyExpiration?: string;
+  lastMaintenanceDate?: string;
+  nextMaintenanceDate?: string;
+  building?: string;
+  floor?: string;
+  room?: string;
+  shelf?: string;
+  bin?: string;
   photoUrl?: string;
   aiClassification?: any;
 }
