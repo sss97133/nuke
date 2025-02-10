@@ -1,8 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { Toast } from "@/hooks/use-toast";
+import { ToastFunction } from "./types";
 
-export const handleExport = async (toast: Toast) => {
+export const handleExport = async (toast: ToastFunction) => {
   try {
     const { data: user } = await supabase.auth.getUser();
     if (!user?.user?.id) {

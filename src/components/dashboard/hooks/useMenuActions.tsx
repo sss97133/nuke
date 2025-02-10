@@ -1,10 +1,9 @@
 
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { handleExport } from "./utils/exportUtils";
-import { handleSignOut, handleKeyboardShortcuts } from "./utils/navigationUtils";
-import { handleToggleUIElement } from "./utils/uiUtils";
+import { handleSignOut, handleKeyboardShortcuts, handleProjectNavigation } from "./utils/navigationUtils";
+import { handleToggleUIElement, handleDialogActions, handleDocumentation } from "./utils/uiUtils";
 
 export const useMenuActions = (
   setShowNewVehicleDialog: (show: boolean) => void,
@@ -33,20 +32,35 @@ export const useMenuActions = (
   };
 
   const handleMenuAction = async (action: string) => {
+    // Handle project navigation
+    if (['new_project', 'professional_dashboard', 'skill_management', 'achievements', 
+         'preferences', 'inventory_view', 'service_view', 'vin_scanner', 
+         'market_analysis', 'studio_workspace', 'streaming_setup'].includes(action)) {
+      handleProjectNavigation(navigate, toast, action);
+      return;
+    }
+
+    // Handle dialogs
+    if (['new_vehicle', 'new_inventory', 'studio_config'].includes(action)) {
+      handleDialogActions(
+        setShowNewVehicleDialog,
+        setShowNewInventoryDialog,
+        setShowStudioConfig,
+        setShowWorkspacePreview,
+        toast,
+        action
+      );
+      return;
+    }
+
+    // Handle documentation
+    if (['documentation', 'about'].includes(action)) {
+      handleDocumentation(toast, action);
+      return;
+    }
+
+    // Handle remaining actions
     switch (action) {
-      case 'new_project':
-        navigate('/projects/new');
-        toast({
-          title: "New Project",
-          description: "Creating new project workspace"
-        });
-        break;
-      case 'new_vehicle':
-        setShowNewVehicleDialog(true);
-        break;
-      case 'new_inventory':
-        setShowNewInventoryDialog(true);
-        break;
       case 'import':
         navigate('/import');
         break;
@@ -69,26 +83,6 @@ export const useMenuActions = (
         break;
       case 'exit':
         await handleSignOut(navigate, toast);
-        break;
-      case 'professional_dashboard':
-        navigate('/professional');
-        break;
-      case 'skill_management':
-        navigate('/skills');
-        break;
-      case 'achievements':
-        navigate('/achievements');
-        break;
-      case 'preferences':
-        navigate('/settings');
-        break;
-      case 'studio_config':
-        setShowStudioConfig(true);
-        setShowWorkspacePreview(true);
-        toast({
-          title: "Studio Configuration",
-          description: "Opening studio configuration panel",
-        });
         break;
       case 'toggle_workspace':
         handleToggleUIElement(
@@ -135,35 +129,8 @@ export const useMenuActions = (
           toast
         );
         break;
-      case 'inventory_view':
-        navigate('/inventory');
-        break;
-      case 'service_view':
-        navigate('/service');
-        break;
-      case 'vin_scanner':
-        navigate('/vin-scanner');
-        break;
-      case 'market_analysis':
-        navigate('/market-analysis');
-        break;
-      case 'studio_workspace':
-        navigate('/studio');
-        break;
-      case 'streaming_setup':
-        navigate('/streaming');
-        break;
-      case 'documentation':
-        window.open('https://docs.example.com', '_blank');
-        break;
       case 'keyboard_shortcuts':
         handleKeyboardShortcuts(toast);
-        break;
-      case 'about':
-        toast({
-          title: "About NUKE",
-          description: "Vehicle Management System v1.0\nBuilt with ❤️",
-        });
         break;
       default:
         toast({
@@ -179,3 +146,4 @@ export const useMenuActions = (
     handleMenuAction,
   };
 };
+
