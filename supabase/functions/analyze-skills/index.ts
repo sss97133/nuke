@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -28,38 +29,18 @@ serve(async (req) => {
     console.log('Analyzing skills with tool:', toolType);
     console.log('User skills data:', userSkills);
 
+    // Simplified prompt structures for better parsing
     let prompt = '';
-    let expectedFormat = '';
     
     switch (toolType) {
       case 'Skill Advisor':
-        expectedFormat = `{
-          "recommendations": ["string[]"],
-          "timeline": "string",
-          "priority": "string",
-          "rationale": "string"
-        }`;
-        prompt = `As a professional development advisor, analyze these skills and provide a development path: ${JSON.stringify(userSkills)}. Return ONLY a JSON object with this exact structure: ${expectedFormat}`;
+        prompt = `Analyze these skills and provide recommendations: ${JSON.stringify(userSkills)}. Format your response as a JSON object with these exact keys: { "recommendations": ["string"], "timeline": "string", "priority": "string", "rationale": "string" }`;
         break;
       case 'Gap Analyzer':
-        expectedFormat = `{
-          "gaps": ["string[]"],
-          "impact": "string",
-          "suggestions": ["string[]"],
-          "priority": "string"
-        }`;
-        prompt = `As a skill gap analyst, identify missing or underdeveloped skills in this profile: ${JSON.stringify(userSkills)}. Return ONLY a JSON object with this exact structure: ${expectedFormat}`;
+        prompt = `Analyze skill gaps in this profile: ${JSON.stringify(userSkills)}. Format your response as a JSON object with these exact keys: { "gaps": ["string"], "impact": "string", "suggestions": ["string"], "priority": "string" }`;
         break;
       case 'Resource Curator':
-        expectedFormat = `{
-          "resources": [{
-            "title": "string",
-            "type": "string",
-            "difficulty": "string",
-            "focus": "string"
-          }]
-        }`;
-        prompt = `As a learning resource curator, recommend specific resources for these skills: ${JSON.stringify(userSkills)}. Return ONLY a JSON object with this exact structure: ${expectedFormat}`;
+        prompt = `Recommend learning resources for these skills: ${JSON.stringify(userSkills)}. Format your response as a JSON object with these exact keys: { "resources": [{ "title": "string", "type": "string", "difficulty": "string", "focus": "string" }] }`;
         break;
       default:
         throw new Error('Invalid tool type');
@@ -78,15 +59,15 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a professional development AI assistant. Respond ONLY with the exact JSON structure requested, nothing else.'
+            content: 'You are a skilled analysis assistant. Always respond with valid JSON only.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.2,
-        max_tokens: 1000,
+        temperature: 0.1, // Lower temperature for more consistent JSON output
+        max_tokens: 500,
       }),
     });
 
@@ -100,48 +81,51 @@ serve(async (req) => {
     const data = await response.json();
     console.log('Received response from Perplexity:', data);
 
-    let analysis;
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error('Invalid API response format');
+    }
+
+    let parsedContent;
     try {
-      // Extract the content from the response
-      const content = data.choices[0].message.content;
-      console.log('Parsing content:', content);
+      // Clean the content string to ensure it's valid JSON
+      const content = data.choices[0].message.content.trim();
+      const cleanedContent = content.replace(/```json|```/g, '').trim();
+      parsedContent = JSON.parse(cleanedContent);
       
-      // Try to parse the JSON response
-      analysis = JSON.parse(content.trim());
-      console.log('Successfully parsed analysis:', analysis);
+      console.log('Successfully parsed content:', parsedContent);
       
-      // Validate the response structure based on tool type
-      if (!analysis || typeof analysis !== 'object') {
-        throw new Error('Invalid analysis format');
+      // Validate the response structure
+      if (!parsedContent || typeof parsedContent !== 'object') {
+        throw new Error('Invalid response format');
       }
       
       // Basic validation based on tool type
       switch (toolType) {
         case 'Skill Advisor':
-          if (!analysis.recommendations || !Array.isArray(analysis.recommendations)) {
-            throw new Error('Invalid Skill Advisor response format');
+          if (!Array.isArray(parsedContent.recommendations)) {
+            throw new Error('Invalid Skill Advisor format');
           }
           break;
         case 'Gap Analyzer':
-          if (!analysis.gaps || !Array.isArray(analysis.gaps)) {
-            throw new Error('Invalid Gap Analyzer response format');
+          if (!Array.isArray(parsedContent.gaps)) {
+            throw new Error('Invalid Gap Analyzer format');
           }
           break;
         case 'Resource Curator':
-          if (!analysis.resources || !Array.isArray(analysis.resources)) {
-            throw new Error('Invalid Resource Curator response format');
+          if (!Array.isArray(parsedContent.resources)) {
+            throw new Error('Invalid Resource Curator format');
           }
           break;
       }
       
     } catch (error) {
-      console.error('Error parsing AI response:', error);
+      console.error('Error parsing API response:', error);
       console.error('Raw content:', data.choices[0].message.content);
-      throw new Error('Failed to parse analysis results');
+      throw new Error('Failed to parse AI response');
     }
 
     return new Response(
-      JSON.stringify(analysis),
+      JSON.stringify(parsedContent),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
