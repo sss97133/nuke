@@ -13,14 +13,13 @@ export const useAuth = () => {
   const handleSocialLogin = async (provider: Provider) => {
     try {
       setIsLoading(true);
-      console.log("Starting OAuth flow with provider:", provider);
+      console.log("[useAuth] Starting OAuth flow with provider:", provider);
       
-      // Get the current URL without any query parameters
       const baseUrl = window.location.origin;
       const redirectTo = `${baseUrl}/auth/callback`;
       
-      console.log("Base URL:", baseUrl);
-      console.log("Redirect URL:", redirectTo);
+      console.log("[useAuth] Base URL:", baseUrl);
+      console.log("[useAuth] Redirect URL:", redirectTo);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -35,7 +34,7 @@ export const useAuth = () => {
       });
 
       if (error) {
-        console.error("OAuth error details:", {
+        console.error("[useAuth] OAuth error details:", {
           message: error.message,
           status: error.status,
           name: error.name,
@@ -47,11 +46,10 @@ export const useAuth = () => {
           description: error.message,
         });
       } else {
-        console.log("OAuth success response:", data);
-        // Let the callback handle navigation
+        console.log("[useAuth] OAuth success response:", data);
       }
     } catch (error) {
-      console.error("Auth error full details:", error);
+      console.error("[useAuth] Auth error full details:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -65,10 +63,12 @@ export const useAuth = () => {
   const handleLogout = async () => {
     try {
       setIsLoading(true);
+      console.log("[useAuth] Starting logout process");
       
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
+      console.log("[useAuth] Successfully logged out");
       toast({
         title: "Logged out",
         description: "Successfully logged out",
@@ -80,7 +80,7 @@ export const useAuth = () => {
       navigate('/login');
       
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("[useAuth] Logout error:", error);
       toast({
         variant: "destructive",
         title: "Error",

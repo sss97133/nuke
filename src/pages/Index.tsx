@@ -16,15 +16,17 @@ const Index = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Handle the OAuth callback
     const handleAuthCallback = async () => {
+      console.log("[Index] Current location:", location.pathname);
+      console.log("[Index] Full URL:", window.location.href);
+      
       const searchParams = new URLSearchParams(window.location.search);
       const code = searchParams.get('code');
       const error = searchParams.get('error');
       const error_description = searchParams.get('error_description');
       
-      console.log("Auth callback triggered", { 
-        code, 
+      console.log("[Index] Auth callback parameters:", { 
+        code: code ? "present" : "absent", 
         error, 
         error_description,
         currentUrl: window.location.href,
@@ -32,7 +34,7 @@ const Index = () => {
       });
       
       if (error) {
-        console.error("OAuth error details:", { error, error_description });
+        console.error("[Index] OAuth error:", { error, error_description });
         toast({
           variant: "destructive",
           title: "Authentication Error",
@@ -44,11 +46,11 @@ const Index = () => {
       
       if (code) {
         try {
-          console.log("Exchanging code for session");
+          console.log("[Index] Exchanging code for session");
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           
           if (error) {
-            console.error("Session exchange error details:", {
+            console.error("[Index] Session exchange error:", {
               message: error.message,
               status: error.status,
               name: error.name
@@ -60,12 +62,12 @@ const Index = () => {
             });
             navigate('/login');
           } else if (data.session) {
-            console.log("Successfully authenticated, session:", data.session);
+            console.log("[Index] Successfully authenticated");
             setSession(data.session);
             navigate('/dashboard');
           }
         } catch (error) {
-          console.error("Code exchange error full details:", error);
+          console.error("[Index] Code exchange error:", error);
           navigate('/login');
         }
       }
@@ -77,7 +79,7 @@ const Index = () => {
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Initial session check:", session ? "Found" : "None");
+      console.log("[Index] Initial session check:", session ? "Found" : "None");
       setSession(session);
       setLoading(false);
     });
@@ -86,7 +88,7 @@ const Index = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("Auth state changed:", _event, session ? "Session exists" : "No session");
+      console.log("[Index] Auth state changed:", _event, session ? "Session exists" : "No session");
       setSession(session);
       
       if (!session && location.pathname !== '/login' && location.pathname !== '/auth/callback') {
