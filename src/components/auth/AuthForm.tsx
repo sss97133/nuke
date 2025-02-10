@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ClassicWindow } from "./ClassicWindow";
