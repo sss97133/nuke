@@ -18,7 +18,7 @@ export const useSocialAuth = () => {
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
           scopes: 'read:user user:email',
-          skipBrowserRedirect: true
+          skipBrowserRedirect: provider === 'github' // Only skip for GitHub
         }
       });
 
@@ -38,7 +38,7 @@ export const useSocialAuth = () => {
         console.log("[useSocialAuth] OAuth response data:", data);
         console.log("[useSocialAuth] Provider URL:", data?.url);
         
-        if (data?.url) {
+        if (provider === 'github' && data?.url) {
           const width = 600;
           const height = 800;
           const left = window.screenX + (window.outerWidth - width) / 2;
