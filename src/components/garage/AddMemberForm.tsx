@@ -17,11 +17,10 @@ type FormData = {
   email: string;
 };
 
-// Define a minimal type for profile queries
-type ProfileResult = {
+interface ProfileData {
   id: string;
-  email: string;
-};
+  email: string | null;
+}
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
   const {
@@ -33,104 +32,80 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
   
   const { toast } = useToast();
 
+  const checkGarageAccess = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('garage_members')
+      .select('id')
+      .eq('garage_id', garageId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw new Error('Failed to check garage access');
+    return !!data;
+  };
+
+  const findUserByEmail = async (email: string): Promise<ProfileData | null> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (error) throw new Error('Failed to check user existence');
+    return data;
+  };
+
+  const checkExistingMembership = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('garage_members')
+      .select('id')
+      .eq('garage_id', garageId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw new Error('Failed to check existing membership');
+    return !!data;
+  };
+
+  const addGarageMember = async (userId: string) => {
+    const { error } = await supabase
+      .from('garage_members')
+      .insert({
+        garage_id: garageId,
+        user_id: userId,
+      });
+
+    if (error) throw new Error('Failed to add member');
+  };
+
   const handleFormSubmit = async (data: FormData) => {
     try {
-      // Get the current user
+      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
       if (userError || !user) {
-        toast({
-          title: 'Authentication Error',
-          description: 'Failed to get current user',
-          variant: 'destructive',
-        });
-        return;
+        throw new Error('Authentication error');
       }
 
-      // First check if the user has permission to add members to this garage
-      const { data: garageAccess, error: accessError } = await supabase
-        .from('garage_members')
-        .select('id')
-        .eq('garage_id', garageId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (accessError || !garageAccess) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to add members to this garage',
-          variant: 'destructive',
-        });
-        return;
+      // Check if current user has access to this garage
+      const hasAccess = await checkGarageAccess(user.id);
+      if (!hasAccess) {
+        throw new Error('You do not have permission to add members to this garage');
       }
 
-      // Check if user exists using maybeSingle to handle no results gracefully
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', data.email)
-        .maybeSingle<ProfileResult>();
-
-      if (profileError) {
-        toast({
-          title: 'Error',
-          description: 'Failed to check user existence',
-          variant: 'destructive',
-        });
-        return;
-      }
-
+      // Find user by email
+      const profile = await findUserByEmail(data.email);
       if (!profile) {
-        toast({
-          title: 'User not found',
-          description: 'No user found with this email address',
-          variant: 'destructive',
-        });
-        return;
+        throw new Error('No user found with this email address');
       }
 
       // Check if user is already a member
-      const { data: existingMember, error: memberCheckError } = await supabase
-        .from('garage_members')
-        .select('id')
-        .eq('garage_id', garageId)
-        .eq('user_id', profile.id)
-        .maybeSingle();
-
-      if (memberCheckError) {
-        toast({
-          title: 'Error',
-          description: 'Failed to check existing membership',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (existingMember) {
-        toast({
-          title: 'Already a member',
-          description: 'This user is already a member of this garage',
-          variant: 'destructive',
-        });
-        return;
+      const isExistingMember = await checkExistingMembership(profile.id);
+      if (isExistingMember) {
+        throw new Error('This user is already a member of this garage');
       }
 
       // Add the new member
-      const { error: insertError } = await supabase
-        .from('garage_members')
-        .insert({
-          garage_id: garageId,
-          user_id: profile.id,
-        });
-
-      if (insertError) {
-        toast({
-          title: 'Error adding member',
-          description: insertError.message,
-          variant: 'destructive',
-        });
-        return;
-      }
+      await addGarageMember(profile.id);
 
       toast({
         title: 'Success',
@@ -139,10 +114,11 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
 
       reset();
       onSuccess?.();
+      
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: 'destructive',
       });
     }
