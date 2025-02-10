@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +38,8 @@ export const AuthForm = () => {
         description: "Successfully logged out",
       });
       
-      navigate('/login');
+      // Navigate to login page
+      window.location.href = '/login';
     } catch (error) {
       console.error("Error:", error);
       toast({
