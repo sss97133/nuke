@@ -13,9 +13,9 @@ interface AddMemberFormProps {
   onCancel?: () => void;
 }
 
-interface FormValues {
+type FormValues = {
   email: string;
-}
+};
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>();
