@@ -7,59 +7,110 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-// Simple prop types without nesting
 type AddMemberFormProps = {
   garageId: string;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
 
-// Basic form data type
 type FormData = {
   email: string;
 };
 
-// Simplified form submission type
 type SubmitFn = (data: FormData) => Promise<void>;
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
+    reset
   } = useForm<FormData>();
   
   const { toast } = useToast();
 
-  // Explicitly typed submission handler
   const handleFormSubmit: SubmitFn = async (data) => {
     try {
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
+      // First check if the user has permission to add members to this garage
+      const { data: garageAccess, error: accessError } = await supabase
+        .from('garage_members')
         .select('id')
-        .eq('email', data.email)
+        .eq('garage_id', garageId)
+        .eq('user_id', supabase.auth.getUser())
         .single();
 
-      if (userError || !userData) {
+      if (accessError || !garageAccess) {
         toast({
-          title: 'User not found',
-          description: 'Please check the email address and try again',
+          title: 'Access Denied',
+          description: 'You do not have permission to add members to this garage',
           variant: 'destructive',
         });
         return;
       }
 
-      const { error: memberError } = await supabase
+      // Check if user exists
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', data.email)
+        .maybeSingle();
+
+      if (userError) {
+        toast({
+          title: 'Error',
+          description: 'Failed to check user existence',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (!userData) {
+        toast({
+          title: 'User not found',
+          description: 'No user found with this email address',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Check if user is already a member
+      const { data: existingMember, error: memberCheckError } = await supabase
+        .from('garage_members')
+        .select('id')
+        .eq('garage_id', garageId)
+        .eq('user_id', userData.id)
+        .maybeSingle();
+
+      if (memberCheckError) {
+        toast({
+          title: 'Error',
+          description: 'Failed to check existing membership',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (existingMember) {
+        toast({
+          title: 'Already a member',
+          description: 'This user is already a member of this garage',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Add the new member
+      const { error: insertError } = await supabase
         .from('garage_members')
         .insert({
           garage_id: garageId,
           user_id: userData.id,
         });
 
-      if (memberError) {
+      if (insertError) {
         toast({
           title: 'Error adding member',
-          description: memberError.message,
+          description: insertError.message,
           variant: 'destructive',
         });
         return;
@@ -70,11 +121,12 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         description: 'Member added successfully',
       });
 
+      reset();
       onSuccess?.();
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to add member',
+        description: 'An unexpected error occurred',
         variant: 'destructive',
       });
     }
@@ -87,21 +139,37 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         <Input
           id="email"
           type="email"
-          {...register('email', { required: true })}
+          {...register('email', { 
+            required: 'Email is required',
+            pattern: {
+              value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+              message: "Invalid email address"
+            }
+          })}
+          disabled={isSubmitting}
+          placeholder="Enter member's email"
         />
         {errors.email && (
-          <span className="text-sm text-red-500">Email is required</span>
+          <span className="text-sm text-red-500">{errors.email.message}</span>
         )}
       </div>
 
       <div className="flex justify-end gap-2">
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
         )}
-        <Button type="submit">Add Member</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Adding...' : 'Add Member'}
+        </Button>
       </div>
     </form>
   );
 };
+
