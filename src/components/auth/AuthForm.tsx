@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ClassicWindow } from "./ClassicWindow";
@@ -54,109 +55,112 @@ export const AuthForm = () => {
   };
 
   return (
-    <div className="w-full max-w-[400px]">
-      <ClassicWindow title="Welcome">
-        <div className="space-y-6">
-          <form onSubmit={handleEmailSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            {!showForgotPassword && (
+    <div className="min-h-screen w-full flex items-center justify-center p-4">
+      <div className="w-full max-w-[400px]">
+        <ClassicWindow title="Welcome">
+          <div className="space-y-6">
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
-            )}
-            {!showForgotPassword && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="remember"
-                    checked={rememberMe}
-                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              {!showForgotPassword && (
+                <div className="space-y-2">
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
                   />
-                  <Label htmlFor="remember" className="text-sm">Remember me</Label>
                 </div>
-              </div>
-            )}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {showForgotPassword ? 'Send Reset Link' : (isSignUp ? 'Sign Up' : 'Login')}
-            </Button>
-            {showForgotPassword ? (
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(false)}
-                  className="text-blue-500 hover:underline"
-                >
-                  Back to login
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center space-x-4 py-2">
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="text-blue-500 hover:underline px-2"
-                >
-                  Forgot password?
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsSignUp(!isSignUp)}
-                  className="text-blue-500 hover:underline px-2"
-                >
-                  {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
-                </button>
-              </div>
-            )}
-          </form>
+              )}
+              {!showForgotPassword && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="remember"
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    />
+                    <Label htmlFor="remember" className="text-sm">Remember me</Label>
+                  </div>
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {showForgotPassword ? 'Send Reset Link' : (isSignUp ? 'Sign Up' : 'Login')}
+              </Button>
+              {showForgotPassword ? (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(false)}
+                    className="text-blue-500 hover:underline"
+                  >
+                    Back to login
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center space-x-4 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-blue-500 hover:underline px-2"
+                  >
+                    Forgot password?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSignUp(!isSignUp)}
+                    className="text-blue-500 hover:underline px-2"
+                  >
+                    {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
+                  </button>
+                </div>
+              )}
+            </form>
 
-          {!showForgotPassword && (
-            <>
-              <Separator/>
+            {!showForgotPassword && (
+              <>
+                <Separator/>
 
-              <SocialLoginButtons 
-                onSocialLogin={handleSocialLogin}
-                isLoading={isLoading}
-              />
-
-              <Separator/>
-
-              <PhoneInput
-                phoneNumber={phoneNumber}
-                setPhoneNumber={setPhoneNumber}
-                onSubmit={handleSendOtp}
-                isLoading={isLoading}
-              />
-
-              {showOtpInput && (
-                <OtpInput
-                  otp={otp}
-                  setOtp={setOtp}
-                  onSubmit={handleVerifyOtp}
+                <SocialLoginButtons 
+                  onSocialLogin={handleSocialLogin}
                   isLoading={isLoading}
                 />
-              )}
-            </>
-          )}
 
-          <AuthFooter />
-        </div>
-      </ClassicWindow>
+                <Separator/>
+
+                <PhoneInput
+                  phoneNumber={phoneNumber}
+                  setPhoneNumber={setPhoneNumber}
+                  onSubmit={handleSendOtp}
+                  isLoading={isLoading}
+                />
+
+                {showOtpInput && (
+                  <OtpInput
+                    otp={otp}
+                    setOtp={setOtp}
+                    onSubmit={handleVerifyOtp}
+                    isLoading={isLoading}
+                  />
+                )}
+              </>
+            )}
+
+            <AuthFooter />
+          </div>
+        </ClassicWindow>
+      </div>
     </div>
   );
 };
+
