@@ -18,20 +18,35 @@ const Index = () => {
   useEffect(() => {
     // Handle the OAuth callback
     const handleAuthCallback = async () => {
-      console.log("Handling auth callback");
       const searchParams = new URLSearchParams(window.location.search);
       const code = searchParams.get('code');
+      const error = searchParams.get('error');
+      const error_description = searchParams.get('error_description');
+      
+      console.log("Auth callback triggered", { code, error, error_description });
+      
+      if (error) {
+        console.error("OAuth error:", error, error_description);
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: error_description || "Failed to authenticate",
+        });
+        navigate('/login');
+        return;
+      }
       
       if (code) {
         try {
           console.log("Exchanging code for session");
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          
           if (error) {
             console.error("Error exchanging code for session:", error);
             toast({
+              variant: "destructive",
               title: "Authentication Error",
               description: error.message,
-              variant: "destructive",
             });
             navigate('/login');
           } else if (data.session) {

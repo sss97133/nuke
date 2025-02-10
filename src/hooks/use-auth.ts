@@ -14,6 +14,7 @@ export const useAuth = () => {
     try {
       setIsLoading(true);
       console.log("Starting OAuth flow with provider:", provider);
+      console.log("Current origin:", window.location.origin);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -34,7 +35,8 @@ export const useAuth = () => {
           description: error.message,
         });
       } else {
-        console.log("OAuth initiated successfully:", data);
+        console.log("OAuth response:", data);
+        // No navigation here - let the callback handle it
       }
     } catch (error) {
       console.error("Auth error:", error);
