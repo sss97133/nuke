@@ -23,10 +23,16 @@ const Index = () => {
       const error = searchParams.get('error');
       const error_description = searchParams.get('error_description');
       
-      console.log("Auth callback triggered", { code, error, error_description });
+      console.log("Auth callback triggered", { 
+        code, 
+        error, 
+        error_description,
+        currentUrl: window.location.href,
+        searchParams: Object.fromEntries(searchParams.entries())
+      });
       
       if (error) {
-        console.error("OAuth error:", error, error_description);
+        console.error("OAuth error details:", { error, error_description });
         toast({
           variant: "destructive",
           title: "Authentication Error",
@@ -42,7 +48,11 @@ const Index = () => {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           
           if (error) {
-            console.error("Error exchanging code for session:", error);
+            console.error("Session exchange error details:", {
+              message: error.message,
+              status: error.status,
+              name: error.name
+            });
             toast({
               variant: "destructive",
               title: "Authentication Error",
@@ -55,7 +65,7 @@ const Index = () => {
             navigate('/dashboard');
           }
         } catch (error) {
-          console.error("Error in auth callback:", error);
+          console.error("Code exchange error full details:", error);
           navigate('/login');
         }
       }

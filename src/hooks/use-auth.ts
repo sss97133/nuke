@@ -14,7 +14,8 @@ export const useAuth = () => {
     try {
       setIsLoading(true);
       console.log("Starting OAuth flow with provider:", provider);
-      console.log("Current origin:", window.location.origin);
+      console.log("Current URL:", window.location.href);
+      console.log("Redirect URL:", `${window.location.origin}/auth/callback`);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -28,18 +29,23 @@ export const useAuth = () => {
       });
 
       if (error) {
-        console.error("OAuth error:", error);
+        console.error("OAuth error details:", {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          stack: error.stack
+        });
         toast({
           variant: "destructive",
-          title: "Error",
+          title: "Authentication Error",
           description: error.message,
         });
       } else {
-        console.log("OAuth response:", data);
+        console.log("OAuth success response:", data);
         // No navigation here - let the callback handle it
       }
     } catch (error) {
-      console.error("Auth error:", error);
+      console.error("Auth error full details:", error);
       toast({
         variant: "destructive",
         title: "Error",
