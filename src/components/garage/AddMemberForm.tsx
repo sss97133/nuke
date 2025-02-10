@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Profile } from '@/types/garage';
 
 type AddMemberFormProps = {
   garageId: string;
@@ -18,10 +17,11 @@ type FormData = {
   email: string;
 };
 
-// Define a specific type for the query result
-type ProfileQueryResult = Pick<Profile, 'id' | 'email'>;
-
-type SubmitFn = (data: FormData) => Promise<void>;
+// Define a minimal type for profile queries
+type ProfileResult = {
+  id: string;
+  email: string;
+};
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
   const {
@@ -33,7 +33,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
   
   const { toast } = useToast();
 
-  const handleFormSubmit: SubmitFn = async (data) => {
+  const handleFormSubmit = async (data: FormData) => {
     try {
       // Get the current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -64,12 +64,12 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         return;
       }
 
-      // Check if user exists - now selecting both id and email with proper typing
+      // Check if user exists
       const { data: userData, error: userError2 } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', data.email)
-        .maybeSingle<ProfileQueryResult>();
+        .maybeSingle<ProfileResult>();
 
       if (userError2) {
         toast({
@@ -188,4 +188,3 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
     </form>
   );
 };
-
