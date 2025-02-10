@@ -1,7 +1,7 @@
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Building, MapPin, Star, Trash2, Users } from "lucide-react";
-import { AddGarageMember } from "./AddGarageMember";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,10 +44,6 @@ export const GarageCard = ({ garage }: GarageCardProps) => {
     }
   };
 
-  const handleMemberAdded = () => {
-    queryClient.invalidateQueries({ queryKey: ['garages'] });
-  };
-
   return (
     <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -84,7 +80,6 @@ export const GarageCard = ({ garage }: GarageCardProps) => {
           <Users className="w-4 h-4" />
           <span>Members: {garage.garage_members?.length || 0}</span>
         </div>
-        <AddGarageMember garageId={garage.id} onMemberAdded={handleMemberAdded} />
       </div>
     </Card>
   );
