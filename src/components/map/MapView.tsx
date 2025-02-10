@@ -40,8 +40,13 @@ export const MapView = () => {
   // Effect to search for nearby garages when user location is available
   useEffect(() => {
     const searchNearbyGarages = async () => {
-      if (!userLocation) return;
+      if (!userLocation) {
+        console.log('No user location available yet');
+        return;
+      }
 
+      console.log('Searching for garages near:', userLocation);
+      
       try {
         const { data, error } = await supabase.functions.invoke('search-local-garages', {
           body: {
@@ -55,11 +60,13 @@ export const MapView = () => {
           console.error('Error searching garages:', error);
           toast({
             title: "Error",
-            description: "Failed to find nearby automotive shops",
+            description: "Failed to find nearby automotive shops: " + error.message,
             variant: "destructive"
           });
           return;
         }
+
+        console.log('Search response:', data);
 
         if (data?.success) {
           toast({
@@ -71,7 +78,7 @@ export const MapView = () => {
         console.error('Error:', error);
         toast({
           title: "Error",
-          description: "Failed to search for nearby shops",
+          description: "Failed to search for nearby shops: " + (error as Error).message,
           variant: "destructive"
         });
       }
