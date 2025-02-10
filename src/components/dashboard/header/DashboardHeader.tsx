@@ -1,3 +1,4 @@
+
 import { AppMenu } from "./AppMenu";
 import { MainMenu } from "./MainMenu";
 import { StatusBar } from "./StatusBar";
@@ -16,6 +17,7 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
   const handleAction = async (action: string) => {
     if (action === "logout") {
       try {
+        // Clear any stored session data
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
         
@@ -24,7 +26,12 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
           description: "Successfully logged out",
         });
         
-        navigate('/login');
+        // Clear any session storage
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Force a full page reload and redirect to login
+        window.location.replace('/login');
       } catch (error) {
         console.error("Error:", error);
         toast({
