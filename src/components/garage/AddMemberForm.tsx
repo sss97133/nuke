@@ -18,6 +18,9 @@ type FormData = {
   email: string;
 };
 
+// Define a specific type for the query result
+type ProfileQueryResult = Pick<Profile, 'id' | 'email'>;
+
 type SubmitFn = (data: FormData) => Promise<void>;
 
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
@@ -61,12 +64,12 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         return;
       }
 
-      // Check if user exists - now selecting both id and email
+      // Check if user exists - now selecting both id and email with proper typing
       const { data: userData, error: userError2 } = await supabase
         .from('profiles')
         .select('id, email')
         .eq('email', data.email)
-        .maybeSingle<Profile>();
+        .maybeSingle<ProfileQueryResult>();
 
       if (userError2) {
         toast({
@@ -185,3 +188,4 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
     </form>
   );
 };
+
