@@ -1,4 +1,5 @@
-import { Car, Package, Wrench, MessageSquare, Star, Activity, User } from "lucide-react";
+
+import { Car, Package, Wrench, MessageSquare, Star, Award, Box, Settings, Tools } from "lucide-react";
 
 export interface FeedItemIconProps {
   itemType: string;
@@ -6,19 +7,21 @@ export interface FeedItemIconProps {
 
 export const FeedItemIcon = ({ itemType }: FeedItemIconProps) => {
   switch (itemType) {
-    case 'vehicle':
+    case 'vehicle_added':
       return <Car className="w-4 h-4" />;
+    case 'maintenance':
+      return <Settings className="w-4 h-4" />;
+    case 'certification':
+      return <Award className="w-4 h-4" />;
     case 'inventory':
-      return <Package className="w-4 h-4" />;
+      return <Box className="w-4 h-4" />;
     case 'service':
-      return <Wrench className="w-4 h-4" />;
+      return <Tools className="w-4 h-4" />;
     case 'comment':
       return <MessageSquare className="w-4 h-4" />;
     case 'achievement':
       return <Star className="w-4 h-4" />;
-    case 'profile':
-      return <User className="w-4 h-4" />;
     default:
-      return <Activity className="w-4 h-4" />;
+      return <MessageSquare className="w-4 h-4" />;
   }
 };

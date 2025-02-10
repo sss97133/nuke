@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
@@ -17,7 +18,11 @@ export const ActivityFeed = () => {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching feed items:', error);
+        throw error;
+      }
+      console.log('Fetched feed items:', data);
       return data as FeedItemType[];
     },
   });
@@ -81,7 +86,7 @@ export const ActivityFeed = () => {
             selected={selectedItem === item.id}
             onSelect={setSelectedItem}
           >
-            {interactions && interactions.length > 0 && (
+            {selectedItem === item.id && interactions && interactions.length > 0 && (
               <FeedInteractions interactions={interactions} />
             )}
           </FeedItem>
