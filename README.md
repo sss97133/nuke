@@ -1,4 +1,5 @@
-# everything solution automobile marketplace
+
+# Nucleus of digital autonomy
 
 A modern web application for managing vehicle fleets, inventory, and service operations with an integrated professional development system.
 
