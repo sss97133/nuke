@@ -7,23 +7,33 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// Simple prop types without nesting
 type AddMemberFormProps = {
   garageId: string;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
 
+// Basic form data type
 type FormData = {
   email: string;
 };
 
+// Simplified form submission type
+type SubmitFn = (data: FormData) => Promise<void>;
+
 export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormProps) => {
-  const { register, handleSubmit, formState } = useForm<FormData>();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormData>();
+  
   const { toast } = useToast();
 
-  const handleFormSubmit = async (data: FormData) => {
+  // Explicitly typed submission handler
+  const handleFormSubmit: SubmitFn = async (data) => {
     try {
-      // Find user by email
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
@@ -39,7 +49,6 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         return;
       }
 
-      // Add garage member
       const { error: memberError } = await supabase
         .from('garage_members')
         .insert({
@@ -80,7 +89,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
           type="email"
           {...register('email', { required: true })}
         />
-        {formState.errors.email && (
+        {errors.email && (
           <span className="text-sm text-red-500">Email is required</span>
         )}
       </div>
