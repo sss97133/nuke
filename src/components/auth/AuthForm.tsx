@@ -8,6 +8,7 @@ import { OtpInput } from "./OtpInput";
 import { Button } from "@/components/ui/button";
 import { Github, Instagram } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Provider } from "@supabase/supabase-js";
 
 export const AuthForm = () => {
   const { toast } = useToast();
@@ -17,7 +18,7 @@ export const AuthForm = () => {
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSocialLogin = async (provider: 'github' | 'google' | 'instagram') => {
+  const handleSocialLogin = async (provider: Provider) => {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
