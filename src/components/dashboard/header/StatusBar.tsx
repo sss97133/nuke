@@ -1,4 +1,4 @@
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
+
 import { useEffect, useState } from "react";
 import { useNetworkSpeed } from "@/hooks/useNetworkSpeed";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -17,7 +17,6 @@ export const StatusBar = () => {
 
   return (
     <div className="flex items-center gap-2 ml-2">
-      <ThemeToggle />
       <div className="flex items-center gap-1 text-[10px] text-foreground">
         <ArrowDown className="h-3 w-3" />
         <span>{download}Mbps</span>
