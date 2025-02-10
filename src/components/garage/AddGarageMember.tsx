@@ -39,7 +39,7 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
     reset
   } = useForm<FormData>();
 
-  const checkGarageAccess = async (userId: string) => {
+  const checkGarageAccess = async (userId: string): Promise<boolean> => {
     const { data, error } = await supabase
       .from('garage_members')
       .select('id')
@@ -58,11 +58,14 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
       .eq('email', email)
       .maybeSingle();
 
-    if (error) throw new Error('Failed to check user existence');
+    if (error) {
+      console.error('Error finding user:', error);
+      return null;
+    }
     return data;
   };
 
-  const checkExistingMembership = async (userId: string) => {
+  const checkExistingMembership = async (userId: string): Promise<boolean> => {
     const { data, error } = await supabase
       .from('garage_members')
       .select('id')
@@ -74,7 +77,7 @@ export const AddGarageMember = ({ garageId, onMemberAdded }: AddGarageMemberProp
     return !!data;
   };
 
-  const addGarageMember = async (userId: string) => {
+  const addGarageMember = async (userId: string): Promise<void> => {
     const { error } = await supabase
       .from('garage_members')
       .insert({
