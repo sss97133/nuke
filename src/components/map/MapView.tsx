@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -36,7 +35,6 @@ export const MapView = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { toast } = useToast();
 
-  // Fetch user's home location
   useEffect(() => {
     const fetchUserLocation = async () => {
       const { data: profile } = await supabase
@@ -45,7 +43,7 @@ export const MapView = () => {
         .single();
 
       if (profile?.home_location) {
-        setUserLocation(profile.home_location);
+        setUserLocation(profile.home_location as { lat: number; lng: number });
       }
     };
 
@@ -125,7 +123,7 @@ export const MapView = () => {
 
         mapboxgl.accessToken = data.secret;
         
-        const initialCenter = userLocation || { lng: -74.5, lat: 40 };
+        const initialCenter = userLocation || { lng: -115.1398, lat: 36.1699 };
         
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
@@ -136,7 +134,6 @@ export const MapView = () => {
 
         map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-        // Add user location marker if available
         if (userLocation) {
           const popup = new mapboxgl.Popup({ offset: 25 })
             .setHTML('<h3 class="font-bold">Home Base</h3>');
@@ -212,4 +209,3 @@ export const MapView = () => {
     </div>
   );
 };
-
