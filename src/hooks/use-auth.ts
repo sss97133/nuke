@@ -13,10 +13,14 @@ export const useAuth = () => {
   const handleSocialLogin = async (provider: Provider) => {
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         }
       });
 
@@ -27,6 +31,8 @@ export const useAuth = () => {
           title: "Error",
           description: error.message,
         });
+      } else {
+        console.log("OAuth success:", data);
       }
     } catch (error) {
       console.error("Auth error:", error);

@@ -18,18 +18,23 @@ const Index = () => {
   useEffect(() => {
     // Handle the OAuth callback
     if (location.hash && location.hash.includes("access_token")) {
+      console.log("Found access token in URL hash");
       const params = new URLSearchParams(location.hash.substring(1));
       if (params.get("error")) {
+        console.error("OAuth error in URL:", params.get("error"));
         toast({
           title: "Authentication Error",
           description: params.get("error_description") || "Failed to authenticate",
           variant: "destructive",
         });
+      } else {
+        console.log("OAuth success, token found");
       }
     }
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Initial session:", session ? "Found" : "None");
       setSession(session);
       setLoading(false);
     });
@@ -38,6 +43,7 @@ const Index = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("Auth state changed:", _event, session ? "Session exists" : "No session");
       setSession(session);
       if (!session) {
         toast({
@@ -70,7 +76,13 @@ const Index = () => {
       {/* Auth callback route */}
       <Route 
         path="/auth/callback" 
-        element={<Navigate to="/dashboard" replace />} 
+        element={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <p>Processing authentication...</p>
+            </div>
+          </div>
+        }
       />
       
       {/* Public routes */}
