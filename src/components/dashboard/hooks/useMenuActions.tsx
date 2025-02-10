@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,14 +80,14 @@ export const useMenuActions = (
         }
         break;
       case 'toggle_assistant':
-        setShowAiAssistant(!showAiAssistant);
+        setShowAiAssistant((prev) => !prev);
         toast({
           title: "AI Assistant",
-          description: `AI Assistant ${!showAiAssistant ? 'enabled' : 'disabled'}`
+          description: "AI Assistant status toggled"
         });
         break;
       case 'help':
-        setShowHelp(!showHelp);
+        setShowHelp((prev) => !prev);
         break;
       case 'exit':
         const confirmed = window.confirm('Are you sure you want to exit?');
