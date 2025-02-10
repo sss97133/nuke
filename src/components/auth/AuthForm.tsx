@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ClassicWindow } from "./ClassicWindow";
@@ -110,14 +111,14 @@ export const AuthForm = () => {
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(true)}
-                  className="text-blue-500 hover:underline"
+                  className="text-blue-500 hover:underline px-2"
                 >
                   Forgot password?
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsSignUp(!isSignUp)}
-                  className="text-blue-500 hover:underline"
+                  className="text-blue-500 hover:underline px-2"
                 >
                   {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
                 </button>
@@ -160,3 +161,4 @@ export const AuthForm = () => {
     </div>
   );
 };
+
