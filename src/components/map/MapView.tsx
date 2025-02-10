@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -37,10 +38,23 @@ export const MapView = () => {
 
   useEffect(() => {
     const fetchUserLocation = async () => {
-      const { data: profile } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log('No authenticated user found');
+        return;
+      }
+
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('home_location')
-        .single();
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching user location:', error);
+        return;
+      }
 
       if (profile?.home_location) {
         setUserLocation(profile.home_location as { lat: number; lng: number });
