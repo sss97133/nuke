@@ -7,8 +7,8 @@ export interface InventoryFormData {
   name: string;
   partNumber: string;
   quantity: number;
-  category?: string;  // Changed to optional
-  notes: string;
+  category?: string;
+  notes?: string;  // Changed to optional
   department: string;
   subDepartment: string;
   assetType: string;
