@@ -6,15 +6,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
 export const useSocialAuth = () => {
-  // All hooks must be called before any conditional logic
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Event handler setup
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
-      // Verify origin for security
       if (event.origin !== window.location.origin) {
         console.error("[useSocialAuth] Origin mismatch:", event.origin);
         return;
@@ -23,18 +20,7 @@ export const useSocialAuth = () => {
       if (event.data?.type === 'supabase:auth:callback') {
         console.log("[useSocialAuth] Received callback message:", event.data);
         
-        if (event.data.error) {
-          console.error("[useSocialAuth] Error in callback:", event.data.error);
-          toast({
-            variant: "destructive",
-            title: "Authentication Error",
-            description: event.data.error.message || "Failed to authenticate"
-          });
-          return;
-        }
-        
         try {
-          // Get the current session
           const { data: { session }, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -59,7 +45,6 @@ export const useSocialAuth = () => {
 
           console.log("[useSocialAuth] Session established:", session);
           
-          // After successful auth, check if user has a profile
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('username')
@@ -70,13 +55,12 @@ export const useSocialAuth = () => {
             console.error("[useSocialAuth] Profile error:", profileError);
           }
 
-          // Only redirect to onboarding if no profile exists
           if (!profile?.username) {
             console.log("[useSocialAuth] No profile found, redirecting to onboarding");
-            navigate('/onboarding');
+            window.location.href = '/onboarding';
           } else {
             console.log("[useSocialAuth] Profile found, redirecting to dashboard");
-            navigate('/dashboard');
+            window.location.href = '/dashboard';
           }
         } catch (error) {
           console.error("[useSocialAuth] Error processing callback:", error);
@@ -91,7 +75,7 @@ export const useSocialAuth = () => {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [toast, navigate]);
+  }, [toast]);
 
   const handleSocialLogin = async (provider: Provider) => {
     try {
