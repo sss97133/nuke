@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -22,10 +21,7 @@ export const useAuth = () => {
         provider: provider,
         options: {
           redirectTo,
-          scopes: provider === 'github' ? 'read:user user:email' : undefined,
-          queryParams: {
-            redirect_uri: redirectTo,
-          }
+          scopes: provider === 'github' ? 'read:user user:email' : undefined
         }
       });
 
