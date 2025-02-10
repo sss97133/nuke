@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +7,7 @@ import { LoadingState } from './LoadingState';
 import { SkillHeader } from './SkillHeader';
 import { SkillCategory } from './SkillCategory';
 import { AIToolsPanel } from './ai/AIToolsPanel';
+import { QuantumSkillVis } from './visualization/QuantumSkillVis';
 import { Skill, SkillStatus, UserSkill } from '@/types/skills';
 
 export const SkillTree = () => {
@@ -112,6 +114,13 @@ export const SkillTree = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <SkillHeader totalProgress={calculateTotalProgress()} />
+      
+      {skills && userSkills && (
+        <div className="mb-8">
+          <h2 className="text-lg font-medium mb-4">Quantum Skill Visualization</h2>
+          <QuantumSkillVis skills={skills} userSkills={userSkills} />
+        </div>
+      )}
       
       <AIToolsPanel />
       
