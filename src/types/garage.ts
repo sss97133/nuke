@@ -1,3 +1,4 @@
+
 export interface AddGarageMemberProps {
   garageId: string;
   onMemberAdded: () => void;
@@ -5,7 +6,12 @@ export interface AddGarageMemberProps {
 
 export type Profile = {
   id: string;
-  email?: string;
+  email: string;
+  created_at?: string;
+  updated_at?: string;
+  username?: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
 };
 
 export type GarageMember = {

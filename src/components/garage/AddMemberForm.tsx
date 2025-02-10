@@ -61,10 +61,10 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         return;
       }
 
-      // Check if user exists
+      // Check if user exists - now selecting both id and email
       const { data: userData, error: userError2 } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, email')
         .eq('email', data.email)
         .maybeSingle<Profile>();
 
