@@ -21,6 +21,7 @@ export const useAuth = () => {
       });
 
       if (error) {
+        console.error("OAuth error:", error);
         toast({
           variant: "destructive",
           title: "Error",
@@ -28,7 +29,7 @@ export const useAuth = () => {
         });
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Auth error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -54,10 +55,10 @@ export const useAuth = () => {
       localStorage.clear();
       sessionStorage.clear();
       
-      window.location.replace('/login');
+      navigate('/login');
       
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Logout error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -91,7 +92,7 @@ export const useAuth = () => {
         return true;
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Phone auth error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -140,7 +141,7 @@ export const useAuth = () => {
         return true;
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("OTP verification error:", error);
       toast({
         variant: "destructive",
         title: "Error",

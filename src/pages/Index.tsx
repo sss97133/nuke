@@ -6,15 +6,28 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
-import { Route, Routes, useNavigate, Navigate } from "react-router-dom";
+import { Route, Routes, useNavigate, useLocation, Navigate } from "react-router-dom";
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
+    // Handle the OAuth callback
+    if (location.hash && location.hash.includes("access_token")) {
+      const params = new URLSearchParams(location.hash.substring(1));
+      if (params.get("error")) {
+        toast({
+          title: "Authentication Error",
+          description: params.get("error_description") || "Failed to authenticate",
+          variant: "destructive",
+        });
+      }
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -37,7 +50,7 @@ const Index = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [toast, navigate]);
+  }, [toast, navigate, location]);
 
   if (loading) {
     return (
@@ -54,6 +67,12 @@ const Index = () => {
 
   return (
     <Routes>
+      {/* Auth callback route */}
+      <Route 
+        path="/auth/callback" 
+        element={<Navigate to="/dashboard" replace />} 
+      />
+      
       {/* Public routes */}
       <Route 
         path="/login" 
