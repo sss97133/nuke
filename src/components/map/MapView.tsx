@@ -1,14 +1,15 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 import { MapFilters, MapFilter } from './MapFilters';
 import { MapSearch } from './MapSearch';
 import { useMapInitialization } from './useMapInitialization';
 import { useUserLocation } from './useUserLocation';
 import { useGarages } from './useGarages';
 import { useMapMarkers } from './useMapMarkers';
+import { useGarageSearch } from './useGarageSearch';
+import { useProbabilitySearch } from './useProbabilitySearch';
+import { useToast } from "@/hooks/use-toast";
 
 const initialFilters: MapFilter[] = [
   { id: 'ptz_workshops', label: 'PTZ Workshops', enabled: true },
@@ -29,63 +30,14 @@ export const MapView = () => {
   const [filters, setFilters] = useState<MapFilter[]>(initialFilters);
   const [searchQuery, setSearchQuery] = useState('');
   const [yearRange, setYearRange] = useState('65-69');
-  const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
 
   const userLocation = useUserLocation();
   const garages = useGarages();
   const map = useMapInitialization(mapContainer, userLocation);
   useMapMarkers(map, garages, userLocation);
-
-  // Effect to search for nearby garages when user location is available
-  useEffect(() => {
-    const searchNearbyGarages = async () => {
-      if (!userLocation) {
-        console.log('No user location available yet');
-        return;
-      }
-
-      console.log('Searching for garages near:', userLocation);
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('search-local-garages', {
-          body: {
-            lat: userLocation.lat,
-            lng: userLocation.lng,
-            radius: 5000 // 5km radius
-          }
-        });
-
-        if (error) {
-          console.error('Error searching garages:', error);
-          toast({
-            title: "Error",
-            description: "Failed to find nearby automotive shops: " + error.message,
-            variant: "destructive"
-          });
-          return;
-        }
-
-        console.log('Search response:', data);
-
-        if (data?.success) {
-          toast({
-            title: "Success",
-            description: `Found ${data.garages.length} nearby automotive shops`,
-          });
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        toast({
-          title: "Error",
-          description: "Failed to search for nearby shops: " + (error as Error).message,
-          variant: "destructive"
-        });
-      }
-    };
-
-    searchNearbyGarages();
-  }, [userLocation, toast]);
+  useGarageSearch(userLocation);
+  const { isSearching, handleProbabilitySearch } = useProbabilitySearch(map);
 
   const handleFilterChange = (id: string, enabled: boolean) => {
     setFilters(filters.map(filter => 
@@ -98,92 +50,8 @@ export const MapView = () => {
     });
   };
 
-  const handleProbabilitySearch = async () => {
-    if (!map.current) return;
-
-    setIsSearching(true);
-    try {
-      const bounds = map.current.getBounds();
-      const boundsObj = {
-        northeast: { lat: bounds.getNorthEast().lat, lng: bounds.getNorthEast().lng },
-        southwest: { lat: bounds.getSouthWest().lat, lng: bounds.getSouthWest().lng }
-      };
-
-      const [startYear, endYear] = yearRange.split('-').map(Number);
-      const response = await supabase.functions.invoke('analyze-vehicle-probability', {
-        body: {
-          searchQuery: `${searchQuery} mustang fastback`,
-          bounds: boundsObj,
-          yearRange: `[${startYear},${endYear}]`
-        }
-      });
-
-      if (response.error) throw response.error;
-
-      const { data } = response;
-      const bounds_coordinates = [
-        [data.location_bounds.southwest.lng, data.location_bounds.southwest.lat],
-        [data.location_bounds.northeast.lng, data.location_bounds.northeast.lat]
-      ];
-
-      if (map.current.getLayer('probability-zone')) {
-        map.current.removeLayer('probability-zone');
-        map.current.removeSource('probability-zone');
-      }
-
-      map.current.addSource('probability-zone', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {
-            probability: data.probability_score,
-            count: data.estimated_count
-          },
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                bounds_coordinates[0],
-                [bounds_coordinates[0][0], bounds_coordinates[1][1]],
-                bounds_coordinates[1],
-                [bounds_coordinates[1][0], bounds_coordinates[0][1]],
-                bounds_coordinates[0]
-              ]
-            ]
-          }
-        }
-      });
-
-      map.current.addLayer({
-        id: 'probability-zone',
-        type: 'fill',
-        source: 'probability-zone',
-        paint: {
-          'fill-color': [
-            'interpolate',
-            ['linear'],
-            ['get', 'probability'],
-            0, 'rgba(33, 102, 172, 0)',
-            1, 'rgba(33, 102, 172, 0.6)'
-          ],
-          'fill-outline-color': 'rgb(33, 102, 172)'
-        }
-      });
-
-      toast({
-        title: "Search Complete",
-        description: `Found an estimated ${data.estimated_count} vehicles matching your criteria`,
-      });
-    } catch (error) {
-      console.error('Search error:', error);
-      toast({
-        title: "Search Failed",
-        description: "Unable to complete the probability search",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSearching(false);
-    }
+  const handleSearch = () => {
+    handleProbabilitySearch(searchQuery, yearRange);
   };
 
   return (
@@ -194,7 +62,7 @@ export const MapView = () => {
         yearRange={yearRange}
         setYearRange={setYearRange}
         isSearching={isSearching}
-        onSearch={handleProbabilitySearch}
+        onSearch={handleSearch}
       />
       
       <MapFilters 
