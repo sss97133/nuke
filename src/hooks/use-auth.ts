@@ -47,36 +47,65 @@ export const useAuth = () => {
   const handleEmailLogin = async (email: string, password: string, isSignUp: boolean) => {
     try {
       setIsLoading(true);
-      console.log("[useAuth] Attempting email authentication...");
+      console.log("[useAuth] Attempting email authentication, mode:", isSignUp ? "signup" : "login");
 
-      const { data, error } = isSignUp 
-        ? await supabase.auth.signUp({
-            email,
-            password,
-          })
-        : await supabase.auth.signInWithPassword({
-            email,
-            password,
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`
+          }
+        });
+
+        if (error) {
+          console.error("[useAuth] Signup error:", error);
+          let errorMessage = error.message;
+          if (error.message.includes("User already registered")) {
+            errorMessage = "This email is already registered. Please try logging in instead.";
+          }
+          toast({
+            variant: "destructive",
+            title: "Signup Error",
+            description: errorMessage
           });
+          return;
+        }
 
-      if (error) {
-        console.error("[useAuth] Email auth error:", error);
-        toast({
-          variant: "destructive",
-          title: "Authentication Error",
-          description: error.message
+        if (data?.user) {
+          toast({
+            title: "Signup Successful",
+            description: "Please check your email to verify your account"
+          });
+          return;
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
         });
-        return;
-      }
 
-      if (isSignUp && data?.user) {
-        toast({
-          title: "Account created",
-          description: "Please check your email to verify your account"
-        });
-      }
+        if (error) {
+          console.error("[useAuth] Login error:", error);
+          let errorMessage = error.message;
+          if (error.message.includes("Invalid login credentials")) {
+            errorMessage = "Invalid email or password. Please try again.";
+          }
+          toast({
+            variant: "destructive",
+            title: "Login Error",
+            description: errorMessage
+          });
+          return;
+        }
 
-      console.log("[useAuth] Email authentication successful:", data);
+        if (data?.user) {
+          toast({
+            title: "Login Successful",
+            description: "Welcome back!"
+          });
+        }
+      }
       
     } catch (error) {
       console.error("[useAuth] Unexpected error:", error);
