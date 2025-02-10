@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { BasicInformation } from "./form-sections/BasicInformation";
 import { Categorization } from "./form-sections/Categorization";
@@ -8,7 +9,6 @@ import { AdditionalInformation } from "./form-sections/AdditionalInformation";
 import { PhotoCapture } from "./form-sections/PhotoCapture";
 import { useInventoryForm } from "./form-handlers/useInventoryForm";
 import { useFormSteps } from "./form-handlers/useFormSteps";
-import { ProgressBar } from "./form-components/ProgressBar";
 import { FormHeader } from "./form-components/FormHeader";
 import { FormFooter } from "./form-components/FormFooter";
 import type { InventoryFormData } from "./form-handlers/useInventoryForm";
@@ -66,12 +66,6 @@ export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <ProgressBar
-        steps={steps}
-        currentStep={currentStep}
-        onStepClick={setCurrentStep}
-      />
-
       <form onSubmit={handleSubmit} className="space-y-6 bg-background border border-border p-6 shadow-classic">
         <FormHeader
           title={steps[currentStep].title}
