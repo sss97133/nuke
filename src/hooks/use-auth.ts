@@ -8,7 +8,6 @@ import { useSocialAuth } from "./use-social-auth";
 import { usePhoneAuth } from "./use-phone-auth";
 
 export const useAuth = () => {
-  // All hooks must be called at the top level
   const { toast } = useToast();
   const navigate = useNavigate();
   const { handleSocialLogin: socialLogin, isLoading: isSocialLoading } = useSocialAuth();
@@ -24,16 +23,16 @@ export const useAuth = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         console.log("[useAuth] Initial session found:", session);
-        navigate('/dashboard');
+        checkAndNavigate(session.user.id);
       }
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[useAuth] Auth state changed:", event, session ? "Session exists" : "No session");
       
       if (event === 'SIGNED_IN' && session) {
-        navigate('/dashboard');
+        await checkAndNavigate(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         navigate('/login');
       }
@@ -43,6 +42,27 @@ export const useAuth = () => {
       subscription.unsubscribe();
     };
   }, [navigate]);
+
+  const checkAndNavigate = async (userId: string) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      if (!profile || !profile.onboarding_completed) {
+        navigate('/onboarding');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error("[useAuth] Profile check error:", error);
+      navigate('/onboarding');
+    }
+  };
 
   const handleEmailLogin = async (email: string, password: string, isSignUp: boolean) => {
     try {
@@ -60,24 +80,35 @@ export const useAuth = () => {
 
         if (error) {
           console.error("[useAuth] Signup error:", error);
-          let errorMessage = error.message;
-          if (error.message.includes("User already registered")) {
-            errorMessage = "This email is already registered. Please try logging in instead.";
-          }
           toast({
             variant: "destructive",
             title: "Signup Error",
-            description: errorMessage
+            description: error.message.includes("User already registered") 
+              ? "This email is already registered. Please try logging in instead."
+              : error.message
           });
           return;
         }
 
         if (data?.user) {
+          // Create initial profile
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([
+              { 
+                id: data.user.id,
+                email: data.user.email
+              }
+            ]);
+
+          if (profileError) {
+            console.error("[useAuth] Profile creation error:", profileError);
+          }
+
           toast({
-            title: "Signup Successful",
+            title: "Account Created",
             description: "Please check your email to verify your account"
           });
-          return;
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -87,26 +118,24 @@ export const useAuth = () => {
 
         if (error) {
           console.error("[useAuth] Login error:", error);
-          let errorMessage = error.message;
-          if (error.message.includes("Invalid login credentials")) {
-            errorMessage = "Invalid email or password. Please try again.";
-          }
           toast({
             variant: "destructive",
             title: "Login Error",
-            description: errorMessage
+            description: error.message.includes("Invalid login credentials")
+              ? "Invalid email or password. Please try again."
+              : error.message
           });
           return;
         }
 
         if (data?.user) {
           toast({
-            title: "Login Successful",
-            description: "Welcome back!"
+            title: "Welcome Back!",
+            description: "Successfully logged in"
           });
+          await checkAndNavigate(data.user.id);
         }
       }
-      
     } catch (error) {
       console.error("[useAuth] Unexpected error:", error);
       toast({
@@ -119,42 +148,9 @@ export const useAuth = () => {
     }
   };
 
-  const handleForgotPassword = async (email: string) => {
-    try {
-      setIsLoading(true);
-      console.log("[useAuth] Sending password reset email to:", email);
-
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) {
-        console.error("[useAuth] Password reset error:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message
-        });
-        return;
-      }
-
-      toast({
-        title: "Password Reset Email Sent",
-        description: "Check your email for password reset instructions"
-      });
-      
-      console.log("[useAuth] Password reset email sent successfully");
-      
-    } catch (error) {
-      console.error("[useAuth] Unexpected error during password reset:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred. Please try again."
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSocialLogin = async (provider: Provider) => {
+    console.log("[useAuth] Initiating social login with provider:", provider);
+    await socialLogin(provider);
   };
 
   const handleLogout = async () => {
@@ -164,32 +160,27 @@ export const useAuth = () => {
       
       console.log("[useAuth] Successfully logged out");
       toast({
-        title: "Logged out",
-        description: "Successfully logged out",
+        title: "Logged Out",
+        description: "See you next time!"
       });
       
-      localStorage.clear();
-      sessionStorage.clear();
-      
       navigate('/login');
-      
     } catch (error) {
       console.error("[useAuth] Logout error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to log out. Please try again.",
+        description: "Failed to log out. Please try again."
       });
     }
   };
 
   return {
     isLoading: isLoading || isSocialLoading || isPhoneLoading,
-    handleSocialLogin: socialLogin,
+    handleSocialLogin,
     handleLogout,
     handlePhoneLogin: phoneLogin,
     verifyOtp: verifyPhoneOtp,
     handleEmailLogin,
-    handleForgotPassword
   };
 };

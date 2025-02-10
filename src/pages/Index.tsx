@@ -16,6 +16,8 @@ const Index = () => {
   const location = useLocation();
 
   useEffect(() => {
+    console.log("[Index] Current route:", location.pathname);
+
     const handleAuthCallback = async () => {
       const params = new URLSearchParams(window.location.search);
       const error = params.get('error');
@@ -26,7 +28,7 @@ const Index = () => {
         toast({
           variant: "destructive",
           title: "Authentication Error",
-          description: error_description || "Failed to authenticate",
+          description: error_description || "Failed to authenticate"
         });
         navigate('/login');
         return;
@@ -43,11 +45,11 @@ const Index = () => {
           
           const { data: profile } = await supabase
             .from('profiles')
-            .select('username')
+            .select('onboarding_completed')
             .eq('id', session.user.id)
             .single();
             
-          if (!profile?.username) {
+          if (!profile?.onboarding_completed) {
             navigate('/onboarding');
           } else {
             navigate('/dashboard');
@@ -55,22 +57,10 @@ const Index = () => {
         }
       } catch (error) {
         console.error("[Index] Session error:", error);
-        navigate('/login');
-      }
-    };
-
-    const handleAuthMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      
-      if (event.data?.type === 'auth:success') {
-        console.log("[Index] Received auth success message:", event.data);
-        navigate(event.data.redirect);
-      } else if (event.data?.type === 'auth:error') {
-        console.error("[Index] Received auth error message:", event.data);
         toast({
           variant: "destructive",
           title: "Authentication Error",
-          description: event.data.error
+          description: "Failed to verify session"
         });
         navigate('/login');
       }
@@ -79,8 +69,6 @@ const Index = () => {
     if (location.pathname === '/auth/callback') {
       handleAuthCallback();
     }
-
-    window.addEventListener('message', handleAuthMessage);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log("[Index] Initial session check:", session ? "Found" : "None");
@@ -99,16 +87,15 @@ const Index = () => {
 
     return () => {
       subscription.unsubscribe();
-      window.removeEventListener('message', handleAuthMessage);
     };
   }, [toast, navigate, location]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-secondary dark:bg-secondary-dark">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse space-y-4 text-center">
-          <div className="h-8 w-32 bg-muted dark:bg-muted-dark rounded mx-auto"></div>
-          <p className="text-muted-foreground dark:text-muted-foreground-dark">
+          <div className="h-8 w-32 bg-muted rounded mx-auto"></div>
+          <p className="text-muted-foreground">
             Loading...
           </p>
         </div>
@@ -123,7 +110,8 @@ const Index = () => {
         element={
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
-              <p>Processing authentication...</p>
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Processing authentication...</p>
             </div>
           </div>
         }
@@ -142,6 +130,7 @@ const Index = () => {
           session ? <OnboardingWizard /> : <Navigate to="/login" replace />
         } 
       />
+
       <Route 
         path="/*" 
         element={
