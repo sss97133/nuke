@@ -22,19 +22,17 @@ serve(async (req) => {
 
     console.log('Querying Mendable with:', query)
     
-    const response = await fetch('https://api.mendable.ai/v1/chat/converse', {
+    const response = await fetch('https://api.mendable.ai/v1/newConversation', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        messages: [{
-          role: "user",
-          content: query
-        }],
-        model: "gpt-4",
-        temperature: 0.7
+        question: query,
+        temperature: 0.7,
+        systemPrompt: "You are a helpful assistant providing automotive and vehicle related information.",
+        maxTokens: 2000
       })
     })
 
@@ -47,7 +45,7 @@ serve(async (req) => {
     console.log('Mendable response:', data)
 
     return new Response(
-      JSON.stringify({ answer: data.message || data.content }),
+      JSON.stringify({ answer: data.answer || data.response || data.content }),
       { 
         headers: { 
           ...corsHeaders,
