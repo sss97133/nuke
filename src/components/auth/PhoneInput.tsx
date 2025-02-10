@@ -1,3 +1,4 @@
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -16,7 +17,6 @@ export const PhoneInput = ({
 }: PhoneInputProps) => (
   <div className="space-y-4">
     <div className="text-center">
-      <h2 className="text-base font-system mb-1">Enter Phone Number</h2>
       <p className="text-xs text-muted-foreground dark:text-muted-foreground-dark">
         Please enter your phone number to sign in or create an account
       </p>
