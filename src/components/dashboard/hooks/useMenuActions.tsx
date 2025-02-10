@@ -1,6 +1,10 @@
+
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { handleExport } from "./utils/exportUtils";
+import { handleSignOut, handleKeyboardShortcuts } from "./utils/navigationUtils";
+import { handleToggleUIElement } from "./utils/uiUtils";
 
 export const useMenuActions = (
   setShowNewVehicleDialog: (show: boolean) => void,
@@ -47,58 +51,24 @@ export const useMenuActions = (
         navigate('/import');
         break;
       case 'export':
-        try {
-          const { data: user } = await supabase.auth.getUser();
-          if (!user?.user?.id) {
-            throw new Error('User not authenticated');
-          }
-          
-          const { data: exportData, error } = await supabase
-            .from('vehicles')
-            .select('*')
-            .eq('user_id', user.user.id);
-            
-          if (error) throw error;
-          
-          const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'export.json';
-          a.click();
-          
-          toast({
-            title: "Export Successful",
-            description: "Your data has been exported successfully",
-          });
-        } catch (error) {
-          toast({
-            title: "Export Failed",
-            description: "Unable to export data. Please try again.",
-            variant: "destructive",
-          });
-        }
+        await handleExport(toast);
         break;
       case 'toggle_assistant':
-        setShowAiAssistant((prev) => !prev);
-        toast({
-          title: "AI Assistant",
-          description: "AI Assistant status toggled"
-        });
+        handleToggleUIElement(
+          setShowAiAssistant,
+          false,
+          {
+            title: "AI Assistant",
+            description: "AI Assistant status toggled"
+          },
+          toast
+        );
         break;
       case 'help':
-        setShowHelp((prev) => !prev);
+        setShowHelp(false);
         break;
       case 'exit':
-        const confirmed = window.confirm('Are you sure you want to exit?');
-        if (confirmed) {
-          await supabase.auth.signOut();
-          navigate('/login');
-          toast({
-            title: "Signed Out",
-            description: "You have been signed out successfully"
-          });
-        }
+        await handleSignOut(navigate, toast);
         break;
       case 'professional_dashboard':
         navigate('/professional');
@@ -121,33 +91,49 @@ export const useMenuActions = (
         });
         break;
       case 'toggle_workspace':
-        setShowWorkspacePreview(!showWorkspacePreview);
-        toast({
-          title: "Workspace Preview",
-          description: `Workspace preview ${!showWorkspacePreview ? 'enabled' : 'disabled'}`
-        });
+        handleToggleUIElement(
+          setShowWorkspacePreview,
+          showWorkspacePreview,
+          {
+            title: "Workspace Preview",
+            description: `Workspace preview ${!showWorkspacePreview ? 'enabled' : 'disabled'}`
+          },
+          toast
+        );
         break;
       case 'toggle_theme':
-        setDarkMode(!darkMode);
+        handleToggleUIElement(
+          setDarkMode,
+          darkMode,
+          {
+            title: "Theme Updated",
+            description: `Switched to ${!darkMode ? 'dark' : 'light'} mode`
+          },
+          toast
+        );
         document.documentElement.classList.toggle('dark');
-        toast({
-          title: "Theme Updated",
-          description: `Switched to ${!darkMode ? 'dark' : 'light'} mode`
-        });
         break;
       case 'toggle_sidebar':
-        setShowSidebar(!showSidebar);
-        toast({
-          title: "Sidebar Toggled",
-          description: `Sidebar ${!showSidebar ? 'shown' : 'hidden'}`
-        });
+        handleToggleUIElement(
+          setShowSidebar,
+          showSidebar,
+          {
+            title: "Sidebar Toggled",
+            description: `Sidebar ${!showSidebar ? 'shown' : 'hidden'}`
+          },
+          toast
+        );
         break;
       case 'toggle_activity':
-        setShowActivityPanel(!showActivityPanel);
-        toast({
-          title: "Activity Panel",
-          description: `Activity panel ${!showActivityPanel ? 'shown' : 'hidden'}`
-        });
+        handleToggleUIElement(
+          setShowActivityPanel,
+          showActivityPanel,
+          {
+            title: "Activity Panel",
+            description: `Activity panel ${!showActivityPanel ? 'shown' : 'hidden'}`
+          },
+          toast
+        );
         break;
       case 'inventory_view':
         navigate('/inventory');
@@ -171,16 +157,7 @@ export const useMenuActions = (
         window.open('https://docs.example.com', '_blank');
         break;
       case 'keyboard_shortcuts':
-        toast({
-          title: "Keyboard Shortcuts",
-          description: [
-            "⌘K - Open Command Bar",
-            "⌘/ - Toggle Help",
-            "⌘B - Toggle Sidebar",
-            "⌘T - Toggle Theme",
-            "⌘\\ - Toggle Activity Panel"
-          ].join('\n'),
-        });
+        handleKeyboardShortcuts(toast);
         break;
       case 'about':
         toast({
