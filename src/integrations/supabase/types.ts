@@ -1490,6 +1490,51 @@ export type Database = {
           },
         ]
       }
+      vehicle_probability_zones: {
+        Row: {
+          confidence_level: number
+          created_at: string | null
+          data_sources: Json
+          estimated_count: number
+          id: string
+          last_updated: string | null
+          location_bounds: Json
+          metadata: Json | null
+          probability_score: number
+          search_query: string
+          vehicle_type: string
+          year_range: unknown | null
+        }
+        Insert: {
+          confidence_level: number
+          created_at?: string | null
+          data_sources: Json
+          estimated_count: number
+          id?: string
+          last_updated?: string | null
+          location_bounds: Json
+          metadata?: Json | null
+          probability_score: number
+          search_query: string
+          vehicle_type: string
+          year_range?: unknown | null
+        }
+        Update: {
+          confidence_level?: number
+          created_at?: string | null
+          data_sources?: Json
+          estimated_count?: number
+          id?: string
+          last_updated?: string | null
+          location_bounds?: Json
+          metadata?: Json | null
+          probability_score?: number
+          search_query?: string
+          vehicle_type?: string
+          year_range?: unknown | null
+        }
+        Relationships: []
+      }
       vehicle_sales_data: {
         Row: {
           created_at: string | null

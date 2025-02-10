@@ -1,16 +1,28 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MapFilters, MapFilter } from './MapFilters';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Garage = {
   id: string;
   name: string;
   location: { lat: number; lng: number } | null;
   address: string | null;
+};
+
+type ProbabilityZone = {
+  id: string;
+  location_bounds: {
+    northeast: { lat: number; lng: number };
+    southwest: { lat: number; lng: number };
+  };
+  probability_score: number;
+  estimated_count: number;
+  vehicle_type: string;
 };
 
 const initialFilters: MapFilter[] = [
@@ -34,6 +46,9 @@ export const MapView = () => {
   const [garages, setGarages] = useState<Garage[]>([]);
   const [filters, setFilters] = useState<MapFilter[]>(initialFilters);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [yearRange, setYearRange] = useState('65-69');
+  const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -211,12 +226,126 @@ export const MapView = () => {
     }
   }, [garages, userLocation]);
 
+  const handleProbabilitySearch = async () => {
+    if (!map.current) return;
+
+    setIsSearching(true);
+    try {
+      const bounds = map.current.getBounds();
+      const boundsObj = {
+        northeast: { lat: bounds.getNorthEast().lat, lng: bounds.getNorthEast().lng },
+        southwest: { lat: bounds.getSouthWest().lat, lng: bounds.getSouthWest().lng }
+      };
+
+      const [startYear, endYear] = yearRange.split('-').map(Number);
+      const response = await supabase.functions.invoke('analyze-vehicle-probability', {
+        body: {
+          searchQuery: `${searchQuery} mustang fastback`,
+          bounds: boundsObj,
+          yearRange: `[${startYear},${endYear}]`
+        }
+      });
+
+      if (response.error) throw response.error;
+
+      // Add probability zone to the map
+      const { data } = response;
+      const bounds_coordinates = [
+        [data.location_bounds.southwest.lng, data.location_bounds.southwest.lat],
+        [data.location_bounds.northeast.lng, data.location_bounds.northeast.lat]
+      ];
+
+      // Remove existing probability layers
+      if (map.current.getLayer('probability-zone')) {
+        map.current.removeLayer('probability-zone');
+        map.current.removeSource('probability-zone');
+      }
+
+      map.current.addSource('probability-zone', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {
+            probability: data.probability_score,
+            count: data.estimated_count
+          },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                bounds_coordinates[0],
+                [bounds_coordinates[0][0], bounds_coordinates[1][1]],
+                bounds_coordinates[1],
+                [bounds_coordinates[1][0], bounds_coordinates[0][1]],
+                bounds_coordinates[0]
+              ]
+            ]
+          }
+        }
+      });
+
+      map.current.addLayer({
+        id: 'probability-zone',
+        type: 'fill',
+        source: 'probability-zone',
+        paint: {
+          'fill-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'probability'],
+            0, 'rgba(33, 102, 172, 0)',
+            1, 'rgba(33, 102, 172, 0.6)'
+          ],
+          'fill-outline-color': 'rgb(33, 102, 172)'
+        }
+      });
+
+      toast({
+        title: "Search Complete",
+        description: `Found an estimated ${data.estimated_count} vehicles matching your criteria`,
+      });
+    } catch (error) {
+      console.error('Search error:', error);
+      toast({
+        title: "Search Failed",
+        description: "Unable to complete the probability search",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <Input
+          type="text"
+          placeholder="Search for vehicles (e.g. mustang fastback)"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1"
+        />
+        <Input
+          type="text"
+          placeholder="Year range (e.g. 65-69)"
+          value={yearRange}
+          onChange={(e) => setYearRange(e.target.value)}
+          className="w-32"
+        />
+        <Button 
+          onClick={handleProbabilitySearch}
+          disabled={isSearching}
+        >
+          {isSearching ? "Searching..." : "Search"}
+        </Button>
+      </div>
+      
       <MapFilters 
         filters={filters}
         onFilterChange={handleFilterChange}
       />
+      
       <div className="w-full h-[400px] rounded-lg overflow-hidden shadow-lg">
         <div ref={mapContainer} className="w-full h-full" />
       </div>
