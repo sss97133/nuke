@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -15,41 +14,26 @@ export const useAuth = () => {
       setIsLoading(true);
       console.log("[useAuth] Starting OAuth flow with provider:", provider);
       
-      const baseUrl = window.location.origin;
-      const redirectTo = `${baseUrl}/auth/callback`;
-      
-      console.log("[useAuth] Base URL:", baseUrl);
-      console.log("[useAuth] Redirect URL:", redirectTo);
-      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+          redirectTo: window.location.origin + '/auth/callback',
           scopes: provider === 'github' ? 'read:user user:email' : undefined
         }
       });
 
       if (error) {
-        console.error("[useAuth] OAuth error details:", {
-          message: error.message,
-          status: error.status,
-          name: error.name,
-          stack: error.stack
-        });
+        console.error("[useAuth] OAuth error:", error);
         toast({
           variant: "destructive",
           title: "Authentication Error",
           description: error.message,
         });
       } else {
-        console.log("[useAuth] OAuth success response:", data);
+        console.log("[useAuth] OAuth initiated:", data);
       }
     } catch (error) {
-      console.error("[useAuth] Auth error full details:", error);
+      console.error("[useAuth] Auth error:", error);
       toast({
         variant: "destructive",
         title: "Error",

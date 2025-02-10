@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
@@ -17,21 +16,9 @@ const Index = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      console.log("[Index] Current location:", location.pathname);
-      console.log("[Index] Full URL:", window.location.href);
-      
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get('code');
-      const error = searchParams.get('error');
-      const error_description = searchParams.get('error_description');
-      
-      console.log("[Index] Auth callback parameters:", { 
-        code: code ? "present" : "absent", 
-        error, 
-        error_description,
-        currentUrl: window.location.href,
-        searchParams: Object.fromEntries(searchParams.entries())
-      });
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get('error');
+      const error_description = params.get('error_description');
       
       if (error) {
         console.error("[Index] OAuth error:", { error, error_description });
@@ -43,33 +30,31 @@ const Index = () => {
         navigate('/login');
         return;
       }
-      
-      if (code) {
-        try {
-          console.log("[Index] Exchanging code for session");
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+        
+        if (session) {
+          console.log("[Index] Session found:", session);
+          setSession(session);
           
-          if (error) {
-            console.error("[Index] Session exchange error:", {
-              message: error.message,
-              status: error.status,
-              name: error.name
-            });
-            toast({
-              variant: "destructive",
-              title: "Authentication Error",
-              description: error.message,
-            });
-            navigate('/login');
-          } else if (data.session) {
-            console.log("[Index] Successfully authenticated");
-            setSession(data.session);
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (!profile?.username) {
+            navigate('/onboarding');
+          } else {
             navigate('/dashboard');
           }
-        } catch (error) {
-          console.error("[Index] Code exchange error:", error);
-          navigate('/login');
         }
+      } catch (error) {
+        console.error("[Index] Session error:", error);
+        navigate('/login');
       }
     };
 
@@ -77,17 +62,13 @@ const Index = () => {
       handleAuthCallback();
     }
 
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log("[Index] Initial session check:", session ? "Found" : "None");
       setSession(session);
       setLoading(false);
     });
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("[Index] Auth state changed:", _event, session ? "Session exists" : "No session");
       setSession(session);
       
@@ -114,7 +95,6 @@ const Index = () => {
 
   return (
     <Routes>
-      {/* Auth callback route */}
       <Route 
         path="/auth/callback" 
         element={
@@ -126,7 +106,6 @@ const Index = () => {
         }
       />
       
-      {/* Public routes */}
       <Route 
         path="/login" 
         element={
@@ -134,7 +113,6 @@ const Index = () => {
         } 
       />
 
-      {/* Protected routes */}
       <Route 
         path="/onboarding" 
         element={
