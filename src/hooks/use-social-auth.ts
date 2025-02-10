@@ -3,9 +3,11 @@ import { useState, useEffect } from "react";
 import { Provider } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export const useSocialAuth = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -19,6 +21,16 @@ export const useSocialAuth = () => {
 
       if (event.data?.type === 'supabase:auth:callback') {
         console.log("[useSocialAuth] Received callback message:", event.data);
+        
+        if (event.data.error) {
+          console.error("[useSocialAuth] Error in callback:", event.data.error);
+          toast({
+            variant: "destructive",
+            title: "Authentication Error",
+            description: event.data.error.message || "Failed to authenticate"
+          });
+          return;
+        }
         
         // Get the current session
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -59,17 +71,17 @@ export const useSocialAuth = () => {
         // Only redirect to onboarding if no profile exists
         if (!profile?.username) {
           console.log("[useSocialAuth] No profile found, redirecting to onboarding");
-          window.location.href = '/onboarding';
+          navigate('/onboarding');
         } else {
           console.log("[useSocialAuth] Profile found, redirecting to dashboard");
-          window.location.href = '/dashboard';
+          navigate('/dashboard');
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [toast]);
+  }, [toast, navigate]);
 
   const handleSocialLogin = async (provider: Provider) => {
     try {
