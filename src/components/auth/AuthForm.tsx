@@ -90,13 +90,6 @@ export const AuthForm = () => {
                   />
                   <Label htmlFor="remember" className="text-sm">Remember me</Label>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="text-sm text-blue-500 hover:underline"
-                >
-                  Forgot password?
-                </button>
               </div>
             )}
             <Button type="submit" className="w-full" disabled={isLoading}>
@@ -113,11 +106,18 @@ export const AuthForm = () => {
                 </button>
               </div>
             ) : (
-              <div className="text-center">
+              <div className="flex items-center justify-between text-sm">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-blue-500 hover:underline"
+                >
+                  Forgot password?
+                </button>
                 <button
                   type="button"
                   onClick={() => setIsSignUp(!isSignUp)}
-                  className="text-sm text-blue-500 hover:underline"
+                  className="text-blue-500 hover:underline"
                 >
                   {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
                 </button>
