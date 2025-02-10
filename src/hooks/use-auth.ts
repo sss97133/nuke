@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,31 @@ export const useAuth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Handle initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        console.log("[useAuth] Initial session found:", session);
+        navigate('/dashboard');
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[useAuth] Auth state changed:", event, session ? "Session exists" : "No session");
+      
+      if (event === 'SIGNED_IN' && session) {
+        navigate('/dashboard');
+      } else if (event === 'SIGNED_OUT') {
+        navigate('/login');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   const handleSocialLogin = async (provider: Provider) => {
     try {
@@ -40,6 +65,10 @@ export const useAuth = () => {
       } else {
         console.log("[useAuth] OAuth response data:", data);
         console.log("[useAuth] Provider URL:", data?.url);
+        // Redirect to the provider's authorization URL
+        if (data?.url) {
+          window.location.href = data.url;
+        }
       }
     } catch (error) {
       console.error("[useAuth] Unexpected error:", error);
