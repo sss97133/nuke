@@ -55,13 +55,8 @@ export const SocialLoginButtons = ({ onSocialLogin, isLoading }: SocialLoginButt
         disabled={isLoading}
         className="w-full"
       >
-        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-          <path
-            fill="currentColor"
-            d="M16.698 22.2c-.247-.047-.4-.21-.4-.47v-6.11h3.117l.187-.203.313-3.062-.197-.203h-3.42v-2.79c0-.827.19-1.43.573-1.81.383-.38.993-.57 1.83-.57h1.663l.187-.203V3.938l-.187-.203c-.033-.007-.073-.013-.12-.02a10.332 10.332 0 0 0-1.797-.163c-1.827 0-3.267.553-4.32 1.66-1.053 1.107-1.58 2.667-1.58 4.68v2.577H9.533l-.187.203v3.062l.187.203h3.234v6.11c0 .26-.153.423-.4.47C5.86 21.427 1.333 17.223 1.333 12c0-5.733 4.934-10.667 10.667-10.667S22.667 6.267 22.667 12c0 5.223-4.527 9.427-10.973 10.2h4.994Z"
-          />
-        </svg>
-        Continue with Meta
+        ∞
+        <span className="ml-2">Continue with Meta</span>
       </Button>
     </>
   );
