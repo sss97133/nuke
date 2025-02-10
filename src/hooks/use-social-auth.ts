@@ -15,6 +15,11 @@ export const useSocialAuth = () => {
       if (event.origin !== window.location.origin) return;
 
       if (event.data?.type === 'supabase:auth:callback') {
+        // Close any existing popups
+        if (event.source && 'close' in event.source) {
+          (event.source as Window).close();
+        }
+
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -26,7 +31,8 @@ export const useSocialAuth = () => {
           });
         } else if (session) {
           console.log("[useSocialAuth] Session established:", session);
-          // The AuthCallback component will handle the redirection
+          // Redirect will be handled by useAuth hook
+          window.location.href = '/onboarding';
         }
       }
     };
@@ -44,7 +50,9 @@ export const useSocialAuth = () => {
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          skipBrowserRedirect: true // Always skip for popup handling
+          skipBrowserRedirect: true,
+          // Enable persistence
+          persistSession: true
         }
       });
 
@@ -86,4 +94,3 @@ export const useSocialAuth = () => {
     handleSocialLogin
   };
 };
-

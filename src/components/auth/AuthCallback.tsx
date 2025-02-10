@@ -28,7 +28,6 @@ export const AuthCallback = () => {
             { type: 'supabase:auth:callback', error },
             window.location.origin
           );
-          window.close();
         } else {
           navigate('/login');
         }
@@ -66,13 +65,12 @@ export const AuthCallback = () => {
           }));
         }
 
-        // If we're in a popup, send success to parent and close
+        // If we're in a popup, send success to parent and let it handle navigation
         if (window.opener) {
           window.opener.postMessage(
             { type: 'supabase:auth:callback', session },
             window.location.origin
           );
-          window.close();
         } else {
           // Direct navigation if not in popup
           if (!profile?.username) {
@@ -88,7 +86,6 @@ export const AuthCallback = () => {
             { type: 'supabase:auth:callback', error: 'No session found' },
             window.location.origin
           );
-          window.close();
         } else {
           navigate('/login');
         }
@@ -106,4 +103,3 @@ export const AuthCallback = () => {
     </div>
   );
 };
-
