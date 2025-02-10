@@ -57,10 +57,26 @@ export const useSocialAuth = () => {
 
           if (!profile?.username) {
             console.log("[useSocialAuth] No profile found, redirecting to onboarding");
-            window.location.href = '/onboarding';
+            if (window.opener) {
+              window.opener.postMessage({ 
+                type: 'auth:success',
+                redirect: '/onboarding'
+              }, window.location.origin);
+              window.close();
+            } else {
+              window.location.href = '/onboarding';
+            }
           } else {
             console.log("[useSocialAuth] Profile found, redirecting to dashboard");
-            window.location.href = '/dashboard';
+            if (window.opener) {
+              window.opener.postMessage({ 
+                type: 'auth:success',
+                redirect: '/dashboard'
+              }, window.location.origin);
+              window.close();
+            } else {
+              window.location.href = '/dashboard';
+            }
           }
         } catch (error) {
           console.error("[useSocialAuth] Error processing callback:", error);
@@ -69,6 +85,13 @@ export const useSocialAuth = () => {
             title: "Authentication Error",
             description: "An unexpected error occurred"
           });
+          if (window.opener) {
+            window.opener.postMessage({ 
+              type: 'auth:error',
+              error: error instanceof Error ? error.message : 'Unknown error'
+            }, window.location.origin);
+            window.close();
+          }
         }
       }
     };

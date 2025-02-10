@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
@@ -58,9 +59,28 @@ const Index = () => {
       }
     };
 
+    const handleAuthMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data?.type === 'auth:success') {
+        console.log("[Index] Received auth success message:", event.data);
+        navigate(event.data.redirect);
+      } else if (event.data?.type === 'auth:error') {
+        console.error("[Index] Received auth error message:", event.data);
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: event.data.error
+        });
+        navigate('/login');
+      }
+    };
+
     if (location.pathname === '/auth/callback') {
       handleAuthCallback();
     }
+
+    window.addEventListener('message', handleAuthMessage);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log("[Index] Initial session check:", session ? "Found" : "None");
@@ -77,7 +97,10 @@ const Index = () => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('message', handleAuthMessage);
+    };
   }, [toast, navigate, location]);
 
   if (loading) {
