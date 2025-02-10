@@ -31,12 +31,24 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
 
   const handleFormSubmit: SubmitFn = async (data) => {
     try {
+      // Get the current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        toast({
+          title: 'Authentication Error',
+          description: 'Failed to get current user',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // First check if the user has permission to add members to this garage
       const { data: garageAccess, error: accessError } = await supabase
         .from('garage_members')
         .select('id')
         .eq('garage_id', garageId)
-        .eq('user_id', supabase.auth.getUser())
+        .eq('user_id', user.id)
         .single();
 
       if (accessError || !garageAccess) {
@@ -49,13 +61,13 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
       }
 
       // Check if user exists
-      const { data: userData, error: userError } = await supabase
+      const { data: userData, error: userError2 } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', data.email)
         .maybeSingle();
 
-      if (userError) {
+      if (userError2) {
         toast({
           title: 'Error',
           description: 'Failed to check user existence',
