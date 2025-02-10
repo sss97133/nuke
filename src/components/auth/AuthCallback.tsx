@@ -36,6 +36,26 @@ export const AuthCallback = () => {
           .single();
 
         if (!profile?.username) {
+          // Extract GitHub profile data from user metadata
+          const metadata = session.user.user_metadata;
+          console.log("[AuthCallback] User metadata:", metadata);
+
+          // Store GitHub data in localStorage for onboarding
+          if (metadata) {
+            localStorage.setItem('onboarding_data', JSON.stringify({
+              firstName: metadata.name ? metadata.name.split(' ')[0] : '',
+              lastName: metadata.name ? metadata.name.split(' ').slice(1).join(' ') : '',
+              avatarUrl: metadata.avatar_url || '',
+              username: metadata.user_name || metadata.preferred_username || '',
+              socialLinks: {
+                github: metadata.user_name ? `https://github.com/${metadata.user_name}` : '',
+                twitter: '',
+                instagram: '',
+                linkedin: ''
+              }
+            }));
+          }
+          
           navigate('/onboarding');
         } else {
           navigate('/dashboard');
