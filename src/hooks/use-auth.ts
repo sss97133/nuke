@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -14,10 +15,13 @@ export const useAuth = () => {
       setIsLoading(true);
       console.log("[useAuth] Starting OAuth flow with provider:", provider);
       
+      const redirectTo = window.location.origin + '/auth/callback';
+      console.log("[useAuth] Redirect URL:", redirectTo);
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: window.location.origin + '/auth/callback',
+          redirectTo,
           scopes: provider === 'github' ? 'read:user user:email' : undefined
         }
       });
