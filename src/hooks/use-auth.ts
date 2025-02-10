@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -7,6 +8,7 @@ import { useSocialAuth } from "./use-social-auth";
 import { usePhoneAuth } from "./use-phone-auth";
 
 export const useAuth = () => {
+  // All hooks must be called at the top level
   const { toast } = useToast();
   const navigate = useNavigate();
   const { handleSocialLogin: socialLogin, isLoading: isSocialLoading } = useSocialAuth();
