@@ -49,7 +49,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         .select('id')
         .eq('garage_id', garageId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (accessError || !garageAccess) {
         toast({
@@ -65,7 +65,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         .from('profiles')
         .select('id')
         .eq('email', data.email)
-        .single();
+        .maybeSingle();
 
       if (userError2) {
         toast({
@@ -91,7 +91,7 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
         .select('id')
         .eq('garage_id', garageId)
         .eq('user_id', userData.id)
-        .single();
+        .maybeSingle();
 
       if (memberCheckError) {
         toast({
@@ -184,4 +184,3 @@ export const AddMemberForm = ({ garageId, onSuccess, onCancel }: AddMemberFormPr
     </form>
   );
 };
-
