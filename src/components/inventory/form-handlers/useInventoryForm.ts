@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -96,7 +97,6 @@ export const useInventoryForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Get the current user's session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError || !session) {
@@ -110,7 +110,7 @@ export const useInventoryForm = () => {
 
     try {
       const { data, error } = await supabase
-        .from("inventory")
+        .from("assets")
         .insert([{
           name: formData.name,
           part_number: formData.partNumber,
@@ -136,7 +136,7 @@ export const useInventoryForm = () => {
           bin: formData.bin,
           photo_url: formData.photoUrl,
           ai_classification: formData.aiClassification || null,
-          user_id: session.user.id, // Explicitly set the user_id
+          user_id: session.user.id,
         }]);
 
       if (error) throw error;

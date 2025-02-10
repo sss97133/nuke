@@ -14,7 +14,7 @@ export interface User {
 export interface Asset {
   id: string;
   name: string;
-  partNumber?: string;
+  partNumber: string;
   quantity: number;
   location?: string;
   category?: string;
@@ -44,6 +44,31 @@ export interface Asset {
   updatedAt: string;
 }
 
+export interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin?: string;
+  notes?: string;
+  status?: string;
+  historical_data?: VehicleHistoricalData;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleHistoricalData {
+  previousSales?: {
+    date?: string;
+    price?: string;
+    source?: string;
+    imageUrl?: string;
+  }[];
+  modifications?: string[];
+  notableHistory?: string;
+  conditionNotes?: string;
+}
+
 export interface InventoryItem {
   id: string;
   sku?: string;
@@ -65,17 +90,6 @@ export interface InventoryItem {
   updatedAt: string;
 }
 
-export interface Supplier {
-  id: string;
-  name: string;
-  contactInfo?: Record<string, any>;
-  apiCredentials?: Record<string, any>;
-  integrationType?: string;
-  status?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface ServiceTicket {
   id: string;
   vehicleId: string;
@@ -85,6 +99,17 @@ export interface ServiceTicket {
   assignedTo?: string;
   createdBy: string;
   updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactInfo?: Record<string, any>;
+  apiCredentials?: Record<string, any>;
+  integrationType?: string;
+  status?: string;
   createdAt: string;
   updatedAt: string;
 }
