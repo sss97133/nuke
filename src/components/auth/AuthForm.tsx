@@ -266,7 +266,7 @@ export const AuthForm = () => {
               {isLoading ? "Logging out..." : "Logout"}
             </Button>
             <p className="text-[10px] text-center text-muted-foreground dark:text-muted-foreground-dark">
-              NUKE © 2024
+              NUKE © 2025
             </p>
           </div>
         </div>
