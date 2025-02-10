@@ -68,15 +68,13 @@ export const MainContent = ({
             )}
           </div>
 
-          <Tabs defaultValue="inventory" className="w-full animate-scale-in">
-            <DashboardTabs showHelp={handleShowHelp} />
-            <CommandBar />
-          </Tabs>
+          <ActivityFeed />
 
-          {showActivityPanel && (
-            <div className="mt-6">
-              <ActivityFeed />
-            </div>
+          {!showActivityPanel && (
+            <Tabs defaultValue="home" className="w-full animate-scale-in mt-6">
+              <DashboardTabs showHelp={handleShowHelp} />
+              <CommandBar />
+            </Tabs>
           )}
         </>
       )}
