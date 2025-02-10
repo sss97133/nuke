@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ interface FormData {
 }
 
 export const AddTeamMemberForm = ({ onSuccess }: AddTeamMemberFormProps) => {
-  const { register, handleSubmit, reset, setValue } = useForm<FormData>();
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormData>();
   const { toast } = useToast();
 
   const onSubmit = async (data: FormData) => {
