@@ -14,6 +14,8 @@ export const useDashboardState = () => {
   const [showStudioConfig, setShowStudioConfig] = useState(false);
   const [showWorkspacePreview, setShowWorkspacePreview] = useState(true);
   const [showActivityPanel, setShowActivityPanel] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
 
   const handleShowHelp = (section: string) => {
     setShowHelp(true);
@@ -27,6 +29,10 @@ export const useDashboardState = () => {
     switch (action) {
       case 'new_project':
         navigate('/projects/new');
+        toast({
+          title: "New Project",
+          description: "Creating new project workspace"
+        });
         break;
       case 'new_vehicle':
         setShowNewVehicleDialog(true);
@@ -65,21 +71,30 @@ export const useDashboardState = () => {
         } catch (error) {
           toast({
             title: "Export Failed",
-            description: error instanceof Error ? error.message : "Failed to export data",
+            description: "Unable to export data. Please try again.",
             variant: "destructive",
           });
         }
         break;
       case 'toggle_assistant':
         setShowAiAssistant(!showAiAssistant);
+        toast({
+          title: "AI Assistant",
+          description: `AI Assistant ${!showAiAssistant ? 'enabled' : 'disabled'}`
+        });
         break;
       case 'help':
         setShowHelp(!showHelp);
         break;
       case 'exit':
-        if (confirm('Are you sure you want to exit?')) {
+        const confirmed = window.confirm('Are you sure you want to exit?');
+        if (confirmed) {
           await supabase.auth.signOut();
           navigate('/login');
+          toast({
+            title: "Signed Out",
+            description: "You have been signed out successfully"
+          });
         }
         break;
       case 'professional_dashboard':
@@ -105,22 +120,30 @@ export const useDashboardState = () => {
       case 'toggle_workspace':
         setShowWorkspacePreview(!showWorkspacePreview);
         toast({
-          title: "Workspace Preview Toggled",
-          description: `Workspace preview is now ${!showWorkspacePreview ? 'visible' : 'hidden'}`,
+          title: "Workspace Preview",
+          description: `Workspace preview ${!showWorkspacePreview ? 'enabled' : 'disabled'}`
         });
         break;
       case 'toggle_theme':
+        setDarkMode(!darkMode);
         document.documentElement.classList.toggle('dark');
         toast({
-          title: "Theme Toggled",
-          description: "Application theme has been updated",
+          title: "Theme Updated",
+          description: `Switched to ${!darkMode ? 'dark' : 'light'} mode`
+        });
+        break;
+      case 'toggle_sidebar':
+        setShowSidebar(!showSidebar);
+        toast({
+          title: "Sidebar Toggled",
+          description: `Sidebar ${!showSidebar ? 'shown' : 'hidden'}`
         });
         break;
       case 'toggle_activity':
         setShowActivityPanel(!showActivityPanel);
         toast({
-          title: "Activity Panel Toggled",
-          description: `Activity panel is now ${!showActivityPanel ? 'visible' : 'hidden'}`,
+          title: "Activity Panel",
+          description: `Activity panel ${!showActivityPanel ? 'shown' : 'hidden'}`
         });
         break;
       case 'inventory_view':
@@ -142,24 +165,31 @@ export const useDashboardState = () => {
         navigate('/streaming');
         break;
       case 'documentation':
-        window.open('/docs', '_blank');
+        window.open('https://docs.example.com', '_blank');
         break;
       case 'keyboard_shortcuts':
         toast({
           title: "Keyboard Shortcuts",
-          description: "⌘K - Open Command Bar\n⌘/ - Toggle Help\n⌘B - Toggle Sidebar",
+          description: [
+            "⌘K - Open Command Bar",
+            "⌘/ - Toggle Help",
+            "⌘B - Toggle Sidebar",
+            "⌘T - Toggle Theme",
+            "⌘\\ - Toggle Activity Panel"
+          ].join('\n'),
         });
         break;
       case 'about':
         toast({
-          title: "About",
-          description: "Vehicle Management System v1.0",
+          title: "About NUKE",
+          description: "Vehicle Management System v1.0\nBuilt with ❤️",
         });
         break;
       default:
         toast({
-          title: `${action} selected`,
-          description: "This feature will be implemented soon.",
+          title: "Coming Soon",
+          description: "This feature is under development",
+          variant: "destructive"
         });
     }
   };
@@ -174,6 +204,8 @@ export const useDashboardState = () => {
     showStudioConfig,
     showWorkspacePreview,
     showActivityPanel,
+    showSidebar,
+    darkMode,
     handleShowHelp,
     handleMenuAction
   };
