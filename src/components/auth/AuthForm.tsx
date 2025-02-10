@@ -60,7 +60,6 @@ export const AuthForm = () => {
         <div className="space-y-6">
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
