@@ -20,7 +20,8 @@ export const useFeedInteractions = () => {
         feed_item_id: feedItemId,
         interaction_type: interactionType,
         view_duration_seconds: viewDurationSeconds || 0,
-        user_id: user.id
+        user_id: user.id,
+        interaction_weight: interactionType === 'click' ? 2.0 : 1.0
       });
 
       if (error) {
