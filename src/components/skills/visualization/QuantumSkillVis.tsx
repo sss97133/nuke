@@ -2,6 +2,13 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { Skill, UserSkill } from '@/types/skills';
+import { createQuantumOrbit } from './quantum/QuantumOrbit';
+import { createQuantumParticles } from './quantum/QuantumParticles';
+import { 
+  calculateCareerMomentum, 
+  calculateQuantumState 
+} from './quantum/QuantumCalculations';
+import { categoryColors } from './quantum/QuantumColors';
 
 interface QuantumSkillVisProps {
   skills: Skill[];
@@ -15,43 +22,14 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const particlesRef = useRef<THREE.Points[]>([]);
 
-  const calculateCareerMomentum = () => {
-    if (!userSkills || userSkills.length === 0) return 0.001;
-    
-    // Calculate momentum based on total XP and skill levels
-    const totalXP = userSkills.reduce((sum, skill) => sum + skill.experience_points, 0);
-    const avgLevel = userSkills.reduce((sum, skill) => sum + skill.level, 0) / userSkills.length;
-    
-    // Quantum-inspired momentum calculation using wave function
-    const waveFactor = Math.sin(Date.now() * 0.001) * 0.0005;
-    const baseSpeed = (totalXP / (10000 * userSkills.length)) * 0.002;
-    
-    // Normalize momentum within bounds
-    return Math.min(0.004, Math.max(0.0005, baseSpeed + waveFactor));
-  };
-
-  const calculateSkillInteraction = (skill1: UserSkill, skill2: UserSkill) => {
-    // Quantum entanglement-inspired interaction
-    const levelDiff = Math.abs(skill1.level - skill2.level);
-    const xpCorrelation = Math.abs(skill1.experience_points - skill2.experience_points) / 5000;
-    
-    // Exponential decay function similar to quantum probability distribution
-    return Math.exp(-(levelDiff + xpCorrelation)) * 0.015;
-  };
-
-  const calculateQuantumState = (skillLevel: number, time: number) => {
-    // Schrödinger-inspired wave function
-    const amplitude = 0.5 + (skillLevel / 10);
-    const frequency = 1 + (skillLevel * 0.2);
-    return amplitude * Math.sin(frequency * time);
-  };
-
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Scene setup
     sceneRef.current = new THREE.Scene();
     sceneRef.current.background = new THREE.Color(0x000000);
     
+    // Camera setup
     cameraRef.current = new THREE.PerspectiveCamera(
       75,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
@@ -59,6 +37,7 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       1000
     );
     
+    // Renderer setup
     rendererRef.current = new THREE.WebGLRenderer({ 
       antialias: true,
       alpha: true 
@@ -70,6 +49,7 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     
     containerRef.current.appendChild(rendererRef.current.domElement);
 
+    // Lighting
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     sceneRef.current.add(ambientLight);
     
@@ -77,19 +57,12 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     pointLight.position.set(10, 10, 10);
     sceneRef.current.add(pointLight);
 
+    // Camera positioning
     cameraRef.current.position.z = 15;
     cameraRef.current.position.y = 5;
     cameraRef.current.lookAt(0, 0, 0);
 
-    const categoryColors: { [key: string]: THREE.Color } = {
-      mechanical: new THREE.Color(0xff3366),
-      electrical: new THREE.Color(0x33ff66),
-      bodywork: new THREE.Color(0x3366ff),
-      diagnostics: new THREE.Color(0xff66ff),
-      restoration: new THREE.Color(0xffff33),
-      customization: new THREE.Color(0x33ffff),
-    };
-
+    // Group skills by category
     const skillsByCategory = skills.reduce((acc: { [key: string]: Skill[] }, skill) => {
       if (!acc[skill.category]) {
         acc[skill.category] = [];
@@ -98,79 +71,40 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       return acc;
     }, {});
 
+    // Create quantum visualization
     Object.entries(skillsByCategory).forEach(([category, categorySkills], categoryIndex) => {
       const baseRadius = (categoryIndex + 2) * 2;
-      const color = categoryColors[category] || new THREE.Color(0xffffff);
+      const color = categoryColors[category as keyof typeof categoryColors] || new THREE.Color(0xffffff);
       
-      // Quantum orbital representation
-      const orbitalGeometry = new THREE.TorusGeometry(
-        baseRadius,
-        0.02 * (1 + categorySkills.length * 0.1),
-        32,
-        200
-      );
-      const orbitalMaterial = new THREE.MeshPhongMaterial({ 
-        color: color,
-        transparent: true,
-        opacity: 0.3,
-        emissive: color,
-        emissiveIntensity: 0.2
+      // Create orbital
+      createQuantumOrbit({ 
+        category: category as any, 
+        baseRadius, 
+        color, 
+        scene: sceneRef.current! 
       });
-      const orbital = new THREE.Mesh(orbitalGeometry, orbitalMaterial);
-      orbital.rotation.x = Math.PI / 2;
-      sceneRef.current?.add(orbital);
 
-      categorySkills.forEach((skill, skillIndex) => {
+      // Create particles for each skill
+      categorySkills.forEach(skill => {
         const userSkill = userSkills.find(us => us.skill_id === skill.id);
-        const level = userSkill?.level || 0;
-        
-        // Quantum probability cloud - more particles for higher levels
-        const particleCount = 100 + level * 50;
-        const particles = new Float32Array(particleCount * 3);
-        const velocities = new Float32Array(particleCount * 3);
-        
-        for (let i = 0; i < particleCount; i++) {
-          const angle = (i / particleCount) * Math.PI * 2;
-          // Heisenberg uncertainty principle inspired variation
-          const uncertaintyFactor = Math.random() * (1 / (level + 1));
-          const radiusVariation = (Math.random() - 0.5) * uncertaintyFactor;
-          const heightVariation = (Math.random() - 0.5) * uncertaintyFactor;
-          
-          particles[i * 3] = (baseRadius + radiusVariation) * Math.cos(angle);
-          particles[i * 3 + 1] = heightVariation;
-          particles[i * 3 + 2] = (baseRadius + radiusVariation) * Math.sin(angle);
-          
-          // Quantum velocity distribution
-          velocities[i * 3] = (Math.random() - 0.5) * 0.02 * (level + 1);
-          velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.02 * (level + 1);
-          velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02 * (level + 1);
-        }
-
-        const particleGeometry = new THREE.BufferGeometry();
-        particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(particles, 3));
-        
-        const particleMaterial = new THREE.PointsMaterial({
-          color: color,
-          size: 0.05 + level * 0.02,
-          transparent: true,
-          opacity: 0.6,
-          blending: THREE.AdditiveBlending,
+        const particles = createQuantumParticles({
+          baseRadius,
+          color,
+          userSkill,
+          scene: sceneRef.current!
         });
-
-        const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-        sceneRef.current?.add(particleSystem);
-        particlesRef.current.push(particleSystem);
+        particlesRef.current.push(particles);
       });
     });
 
+    // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
       
       if (sceneRef.current && cameraRef.current && rendererRef.current) {
-        const spinRate = calculateCareerMomentum();
+        const spinRate = calculateCareerMomentum(userSkills);
         const time = Date.now() * 0.001;
         
-        // Quantum-inspired rotation
         sceneRef.current.rotation.y += spinRate;
         
         particlesRef.current.forEach((particles, idx) => {
@@ -184,7 +118,6 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
             const radius = Math.sqrt(x * x + z * z);
             const angle = Math.atan2(z, x);
             
-            // Quantum wave function influence
             const userSkill = userSkills[Math.floor(idx / 2)];
             const quantumState = calculateQuantumState(userSkill?.level || 0, time);
             const waveFunction = Math.sin(angle * 3 + time) * 0.03 * quantumState;
@@ -204,6 +137,7 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     };
     animate();
 
+    // Handle window resize
     const handleResize = () => {
       if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
       
@@ -233,4 +167,3 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     />
   );
 };
-
