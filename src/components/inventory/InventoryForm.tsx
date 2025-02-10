@@ -7,13 +7,13 @@ import { PurchaseMaintenance } from "./form-sections/PurchaseMaintenance";
 import { Location } from "./form-sections/Location";
 import { AdditionalInformation } from "./form-sections/AdditionalInformation";
 import { PhotoCapture } from "./form-sections/PhotoCapture";
-import { useInventoryForm } from "./form-handlers/useInventoryForm";
+import { useAssetForm } from "./form-handlers/useAssetForm";
 import { useFormSteps } from "./form-handlers/useFormSteps";
 import { FormHeader } from "./form-components/FormHeader";
 import { FormFooter } from "./form-components/FormFooter";
-import type { InventoryFormData } from "./form-handlers/useInventoryForm";
+import type { Asset } from "@/types/inventory";
 
-interface InventoryFormProps {
+interface AssetFormProps {
   onSuccess?: () => void;
 }
 
@@ -32,16 +32,16 @@ const steps: StepComponent[] = [
   { title: "Additional Information", component: AdditionalInformation },
 ];
 
-export const InventoryForm = ({ onSuccess }: InventoryFormProps = {}) => {
+export const AssetForm = ({ onSuccess }: AssetFormProps = {}) => {
   const {
     formData,
     setFormData: originalSetFormData,
     isProcessing,
     handleSubmit: originalHandleSubmit,
     handlePhotoUpload,
-  } = useInventoryForm();
+  } = useAssetForm();
 
-  const setFormData = (data: Partial<InventoryFormData>) => {
+  const setFormData = (data: Partial<Asset>) => {
     originalSetFormData(prev => ({ ...prev, ...data }));
   };
 
