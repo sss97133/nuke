@@ -42,6 +42,8 @@ export const OnboardingWizard = () => {
             firstName={formData.firstName}
             lastName={formData.lastName}
             username={formData.username}
+            email={formData.email}
+            avatarUrl={formData.avatarUrl}
             onUpdate={updateFormData}
           />
         );
