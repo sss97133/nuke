@@ -13,44 +13,53 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const particlesRef = useRef<THREE.Points[]>([]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     // Initialize Three.js scene
     sceneRef.current = new THREE.Scene();
+    sceneRef.current.background = new THREE.Color(0x000000);
+    
     cameraRef.current = new THREE.PerspectiveCamera(
       75,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
       0.1,
       1000
     );
-    rendererRef.current = new THREE.WebGLRenderer({ antialias: true });
+    
+    rendererRef.current = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: true 
+    });
     rendererRef.current.setSize(
       containerRef.current.clientWidth,
       containerRef.current.clientHeight
     );
     containerRef.current.appendChild(rendererRef.current.domElement);
 
-    // Add lighting
-    const ambientLight = new THREE.AmbientLight(0x404040);
+    // Add ambient and point lights
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     sceneRef.current.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(1, 1, 1);
-    sceneRef.current.add(directionalLight);
+    const pointLight = new THREE.PointLight(0xffffff, 1);
+    pointLight.position.set(10, 10, 10);
+    sceneRef.current.add(pointLight);
 
     // Position camera
-    cameraRef.current.position.z = 5;
+    cameraRef.current.position.z = 15;
+    cameraRef.current.position.y = 5;
+    cameraRef.current.lookAt(0, 0, 0);
 
-    // Create orbital geometries for each skill category
-    const categoryColors: { [key: string]: number } = {
-      mechanical: 0xff0000,
-      electrical: 0x00ff00,
-      bodywork: 0x0000ff,
-      diagnostics: 0xff00ff,
-      restoration: 0xffff00,
-      customization: 0x00ffff,
+    // Create Bohmian orbital paths for each skill category
+    const categoryColors: { [key: string]: THREE.Color } = {
+      mechanical: new THREE.Color(0xff3366),
+      electrical: new THREE.Color(0x33ff66),
+      bodywork: new THREE.Color(0x3366ff),
+      diagnostics: new THREE.Color(0xff66ff),
+      restoration: new THREE.Color(0xffff33),
+      customization: new THREE.Color(0x33ffff),
     };
 
     // Group skills by category
@@ -62,32 +71,97 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       return acc;
     }, {});
 
-    // Create orbital shells for each category
-    Object.entries(skillsByCategory).forEach(([category, categorySkills], index) => {
-      const radius = (index + 2) * 0.8;
-      const orbital = createOrbitalShape(radius, categoryColors[category] || 0xffffff);
-      sceneRef.current?.add(orbital);
+    // Create quantum orbital shells for each category
+    Object.entries(skillsByCategory).forEach(([category, categorySkills], categoryIndex) => {
+      const baseRadius = (categoryIndex + 2) * 2;
+      const color = categoryColors[category] || new THREE.Color(0xffffff);
+      
+      // Create orbital path
+      const orbitalGeometry = new THREE.TorusGeometry(baseRadius, 0.02, 16, 100);
+      const orbitalMaterial = new THREE.MeshPhongMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.3,
+        emissive: color,
+        emissiveIntensity: 0.2
+      });
+      const orbital = new THREE.Mesh(orbitalGeometry, orbitalMaterial);
+      orbital.rotation.x = Math.PI / 2;
+      sceneRef.current.add(orbital);
 
-      // Add skill points within the orbital
+      // Create Bohmian particle system for skills
       categorySkills.forEach((skill, skillIndex) => {
-        const angle = (skillIndex / categorySkills.length) * Math.PI * 2;
-        const skillPoint = createSkillPoint(
-          radius * Math.cos(angle),
-          radius * Math.sin(angle),
-          index * 0.5,
-          userSkills.find(us => us.skill_id === skill.id)?.level || 0
-        );
-        sceneRef.current?.add(skillPoint);
+        const userSkill = userSkills.find(us => us.skill_id === skill.id);
+        const level = userSkill?.level || 0;
+        const particleCount = 50 + level * 20; // More particles for higher levels
+
+        const particles = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount * 3);
+        
+        // Initialize particles in a quantum-like probability distribution
+        for (let i = 0; i < particleCount; i++) {
+          const angle = (i / particleCount) * Math.PI * 2;
+          const radiusVariation = (Math.random() - 0.5) * 0.5;
+          const heightVariation = (Math.random() - 0.5) * 0.5;
+          
+          particles[i * 3] = (baseRadius + radiusVariation) * Math.cos(angle);
+          particles[i * 3 + 1] = heightVariation;
+          particles[i * 3 + 2] = (baseRadius + radiusVariation) * Math.sin(angle);
+          
+          // Add velocities for particle movement
+          velocities[i * 3] = (Math.random() - 0.5) * 0.02;
+          velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.02;
+          velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+        }
+
+        const particleGeometry = new THREE.BufferGeometry();
+        particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(particles, 3));
+        
+        const particleMaterial = new THREE.PointsMaterial({
+          color: color,
+          size: 0.05 + level * 0.02,
+          transparent: true,
+          opacity: 0.6,
+          blending: THREE.AdditiveBlending,
+        });
+
+        const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+        sceneRef.current?.add(particleSystem);
+        particlesRef.current.push(particleSystem);
       });
     });
 
-    // Animation loop
+    // Animation loop with Bohmian trajectory updates
     const animate = () => {
       requestAnimationFrame(animate);
       
       if (sceneRef.current && cameraRef.current && rendererRef.current) {
         // Rotate the entire scene slowly
         sceneRef.current.rotation.y += 0.001;
+        
+        // Update particle positions based on Bohmian mechanics-inspired trajectories
+        particlesRef.current.forEach(particles => {
+          const positions = particles.geometry.attributes.position.array as Float32Array;
+          
+          for (let i = 0; i < positions.length; i += 3) {
+            // Apply quantum-inspired motion
+            const x = positions[i];
+            const y = positions[i + 1];
+            const z = positions[i + 2];
+            
+            // Calculate radius and angle
+            const radius = Math.sqrt(x * x + z * z);
+            const angle = Math.atan2(z, x);
+            
+            // Update position with wave-like motion
+            const newAngle = angle + 0.02;
+            positions[i] = radius * Math.cos(newAngle);
+            positions[i + 1] = y + Math.sin(newAngle) * 0.02;
+            positions[i + 2] = radius * Math.sin(newAngle);
+          }
+          
+          particles.geometry.attributes.position.needsUpdate = true;
+        });
         
         rendererRef.current.render(sceneRef.current, cameraRef.current);
       }
@@ -110,38 +184,9 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     return () => {
       window.removeEventListener('resize', handleResize);
       containerRef.current?.removeChild(rendererRef.current?.domElement!);
+      particlesRef.current = [];
     };
   }, [skills, userSkills]);
-
-  // Helper function to create orbital shape
-  const createOrbitalShape = (radius: number, color: number) => {
-    const points = [];
-    for (let i = 0; i <= 100; i++) {
-      const angle = (i / 50) * Math.PI;
-      points.push(
-        new THREE.Vector3(
-          radius * Math.cos(angle),
-          radius * Math.sin(angle),
-          0
-        )
-      );
-    }
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 });
-    return new THREE.Line(geometry, material);
-  };
-
-  // Helper function to create skill point
-  const createSkillPoint = (x: number, y: number, z: number, level: number) => {
-    const geometry = new THREE.SphereGeometry(0.1 + level * 0.02);
-    const material = new THREE.MeshPhongMaterial({
-      color: new THREE.Color(1, 1, 1).multiplyScalar(0.2 + level * 0.16),
-      emissive: new THREE.Color(0, 1, 1).multiplyScalar(level * 0.2),
-    });
-    const sphere = new THREE.Mesh(geometry, material);
-    sphere.position.set(x, y, z);
-    return sphere;
-  };
 
   return (
     <div 
