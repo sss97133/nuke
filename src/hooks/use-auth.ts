@@ -15,14 +15,19 @@ export const useAuth = () => {
       setIsLoading(true);
       console.log("[useAuth] Starting OAuth flow with provider:", provider);
       
-      const redirectTo = window.location.origin + '/auth/callback';
+      // Use the origin for the callback URL
+      const redirectTo = `${window.location.origin}/auth/callback`;
       console.log("[useAuth] Redirect URL:", redirectTo);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: provider,
         options: {
           redirectTo,
-          scopes: provider === 'github' ? 'read:user user:email' : undefined
+          // Required scopes for GitHub
+          scopes: provider === 'github' ? 'read:user user:email' : undefined,
+          queryParams: provider === 'github' ? {
+            redirect_uri: redirectTo,
+          } : undefined
         }
       });
 
