@@ -68,14 +68,18 @@ export const MainContent = ({
             )}
           </div>
 
-          <ActivityFeed />
-
-          {!showActivityPanel && (
-            <Tabs defaultValue="home" className="w-full animate-scale-in mt-6">
-              <DashboardTabs showHelp={handleShowHelp} />
-              <CommandBar />
-            </Tabs>
-          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Tabs defaultValue="home" className="w-full animate-scale-in">
+                <DashboardTabs showHelp={handleShowHelp} />
+                <CommandBar />
+              </Tabs>
+            </div>
+            
+            <div className="lg:col-span-1">
+              <ActivityFeed />
+            </div>
+          </div>
         </>
       )}
     </main>
