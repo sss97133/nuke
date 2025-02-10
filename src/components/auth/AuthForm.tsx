@@ -30,6 +30,8 @@ export const AuthForm = () => {
   const handleLogout = async () => {
     try {
       setIsLoading(true);
+      
+      // Clear any stored session data
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
@@ -38,8 +40,13 @@ export const AuthForm = () => {
         description: "Successfully logged out",
       });
       
-      // Navigate to login page
-      window.location.href = '/login';
+      // Clear any session storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Force a full page reload and redirect to login
+      window.location.replace('/login');
+      
     } catch (error) {
       console.error("Error:", error);
       toast({
