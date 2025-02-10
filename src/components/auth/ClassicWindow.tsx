@@ -11,7 +11,7 @@ export const ClassicWindow = ({ title, children }: ClassicWindowProps) => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setAngle((prev) => (prev + 2) % 360);
+      setAngle(prev => prev + 2);
     }, 50);
     return () => clearInterval(interval);
   }, []);
@@ -52,4 +52,3 @@ export const ClassicWindow = ({ title, children }: ClassicWindowProps) => {
     </div>
   );
 };
-
