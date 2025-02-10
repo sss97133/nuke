@@ -22,7 +22,7 @@ serve(async (req) => {
 
     console.log('Querying Mendable with:', query)
     
-    // Updated to latest Mendable API endpoint
+    // Updated Mendable API request with proper structure
     const response = await fetch('https://api.mendable.ai/v1/newConversation', {
       method: 'POST',
       headers: {
@@ -35,8 +35,9 @@ serve(async (req) => {
           content: query
         }],
         temperature: 0.7,
-        model: "gpt-4", // Using GPT-4 as default model
-        stream: false
+        model: "gpt-4",
+        systemPrompt: "You are a helpful assistant that helps users with their automotive and inventory management questions. Please provide clear and concise answers.",
+        maxTokens: 500
       })
     })
 
@@ -48,7 +49,6 @@ serve(async (req) => {
     const data = await response.json()
     console.log('Mendable response:', data)
 
-    // Updated response structure based on new Mendable API
     const answer = data.answer || data.choices?.[0]?.message?.content || data.message
 
     return new Response(
