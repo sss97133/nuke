@@ -16,6 +16,7 @@ export const useAuth = () => {
     verifyOtp: verifyPhoneOtp,
     isLoading: isPhoneLoading 
   } = usePhoneAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Handle initial session
@@ -41,6 +42,52 @@ export const useAuth = () => {
       subscription.unsubscribe();
     };
   }, [navigate]);
+
+  const handleEmailLogin = async (email: string, password: string, isSignUp: boolean) => {
+    try {
+      setIsLoading(true);
+      console.log("[useAuth] Attempting email authentication...");
+
+      const { data, error } = isSignUp 
+        ? await supabase.auth.signUp({
+            email,
+            password,
+          })
+        : await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+      if (error) {
+        console.error("[useAuth] Email auth error:", error);
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: error.message
+        });
+        return;
+      }
+
+      if (isSignUp && data?.user) {
+        toast({
+          title: "Account created",
+          description: "Please check your email to verify your account"
+        });
+      }
+
+      console.log("[useAuth] Email authentication successful:", data);
+      
+    } catch (error) {
+      console.error("[useAuth] Unexpected error:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred. Please try again."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -69,10 +116,11 @@ export const useAuth = () => {
   };
 
   return {
-    isLoading: isSocialLoading || isPhoneLoading,
+    isLoading: isLoading || isSocialLoading || isPhoneLoading,
     handleSocialLogin: socialLogin,
     handleLogout,
     handlePhoneLogin: phoneLogin,
-    verifyOtp: verifyPhoneOtp
+    verifyOtp: verifyPhoneOtp,
+    handleEmailLogin
   };
 };
