@@ -1284,6 +1284,39 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          auto_save_enabled: boolean | null
+          compact_view_enabled: boolean | null
+          created_at: string
+          id: string
+          notifications_enabled: boolean | null
+          theme: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          auto_save_enabled?: boolean | null
+          compact_view_enabled?: boolean | null
+          created_at?: string
+          id?: string
+          notifications_enabled?: boolean | null
+          theme?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          auto_save_enabled?: boolean | null
+          compact_view_enabled?: boolean | null
+          created_at?: string
+          id?: string
+          notifications_enabled?: boolean | null
+          theme?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
