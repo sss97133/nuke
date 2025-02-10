@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { Skill, UserSkill } from '@/types/skills';
@@ -48,7 +49,9 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       containerRef.current.clientWidth,
       containerRef.current.clientHeight
     );
-    containerRef.current.appendChild(rendererRef.current);
+    
+    // Fix: Append the renderer's domElement instead of the renderer itself
+    containerRef.current.appendChild(rendererRef.current.domElement);
 
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     sceneRef.current.add(ambientLight);
@@ -186,7 +189,9 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      containerRef.current?.removeChild(rendererRef.current?.domElement!);
+      if (containerRef.current && rendererRef.current) {
+        containerRef.current.removeChild(rendererRef.current.domElement);
+      }
       particlesRef.current = [];
     };
   }, [skills, userSkills]);
@@ -199,3 +204,4 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     />
   );
 };
+
