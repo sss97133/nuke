@@ -17,7 +17,6 @@ export const useSocialAuth = () => {
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          // These query params ensure we get a refresh token and force consent
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -46,7 +45,6 @@ export const useSocialAuth = () => {
       }
 
       console.log("[useSocialAuth] Opening OAuth URL:", data.url);
-      // Redirect to the OAuth URL instead of using a popup
       window.location.href = data.url;
       
     } catch (error) {
