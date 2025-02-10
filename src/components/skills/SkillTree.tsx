@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,15 +26,15 @@ export const SkillTree = () => {
   ];
 
   const mockUserSkills: UserSkill[] = [
-    { id: 'us1', skill_id: '1', level: 4, experience_points: 3500 },
-    { id: 'us2', skill_id: '2', level: 3, experience_points: 2500 },
-    { id: 'us3', skill_id: '3', level: 5, experience_points: 5000 },
-    { id: 'us4', skill_id: '4', level: 2, experience_points: 1500 },
-    { id: 'us5', skill_id: '5', level: 4, experience_points: 3800 },
-    { id: 'us6', skill_id: '6', level: 1, experience_points: 800 },
-    { id: 'us7', skill_id: '7', level: 3, experience_points: 2700 },
-    { id: 'us8', skill_id: '8', level: 2, experience_points: 1600 },
-    { id: 'us9', skill_id: '9', level: 5, experience_points: 5000 },
+    { id: 'us1', user_id: 'mock-user-1', skill_id: '1', level: 4, experience_points: 3500, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 'us2', user_id: 'mock-user-1', skill_id: '2', level: 3, experience_points: 2500, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 'us3', user_id: 'mock-user-1', skill_id: '3', level: 5, experience_points: 5000, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 'us4', user_id: 'mock-user-1', skill_id: '4', level: 2, experience_points: 1500, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 'us5', user_id: 'mock-user-1', skill_id: '5', level: 4, experience_points: 3800, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 'us6', user_id: 'mock-user-1', skill_id: '6', level: 1, experience_points: 800, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 'us7', user_id: 'mock-user-1', skill_id: '7', level: 3, experience_points: 2700, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 'us8', user_id: 'mock-user-1', skill_id: '8', level: 2, experience_points: 1600, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 'us9', user_id: 'mock-user-1', skill_id: '9', level: 5, experience_points: 5000, created_at: '2024-01-01', updated_at: '2024-01-01' },
   ];
 
   const { data: skills, isLoading, error } = useQuery({
@@ -133,4 +132,3 @@ export const SkillTree = () => {
     </div>
   );
 };
-
