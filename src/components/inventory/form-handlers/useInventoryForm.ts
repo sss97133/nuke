@@ -7,7 +7,7 @@ export interface InventoryFormData {
   name: string;
   partNumber: string;
   quantity: number;
-  category: string;
+  category?: string;  // Changed to optional
   notes: string;
   department: string;
   subDepartment: string;
@@ -69,13 +69,13 @@ export const useInventoryForm = () => {
       const filePath = `${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('inventory-images')
+        .from('asset-images')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('inventory-images')
+        .from('asset-images')
         .getPublicUrl(filePath);
 
       setFormData(prev => ({ ...prev, photoUrl: publicUrl }));
@@ -102,7 +102,7 @@ export const useInventoryForm = () => {
     if (sessionError || !session) {
       toast({
         title: "Error",
-        description: "You must be logged in to add inventory items",
+        description: "You must be logged in to add assets",
         variant: "destructive",
       });
       return;
@@ -142,14 +142,14 @@ export const useInventoryForm = () => {
       if (error) throw error;
 
       toast({
-        title: "Item added successfully",
+        title: "Asset added successfully",
       });
       
       setFormData(initialFormData);
     } catch (error) {
-      console.error("Error adding item:", error);
+      console.error("Error adding asset:", error);
       toast({
-        title: "Error adding item",
+        title: "Error adding asset",
         variant: "destructive",
       });
     }
