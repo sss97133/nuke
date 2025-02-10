@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { Skill, UserSkill } from '@/types/skills';
@@ -15,10 +14,22 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const particlesRef = useRef<THREE.Points[]>([]);
 
+  const calculateCareerMomentum = () => {
+    if (!userSkills || userSkills.length === 0) return 0.001;
+    
+    const totalXP = userSkills.reduce((sum, skill) => sum + skill.experience_points, 0);
+    const avgXP = totalXP / userSkills.length;
+    return Math.min(0.003, Math.max(0.0005, (avgXP / 5000) * 0.002));
+  };
+
+  const calculateSkillInteraction = (skill1: UserSkill, skill2: UserSkill) => {
+    const levelDiff = Math.abs(skill1.level - skill2.level);
+    return Math.exp(-levelDiff) * 0.01;
+  };
+
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Initialize Three.js scene
     sceneRef.current = new THREE.Scene();
     sceneRef.current.background = new THREE.Color(0x000000);
     
@@ -37,9 +48,8 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       containerRef.current.clientWidth,
       containerRef.current.clientHeight
     );
-    containerRef.current.appendChild(rendererRef.current.domElement);
+    containerRef.current.appendChild(rendererRef.current);
 
-    // Add ambient and point lights
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     sceneRef.current.add(ambientLight);
     
@@ -47,12 +57,10 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     pointLight.position.set(10, 10, 10);
     sceneRef.current.add(pointLight);
 
-    // Position camera
     cameraRef.current.position.z = 15;
     cameraRef.current.position.y = 5;
     cameraRef.current.lookAt(0, 0, 0);
 
-    // Create Bohmian orbital paths for each skill category
     const categoryColors: { [key: string]: THREE.Color } = {
       mechanical: new THREE.Color(0xff3366),
       electrical: new THREE.Color(0x33ff66),
@@ -62,7 +70,6 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       customization: new THREE.Color(0x33ffff),
     };
 
-    // Group skills by category
     const skillsByCategory = skills.reduce((acc: { [key: string]: Skill[] }, skill) => {
       if (!acc[skill.category]) {
         acc[skill.category] = [];
@@ -71,13 +78,16 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       return acc;
     }, {});
 
-    // Create quantum orbital shells for each category
     Object.entries(skillsByCategory).forEach(([category, categorySkills], categoryIndex) => {
       const baseRadius = (categoryIndex + 2) * 2;
       const color = categoryColors[category] || new THREE.Color(0xffffff);
       
-      // Create orbital path
-      const orbitalGeometry = new THREE.TorusGeometry(baseRadius, 0.02, 16, 100);
+      const orbitalGeometry = new THREE.TorusGeometry(
+        baseRadius,
+        0.02 * (1 + categorySkills.length * 0.1),
+        16,
+        100
+      );
       const orbitalMaterial = new THREE.MeshPhongMaterial({ 
         color: color,
         transparent: true,
@@ -89,29 +99,26 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       orbital.rotation.x = Math.PI / 2;
       sceneRef.current.add(orbital);
 
-      // Create Bohmian particle system for skills
       categorySkills.forEach((skill, skillIndex) => {
         const userSkill = userSkills.find(us => us.skill_id === skill.id);
         const level = userSkill?.level || 0;
-        const particleCount = 50 + level * 20; // More particles for higher levels
+        const particleCount = 50 + level * 20;
 
         const particles = new Float32Array(particleCount * 3);
         const velocities = new Float32Array(particleCount * 3);
         
-        // Initialize particles in a quantum-like probability distribution
         for (let i = 0; i < particleCount; i++) {
           const angle = (i / particleCount) * Math.PI * 2;
-          const radiusVariation = (Math.random() - 0.5) * 0.5;
-          const heightVariation = (Math.random() - 0.5) * 0.5;
+          const radiusVariation = (Math.random() - 0.5) * (0.5 / (level + 1));
+          const heightVariation = (Math.random() - 0.5) * (0.5 / (level + 1));
           
           particles[i * 3] = (baseRadius + radiusVariation) * Math.cos(angle);
           particles[i * 3 + 1] = heightVariation;
           particles[i * 3 + 2] = (baseRadius + radiusVariation) * Math.sin(angle);
           
-          // Add velocities for particle movement
-          velocities[i * 3] = (Math.random() - 0.5) * 0.02;
-          velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.02;
-          velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+          velocities[i * 3] = (Math.random() - 0.5) * 0.02 * (level + 1);
+          velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.02 * (level + 1);
+          velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02 * (level + 1);
         }
 
         const particleGeometry = new THREE.BufferGeometry();
@@ -131,32 +138,29 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       });
     });
 
-    // Animation loop with Bohmian trajectory updates
     const animate = () => {
       requestAnimationFrame(animate);
       
       if (sceneRef.current && cameraRef.current && rendererRef.current) {
-        // Rotate the entire scene slowly
-        sceneRef.current.rotation.y += 0.001;
+        const spinRate = calculateCareerMomentum();
+        sceneRef.current.rotation.y += spinRate;
         
-        // Update particle positions based on Bohmian mechanics-inspired trajectories
-        particlesRef.current.forEach(particles => {
+        particlesRef.current.forEach((particles, idx) => {
           const positions = particles.geometry.attributes.position.array as Float32Array;
           
           for (let i = 0; i < positions.length; i += 3) {
-            // Apply quantum-inspired motion
             const x = positions[i];
             const y = positions[i + 1];
             const z = positions[i + 2];
             
-            // Calculate radius and angle
             const radius = Math.sqrt(x * x + z * z);
             const angle = Math.atan2(z, x);
             
-            // Update position with wave-like motion
-            const newAngle = angle + 0.02;
+            const waveFunction = Math.sin(angle * 2 + Date.now() * 0.001) * 0.02;
+            const newAngle = angle + spinRate * (1 + waveFunction);
+            
             positions[i] = radius * Math.cos(newAngle);
-            positions[i + 1] = y + Math.sin(newAngle) * 0.02;
+            positions[i + 1] = y + Math.sin(newAngle * 2) * 0.02;
             positions[i + 2] = radius * Math.sin(newAngle);
           }
           
@@ -168,7 +172,6 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     };
     animate();
 
-    // Handle window resize
     const handleResize = () => {
       if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
       
