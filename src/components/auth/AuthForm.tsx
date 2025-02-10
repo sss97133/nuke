@@ -130,14 +130,14 @@ export const AuthForm = () => {
 
           {!showForgotPassword && (
             <>
-              <Separator className="my-4" />
+              <Separator/>
 
               <SocialLoginButtons 
                 onSocialLogin={handleSocialLogin}
                 isLoading={isLoading}
               />
 
-              <Separator className="my-4" />
+              <Separator/>
 
               <PhoneInput
                 phoneNumber={phoneNumber}
@@ -163,4 +163,3 @@ export const AuthForm = () => {
     </div>
   );
 };
-
