@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export const AuthForm = () => {
-  const { isLoading, handleSocialLogin, handleLogout, handlePhoneLogin, verifyOtp, handleEmailLogin } = useAuth();
+  const { isLoading, handleSocialLogin, handleLogout, handlePhoneLogin, verifyOtp, handleEmailLogin, handleForgotPassword } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -21,6 +21,7 @@ export const AuthForm = () => {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const formatPhoneNumber = (phone: string) => {
     const cleaned = phone.replace(/\D/g, "");
@@ -46,6 +47,10 @@ export const AuthForm = () => {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (showForgotPassword) {
+      await handleForgotPassword(email);
+      return;
+    }
     await handleEmailLogin(email, password, isSignUp);
   };
 
@@ -65,81 +70,110 @@ export const AuthForm = () => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="remember"
-                checked={rememberMe}
-                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-              />
-              <Label htmlFor="remember" className="text-sm">Remember me</Label>
-            </div>
+            {!showForgotPassword && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+            {!showForgotPassword && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                  />
+                  <Label htmlFor="remember" className="text-sm">Remember me</Label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-blue-500 hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isSignUp ? 'Sign Up' : 'Login'}
+              {showForgotPassword ? 'Send Reset Link' : (isSignUp ? 'Sign Up' : 'Login')}
             </Button>
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sm text-blue-500 hover:underline"
-              >
-                {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
-              </button>
-            </div>
+            {showForgotPassword ? (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(false)}
+                  className="text-sm text-blue-500 hover:underline"
+                >
+                  Back to login
+                </button>
+              </div>
+            ) : (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-sm text-blue-500 hover:underline"
+                >
+                  {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
+                </button>
+              </div>
+            )}
           </form>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
+          {!showForgotPassword && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
 
-          <SocialLoginButtons 
-            onSocialLogin={handleSocialLogin}
-            isLoading={isLoading}
-          />
+              <SocialLoginButtons 
+                onSocialLogin={handleSocialLogin}
+                isLoading={isLoading}
+              />
 
-          <Separator className="my-4" />
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with phone
-              </span>
-            </div>
-          </div>
+              <Separator className="my-4" />
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with phone
+                  </span>
+                </div>
+              </div>
 
-          {!showOtpInput ? (
-            <PhoneInput
-              phoneNumber={phoneNumber}
-              setPhoneNumber={setPhoneNumber}
-              onSubmit={handleSendOtp}
-              isLoading={isLoading}
-            />
-          ) : (
-            <OtpInput
-              otp={otp}
-              setOtp={setOtp}
-              onSubmit={handleVerifyOtp}
-              isLoading={isLoading}
-            />
+              {!showOtpInput ? (
+                <PhoneInput
+                  phoneNumber={phoneNumber}
+                  setPhoneNumber={setPhoneNumber}
+                  onSubmit={handleSendOtp}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <OtpInput
+                  otp={otp}
+                  setOtp={setOtp}
+                  onSubmit={handleVerifyOtp}
+                  isLoading={isLoading}
+                />
+              )}
+            </>
           )}
 
           <AuthFooter 

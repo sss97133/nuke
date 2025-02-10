@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -89,6 +88,44 @@ export const useAuth = () => {
     }
   };
 
+  const handleForgotPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      console.log("[useAuth] Sending password reset email to:", email);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error("[useAuth] Password reset error:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message
+        });
+        return;
+      }
+
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Check your email for password reset instructions"
+      });
+      
+      console.log("[useAuth] Password reset email sent successfully");
+      
+    } catch (error) {
+      console.error("[useAuth] Unexpected error during password reset:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred. Please try again."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -121,6 +158,7 @@ export const useAuth = () => {
     handleLogout,
     handlePhoneLogin: phoneLogin,
     verifyOtp: verifyPhoneOtp,
-    handleEmailLogin
+    handleEmailLogin,
+    handleForgotPassword
   };
 };
