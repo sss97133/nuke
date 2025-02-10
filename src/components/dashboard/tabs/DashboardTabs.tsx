@@ -9,6 +9,7 @@ import { AuctionList } from "@/components/auctions/AuctionList";
 import { CreateAuction } from "@/components/auctions/CreateAuction";
 import { StudioConfiguration } from "@/components/studio/StudioConfiguration";
 import { Home } from "@/components/dashboard/Home";
+import { Sitemap } from "@/components/sitemap/Sitemap";
 
 interface DashboardTabsProps {
   showHelp: (section: string) => void;
@@ -107,6 +108,9 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
         </TabsContent>
         <TabsContent value="studio">
           <StudioConfiguration />
+        </TabsContent>
+        <TabsContent value="sitemap">
+          <Sitemap />
         </TabsContent>
       </div>
     </>

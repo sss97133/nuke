@@ -1,3 +1,4 @@
+
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
 import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle } from "lucide-react";
 
@@ -74,6 +75,10 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           </MenubarItem>
           <MenubarItem onClick={() => handleMenuAction('service_view')}>
             Service
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => handleMenuAction('sitemap')}>
+            Sitemap
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('toggle_theme')}>
