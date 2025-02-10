@@ -55,10 +55,10 @@ Deno.serve(async (req) => {
 
     const userPrefs = preferences as AlgorithmPreferences
 
-    // Get user's engagement metrics
+    // Get user's engagement metrics with interaction weights
     const { data: engagements, error: engagementsError } = await supabaseClient
       .from('engagement_metrics')
-      .select('feed_item_id, interaction_type, interaction_weight')
+      .select('feed_item_id, interaction_type, view_duration_seconds')
       .eq('user_id', user_id)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -67,13 +67,31 @@ Deno.serve(async (req) => {
       throw engagementsError
     }
 
-    // Calculate engagement scores
+    // Calculate engagement scores with weighted interactions
     const engagementScores = new Map<string, number>()
     engagements.forEach((engagement) => {
       const currentScore = engagementScores.get(engagement.feed_item_id) || 0
+      let interactionWeight = 1.0
+
+      // Weight different types of interactions
+      switch (engagement.interaction_type) {
+        case 'click':
+          interactionWeight = 2.0
+          break
+        case 'view':
+          interactionWeight = 1.0
+          break
+        case 'view_complete':
+          // Longer views get higher weights
+          interactionWeight = Math.min(3.0, 1.0 + (engagement.view_duration_seconds || 0) / 60)
+          break
+        default:
+          interactionWeight = 1.0
+      }
+
       engagementScores.set(
         engagement.feed_item_id,
-        currentScore + engagement.interaction_weight
+        currentScore + interactionWeight
       )
     })
 

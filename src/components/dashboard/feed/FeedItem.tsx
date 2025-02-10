@@ -1,7 +1,9 @@
-import React from 'react';
+
+import React, { useEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { FeedItemIcon } from "./FeedItemIcon";
 import { FeedItemProfile } from "@/types/feed";
+import { useFeedInteractions } from "./useFeedInteractions";
 
 interface FeedItemProps {
   id: string;
@@ -24,12 +26,31 @@ export const FeedItem = ({
   onSelect,
   children
 }: FeedItemProps) => {
+  const { trackEngagement } = useFeedInteractions();
+  const viewStartTime = React.useRef(Date.now());
+
+  useEffect(() => {
+    // Track view when component mounts
+    trackEngagement(id, 'view');
+
+    return () => {
+      // Track view duration when component unmounts
+      const viewDurationSeconds = Math.floor((Date.now() - viewStartTime.current) / 1000);
+      trackEngagement(id, 'view_complete', viewDurationSeconds);
+    };
+  }, [id]);
+
+  const handleClick = () => {
+    trackEngagement(id, 'click');
+    onSelect(id);
+  };
+
   return (
     <div
       className={`p-4 border rounded-lg mb-4 cursor-pointer transition-colors ${
         selected ? 'bg-accent' : 'hover:bg-accent/50'
       }`}
-      onClick={() => onSelect(id)}
+      onClick={handleClick}
     >
       <div className="flex items-start space-x-4">
         <Avatar>
