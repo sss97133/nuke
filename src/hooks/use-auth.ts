@@ -39,14 +39,13 @@ export const useAuth = () => {
     try {
       setIsLoading(true);
       console.log("[useAuth] Starting OAuth flow with provider:", provider);
-      console.log("[useAuth] Current URL:", window.location.href);
-      console.log("[useAuth] Redirect URL:", `${window.location.origin}/auth/callback`);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
           scopes: 'read:user user:email',
+          skipBrowserRedirect: true // This prevents automatic redirect
         }
       });
 
@@ -65,9 +64,19 @@ export const useAuth = () => {
       } else {
         console.log("[useAuth] OAuth response data:", data);
         console.log("[useAuth] Provider URL:", data?.url);
-        // Redirect to the provider's authorization URL
+        
+        // Open popup window for authentication
         if (data?.url) {
-          window.location.href = data.url;
+          const width = 600;
+          const height = 800;
+          const left = window.screenX + (window.outerWidth - width) / 2;
+          const top = window.screenY + (window.outerHeight - height) / 2;
+          
+          window.open(
+            data.url,
+            'Login',
+            `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
+          );
         }
       }
     } catch (error) {
