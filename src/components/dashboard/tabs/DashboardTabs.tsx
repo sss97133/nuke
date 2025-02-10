@@ -33,7 +33,7 @@ export const DashboardTabs = ({ showHelp }: DashboardTabsProps) => {
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-3 py-2 text-sm font-mono flex items-center justify-center gap-2 shadow-classic data-[state=active]:shadow-classic-pressed"
             >
               <Warehouse className="w-4 h-4" />
-              <span className="hidden sm:inline">Inventory</span>
+              <span className="hidden sm:inline">Assets</span>
             </TabsTrigger>
             <TabsTrigger 
               value="vehicles" 

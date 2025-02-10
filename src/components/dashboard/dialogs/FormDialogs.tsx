@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VehicleForm } from "@/components/vehicles/VehicleForm";
 import { InventoryForm } from "@/components/inventory/InventoryForm";
@@ -29,7 +30,7 @@ export const FormDialogs = ({
       <Dialog open={showNewInventoryDialog} onOpenChange={setShowNewInventoryDialog}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Add New Inventory Item</DialogTitle>
+            <DialogTitle>Add New Asset</DialogTitle>
           </DialogHeader>
           <InventoryForm onSuccess={() => setShowNewInventoryDialog(false)} />
         </DialogContent>

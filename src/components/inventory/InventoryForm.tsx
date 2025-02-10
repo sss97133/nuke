@@ -32,7 +32,7 @@ const steps: StepComponent[] = [
   { title: "Additional Information", component: AdditionalInformation },
 ];
 
-export const AssetForm = ({ onSuccess }: AssetFormProps = {}) => {
+export const InventoryForm = ({ onSuccess }: AssetFormProps = {}) => {
   const {
     formData,
     setFormData: originalSetFormData,
