@@ -23,11 +23,6 @@ const Index = () => {
       console.log("[Index] Initial session check:", session ? "Found" : "None");
       setSession(session);
       setLoading(false);
-
-      // If we have a session but we're on the root route, redirect to dashboard
-      if (session && location.pathname === '/') {
-        navigate('/dashboard');
-      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -77,13 +72,6 @@ const Index = () => {
       />
 
       <Route 
-        path="/" 
-        element={
-          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
-        } 
-      />
-
-      <Route 
         path="/dashboard/*" 
         element={
           session ? <DashboardLayout /> : <Navigate to="/login" replace />
@@ -91,10 +79,15 @@ const Index = () => {
       />
 
       <Route 
-        path="*" 
+        path="/" 
         element={
           session ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
         } 
+      />
+
+      <Route 
+        path="*" 
+        element={<Navigate to="/" replace />} 
       />
     </Routes>
   );
