@@ -70,6 +70,14 @@ const Index = () => {
         } 
       />
 
+      {/* Add explicit root route handling */}
+      <Route 
+        path="/" 
+        element={
+          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+        } 
+      />
+
       <Route 
         path="/*" 
         element={
