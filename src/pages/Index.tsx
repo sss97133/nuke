@@ -23,13 +23,18 @@ const Index = () => {
       console.log("[Index] Initial session check:", session ? "Found" : "None");
       setSession(session);
       setLoading(false);
+
+      // If we have a session but we're on the root route, redirect to dashboard
+      if (session && location.pathname === '/') {
+        navigate('/dashboard');
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("[Index] Auth state changed:", _event, session ? "Session exists" : "No session");
       setSession(session);
       
-      if (!session && location.pathname !== '/login' && location.pathname !== '/auth/callback') {
+      if (!session && !location.pathname.startsWith('/auth/') && location.pathname !== '/login') {
         navigate('/login');
       }
     });
@@ -70,7 +75,6 @@ const Index = () => {
         } 
       />
 
-      {/* Add explicit root route handling */}
       <Route 
         path="/" 
         element={

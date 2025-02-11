@@ -31,7 +31,7 @@ export const AuthCallback = () => {
         // Check if user has a profile
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, onboarding_completed')
           .eq('id', session.user.id)
           .single();
 
@@ -60,24 +60,13 @@ export const AuthCallback = () => {
           }));
         }
 
-        // If we're in a popup, send success to parent
-        if (window.opener) {
-          console.log("[AuthCallback] Sending success to parent window");
-          window.opener.postMessage(
-            { type: 'supabase:auth:callback', session },
-            window.location.origin
-          );
-          // Close the popup after sending the message
-          window.close();
+        // Redirect based on profile status
+        if (!profile?.username || !profile?.onboarding_completed) {
+          navigate('/onboarding');
         } else {
-          console.log("[AuthCallback] Direct navigation");
-          // Direct navigation if not in popup
-          if (!profile?.username) {
-            navigate('/onboarding');
-          } else {
-            navigate('/dashboard');
-          }
+          navigate('/dashboard');
         }
+        
       } catch (error) {
         console.error("[AuthCallback] Error:", error);
         toast({
@@ -85,21 +74,11 @@ export const AuthCallback = () => {
           title: "Authentication Error",
           description: error instanceof Error ? error.message : 'Failed to authenticate'
         });
-        
-        // If we're in a popup, send error to parent
-        if (window.opener) {
-          console.log("[AuthCallback] Sending error to parent window");
-          window.opener.postMessage(
-            { type: 'supabase:auth:callback', error },
-            window.location.origin
-          );
-          window.close();
-        } else {
-          navigate('/login');
-        }
+        navigate('/login');
       }
     };
 
+    // Process the callback immediately
     handleCallback();
   }, [navigate, toast]);
 
