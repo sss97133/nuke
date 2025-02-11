@@ -84,9 +84,16 @@ const Index = () => {
       />
 
       <Route 
-        path="/*" 
+        path="/dashboard/*" 
         element={
           session ? <DashboardLayout /> : <Navigate to="/login" replace />
+        } 
+      />
+
+      <Route 
+        path="*" 
+        element={
+          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
         } 
       />
     </Routes>
