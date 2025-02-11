@@ -34,6 +34,7 @@ const Index = () => {
       console.log("[Index] Auth state changed:", _event, session ? "Session exists" : "No session");
       setSession(session);
       
+      // Only redirect to login if we're not on an auth-related path
       if (!session && !location.pathname.startsWith('/auth/') && location.pathname !== '/login') {
         navigate('/login');
       }
