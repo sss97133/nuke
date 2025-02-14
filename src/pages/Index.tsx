@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
-import { Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import { Route, Routes, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { AuthCallback } from "@/components/auth/AuthCallback";
 import { Sitemap } from "@/components/sitemap/Sitemap";
 import { Glossary } from "@/components/glossary/Glossary";
@@ -100,3 +100,4 @@ const Index = () => {
 };
 
 export default Index;
+
