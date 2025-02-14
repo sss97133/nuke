@@ -1,6 +1,6 @@
 
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
-import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map, BookOpen, Coins, Vote, Token } from "lucide-react";
+import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map, BookOpen, Coins, Vote } from "lucide-react";
 
 interface MainMenuProps {
   handleMenuAction: (action: string) => void;
@@ -70,7 +70,7 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
       <MenubarMenu>
         <MenubarTrigger className="text-[11px]">View</MenubarTrigger>
         <MenubarContent>
-          <MenubarItem onClick={() => handleNavigation('toggle_sidebar')}>
+          <MenubarItem onClick={() => handleMenuAction('toggle_sidebar')}>
             Toggle Sidebar
             <MenubarShortcut>⌘\</MenubarShortcut>
           </MenubarItem>
@@ -89,7 +89,7 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('token_management')}>
-            <Token className="mr-2 h-4 w-4" />
+            <Coins className="mr-2 h-4 w-4" />
             Token Management
           </MenubarItem>
           <MenubarItem onClick={() => handleMenuAction('dao_governance')}>
@@ -174,3 +174,4 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
     </Menubar>
   );
 };
+
