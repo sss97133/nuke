@@ -166,8 +166,29 @@ export const Sitemap = () => {
             </li>
           </ul>
         </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Documentation</h2>
+          <ul className="list-disc pl-5 space-y-2">
+            <li>
+              <button 
+                onClick={() => handleNavigation('/algorithms', true)}
+                className="text-blue-600 hover:underline text-left"
+              >
+                System Algorithms
+              </button>
+            </li>
+            <li>
+              <button 
+                onClick={() => handleNavigation('/glossary', true)}
+                className="text-blue-600 hover:underline text-left"
+              >
+                Glossary
+              </button>
+            </li>
+          </ul>
+        </section>
       </div>
     </div>
   );
 };
-

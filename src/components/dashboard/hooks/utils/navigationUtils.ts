@@ -65,7 +65,6 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
 
   switch (action) {
     case 'access_control':
-      // Fix: Navigate to terminal instead of home
       navigate('/terminal');
       break;
     case 'token_management':
@@ -79,6 +78,9 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       break;
     case 'glossary':
       navigate('/glossary');
+      break;
+    case 'algorithms':
+      navigate('/algorithms');
       break;
     case 'new_project':
       navigate('/projects/new');
@@ -119,7 +121,6 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       break;
     default:
       console.log('Navigation action not found:', action);
-      // For unhandled routes, show a toast instead of silently failing
       toast({
         title: "Navigation Error",
         description: "This page or feature is not yet implemented",
