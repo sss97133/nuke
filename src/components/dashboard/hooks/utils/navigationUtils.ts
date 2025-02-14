@@ -1,4 +1,3 @@
-
 import { NavigateFunction } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ToastFunction } from "./types";
@@ -45,7 +44,8 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     'studio_workspace',
     'streaming_setup',
     'token_management',
-    'dao_governance'
+    'dao_governance',
+    'access_control'
   ];
 
   if (protectedRoutes.includes(action) && !session) {
@@ -59,6 +59,40 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
   }
 
   switch (action) {
+    case 'access_control':
+      navigate('/terminal');
+      toast({
+        title: "Access Control",
+        description: "Opening access control terminal"
+      });
+      break;
+    case 'token_management':
+      navigate('/tokens');
+      toast({
+        title: "Token Management",
+        description: "Accessing token management dashboard"
+      });
+      break;
+    case 'dao_governance':
+      navigate('/dao');
+      toast({
+        title: "DAO Governance",
+        description: "Accessing DAO governance portal"
+      });
+      break;
+    case 'token_analytics':
+      navigate('/token-analytics');
+      toast({
+        title: "Token Analytics",
+        description: "Viewing token analytics dashboard"
+      });
+      break;
+    case 'sitemap':
+      navigate('/sitemap');
+      break;
+    case 'glossary':
+      navigate('/glossary');
+      break;
     case 'new_project':
       navigate('/projects/new');
       toast({
@@ -96,33 +130,5 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     case 'streaming_setup':
       navigate('/streaming');
       break;
-    case 'token_management':
-      navigate('/tokens');
-      toast({
-        title: "Token Management",
-        description: "Accessing token management dashboard"
-      });
-      break;
-    case 'dao_governance':
-      navigate('/dao');
-      toast({
-        title: "DAO Governance",
-        description: "Accessing DAO governance portal"
-      });
-      break;
-    case 'token_analytics':
-      navigate('/token-analytics');
-      toast({
-        title: "Token Analytics",
-        description: "Viewing token analytics dashboard"
-      });
-      break;
-    case 'sitemap':
-      navigate('/sitemap');
-      break;
-    case 'glossary':
-      navigate('/glossary');
-      break;
   }
 };
-
