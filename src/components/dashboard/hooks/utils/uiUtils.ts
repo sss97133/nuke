@@ -40,19 +40,7 @@ export const handleDialogActions = (
 export const handleDocumentation = (toast: ToastFunction, action: string) => {
   switch (action) {
     case 'documentation':
-      toast({
-        title: "Documentation",
-        description: [
-          "Key Features:",
-          "• Vehicle Management - Add, edit, and track vehicles",
-          "• Inventory System - Manage parts and supplies",
-          "• Service Tracking - Schedule and monitor maintenance",
-          "• Token Management - Handle digital assets",
-          "• DAO Governance - Participate in decision making",
-          "\nFor detailed guides, check the Help menu or press ⌘/"
-        ].join('\n')
-      });
-      break;
+      return 'token_analytics';  // Return action for navigation
     case 'about':
       toast({
         title: "About NUKE",

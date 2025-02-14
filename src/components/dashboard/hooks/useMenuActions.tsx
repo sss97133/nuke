@@ -53,9 +53,12 @@ export const useMenuActions = (
       return;
     }
 
-    // Handle documentation
+    // Handle documentation and potentially navigate to token analytics
     if (['documentation', 'about'].includes(action)) {
-      handleDocumentation(toast, action);
+      const nextAction = handleDocumentation(toast, action);
+      if (nextAction) {
+        handleProjectNavigation(navigate, toast, nextAction);
+      }
       return;
     }
 
@@ -146,3 +149,4 @@ export const useMenuActions = (
     handleMenuAction,
   };
 };
+
