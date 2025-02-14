@@ -21,10 +21,6 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const particlesRef = useRef<THREE.Points[]>([]);
-  const animationFrameRef = useRef<number>();
-  const lastFrameTimeRef = useRef<number>(0);
-  const FPS = 30;
-  const frameInterval = 1000 / FPS;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -80,6 +76,7 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       const baseRadius = (categoryIndex + 2) * 2;
       const color = categoryColors[category as keyof typeof categoryColors] || new THREE.Color(0xffffff);
       
+      // Create orbital
       createQuantumOrbit({ 
         category: category as any, 
         baseRadius, 
@@ -87,6 +84,7 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
         scene: sceneRef.current! 
       });
 
+      // Create particles for each skill
       categorySkills.forEach(skill => {
         const userSkill = userSkills.find(us => us.skill_id === skill.id);
         const particles = createQuantumParticles({
@@ -99,19 +97,13 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
       });
     });
 
-    // Animation loop with fixed frame rate
-    const animate = (currentTime: number) => {
-      animationFrameRef.current = requestAnimationFrame(animate);
-      
-      const deltaTime = currentTime - lastFrameTimeRef.current;
-      
-      if (deltaTime < frameInterval) return;
-      
-      lastFrameTimeRef.current = currentTime - (deltaTime % frameInterval);
+    // Animation loop
+    const animate = () => {
+      requestAnimationFrame(animate);
       
       if (sceneRef.current && cameraRef.current && rendererRef.current) {
         const spinRate = calculateCareerMomentum(userSkills);
-        const time = currentTime * 0.001;
+        const time = Date.now() * 0.001;
         
         sceneRef.current.rotation.y += spinRate;
         
@@ -143,9 +135,7 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
         rendererRef.current.render(sceneRef.current, cameraRef.current);
       }
     };
-    
-    lastFrameTimeRef.current = performance.now();
-    animate(lastFrameTimeRef.current);
+    animate();
 
     // Handle window resize
     const handleResize = () => {
@@ -161,9 +151,6 @@ export const QuantumSkillVis = ({ skills, userSkills }: QuantumSkillVisProps) =>
     window.addEventListener('resize', handleResize);
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
       window.removeEventListener('resize', handleResize);
       if (containerRef.current && rendererRef.current) {
         containerRef.current.removeChild(rendererRef.current.domElement);
