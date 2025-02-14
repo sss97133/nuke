@@ -92,6 +92,14 @@ export const Sitemap = () => {
                 DAO Proposals
               </button>
             </li>
+            <li>
+              <button 
+                onClick={() => handleNavigation('/terminal', true)}
+                className="text-blue-600 hover:underline text-left"
+              >
+                Bloomberg Terminal
+              </button>
+            </li>
           </ul>
         </section>
 
@@ -162,3 +170,4 @@ export const Sitemap = () => {
     </div>
   );
 };
+
