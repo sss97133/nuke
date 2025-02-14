@@ -1,5 +1,6 @@
+
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
-import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map, BookOpen, ShoppingBag, Vote } from "lucide-react";
+import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map, BookOpen, ShoppingBag, Vote, Lock } from "lucide-react";
 
 interface MainMenuProps {
   handleMenuAction: (action: string) => void;
@@ -94,6 +95,10 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           <MenubarItem onClick={() => handleMenuAction('dao_governance')}>
             <Vote className="mr-2 h-4 w-4" />
             DAO Governance
+          </MenubarItem>
+          <MenubarItem onClick={() => handleMenuAction('access_control')}>
+            <Lock className="mr-2 h-4 w-4" />
+            Access Control
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('sitemap')}>
