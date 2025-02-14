@@ -873,6 +873,59 @@ export type Database = {
         }
         Relationships: []
       }
+      governance_proposals: {
+        Row: {
+          created_at: string
+          creator_id: string | null
+          description: string
+          end_date: string
+          id: string
+          metadata: Json | null
+          required_votes: number | null
+          start_date: string
+          status: string | null
+          title: string
+          token_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id?: string | null
+          description: string
+          end_date: string
+          id?: string
+          metadata?: Json | null
+          required_votes?: number | null
+          start_date: string
+          status?: string | null
+          title: string
+          token_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string | null
+          description?: string
+          end_date?: string
+          id?: string
+          metadata?: Json | null
+          required_votes?: number | null
+          start_date?: string
+          status?: string | null
+          title?: string
+          token_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governance_proposals_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_items: {
         Row: {
           category: string | null
@@ -1229,6 +1282,44 @@ export type Database = {
           },
         ]
       }
+      proposal_votes: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          proposal_id: string | null
+          vote_amount: number
+          vote_type: string
+          voter_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          proposal_id?: string | null
+          vote_amount: number
+          vote_type: string
+          voter_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          proposal_id?: string | null
+          vote_amount?: number
+          vote_type?: string
+          voter_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_votes_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "governance_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_tickets: {
         Row: {
           completion_date: string | null
@@ -1513,6 +1604,44 @@ export type Database = {
           },
         ]
       }
+      token_analytics: {
+        Row: {
+          created_at: string
+          id: string
+          market_cap: number | null
+          price_usd: number | null
+          timestamp: string
+          token_id: string | null
+          volume_24h: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          market_cap?: number | null
+          price_usd?: number | null
+          timestamp?: string
+          token_id?: string | null
+          volume_24h?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          market_cap?: number | null
+          price_usd?: number | null
+          timestamp?: string
+          token_id?: string | null
+          volume_24h?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_analytics_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       token_holdings: {
         Row: {
           balance: number
@@ -1593,6 +1722,95 @@ export type Database = {
           total_supply?: number
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      token_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          from_address: string | null
+          id: string
+          metadata: Json | null
+          status: string | null
+          to_address: string | null
+          token_id: string | null
+          transaction_hash: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          from_address?: string | null
+          id?: string
+          metadata?: Json | null
+          status?: string | null
+          to_address?: string | null
+          token_id?: string | null
+          transaction_hash?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          from_address?: string | null
+          id?: string
+          metadata?: Json | null
+          status?: string | null
+          to_address?: string | null
+          token_id?: string | null
+          transaction_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_transactions_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tokens: {
+        Row: {
+          contract_address: string | null
+          created_at: string
+          decimals: number
+          description: string | null
+          id: string
+          metadata: Json | null
+          name: string
+          owner_id: string | null
+          status: string | null
+          symbol: string
+          total_supply: number
+          updated_at: string
+        }
+        Insert: {
+          contract_address?: string | null
+          created_at?: string
+          decimals?: number
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          owner_id?: string | null
+          status?: string | null
+          symbol: string
+          total_supply: number
+          updated_at?: string
+        }
+        Update: {
+          contract_address?: string | null
+          created_at?: string
+          decimals?: number
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          owner_id?: string | null
+          status?: string | null
+          symbol?: string
+          total_supply?: number
+          updated_at?: string
         }
         Relationships: []
       }
