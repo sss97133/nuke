@@ -34,6 +34,10 @@ const glossaryItems = [
   {
     term: "Mental Real Estate",
     definition: "The space a brand or product occupies in consumers' minds, affecting their perception and decision-making."
+  },
+  {
+    term: "Product-Market Fit",
+    definition: "A condition where a product satisfies a strong market demand, indicated by rapid organic growth, high user retention, and strong word-of-mouth referrals. Term popularized by Marc Andreessen, defining the moment when a product meets the real needs of a market segment so well that growth becomes inevitable."
   }
 ];
 
