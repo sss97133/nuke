@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -6,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Car, Package, Wrench, Users, Activity, 
-  Calendar, Video, Award, TrendingUp 
+  Calendar, Video, Award, TrendingUp, Vote 
 } from "lucide-react";
 
 interface FeedItem {
@@ -112,6 +113,18 @@ export const Home = () => {
 
   return (
     <div className="space-y-6 p-6 pb-16">
+      {/* Quick Actions */}
+      <div className="mb-6">
+        <Button 
+          variant="outline"
+          onClick={() => navigate('/dao')}
+          className="flex items-center gap-2"
+        >
+          <Vote className="h-4 w-4" />
+          DAO Governance
+        </Button>
+      </div>
+
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card 
