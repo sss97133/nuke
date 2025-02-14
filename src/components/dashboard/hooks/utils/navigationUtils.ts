@@ -29,6 +29,13 @@ export const handleKeyboardShortcuts = (toast: ToastFunction) => {
 };
 
 export const handleProjectNavigation = async (navigate: NavigateFunction, toast: ToastFunction, action: string) => {
+  // For actions that shouldn't require auth, handle them first
+  if (action === 'dao_governance') {
+    console.log('Navigating to DAO page...');
+    navigate('/dao');
+    return;
+  }
+
   // Check if user is logged in for protected routes
   const { data: { session } } = await supabase.auth.getSession();
   
@@ -62,9 +69,6 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       break;
     case 'token_management':
       navigate('/tokens');
-      break;
-    case 'dao_governance':
-      navigate('/dao');
       break;
     case 'token_analytics':
       navigate('/token-analytics');
