@@ -57,7 +57,7 @@ export const AuthForm = () => {
   };
 
   const handleContinueWithoutLogin = () => {
-    navigate('/sitemap');
+    navigate('/');
   };
 
   return (
