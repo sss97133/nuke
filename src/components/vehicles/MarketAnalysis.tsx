@@ -1,9 +1,10 @@
+
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, TrendingUp, Award, DollarSign } from "lucide-react";
+import { Loader2, TrendingUp, Award, DollarSign, Wallet, CandlestickChart } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -23,6 +24,18 @@ interface MarketAnalysisProps {
   };
 }
 
+interface TokenAnalysis {
+  currentTokenPrice: number;
+  tokenVolume24h: number;
+  marketCap: number;
+  circulatingSupply: number;
+  derivativesData: Array<{
+    type: string;
+    price: number;
+    expirationDate: string;
+  }>;
+}
+
 interface Analysis {
   marketAnalysis: string;
   uniqueFeatures: string[];
@@ -34,6 +47,7 @@ interface Analysis {
     trendDirection: "up" | "down" | "stable";
     comparableSales: Array<{ price: number; date: string; notes: string }>;
   };
+  tokenAnalysis?: TokenAnalysis;
 }
 
 export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
@@ -112,6 +126,53 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
             </div>
           </Card>
 
+          {analysis.tokenAnalysis && (
+            <Card className="p-6">
+              <div className="flex items-start gap-4">
+                <Wallet className="h-5 w-5 text-[#283845] mt-1" />
+                <div className="w-full">
+                  <h4 className="font-mono text-sm font-semibold mb-4">
+                    Token Analysis
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="font-mono text-sm text-[#666]">
+                        Current Token Price:
+                      </span>
+                      <p className="font-mono text-lg font-semibold">
+                        {formatCurrency(analysis.tokenAnalysis.currentTokenPrice)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-mono text-sm text-[#666]">
+                        24h Volume:
+                      </span>
+                      <p className="font-mono text-lg font-semibold">
+                        {formatCurrency(analysis.tokenAnalysis.tokenVolume24h)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-mono text-sm text-[#666]">
+                        Market Cap:
+                      </span>
+                      <p className="font-mono text-lg font-semibold">
+                        {formatCurrency(analysis.tokenAnalysis.marketCap)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-mono text-sm text-[#666]">
+                        Circulating Supply:
+                      </span>
+                      <p className="font-mono text-lg font-semibold">
+                        {analysis.tokenAnalysis.circulatingSupply.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="p-6">
               <div className="flex items-start gap-4">
@@ -155,6 +216,37 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
               </div>
             </Card>
           </div>
+
+          {analysis.tokenAnalysis?.derivativesData && (
+            <Card className="p-6">
+              <div className="flex items-start gap-4">
+                <CandlestickChart className="h-5 w-5 text-[#283845] mt-1" />
+                <div className="w-full">
+                  <h4 className="font-mono text-sm font-semibold mb-4">
+                    Derivatives Market
+                  </h4>
+                  <div className="divide-y">
+                    {analysis.tokenAnalysis.derivativesData.map((derivative, index) => (
+                      <div
+                        key={index}
+                        className="py-3 grid grid-cols-3 gap-4"
+                      >
+                        <div className="font-mono text-sm">
+                          {derivative.type}
+                        </div>
+                        <div className="font-mono text-sm">
+                          {formatCurrency(derivative.price)}
+                        </div>
+                        <div className="font-mono text-sm text-[#666]">
+                          Expires: {new Date(derivative.expirationDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {chartData && chartData.length > 0 && (
             <Card className="p-6">
@@ -252,3 +344,4 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
     </div>
   );
 };
+
