@@ -8,6 +8,7 @@ import { Session } from "@supabase/supabase-js";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { Route, Routes, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { AuthCallback } from "@/components/auth/AuthCallback";
+import { Sitemap } from "@/components/sitemap/Sitemap";
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -68,6 +69,13 @@ const Index = () => {
         path="/onboarding" 
         element={
           session ? <OnboardingWizard /> : <Navigate to="/login" replace />
+        } 
+      />
+
+      <Route 
+        path="/sitemap" 
+        element={
+          session ? <Sitemap /> : <Navigate to="/login" replace />
         } 
       />
 

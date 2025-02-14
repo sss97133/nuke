@@ -1,6 +1,6 @@
 
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
-import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle } from "lucide-react";
+import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map } from "lucide-react";
 
 interface MainMenuProps {
   handleMenuAction: (action: string) => void;
@@ -33,7 +33,9 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('sitemap')}>
+            <Map className="mr-2 h-4 w-4" />
             Sitemap
+            <MenubarShortcut>⌘M</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('exit')}>
@@ -153,4 +155,3 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
     </Menubar>
   );
 };
-

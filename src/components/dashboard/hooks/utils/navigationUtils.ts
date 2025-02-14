@@ -1,3 +1,4 @@
+
 import { NavigateFunction } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ToastFunction } from "./types";
@@ -65,6 +66,9 @@ export const handleProjectNavigation = (navigate: NavigateFunction, toast: Toast
       break;
     case 'streaming_setup':
       navigate('/streaming');
+      break;
+    case 'sitemap':
+      navigate('/sitemap');
       break;
   }
 };

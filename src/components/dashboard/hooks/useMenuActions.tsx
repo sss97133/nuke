@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { handleExport } from "./utils/exportUtils";
@@ -35,7 +34,7 @@ export const useMenuActions = (
     // Handle project navigation
     if (['new_project', 'professional_dashboard', 'skill_management', 'achievements', 
          'preferences', 'inventory_view', 'service_view', 'vin_scanner', 
-         'market_analysis', 'studio_workspace', 'streaming_setup'].includes(action)) {
+         'market_analysis', 'studio_workspace', 'streaming_setup', 'sitemap'].includes(action)) {
       handleProjectNavigation(navigate, toast, action);
       return;
     }
@@ -66,13 +65,6 @@ export const useMenuActions = (
         break;
       case 'export':
         await handleExport(toast);
-        break;
-      case 'sitemap':
-        navigate('/dashboard');
-        toast({
-          title: "Sitemap",
-          description: "Opening sitemap view"
-        });
         break;
       case 'toggle_assistant':
         handleToggleUIElement(
@@ -153,4 +145,3 @@ export const useMenuActions = (
     handleMenuAction,
   };
 };
-
