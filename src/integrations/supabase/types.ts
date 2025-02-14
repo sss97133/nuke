@@ -1551,6 +1551,51 @@ export type Database = {
           },
         ]
       }
+      token_management: {
+        Row: {
+          contract_address: string | null
+          created_at: string
+          decimals: number
+          id: string
+          metadata: Json | null
+          network: string
+          token_name: string
+          token_symbol: string
+          token_type: string
+          total_supply: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          contract_address?: string | null
+          created_at?: string
+          decimals?: number
+          id?: string
+          metadata?: Json | null
+          network?: string
+          token_name: string
+          token_symbol: string
+          token_type?: string
+          total_supply?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          contract_address?: string | null
+          created_at?: string
+          decimals?: number
+          id?: string
+          metadata?: Json | null
+          network?: string
+          token_name?: string
+          token_symbol?: string
+          token_type?: string
+          total_supply?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_achievements: {
         Row: {
           achievement_data: Json | null
