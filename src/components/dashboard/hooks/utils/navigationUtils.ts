@@ -70,5 +70,9 @@ export const handleProjectNavigation = (navigate: NavigateFunction, toast: Toast
     case 'sitemap':
       navigate('/sitemap');
       break;
+    case 'glossary':
+      navigate('/glossary');
+      break;
   }
 };
+

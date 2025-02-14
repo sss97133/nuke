@@ -9,6 +9,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { Route, Routes, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { AuthCallback } from "@/components/auth/AuthCallback";
 import { Sitemap } from "@/components/sitemap/Sitemap";
+import { Glossary } from "@/components/glossary/Glossary";
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -76,6 +77,13 @@ const Index = () => {
         path="/sitemap" 
         element={
           session ? <Sitemap /> : <Navigate to="/login" replace />
+        } 
+      />
+
+      <Route 
+        path="/glossary" 
+        element={
+          session ? <Glossary /> : <Navigate to="/login" replace />
         } 
       />
 
