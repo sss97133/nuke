@@ -1,6 +1,5 @@
-
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
-import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map, BookOpen, Coins, Vote } from "lucide-react";
+import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map, BookOpen, ShoppingBag, Vote } from "lucide-react";
 
 interface MainMenuProps {
   handleMenuAction: (action: string) => void;
@@ -89,7 +88,7 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('token_management')}>
-            <Coins className="mr-2 h-4 w-4" />
+            <ShoppingBag className="mr-2 h-4 w-4" />
             Token Management
           </MenubarItem>
           <MenubarItem onClick={() => handleMenuAction('dao_governance')}>
@@ -122,7 +121,7 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('token_analytics')}>
-            <Coins className="mr-2 h-4 w-4" />
+            <ShoppingBag className="mr-2 h-4 w-4" />
             Token Analytics
           </MenubarItem>
           <MenubarSeparator />
@@ -174,4 +173,3 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
     </Menubar>
   );
 };
-
