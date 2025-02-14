@@ -32,6 +32,10 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
             <MenubarShortcut>⌘E</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
+          <MenubarItem onClick={() => handleMenuAction('sitemap')}>
+            Sitemap
+          </MenubarItem>
+          <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('exit')}>
             Exit
             <MenubarShortcut>⌘Q</MenubarShortcut>
@@ -149,3 +153,4 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
     </Menubar>
   );
 };
+

@@ -67,6 +67,13 @@ export const useMenuActions = (
       case 'export':
         await handleExport(toast);
         break;
+      case 'sitemap':
+        navigate('/dashboard');
+        toast({
+          title: "Sitemap",
+          description: "Opening sitemap view"
+        });
+        break;
       case 'toggle_assistant':
         handleToggleUIElement(
           setShowAiAssistant,
