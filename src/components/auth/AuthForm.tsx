@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useNavigate } from "react-router-dom";
 
 export const AuthForm = () => {
   const { isLoading, handleSocialLogin, handlePhoneLogin, verifyOtp, handleEmailLogin, handleForgotPassword } = useAuth();
@@ -22,6 +23,7 @@ export const AuthForm = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const navigate = useNavigate();
 
   const formatPhoneNumber = (phone: string) => {
     const cleaned = phone.replace(/\D/g, "");
@@ -52,6 +54,10 @@ export const AuthForm = () => {
       return;
     }
     await handleEmailLogin(email, password, isSignUp);
+  };
+
+  const handleContinueWithoutLogin = () => {
+    navigate('/sitemap');
   };
 
   return (
@@ -97,6 +103,16 @@ export const AuthForm = () => {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {showForgotPassword ? 'Send Reset Link' : (isSignUp ? 'Sign Up' : 'Login')}
               </Button>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleContinueWithoutLogin}
+              >
+                Continue without logging in
+              </Button>
+
               {showForgotPassword ? (
                 <div className="text-center">
                   <button
@@ -163,3 +179,4 @@ export const AuthForm = () => {
     </div>
   );
 };
+
