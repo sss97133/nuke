@@ -6,13 +6,10 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
-import { Route, Routes, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { AuthCallback } from "@/components/auth/AuthCallback";
 import { Sitemap } from "@/components/sitemap/Sitemap";
 import { Glossary } from "@/components/glossary/Glossary";
-
-// Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/sitemap', '/glossary'];
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,10 +40,6 @@ const Index = () => {
     };
   }, [toast, navigate, location]);
 
-  const isPublicRoute = (path: string) => {
-    return PUBLIC_ROUTES.some(route => path.startsWith(route));
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -73,9 +66,7 @@ const Index = () => {
 
       <Route 
         path="/onboarding" 
-        element={
-          session ? <OnboardingWizard /> : <Navigate to="/login" replace />
-        } 
+        element={<OnboardingWizard />} 
       />
 
       <Route 
@@ -90,35 +81,22 @@ const Index = () => {
 
       <Route 
         path="/dashboard/*" 
-        element={
-          session ? <DashboardLayout /> : <Navigate to="/login" state={{ from: location }} replace />
-        } 
+        element={<DashboardLayout />} 
       />
 
       <Route 
         path="/" 
         element={
-          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/sitemap" replace />
+          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/dashboard" replace />
         } 
       />
 
       <Route 
         path="*" 
-        element={
-          isPublicRoute(location.pathname) ? (
-            <Navigate to={location.pathname} replace />
-          ) : (
-            session ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <Navigate to="/login" state={{ from: location }} replace />
-            )
-          )
-        } 
+        element={<Navigate to="/dashboard" replace />} 
       />
     </Routes>
   );
 };
 
 export default Index;
-

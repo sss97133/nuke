@@ -57,7 +57,7 @@ export const AuthForm = () => {
   };
 
   const handleContinueWithoutLogin = () => {
-    navigate('/');
+    navigate('/dashboard');
   };
 
   return (
@@ -179,4 +179,3 @@ export const AuthForm = () => {
     </div>
   );
 };
-
