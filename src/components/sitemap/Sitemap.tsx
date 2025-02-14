@@ -58,6 +58,44 @@ export const Sitemap = () => {
         </section>
 
         <section>
+          <h2 className="text-xl font-semibold mb-3">Tokenization & DAO</h2>
+          <ul className="list-disc pl-5 space-y-2">
+            <li>
+              <button 
+                onClick={() => handleNavigation('/token-management', false)}
+                className="text-blue-600 hover:underline text-left"
+              >
+                Token Management
+              </button>
+            </li>
+            <li>
+              <button 
+                onClick={() => handleNavigation('/dao-governance', false)}
+                className="text-blue-600 hover:underline text-left"
+              >
+                DAO Governance
+              </button>
+            </li>
+            <li>
+              <button 
+                onClick={() => handleNavigation('/vehicle-tokens', false)}
+                className="text-blue-600 hover:underline text-left"
+              >
+                Vehicle Tokens
+              </button>
+            </li>
+            <li>
+              <button 
+                onClick={() => handleNavigation('/proposals', false)}
+                className="text-blue-600 hover:underline text-left"
+              >
+                DAO Proposals
+              </button>
+            </li>
+          </ul>
+        </section>
+
+        <section>
           <h2 className="text-xl font-semibold mb-3">Service</h2>
           <ul className="list-disc pl-5 space-y-2">
             <li>

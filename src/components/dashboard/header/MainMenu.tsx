@@ -1,6 +1,6 @@
 
 import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
-import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map, BookOpen } from "lucide-react";
+import { FileIcon, Settings, Layout, Wrench, PanelLeft, HelpCircle, Map, BookOpen, Coins, Vote, Token } from "lucide-react";
 
 interface MainMenuProps {
   handleMenuAction: (action: string) => void;
@@ -70,7 +70,7 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
       <MenubarMenu>
         <MenubarTrigger className="text-[11px]">View</MenubarTrigger>
         <MenubarContent>
-          <MenubarItem onClick={() => handleMenuAction('toggle_sidebar')}>
+          <MenubarItem onClick={() => handleNavigation('toggle_sidebar')}>
             Toggle Sidebar
             <MenubarShortcut>⌘\</MenubarShortcut>
           </MenubarItem>
@@ -86,6 +86,15 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           </MenubarItem>
           <MenubarItem onClick={() => handleMenuAction('service_view')}>
             Service
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => handleMenuAction('token_management')}>
+            <Token className="mr-2 h-4 w-4" />
+            Token Management
+          </MenubarItem>
+          <MenubarItem onClick={() => handleMenuAction('dao_governance')}>
+            <Vote className="mr-2 h-4 w-4" />
+            DAO Governance
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('sitemap')}>
@@ -110,6 +119,11 @@ export const MainMenu = ({ handleMenuAction }: MainMenuProps) => {
           </MenubarItem>
           <MenubarItem onClick={() => handleMenuAction('skill_management')}>
             Skill Management
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => handleMenuAction('token_analytics')}>
+            <Coins className="mr-2 h-4 w-4" />
+            Token Analytics
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onClick={() => handleMenuAction('toggle_assistant')}>
