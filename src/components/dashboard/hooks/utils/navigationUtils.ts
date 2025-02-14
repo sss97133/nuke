@@ -32,7 +32,7 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
   // For actions that shouldn't require auth, handle them first
   if (action === 'dao_governance') {
     console.log('Navigating to DAO page...');
-    navigate('/dao');
+    navigate('/tokens');
     return;
   }
 
@@ -65,6 +65,7 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
 
   switch (action) {
     case 'access_control':
+      // Fix: Navigate to terminal instead of home
       navigate('/terminal');
       break;
     case 'token_management':
@@ -116,5 +117,13 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     case 'streaming_setup':
       navigate('/streaming');
       break;
+    default:
+      console.log('Navigation action not found:', action);
+      // For unhandled routes, show a toast instead of silently failing
+      toast({
+        title: "Navigation Error",
+        description: "This page or feature is not yet implemented",
+        variant: "destructive"
+      });
   }
 };
