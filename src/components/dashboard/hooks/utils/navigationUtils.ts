@@ -43,7 +43,9 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     'vin_scanner',
     'market_analysis',
     'studio_workspace',
-    'streaming_setup'
+    'streaming_setup',
+    'token_management',
+    'dao_governance'
   ];
 
   if (protectedRoutes.includes(action) && !session) {
@@ -93,6 +95,27 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       break;
     case 'streaming_setup':
       navigate('/streaming');
+      break;
+    case 'token_management':
+      navigate('/tokens');
+      toast({
+        title: "Token Management",
+        description: "Accessing token management dashboard"
+      });
+      break;
+    case 'dao_governance':
+      navigate('/dao');
+      toast({
+        title: "DAO Governance",
+        description: "Accessing DAO governance portal"
+      });
+      break;
+    case 'token_analytics':
+      navigate('/token-analytics');
+      toast({
+        title: "Token Analytics",
+        description: "Viewing token analytics dashboard"
+      });
       break;
     case 'sitemap':
       navigate('/sitemap');
