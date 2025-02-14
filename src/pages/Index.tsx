@@ -11,6 +11,9 @@ import { AuthCallback } from "@/components/auth/AuthCallback";
 import { Sitemap } from "@/components/sitemap/Sitemap";
 import { Glossary } from "@/components/glossary/Glossary";
 
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = ['/sitemap', '/glossary'];
+
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,24 +27,7 @@ const Index = () => {
     const initializeSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       console.log("[Index] Initial session check:", session ? "Found" : "None");
-
-      if (!session && process.env.NODE_ENV === 'development') {
-        // Attempt to sign in as development user
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: 'dev@example.com',
-          password: 'development-password-123'
-        });
-        
-        if (error) {
-          console.log("[Index] Dev login failed:", error.message);
-          setSession(null);
-        } else {
-          console.log("[Index] Dev login successful");
-          setSession(data.session);
-        }
-      } else {
-        setSession(session);
-      }
+      setSession(session);
       setLoading(false);
     };
 
@@ -50,17 +36,16 @@ const Index = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("[Index] Auth state changed:", _event, session ? "Session exists" : "No session");
       setSession(session);
-      
-      // Only redirect to login if we're not on an auth-related path
-      if (!session && !location.pathname.startsWith('/auth/') && location.pathname !== '/login') {
-        navigate('/login');
-      }
     });
 
     return () => {
       subscription.unsubscribe();
     };
   }, [toast, navigate, location]);
+
+  const isPublicRoute = (path: string) => {
+    return PUBLIC_ROUTES.some(route => path.startsWith(route));
+  };
 
   if (loading) {
     return (
@@ -95,38 +80,45 @@ const Index = () => {
 
       <Route 
         path="/sitemap" 
-        element={
-          session ? <Sitemap /> : <Navigate to="/login" replace />
-        } 
+        element={<Sitemap />} 
       />
 
       <Route 
         path="/glossary" 
-        element={
-          session ? <Glossary /> : <Navigate to="/login" replace />
-        } 
+        element={<Glossary />} 
       />
 
       <Route 
         path="/dashboard/*" 
         element={
-          session ? <DashboardLayout /> : <Navigate to="/login" replace />
+          session ? <DashboardLayout /> : <Navigate to="/login" state={{ from: location }} replace />
         } 
       />
 
       <Route 
         path="/" 
         element={
-          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/sitemap" replace />
         } 
       />
 
       <Route 
         path="*" 
-        element={<Navigate to="/" replace />} 
+        element={
+          isPublicRoute(location.pathname) ? (
+            <Navigate to={location.pathname} replace />
+          ) : (
+            session ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Navigate to="/login" state={{ from: location }} replace />
+            )
+          )
+        } 
       />
     </Routes>
   );
 };
 
 export default Index;
+

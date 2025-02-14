@@ -7,7 +7,7 @@ export const handleSignOut = async (navigate: NavigateFunction, toast: ToastFunc
   const confirmed = window.confirm('Are you sure you want to exit?');
   if (confirmed) {
     await supabase.auth.signOut();
-    navigate('/login');
+    navigate('/sitemap');
     toast({
       title: "Signed Out",
       description: "You have been signed out successfully"
@@ -28,7 +28,34 @@ export const handleKeyboardShortcuts = (toast: ToastFunction) => {
   });
 };
 
-export const handleProjectNavigation = (navigate: NavigateFunction, toast: ToastFunction, action: string) => {
+export const handleProjectNavigation = async (navigate: NavigateFunction, toast: ToastFunction, action: string) => {
+  // Check if user is logged in for protected routes
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  const protectedRoutes = [
+    'new_project',
+    'professional_dashboard',
+    'skill_management',
+    'achievements',
+    'preferences',
+    'inventory_view',
+    'service_view',
+    'vin_scanner',
+    'market_analysis',
+    'studio_workspace',
+    'streaming_setup'
+  ];
+
+  if (protectedRoutes.includes(action) && !session) {
+    toast({
+      title: "Login Required",
+      description: "Please log in to access this feature",
+      variant: "destructive"
+    });
+    navigate('/login');
+    return;
+  }
+
   switch (action) {
     case 'new_project':
       navigate('/projects/new');
