@@ -21,11 +21,31 @@ const Index = () => {
   useEffect(() => {
     console.log("[Index] Current route:", location.pathname);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initializeSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       console.log("[Index] Initial session check:", session ? "Found" : "None");
-      setSession(session);
+
+      if (!session && process.env.NODE_ENV === 'development') {
+        // Attempt to sign in as development user
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: 'dev@example.com',
+          password: 'development-password-123'
+        });
+        
+        if (error) {
+          console.log("[Index] Dev login failed:", error.message);
+          setSession(null);
+        } else {
+          console.log("[Index] Dev login successful");
+          setSession(data.session);
+        }
+      } else {
+        setSession(session);
+      }
       setLoading(false);
-    });
+    };
+
+    initializeSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("[Index] Auth state changed:", _event, session ? "Session exists" : "No session");
