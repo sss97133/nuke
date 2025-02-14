@@ -550,6 +550,41 @@ export type Database = {
         }
         Relationships: []
       }
+      dao_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          proposal_id: string | null
+          user_id: string | null
+          vote_type: string
+          voting_power: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          proposal_id?: string | null
+          user_id?: string | null
+          vote_type: string
+          voting_power?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          proposal_id?: string | null
+          user_id?: string | null
+          vote_type?: string
+          voting_power?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dao_votes_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "dao_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       derivatives: {
         Row: {
           created_at: string | null
@@ -1474,6 +1509,44 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      token_holdings: {
+        Row: {
+          balance: number
+          created_at: string | null
+          id: string
+          last_transaction_at: string | null
+          token_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          balance?: number
+          created_at?: string | null
+          id?: string
+          last_transaction_at?: string | null
+          token_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          balance?: number
+          created_at?: string | null
+          id?: string
+          last_transaction_at?: string | null
+          token_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_holdings_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_tokens"
             referencedColumns: ["id"]
           },
         ]
