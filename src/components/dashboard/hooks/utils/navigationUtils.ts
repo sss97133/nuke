@@ -43,10 +43,7 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     'vin_scanner',
     'market_analysis',
     'studio_workspace',
-    'streaming_setup',
-    'token_management',
-    'dao_governance',
-    'access_control'
+    'streaming_setup'
   ];
 
   if (protectedRoutes.includes(action) && !session) {
