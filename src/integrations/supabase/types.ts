@@ -1546,7 +1546,7 @@ export type Database = {
             foreignKeyName: "token_holdings_token_id_fkey"
             columns: ["token_id"]
             isOneToOne: false
-            referencedRelation: "vehicle_tokens"
+            referencedRelation: "token_management"
             referencedColumns: ["id"]
           },
         ]
