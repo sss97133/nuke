@@ -117,7 +117,7 @@ export const Home = () => {
       <div className="mb-6">
         <Button 
           variant="outline"
-          onClick={() => navigate('/dao')}
+          onClick={() => navigate('/tokens')}
           className="flex items-center gap-2"
         >
           <Vote className="h-4 w-4" />
