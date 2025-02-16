@@ -13,22 +13,22 @@ import { Sitemap } from "@/components/sitemap/Sitemap";
 import { Home } from "./Home";
 
 export const Index = () => {
-  const { session, loading } = useAuth();
+  const { session, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!loading) {
+    if (!isLoading) {
       if (!session && location.pathname !== "/login") {
         navigate("/login");
       } else if (session && location.pathname === "/login") {
         navigate("/");
       }
     }
-  }, [session, loading, navigate, location.pathname]);
+  }, [session, isLoading, navigate, location.pathname]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
