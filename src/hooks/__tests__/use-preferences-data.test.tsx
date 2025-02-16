@@ -64,8 +64,6 @@ describe('usePreferencesData', () => {
   });
 
   it('should handle error when user is not found', async () => {
-    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: null } });
-
     const { result } = renderHook(() => usePreferencesData());
     
     await expect(result.current.handleResetPreferences({ user: null })).rejects.toThrow('No user found');
