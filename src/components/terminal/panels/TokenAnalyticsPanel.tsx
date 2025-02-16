@@ -1,5 +1,7 @@
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
+
 export const TokenAnalyticsPanel = () => {
   return <ScrollArea className="h-[calc(85vh-2.5rem)] p-4">
       <div className="space-y-4">
@@ -55,3 +57,5 @@ export const TokenAnalyticsPanel = () => {
       </div>
     </ScrollArea>;
 };
+
+export { TokenAnalyticsPanel as TokenAnalytics };

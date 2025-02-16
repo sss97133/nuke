@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -16,12 +15,12 @@ import { DAOGovernance } from "@/components/dao/DAOGovernance";
 import { StudioConfiguration } from "@/components/studio/StudioConfiguration";
 import { ProfessionalDashboard } from "@/components/dashboard/ProfessionalDashboard";
 import { MarketAnalysis } from "@/components/vehicles/MarketAnalysis";
-import { VinScanner } from "@/components/vehicles/VinCapture";
+import { VinCapture as VinScanner } from "@/components/vehicles/VinCapture";
 import { TokenAnalytics } from "@/components/terminal/panels/TokenAnalyticsPanel";
 import { AccessControl } from "@/components/auth/AccessControl";
 import { VehicleTokens } from "@/components/tokens/VehicleTokens";
 import { DAOProposals } from "@/components/dao/DAOProposals";
-import { Auctions } from "@/components/auctions/AuctionList";
+import { AuctionList as Auctions } from "@/components/auctions/AuctionList";
 
 export const Index = () => {
   const { session, isLoading } = useAuth();
@@ -63,7 +62,7 @@ export const Index = () => {
         <Route path="/dao-governance" element={<DAOGovernance />} />
         <Route path="/studio-config" element={<StudioConfiguration />} />
         <Route path="/professional-dashboard" element={<ProfessionalDashboard />} />
-        <Route path="/market-analysis" element={<MarketAnalysis />} />
+        <Route path="/market-analysis" element={<MarketAnalysis vehicleData={{}} />} />
         <Route path="/vin-scanner" element={<VinScanner />} />
         <Route path="/token-analytics" element={<TokenAnalytics />} />
         <Route path="/access-control" element={<AccessControl />} />
