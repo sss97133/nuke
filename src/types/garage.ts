@@ -1,4 +1,6 @@
 
+import { Json } from '@/integrations/supabase/types';
+
 export interface AddGarageMemberProps {
   garageId: string;
   onMemberAdded: () => void;
@@ -16,11 +18,11 @@ export type Profile = {
   default_garage_id?: string | null;
   first_name?: string | null;
   last_name?: string | null;
-  home_location?: Record<string, any> | null;
+  home_location?: Json | null;  // Changed from Record<string, any> to Json
   onboarding_completed?: boolean;
   onboarding_step?: number;
-  streaming_links?: Record<string, any> | null;
-  social_links?: Record<string, any> | null;
+  streaming_links?: Json | null;  // Changed from Record<string, any> to Json
+  social_links?: Json | null;  // Changed from Record<string, any> to Json
 };
 
 export type GarageMember = {

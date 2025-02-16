@@ -10,13 +10,13 @@ export const ActivityFeedItem = ({ item }: ActivityFeedItemProps) => {
   const getFeedItemContent = (item: FeedItem) => {
     switch (item.type) {
       case 'vehicle':
-        return `New vehicle added: ${item.data.make || ''} ${item.data.model || ''}`;
+        return `New vehicle added: ${item.data?.make || ''} ${item.data?.model || ''}`;
       case 'asset':
-        return `Asset updated: ${item.data.name || ''}`;
+        return `Asset updated: ${item.data?.name || ''}`;
       case 'service':
-        return `Service ticket: ${item.data.description || 'No description'}`;
+        return `Service ticket: ${item.data?.description || 'No description'}`;
       case 'auction':
-        return `New auction: ${item.data.title || 'Untitled auction'}`;
+        return `New auction: ${item.data?.title || 'Untitled auction'}`;
       default:
         return 'Unknown update';
     }

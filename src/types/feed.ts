@@ -19,10 +19,10 @@ export interface FeedItem {
   item_id: string;
   content: string;
   type: 'vehicle' | 'asset' | 'service' | 'auction';
-  data: FeedItemData;
-  date: string;
-  metadata?: Record<string, any>;
+  data: FeedItemData | null;
+  // Removed date field since we use created_at instead
   created_at: string;
+  metadata?: Record<string, any>;
   profile?: FeedItemProfile;
 }
 
