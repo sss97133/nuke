@@ -41,9 +41,7 @@ describe('usePreferencesData', () => {
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
     (supabase.from as any)().update().eq.mockResolvedValue({ data: null, error: null });
 
-    const { result } = renderHook(() => usePreferencesData(), {
-      wrapper: ({ children }) => children
-    });
+    const { result } = renderHook(() => usePreferencesData());
 
     expect(result.current.handleResetPreferences).toBeDefined();
     await result.current.handleResetPreferences({ user: mockUser });
@@ -54,9 +52,7 @@ describe('usePreferencesData', () => {
   });
 
   it('should handle error when user is not found', async () => {
-    const { result } = renderHook(() => usePreferencesData(), {
-      wrapper: ({ children }) => children
-    });
+    const { result } = renderHook(() => usePreferencesData());
 
     expect(result.current.handleResetPreferences).toBeDefined();
     const resetPromise = result.current.handleResetPreferences({ user: null });
