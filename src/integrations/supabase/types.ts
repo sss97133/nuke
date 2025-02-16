@@ -1377,6 +1377,45 @@ export type Database = {
           },
         ]
       }
+      routes: {
+        Row: {
+          action: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          path: string
+          requires_auth: boolean | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          path: string
+          requires_auth?: boolean | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          path?: string
+          requires_auth?: boolean | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       service_tickets: {
         Row: {
           completion_date: string | null
