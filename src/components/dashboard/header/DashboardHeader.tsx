@@ -7,6 +7,7 @@ import { useTheme } from "next-themes";
 import { handleProjectNavigation } from "../hooks/utils/navigationUtils";
 import { SearchResults } from "./search/SearchResults";
 import { UserMenu } from "./menu/UserMenu";
+import { MainMenu } from "../MainMenu";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
@@ -49,7 +50,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
 
   return (
     <div className="border-b">
-      <div className="flex h-16 items-center px-4">
+      <div className="flex h-16 items-center px-4 gap-4">
+        <MainMenu handleMenuAction={handleMenuAction} />
+        
         <div className="relative flex-1 max-w-lg">
           <Input
             value={searchValue}
