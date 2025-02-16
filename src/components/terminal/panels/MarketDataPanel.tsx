@@ -1,6 +1,8 @@
+
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
 const mockData = [{
   time: '09:30',
   value: 100
@@ -20,8 +22,10 @@ const mockData = [{
   time: '12:00',
   value: 110
 }];
+
 export const MarketDataPanel = () => {
-  return <ScrollArea className="h-[calc(85vh-2.5rem)] p-4">
+  return (
+    <ScrollArea className="h-[calc(85vh-2.5rem)] p-4">
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2">
           <Card className="p-2 bg-gray-400 hover:bg-gray-300">
@@ -36,15 +40,17 @@ export const MarketDataPanel = () => {
           </Card>
         </div>
 
-        <Card className="p-4 h-48 bg-gray-400 hover:bg-gray-300">
+        <Card className="p-4 h-32 bg-gray-400 hover:bg-gray-300">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={mockData}>
               <XAxis dataKey="time" stroke="#666" />
               <YAxis stroke="#666" />
-              <Tooltip contentStyle={{
-              backgroundColor: '#1f2937',
-              border: 'none'
-            }} />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: '#1f2937',
+                  border: 'none'
+                }}
+              />
               <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -64,5 +70,6 @@ export const MarketDataPanel = () => {
           </div>
         </div>
       </div>
-    </ScrollArea>;
+    </ScrollArea>
+  );
 };

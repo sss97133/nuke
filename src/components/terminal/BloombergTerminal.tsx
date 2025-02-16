@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,9 +8,13 @@ import { MarketDataPanel } from "./panels/MarketDataPanel";
 import { TokenAnalyticsPanel } from "./panels/TokenAnalyticsPanel";
 import { NewsPanel } from "./panels/NewsPanel";
 import { OrderBookPanel } from "./panels/OrderBookPanel";
+import { ChartPanel } from "./panels/ChartPanel";
+
 export const BloombergTerminal = () => {
   const [layout, setLayout] = useState([30, 40, 30]);
-  return <div className="h-[90vh] bg-background text-foreground p-4">
+
+  return (
+    <div className="h-[90vh] bg-background text-foreground p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Monitor className="w-5 h-5" />
@@ -30,12 +35,16 @@ export const BloombergTerminal = () => {
               <TabsList className="w-full bg-muted">
                 <TabsTrigger value="market">Market Data</TabsTrigger>
                 <TabsTrigger value="tokens">Token Analytics</TabsTrigger>
+                <TabsTrigger value="chart">Chart</TabsTrigger>
               </TabsList>
               <TabsContent value="market">
                 <MarketDataPanel />
               </TabsContent>
               <TabsContent value="tokens">
                 <TokenAnalyticsPanel />
+              </TabsContent>
+              <TabsContent value="chart">
+                <ChartPanel />
               </TabsContent>
             </Tabs>
           </Card>
@@ -57,5 +66,6 @@ export const BloombergTerminal = () => {
           </Card>
         </ResizablePanel>
       </ResizablePanelGroup>
-    </div>;
+    </div>
+  );
 };
