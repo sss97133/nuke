@@ -23,18 +23,52 @@ import { Streaming } from "./pages/Streaming";
 import { AIExplanations } from "./pages/AIExplanations";
 import { TokenAnalytics } from "./pages/TokenAnalytics";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { AuthForm } from "@/components/auth/AuthForm";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 
 // Create a client
 const queryClient = new QueryClient();
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+        setIsAuthenticated(!!session);
+      });
+
+      return () => subscription.unsubscribe();
+    };
+
+    checkAuth();
+  }, []);
+
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <Router>
           <Routes>
-            {/* Routes that use DashboardLayout */}
-            <Route element={<DashboardLayout />}>
+            {/* Public routes */}
+            <Route 
+              path="/login" 
+              element={isAuthenticated ? <Navigate to="/" /> : <AuthForm />} 
+            />
+
+            {/* Protected routes */}
+            <Route element={!isAuthenticated ? <Navigate to="/login" /> : <DashboardLayout />}>
               <Route path="/" element={<BloombergTerminal />} />
               <Route path="/terminal" element={<BloombergTerminal />} />
               <Route path="/tokens" element={<TokensPage />} />
