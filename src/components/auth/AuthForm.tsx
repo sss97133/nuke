@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ClassicWindow } from "./ClassicWindow";
 import { PhoneInput } from "./PhoneInput";
@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 export const AuthForm = () => {
   const { isLoading, handleSocialLogin, handlePhoneLogin, verifyOtp, handleEmailLogin, handleForgotPassword } = useAuth();
@@ -24,6 +25,17 @@ export const AuthForm = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isResetFlow, setIsResetFlow] = useState(false);
+
+  useEffect(() => {
+    // Check if we're in the reset password flow
+    const isReset = searchParams.get('reset') === 'true';
+    setIsResetFlow(isReset);
+    setShowForgotPassword(false); // Reset the forgot password view if we're in reset flow
+  }, [searchParams]);
 
   const formatPhoneNumber = (phone: string) => {
     const cleaned = phone.replace(/\D/g, "");
@@ -47,6 +59,25 @@ export const AuthForm = () => {
     await verifyOtp(formattedPhone, otp);
   };
 
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      // Redirect to login
+      navigate('/login');
+    } catch (error) {
+      console.error('Error updating password:', error);
+    }
+  };
+
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (showForgotPassword) {
@@ -57,8 +88,44 @@ export const AuthForm = () => {
   };
 
   const handleContinueWithoutLogin = () => {
-    navigate('/dashboard');
+    navigate('/');
   };
+
+  if (isResetFlow) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center p-4">
+        <div className="w-full max-w-[400px]">
+          <ClassicWindow title="Reset Password">
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading || newPassword !== confirmPassword}>
+                Update Password
+              </Button>
+            </form>
+          </ClassicWindow>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4">
