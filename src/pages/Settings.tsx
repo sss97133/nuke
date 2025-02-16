@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePreferences } from "@/hooks/use-preferences";
+import { ErrorBoundary } from "@/components/error-boundary/ErrorBoundary";
 
 export const Settings = () => {
   const {
@@ -54,63 +55,75 @@ export const Settings = () => {
       <h1 className="text-3xl font-bold">System Preferences</h1>
       
       <Card className="p-6 space-y-6">
-        <AppearanceSettings
-          compactViewEnabled={preferences.compactViewEnabled}
-          onCompactViewChange={(checked) => {
-            savePreferences({ compact_view_enabled: checked });
-          }}
-        />
+        <ErrorBoundary>
+          <AppearanceSettings
+            compactViewEnabled={preferences.compactViewEnabled}
+            onCompactViewChange={(checked) => {
+              savePreferences({ compact_view_enabled: checked });
+            }}
+          />
+        </ErrorBoundary>
 
-        <DisplaySettings
-          distanceUnit={preferences.distanceUnit}
-          currency={preferences.currency}
-          defaultGarageView={preferences.defaultGarageView}
-          onDistanceUnitChange={(value) => {
-            savePreferences({ distance_unit: value });
-          }}
-          onCurrencyChange={(value) => {
-            savePreferences({ currency: value });
-          }}
-          onDefaultGarageViewChange={(value) => {
-            savePreferences({ default_garage_view: value });
-          }}
-        />
+        <ErrorBoundary>
+          <DisplaySettings
+            distanceUnit={preferences.distanceUnit}
+            currency={preferences.currency}
+            defaultGarageView={preferences.defaultGarageView}
+            onDistanceUnitChange={(value) => {
+              savePreferences({ distance_unit: value });
+            }}
+            onCurrencyChange={(value) => {
+              savePreferences({ currency: value });
+            }}
+            onDefaultGarageViewChange={(value) => {
+              savePreferences({ default_garage_view: value });
+            }}
+          />
+        </ErrorBoundary>
 
-        <NotificationSettings
-          notificationsEnabled={preferences.notificationsEnabled}
-          onNotificationsChange={(checked) => {
-            savePreferences({ notifications_enabled: checked });
-          }}
-        />
+        <ErrorBoundary>
+          <NotificationSettings
+            notificationsEnabled={preferences.notificationsEnabled}
+            onNotificationsChange={(checked) => {
+              savePreferences({ notifications_enabled: checked });
+            }}
+          />
+        </ErrorBoundary>
 
-        <AlertSettings
-          serviceRemindersEnabled={preferences.serviceRemindersEnabled}
-          inventoryAlertsEnabled={preferences.inventoryAlertsEnabled}
-          priceAlertsEnabled={preferences.priceAlertsEnabled}
-          onServiceRemindersChange={(checked) => {
-            savePreferences({ service_reminders_enabled: checked });
-          }}
-          onInventoryAlertsChange={(checked) => {
-            savePreferences({ inventory_alerts_enabled: checked });
-          }}
-          onPriceAlertsChange={(checked) => {
-            savePreferences({ price_alerts_enabled: checked });
-          }}
-        />
+        <ErrorBoundary>
+          <AlertSettings
+            serviceRemindersEnabled={preferences.serviceRemindersEnabled}
+            inventoryAlertsEnabled={preferences.inventoryAlertsEnabled}
+            priceAlertsEnabled={preferences.priceAlertsEnabled}
+            onServiceRemindersChange={(checked) => {
+              savePreferences({ service_reminders_enabled: checked });
+            }}
+            onInventoryAlertsChange={(checked) => {
+              savePreferences({ inventory_alerts_enabled: checked });
+            }}
+            onPriceAlertsChange={(checked) => {
+              savePreferences({ price_alerts_enabled: checked });
+            }}
+          />
+        </ErrorBoundary>
 
-        <AutoSaveSettings
-          autoSaveEnabled={preferences.autoSaveEnabled}
-          onAutoSaveChange={(checked) => {
-            savePreferences({ auto_save_enabled: checked });
-          }}
-        />
+        <ErrorBoundary>
+          <AutoSaveSettings
+            autoSaveEnabled={preferences.autoSaveEnabled}
+            onAutoSaveChange={(checked) => {
+              savePreferences({ auto_save_enabled: checked });
+            }}
+          />
+        </ErrorBoundary>
       </Card>
 
       <Card className="p-6">
-        <DataManagement
-          onResetPreferences={handleResetPreferences}
-          onClearData={handleClearData}
-        />
+        <ErrorBoundary>
+          <DataManagement
+            onResetPreferences={handleResetPreferences}
+            onClearData={handleClearData}
+          />
+        </ErrorBoundary>
       </Card>
     </div>
   );
