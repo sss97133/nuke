@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -38,14 +39,14 @@ export const Index = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<DashboardLayout />}>
-        <Route index element={<DashboardLayout />} />
+      <Route path="/login" element={<Login />} />
+      <Route element={<DashboardLayout />}>
+        <Route path="/" element={<DashboardLayout />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/import" element={<Import />} />
         <Route path="/glossary" element={<Glossary />} />
         <Route path="/sitemap" element={<Sitemap />} />
-        <Route path="/settings" element={<Settings />} />
       </Route>
-      <Route path="/login" element={<Login />} />
       <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
