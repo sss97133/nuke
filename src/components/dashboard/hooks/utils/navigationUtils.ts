@@ -66,6 +66,7 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     'market_analysis',
     'studio_workspace',
     'streaming_setup',
+    'garage_selection',
     'ai_explanations'
   ];
 
@@ -80,6 +81,13 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
   }
 
   switch (action) {
+    case 'garage_selection':
+      navigate('/garage/import');
+      toast({
+        title: "Garage Selection",
+        description: "Opening garage selection interface"
+      });
+      break;
     case 'token_analytics':
       navigate('/token-analytics');
       break;
