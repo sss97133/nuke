@@ -13,7 +13,7 @@ export const BloombergTerminal = () => {
   const [layout, setLayout] = useState([30, 40, 30]);
 
   return (
-    <div className="h-[90vh] bg-black text-white p-4">
+    <div className="h-[90vh] bg-background text-foreground p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Monitor className="w-5 h-5" />
@@ -29,9 +29,9 @@ export const BloombergTerminal = () => {
 
       <ResizablePanelGroup direction="horizontal" className="min-h-[85vh]">
         <ResizablePanel defaultSize={layout[0]}>
-          <Card className="h-full bg-gray-900 border-gray-800">
+          <Card className="h-full bg-card border-border">
             <Tabs defaultValue="market" className="w-full">
-              <TabsList className="w-full bg-gray-800">
+              <TabsList className="w-full bg-muted">
                 <TabsTrigger value="market">Market Data</TabsTrigger>
                 <TabsTrigger value="tokens">Token Analytics</TabsTrigger>
               </TabsList>
@@ -45,18 +45,18 @@ export const BloombergTerminal = () => {
           </Card>
         </ResizablePanel>
 
-        <ResizableHandle className="bg-gray-800" />
+        <ResizableHandle className="bg-border" />
 
         <ResizablePanel defaultSize={layout[1]}>
-          <Card className="h-full bg-gray-900 border-gray-800">
+          <Card className="h-full bg-card border-border">
             <OrderBookPanel />
           </Card>
         </ResizablePanel>
 
-        <ResizableHandle className="bg-gray-800" />
+        <ResizableHandle className="bg-border" />
 
         <ResizablePanel defaultSize={layout[2]}>
-          <Card className="h-full bg-gray-900 border-gray-800">
+          <Card className="h-full bg-card border-border">
             <NewsPanel />
           </Card>
         </ResizablePanel>
