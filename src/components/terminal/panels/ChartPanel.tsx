@@ -55,13 +55,21 @@ export const ChartPanel = () => {
               <LineChart data={mockData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#666" />
                 <XAxis dataKey="time" stroke="#666" />
-                <YAxis stroke="#666" />
+                <YAxis yAxisId="price" stroke="#666" />
+                <YAxis 
+                  yAxisId="volume" 
+                  orientation="right" 
+                  stroke="#60a5fa"
+                />
                 <Tooltip 
                   contentStyle={{
                     backgroundColor: '#1f2937',
                     border: 'none'
                   }}
-                  formatter={(value) => [`$${value}`, 'Price']}
+                  formatter={(value, name) => [
+                    name === 'Price' ? `$${value}` : value,
+                    name
+                  ]}
                 />
                 <Legend />
                 <Line 
@@ -71,6 +79,7 @@ export const ChartPanel = () => {
                   strokeWidth={2} 
                   dot={false} 
                   name="Price"
+                  yAxisId="price"
                 />
                 <Line 
                   type="monotone" 
@@ -79,7 +88,7 @@ export const ChartPanel = () => {
                   strokeWidth={1} 
                   dot={false} 
                   name="Volume"
-                  yAxisId={1}
+                  yAxisId="volume"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -104,3 +113,4 @@ export const ChartPanel = () => {
     </ScrollArea>
   );
 };
+
