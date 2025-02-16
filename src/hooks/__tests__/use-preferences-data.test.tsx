@@ -11,9 +11,12 @@ vi.mock('@/integrations/supabase/client', () => ({
       getUser: vi.fn()
     },
     from: vi.fn(() => ({
-      update: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      eq: vi.fn()
+      update: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({ data: null, error: null }))
+      })),
+      delete: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({ data: null, error: null }))
+      }))
     }))
   }
 }));
@@ -32,7 +35,6 @@ describe('usePreferencesData', () => {
   it('should reset preferences successfully', async () => {
     const mockUser = { id: 'test-id', email: 'test@example.com' };
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
-    (supabase.from as any)().update().eq.mockResolvedValue({ data: null, error: null });
 
     const { result } = renderHook(() => usePreferencesData());
 
@@ -40,8 +42,8 @@ describe('usePreferencesData', () => {
     await result.current.handleResetPreferences({ user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
-    expect(supabase.from().update).toHaveBeenCalled();
-    expect(supabase.from().update().eq).toHaveBeenCalledWith('user_id', mockUser.id);
+    expect(supabase.from('user_preferences').update).toHaveBeenCalled();
+    expect(supabase.from('user_preferences').update().eq).toHaveBeenCalledWith('user_id', mockUser.id);
   });
 
   it('should handle error when user is not found', async () => {

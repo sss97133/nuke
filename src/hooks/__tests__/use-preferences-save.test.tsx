@@ -11,8 +11,9 @@ vi.mock('@/integrations/supabase/client', () => ({
       getUser: vi.fn()
     },
     from: vi.fn(() => ({
-      update: vi.fn().mockReturnThis(),
-      eq: vi.fn()
+      update: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({ data: null, error: null }))
+      }))
     }))
   }
 }));
@@ -33,7 +34,6 @@ describe('usePreferencesSave', () => {
     const mockUpdates = { notifications_enabled: false };
     
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
-    (supabase.from as any)().update().eq.mockResolvedValue({ data: null, error: null });
 
     const { result } = renderHook(() => usePreferencesSave());
 
@@ -41,8 +41,8 @@ describe('usePreferencesSave', () => {
     await result.current.savePreferences({ updates: mockUpdates, user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
-    expect(supabase.from().update).toHaveBeenCalledWith(mockUpdates);
-    expect(supabase.from().update().eq).toHaveBeenCalledWith('user_id', mockUser.id);
+    expect(supabase.from('user_preferences').update).toHaveBeenCalledWith(mockUpdates);
+    expect(supabase.from('user_preferences').update().eq).toHaveBeenCalledWith('user_id', mockUser.id);
   });
 
   it('should handle error when user is not found', async () => {
