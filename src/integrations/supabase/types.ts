@@ -1503,6 +1503,36 @@ export type Database = {
           },
         ]
       }
+      streaming_sessions: {
+        Row: {
+          ended_at: string | null
+          id: string
+          is_live: boolean | null
+          session_data: Json | null
+          started_at: string | null
+          title: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ended_at?: string | null
+          id?: string
+          is_live?: boolean | null
+          session_data?: Json | null
+          started_at?: string | null
+          title?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ended_at?: string | null
+          id?: string
+          is_live?: boolean | null
+          session_data?: Json | null
+          started_at?: string | null
+          title?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       studio_configurations: {
         Row: {
           audio_config: Json | null
@@ -2007,6 +2037,36 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          session_type: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          session_type: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          session_type?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
