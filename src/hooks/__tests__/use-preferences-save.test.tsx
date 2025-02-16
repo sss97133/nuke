@@ -53,6 +53,9 @@ describe('usePreferencesSave', () => {
     });
 
     expect(result.current.savePreferences).toBeDefined();
-    await expect(result.current.savePreferences({ updates: mockUpdates, user: null })).rejects.toThrow('No user found');
+    await expect(() => 
+      result.current.savePreferences({ updates: mockUpdates, user: null })
+    ).rejects.toThrow('No user found');
   });
 });
+
