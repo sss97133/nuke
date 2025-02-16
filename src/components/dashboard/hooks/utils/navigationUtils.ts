@@ -30,8 +30,8 @@ export const handleKeyboardShortcuts = (toast: ToastFunction) => {
 
 export const handleProjectNavigation = async (navigate: NavigateFunction, toast: ToastFunction, action: string) => {
   // For actions that shouldn't require auth, handle them first
-  if (action === 'dao_governance') {
-    console.log('Navigating to DAO page...');
+  if (action === 'dao_governance' || action === 'access_control' || action === 'token_management') {
+    console.log('Navigating to tokens page...');
     navigate('/tokens');
     return;
   }
@@ -65,10 +65,6 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
   }
 
   switch (action) {
-    case 'access_control':
-    case 'token_management':
-      navigate('/tokens');
-      break;
     case 'token_analytics':
       navigate('/token-analytics');
       break;
@@ -130,4 +126,3 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       });
   }
 };
-
