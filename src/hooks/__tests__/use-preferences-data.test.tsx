@@ -39,7 +39,7 @@ describe('usePreferencesData', () => {
 
   it('should reset preferences successfully', async () => {
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
-    (supabase.from as any)().update().eq.mockResolvedValue({ error: null });
+    (supabase.from as any)().update().eq.mockResolvedValue({ data: null, error: null });
 
     const { result } = renderHook(() => usePreferencesData());
 
@@ -53,7 +53,7 @@ describe('usePreferencesData', () => {
 
   it('should clear data successfully', async () => {
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
-    (supabase.from as any)().delete().eq.mockResolvedValue({ error: null });
+    (supabase.from as any)().delete().eq.mockResolvedValue({ data: null, error: null });
 
     const { result } = renderHook(() => usePreferencesData());
 
@@ -69,12 +69,12 @@ describe('usePreferencesData', () => {
     const { result } = renderHook(() => usePreferencesData());
 
     expect(result.current.handleResetPreferences).toBeDefined();
-    await expect(() => result.current.handleResetPreferences({ user: null }))
+    await expect(result.current.handleResetPreferences({ user: null }))
       .rejects
       .toThrow('No user found');
       
     expect(result.current.handleClearData).toBeDefined();
-    await expect(() => result.current.handleClearData({ user: null }))
+    await expect(result.current.handleClearData({ user: null }))
       .rejects
       .toThrow('No user found');
   });

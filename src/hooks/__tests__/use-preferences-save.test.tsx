@@ -33,7 +33,7 @@ describe('usePreferencesSave', () => {
 
   it('should save preferences successfully', async () => {
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
-    (supabase.from as any)().update().eq.mockResolvedValue({ error: null });
+    (supabase.from as any)().update().eq.mockResolvedValue({ data: null, error: null });
 
     const { result } = renderHook(() => usePreferencesSave());
 
@@ -49,8 +49,8 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await result.current.savePreferences({ updates: mockUpdates, user: null });
-
-    expect(supabase.from().update).not.toHaveBeenCalled();
+    await expect(result.current.savePreferences({ updates: mockUpdates, user: null }))
+      .rejects
+      .toThrow('No user found');
   });
 });

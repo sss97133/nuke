@@ -63,7 +63,7 @@ export const useAuth = () => {
   }, [navigate, checkAndNavigate]);
 
   return {
-    loading: loading || isSocialLoading || isPhoneLoading || isEmailLoading,
+    isLoading: loading || isSocialLoading || isPhoneLoading || isEmailLoading,
     session,
     handleSocialLogin: socialLogin,
     handleLogout: async () => {
