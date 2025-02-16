@@ -17,7 +17,7 @@ export const useEmailAuth = () => {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`
+            emailRedirectTo: `${window.location.origin}/login`
           }
         });
 
@@ -93,7 +93,7 @@ export const useEmailAuth = () => {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?reset=true`,
+        redirectTo: `${window.location.origin}/login?reset=true`,
       });
 
       if (error) {
