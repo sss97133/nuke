@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
@@ -27,6 +28,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<BloombergTerminal />} />
+          <Route path="/terminal" element={<BloombergTerminal />} />
           <Route path="/tokens" element={<TokensPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/sitemap" element={<Sitemap />} />
