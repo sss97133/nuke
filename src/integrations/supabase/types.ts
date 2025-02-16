@@ -873,6 +873,8 @@ export type Database = {
       garages: {
         Row: {
           address: string | null
+          business_hours: Json | null
+          contact_info: Json | null
           created_at: string
           google_place_id: string | null
           id: string
@@ -883,6 +885,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          business_hours?: Json | null
+          contact_info?: Json | null
           created_at?: string
           google_place_id?: string | null
           id?: string
@@ -893,6 +897,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          business_hours?: Json | null
+          contact_info?: Json | null
           created_at?: string
           google_place_id?: string | null
           id?: string
