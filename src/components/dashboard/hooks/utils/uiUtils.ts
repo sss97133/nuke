@@ -2,12 +2,12 @@
 import { ToastFunction } from "./types";
 
 export const handleToggleUIElement = (
-  toggle: React.Dispatch<React.SetStateAction<boolean>>,
-  currentState: boolean,
+  setter: (value: boolean) => void,
+  currentValue: boolean,
   toastMessage: { title: string; description: string },
   toast: ToastFunction
 ) => {
-  toggle(!currentState);
+  setter(!currentValue);
   toast(toastMessage);
 };
 
@@ -22,31 +22,47 @@ export const handleDialogActions = (
   switch (action) {
     case 'new_vehicle':
       setShowNewVehicleDialog(true);
+      toast({
+        title: "New Vehicle",
+        description: "Opening new vehicle form"
+      });
       break;
     case 'new_inventory':
       setShowNewInventoryDialog(true);
+      toast({
+        title: "New Inventory",
+        description: "Opening new inventory form"
+      });
       break;
     case 'studio_config':
       setShowStudioConfig(true);
       setShowWorkspacePreview(true);
       toast({
         title: "Studio Configuration",
-        description: "Opening studio configuration panel",
+        description: "Opening studio configuration"
       });
       break;
+    default:
+      console.error('Unknown dialog action:', action);
   }
 };
 
 export const handleDocumentation = (toast: ToastFunction, action: string) => {
   switch (action) {
     case 'documentation':
-      return 'token_analytics';  // Return action for navigation
+      toast({
+        title: "Documentation",
+        description: "Opening documentation in new tab"
+      });
+      window.open('https://docs.lovable.dev', '_blank');
+      break;
     case 'about':
       toast({
-        title: "About NUKE",
-        description: "Vehicle Management System v1.0\nBuilt with ❤️",
+        title: "About",
+        description: "Opening about page"
       });
-      break;
+      return 'ai_explanations';
+    default:
+      console.error('Unknown documentation action:', action);
   }
 };
-

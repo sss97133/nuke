@@ -6,12 +6,27 @@ import { ToastFunction } from "./types";
 export const handleSignOut = async (navigate: NavigateFunction, toast: ToastFunction) => {
   const confirmed = window.confirm('Are you sure you want to exit?');
   if (confirmed) {
-    await supabase.auth.signOut();
-    navigate('/sitemap');
-    toast({
-      title: "Signed Out",
-      description: "You have been signed out successfully"
-    });
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      toast({
+        title: "Signed Out",
+        description: "You have been signed out successfully"
+      });
+      
+      window.location.replace('/login');
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to sign out. Please try again."
+      });
+    }
   }
 };
 
@@ -117,11 +132,24 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     case 'streaming_setup':
       navigate('/streaming');
       break;
+    case 'import':
+      navigate('/import');
+      toast({
+        title: "Import",
+        description: "Opening import interface"
+      });
+      break;
+    case 'export':
+      toast({
+        title: "Export",
+        description: "Preparing data for export..."
+      });
+      break;
     default:
       console.log('Navigation action not found:', action);
       toast({
-        title: "Navigation Error",
-        description: "This page or feature is not yet implemented",
+        title: "Not Implemented",
+        description: "This feature is not yet available",
         variant: "destructive"
       });
   }
