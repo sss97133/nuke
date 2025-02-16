@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,16 +7,13 @@ import { MarketDataPanel } from "./panels/MarketDataPanel";
 import { TokenAnalyticsPanel } from "./panels/TokenAnalyticsPanel";
 import { NewsPanel } from "./panels/NewsPanel";
 import { OrderBookPanel } from "./panels/OrderBookPanel";
-
 export const BloombergTerminal = () => {
   const [layout, setLayout] = useState([30, 40, 30]);
-
-  return (
-    <div className="h-[90vh] bg-background text-foreground p-4">
+  return <div className="h-[90vh] bg-background text-foreground p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Monitor className="w-5 h-5" />
-          <h2 className="text-lg font-mono">NUKE Terminal</h2>
+          <h2 className="text-lg font-mono">SCRAP Terminal</h2>
         </div>
         <div className="flex gap-2">
           <DollarSign className="w-5 h-5" />
@@ -61,6 +57,5 @@ export const BloombergTerminal = () => {
           </Card>
         </ResizablePanel>
       </ResizablePanelGroup>
-    </div>
-  );
+    </div>;
 };
