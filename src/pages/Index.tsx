@@ -6,6 +6,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { ImportGarageWizard } from "@/components/garage/ImportGarageWizard";
 import { Route, Routes, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { AuthCallback } from "@/components/auth/AuthCallback";
 import { Sitemap } from "@/components/sitemap/Sitemap";
@@ -72,6 +73,11 @@ const Index = () => {
       />
 
       <Route 
+        path="/garage/import" 
+        element={<ImportGarageWizard />} 
+      />
+
+      <Route 
         path="/sitemap" 
         element={<Sitemap />} 
       />
@@ -110,4 +116,3 @@ const Index = () => {
 };
 
 export default Index;
-
