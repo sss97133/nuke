@@ -1406,6 +1406,151 @@ export type Database = {
           },
         ]
       }
+      shop_invitations: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string | null
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["shop_role"]
+          shop_id: string | null
+          status: string | null
+          token: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string | null
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["shop_role"]
+          shop_id?: string | null
+          status?: string | null
+          token?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string | null
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["shop_role"]
+          shop_id?: string | null
+          status?: string | null
+          token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_invitations_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_members: {
+        Row: {
+          created_at: string
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          joined_at: string | null
+          permissions: Json | null
+          role: Database["public"]["Enums"]["shop_role"]
+          shop_id: string | null
+          status: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          joined_at?: string | null
+          permissions?: Json | null
+          role?: Database["public"]["Enums"]["shop_role"]
+          shop_id?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          joined_at?: string | null
+          permissions?: Json | null
+          role?: Database["public"]["Enums"]["shop_role"]
+          shop_id?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_members_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shops: {
+        Row: {
+          business_hours: Json | null
+          business_type: string | null
+          contact_info: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          location: Json | null
+          logo_url: string | null
+          metadata: Json | null
+          name: string
+          settings: Json | null
+          status: string | null
+          updated_at: string
+          verification_status: string | null
+        }
+        Insert: {
+          business_hours?: Json | null
+          business_type?: string | null
+          contact_info?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: Json | null
+          logo_url?: string | null
+          metadata?: Json | null
+          name: string
+          settings?: Json | null
+          status?: string | null
+          updated_at?: string
+          verification_status?: string | null
+        }
+        Update: {
+          business_hours?: Json | null
+          business_type?: string | null
+          contact_info?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: Json | null
+          logo_url?: string | null
+          metadata?: Json | null
+          name?: string
+          settings?: Json | null
+          status?: string | null
+          updated_at?: string
+          verification_status?: string | null
+        }
+        Relationships: []
+      }
       skills: {
         Row: {
           category: Database["public"]["Enums"]["skill_category"]
@@ -2541,6 +2686,7 @@ export type Database = {
         | "modification"
         | "emergency"
         | "recall"
+      shop_role: "owner" | "co-founder" | "manager" | "staff"
       skill_category:
         | "mechanical"
         | "electrical"
