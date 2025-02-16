@@ -37,6 +37,7 @@ describe('usePreferencesSave', () => {
 
     const { result } = renderHook(() => usePreferencesSave());
 
+    expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: mockUpdates, user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
@@ -47,6 +48,7 @@ describe('usePreferencesSave', () => {
   it('should handle error when user is not found', async () => {
     const { result } = renderHook(() => usePreferencesSave());
 
+    expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: mockUpdates, user: null });
 
     expect(supabase.from().update).not.toHaveBeenCalled();
