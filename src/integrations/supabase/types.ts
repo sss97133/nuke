@@ -1991,8 +1991,14 @@ export type Database = {
           auto_save_enabled: boolean | null
           compact_view_enabled: boolean | null
           created_at: string
+          currency: string | null
+          default_garage_view: string | null
+          distance_unit: string | null
           id: string
+          inventory_alerts_enabled: boolean | null
           notifications_enabled: boolean | null
+          price_alerts_enabled: boolean | null
+          service_reminders_enabled: boolean | null
           theme: string | null
           updated_at: string
           user_id: string | null
@@ -2001,8 +2007,14 @@ export type Database = {
           auto_save_enabled?: boolean | null
           compact_view_enabled?: boolean | null
           created_at?: string
+          currency?: string | null
+          default_garage_view?: string | null
+          distance_unit?: string | null
           id?: string
+          inventory_alerts_enabled?: boolean | null
           notifications_enabled?: boolean | null
+          price_alerts_enabled?: boolean | null
+          service_reminders_enabled?: boolean | null
           theme?: string | null
           updated_at?: string
           user_id?: string | null
@@ -2011,8 +2023,14 @@ export type Database = {
           auto_save_enabled?: boolean | null
           compact_view_enabled?: boolean | null
           created_at?: string
+          currency?: string | null
+          default_garage_view?: string | null
+          distance_unit?: string | null
           id?: string
+          inventory_alerts_enabled?: boolean | null
           notifications_enabled?: boolean | null
+          price_alerts_enabled?: boolean | null
+          service_reminders_enabled?: boolean | null
           theme?: string | null
           updated_at?: string
           user_id?: string | null
