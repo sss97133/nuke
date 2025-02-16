@@ -982,7 +982,7 @@ export type Database = {
           supplier_id: string | null
           unit_price: number | null
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           category?: string | null
@@ -1003,7 +1003,7 @@ export type Database = {
           supplier_id?: string | null
           unit_price?: number | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           category?: string | null
@@ -1024,9 +1024,17 @@ export type Database = {
           supplier_id?: string | null
           unit_price?: number | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_user_id_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       live_streams: {
         Row: {
@@ -1224,6 +1232,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "project_tasks_assigned_user_fk"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "project_tasks_project_id_fkey"
             columns: ["project_id"]
@@ -1431,8 +1446,8 @@ export type Database = {
           status: string
           technician_notes: string | null
           updated_at: string
-          user_id: string | null
-          vehicle_id: string | null
+          user_id: string
+          vehicle_id: string
         }
         Insert: {
           completion_date?: string | null
@@ -1448,8 +1463,8 @@ export type Database = {
           status?: string
           technician_notes?: string | null
           updated_at?: string
-          user_id?: string | null
-          vehicle_id?: string | null
+          user_id: string
+          vehicle_id: string
         }
         Update: {
           completion_date?: string | null
@@ -1465,10 +1480,24 @@ export type Database = {
           status?: string
           technician_notes?: string | null
           updated_at?: string
-          user_id?: string | null
-          vehicle_id?: string | null
+          user_id?: string
+          vehicle_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_tickets_user_id_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_tickets_vehicle_id_fk"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "service_tickets_vehicle_id_fkey"
             columns: ["vehicle_id"]
@@ -2515,7 +2544,7 @@ export type Database = {
           source_url: string | null
           status: string | null
           updated_at: string
-          user_id: string | null
+          user_id: string
           vin: string | null
           vin_image_url: string | null
           vin_processing_status: string | null
@@ -2535,7 +2564,7 @@ export type Database = {
           source_url?: string | null
           status?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
           vin?: string | null
           vin_image_url?: string | null
           vin_processing_status?: string | null
@@ -2555,14 +2584,22 @@ export type Database = {
           source_url?: string | null
           status?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
           vin?: string | null
           vin_image_url?: string | null
           vin_processing_status?: string | null
           vin_verification_data?: Json | null
           year?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_user_id_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       verified_locations: {
         Row: {
