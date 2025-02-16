@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isWorkspaceDimensions, isPTZConfigurations } from '@/types/studio';
@@ -7,8 +8,13 @@ export const useStudioConfig = (defaultDimensions: WorkspaceDimensions) => {
   return useQuery({
     queryKey: ['studioConfig'],
     queryFn: async () => {
+      console.log('Fetching studio config...');
+      
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!user) {
+        console.log('No user found');
+        throw new Error('No user found');
+      }
       
       const { data, error } = await supabase
         .from('studio_configurations')
@@ -16,7 +22,12 @@ export const useStudioConfig = (defaultDimensions: WorkspaceDimensions) => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching studio config:', error);
+        throw error;
+      }
+
+      console.log('Studio config data:', data);
 
       let workspaceDims = defaultDimensions;
       if (data?.workspace_dimensions && isWorkspaceDimensions(data.workspace_dimensions)) {
