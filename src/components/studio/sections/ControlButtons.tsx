@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { isRecord } from '@/types/json';
 
 interface ControlButtonsProps {
   isRecording: boolean;
@@ -109,12 +110,14 @@ export const ControlButtons = ({
           .single();
 
         if (currentSession) {
+          const existingMetadata = isRecord(currentSession.metadata) ? currentSession.metadata : {};
+          
           await supabase
             .from('user_sessions')
             .update({
               is_active: false,
               metadata: {
-                ...currentSession.metadata,
+                ...existingMetadata,
                 ended_at: new Date().toISOString()
               }
             })
@@ -157,3 +160,4 @@ export const ControlButtons = ({
     </div>
   );
 };
+
