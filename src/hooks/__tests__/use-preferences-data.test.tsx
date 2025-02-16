@@ -26,25 +26,26 @@ vi.mock('@/hooks/use-toast', () => ({
 
 describe('usePreferencesData', () => {
   const mockUser = { id: '123', email: 'test@example.com' };
+  const defaultPreferences = {
+    notifications_enabled: true,
+    auto_save_enabled: true,
+    compact_view_enabled: false,
+    theme: 'system'
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should reset preferences successfully', async () => {
-    const defaultPreferences = {
-      notifications_enabled: true,
-      auto_save_enabled: true,
-      compact_view_enabled: false,
-      theme: 'system'
-    };
-
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
     (supabase.from as any)().update().eq.mockResolvedValue({ error: null });
 
     const { result } = renderHook(() => usePreferencesData());
 
-    await expect(result.current.handleResetPreferences({ user: mockUser })).resolves.not.toThrow();
+    await expect(result.current.handleResetPreferences({ user: mockUser }))
+      .resolves
+      .toBeUndefined();
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     expect(supabase.from().update).toHaveBeenCalledWith(defaultPreferences);
@@ -57,7 +58,9 @@ describe('usePreferencesData', () => {
 
     const { result } = renderHook(() => usePreferencesData());
 
-    await expect(result.current.handleClearData({ user: mockUser })).resolves.not.toThrow();
+    await expect(result.current.handleClearData({ user: mockUser }))
+      .resolves
+      .toBeUndefined();
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     expect(supabase.from().delete).toHaveBeenCalled();
@@ -67,8 +70,12 @@ describe('usePreferencesData', () => {
   it('should handle error when user is not found', async () => {
     const { result } = renderHook(() => usePreferencesData());
 
-    await expect(result.current.handleResetPreferences({ user: null })).rejects.toThrow('No user found');
-    await expect(result.current.handleClearData({ user: null })).rejects.toThrow('No user found');
+    await expect(result.current.handleResetPreferences({ user: null }))
+      .rejects
+      .toThrow('No user found');
+      
+    await expect(result.current.handleClearData({ user: null }))
+      .rejects
+      .toThrow('No user found');
   });
 });
-
