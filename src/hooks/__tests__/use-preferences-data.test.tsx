@@ -59,14 +59,13 @@ describe('usePreferencesData', () => {
     });
 
     expect(result.current.handleResetPreferences).toBeDefined();
-    await expect(result.current.handleResetPreferences({ user: null }))
+    await expect(() => result.current.handleResetPreferences({ user: null }))
       .rejects
       .toThrow('No user found');
       
     expect(result.current.handleClearData).toBeDefined();
-    await expect(result.current.handleClearData({ user: null }))
+    await expect(() => result.current.handleClearData({ user: null }))
       .rejects
       .toThrow('No user found');
   });
 });
-
