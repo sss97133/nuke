@@ -42,7 +42,7 @@ describe('usePreferencesData', () => {
     (supabase.from as any)().update().eq.mockResolvedValue({ error: null });
 
     const { result } = renderHook(() => usePreferencesData());
-    await result.current.handleResetPreferences();
+    await result.current.handleResetPreferences({ user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     expect(supabase.from().update).toHaveBeenCalledWith(defaultPreferences);
@@ -56,7 +56,7 @@ describe('usePreferencesData', () => {
     (supabase.from as any)().delete().eq.mockResolvedValue({ error: null });
 
     const { result } = renderHook(() => usePreferencesData());
-    await result.current.handleClearData();
+    await result.current.handleClearData({ user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     expect(supabase.from().delete).toHaveBeenCalled();
@@ -68,8 +68,7 @@ describe('usePreferencesData', () => {
 
     const { result } = renderHook(() => usePreferencesData());
     
-    await expect(result.current.handleResetPreferences()).rejects.toThrow('No user found');
-    await expect(result.current.handleClearData()).rejects.toThrow('No user found');
+    await expect(result.current.handleResetPreferences({ user: null })).rejects.toThrow('No user found');
+    await expect(result.current.handleClearData({ user: null })).rejects.toThrow('No user found');
   });
 });
-

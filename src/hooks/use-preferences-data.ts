@@ -2,12 +2,15 @@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+interface UserParam {
+  user: { id: string; email: string } | null;
+}
+
 export const usePreferencesData = () => {
   const { toast } = useToast();
 
-  const handleResetPreferences = async () => {
+  const handleResetPreferences = async ({ user }: UserParam) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
       const defaultPreferences = {
@@ -35,12 +38,12 @@ export const usePreferencesData = () => {
         description: "Failed to reset preferences",
         variant: "destructive",
       });
+      throw error;
     }
   };
 
-  const handleClearData = async () => {
+  const handleClearData = async ({ user }: UserParam) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
       const { error } = await supabase
@@ -61,6 +64,7 @@ export const usePreferencesData = () => {
         description: "Failed to clear data",
         variant: "destructive",
       });
+      throw error;
     }
   };
 

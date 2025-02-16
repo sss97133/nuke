@@ -36,7 +36,7 @@ describe('usePreferencesSave', () => {
     (supabase.from as any)().update().eq.mockResolvedValue({ error: null });
 
     const { result } = renderHook(() => usePreferencesSave());
-    await result.current.savePreferences(updates);
+    await result.current.savePreferences({ updates, user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     expect(supabase.from().update).toHaveBeenCalledWith(updates);
@@ -47,10 +47,9 @@ describe('usePreferencesSave', () => {
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: null } });
 
     const { result } = renderHook(() => usePreferencesSave());
-    await result.current.savePreferences({ notifications_enabled: false });
+    await result.current.savePreferences({ updates: { notifications_enabled: false }, user: null });
 
     // Verify that the update was not attempted
     expect(supabase.from().update).not.toHaveBeenCalled();
   });
 });
-

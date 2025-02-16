@@ -15,12 +15,16 @@ type PreferenceUpdates = Partial<{
   price_alerts_enabled: boolean;
 }>;
 
+interface SavePreferencesParams {
+  updates: PreferenceUpdates;
+  user: { id: string; email: string } | null;
+}
+
 export const usePreferencesSave = () => {
   const { toast } = useToast();
 
-  const savePreferences = async (updates: PreferenceUpdates) => {
+  const savePreferences = async ({ updates, user }: SavePreferencesParams) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({
           title: "Error",
