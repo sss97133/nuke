@@ -2,7 +2,16 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 
-export const MarketAnalysis = () => {
+interface MarketAnalysisProps {
+  vehicleData: {
+    make: string;
+    model: string;
+    year: number;
+    historical_data?: any;
+  };
+}
+
+export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
   return (
     <ScrollArea className="h-[calc(100vh-4rem)] p-4">
       <div className="space-y-4">

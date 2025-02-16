@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -62,8 +63,8 @@ export const Index = () => {
         <Route path="/dao-governance" element={<DAOGovernance />} />
         <Route path="/studio-config" element={<StudioConfiguration />} />
         <Route path="/professional-dashboard" element={<ProfessionalDashboard />} />
-        <Route path="/market-analysis" element={<MarketAnalysis vehicleData={{}} />} />
-        <Route path="/vin-scanner" element={<VinScanner />} />
+        <Route path="/market-analysis" element={<MarketAnalysis vehicleData={{ make: "Sample", model: "Vehicle", year: 2024 }} />} />
+        <Route path="/vin-scanner" element={<VinScanner onVinData={(data) => console.log('VIN data:', data)} />} />
         <Route path="/token-analytics" element={<TokenAnalytics />} />
         <Route path="/access-control" element={<AccessControl />} />
         <Route path="/vehicle-tokens" element={<VehicleTokens />} />
