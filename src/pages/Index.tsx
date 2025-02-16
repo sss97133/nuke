@@ -11,6 +11,7 @@ import { AuthCallback } from "@/components/auth/AuthCallback";
 import { Sitemap } from "@/components/sitemap/Sitemap";
 import { Glossary } from "@/components/glossary/Glossary";
 import { BloombergTerminal } from "@/components/terminal/BloombergTerminal";
+import { NotFound } from "./NotFound";
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -98,14 +99,12 @@ const Index = () => {
       <Route 
         path="/" 
         element={
-          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/dashboard" replace />
+          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
         } 
       />
 
-      <Route 
-        path="*" 
-        element={<Navigate to="/dashboard" replace />} 
-      />
+      {/* Catch unmatched routes and show 404 page */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
