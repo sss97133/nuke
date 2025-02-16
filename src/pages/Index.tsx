@@ -10,6 +10,7 @@ import Login from "./Login";
 import { Import } from "@/components/import/Import";
 import { Glossary } from "@/components/glossary/Glossary";
 import { Sitemap } from "@/components/sitemap/Sitemap";
+import { Home } from "./Home";
 
 export const Index = () => {
   const { session, loading } = useAuth();
@@ -41,7 +42,7 @@ export const Index = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<DashboardLayout />}>
-        <Route path="/" element={<DashboardLayout />} />
+        <Route path="/" element={<Home />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/import" element={<Import />} />
         <Route path="/glossary" element={<Glossary />} />
