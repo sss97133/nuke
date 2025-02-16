@@ -25,12 +25,13 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 
 describe('usePreferencesData', () => {
+  const mockUser = { id: '123', email: 'test@example.com' };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should reset preferences successfully', async () => {
-    const mockUser = { id: '123', email: 'test@example.com' };
     const defaultPreferences = {
       notifications_enabled: true,
       auto_save_enabled: true,
@@ -50,8 +51,6 @@ describe('usePreferencesData', () => {
   });
 
   it('should clear data successfully', async () => {
-    const mockUser = { id: '123', email: 'test@example.com' };
-
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
     (supabase.from as any)().delete().eq.mockResolvedValue({ error: null });
 

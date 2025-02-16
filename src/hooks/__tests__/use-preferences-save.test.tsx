@@ -24,12 +24,13 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 
 describe('usePreferencesSave', () => {
+  const mockUser = { id: '123', email: 'test@example.com' };
+  
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should save preferences successfully', async () => {
-    const mockUser = { id: '123', email: 'test@example.com' };
     const updates = { notifications_enabled: false };
 
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
@@ -44,8 +45,6 @@ describe('usePreferencesSave', () => {
   });
 
   it('should handle error when user is not found', async () => {
-    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: null } });
-
     const { result } = renderHook(() => usePreferencesSave());
     await result.current.savePreferences({ updates: { notifications_enabled: false }, user: null });
 

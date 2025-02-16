@@ -25,10 +25,15 @@ export const useAuth = () => {
   } = useEmailAuth();
   const { checkAndNavigate } = useAuthNavigation();
   const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email || ''
+        });
         console.log("[useAuth] Initial session found:", session);
         checkAndNavigate(session.user.id);
       }
@@ -38,8 +43,13 @@ export const useAuth = () => {
       console.log("[useAuth] Auth state changed:", event, session ? "Session exists" : "No session");
       
       if (event === 'SIGNED_IN' && session) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email || ''
+        });
         await checkAndNavigate(session.user.id);
       } else if (event === 'SIGNED_OUT') {
+        setUser(null);
         navigate('/login');
       }
     });
@@ -88,5 +98,6 @@ export const useAuth = () => {
     verifyOtp: verifyPhoneOtp,
     handleEmailLogin,
     handleForgotPassword,
+    user
   };
 };
