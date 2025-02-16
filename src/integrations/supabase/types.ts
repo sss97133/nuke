@@ -1402,6 +1402,7 @@ export type Database = {
           metadata: Json | null
           path: string
           requires_auth: boolean | null
+          show_toast: boolean | null
           title: string
           updated_at: string | null
         }
@@ -1414,6 +1415,7 @@ export type Database = {
           metadata?: Json | null
           path: string
           requires_auth?: boolean | null
+          show_toast?: boolean | null
           title: string
           updated_at?: string | null
         }
@@ -1426,6 +1428,7 @@ export type Database = {
           metadata?: Json | null
           path?: string
           requires_auth?: boolean | null
+          show_toast?: boolean | null
           title?: string
           updated_at?: string | null
         }
