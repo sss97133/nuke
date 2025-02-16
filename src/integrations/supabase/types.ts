@@ -2608,6 +2608,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      analyze_market_trends: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cube:
         | {
             Args: {
