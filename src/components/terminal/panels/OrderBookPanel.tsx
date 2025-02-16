@@ -21,7 +21,7 @@ export const OrderBookPanel = () => {
               </div>)}
           </div>
 
-          <Card className="p-2 my-2 bg-gray-400 hover:bg-gray-300">
+          <Card className="p-2 my-2 bg-gray-100">
             <div className="text-center font-mono text-lg">$110.45</div>
             <div className="text-center text-xs text-green-500">+2.3%</div>
           </Card>
