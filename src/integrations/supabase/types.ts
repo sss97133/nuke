@@ -97,6 +97,30 @@ export type Database = {
           },
         ]
       }
+      ai_explanations: {
+        Row: {
+          created_at: string
+          explanation: string
+          id: string
+          model: string
+          question: string
+        }
+        Insert: {
+          created_at?: string
+          explanation: string
+          id?: string
+          model: string
+          question: string
+        }
+        Update: {
+          created_at?: string
+          explanation?: string
+          id?: string
+          model?: string
+          question?: string
+        }
+        Relationships: []
+      }
       algorithm_preferences: {
         Row: {
           content_weights: Json | null
