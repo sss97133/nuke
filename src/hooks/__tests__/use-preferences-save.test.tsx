@@ -24,20 +24,18 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 
 describe('usePreferencesSave', () => {
-  const mockUser = { id: '123', email: 'test@example.com' };
-  const mockUpdates = { notifications_enabled: false };
-  
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should save preferences successfully', async () => {
+    const mockUser = { id: 'test-id', email: 'test@example.com' };
+    const mockUpdates = { notifications_enabled: false };
+    
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
     (supabase.from as any)().update().eq.mockResolvedValue({ data: null, error: null });
 
-    const { result } = renderHook(() => usePreferencesSave(), {
-      wrapper: ({ children }) => <div>{children}</div>
-    });
+    const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: mockUpdates, user: mockUser });
@@ -48,14 +46,11 @@ describe('usePreferencesSave', () => {
   });
 
   it('should handle error when user is not found', async () => {
-    const { result } = renderHook(() => usePreferencesSave(), {
-      wrapper: ({ children }) => <div>{children}</div>
-    });
+    const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
     await expect(() => 
-      result.current.savePreferences({ updates: mockUpdates, user: null })
+      result.current.savePreferences({ updates: {}, user: null })
     ).rejects.toThrow('No user found');
   });
 });
-
