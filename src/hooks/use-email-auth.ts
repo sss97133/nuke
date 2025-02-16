@@ -7,7 +7,7 @@ export const useEmailAuth = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleEmailLogin = async (email: string, password: string, isSignUp: boolean) => {
+  const handleEmailLogin = async (email: string, password: string, isSignUp: boolean, avatarUrl?: string) => {
     try {
       setIsLoading(true);
       console.log("[useEmailAuth] Attempting email authentication, mode:", isSignUp ? "signup" : "login");
@@ -39,7 +39,8 @@ export const useEmailAuth = () => {
             .insert([
               { 
                 id: data.user.id,
-                email: data.user.email
+                email: data.user.email,
+                avatar_url: avatarUrl
               }
             ]);
 

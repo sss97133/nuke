@@ -19,7 +19,7 @@ export const useAuth = () => {
     isLoading: isPhoneLoading 
   } = usePhoneAuth();
   const {
-    handleEmailLogin,
+    handleEmailLogin: emailLogin,
     handleForgotPassword,
     isLoading: isEmailLoading
   } = useEmailAuth();
@@ -74,6 +74,10 @@ export const useAuth = () => {
         description: "Failed to log out. Please try again."
       });
     }
+  };
+
+  const handleEmailLogin = async (email: string, password: string, isSignUp: boolean, avatarUrl?: string) => {
+    return emailLogin(email, password, isSignUp, avatarUrl);
   };
 
   return {
