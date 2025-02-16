@@ -19,6 +19,7 @@ interface MainContentProps {
   showWorkspacePreview: boolean;
   showActivityPanel: boolean;
   handleShowHelp: (section: string) => void;
+  children?: ReactNode;
 }
 
 export const MainContent = ({
@@ -31,6 +32,7 @@ export const MainContent = ({
   showWorkspacePreview,
   showActivityPanel,
   handleShowHelp,
+  children,
 }: MainContentProps) => {
   return (
     <main className="flex-1 p-6">
@@ -60,28 +62,16 @@ export const MainContent = ({
             setShowNewInventoryDialog={setShowNewInventoryDialog}
           />
 
-          <div className="grid grid-cols-1 gap-4">
-            {showAiAssistant && (
-              <div className="fixed bottom-4 right-4 w-96 z-50">
-                <MendableChat />
-              </div>
-            )}
-          </div>
+          {showAiAssistant && (
+            <div className="fixed bottom-4 right-4 w-96 z-50">
+              <MendableChat />
+            </div>
+          )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <Tabs defaultValue="home" className="w-full animate-scale-in">
-                <DashboardTabs showHelp={handleShowHelp} />
-                <CommandBar />
-              </Tabs>
-            </div>
-            
-            <div className="lg:col-span-1">
-              <ActivityFeed />
-            </div>
-          </div>
+          {children}
         </>
       )}
     </main>
   );
 };
+

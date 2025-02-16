@@ -1,5 +1,6 @@
 
 import { ReactNode } from "react";
+import { Outlet } from "react-router-dom";
 import { DashboardHeader } from "./header/DashboardHeader";
 import { MainContent } from "./layout/MainContent";
 import { useDashboardState } from "./hooks/useDashboardState";
@@ -35,7 +36,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         showWorkspacePreview={showWorkspacePreview}
         showActivityPanel={showActivityPanel}
         handleShowHelp={handleShowHelp}
-      />
+      >
+        <Outlet />
+      </MainContent>
     </div>
   );
 };
+
