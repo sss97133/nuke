@@ -66,8 +66,6 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
 
   switch (action) {
     case 'access_control':
-      navigate('/terminal');
-      break;
     case 'token_management':
       navigate('/tokens');
       break;
@@ -132,3 +130,4 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       });
   }
 };
+
