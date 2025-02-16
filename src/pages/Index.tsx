@@ -20,22 +20,23 @@ export const Index = () => {
 
   useEffect(() => {
     if (!loading) {
-      console.info("[Index] Current route:", location.pathname);
       if (!session && location.pathname !== "/login") {
         navigate("/login");
+      } else if (session && location.pathname === "/login") {
+        navigate("/");
       }
     }
   }, [session, loading, navigate, location.pathname]);
 
-  useEffect(() => {
-    // Initial session check
-    if (session) {
-      console.info("[Index] Initial session check: Found");
-    }
-  }, [session]);
-
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

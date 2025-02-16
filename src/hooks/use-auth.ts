@@ -28,14 +28,22 @@ export const useAuth = () => {
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-      if (session) {
-        console.log("[useAuth] Initial session found:", session);
-        checkAndNavigate(session.user.id);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        if (session) {
+          console.log("[useAuth] Initial session found:", session);
+          await checkAndNavigate(session.user.id);
+        }
+      } catch (error) {
+        console.error("[useAuth] Error initializing auth:", error);
+      } finally {
+        setLoading(false);
       }
-    });
+    };
+
+    initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[useAuth] Auth state changed:", event, session ? "Session exists" : "No session");
@@ -52,12 +60,11 @@ export const useAuth = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, checkAndNavigate]);
 
   return {
-    loading,
+    loading: loading || isSocialLoading || isPhoneLoading || isEmailLoading,
     session,
-    isLoading: loading || isSocialLoading || isPhoneLoading || isEmailLoading,
     handleSocialLogin: socialLogin,
     handleLogout: async () => {
       try {
