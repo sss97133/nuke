@@ -36,9 +36,8 @@ describe('usePreferencesSave', () => {
     (supabase.from as any)().update().eq.mockResolvedValue({ error: null });
 
     const { result } = renderHook(() => usePreferencesSave());
-    
-    // Pass both required arguments: updates and user
-    await result.current.savePreferences({ updates: mockUpdates, user: mockUser });
+
+    await expect(result.current.savePreferences({ updates: mockUpdates, user: mockUser })).resolves.not.toThrow();
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     expect(supabase.from().update).toHaveBeenCalledWith(mockUpdates);
@@ -47,11 +46,9 @@ describe('usePreferencesSave', () => {
 
   it('should handle error when user is not found', async () => {
     const { result } = renderHook(() => usePreferencesSave());
-    
-    // Pass both required arguments, with null user
+
     await result.current.savePreferences({ updates: mockUpdates, user: null });
 
-    // Verify that the update was not attempted
     expect(supabase.from().update).not.toHaveBeenCalled();
   });
 });
