@@ -7,6 +7,8 @@ import { handleProjectNavigation } from "../hooks/utils/navigationUtils";
 import { UserMenu } from "./menu/UserMenu";
 import { Button } from "@/components/ui/button";
 import { Warehouse } from "lucide-react";
+import { MainMenu } from "./MainMenu";
+import { AppMenu } from "./AppMenu";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
@@ -28,6 +30,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
   return (
     <div className="border-b bg-secondary">
       <div className="flex h-16 items-center px-4 gap-4">
+        <AppMenu handleMenuAction={handleMenuAction} />
+        
         <Button 
           variant="ghost" 
           onClick={handleSelectGarage}
@@ -36,6 +40,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
           <Warehouse className="h-4 w-4" />
           Select Garage
         </Button>
+
+        <MainMenu handleMenuAction={handleMenuAction} />
 
         <div className="flex-1" />
 
