@@ -1,20 +1,25 @@
+
 import React from 'react';
-import { UserRound } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface UserProfileHeaderProps {
   fullName: string | null;
   username: string | null;
+  avatarUrl?: string | null;
 }
 
-export const UserProfileHeader = ({ fullName, username }: UserProfileHeaderProps) => {
+export const UserProfileHeader = ({ fullName, username, avatarUrl }: UserProfileHeaderProps) => {
   return (
-    <div className="flex items-start gap-4 mb-6 bg-[#FFFFFF] p-3 border border-[#403E43]">
-      <div className="bg-[#C8C8C9] p-2 border border-[#8A898C]">
-        <UserRound className="w-4 h-4 text-[#222222]" />
-      </div>
+    <div className="flex items-start gap-4 mb-6">
+      <Avatar className="h-12 w-12">
+        <AvatarImage src={avatarUrl || undefined} alt={fullName || 'User avatar'} />
+        <AvatarFallback>
+          {fullName ? fullName.charAt(0).toUpperCase() : 'U'}
+        </AvatarFallback>
+      </Avatar>
       <div className="text-left">
-        <h2 className="text-tiny font-mono text-[#222222]">{fullName || 'USER_NAME_NOT_FOUND'}</h2>
-        <p className="text-[10px] text-[#403E43] font-mono">@{username || 'username_404'}</p>
+        <h2 className="text-lg font-semibold">{fullName || 'USER_NAME_NOT_FOUND'}</h2>
+        <p className="text-sm text-muted-foreground">@{username || 'username_404'}</p>
       </div>
     </div>
   );

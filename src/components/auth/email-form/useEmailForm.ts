@@ -6,6 +6,7 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState("");
   const { handleEmailLogin, handleForgotPassword } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -14,7 +15,7 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
       await handleForgotPassword(email);
       return;
     }
-    await handleEmailLogin(email, password, isSignUp);
+    await handleEmailLogin(email, password, isSignUp, avatarUrl);
   };
 
   return {
@@ -24,6 +25,8 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
     setPassword,
     rememberMe,
     setRememberMe,
+    avatarUrl,
+    setAvatarUrl,
     handleSubmit
   };
 };

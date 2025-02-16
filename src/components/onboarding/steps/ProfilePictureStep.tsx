@@ -20,8 +20,14 @@ export const ProfilePictureStep = ({ avatarUrl, onUpdate }: ProfilePictureStepPr
       const file = event.target.files?.[0];
       if (!file) return;
 
+      // Get user session to ensure they're authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        throw new Error('User must be authenticated to upload avatar');
+      }
+
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -34,8 +40,22 @@ export const ProfilePictureStep = ({ avatarUrl, onUpdate }: ProfilePictureStepPr
         .from('avatars')
         .getPublicUrl(filePath);
 
+      // Update the profile with the new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', session.user.id);
+
+      if (updateError) throw updateError;
+
       onUpdate(publicUrl);
+      
+      toast({
+        title: "Success",
+        description: "Profile picture updated successfully",
+      });
     } catch (error) {
+      console.error('Error uploading avatar:', error);
       toast({
         title: 'Error',
         description: 'Failed to upload image. Please try again.',
