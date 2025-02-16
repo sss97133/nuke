@@ -8,7 +8,12 @@ export const usePreferences = () => {
   const { preferences, loading, error } = usePreferencesBase();
   const { savePreferences } = usePreferencesSave();
   const { handleResetPreferences, handleClearData } = usePreferencesData();
-  const { user } = useAuth();
+  const { session } = useAuth();
+  
+  const user = session?.user ? {
+    id: session.user.id,
+    email: session.user.email || ''
+  } : null;
 
   return {
     preferences,
@@ -19,3 +24,4 @@ export const usePreferences = () => {
     handleClearData: () => handleClearData({ user })
   };
 };
+

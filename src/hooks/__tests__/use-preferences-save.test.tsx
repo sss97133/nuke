@@ -25,30 +25,34 @@ vi.mock('@/hooks/use-toast', () => ({
 
 describe('usePreferencesSave', () => {
   const mockUser = { id: '123', email: 'test@example.com' };
+  const mockUpdates = { notifications_enabled: false };
   
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should save preferences successfully', async () => {
-    const updates = { notifications_enabled: false };
-
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
     (supabase.from as any)().update().eq.mockResolvedValue({ error: null });
 
     const { result } = renderHook(() => usePreferencesSave());
-    await result.current.savePreferences({ updates, user: mockUser });
+    
+    // Pass both required arguments: updates and user
+    await result.current.savePreferences({ updates: mockUpdates, user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
-    expect(supabase.from().update).toHaveBeenCalledWith(updates);
+    expect(supabase.from().update).toHaveBeenCalledWith(mockUpdates);
     expect(supabase.from().update().eq).toHaveBeenCalledWith('user_id', mockUser.id);
   });
 
   it('should handle error when user is not found', async () => {
     const { result } = renderHook(() => usePreferencesSave());
-    await result.current.savePreferences({ updates: { notifications_enabled: false }, user: null });
+    
+    // Pass both required arguments, with null user
+    await result.current.savePreferences({ updates: mockUpdates, user: null });
 
     // Verify that the update was not attempted
     expect(supabase.from().update).not.toHaveBeenCalled();
   });
 });
+
