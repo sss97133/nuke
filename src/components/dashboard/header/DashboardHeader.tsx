@@ -1,6 +1,5 @@
 
-import { useState } from "react";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +12,7 @@ interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
 }
 
-export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
+export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuAction }) => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -41,7 +40,7 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
     setOpen(false);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
