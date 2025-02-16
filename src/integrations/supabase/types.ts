@@ -2042,27 +2042,36 @@ export type Database = {
       }
       user_sessions: {
         Row: {
+          action_result: Json | null
+          action_timestamp: string | null
           created_at: string | null
           id: string
           is_active: boolean | null
+          last_action: string | null
           metadata: Json | null
           session_type: string
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
+          action_result?: Json | null
+          action_timestamp?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          last_action?: string | null
           metadata?: Json | null
           session_type: string
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
+          action_result?: Json | null
+          action_timestamp?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          last_action?: string | null
           metadata?: Json | null
           session_type?: string
           updated_at?: string | null
