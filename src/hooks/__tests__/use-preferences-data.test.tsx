@@ -54,18 +54,15 @@ describe('usePreferencesData', () => {
   });
 
   it('should handle error when user is not found', async () => {
-    const { result } = renderHook(() => usePreferencesData(), {
-      wrapper: ({ children }) => children
-    });
+    const { result } = renderHook(() => usePreferencesData());
 
     expect(result.current.handleResetPreferences).toBeDefined();
-    await expect(() => result.current.handleResetPreferences({ user: null }))
-      .rejects
-      .toThrow('No user found');
+    const resetPromise = result.current.handleResetPreferences({ user: null });
+    await expect(resetPromise).rejects.toThrow('No user found');
       
     expect(result.current.handleClearData).toBeDefined();
-    await expect(() => result.current.handleClearData({ user: null }))
-      .rejects
-      .toThrow('No user found');
+    const clearPromise = result.current.handleClearData({ user: null });
+    await expect(clearPromise).rejects.toThrow('No user found');
   });
 });
+
