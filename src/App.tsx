@@ -24,6 +24,7 @@ import { AIExplanations } from "./pages/AIExplanations";
 import { TokenAnalytics } from "./pages/TokenAnalytics";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { AuthForm } from "@/components/auth/AuthForm";
+import { AuthCallback } from "@/components/auth/AuthCallback";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 
@@ -66,6 +67,7 @@ function App() {
               path="/login" 
               element={isAuthenticated ? <Navigate to="/" /> : <AuthForm />} 
             />
+            <Route path="/auth/callback" element={<AuthCallback />} />
 
             {/* Protected routes */}
             <Route element={!isAuthenticated ? <Navigate to="/login" /> : <DashboardLayout />}>
