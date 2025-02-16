@@ -10,6 +10,7 @@ import { Route, Routes, useNavigate, useLocation, Navigate } from "react-router-
 import { AuthCallback } from "@/components/auth/AuthCallback";
 import { Sitemap } from "@/components/sitemap/Sitemap";
 import { Glossary } from "@/components/glossary/Glossary";
+import { BloombergTerminal } from "@/components/terminal/BloombergTerminal";
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -77,6 +78,16 @@ const Index = () => {
       <Route 
         path="/glossary" 
         element={<Glossary />} 
+      />
+
+      <Route 
+        path="/terminal" 
+        element={<BloombergTerminal />} 
+      />
+
+      <Route 
+        path="/tokens" 
+        element={<DashboardLayout />} 
       />
 
       <Route 
