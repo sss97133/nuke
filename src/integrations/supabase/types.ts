@@ -2816,6 +2816,7 @@ export type Database = {
         | "intern"
         | "partner"
         | "collaborator"
+      theme_type: "light" | "dark" | "system"
       user_type: "viewer" | "professional"
     }
     CompositeTypes: {
