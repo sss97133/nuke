@@ -10,6 +10,9 @@ import { DataManagement } from "@/components/settings/DataManagement";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export const Settings = () => {
   const { toast } = useToast();
@@ -23,6 +26,7 @@ export const Settings = () => {
   const [inventoryAlertsEnabled, setInventoryAlertsEnabled] = useState(true);
   const [priceAlertsEnabled, setPriceAlertsEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadUserPreferences();
@@ -30,8 +34,12 @@ export const Settings = () => {
 
   const loadUserPreferences = async () => {
     try {
+      setError(null);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!user) {
+        setError('No user found. Please sign in again.');
+        return;
+      }
 
       const { data: preferences, error } = await supabase
         .from('user_preferences')
@@ -39,7 +47,8 @@ export const Settings = () => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        setError('Failed to load preferences. Please try again.');
+        return;
       }
 
       if (preferences) {
@@ -69,11 +78,7 @@ export const Settings = () => {
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load preferences",
-        variant: "destructive",
-      });
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -93,7 +98,14 @@ export const Settings = () => {
   }>) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "No user found. Please sign in again.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const { error } = await supabase
         .from('user_preferences')
@@ -181,8 +193,32 @@ export const Settings = () => {
     }
   };
 
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   if (loading) {
-    return <div className="container mx-auto p-6">Loading preferences...</div>;
+    return (
+      <div className="container mx-auto p-6 space-y-8">
+        <Skeleton className="h-8 w-48" />
+        <Card className="p-6 space-y-6">
+          <Skeleton className="h-4 w-32" />
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (
