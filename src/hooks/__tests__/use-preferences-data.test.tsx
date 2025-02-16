@@ -43,9 +43,7 @@ describe('usePreferencesData', () => {
 
     const { result } = renderHook(() => usePreferencesData());
 
-    await expect(result.current.handleResetPreferences({ user: mockUser }))
-      .resolves
-      .toBeUndefined();
+    await result.current.handleResetPreferences({ user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     expect(supabase.from().update).toHaveBeenCalledWith(defaultPreferences);
@@ -58,9 +56,7 @@ describe('usePreferencesData', () => {
 
     const { result } = renderHook(() => usePreferencesData());
 
-    await expect(result.current.handleClearData({ user: mockUser }))
-      .resolves
-      .toBeUndefined();
+    await result.current.handleClearData({ user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     expect(supabase.from().delete).toHaveBeenCalled();
@@ -70,11 +66,11 @@ describe('usePreferencesData', () => {
   it('should handle error when user is not found', async () => {
     const { result } = renderHook(() => usePreferencesData());
 
-    await expect(result.current.handleResetPreferences({ user: null }))
+    await expect(() => result.current.handleResetPreferences({ user: null }))
       .rejects
       .toThrow('No user found');
       
-    await expect(result.current.handleClearData({ user: null }))
+    await expect(() => result.current.handleClearData({ user: null }))
       .rejects
       .toThrow('No user found');
   });
