@@ -2,6 +2,7 @@
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { useStudioScene } from './hooks/useStudioScene';
+import { useStudioAnimation } from './hooks/useStudioAnimation';
 import { createHuman } from './components/HumanFigure';
 import { createPTZCamera } from './components/PTZCamera';
 import type { StudioWorkspaceProps } from './types/workspace';
@@ -11,10 +12,9 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
   const objectsRef = useRef<THREE.Object3D[]>([]);
   const ptzCamerasRef = useRef<THREE.Group[]>([]);
   const humanRef = useRef<THREE.Group | null>(null);
-  const animationFrameRef = useRef<number>();
-  const timeRef = useRef<number>(0);
 
   const { sceneRef, cameraRef, rendererRef, controlsRef } = useStudioScene(containerRef, dimensions);
+  useStudioAnimation(humanRef, ptzCamerasRef, ptzTracks, dimensions);
 
   useEffect(() => {
     if (!sceneRef.current) return;
@@ -58,26 +58,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
       ptzCamerasRef.current.push(ptzGroup);
     });
 
-    // Animation loop
     const animate = () => {
-      timeRef.current += 0.005;
-      
-      if (humanRef.current) {
-        const walkRadius = Math.min(dimensions.length, dimensions.width) / 2 - 2;
-        humanRef.current.position.x = Math.sin(timeRef.current) * walkRadius;
-        humanRef.current.position.z = Math.cos(timeRef.current * 0.7) * walkRadius;
-        humanRef.current.position.y = Math.sin(timeRef.current * 4) * 0.1;
-      }
-
-      ptzCamerasRef.current.forEach((ptzCamera, index) => {
-        if (ptzCamera && humanRef.current && ptzTracks[index]) {
-          ptzCamera.lookAt(humanRef.current.position);
-          const track = ptzTracks[index];
-          const trackPosition = Math.sin(timeRef.current * track.speed) * (track.length / 2);
-          ptzCamera.position.x = track.position.x + trackPosition;
-        }
-      });
-
       if (controlsRef.current) {
         controlsRef.current.update();
       }
@@ -86,16 +67,10 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
         rendererRef.current.render(sceneRef.current, cameraRef.current);
       }
 
-      animationFrameRef.current = requestAnimationFrame(animate);
+      requestAnimationFrame(animate);
     };
 
     animate();
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
   }, [dimensions, ptzTracks]);
 
   return (
@@ -105,3 +80,4 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     />
   );
 };
+
