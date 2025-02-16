@@ -11,6 +11,17 @@ import { Import } from "@/components/import/Import";
 import { Glossary } from "@/components/glossary/Glossary";
 import { Sitemap } from "@/components/sitemap/Sitemap";
 import { Home } from "./Home";
+import { TokenManagement } from "@/components/tokens/TokenManagement";
+import { DAOGovernance } from "@/components/dao/DAOGovernance";
+import { StudioConfiguration } from "@/components/studio/StudioConfiguration";
+import { ProfessionalDashboard } from "@/components/dashboard/ProfessionalDashboard";
+import { MarketAnalysis } from "@/components/vehicles/MarketAnalysis";
+import { VinScanner } from "@/components/vehicles/VinCapture";
+import { TokenAnalytics } from "@/components/terminal/panels/TokenAnalyticsPanel";
+import { AccessControl } from "@/components/auth/AccessControl";
+import { VehicleTokens } from "@/components/tokens/VehicleTokens";
+import { DAOProposals } from "@/components/dao/DAOProposals";
+import { Auctions } from "@/components/auctions/AuctionList";
 
 export const Index = () => {
   const { session, isLoading } = useAuth();
@@ -48,6 +59,17 @@ export const Index = () => {
         <Route path="/import" element={<Import />} />
         <Route path="/glossary" element={<Glossary />} />
         <Route path="/sitemap" element={<Sitemap />} />
+        <Route path="/token-management" element={<TokenManagement />} />
+        <Route path="/dao-governance" element={<DAOGovernance />} />
+        <Route path="/studio-config" element={<StudioConfiguration />} />
+        <Route path="/professional-dashboard" element={<ProfessionalDashboard />} />
+        <Route path="/market-analysis" element={<MarketAnalysis />} />
+        <Route path="/vin-scanner" element={<VinScanner />} />
+        <Route path="/token-analytics" element={<TokenAnalytics />} />
+        <Route path="/access-control" element={<AccessControl />} />
+        <Route path="/vehicle-tokens" element={<VehicleTokens />} />
+        <Route path="/dao-proposals" element={<DAOProposals />} />
+        <Route path="/auctions" element={<Auctions />} />
       </Route>
       <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<NotFound />} />
