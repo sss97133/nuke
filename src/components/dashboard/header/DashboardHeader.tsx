@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 
 interface DashboardHeaderProps {
@@ -70,6 +71,10 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
     }
   };
 
+  const handleProfileClick = () => {
+    navigate('/profile');
+  };
+
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center h-6 px-2 bg-secondary border-b border-border shadow-classic">
@@ -79,7 +84,12 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
         </div>
         <div className="flex items-center gap-2 mr-2">
           {userDetails && (
-            <div className="flex items-center gap-2 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleProfileClick}
+              className="h-5 px-2 text-xs flex items-center gap-2 hover:bg-secondary-foreground/10"
+            >
               <Avatar className="h-4 w-4">
                 <AvatarImage src={userDetails.avatar_url || ''} />
                 <AvatarFallback className="text-[10px]">
@@ -89,7 +99,7 @@ export const DashboardHeader = ({ handleMenuAction }: DashboardHeaderProps) => {
               <span className="text-muted-foreground">
                 {userDetails.full_name || userDetails.email}
               </span>
-            </div>
+            </Button>
           )}
         </div>
         <StatusBar />
