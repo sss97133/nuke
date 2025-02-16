@@ -1,115 +1,52 @@
-
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { AuthForm } from "@/components/auth/AuthForm";
+import { useEffect } from "react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
-import { Session } from "@supabase/supabase-js";
-import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
-import { ImportGarageWizard } from "@/components/garage/ImportGarageWizard";
-import { Route, Routes, useNavigate, useLocation, Navigate } from "react-router-dom";
-import { AuthCallback } from "@/components/auth/AuthCallback";
-import { Sitemap } from "@/components/sitemap/Sitemap";
-import { Glossary } from "@/components/glossary/Glossary";
-import { BloombergTerminal } from "@/components/terminal/BloombergTerminal";
 import { NotFound } from "./NotFound";
+import { Settings } from "./Settings";
+import Login from "./Login";
+import { Import } from "@/components/import/Import";
+import { Glossary } from "@/components/glossary/Glossary";
+import { Sitemap } from "@/components/sitemap/Sitemap";
 
-const Index = () => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+export const Index = () => {
+  const { session, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
 
   useEffect(() => {
-    console.log("[Index] Current route:", location.pathname);
+    if (!loading) {
+      console.info("[Index] Current route:", location.pathname);
+      if (!session && location.pathname !== "/login") {
+        navigate("/login");
+      }
+    }
+  }, [session, loading, navigate, location.pathname]);
 
-    const initializeSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("[Index] Initial session check:", session ? "Found" : "None");
-      setSession(session);
-      setLoading(false);
-    };
-
-    initializeSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("[Index] Auth state changed:", _event, session ? "Session exists" : "No session");
-      setSession(session);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [toast, navigate, location]);
+  useEffect(() => {
+    // Initial session check
+    if (session) {
+      console.info("[Index] Initial session check: Found");
+    }
+  }, [session]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse space-y-4 text-center">
-          <div className="h-8 w-32 bg-muted rounded mx-auto"></div>
-          <p className="text-muted-foreground">
-            Loading...
-          </p>
-        </div>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
   return (
     <Routes>
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      
-      <Route 
-        path="/login" 
-        element={
-          session ? <Navigate to="/dashboard" replace /> : <AuthForm />
-        } 
-      />
-
-      <Route 
-        path="/onboarding" 
-        element={<OnboardingWizard />} 
-      />
-
-      <Route 
-        path="/garage/import" 
-        element={<ImportGarageWizard />} 
-      />
-
-      <Route 
-        path="/sitemap" 
-        element={<Sitemap />} 
-      />
-
-      <Route 
-        path="/glossary" 
-        element={<Glossary />} 
-      />
-
-      <Route 
-        path="/terminal" 
-        element={<BloombergTerminal />} 
-      />
-
-      <Route 
-        path="/tokens" 
-        element={<DashboardLayout />} 
-      />
-
-      <Route 
-        path="/dashboard/*" 
-        element={<DashboardLayout />} 
-      />
-
-      <Route 
-        path="/" 
-        element={
-          session ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
-        } 
-      />
-
-      {/* Catch unmatched routes and show 404 page */}
+      <Route path="/" element={<DashboardLayout />}>
+        <Route index element={<DashboardLayout />} />
+        <Route path="/import" element={<Import />} />
+        <Route path="/glossary" element={<Glossary />} />
+        <Route path="/sitemap" element={<Sitemap />} />
+        <Route path="/settings" element={<Settings />} />
+      </Route>
+      <Route path="/login" element={<Login />} />
+      <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
