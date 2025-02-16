@@ -4,13 +4,21 @@ import { Card } from "@/components/ui/card";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Json } from "@/integrations/supabase/types";
 
 interface Token {
   id: string;
   name: string;
   symbol: string;
   total_supply: number;
-  metadata: Record<string, any>;
+  metadata: Json;
+  contract_address: string;
+  created_at: string;
+  decimals: number;
+  description: string;
+  owner_id: string;
+  status: string;
+  updated_at: string;
 }
 
 export const TokensPage = () => {
