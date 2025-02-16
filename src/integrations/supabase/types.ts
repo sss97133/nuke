@@ -777,6 +777,7 @@ export type Database = {
         Row: {
           content: string | null
           created_at: string | null
+          data: Json | null
           expiration_time: string | null
           geographic_relevance: Json | null
           id: string
@@ -788,12 +789,14 @@ export type Database = {
           relevance_score: number | null
           technical_level: number | null
           trending_score: number | null
+          type: string | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           content?: string | null
           created_at?: string | null
+          data?: Json | null
           expiration_time?: string | null
           geographic_relevance?: Json | null
           id?: string
@@ -805,12 +808,14 @@ export type Database = {
           relevance_score?: number | null
           technical_level?: number | null
           trending_score?: number | null
+          type?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           content?: string | null
           created_at?: string | null
+          data?: Json | null
           expiration_time?: string | null
           geographic_relevance?: Json | null
           id?: string
@@ -822,6 +827,7 @@ export type Database = {
           relevance_score?: number | null
           technical_level?: number | null
           trending_score?: number | null
+          type?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -1063,8 +1069,10 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active_garage_id: string | null
           avatar_url: string | null
           created_at: string
+          default_garage_id: string | null
           email: string | null
           first_name: string | null
           full_name: string | null
@@ -1082,8 +1090,10 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          active_garage_id?: string | null
           avatar_url?: string | null
           created_at?: string
+          default_garage_id?: string | null
           email?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -1101,8 +1111,10 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          active_garage_id?: string | null
           avatar_url?: string | null
           created_at?: string
+          default_garage_id?: string | null
           email?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -1119,7 +1131,22 @@ export type Database = {
           user_type?: Database["public"]["Enums"]["user_type"] | null
           username?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_active_garage_id_fkey"
+            columns: ["active_garage_id"]
+            isOneToOne: false
+            referencedRelation: "garages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_default_garage_id_fkey"
+            columns: ["default_garage_id"]
+            isOneToOne: false
+            referencedRelation: "garages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_collaborators: {
         Row: {
