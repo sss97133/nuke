@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { handleExport } from "./utils/exportUtils";
 import { handleSignOut, handleKeyboardShortcuts, handleProjectNavigation } from "./utils/navigationUtils";
-import { handleToggleUIElement, handleDialogActions, handleDocumentation } from "./utils/uiUtils";
+import { handleToggleUIElement, handleDialogActions } from "./utils/uiUtils";
 
 export const useMenuActions = (
   setShowNewVehicleDialog: (show: boolean) => void,
@@ -32,11 +32,13 @@ export const useMenuActions = (
   };
 
   const handleMenuAction = async (action: string) => {
-    // Handle project navigation
-    if (['new_project', 'professional_dashboard', 'skill_management', 'achievements', 
-         'preferences', 'inventory_view', 'service_view', 'vin_scanner', 
-         'market_analysis', 'studio_workspace', 'streaming_setup', 'sitemap', 'glossary'].includes(action)) {
-      handleProjectNavigation(navigate, toast, action);
+    // Handle navigation actions using routes table
+    if (['new_project', 'professional_dashboard', 'skill_management', 
+         'achievements', 'preferences', 'inventory_view', 'service_view', 
+         'vin_scanner', 'market_analysis', 'studio_workspace', 
+         'streaming_setup', 'sitemap', 'glossary', 'token_management',
+         'dao_governance', 'token_analytics', 'access_control'].includes(action)) {
+      await handleProjectNavigation(navigate, toast, action);
       return;
     }
 
@@ -50,15 +52,6 @@ export const useMenuActions = (
         toast,
         action
       );
-      return;
-    }
-
-    // Handle documentation and potentially navigate to token analytics
-    if (['documentation', 'about'].includes(action)) {
-      const nextAction = handleDocumentation(toast, action);
-      if (nextAction) {
-        handleProjectNavigation(navigate, toast, nextAction);
-      }
       return;
     }
 
@@ -82,7 +75,7 @@ export const useMenuActions = (
         );
         break;
       case 'help':
-        setShowHelp(false);
+        setShowHelp(true);
         break;
       case 'exit':
         await handleSignOut(navigate, toast);
@@ -149,4 +142,3 @@ export const useMenuActions = (
     handleMenuAction,
   };
 };
-

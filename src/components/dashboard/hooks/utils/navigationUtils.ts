@@ -45,6 +45,8 @@ export const handleKeyboardShortcuts = (toast: ToastFunction) => {
 
 export const handleProjectNavigation = async (navigate: NavigateFunction, toast: ToastFunction, action: string) => {
   try {
+    console.log('Navigating to action:', action);
+    
     // Get the route for this action from the database
     const { data: route, error } = await supabase
       .from('routes')
@@ -52,7 +54,10 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       .eq('action', action)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Route fetch error:', error);
+      throw error;
+    }
     
     if (!route) {
       console.error('Route not found for action:', action);
@@ -78,14 +83,16 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       }
     }
 
+    console.log('Found route:', route);
+
     // Navigate to the route
     navigate(route.path);
 
-    // Show toast for specific actions
-    if (['garage_selection', 'new_project', 'import'].includes(action)) {
+    // Show toast for specific navigation actions
+    if (route.show_toast) {
       toast({
         title: route.title,
-        description: route.description || `Opening ${route.title.toLowerCase()} interface`
+        description: route.description || `Opening ${route.title.toLowerCase()}`
       });
     }
 
