@@ -1,9 +1,5 @@
 
-import { ReactNode, useState } from "react";
-import { Tabs } from "@/components/ui/tabs";
-import { CommandBar } from "../CommandBar";
-import { DashboardTabs } from "../tabs/DashboardTabs";
-import { ActivityFeed } from "../ActivityFeed";
+import { ReactNode } from "react";
 import { FormDialogs } from "../dialogs/FormDialogs";
 import { MendableChat } from "../../ai/MendableChat";
 import { StudioConfiguration } from "../../studio/StudioConfiguration";
@@ -35,7 +31,7 @@ export const MainContent = ({
   children,
 }: MainContentProps) => {
   return (
-    <main className="flex-1 p-6">
+    <main className="flex-1 p-6 bg-background">
       {showStudioConfig ? (
         <div className="space-y-6">
           <StudioConfiguration />
@@ -54,7 +50,7 @@ export const MainContent = ({
           )}
         </div>
       ) : (
-        <>
+        <div className="relative">
           <FormDialogs
             showNewVehicleDialog={showNewVehicleDialog}
             setShowNewVehicleDialog={setShowNewVehicleDialog}
@@ -69,9 +65,8 @@ export const MainContent = ({
           )}
 
           {children}
-        </>
+        </div>
       )}
     </main>
   );
 };
-
