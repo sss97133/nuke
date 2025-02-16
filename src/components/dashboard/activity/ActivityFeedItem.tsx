@@ -10,9 +10,9 @@ export const ActivityFeedItem = ({ item }: ActivityFeedItemProps) => {
   const getFeedItemContent = (item: FeedItem) => {
     switch (item.type) {
       case 'vehicle':
-        return `New vehicle added: ${item.data.make} ${item.data.model}`;
+        return `New vehicle added: ${item.data.make || ''} ${item.data.model || ''}`;
       case 'asset':
-        return `Asset updated: ${item.data.name}`;
+        return `Asset updated: ${item.data.name || ''}`;
       case 'service':
         return `Service ticket: ${item.data.description || 'No description'}`;
       case 'auction':
@@ -31,7 +31,7 @@ export const ActivityFeedItem = ({ item }: ActivityFeedItemProps) => {
       <div>
         <p className="text-sm">{getFeedItemContent(item)}</p>
         <p className="text-xs text-muted-foreground">
-          {new Date(item.date).toLocaleString()}
+          {new Date(item.created_at).toLocaleString()}
         </p>
       </div>
     </div>

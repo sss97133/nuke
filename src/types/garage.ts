@@ -14,6 +14,13 @@ export type Profile = {
   avatar_url?: string | null;
   active_garage_id?: string | null;
   default_garage_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  home_location?: Record<string, any> | null;
+  onboarding_completed?: boolean;
+  onboarding_step?: number;
+  streaming_links?: Record<string, any> | null;
+  social_links?: Record<string, any> | null;
 };
 
 export type GarageMember = {
