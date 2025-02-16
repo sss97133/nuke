@@ -1377,30 +1377,6 @@ export type Database = {
           },
         ]
       }
-      routes: {
-        Row: {
-          action: string
-          created_at: string | null
-          id: number
-          path: string
-          requires_auth: boolean | null
-        }
-        Insert: {
-          action: string
-          created_at?: string | null
-          id?: number
-          path: string
-          requires_auth?: boolean | null
-        }
-        Update: {
-          action?: string
-          created_at?: string | null
-          id?: number
-          path?: string
-          requires_auth?: boolean | null
-        }
-        Relationships: []
-      }
       service_tickets: {
         Row: {
           completion_date: string | null
