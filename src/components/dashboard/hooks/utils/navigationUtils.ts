@@ -50,7 +50,8 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     'vin_scanner',
     'market_analysis',
     'studio_workspace',
-    'streaming_setup'
+    'streaming_setup',
+    'ai_explanations'
   ];
 
   if (protectedRoutes.includes(action) && !session) {
@@ -81,6 +82,9 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
       break;
     case 'algorithms':
       navigate('/algorithms');
+      break;
+    case 'ai_explanations':
+      navigate('/ai-explanations');
       break;
     case 'new_project':
       navigate('/projects/new');

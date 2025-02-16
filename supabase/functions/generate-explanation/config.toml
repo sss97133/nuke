@@ -1,0 +1,6 @@
+
+project_id = "qkgaybvrernstplzjaam"
+[build]
+command = ""
+[functions.generate-explanation]
+verify_jwt = true
