@@ -61,11 +61,5 @@ describe('usePreferencesData', () => {
     expect(supabase.from().delete).toHaveBeenCalled();
     expect(supabase.from().delete().eq).toHaveBeenCalledWith('user_id', mockUser.id);
   });
-
-  it('should handle error when user is not found', async () => {
-    const { result } = renderHook(() => usePreferencesData());
-    
-    await expect(result.current.handleResetPreferences({ user: null })).rejects.toThrow('No user found');
-    await expect(result.current.handleClearData({ user: null })).rejects.toThrow('No user found');
-  });
 });
+

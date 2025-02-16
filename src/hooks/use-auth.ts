@@ -24,16 +24,14 @@ export const useAuth = () => {
     isLoading: isEmailLoading
   } = useEmailAuth();
   const { checkAndNavigate } = useAuthNavigation();
-  const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
       if (session) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || ''
-        });
         console.log("[useAuth] Initial session found:", session);
         checkAndNavigate(session.user.id);
       }
@@ -43,13 +41,10 @@ export const useAuth = () => {
       console.log("[useAuth] Auth state changed:", event, session ? "Session exists" : "No session");
       
       if (event === 'SIGNED_IN' && session) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || ''
-        });
+        setSession(session);
         await checkAndNavigate(session.user.id);
       } else if (event === 'SIGNED_OUT') {
-        setUser(null);
+        setSession(null);
         navigate('/login');
       }
     });
@@ -59,45 +54,35 @@ export const useAuth = () => {
     };
   }, [navigate]);
 
-  const handleSocialLogin = async (provider: Provider) => {
-    console.log("[useAuth] Initiating social login with provider:", provider);
-    await socialLogin(provider);
-  };
-
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      console.log("[useAuth] Successfully logged out");
-      toast({
-        title: "Logged Out",
-        description: "See you next time!"
-      });
-      
-      navigate('/login');
-    } catch (error) {
-      console.error("[useAuth] Logout error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to log out. Please try again."
-      });
-    }
-  };
-
-  const handleEmailLogin = async (email: string, password: string, isSignUp: boolean, avatarUrl?: string) => {
-    return emailLogin(email, password, isSignUp, avatarUrl);
-  };
-
   return {
-    isLoading: isLoading || isSocialLoading || isPhoneLoading || isEmailLoading,
-    handleSocialLogin,
-    handleLogout,
+    loading,
+    session,
+    isLoading: loading || isSocialLoading || isPhoneLoading || isEmailLoading,
+    handleSocialLogin: socialLogin,
+    handleLogout: async () => {
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        
+        console.log("[useAuth] Successfully logged out");
+        toast({
+          title: "Logged Out",
+          description: "See you next time!"
+        });
+        
+        navigate('/login');
+      } catch (error) {
+        console.error("[useAuth] Logout error:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to log out. Please try again."
+        });
+      }
+    },
     handlePhoneLogin: phoneLogin,
     verifyOtp: verifyPhoneOtp,
-    handleEmailLogin,
-    handleForgotPassword,
-    user
+    handleEmailLogin: emailLogin,
+    handleForgotPassword
   };
 };
