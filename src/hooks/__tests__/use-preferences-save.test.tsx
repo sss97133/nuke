@@ -12,7 +12,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: null, error: null })
+        eq: vi.fn((column: string, value: string) => Promise.resolve({ data: null, error: null }))
       })
     })
   }
@@ -54,4 +54,3 @@ describe('usePreferencesSave', () => {
     expect(savePromise).toBeDefined();
   });
 });
-
