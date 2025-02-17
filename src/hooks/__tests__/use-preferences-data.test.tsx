@@ -42,8 +42,14 @@ describe('usePreferencesData', () => {
     await result.current.handleResetPreferences({ user: mockUser });
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
-    expect(supabase.from('user_preferences').update).toHaveBeenCalled();
-    expect(supabase.from('user_preferences').update().eq).toHaveBeenCalledWith('user_id', mockUser.id);
+    const updateMock = supabase.from('user_preferences').update;
+    expect(updateMock).toHaveBeenCalledWith({
+      notifications_enabled: true,
+      auto_save_enabled: true,
+      compact_view_enabled: false,
+      theme: 'system'
+    });
+    expect(updateMock().eq).toHaveBeenCalledWith('user_id', mockUser.id);
   });
 
   it('should handle error when user is not found', async () => {
