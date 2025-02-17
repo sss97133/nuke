@@ -71,7 +71,6 @@ export const Index = () => {
         <Route path="/dao-proposals" element={<DAOProposals />} />
         <Route path="/auctions" element={<Auctions />} />
       </Route>
-      <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

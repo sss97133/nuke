@@ -16,7 +16,6 @@ function App() {
         <Router>
           <Routes>
             <Route path="/*" element={<Index />} />
-            <Route path="/404" element={<NotFound />} />
           </Routes>
         </Router>
         <Toaster />
@@ -26,4 +25,3 @@ function App() {
 }
 
 export default App;
-

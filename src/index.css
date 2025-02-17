@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 96%;
+    --background: 0 0% 100%;
     --foreground: 0 0% 13%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 13%;
@@ -25,15 +25,41 @@
     --ring: 0 0% 33%;
     --radius: 0;
   }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+  }
 }
 
 @layer base {
   * {
-    @apply border-border transition-colors duration-200;
+    @apply border-border;
   }
   
   body {
-    @apply bg-background text-foreground font-system antialiased;
+    @apply bg-background text-foreground;
+  }
+
+  .glass-morphism {
+    @apply backdrop-blur-xl bg-white/5 dark:bg-black/40 border border-white/10;
   }
 
   h1, h2, h3, h4, h5, h6 {
