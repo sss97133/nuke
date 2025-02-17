@@ -43,7 +43,7 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await result.current.savePreferences(mockUpdates, mockUser);
+    await result.current.savePreferences(mockUpdates);
 
     // Verify correct method chain with mock data
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
@@ -57,7 +57,7 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await expect(result.current.savePreferences({}, null))
+    await expect(result.current.savePreferences({}))
       .rejects.toThrow('No user found');
   });
 });
