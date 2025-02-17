@@ -8,7 +8,7 @@ import { SkillHeader } from './SkillHeader';
 import { SkillCategory } from './SkillCategory';
 import { AIToolsPanel } from './ai/AIToolsPanel';
 import { QuantumSkillVis } from './visualization/QuantumSkillVis';
-import { Skill, SkillStatus, UserSkill } from '@/types/skills';
+import { Skill, UserSkill } from '@/types/skills';
 
 export const SkillTree = () => {
   const { toast } = useToast();
@@ -16,38 +16,70 @@ export const SkillTree = () => {
   const { data: skills, isLoading: skillsLoading, error: skillsError } = useQuery({
     queryKey: ['skills'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('skills')
-        .select('*');
-      
-      if (error) throw error;
-      return data as Skill[];
-    }
+      try {
+        const { data, error } = await supabase
+          .from('skills')
+          .select('*');
+        
+        if (error) throw error;
+        return data as Skill[];
+      } catch (error) {
+        console.error('Error fetching skills:', error);
+        throw error;
+      }
+    },
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
   });
 
   const { data: userSkills, error: userSkillsError } = useQuery({
     queryKey: ['user-skills'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.log('No authenticated user found');
+          return [];
+        }
 
-      const { data, error } = await supabase
-        .from('user_skills')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
-      return data as UserSkill[];
-    }
+        const { data, error } = await supabase
+          .from('user_skills')
+          .select('*')
+          .eq('user_id', user.id);
+        
+        if (error) throw error;
+        return data as UserSkill[];
+      } catch (error) {
+        console.error('Error fetching user skills:', error);
+        throw error;
+      }
+    },
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    cacheTime: 5 * 60 * 1000 // Keep in cache for 5 minutes
   });
 
-  if (skillsError || userSkillsError) {
-    toast({
-      title: 'Error',
-      description: 'Failed to load skills data. Please try again.',
-      variant: 'destructive',
-    });
-  }
+  // Handle errors more gracefully
+  React.useEffect(() => {
+    if (skillsError) {
+      console.error('Skills error:', skillsError);
+      toast({
+        title: 'Error Loading Skills',
+        description: 'Failed to load skills data. Please try refreshing the page.',
+        variant: 'destructive',
+      });
+    }
+    
+    if (userSkillsError) {
+      console.error('User skills error:', userSkillsError);
+      toast({
+        title: 'Error Loading Progress',
+        description: 'Failed to load your skill progress. Please try refreshing the page.',
+        variant: 'destructive',
+      });
+    }
+  }, [skillsError, userSkillsError, toast]);
 
   if (skillsLoading) {
     return <LoadingState />;
