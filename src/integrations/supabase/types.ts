@@ -1046,6 +1046,7 @@ export type Database = {
           started_at: string | null
           status: string | null
           stream_key: string | null
+          stream_url: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -1060,6 +1061,7 @@ export type Database = {
           started_at?: string | null
           status?: string | null
           stream_key?: string | null
+          stream_url?: string | null
           title: string
           updated_at?: string | null
           user_id: string
@@ -1074,6 +1076,7 @@ export type Database = {
           started_at?: string | null
           status?: string | null
           stream_key?: string | null
+          stream_url?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
