@@ -4,7 +4,7 @@ import { usePreferencesSave } from '../use-preferences-save';
 import { supabase } from '@/integrations/supabase/client';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// Using solution #1 (Basic Mock with Required Arguments)
+// Mock implementation with column name checking
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
@@ -12,7 +12,12 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn((column: string, value: any) => Promise.resolve({ data: null, error: null }))
+        eq: vi.fn().mockImplementation((column: string, value: string) => {
+          if (column === 'user_id') {
+            return Promise.resolve({ data: null, error: null });
+          }
+          throw new Error(`Unexpected column: ${column}`);
+        })
       })
     })
   }
@@ -55,3 +60,4 @@ describe('usePreferencesSave', () => {
     await result.current.savePreferences({ updates: {}, user: null });
   });
 });
+
