@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,6 +21,7 @@ import { AccessControl } from "@/components/auth/AccessControl";
 import { VehicleTokens } from "@/components/tokens/VehicleTokens";
 import { DAOProposals } from "@/components/dao/DAOProposals";
 import { AuctionList as Auctions } from "@/components/auctions/AuctionList";
+import { VideoAnalysis } from "@/components/analysis/VideoAnalysis";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, isLoading } = useAuth();
@@ -86,6 +86,7 @@ export const Index = () => {
         <Route path="vehicle-tokens" element={<VehicleTokens />} />
         <Route path="dao-proposals" element={<DAOProposals />} />
         <Route path="auctions" element={<Auctions />} />
+        <Route path="video-analysis/:jobId" element={<VideoAnalysis />} />
       </Route>
 
       <Route path="/" element={
@@ -98,4 +99,3 @@ export const Index = () => {
 };
 
 export default Index;
-
