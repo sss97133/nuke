@@ -58,5 +58,7 @@ describe('usePreferencesSave', () => {
 
     expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: {}, user: null });
+
+    // No need to make assertions here since we're just testing that it doesn't throw
   });
 });

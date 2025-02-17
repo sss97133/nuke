@@ -53,7 +53,7 @@ export const Index = () => {
 
   useEffect(() => {
     if (!isLoading && session && location.pathname === '/login') {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [session, isLoading, navigate, location]);
 
@@ -61,7 +61,7 @@ export const Index = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       
-      <Route element={
+      <Route path="/dashboard" element={
         <ProtectedRoute>
           <DashboardLayout />
         </ProtectedRoute>
@@ -74,7 +74,7 @@ export const Index = () => {
         <Route path="token-management" element={<TokenManagement />} />
         <Route path="dao-governance" element={<DAOGovernance />} />
         <Route path="studio-config" element={<StudioConfiguration />} />
-        <Route path="professional-dashboard" element={<ProfessionalDashboard />} />
+        <Route path="professional" element={<ProfessionalDashboard />} />
         <Route path="market-analysis" element={
           <MarketAnalysis vehicleData={{ make: "Sample", model: "Vehicle", year: 2024 }} />
         } />
@@ -88,9 +88,14 @@ export const Index = () => {
         <Route path="auctions" element={<Auctions />} />
       </Route>
 
+      <Route path="/" element={
+        <Navigate to="/dashboard" replace />
+      } />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
 
 export default Index;
+
