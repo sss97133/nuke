@@ -12,20 +12,10 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockImplementation((column, value) => {
-          // Mock implementation that uses the arguments
-          expect(column).toBeDefined();
-          expect(value).toBeDefined();
-          return Promise.resolve({ data: null, error: null });
-        })
+        eq: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: null }))
       }),
       delete: vi.fn().mockReturnValue({
-        eq: vi.fn().mockImplementation((column, value) => {
-          // Mock implementation that uses the arguments
-          expect(column).toBeDefined();
-          expect(value).toBeDefined();
-          return Promise.resolve({ data: null, error: null });
-        })
+        eq: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: null }))
       })
     })
   }
@@ -60,7 +50,8 @@ describe('usePreferencesData', () => {
       compact_view_enabled: false,
       theme: 'system'
     });
-    expect(updateMock().eq).toHaveBeenCalledWith('user_id', mockUser.id);
+    const eqMock = updateMock().eq;
+    expect(eqMock).toHaveBeenCalledWith('user_id', mockUser.id);
   });
 
   it('should handle error when user is not found', async () => {
@@ -75,4 +66,3 @@ describe('usePreferencesData', () => {
       .rejects.toThrow('No user found');
   });
 });
-

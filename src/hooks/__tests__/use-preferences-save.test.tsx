@@ -12,12 +12,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockImplementation((column, value) => {
-          // Mock implementation that uses the arguments
-          expect(column).toBeDefined();
-          expect(value).toBeDefined();
-          return Promise.resolve({ data: null, error: null });
-        })
+        eq: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: null }))
       })
     })
   }
@@ -49,7 +44,8 @@ describe('usePreferencesSave', () => {
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     const updateMock = supabase.from('user_preferences').update;
     expect(updateMock).toHaveBeenCalledWith(mockUpdates);
-    expect(updateMock().eq).toHaveBeenCalledWith('user_id', mockUser.id);
+    const eqMock = updateMock().eq;
+    expect(eqMock).toHaveBeenCalledWith('user_id', mockUser.id);
   });
 
   it('should handle error when user is not found', async () => {
@@ -59,4 +55,3 @@ describe('usePreferencesSave', () => {
     await result.current.savePreferences({ updates: {}, user: null });
   });
 });
-
