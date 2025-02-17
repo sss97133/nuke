@@ -6,15 +6,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { VideoAnalysisResults } from '@/components/video/VideoAnalysisResults';
 import { Badge } from '@/components/ui/badge';
 
+interface LiveStream {
+  id: string;
+  stream_url: string;
+}
+
 interface VideoProcessingJob {
   id: string;
-  status: string;
+  status: 'pending' | 'processing' | 'completed' | 'error';
   video_url: string;
   streaming_analysis: boolean;
-  live_streams?: {
-    id: string;
-    stream_url: string;
-  } | null;
+  live_streams?: LiveStream | null;
 }
 
 export const VideoAnalysis = () => {
@@ -33,7 +35,10 @@ export const VideoAnalysis = () => {
       return data as VideoProcessingJob;
     },
     enabled: !!jobId,
-    refetchInterval: (data) => data?.status === 'processing' ? 5000 : false
+    refetchInterval: (data) => 
+      data?.status === 'processing' ? 5000 : false,
+    staleTime: 2000, // Add stale time to prevent unnecessary refetches
+    gcTime: 10 * 60 * 1000 // Garbage collect after 10 minutes
   });
 
   if (!jobId) {

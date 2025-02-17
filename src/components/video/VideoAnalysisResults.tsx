@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -43,8 +43,15 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
       }
     },
     refetchInterval: isStreaming ? 2000 : false,
-    placeholderData: (prev) => prev // This replaces keepPreviousData
+    placeholderData: (prev) => prev,
+    staleTime: 1000, // Data is considered fresh for 1 second
+    gcTime: 5 * 60 * 1000, // Garbage collect after 5 minutes
+    keepPreviousData: false // Disable keeping previous data to reduce memory usage
   });
+
+  const changePage = useCallback((newPage: number) => {
+    setPage(newPage);
+  }, []);
 
   if (isLoading && !results) {
     return (
@@ -99,7 +106,7 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
       <div className="flex justify-between items-center pt-4">
         <Button
           variant="outline"
-          onClick={() => setPage(p => Math.max(0, p - 1))}
+          onClick={() => changePage(Math.max(0, page - 1))}
           disabled={page === 0}
         >
           Previous
@@ -109,7 +116,7 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
         </span>
         <Button
           variant="outline"
-          onClick={() => setPage(p => p + 1)}
+          onClick={() => changePage(page + 1)}
           disabled={results.length < ITEMS_PER_PAGE}
         >
           Next
