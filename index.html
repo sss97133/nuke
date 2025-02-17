@@ -8,11 +8,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>nuke</title>
     <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/apple-symbols" />
+    <style>
+      html, body {
+        min-height: 100dvh;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+      #root {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
-    <script type="module" src="/src/main.tsx"></script>
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module" defer></script>
+    <script type="module" src="/src/main.tsx" defer></script>
   </body>
 </html>
 
