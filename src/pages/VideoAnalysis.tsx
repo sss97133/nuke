@@ -14,7 +14,7 @@ export const VideoAnalysis = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('video_processing_jobs')
-        .select('*')
+        .select('*, live_streams(*)')
         .eq('id', jobId)
         .maybeSingle();
 
@@ -44,7 +44,9 @@ export const VideoAnalysis = () => {
     <div className="container mx-auto py-8">
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Video Analysis Results</h1>
+          <h1 className="text-2xl font-bold">
+            {job.streaming_analysis ? 'Live Analysis' : 'Video Analysis'} Results
+          </h1>
           <Badge variant={
             job.status === 'completed' ? 'default' :
             job.status === 'processing' ? 'secondary' :
@@ -53,16 +55,33 @@ export const VideoAnalysis = () => {
             {job.status}
           </Badge>
         </div>
-        {job.video_url && (
-          <video
-            src={job.video_url}
-            controls
-            className="w-full max-h-[400px] object-contain bg-black rounded-lg"
-          />
+        {job.streaming_analysis ? (
+          <div className="bg-black rounded-lg aspect-video relative">
+            {job.live_streams?.stream_url ? (
+              <video
+                src={job.live_streams.stream_url}
+                controls
+                autoPlay
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-white">
+                Waiting for stream...
+              </div>
+            )}
+          </div>
+        ) : (
+          job.video_url && (
+            <video
+              src={job.video_url}
+              controls
+              className="w-full max-h-[400px] object-contain bg-black rounded-lg"
+            />
+          )
         )}
       </div>
       
-      <VideoAnalysisResults jobId={jobId} />
+      <VideoAnalysisResults jobId={jobId} isStreaming={job.streaming_analysis} />
     </div>
   );
 };

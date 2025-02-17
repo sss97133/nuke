@@ -2,36 +2,40 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { formatDistance } from 'date-fns';
 
-interface VideoAnalysisResult {
-  id: string;
-  object_type: string | null;
-  confidence_score: number | null;
-  classification_labels: string[] | null;
-  created_at: string;
-  normalized_data: any;
-  spatial_data: any;
-  timestamp_start: string | null;
-  timestamp_end: string | null;
+interface VideoAnalysisResultsProps {
+  jobId: string;
+  isStreaming?: boolean;
 }
 
-export const VideoAnalysisResults = ({ jobId }: { jobId: string }) => {
-  const { data: results, isLoading, error } = useQuery({
-    queryKey: ['video-analysis', jobId],
+export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResultsProps) => {
+  const { data: results, isLoading } = useQuery({
+    queryKey: ['video-analysis-results', jobId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('video_analysis_results')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('created_at', { ascending: true });
+      if (isStreaming) {
+        const { data, error } = await supabase
+          .from('realtime_video_segments')
+          .select('*')
+          .eq('job_id', jobId)
+          .order('segment_number', { ascending: true });
 
-      if (error) throw error;
-      return data as VideoAnalysisResult[];
-    }
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from('video_analysis_results')
+          .select('*')
+          .eq('job_id', jobId)
+          .order('timestamp', { ascending: true });
+
+        if (error) throw error;
+        return data;
+      }
+    },
+    refetchInterval: isStreaming ? 1000 : false,
   });
 
   if (isLoading) {
@@ -42,70 +46,42 @@ export const VideoAnalysisResults = ({ jobId }: { jobId: string }) => {
     );
   }
 
-  if (error) {
+  if (!results || results.length === 0) {
     return (
-      <div className="p-4 text-red-500">
-        Error loading analysis results: {error.message}
-      </div>
-    );
-  }
-
-  if (!results?.length) {
-    return (
-      <div className="p-4 text-muted-foreground">
-        No analysis results available yet.
-      </div>
+      <Card className="p-6">
+        <p className="text-center text-muted-foreground">
+          {isStreaming ? 'Waiting for analysis results...' : 'No analysis results available'}
+        </p>
+      </Card>
     );
   }
 
   return (
-    <ScrollArea className="h-[600px] w-full rounded-md border p-4">
+    <ScrollArea className="h-[400px]">
       <div className="space-y-4">
-        {results.map((result) => (
+        {results.map((result, index) => (
           <Card key={result.id} className="p-4">
-            <div className="flex items-start justify-between mb-2">
+            <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-medium">
-                  {result.object_type || 'Unknown Object'}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {formatDistance(new Date(result.created_at), new Date(), { addSuffix: true })}
-                </p>
-              </div>
-              {result.confidence_score && (
-                <Badge variant={result.confidence_score > 0.7 ? "default" : "secondary"}>
-                  {Math.round(result.confidence_score * 100)}% confidence
+                <Badge variant="outline" className="mb-2">
+                  {isStreaming 
+                    ? `Segment ${result.segment_number}`
+                    : new Date(result.timestamp).toLocaleTimeString()
+                }
                 </Badge>
-              )}
-            </div>
-            
-            {result.classification_labels && result.classification_labels.length > 0 && (
-              <div className="mt-2">
-                <p className="text-sm font-medium mb-1">Classifications:</p>
-                <div className="flex flex-wrap gap-2">
-                  {result.classification_labels.map((label, index) => (
-                    <Badge key={index} variant="outline">
-                      {label}
-                    </Badge>
-                  ))}
+                <div className="space-y-2">
+                  {isStreaming ? (
+                    <pre className="text-sm whitespace-pre-wrap">
+                      {result.segment_data}
+                    </pre>
+                  ) : (
+                    <pre className="text-sm whitespace-pre-wrap">
+                      {JSON.stringify(result.analysis_data, null, 2)}
+                    </pre>
+                  )}
                 </div>
               </div>
-            )}
-            
-            {result.normalized_data && (
-              <div className="mt-2">
-                <p className="text-sm font-medium mb-1">Normalized Data:</p>
-                <pre className="text-xs bg-muted p-2 rounded-md overflow-x-auto">
-                  {JSON.stringify(result.normalized_data, null, 2)}
-                </pre>
-              </div>
-            )}
-            
-            {result.timestamp_start && result.timestamp_end && (
-              <div className="mt-2 text-sm text-muted-foreground">
-                Time Range: {result.timestamp_start} - {result.timestamp_end}
-              </div>
-            )}
+            </div>
           </Card>
         ))}
       </div>
