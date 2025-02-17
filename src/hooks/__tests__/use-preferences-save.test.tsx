@@ -60,4 +60,3 @@ describe('usePreferencesSave', () => {
     await result.current.savePreferences({ updates: {}, user: null });
   });
 });
-
