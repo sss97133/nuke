@@ -10,14 +10,14 @@ vi.mock('@/integrations/supabase/client', () => ({
     auth: {
       getUser: vi.fn()
     },
-    from: vi.fn((table: string) => ({
-      update: vi.fn(() => ({
-        eq: vi.fn((column: string, value: string) => Promise.resolve({ data: null, error: null }))
-      })),
-      delete: vi.fn(() => ({
-        eq: vi.fn((column: string, value: string) => Promise.resolve({ data: null, error: null }))
-      }))
-    }))
+    from: vi.fn().mockReturnValue({
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn()
+      }),
+      delete: vi.fn().mockReturnValue({
+        eq: vi.fn()
+      })
+    })
   }
 }));
 
@@ -30,6 +30,15 @@ vi.mock('@/hooks/use-toast', () => ({
 describe('usePreferencesData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Set up the mock implementations for eq
+    const eqMock = vi.fn().mockResolvedValue({ data: null, error: null });
+    const updateMock = vi.fn().mockReturnValue({ eq: eqMock });
+    const deleteMock = vi.fn().mockReturnValue({ eq: eqMock });
+    (supabase.from as any).mockReturnValue({ 
+      update: updateMock,
+      delete: deleteMock
+    });
   });
 
   it('should reset preferences successfully', async () => {

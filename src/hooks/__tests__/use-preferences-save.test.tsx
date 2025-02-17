@@ -12,7 +12,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn((column: string, value: string) => Promise.resolve({ data: null, error: null }))
+        eq: vi.fn()
       })
     })
   }
@@ -27,6 +27,11 @@ vi.mock('@/hooks/use-toast', () => ({
 describe('usePreferencesSave', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Set up the mock implementation for eq
+    const eqMock = vi.fn().mockResolvedValue({ data: null, error: null });
+    const updateMock = vi.fn().mockReturnValue({ eq: eqMock });
+    (supabase.from as any).mockReturnValue({ update: updateMock });
   });
 
   it('should save preferences successfully', async () => {
@@ -50,7 +55,8 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    const savePromise = result.current.savePreferences({ updates: {}, user: null });
-    expect(savePromise).toBeDefined();
+    await result.current.savePreferences({ updates: {}, user: null });
+
+    // No need to make assertions about eq() call since it won't be called when user is null
   });
 });
