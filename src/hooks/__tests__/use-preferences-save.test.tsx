@@ -45,6 +45,7 @@ describe('usePreferencesSave', () => {
     expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: mockUpdates, user: mockUser });
 
+    // Verify correct method chain
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     const updateMock = supabase.from('user_preferences').update;
     expect(updateMock).toHaveBeenCalledWith(mockUpdates);
@@ -56,5 +57,6 @@ describe('usePreferencesSave', () => {
 
     expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: {}, user: null });
+    // Test will pass as the function handles null user case internally
   });
 });

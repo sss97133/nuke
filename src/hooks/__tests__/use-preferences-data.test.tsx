@@ -31,7 +31,7 @@ describe('usePreferencesData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Set up the mock implementations for eq
+    // Set up the mock implementation for eq
     const eqMock = vi.fn().mockResolvedValue({ data: null, error: null });
     const updateMock = vi.fn().mockReturnValue({ eq: eqMock });
     const deleteMock = vi.fn().mockReturnValue({ eq: eqMock });
@@ -43,13 +43,14 @@ describe('usePreferencesData', () => {
 
   it('should reset preferences successfully', async () => {
     const mockUser = { id: 'test-id', email: 'test@example.com' };
-    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser }, error: null });
 
     const { result } = renderHook(() => usePreferencesData());
 
     expect(result.current.handleResetPreferences).toBeDefined();
     await result.current.handleResetPreferences({ user: mockUser });
 
+    // Verify correct method chain
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     const updateMock = supabase.from('user_preferences').update;
     expect(updateMock).toHaveBeenCalledWith({
