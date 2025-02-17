@@ -57,7 +57,7 @@ export const SkillTree = () => {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     staleTime: 30000, // Consider data fresh for 30 seconds
-    cacheTime: 5 * 60 * 1000 // Keep in cache for 5 minutes
+    gcTime: 5 * 60 * 1000 // Keep in cache for 5 minutes (renamed from cacheTime)
   });
 
   // Handle errors more gracefully
@@ -152,3 +152,4 @@ export const SkillTree = () => {
     </div>
   );
 };
+

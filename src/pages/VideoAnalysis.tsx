@@ -32,13 +32,23 @@ export const VideoAnalysis = () => {
         .maybeSingle();
 
       if (error) throw error;
-      return data as VideoProcessingJob;
+      
+      // Ensure the response matches our expected type
+      const processedData: VideoProcessingJob = {
+        id: data?.id || '',
+        status: (data?.status as VideoProcessingJob['status']) || 'pending',
+        video_url: data?.video_url || '',
+        streaming_analysis: data?.streaming_analysis || false,
+        live_streams: data?.live_streams as LiveStream
+      };
+      
+      return processedData;
     },
     enabled: !!jobId,
     refetchInterval: (data) => 
       data?.status === 'processing' ? 5000 : false,
-    staleTime: 2000, // Add stale time to prevent unnecessary refetches
-    gcTime: 10 * 60 * 1000 // Garbage collect after 10 minutes
+    staleTime: 2000,
+    gcTime: 10 * 60 * 1000
   });
 
   if (!jobId) {
@@ -104,3 +114,4 @@ export const VideoAnalysis = () => {
     </div>
   );
 };
+

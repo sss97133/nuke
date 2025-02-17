@@ -45,8 +45,7 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
     refetchInterval: isStreaming ? 2000 : false,
     placeholderData: (prev) => prev,
     staleTime: 1000, // Data is considered fresh for 1 second
-    gcTime: 5 * 60 * 1000, // Garbage collect after 5 minutes
-    keepPreviousData: false // Disable keeping previous data to reduce memory usage
+    gcTime: 5 * 60 * 1000 // Garbage collect after 5 minutes (renamed from cacheTime)
   });
 
   const changePage = useCallback((newPage: number) => {
@@ -125,3 +124,4 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
     </div>
   );
 };
+
