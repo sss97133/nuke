@@ -15,23 +15,20 @@ type PreferenceUpdates = Partial<{
   price_alerts_enabled: boolean;
 }>;
 
-interface SavePreferencesParams {
-  updates: PreferenceUpdates;
-  user: { id: string; email: string } | null;
-}
-
 export const usePreferencesSave = () => {
   const { toast } = useToast();
 
-  const savePreferences = async ({ updates, user }: SavePreferencesParams) => {
+  const savePreferences = async (updates: PreferenceUpdates) => {
     try {
-      if (!user) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (!user || userError) {
         toast({
           title: "Error",
           description: "No user found. Please sign in again.",
           variant: "destructive",
         });
-        return;
+        throw new Error('No user found');
       }
 
       const { error } = await supabase
@@ -52,8 +49,10 @@ export const usePreferencesSave = () => {
         description: "Failed to save preferences",
         variant: "destructive",
       });
+      throw error;
     }
   };
 
   return { savePreferences };
 };
+

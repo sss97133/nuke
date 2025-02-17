@@ -34,15 +34,15 @@ describe('usePreferencesSave', () => {
   });
 
   it('should save preferences successfully', async () => {
-    const mockUpdates = { updates: { notifications_enabled: false }, user: mockUser };
+    const mockUpdates = { notifications_enabled: false };
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await result.current.savePreferences(mockUpdates.updates, mockUser);
+    await result.current.savePreferences(mockUpdates);
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     const updateMock = supabase.from('user_preferences').update;
-    expect(updateMock).toHaveBeenCalledWith(mockUpdates.updates);
+    expect(updateMock).toHaveBeenCalledWith(mockUpdates);
     const eqMock = updateMock().eq;
     expect(eqMock).toHaveBeenCalledWith('user_id', mockUser.id);
   });
@@ -54,6 +54,7 @@ describe('usePreferencesSave', () => {
     const mockUpdates = { notifications_enabled: false };
     
     expect(result.current.savePreferences).toBeDefined();
-    await expect(result.current.savePreferences(mockUpdates, null)).rejects.toThrow('No user found');
+    await expect(result.current.savePreferences(mockUpdates)).rejects.toThrow('No user found');
   });
 });
+

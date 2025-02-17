@@ -22,7 +22,7 @@ interface VideoProcessingJob {
 export const VideoAnalysis = () => {
   const { jobId } = useParams();
 
-  const { data: job, isLoading, error } = useQuery({
+  const { data: job, isLoading, error } = useQuery<VideoProcessingJob, Error>({
     queryKey: ['video-job', jobId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -33,13 +33,15 @@ export const VideoAnalysis = () => {
 
       if (error) throw error;
       
+      if (!data) throw new Error('Video processing job not found');
+      
       // Ensure the response matches our expected type
       const processedData: VideoProcessingJob = {
-        id: data?.id || '',
-        status: (data?.status as VideoProcessingJob['status']) || 'pending',
-        video_url: data?.video_url || '',
-        streaming_analysis: data?.streaming_analysis || false,
-        live_streams: data?.live_streams as LiveStream
+        id: data.id,
+        status: data.status as VideoProcessingJob['status'],
+        video_url: data.video_url,
+        streaming_analysis: data.streaming_analysis,
+        live_streams: data.live_streams as LiveStream
       };
       
       return processedData;
@@ -118,3 +120,4 @@ export const VideoAnalysis = () => {
     </div>
   );
 };
+
