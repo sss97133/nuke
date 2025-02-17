@@ -2747,6 +2747,95 @@ export type Database = {
         }
         Relationships: []
       }
+      video_analysis_results: {
+        Row: {
+          classification_labels: string[] | null
+          confidence_score: number | null
+          created_at: string
+          id: string
+          job_id: string | null
+          metadata: Json | null
+          normalized_data: Json | null
+          object_type: string | null
+          spatial_data: Json | null
+          timestamp_end: unknown | null
+          timestamp_start: unknown | null
+        }
+        Insert: {
+          classification_labels?: string[] | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          metadata?: Json | null
+          normalized_data?: Json | null
+          object_type?: string | null
+          spatial_data?: Json | null
+          timestamp_end?: unknown | null
+          timestamp_start?: unknown | null
+        }
+        Update: {
+          classification_labels?: string[] | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          metadata?: Json | null
+          normalized_data?: Json | null
+          object_type?: string | null
+          spatial_data?: Json | null
+          timestamp_end?: unknown | null
+          timestamp_start?: unknown | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_analysis_results_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "video_processing_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_processing_jobs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          processing_completed_at: string | null
+          processing_started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          video_url?: string
+        }
+        Relationships: []
+      }
       vin_processing_jobs: {
         Row: {
           batch_data: Json | null
