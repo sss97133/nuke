@@ -38,7 +38,7 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await result.current.savePreferences(mockUpdates);
+    await result.current.savePreferences(mockUpdates.updates, mockUser);
 
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     const updateMock = supabase.from('user_preferences').update;
@@ -51,9 +51,9 @@ describe('usePreferencesSave', () => {
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: null }, error: new Error('No user found') });
     
     const { result } = renderHook(() => usePreferencesSave());
-    const mockUpdates = { updates: {}, user: null };
+    const mockUpdates = { notifications_enabled: false };
     
     expect(result.current.savePreferences).toBeDefined();
-    await expect(result.current.savePreferences(mockUpdates)).rejects.toThrow('No user found');
+    await expect(result.current.savePreferences(mockUpdates, null)).rejects.toThrow('No user found');
   });
 });

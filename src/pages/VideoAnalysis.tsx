@@ -22,7 +22,7 @@ interface VideoProcessingJob {
 export const VideoAnalysis = () => {
   const { jobId } = useParams();
 
-  const { data: job, isLoading } = useQuery({
+  const { data: job, isLoading, error } = useQuery({
     queryKey: ['video-job', jobId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -61,6 +61,10 @@ export const VideoAnalysis = () => {
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     );
+  }
+
+  if (error) {
+    return <div className="p-4 text-red-500">Error: {error.message}</div>;
   }
 
   if (!job) {
@@ -114,4 +118,3 @@ export const VideoAnalysis = () => {
     </div>
   );
 };
-
