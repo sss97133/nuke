@@ -10,12 +10,12 @@ vi.mock('@/integrations/supabase/client', () => ({
     auth: {
       getUser: vi.fn()
     },
-    from: vi.fn(() => ({
+    from: vi.fn((table: string) => ({
       update: vi.fn(() => ({
-        eq: vi.fn(() => Promise.resolve({ data: null, error: null }))
+        eq: vi.fn((column: string, value: string) => Promise.resolve({ data: null, error: null }))
       })),
       delete: vi.fn(() => ({
-        eq: vi.fn(() => Promise.resolve({ data: null, error: null }))
+        eq: vi.fn((column: string, value: string) => Promise.resolve({ data: null, error: null }))
       }))
     }))
   }
