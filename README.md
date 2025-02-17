@@ -31,21 +31,6 @@ This system provides comprehensive tools for:
 
 For detailed setup instructions, see our [Getting Started Guide](./docs/GETTING_STARTED.md).
 
-## Recent Updates
-
-- Fixed authentication and routing implementation
-- Corrected dashboard layout integration with authentication
-- Improved route handling and navigation
-- Enhanced test suite reliability for user preferences
-- Fixed build issues in test files
-
-## Architecture Notes
-
-- Uses React Router for navigation with protected routes
-- Implements Supabase for authentication and data storage
-- Features a dashboard layout with nested routing
-- Includes comprehensive test coverage for core functionality
-
 ## Support
 
 For support, please open an issue in the repository or contact the development team.
