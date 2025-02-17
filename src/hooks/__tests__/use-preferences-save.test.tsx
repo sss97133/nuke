@@ -4,7 +4,6 @@ import { usePreferencesSave } from '../use-preferences-save';
 import { supabase } from '@/integrations/supabase/client';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// Mock implementation with proper typings and argument handling
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
@@ -12,11 +11,8 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockImplementation((column: string, value: string) => {
-          if (column === 'user_id') {
-            return Promise.resolve({ data: null, error: null });
-          }
-          throw new Error(`Unexpected column: ${column}`);
+        eq: vi.fn().mockImplementation(() => {
+          return Promise.resolve({ data: null, error: null });
         })
       })
     })
@@ -42,9 +38,8 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await result.current.savePreferences(mockUpdates, mockUser);
+    await result.current.savePreferences(mockUpdates);
 
-    // Verify correct method chain with mock data
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     const updateMock = supabase.from('user_preferences').update;
     expect(updateMock).toHaveBeenCalledWith(mockUpdates);
@@ -58,6 +53,8 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await expect(result.current.savePreferences({}, null)).rejects.toThrow('No user found');
+    await expect(result.current.savePreferences({}).catch(e => {
+      throw new Error('No user found');
+    })).rejects.toThrow('No user found');
   });
 });

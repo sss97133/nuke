@@ -6,6 +6,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { VideoAnalysisResults } from '@/components/video/VideoAnalysisResults';
 import { Badge } from '@/components/ui/badge';
 
+interface VideoProcessingJob {
+  id: string;
+  status: string;
+  video_url: string;
+  streaming_analysis: boolean;
+  live_streams?: {
+    id: string;
+    stream_url: string;
+  } | null;
+}
+
 export const VideoAnalysis = () => {
   const { jobId } = useParams();
 
@@ -14,15 +25,15 @@ export const VideoAnalysis = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('video_processing_jobs')
-        .select('*, live_streams(*)')
+        .select('*, live_streams(id, stream_url)')
         .eq('id', jobId)
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data as VideoProcessingJob;
     },
     enabled: !!jobId,
-    refetchInterval: (data) => data?.status === 'processing' ? 5000 : false, // Only poll if job is processing
+    refetchInterval: (data) => data?.status === 'processing' ? 5000 : false
   });
 
   if (!jobId) {
@@ -64,7 +75,7 @@ export const VideoAnalysis = () => {
                 controls
                 autoPlay
                 className="w-full h-full object-contain"
-                playsInline // Add playsInline for better mobile support
+                playsInline
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-white">
@@ -77,7 +88,7 @@ export const VideoAnalysis = () => {
             <video
               src={job.video_url}
               controls
-              playsInline // Add playsInline for better mobile support
+              playsInline
               className="w-full max-h-[400px] object-contain bg-black rounded-lg"
             />
           )
@@ -88,4 +99,3 @@ export const VideoAnalysis = () => {
     </div>
   );
 };
-

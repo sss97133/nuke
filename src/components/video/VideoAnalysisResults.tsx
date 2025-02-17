@@ -42,8 +42,8 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
         return data;
       }
     },
-    refetchInterval: isStreaming ? 2000 : false, // Reduced polling frequency to 2 seconds
-    keepPreviousData: true, // Keep old data while fetching new data
+    refetchInterval: isStreaming ? 2000 : false,
+    placeholderData: (prev) => prev // This replaces keepPreviousData
   });
 
   if (isLoading && !results) {
@@ -68,7 +68,7 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
     <div className="space-y-4">
       <ScrollArea className="h-[400px]">
         <div className="space-y-4">
-          {results.map((result, index) => (
+          {results.map((result) => (
             <Card key={result.id} className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -118,4 +118,3 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
     </div>
   );
 };
-
