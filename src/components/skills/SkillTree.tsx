@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,49 +12,36 @@ import { Skill, SkillStatus, UserSkill } from '@/types/skills';
 
 export const SkillTree = () => {
   const { toast } = useToast();
-  
-  // Mock data for demonstration
-  const mockSkills: Skill[] = [
-    { id: '1', name: 'Engine Repair', category: 'mechanical', description: 'Advanced engine repair techniques' },
-    { id: '2', name: 'Transmission', category: 'mechanical', description: 'Transmission maintenance and repair' },
-    { id: '3', name: 'Circuit Diagnosis', category: 'electrical', description: 'Electrical system diagnosis' },
-    { id: '4', name: 'Battery Systems', category: 'electrical', description: 'Battery and charging systems' },
-    { id: '5', name: 'Paint Finishing', category: 'bodywork', description: 'Professional paint finishing' },
-    { id: '6', name: 'Panel Repair', category: 'bodywork', description: 'Body panel repair and alignment' },
-    { id: '7', name: 'OBD Analysis', category: 'diagnostics', description: 'OBD system analysis' },
-    { id: '8', name: 'Parts Restoration', category: 'restoration', description: 'Vintage parts restoration' },
-    { id: '9', name: 'Custom Fabrication', category: 'customization', description: 'Custom parts fabrication' },
-  ];
 
-  const mockUserSkills: UserSkill[] = [
-    { id: 'us1', user_id: 'mock-user-1', skill_id: '1', level: 4, experience_points: 3500, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 'us2', user_id: 'mock-user-1', skill_id: '2', level: 3, experience_points: 2500, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 'us3', user_id: 'mock-user-1', skill_id: '3', level: 5, experience_points: 5000, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 'us4', user_id: 'mock-user-1', skill_id: '4', level: 2, experience_points: 1500, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 'us5', user_id: 'mock-user-1', skill_id: '5', level: 4, experience_points: 3800, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 'us6', user_id: 'mock-user-1', skill_id: '6', level: 1, experience_points: 800, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 'us7', user_id: 'mock-user-1', skill_id: '7', level: 3, experience_points: 2700, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 'us8', user_id: 'mock-user-1', skill_id: '8', level: 2, experience_points: 1600, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 'us9', user_id: 'mock-user-1', skill_id: '9', level: 5, experience_points: 5000, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  ];
-
-  const { data: skills, isLoading, error } = useQuery({
+  const { data: skills, isLoading: skillsLoading, error: skillsError } = useQuery({
     queryKey: ['skills'],
     queryFn: async () => {
-      // For demo, return mock data instead of fetching
-      return mockSkills;
-    },
+      const { data, error } = await supabase
+        .from('skills')
+        .select('*');
+      
+      if (error) throw error;
+      return data as Skill[];
+    }
   });
 
   const { data: userSkills, error: userSkillsError } = useQuery({
     queryKey: ['user-skills'],
     queryFn: async () => {
-      // For demo, return mock data instead of fetching
-      return mockUserSkills;
-    },
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from('user_skills')
+        .select('*')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      return data as UserSkill[];
+    }
   });
 
-  if (error || userSkillsError) {
+  if (skillsError || userSkillsError) {
     toast({
       title: 'Error',
       description: 'Failed to load skills data. Please try again.',
@@ -61,7 +49,7 @@ export const SkillTree = () => {
     });
   }
 
-  if (isLoading) {
+  if (skillsLoading) {
     return <LoadingState />;
   }
 
