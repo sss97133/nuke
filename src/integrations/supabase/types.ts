@@ -1907,6 +1907,107 @@ export type Database = {
           },
         ]
       }
+      test_cases: {
+        Row: {
+          complexity_score: number | null
+          created_at: string | null
+          description: string | null
+          execution_count: number | null
+          generated_by: string | null
+          id: string
+          is_active: boolean | null
+          last_execution_time: string | null
+          metadata: Json | null
+          name: string
+          priority: number | null
+          status: Database["public"]["Enums"]["test_status"] | null
+          success_rate: number | null
+          tags: string[] | null
+          test_code: string
+          updated_at: string | null
+        }
+        Insert: {
+          complexity_score?: number | null
+          created_at?: string | null
+          description?: string | null
+          execution_count?: number | null
+          generated_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_execution_time?: string | null
+          metadata?: Json | null
+          name: string
+          priority?: number | null
+          status?: Database["public"]["Enums"]["test_status"] | null
+          success_rate?: number | null
+          tags?: string[] | null
+          test_code: string
+          updated_at?: string | null
+        }
+        Update: {
+          complexity_score?: number | null
+          created_at?: string | null
+          description?: string | null
+          execution_count?: number | null
+          generated_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_execution_time?: string | null
+          metadata?: Json | null
+          name?: string
+          priority?: number | null
+          status?: Database["public"]["Enums"]["test_status"] | null
+          success_rate?: number | null
+          tags?: string[] | null
+          test_code?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      test_executions: {
+        Row: {
+          created_at: string | null
+          environment_info: Json | null
+          error_message: string | null
+          execution_time: number | null
+          id: string
+          metadata: Json | null
+          stack_trace: string | null
+          status: Database["public"]["Enums"]["test_status"]
+          test_case_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          environment_info?: Json | null
+          error_message?: string | null
+          execution_time?: number | null
+          id?: string
+          metadata?: Json | null
+          stack_trace?: string | null
+          status: Database["public"]["Enums"]["test_status"]
+          test_case_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          environment_info?: Json | null
+          error_message?: string | null
+          execution_time?: number | null
+          id?: string
+          metadata?: Json | null
+          stack_trace?: string | null
+          status?: Database["public"]["Enums"]["test_status"]
+          test_case_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_executions_test_case_id_fkey"
+            columns: ["test_case_id"]
+            isOneToOne: false
+            referencedRelation: "test_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       token_analytics: {
         Row: {
           created_at: string
@@ -2816,6 +2917,7 @@ export type Database = {
         | "intern"
         | "partner"
         | "collaborator"
+      test_status: "pending" | "running" | "passed" | "failed"
       theme_type: "light" | "dark" | "system"
       user_type: "viewer" | "professional"
     }
