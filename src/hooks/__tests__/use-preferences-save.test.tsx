@@ -34,19 +34,17 @@ describe('usePreferencesSave', () => {
   
   beforeEach(() => {
     vi.clearAllMocks();
+    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
   });
 
   it('should save preferences successfully', async () => {
     const mockUpdates = { notifications_enabled: false };
-    
-    (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
-
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await result.current.savePreferences({ 
-      user: mockUser,
-      updates: mockUpdates 
+    await result.current.savePreferences({
+      updates: mockUpdates,
+      user: mockUser
     });
 
     // Verify correct method chain with mock data
@@ -63,9 +61,9 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await expect(result.current.savePreferences({ 
-      user: null, 
-      updates: {} 
+    await expect(result.current.savePreferences({
+      updates: {},
+      user: null
     })).rejects.toThrow('No user found');
   });
 });
