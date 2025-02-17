@@ -26,12 +26,13 @@ export const usePreferencesBase = () => {
 
   const loadUserPreferences = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError) throw userError;
+      if (userError) {
+        setError('Authentication error. Please sign in again.');
+        setLoading(false);
+        return;
+      }
       
       if (!user) {
         setError('No user found. Please sign in again.');
@@ -45,8 +46,11 @@ export const usePreferencesBase = () => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (preferencesError && preferencesError.code !== 'PGRST116') {
-        throw preferencesError;
+      if (preferencesError) {
+        console.error('Error loading preferences:', preferencesError);
+        setError('Failed to load preferences');
+        setLoading(false);
+        return;
       }
 
       if (preferencesData) {
@@ -77,18 +81,26 @@ export const usePreferencesBase = () => {
           price_alerts_enabled: true
         });
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Error inserting default preferences:', insertError);
+          setError('Failed to create default preferences');
+          setLoading(false);
+          return;
+        }
       }
+      
+      setLoading(false);
+      setError(null);
+      
     } catch (error) {
-      console.error('Error loading preferences:', error);
+      console.error('Unexpected error loading preferences:', error);
       setError('An unexpected error occurred. Please try again.');
+      setLoading(false);
       toast({
         title: "Error",
         description: "Failed to load preferences. Please refresh the page.",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
