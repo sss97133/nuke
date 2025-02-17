@@ -4,7 +4,7 @@ import { usePreferencesSave } from '../use-preferences-save';
 import { supabase } from '@/integrations/supabase/client';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// Mock implementation with column name checking
+// Mock implementation with proper typings and argument handling
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
@@ -60,4 +60,3 @@ describe('usePreferencesSave', () => {
     await result.current.savePreferences({ updates: {}, user: null });
   });
 });
-
