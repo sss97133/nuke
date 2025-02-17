@@ -1392,6 +1392,47 @@ export type Database = {
           },
         ]
       }
+      realtime_video_segments: {
+        Row: {
+          created_at: string | null
+          id: string
+          job_id: string | null
+          processed: boolean | null
+          segment_data: string
+          segment_number: number
+          timestamp_end: string
+          timestamp_start: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          job_id?: string | null
+          processed?: boolean | null
+          segment_data: string
+          segment_number: number
+          timestamp_end: string
+          timestamp_start: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          job_id?: string | null
+          processed?: boolean | null
+          segment_data?: string
+          segment_number?: number
+          timestamp_end?: string
+          timestamp_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realtime_video_segments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "video_processing_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routes: {
         Row: {
           action: string
@@ -2806,6 +2847,8 @@ export type Database = {
           processing_completed_at: string | null
           processing_started_at: string | null
           status: string
+          stream_id: string | null
+          streaming_analysis: boolean | null
           updated_at: string
           user_id: string | null
           video_url: string
@@ -2818,6 +2861,8 @@ export type Database = {
           processing_completed_at?: string | null
           processing_started_at?: string | null
           status?: string
+          stream_id?: string | null
+          streaming_analysis?: boolean | null
           updated_at?: string
           user_id?: string | null
           video_url: string
@@ -2830,11 +2875,21 @@ export type Database = {
           processing_completed_at?: string | null
           processing_started_at?: string | null
           status?: string
+          stream_id?: string | null
+          streaming_analysis?: boolean | null
           updated_at?: string
           user_id?: string | null
           video_url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "video_processing_jobs_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vin_processing_jobs: {
         Row: {
