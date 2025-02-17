@@ -4,7 +4,7 @@ import { usePreferencesSave } from '../use-preferences-save';
 import { supabase } from '@/integrations/supabase/client';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// Mock Supabase client and toast
+// Using solution #1 (Basic Mock with Required Arguments)
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
@@ -12,7 +12,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: null }))
+        eq: vi.fn((column: string, value: any) => Promise.resolve({ data: null, error: null }))
       })
     })
   }
