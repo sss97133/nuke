@@ -56,7 +56,5 @@ describe('usePreferencesSave', () => {
 
     expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: {}, user: null });
-
-    // No need to make assertions about eq() call since it won't be called when user is null
   });
 });
