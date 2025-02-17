@@ -43,7 +43,7 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await result.current.savePreferences({ updates: mockUpdates, user: mockUser });
+    await result.current.savePreferences(mockUpdates, mockUser);
 
     // Verify correct method chain with mock data
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
@@ -57,8 +57,7 @@ describe('usePreferencesSave', () => {
     const { result } = renderHook(() => usePreferencesSave());
 
     expect(result.current.savePreferences).toBeDefined();
-    await result.current.savePreferences({ updates: {}, user: null });
-
-    // No need to make assertions here since we're just testing that it doesn't throw
+    await expect(result.current.savePreferences({}, null))
+      .rejects.toThrow('No user found');
   });
 });
