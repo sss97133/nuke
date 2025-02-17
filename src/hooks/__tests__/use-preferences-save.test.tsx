@@ -12,7 +12,12 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn()
+        eq: vi.fn().mockImplementation((column, value) => {
+          // Mock implementation that uses the arguments
+          expect(column).toBeDefined();
+          expect(value).toBeDefined();
+          return Promise.resolve({ data: null, error: null });
+        })
       })
     })
   }
@@ -27,11 +32,6 @@ vi.mock('@/hooks/use-toast', () => ({
 describe('usePreferencesSave', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    // Set up the mock implementation for eq
-    const eqMock = vi.fn().mockResolvedValue({ data: null, error: null });
-    const updateMock = vi.fn().mockReturnValue({ eq: eqMock });
-    (supabase.from as any).mockReturnValue({ update: updateMock });
   });
 
   it('should save preferences successfully', async () => {
@@ -45,7 +45,7 @@ describe('usePreferencesSave', () => {
     expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: mockUpdates, user: mockUser });
 
-    // Verify correct method chain
+    // Verify correct method chain with mock data
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     const updateMock = supabase.from('user_preferences').update;
     expect(updateMock).toHaveBeenCalledWith(mockUpdates);
@@ -57,6 +57,6 @@ describe('usePreferencesSave', () => {
 
     expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences({ updates: {}, user: null });
-    // Test will pass as the function handles null user case internally
   });
 });
+

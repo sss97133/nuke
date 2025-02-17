@@ -12,10 +12,20 @@ vi.mock('@/integrations/supabase/client', () => ({
     },
     from: vi.fn().mockReturnValue({
       update: vi.fn().mockReturnValue({
-        eq: vi.fn()
+        eq: vi.fn().mockImplementation((column, value) => {
+          // Mock implementation that uses the arguments
+          expect(column).toBeDefined();
+          expect(value).toBeDefined();
+          return Promise.resolve({ data: null, error: null });
+        })
       }),
       delete: vi.fn().mockReturnValue({
-        eq: vi.fn()
+        eq: vi.fn().mockImplementation((column, value) => {
+          // Mock implementation that uses the arguments
+          expect(column).toBeDefined();
+          expect(value).toBeDefined();
+          return Promise.resolve({ data: null, error: null });
+        })
       })
     })
   }
@@ -30,15 +40,6 @@ vi.mock('@/hooks/use-toast', () => ({
 describe('usePreferencesData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    // Set up the mock implementation for eq
-    const eqMock = vi.fn().mockResolvedValue({ data: null, error: null });
-    const updateMock = vi.fn().mockReturnValue({ eq: eqMock });
-    const deleteMock = vi.fn().mockReturnValue({ eq: eqMock });
-    (supabase.from as any).mockReturnValue({ 
-      update: updateMock,
-      delete: deleteMock
-    });
   });
 
   it('should reset preferences successfully', async () => {
@@ -50,7 +51,7 @@ describe('usePreferencesData', () => {
     expect(result.current.handleResetPreferences).toBeDefined();
     await result.current.handleResetPreferences({ user: mockUser });
 
-    // Verify correct method chain
+    // Verify correct method chain with mock data
     expect(supabase.from).toHaveBeenCalledWith('user_preferences');
     const updateMock = supabase.from('user_preferences').update;
     expect(updateMock).toHaveBeenCalledWith({
@@ -74,3 +75,4 @@ describe('usePreferencesData', () => {
       .rejects.toThrow('No user found');
   });
 });
+
