@@ -57,4 +57,3 @@ describe('usePreferencesSave', () => {
     await expect(result.current.savePreferences(mockUpdates)).rejects.toThrow('No user found');
   });
 });
-

@@ -19,9 +19,8 @@ export const usePreferences = () => {
     preferences,
     loading,
     error,
-    savePreferences: (updates: any) => savePreferences({ updates, user }),
+    savePreferences,
     handleResetPreferences: () => handleResetPreferences({ user }),
     handleClearData: () => handleClearData({ user })
   };
 };
-

@@ -22,7 +22,7 @@ interface VideoProcessingJob {
 export const VideoAnalysis = () => {
   const { jobId } = useParams();
 
-  const { data: job, isLoading, error } = useQuery<VideoProcessingJob, Error>({
+  const { data: job, isLoading, error } = useQuery<VideoProcessingJob>({
     queryKey: ['video-job', jobId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -120,4 +120,3 @@ export const VideoAnalysis = () => {
     </div>
   );
 };
-
