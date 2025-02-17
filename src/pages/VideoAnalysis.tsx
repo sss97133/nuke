@@ -22,6 +22,7 @@ export const VideoAnalysis = () => {
       return data;
     },
     enabled: !!jobId,
+    refetchInterval: (data) => data?.status === 'processing' ? 5000 : false, // Only poll if job is processing
   });
 
   if (!jobId) {
@@ -63,6 +64,7 @@ export const VideoAnalysis = () => {
                 controls
                 autoPlay
                 className="w-full h-full object-contain"
+                playsInline // Add playsInline for better mobile support
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-white">
@@ -75,6 +77,7 @@ export const VideoAnalysis = () => {
             <video
               src={job.video_url}
               controls
+              playsInline // Add playsInline for better mobile support
               className="w-full max-h-[400px] object-contain bg-black rounded-lg"
             />
           )
@@ -85,3 +88,4 @@ export const VideoAnalysis = () => {
     </div>
   );
 };
+

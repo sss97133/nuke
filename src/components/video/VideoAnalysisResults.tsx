@@ -1,26 +1,32 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface VideoAnalysisResultsProps {
   jobId: string;
   isStreaming?: boolean;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResultsProps) => {
+  const [page, setPage] = useState(0);
+
   const { data: results, isLoading } = useQuery({
-    queryKey: ['video-analysis-results', jobId],
+    queryKey: ['video-analysis-results', jobId, page],
     queryFn: async () => {
       if (isStreaming) {
         const { data, error } = await supabase
           .from('realtime_video_segments')
           .select('*')
           .eq('job_id', jobId)
-          .order('segment_number', { ascending: true });
+          .order('segment_number', { ascending: false })
+          .range(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE - 1);
 
         if (error) throw error;
         return data;
@@ -29,16 +35,18 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
           .from('video_analysis_results')
           .select('*')
           .eq('job_id', jobId)
-          .order('timestamp', { ascending: true });
+          .order('timestamp', { ascending: false })
+          .range(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE - 1);
 
         if (error) throw error;
         return data;
       }
     },
-    refetchInterval: isStreaming ? 1000 : false,
+    refetchInterval: isStreaming ? 2000 : false, // Reduced polling frequency to 2 seconds
+    keepPreviousData: true, // Keep old data while fetching new data
   });
 
-  if (isLoading) {
+  if (isLoading && !results) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
@@ -57,34 +65,57 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
   }
 
   return (
-    <ScrollArea className="h-[400px]">
-      <div className="space-y-4">
-        {results.map((result, index) => (
-          <Card key={result.id} className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <Badge variant="outline" className="mb-2">
-                  {isStreaming 
-                    ? `Segment ${result.segment_number}`
-                    : new Date(result.timestamp).toLocaleTimeString()
-                }
-                </Badge>
-                <div className="space-y-2">
-                  {isStreaming ? (
-                    <pre className="text-sm whitespace-pre-wrap">
-                      {result.segment_data}
-                    </pre>
-                  ) : (
-                    <pre className="text-sm whitespace-pre-wrap">
-                      {JSON.stringify(result.analysis_data, null, 2)}
-                    </pre>
-                  )}
+    <div className="space-y-4">
+      <ScrollArea className="h-[400px]">
+        <div className="space-y-4">
+          {results.map((result, index) => (
+            <Card key={result.id} className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <Badge variant="outline" className="mb-2">
+                    {isStreaming 
+                      ? `Segment ${result.segment_number}`
+                      : new Date(result.timestamp).toLocaleTimeString()
+                    }
+                  </Badge>
+                  <div className="space-y-2">
+                    {isStreaming ? (
+                      <pre className="text-sm whitespace-pre-wrap overflow-auto max-h-[200px]">
+                        {result.segment_data}
+                      </pre>
+                    ) : (
+                      <pre className="text-sm whitespace-pre-wrap overflow-auto max-h-[200px]">
+                        {JSON.stringify(result.analysis_data, null, 2)}
+                      </pre>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))}
+        </div>
+      </ScrollArea>
+      
+      <div className="flex justify-between items-center pt-4">
+        <Button
+          variant="outline"
+          onClick={() => setPage(p => Math.max(0, p - 1))}
+          disabled={page === 0}
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          Page {page + 1}
+        </span>
+        <Button
+          variant="outline"
+          onClick={() => setPage(p => p + 1)}
+          disabled={results.length < ITEMS_PER_PAGE}
+        >
+          Next
+        </Button>
       </div>
-    </ScrollArea>
+    </div>
   );
 };
+
