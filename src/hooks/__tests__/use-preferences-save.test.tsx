@@ -10,11 +10,11 @@ vi.mock('@/integrations/supabase/client', () => ({
     auth: {
       getUser: vi.fn()
     },
-    from: vi.fn((table: string) => ({
-      update: vi.fn(() => ({
-        eq: vi.fn((column: string, value: string) => Promise.resolve({ data: null, error: null }))
-      }))
-    }))
+    from: vi.fn().mockReturnValue({
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null })
+      })
+    })
   }
 }));
 
@@ -54,3 +54,4 @@ describe('usePreferencesSave', () => {
     expect(savePromise).toBeDefined();
   });
 });
+
