@@ -76,3 +76,4 @@ describe('usePreferencesData', () => {
       .rejects.toThrow('No user found');
   });
 });
+
