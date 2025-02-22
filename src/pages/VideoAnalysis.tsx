@@ -78,17 +78,17 @@ export const VideoAnalysis = () => {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">
-            {job.streaming_analysis ? 'Live Analysis' : 'Video Analysis'} Results
+            {job?.streaming_analysis ? 'Live Analysis' : 'Video Analysis'} Results
           </h1>
           <Badge variant={
-            job.status === 'completed' ? 'default' :
-            job.status === 'processing' ? 'secondary' :
-            job.status === 'error' ? 'destructive' : 'outline'
+            job?.status === 'completed' ? 'default' :
+            job?.status === 'processing' ? 'secondary' :
+            job?.status === 'error' ? 'destructive' : 'outline'
           }>
-            {job.status}
+            {job?.status}
           </Badge>
         </div>
-        {job.streaming_analysis ? (
+        {job?.streaming_analysis ? (
           <div className="bg-black rounded-lg aspect-video relative">
             {job.live_streams?.stream_url ? (
               <video
@@ -105,7 +105,7 @@ export const VideoAnalysis = () => {
             )}
           </div>
         ) : (
-          job.video_url && (
+          job?.video_url && (
             <video
               src={job.video_url}
               controls
@@ -116,7 +116,7 @@ export const VideoAnalysis = () => {
         )}
       </div>
       
-      <VideoAnalysisResults jobId={jobId} isStreaming={job.streaming_analysis} />
+      <VideoAnalysisResults jobId={jobId} isStreaming={job?.streaming_analysis} />
     </div>
   );
 };
