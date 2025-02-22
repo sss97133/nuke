@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,8 +9,9 @@ import { SocialLinksForm } from './SocialLinksForm';
 import { StreamingLinksForm } from './StreamingLinksForm';
 import { AchievementsList } from './AchievementsList';
 import { TeamSection } from './TeamSection';
+import { ContributionsGraph } from './ContributionsGraph';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Users, Trophy } from 'lucide-react';
+import { UserRound, Users, Trophy, GitCommit } from 'lucide-react';
 import { SocialLinks, StreamingLinks, toSocialLinks, toStreamingLinks, toJson } from '@/types/profile';
 
 export const UserProfile = () => {
@@ -145,6 +147,16 @@ export const UserProfile = () => {
           reputationScore={profile?.reputation_score}
           achievementsCount={achievements?.length || 0}
         />
+
+        {profile?.id && (
+          <div className="mt-6 border rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <GitCommit className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-medium">Video Analysis Contributions</h3>
+            </div>
+            <ContributionsGraph userId={profile.id} />
+          </div>
+        )}
 
         <Tabs defaultValue="profile" className="w-full mt-6">
           <TabsList>
