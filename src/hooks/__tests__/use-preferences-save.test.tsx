@@ -35,7 +35,9 @@ describe('usePreferencesSave', () => {
 
   it('should save preferences successfully', async () => {
     const mockUpdates = { notifications_enabled: false };
-    const { result } = renderHook(() => usePreferencesSave());
+    const { result } = renderHook({ 
+      callback: () => usePreferencesSave()
+    });
 
     expect(result.current.savePreferences).toBeDefined();
     await result.current.savePreferences(mockUpdates);
@@ -50,7 +52,9 @@ describe('usePreferencesSave', () => {
   it('should handle error when user is not found', async () => {
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: null }, error: new Error('No user found') });
     
-    const { result } = renderHook(() => usePreferencesSave());
+    const { result } = renderHook({ 
+      callback: () => usePreferencesSave()
+    });
     const mockUpdates = { notifications_enabled: false };
     
     expect(result.current.savePreferences).toBeDefined();
