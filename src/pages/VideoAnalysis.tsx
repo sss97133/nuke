@@ -47,7 +47,7 @@ export const VideoAnalysis = () => {
       return processedData;
     },
     enabled: !!jobId,
-    refetchInterval: (data) => 
+    refetchInterval: (data?: VideoProcessingJob) => 
       data?.status === 'completed' ? false : 5000,
     staleTime: 2000,
     gcTime: 10 * 60 * 1000
@@ -120,3 +120,4 @@ export const VideoAnalysis = () => {
     </div>
   );
 };
+
