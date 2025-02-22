@@ -2791,6 +2791,36 @@ export type Database = {
         }
         Relationships: []
       }
+      video_analysis_contributions: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          label_count: number
+          labels: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          label_count?: number
+          labels?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          label_count?: number
+          labels?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       video_analysis_results: {
         Row: {
           classification_labels: string[] | null
