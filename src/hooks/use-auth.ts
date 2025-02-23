@@ -11,19 +11,25 @@ import { useAuthNavigation } from "./use-auth-navigation";
 
 // Get the base URL for auth redirects
 const getRedirectBase = () => {
+  const hostname = window.location.hostname;
+  const origin = window.location.origin;
+  
+  console.log("[useAuth] Current hostname:", hostname);
+  console.log("[useAuth] Current origin:", origin);
+  
   // Check if we're in the preview environment
-  if (window.location.hostname.includes('lovable.ai')) {
-    console.log("[useAuth] Using preview URL:", window.location.origin);
-    return window.location.origin;
+  if (hostname.includes('lovable.ai')) {
+    console.log("[useAuth] Using preview URL:", origin);
+    return origin;
   }
   // For local development
-  if (window.location.hostname === 'localhost') {
+  if (hostname === 'localhost') {
     console.log("[useAuth] Using localhost URL");
     return 'http://localhost:5173';
   }
   // Default to the current origin (for production)
-  console.log("[useAuth] Using default URL:", window.location.origin);
-  return window.location.origin;
+  console.log("[useAuth] Using default URL:", origin);
+  return origin;
 };
 
 export const useAuth = () => {
@@ -50,6 +56,7 @@ export const useAuth = () => {
     const initializeAuth = async () => {
       try {
         console.log("[useAuth] Initializing auth...");
+        console.log("[useAuth] Current URL:", window.location.href);
         
         // Get initial session
         const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
@@ -68,11 +75,16 @@ export const useAuth = () => {
             console.log("[useAuth] Session details:", {
               userId: currentSession.user.id,
               expiresAt: currentSession.expires_at,
-              provider: currentSession.user.app_metadata.provider
+              provider: currentSession.user.app_metadata.provider,
+              currentUrl: window.location.href
             });
             await checkAndNavigate(currentSession.user.id);
           } else {
             console.log("[useAuth] No active session found");
+            console.log("[useAuth] Current pathname:", window.location.pathname);
+            if (window.location.pathname !== '/login') {
+              navigate('/login');
+            }
           }
         }
       } catch (error: any) {
@@ -99,12 +111,14 @@ export const useAuth = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log("[useAuth] Auth state changed:", event, currentSession ? "Session exists" : "No session");
+      console.log("[useAuth] Current URL during auth change:", window.location.href);
       
       if (event === 'SIGNED_IN' && currentSession) {
         console.log("[useAuth] Sign in event details:", {
           userId: currentSession.user.id,
           provider: currentSession.user.app_metadata.provider,
-          event: event
+          event: event,
+          currentUrl: window.location.href
         });
         if (isSubscribed) {
           setSession(currentSession);
