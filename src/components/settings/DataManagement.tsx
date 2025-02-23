@@ -1,5 +1,5 @@
 
-import { Button } from "@/components/ui/button";
+import { LoggedButton } from "@/components/ui/logged-button";
 
 interface DataManagementProps {
   onResetPreferences: () => void;
@@ -14,13 +14,22 @@ export const DataManagement = ({
     <div className="space-y-4">
       <h2 className="text-xl font-semibold">Data Management</h2>
       <div className="space-x-4">
-        <Button variant="outline" onClick={onResetPreferences}>
+        <LoggedButton 
+          variant="outline" 
+          onClick={onResetPreferences}
+          logId="reset-preferences"
+        >
           Reset to Defaults
-        </Button>
-        <Button variant="destructive" onClick={onClearData}>
+        </LoggedButton>
+        <LoggedButton 
+          variant="destructive" 
+          onClick={onClearData}
+          logId="clear-all-data"
+        >
           Clear All Data
-        </Button>
+        </LoggedButton>
       </div>
     </div>
   );
 };
+
