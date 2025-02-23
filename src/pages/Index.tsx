@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,9 +28,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, isLoading } = useAuth();
   const location = useLocation();
 
-  console.log("[ProtectedRoute] Rendering, isLoading:", isLoading, "hasSession:", !!session);
+  console.log("[ProtectedRoute] Status - Loading:", isLoading, "Session:", !!session);
 
   if (isLoading) {
+    console.log("[ProtectedRoute] Still loading auth state...");
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -41,26 +43,29 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!session) {
-    console.log("[ProtectedRoute] No session, redirecting to login");
+    console.log("[ProtectedRoute] No session found, redirecting to login");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  console.log("[ProtectedRoute] Session exists, rendering children");
+  console.log("[ProtectedRoute] Auth check passed, rendering content");
   return <>{children}</>;
 };
 
 export const Index = () => {
   const { session, isLoading } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const location = useLocation();
 
   useEffect(() => {
-    if (!isLoading && session && location.pathname === '/login') {
-      console.log("[Index] Redirecting authenticated user from login to dashboard");
-      navigate('/dashboard');
+    if (!isLoading) {
+      console.log("[Index] Auth state resolved - Session:", !!session, "Path:", location.pathname);
+      
+      if (session && location.pathname === '/login') {
+        console.log("[Index] Redirecting authenticated user from login to dashboard");
+        navigate('/dashboard');
+      }
     }
-  }, [session, isLoading, navigate, location]);
+  }, [session, isLoading, navigate, location.pathname]);
 
   return (
     <Routes>
