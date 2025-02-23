@@ -2,7 +2,6 @@
 import React from "react";
 import { NavigateFunction } from "react-router-dom";
 import { ToastFunction } from "../../hooks/utils/types";
-import { handleProjectNavigation } from "../../hooks/utils/navigationUtils";
 import { LoggedButton } from "@/components/ui/logged-button";
 import { Warehouse } from "lucide-react";
 
@@ -12,18 +11,9 @@ interface GarageButtonProps {
 }
 
 export const GarageButton: React.FC<GarageButtonProps> = ({ navigate, toast }) => {
-  const handleSelectGarage = async () => {
-    console.log("Attempting to navigate to garage selection...");
-    try {
-      await handleProjectNavigation(navigate, toast, 'garage_selection');
-    } catch (error) {
-      console.error("Failed to navigate to garage selection:", error);
-      toast({
-        title: "Navigation Failed",
-        description: "Could not access garage selection. Please try again.",
-        variant: "destructive"
-      });
-    }
+  const handleSelectGarage = () => {
+    console.log("Navigating to garage selector...");
+    navigate('/garage-selector');
   };
 
   return (
@@ -38,4 +28,3 @@ export const GarageButton: React.FC<GarageButtonProps> = ({ navigate, toast }) =
     </LoggedButton>
   );
 };
-

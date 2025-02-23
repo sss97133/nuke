@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -23,6 +22,7 @@ import { VehicleTokens } from "@/components/tokens/VehicleTokens";
 import { DAOProposals } from "@/components/dao/DAOProposals";
 import { AuctionList as Auctions } from "@/components/auctions/AuctionList";
 import { VideoAnalysis } from "./VideoAnalysis";
+import { GarageSelector } from "@/components/garage/GarageSelector";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, isLoading } = useAuth();
@@ -65,13 +65,11 @@ export const Index = () => {
         navigate('/dashboard');
       }
 
-      // Redirect /settings to /dashboard/settings
       if (location.pathname === '/settings') {
         console.log("[Index] Redirecting /settings to /dashboard/settings");
         navigate('/dashboard/settings', { replace: true });
       }
 
-      // Add redirect for /sitemap to /dashboard/sitemap
       if (location.pathname === '/sitemap') {
         console.log("[Index] Redirecting /sitemap to /dashboard/sitemap");
         navigate('/dashboard/sitemap', { replace: true });
@@ -110,17 +108,20 @@ export const Index = () => {
         <Route path="auctions" element={<Auctions />} />
       </Route>
 
-      {/* Add a direct /import route that redirects to /dashboard/import */}
+      <Route path="/garage-selector" element={
+        <ProtectedRoute>
+          <GarageSelector />
+        </ProtectedRoute>
+      } />
+
       <Route path="/import" element={
         <Navigate to="/dashboard/import" replace />
       } />
 
-      {/* Add a direct /glossary route that redirects to /dashboard/glossary */}
       <Route path="/glossary" element={
         <Navigate to="/dashboard/glossary" replace />
       } />
 
-      {/* Add a direct /sitemap route that redirects to /dashboard/sitemap */}
       <Route path="/sitemap" element={
         <Navigate to="/dashboard/sitemap" replace />
       } />
@@ -145,4 +146,3 @@ export const Index = () => {
 };
 
 export default Index;
-
