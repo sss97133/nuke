@@ -11,24 +11,20 @@ import { useAuthNavigation } from "./use-auth-navigation";
 
 // Get the base URL for auth redirects
 const getRedirectBase = () => {
-  const hostname = window.location.hostname;
+  // Using a single source of truth for host/origin
   const origin = window.location.origin;
+  const hostname = window.location.hostname;
   
-  console.log("[useAuth] Current hostname:", hostname);
   console.log("[useAuth] Current origin:", origin);
-  
-  // Check if we're in the preview environment
+
   if (hostname.includes('lovable.ai')) {
-    console.log("[useAuth] Using preview URL:", origin);
     return origin;
   }
-  // For local development
+  
   if (hostname === 'localhost') {
-    console.log("[useAuth] Using localhost URL");
     return 'http://localhost:5173';
   }
-  // Default to the current origin (for production)
-  console.log("[useAuth] Using default URL:", origin);
+
   return origin;
 };
 
@@ -51,57 +47,42 @@ export const useAuth = () => {
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
-    let isSubscribed = true; // For cleanup
+    let mounted = true;
 
     const initializeAuth = async () => {
       try {
-        console.log("[useAuth] Initializing auth...");
-        console.log("[useAuth] Current URL:", window.location.href);
-        
-        // Get initial session
         const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.error("[useAuth] Session retrieval error:", sessionError);
+          console.error("[useAuth] Session error:", sessionError);
           throw sessionError;
         }
 
-        console.log("[useAuth] Initial session check:", currentSession ? "Session exists" : "No session");
+        if (!mounted) return;
+
+        setSession(currentSession);
         
-        if (isSubscribed) {
-          setSession(currentSession);
-        
-          if (currentSession) {
-            console.log("[useAuth] Session details:", {
-              userId: currentSession.user.id,
-              expiresAt: currentSession.expires_at,
-              provider: currentSession.user.app_metadata.provider,
-              currentUrl: window.location.href
-            });
-            await checkAndNavigate(currentSession.user.id);
-          } else {
-            console.log("[useAuth] No active session found");
-            console.log("[useAuth] Current pathname:", window.location.pathname);
-            if (window.location.pathname !== '/login') {
-              navigate('/login');
-            }
+        if (currentSession?.user) {
+          console.log("[useAuth] User authenticated:", {
+            id: currentSession.user.id,
+            email: currentSession.user.email
+          });
+          await checkAndNavigate(currentSession.user.id);
+        } else {
+          console.log("[useAuth] No active session");
+          if (window.location.pathname !== '/login') {
+            navigate('/login');
           }
         }
       } catch (error: any) {
-        console.error("[useAuth] Error initializing auth:", error);
-        console.error("[useAuth] Error details:", {
-          message: error.message,
-          status: error.status,
-          name: error.name,
-          stack: error.stack
-        });
+        console.error("[useAuth] Auth error:", error);
         toast({
           variant: "destructive",
           title: "Authentication Error",
-          description: "There was a problem initializing authentication. Please try refreshing the page."
+          description: "Please try signing in again."
         });
       } finally {
-        if (isSubscribed) {
+        if (mounted) {
           setLoading(false);
         }
       }
@@ -110,34 +91,21 @@ export const useAuth = () => {
     initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log("[useAuth] Auth state changed:", event, currentSession ? "Session exists" : "No session");
-      console.log("[useAuth] Current URL during auth change:", window.location.href);
+      console.log("[useAuth] Auth state changed:", event);
       
+      if (!mounted) return;
+
       if (event === 'SIGNED_IN' && currentSession) {
-        console.log("[useAuth] Sign in event details:", {
-          userId: currentSession.user.id,
-          provider: currentSession.user.app_metadata.provider,
-          event: event,
-          currentUrl: window.location.href
-        });
-        if (isSubscribed) {
-          setSession(currentSession);
-          await checkAndNavigate(currentSession.user.id);
-        }
+        setSession(currentSession);
+        await checkAndNavigate(currentSession.user.id);
       } else if (event === 'SIGNED_OUT') {
-        console.log("[useAuth] User signed out");
-        if (isSubscribed) {
-          setSession(null);
-          navigate('/login');
-        }
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log("[useAuth] Token refreshed");
+        setSession(null);
+        navigate('/login');
       }
     });
 
-    // Cleanup subscription on unmount
     return () => {
-      isSubscribed = false;
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [navigate, checkAndNavigate, toast]);
@@ -148,9 +116,7 @@ export const useAuth = () => {
     handleSocialLogin: async (provider: Provider) => {
       try {
         const redirectTo = `${getRedirectBase()}/auth/callback`;
-        console.log("[useAuth] Initiating social login with provider:", provider);
-        console.log("[useAuth] Using redirect URL:", redirectTo);
-
+        
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
@@ -162,23 +128,14 @@ export const useAuth = () => {
           }
         });
 
-        if (error) {
-          console.error("[useAuth] Social login error:", error);
-          throw error;
-        }
-
-        console.log("[useAuth] Social login successful:", data);
+        if (error) throw error;
         return data;
       } catch (error: any) {
-        console.error("[useAuth] Social login error:", {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        });
+        console.error("[useAuth] Social login error:", error);
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Failed to sign in with social provider. Please try again."
+          title: "Login Error",
+          description: "Could not complete social login. Please try again."
         });
       }
     },
@@ -187,19 +144,14 @@ export const useAuth = () => {
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
         
-        console.log("[useAuth] Successfully logged out");
         toast({
           title: "Logged Out",
-          description: "See you next time!"
+          description: "You have been successfully logged out."
         });
         
         navigate('/login');
       } catch (error: any) {
-        console.error("[useAuth] Logout error:", {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        });
+        console.error("[useAuth] Logout error:", error);
         toast({
           variant: "destructive",
           title: "Error",
