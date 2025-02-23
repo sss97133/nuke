@@ -2,13 +2,10 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { useTheme } from "next-themes";
-import { handleProjectNavigation } from "../hooks/utils/navigationUtils";
 import { UserMenu } from "./menu/UserMenu";
-import { LoggedButton } from "@/components/ui/logged-button";
-import { Warehouse } from "lucide-react";
 import { MainMenu } from "./MainMenu";
 import { AppMenu } from "./AppMenu";
+import { GarageButton } from "./buttons/GarageButton";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
@@ -16,16 +13,7 @@ interface DashboardHeaderProps {
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuAction }) => {
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
   const { toast } = useToast();
-
-  const handleToggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
-
-  const handleSelectGarage = () => {
-    handleProjectNavigation(navigate, toast, 'garage_selection');
-  };
 
   return (
     <div className="border-b bg-secondary">
@@ -36,15 +24,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
 
         <div className="flex-1" />
 
-        <LoggedButton 
-          variant="ghost" 
-          onClick={handleSelectGarage}
-          className="gap-2"
-          logId="select_garage_button"
-        >
-          <Warehouse className="h-4 w-4" />
-          Select Garage
-        </LoggedButton>
+        <GarageButton 
+          navigate={navigate}
+          toast={toast}
+        />
 
         <UserMenu 
           navigate={navigate}
