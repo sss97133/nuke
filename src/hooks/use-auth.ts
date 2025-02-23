@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -13,13 +12,16 @@ import { useAuthNavigation } from "./use-auth-navigation";
 const getRedirectBase = () => {
   // Check if we're in the preview environment
   if (window.location.hostname.includes('lovable.ai')) {
+    console.log("[useAuth] Using preview URL:", window.location.origin);
     return window.location.origin;
   }
   // For local development
   if (window.location.hostname === 'localhost') {
+    console.log("[useAuth] Using localhost URL");
     return 'http://localhost:5173';
   }
   // Default to the current origin (for production)
+  console.log("[useAuth] Using default URL:", window.location.origin);
   return window.location.origin;
 };
 
@@ -44,22 +46,30 @@ export const useAuth = () => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        console.log("[useAuth] Initializing auth...");
+        
         // Configure auth redirect options
         const redirectTo = `${getRedirectBase()}/auth/callback`;
-        await supabase.auth.setSession({
-          access_token: session?.access_token,
-          refresh_token: session?.refresh_token,
-        });
-
+        
+        // Get initial session
         const { data: { session: currentSession } } = await supabase.auth.getSession();
+        console.log("[useAuth] Initial session check:", currentSession ? "Session exists" : "No session");
+        
         setSession(currentSession);
         
         if (currentSession) {
-          console.log("[useAuth] Initial session found:", currentSession);
+          console.log("[useAuth] Navigating with session userId:", currentSession.user.id);
           await checkAndNavigate(currentSession.user.id);
+        } else {
+          console.log("[useAuth] No session, staying on current page");
         }
       } catch (error) {
         console.error("[useAuth] Error initializing auth:", error);
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: "There was a problem initializing authentication. Please try refreshing the page."
+        });
       } finally {
         setLoading(false);
       }
@@ -82,7 +92,7 @@ export const useAuth = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, checkAndNavigate]);
+  }, [navigate, checkAndNavigate, toast]);
 
   return {
     isLoading: loading || isSocialLoading || isPhoneLoading || isEmailLoading,
