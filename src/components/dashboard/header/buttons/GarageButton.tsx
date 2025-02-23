@@ -12,7 +12,7 @@ interface GarageButtonProps {
 
 export const GarageButton: React.FC<GarageButtonProps> = ({ navigate, toast }) => {
   const handleSelectGarage = () => {
-    console.log("Navigating to garage selector...");
+    console.log("[GarageButton] Navigating to garage selector...");
     navigate('/garage-selector');
   };
 
@@ -28,3 +28,4 @@ export const GarageButton: React.FC<GarageButtonProps> = ({ navigate, toast }) =
     </LoggedButton>
   );
 };
+

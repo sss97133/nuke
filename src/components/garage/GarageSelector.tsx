@@ -15,6 +15,16 @@ export const GarageSelector = () => {
   const { data: garages, isLoading } = useQuery({
     queryKey: ['garages'],
     queryFn: async () => {
+      console.log("[GarageSelector] Fetching garages for user");
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error("[GarageSelector] Error fetching user:", userError);
+        throw userError;
+      }
+
+      console.log("[GarageSelector] User ID:", user?.id);
+
       const { data, error } = await supabase
         .from('garages')
         .select(`
@@ -26,23 +36,40 @@ export const GarageSelector = () => {
             status
           )
         `)
-        .eq('garage_members.user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('garage_members.user_id', user?.id)
         .eq('garage_members.status', 'active');
 
-      if (error) throw error;
+      if (error) {
+        console.error("[GarageSelector] Error fetching garages:", error);
+        throw error;
+      }
+
+      console.log("[GarageSelector] Fetched garages:", data);
       return data;
     }
   });
 
   const handleSelectGarage = async (garageId: string) => {
+    console.log("[GarageSelector] Selecting garage:", garageId);
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error("[GarageSelector] Error getting user for garage selection:", userError);
+        throw userError;
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({ active_garage_id: garageId })
-        .eq('id', (await supabase.auth.getUser()).data.user?.id);
+        .eq('id', user?.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("[GarageSelector] Error updating active garage:", error);
+        throw error;
+      }
 
+      console.log("[GarageSelector] Successfully set active garage:", garageId);
       toast({
         title: "Garage Selected",
         description: "Successfully switched active garage"
@@ -50,7 +77,7 @@ export const GarageSelector = () => {
 
       navigate('/dashboard');
     } catch (error) {
-      console.error('Error selecting garage:', error);
+      console.error('[GarageSelector] Error selecting garage:', error);
       toast({
         title: "Error",
         description: "Failed to select garage. Please try again.",
@@ -60,12 +87,15 @@ export const GarageSelector = () => {
   };
 
   if (isLoading) {
+    console.log("[GarageSelector] Loading garages...");
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
   }
+
+  console.log("[GarageSelector] Rendering", garages?.length || 0, "garages");
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -99,3 +129,4 @@ export const GarageSelector = () => {
     </div>
   );
 };
+
