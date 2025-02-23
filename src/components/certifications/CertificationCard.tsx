@@ -6,6 +6,7 @@ import { CertificationHeader } from './card/CertificationHeader';
 import { CertificationProgress } from './card/CertificationProgress';
 import { CertificationActions } from './card/CertificationActions';
 import { CertificationMetrics } from './card/CertificationMetrics';
+import { useToast } from "@/hooks/use-toast";
 
 interface CertificationCardProps {
   name: string;
@@ -34,6 +35,7 @@ export const CertificationCard = ({
 }: CertificationCardProps) => {
   const [likes, setLikes] = React.useState(Math.floor(Math.random() * 100));
   const [viewers] = React.useState(Math.floor(Math.random() * 50));
+  const { toast } = useToast();
 
   const handleLike = () => {
     setLikes(prev => prev + 1);

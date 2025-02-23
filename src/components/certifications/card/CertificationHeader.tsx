@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BadgeCheck, Eye, EyeOff, Trophy, Clock, TrendingUp } from 'lucide-react';
+import { BadgeCheck, Eye, EyeOff, Trophy, Clock, TrendingUp, Star } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
