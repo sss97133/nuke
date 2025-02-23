@@ -23,29 +23,54 @@ export const GarageSelector = () => {
         throw userError;
       }
 
-      console.log("[GarageSelector] User ID:", user?.id);
-
-      const { data, error } = await supabase
-        .from('garages')
-        .select(`
-          id,
-          name,
-          garage_members!inner (
-            id,
-            role,
-            status
-          )
-        `)
-        .eq('garage_members.user_id', user?.id)
-        .eq('garage_members.status', 'active');
-
-      if (error) {
-        console.error("[GarageSelector] Error fetching garages:", error);
-        throw error;
+      if (!user?.id) {
+        console.error("[GarageSelector] No user ID found");
+        throw new Error("No user ID found");
       }
 
-      console.log("[GarageSelector] Fetched garages:", data);
-      return data;
+      console.log("[GarageSelector] User ID:", user.id);
+
+      // First get the garage memberships for the user
+      const { data: memberships, error: membershipError } = await supabase
+        .from('garage_members')
+        .select('garage_id, role, status')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+
+      if (membershipError) {
+        console.error("[GarageSelector] Error fetching memberships:", membershipError);
+        throw membershipError;
+      }
+
+      if (!memberships?.length) {
+        console.log("[GarageSelector] No garage memberships found");
+        return [];
+      }
+
+      // Then get the garage details for those memberships
+      const { data: garages, error: garagesError } = await supabase
+        .from('garages')
+        .select('*')
+        .in('id', memberships.map(m => m.garage_id));
+
+      if (garagesError) {
+        console.error("[GarageSelector] Error fetching garages:", garagesError);
+        throw garagesError;
+      }
+
+      // Combine the data
+      const garagesWithRoles = garages.map(garage => ({
+        ...garage,
+        garage_members: [
+          {
+            role: memberships.find(m => m.garage_id === garage.id)?.role || 'member',
+            status: 'active'
+          }
+        ]
+      }));
+
+      console.log("[GarageSelector] Fetched garages:", garagesWithRoles);
+      return garagesWithRoles;
     }
   });
 
@@ -59,10 +84,14 @@ export const GarageSelector = () => {
         throw userError;
       }
 
+      if (!user?.id) {
+        throw new Error("No user ID found");
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({ active_garage_id: garageId })
-        .eq('id', user?.id);
+        .eq('id', user.id);
 
       if (error) {
         console.error("[GarageSelector] Error updating active garage:", error);
@@ -129,4 +158,3 @@ export const GarageSelector = () => {
     </div>
   );
 };
-
