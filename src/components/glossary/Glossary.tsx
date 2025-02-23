@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -205,32 +204,23 @@ export const Glossary = () => {
   const letters = Object.keys(groupedItems).sort();
 
   return (
-    <div className="container mx-auto py-6 max-w-4xl">
+    <div className="container mx-auto py-4 max-w-4xl">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-3xl font-serif font-bold text-center border-b border-neutral-200 pb-4">
-            Automotive Glossary
-          </CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-2xl">Automotive Glossary</CardTitle>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[70vh] pr-4">
-            <div className="space-y-8">
+          <ScrollArea className="h-[70vh]">
+            <div className="space-y-4">
               {letters.map((letter) => (
-                <div key={letter} className="space-y-6">
-                  <h2 className="text-4xl font-serif font-bold text-primary sticky top-0 bg-background py-2 px-4 -mx-4">
+                <div key={letter} className="space-y-2">
+                  <h2 className="text-2xl font-bold text-primary sticky top-0 bg-background py-1">
                     {letter}
                   </h2>
                   {groupedItems[letter].map((item, index) => (
-                    <div key={index} className="border-b border-neutral-100 pb-6 last:border-0 pl-6">
-                      <h3 className="text-xl font-serif font-bold mb-2 text-neutral-900">
-                        {item.term}
-                        <span className="text-sm font-normal font-sans text-neutral-500 ml-2 italic">
-                          n.
-                        </span>
-                      </h3>
-                      <p className="text-neutral-700 leading-relaxed font-serif text-[15px]">
-                        {item.definition}
-                      </p>
+                    <div key={index} className="border-b border-border pb-2 last:border-0">
+                      <h3 className="text-base font-medium">{item.term}</h3>
+                      <p className="text-sm text-muted-foreground">{item.definition}</p>
                     </div>
                   ))}
                 </div>
