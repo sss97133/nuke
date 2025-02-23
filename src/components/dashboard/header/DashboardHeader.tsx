@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
 import { handleProjectNavigation } from "../hooks/utils/navigationUtils";
 import { UserMenu } from "./menu/UserMenu";
-import { Button } from "@/components/ui/button";
+import { LoggedButton } from "@/components/ui/logged-button";
 import { Warehouse } from "lucide-react";
 import { MainMenu } from "./MainMenu";
 import { AppMenu } from "./AppMenu";
@@ -36,14 +36,15 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
 
         <div className="flex-1" />
 
-        <Button 
+        <LoggedButton 
           variant="ghost" 
           onClick={handleSelectGarage}
           className="gap-2"
+          logId="select_garage_button"
         >
           <Warehouse className="h-4 w-4" />
           Select Garage
-        </Button>
+        </LoggedButton>
 
         <UserMenu 
           navigate={navigate}
@@ -54,4 +55,3 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
     </div>
   );
 };
-
