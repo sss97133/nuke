@@ -70,6 +70,12 @@ export const Index = () => {
         console.log("[Index] Redirecting /settings to /dashboard/settings");
         navigate('/dashboard/settings', { replace: true });
       }
+
+      // Add redirect for /sitemap to /dashboard/sitemap
+      if (location.pathname === '/sitemap') {
+        console.log("[Index] Redirecting /sitemap to /dashboard/sitemap");
+        navigate('/dashboard/sitemap', { replace: true });
+      }
     }
   }, [session, isLoading, navigate, location.pathname]);
 
@@ -114,6 +120,11 @@ export const Index = () => {
         <Navigate to="/dashboard/glossary" replace />
       } />
 
+      {/* Add a direct /sitemap route that redirects to /dashboard/sitemap */}
+      <Route path="/sitemap" element={
+        <Navigate to="/dashboard/sitemap" replace />
+      } />
+
       <Route path="/video-analysis/:jobId" element={
         <ProtectedRoute>
           <VideoAnalysis />
@@ -134,3 +145,4 @@ export const Index = () => {
 };
 
 export default Index;
+
