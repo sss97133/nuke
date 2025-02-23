@@ -359,6 +359,22 @@ export const glossaryItems: GlossaryItem[] = [
   {
     term: "WebSocket",
     definition: "Protocol that enables two-way communication between client and server."
+  },
+  {
+    term: "XState",
+    definition: "State management library for managing complex application state using state machines and statecharts."
+  },
+  {
+    term: "YAML",
+    definition: "Human-readable data serialization format often used for configuration files."
+  },
+  {
+    term: "Zero-config",
+    definition: "Development approach where tools work immediately with sensible defaults, requiring minimal setup."
+  },
+  {
+    term: "Zod",
+    definition: "TypeScript-first schema validation library with static type inference."
   }
 ].sort((a, b) => a.term.localeCompare(b.term));
 

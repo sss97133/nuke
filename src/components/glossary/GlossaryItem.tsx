@@ -1,8 +1,8 @@
 
-import { type GlossaryItem } from "./glossaryData";
+import { type GlossaryItem as GlossaryItemType } from "./glossaryData";
 
 interface GlossaryItemProps {
-  item: GlossaryItem;
+  item: GlossaryItemType;
 }
 
 export const GlossaryItem = ({ item }: GlossaryItemProps) => {
@@ -13,3 +13,4 @@ export const GlossaryItem = ({ item }: GlossaryItemProps) => {
     </div>
   );
 };
+
