@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -44,52 +45,85 @@ export const useAuth = () => {
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
+    let isSubscribed = true; // For cleanup
+
     const initializeAuth = async () => {
       try {
         console.log("[useAuth] Initializing auth...");
         
-        // Configure auth redirect options
-        const redirectTo = `${getRedirectBase()}/auth/callback`;
-        
         // Get initial session
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("[useAuth] Session retrieval error:", sessionError);
+          throw sessionError;
+        }
+
         console.log("[useAuth] Initial session check:", currentSession ? "Session exists" : "No session");
         
-        setSession(currentSession);
+        if (isSubscribed) {
+          setSession(currentSession);
         
-        if (currentSession) {
-          console.log("[useAuth] Navigating with session userId:", currentSession.user.id);
-          await checkAndNavigate(currentSession.user.id);
-        } else {
-          console.log("[useAuth] No session, staying on current page");
+          if (currentSession) {
+            console.log("[useAuth] Session details:", {
+              userId: currentSession.user.id,
+              expiresAt: currentSession.expires_at,
+              provider: currentSession.user.app_metadata.provider
+            });
+            await checkAndNavigate(currentSession.user.id);
+          } else {
+            console.log("[useAuth] No active session found");
+          }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("[useAuth] Error initializing auth:", error);
+        console.error("[useAuth] Error details:", {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          stack: error.stack
+        });
         toast({
           variant: "destructive",
           title: "Authentication Error",
           description: "There was a problem initializing authentication. Please try refreshing the page."
         });
       } finally {
-        setLoading(false);
+        if (isSubscribed) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[useAuth] Auth state changed:", event, session ? "Session exists" : "No session");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log("[useAuth] Auth state changed:", event, currentSession ? "Session exists" : "No session");
       
-      if (event === 'SIGNED_IN' && session) {
-        setSession(session);
-        await checkAndNavigate(session.user.id);
+      if (event === 'SIGNED_IN' && currentSession) {
+        console.log("[useAuth] Sign in event details:", {
+          userId: currentSession.user.id,
+          provider: currentSession.user.app_metadata.provider,
+          event: event
+        });
+        if (isSubscribed) {
+          setSession(currentSession);
+          await checkAndNavigate(currentSession.user.id);
+        }
       } else if (event === 'SIGNED_OUT') {
-        setSession(null);
-        navigate('/login');
+        console.log("[useAuth] User signed out");
+        if (isSubscribed) {
+          setSession(null);
+          navigate('/login');
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log("[useAuth] Token refreshed");
       }
     });
 
+    // Cleanup subscription on unmount
     return () => {
+      isSubscribed = false;
       subscription.unsubscribe();
     };
   }, [navigate, checkAndNavigate, toast]);
@@ -100,6 +134,9 @@ export const useAuth = () => {
     handleSocialLogin: async (provider: Provider) => {
       try {
         const redirectTo = `${getRedirectBase()}/auth/callback`;
+        console.log("[useAuth] Initiating social login with provider:", provider);
+        console.log("[useAuth] Using redirect URL:", redirectTo);
+
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
@@ -111,10 +148,19 @@ export const useAuth = () => {
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error("[useAuth] Social login error:", error);
+          throw error;
+        }
+
+        console.log("[useAuth] Social login successful:", data);
         return data;
-      } catch (error) {
-        console.error("[useAuth] Social login error:", error);
+      } catch (error: any) {
+        console.error("[useAuth] Social login error:", {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
         toast({
           variant: "destructive",
           title: "Error",
@@ -134,8 +180,12 @@ export const useAuth = () => {
         });
         
         navigate('/login');
-      } catch (error) {
-        console.error("[useAuth] Logout error:", error);
+      } catch (error: any) {
+        console.error("[useAuth] Logout error:", {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
         toast({
           variant: "destructive",
           title: "Error",
