@@ -109,6 +109,11 @@ export const Index = () => {
         <Navigate to="/dashboard/import" replace />
       } />
 
+      {/* Add a direct /glossary route that redirects to /dashboard/glossary */}
+      <Route path="/glossary" element={
+        <Navigate to="/dashboard/glossary" replace />
+      } />
+
       <Route path="/video-analysis/:jobId" element={
         <ProtectedRoute>
           <VideoAnalysis />
