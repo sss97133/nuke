@@ -104,6 +104,11 @@ export const Index = () => {
         <Route path="auctions" element={<Auctions />} />
       </Route>
 
+      {/* Add a direct /import route that redirects to /dashboard/import */}
+      <Route path="/import" element={
+        <Navigate to="/dashboard/import" replace />
+      } />
+
       <Route path="/video-analysis/:jobId" element={
         <ProtectedRoute>
           <VideoAnalysis />
@@ -114,7 +119,6 @@ export const Index = () => {
         <Navigate to="/dashboard" replace />
       } />
 
-      {/* Add a redirect for /settings to /dashboard/settings */}
       <Route path="/settings" element={
         <Navigate to="/dashboard/settings" replace />
       } />
