@@ -4,36 +4,40 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthNavigation } from "../use-auth-navigation";
+import { Session } from "@supabase/supabase-js";
 
 export const useAuthState = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { checkAndNavigate } = useAuthNavigation();
   const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    let mounted = true;
+    // Track if the component is mounted
+    let isMounted = true;
 
     const initializeAuth = async () => {
       try {
-        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+        // Get initial session
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
           console.error("[useAuthState] Session error:", sessionError);
           throw sessionError;
         }
 
-        if (!mounted) return;
+        // Only update state if component is still mounted
+        if (!isMounted) return;
 
-        setSession(currentSession);
+        setSession(initialSession);
         
-        if (currentSession?.user) {
+        if (initialSession?.user) {
           console.log("[useAuthState] User authenticated:", {
-            id: currentSession.user.id,
-            email: currentSession.user.email
+            id: initialSession.user.id,
+            email: initialSession.user.email
           });
-          await checkAndNavigate(currentSession.user.id);
+          await checkAndNavigate(initialSession.user.id);
         } else {
           console.log("[useAuthState] No active session");
           if (window.location.pathname !== '/login') {
@@ -42,36 +46,43 @@ export const useAuthState = () => {
         }
       } catch (error: any) {
         console.error("[useAuthState] Auth error:", error);
-        toast({
-          variant: "destructive",
-          title: "Authentication Error",
-          description: "Please try signing in again."
-        });
+        if (isMounted) {
+          toast({
+            variant: "destructive",
+            title: "Authentication Error",
+            description: "Please try signing in again."
+          });
+        }
       } finally {
-        if (mounted) {
+        if (isMounted) {
           setLoading(false);
         }
       }
     };
 
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        console.log("[useAuthState] Auth state changed:", event);
+        
+        if (!isMounted) return;
+
+        setSession(currentSession);
+
+        if (event === 'SIGNED_IN' && currentSession?.user) {
+          await checkAndNavigate(currentSession.user.id);
+        } else if (event === 'SIGNED_OUT') {
+          navigate('/login');
+        }
+      }
+    );
+
+    // Initialize auth state
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log("[useAuthState] Auth state changed:", event);
-      
-      if (!mounted) return;
-
-      if (event === 'SIGNED_IN' && currentSession) {
-        setSession(currentSession);
-        await checkAndNavigate(currentSession.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        setSession(null);
-        navigate('/login');
-      }
-    });
-
+    // Cleanup function
     return () => {
-      mounted = false;
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [navigate, checkAndNavigate, toast]);
