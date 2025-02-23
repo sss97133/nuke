@@ -208,20 +208,29 @@ export const Glossary = () => {
     <div className="container mx-auto py-6 max-w-4xl">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">Glossary</CardTitle>
+          <CardTitle className="text-3xl font-serif font-bold text-center border-b border-neutral-200 pb-4">
+            Automotive Glossary
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[70vh] pr-4">
             <div className="space-y-8">
               {letters.map((letter) => (
-                <div key={letter} className="space-y-4">
-                  <h2 className="text-2xl font-bold text-primary sticky top-0 bg-background py-2">
+                <div key={letter} className="space-y-6">
+                  <h2 className="text-4xl font-serif font-bold text-primary sticky top-0 bg-background py-2 px-4 -mx-4">
                     {letter}
                   </h2>
                   {groupedItems[letter].map((item, index) => (
-                    <div key={index} className="border-b border-border pb-4 last:border-0">
-                      <h3 className="text-lg font-semibold mb-2">{item.term}</h3>
-                      <p className="text-muted-foreground">{item.definition}</p>
+                    <div key={index} className="border-b border-neutral-100 pb-6 last:border-0 pl-6">
+                      <h3 className="text-xl font-serif font-bold mb-2 text-neutral-900">
+                        {item.term}
+                        <span className="text-sm font-normal font-sans text-neutral-500 ml-2 italic">
+                          n.
+                        </span>
+                      </h3>
+                      <p className="text-neutral-700 leading-relaxed font-serif text-[15px]">
+                        {item.definition}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -233,4 +242,3 @@ export const Glossary = () => {
     </div>
   );
 };
-
