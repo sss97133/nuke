@@ -3072,6 +3072,8 @@ export type Database = {
         | "garage_admin"
       certification_status: "pending" | "in_progress" | "completed" | "expired"
       feed_importance: "low" | "medium" | "high" | "urgent"
+      garage_membership_status: "pending" | "active" | "rejected"
+      garage_role: "manager" | "technician" | "staff"
       location_status: "pending" | "approved" | "rejected"
       service_type:
         | "routine_maintenance"
