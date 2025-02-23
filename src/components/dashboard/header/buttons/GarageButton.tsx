@@ -12,8 +12,18 @@ interface GarageButtonProps {
 }
 
 export const GarageButton: React.FC<GarageButtonProps> = ({ navigate, toast }) => {
-  const handleSelectGarage = () => {
-    handleProjectNavigation(navigate, toast, 'garage_selection');
+  const handleSelectGarage = async () => {
+    console.log("Attempting to navigate to garage selection...");
+    try {
+      await handleProjectNavigation(navigate, toast, 'garage_selection');
+    } catch (error) {
+      console.error("Failed to navigate to garage selection:", error);
+      toast({
+        title: "Navigation Failed",
+        description: "Could not access garage selection. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -28,3 +38,4 @@ export const GarageButton: React.FC<GarageButtonProps> = ({ navigate, toast }) =
     </LoggedButton>
   );
 };
+
