@@ -64,6 +64,12 @@ export const Index = () => {
         console.log("[Index] Redirecting authenticated user from login to dashboard");
         navigate('/dashboard');
       }
+
+      // Redirect /settings to /dashboard/settings
+      if (location.pathname === '/settings') {
+        console.log("[Index] Redirecting /settings to /dashboard/settings");
+        navigate('/dashboard/settings', { replace: true });
+      }
     }
   }, [session, isLoading, navigate, location.pathname]);
 
@@ -106,6 +112,11 @@ export const Index = () => {
 
       <Route path="/" element={
         <Navigate to="/dashboard" replace />
+      } />
+
+      {/* Add a redirect for /settings to /dashboard/settings */}
+      <Route path="/settings" element={
+        <Navigate to="/dashboard/settings" replace />
       } />
 
       <Route path="*" element={<NotFound />} />
