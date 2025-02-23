@@ -847,6 +847,7 @@ export type Database = {
           garage_id: string
           id: string
           role: string
+          status: string
           user_id: string
         }
         Insert: {
@@ -854,6 +855,7 @@ export type Database = {
           garage_id: string
           id?: string
           role?: string
+          status?: string
           user_id: string
         }
         Update: {
@@ -861,6 +863,7 @@ export type Database = {
           garage_id?: string
           id?: string
           role?: string
+          status?: string
           user_id?: string
         }
         Relationships: [
