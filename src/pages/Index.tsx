@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -28,6 +27,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, isLoading } = useAuth();
   const location = useLocation();
 
+  console.log("[ProtectedRoute] Rendering, isLoading:", isLoading, "hasSession:", !!session);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -40,9 +41,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!session) {
+    console.log("[ProtectedRoute] No session, redirecting to login");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  console.log("[ProtectedRoute] Session exists, rendering children");
   return <>{children}</>;
 };
 
@@ -54,6 +57,7 @@ export const Index = () => {
 
   useEffect(() => {
     if (!isLoading && session && location.pathname === '/login') {
+      console.log("[Index] Redirecting authenticated user from login to dashboard");
       navigate('/dashboard');
     }
   }, [session, isLoading, navigate, location]);

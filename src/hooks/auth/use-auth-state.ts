@@ -12,14 +12,14 @@ export const useAuthState = () => {
   const { checkAndNavigate } = useAuthNavigation();
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    // Track if the component is mounted
     let isMounted = true;
+    console.log("[useAuthState] Initializing auth state, current pathname:", window.location.pathname);
 
     const initializeAuth = async () => {
       try {
-        // Get initial session
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -27,20 +27,24 @@ export const useAuthState = () => {
           throw sessionError;
         }
 
-        // Only update state if component is still mounted
         if (!isMounted) return;
 
+        console.log("[useAuthState] Initial session:", initialSession ? "exists" : "null");
         setSession(initialSession);
-        
+
         if (initialSession?.user) {
           console.log("[useAuthState] User authenticated:", {
             id: initialSession.user.id,
             email: initialSession.user.email
           });
-          await checkAndNavigate(initialSession.user.id);
+          if (window.location.pathname === '/login') {
+            console.log("[useAuthState] Redirecting from login to dashboard");
+            navigate('/dashboard');
+          }
         } else {
           console.log("[useAuthState] No active session");
           if (window.location.pathname !== '/login') {
+            console.log("[useAuthState] Redirecting to login");
             navigate('/login');
           }
         }
@@ -52,26 +56,29 @@ export const useAuthState = () => {
             title: "Authentication Error",
             description: "Please try signing in again."
           });
+          navigate('/login');
         }
       } finally {
         if (isMounted) {
           setLoading(false);
+          setInitialized(true);
         }
       }
     };
 
-    // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log("[useAuthState] Auth state changed:", event);
+        console.log("[useAuthState] Auth state changed:", event, "Session:", currentSession ? "exists" : "null");
         
         if (!isMounted) return;
 
         setSession(currentSession);
 
         if (event === 'SIGNED_IN' && currentSession?.user) {
-          await checkAndNavigate(currentSession.user.id);
+          console.log("[useAuthState] User signed in, navigating to dashboard");
+          navigate('/dashboard');
         } else if (event === 'SIGNED_OUT') {
+          console.log("[useAuthState] User signed out, navigating to login");
           navigate('/login');
         }
       }
@@ -80,15 +87,16 @@ export const useAuthState = () => {
     // Initialize auth state
     initializeAuth();
 
-    // Cleanup function
     return () => {
+      console.log("[useAuthState] Cleaning up auth state");
       isMounted = false;
       subscription.unsubscribe();
     };
   }, [navigate, checkAndNavigate, toast]);
 
   return {
-    loading,
+    loading: loading && !initialized,
     session
   };
 };
+
