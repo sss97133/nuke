@@ -9,6 +9,20 @@ import { usePhoneAuth } from "./use-phone-auth";
 import { useEmailAuth } from "./use-email-auth";
 import { useAuthNavigation } from "./use-auth-navigation";
 
+// Get the base URL for auth redirects
+const getRedirectBase = () => {
+  // Check if we're in the preview environment
+  if (window.location.hostname.includes('lovable.ai')) {
+    return window.location.origin;
+  }
+  // For local development
+  if (window.location.hostname === 'localhost') {
+    return 'http://localhost:5173';
+  }
+  // Default to the current origin (for production)
+  return window.location.origin;
+};
+
 export const useAuth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -30,11 +44,19 @@ export const useAuth = () => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        if (session) {
-          console.log("[useAuth] Initial session found:", session);
-          await checkAndNavigate(session.user.id);
+        // Configure auth redirect options
+        const redirectTo = `${getRedirectBase()}/auth/callback`;
+        await supabase.auth.setSession({
+          access_token: session?.access_token,
+          refresh_token: session?.refresh_token,
+        });
+
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        setSession(currentSession);
+        
+        if (currentSession) {
+          console.log("[useAuth] Initial session found:", currentSession);
+          await checkAndNavigate(currentSession.user.id);
         }
       } catch (error) {
         console.error("[useAuth] Error initializing auth:", error);
@@ -65,7 +87,31 @@ export const useAuth = () => {
   return {
     isLoading: loading || isSocialLoading || isPhoneLoading || isEmailLoading,
     session,
-    handleSocialLogin: socialLogin,
+    handleSocialLogin: async (provider: Provider) => {
+      try {
+        const redirectTo = `${getRedirectBase()}/auth/callback`;
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'consent',
+            },
+          }
+        });
+
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.error("[useAuth] Social login error:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to sign in with social provider. Please try again."
+        });
+      }
+    },
     handleLogout: async () => {
       try {
         const { error } = await supabase.auth.signOut();
