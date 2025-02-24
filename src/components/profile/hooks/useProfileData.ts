@@ -2,39 +2,40 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { SocialLinks, StreamingLinks, toSocialLinks, toStreamingLinks } from '@/types/profile';
 
 export const useProfileData = () => {
   const { toast } = useToast();
   
-  const { data: profile, refetch } = useQuery({
+  const { data: profile, isLoading, error, refetch } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
+      console.log('🔍 Fetching user profile...');
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      if (!user) {
+        console.log('❌ No authenticated user found');
+        throw new Error('You must be logged in to view this profile');
+      }
       
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       
       if (error) {
-        toast({
-          title: 'Error loading profile',
-          description: error.message,
-          variant: 'destructive',
-        });
+        console.error('❌ Error fetching profile:', error);
         throw error;
       }
       
+      console.log('✅ Profile data received:', data);
       return data;
     },
   });
 
-  const { data: achievements } = useQuery({
+  const { data: achievements, isLoading: achievementsLoading } = useQuery({
     queryKey: ['achievements'],
     queryFn: async () => {
+      console.log('🔍 Fetching user achievements...');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
       
@@ -45,6 +46,7 @@ export const useProfileData = () => {
         .order('earned_at', { ascending: false });
       
       if (error) {
+        console.error('❌ Error fetching achievements:', error);
         toast({
           title: 'Error loading achievements',
           description: error.message,
@@ -52,6 +54,8 @@ export const useProfileData = () => {
         });
         throw error;
       }
+
+      console.log('✅ Achievements data received:', data);
       return data || [];
     },
   });
@@ -59,6 +63,9 @@ export const useProfileData = () => {
   return {
     profile,
     achievements,
+    isLoading: isLoading || achievementsLoading,
+    error,
     refetch
   };
 };
+

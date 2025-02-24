@@ -8,10 +8,13 @@ import { AchievementsList } from './AchievementsList';
 import { TeamSection } from './TeamSection';
 import { ContributionsGraph } from './ContributionsGraph';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Users, Trophy, GitCommit } from 'lucide-react';
+import { UserRound, Users, Trophy, GitCommit, AlertCircle } from 'lucide-react';
 import { SocialLinks, StreamingLinks, toSocialLinks, toStreamingLinks } from '@/types/profile';
 import { useProfileData } from './hooks/useProfileData';
 import { useProfileActions } from './hooks/useProfileActions';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingState } from '@/components/skills/LoadingState';
 
 export const UserProfile = () => {
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({
@@ -26,7 +29,7 @@ export const UserProfile = () => {
     tiktok: ''
   });
   
-  const { profile, achievements, refetch } = useProfileData();
+  const { profile, achievements, isLoading, error, refetch } = useProfileData();
   const { handleSocialLinksUpdate, handleStreamingLinksUpdate } = useProfileActions(refetch);
 
   React.useEffect(() => {
@@ -37,6 +40,47 @@ export const UserProfile = () => {
       setStreamingLinks(toStreamingLinks(profile.streaming_links));
     }
   }, [profile]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-background p-4 border rounded-lg shadow-sm">
+          <div className="flex items-start gap-4 mb-6">
+            <Skeleton className="h-20 w-20 rounded-full" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-6 w-1/3" />
+              <Skeleton className="h-4 w-1/4" />
+              <Skeleton className="h-16 w-full mt-4" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-24" />
+            ))}
+          </div>
+          <Skeleton className="h-[200px] w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error loading profile</AlertTitle>
+        <AlertDescription>
+          {error.message}
+          <button 
+            onClick={() => refetch()} 
+            className="ml-2 text-sm underline hover:text-foreground/70"
+          >
+            Try again
+          </button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -109,3 +153,4 @@ export const UserProfile = () => {
     </div>
   );
 };
+
