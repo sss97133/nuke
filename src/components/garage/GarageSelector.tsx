@@ -11,7 +11,6 @@ import { Loader2 } from "lucide-react";
 // Constants for safety bounds
 const MAX_GARAGES = 100;
 const MAX_RETRIES = 3;
-const TIMEOUT_MS = 5000;
 
 interface Garage {
   id: string;
@@ -22,7 +21,7 @@ interface Garage {
   }>;
 }
 
-// Assertion function (Rule 5)
+// Assertion function
 function assert(condition: boolean, message: string): boolean {
   if (!condition) {
     console.error(`[GarageSelector] Assertion failed: ${message}`);
@@ -31,87 +30,87 @@ function assert(condition: boolean, message: string): boolean {
   return true;
 }
 
+const fetchGarages = async (): Promise<Garage[]> => {
+  console.log("[GarageSelector] Fetching garages for user");
+  
+  // Assertion 1: Check authentication
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (!assert(!userError, "User fetch succeeded")) {
+    throw new Error("Failed to fetch user");
+  }
+  
+  // Assertion 2: Verify user existence
+  if (!assert(user?.id != null, "User ID exists")) {
+    throw new Error("No user ID found");
+  }
+
+  // First get the garage memberships with bounded fetch
+  const { data: memberships, error: membershipError } = await supabase
+    .from('garage_members')
+    .select('garage_id, role, status')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .limit(MAX_GARAGES);
+
+  // Assertion 3: Check membership fetch
+  if (!assert(!membershipError, "Membership fetch succeeded")) {
+    throw membershipError;
+  }
+
+  // Assertion 4: Verify membership data
+  if (!assert(Array.isArray(memberships), "Memberships is an array")) {
+    return [];
+  }
+
+  if (memberships.length === 0) {
+    return [];
+  }
+
+  // Assertion 5: Check membership count
+  if (!assert(memberships.length <= MAX_GARAGES, "Membership count within bounds")) {
+    throw new Error("Too many garages");
+  }
+
+  // Then get the garage details with bounded fetch
+  const { data: garages, error: garagesError } = await supabase
+    .from('garages')
+    .select('*')
+    .in('id', memberships.map(m => m.garage_id))
+    .limit(MAX_GARAGES);
+
+  // Assertion 6: Check garage fetch
+  if (!assert(!garagesError, "Garage fetch succeeded")) {
+    throw garagesError;
+  }
+
+  // Assertion 7: Verify garage data
+  if (!assert(Array.isArray(garages), "Garages is an array")) {
+    return [];
+  }
+
+  // Combine the data with single-level access
+  return garages.map(garage => {
+    const membership = memberships.find(m => m.garage_id === garage.id);
+    return {
+      id: garage.id,
+      name: garage.name,
+      garage_members: [{
+        role: membership?.role || 'member',
+        status: 'active'
+      }]
+    };
+  });
+};
+
 export const GarageSelector = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const { data: garages, isLoading } = useQuery({
     queryKey: ['garages'],
-    queryFn: async () => {
-      console.log("[GarageSelector] Fetching garages for user");
-      
-      // Assertion 1: Check authentication
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (!assert(!userError, "User fetch succeeded")) {
-        throw new Error("Failed to fetch user");
-      }
-      
-      // Assertion 2: Verify user existence
-      if (!assert(user?.id != null, "User ID exists")) {
-        throw new Error("No user ID found");
-      }
-
-      // First get the garage memberships with bounded fetch
-      const { data: memberships, error: membershipError } = await supabase
-        .from('garage_members')
-        .select('garage_id, role, status')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .limit(MAX_GARAGES); // Rule 2: Explicit upper bound
-
-      // Assertion 3: Check membership fetch
-      if (!assert(!membershipError, "Membership fetch succeeded")) {
-        throw membershipError;
-      }
-
-      // Assertion 4: Verify membership data
-      if (!assert(Array.isArray(memberships), "Memberships is an array")) {
-        return [];
-      }
-
-      if (memberships.length === 0) {
-        return [];
-      }
-
-      // Assertion 5: Check membership count
-      if (!assert(memberships.length <= MAX_GARAGES, "Membership count within bounds")) {
-        throw new Error("Too many garages");
-      }
-
-      // Then get the garage details with bounded fetch
-      const { data: garages, error: garagesError } = await supabase
-        .from('garages')
-        .select('*')
-        .in('id', memberships.map(m => m.garage_id))
-        .limit(MAX_GARAGES);
-
-      // Assertion 6: Check garage fetch
-      if (!assert(!garagesError, "Garage fetch succeeded")) {
-        throw garagesError;
-      }
-
-      // Assertion 7: Verify garage data
-      if (!assert(Array.isArray(garages), "Garages is an array")) {
-        return [];
-      }
-
-      // Combine the data with single-level access (Rule 9)
-      const garagesWithRoles: Garage[] = garages.map(garage => {
-        const membership = memberships.find(m => m.garage_id === garage.id);
-        return {
-          id: garage.id,
-          name: garage.name,
-          garage_members: [{
-            role: membership?.role || 'member',
-            status: 'active'
-          }]
-        };
-      });
-
-      return garagesWithRoles;
-    },
+    queryFn: fetchGarages,
     retry: MAX_RETRIES,
-    timeout: TIMEOUT_MS
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const handleSelectGarage = async (garageId: string) => {
