@@ -20,28 +20,38 @@ export const useAuthState = () => {
     const handleAuthChange = async (currentSession: Session | null) => {
       if (!isMounted) return;
       
+      console.log("[useAuthState] Auth state changed, session:", currentSession?.user?.email);
+      
       setSession(currentSession);
       setIsLoading(false);
 
+      // Only proceed with navigation if mounted
       if (currentSession?.user) {
-        console.log("[useAuthState] Active session detected for user:", currentSession.user.email);
-      } else {
-        console.log("[useAuthState] No active session");
+        console.log("[useAuthState] Active session detected, checking navigation");
+        try {
+          await checkAndNavigate(currentSession.user.id);
+        } catch (error) {
+          console.error("[useAuthState] Navigation check failed:", error);
+          // Don't throw - handle gracefully and stay on current page
+          toast({
+            variant: "destructive",
+            title: "Navigation Error",
+            description: "There was an error loading your profile. Please try refreshing the page."
+          });
+        }
       }
     };
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log("[useAuthState] Auth state changed:", event);
-        await handleAuthChange(currentSession);
+        console.log("[useAuthState] Auth event:", event);
 
         if (!isMounted) return;
 
-        if (event === 'SIGNED_IN' && currentSession?.user) {
-          console.log("[useAuthState] User signed in, checking navigation");
-          await checkAndNavigate(currentSession.user.id);
-        } else if (event === 'SIGNED_OUT') {
+        await handleAuthChange(currentSession);
+
+        if (event === 'SIGNED_OUT') {
           console.log("[useAuthState] User signed out, redirecting to login");
           navigate('/login');
         }
@@ -58,16 +68,12 @@ export const useAuthState = () => {
             title: "Authentication Error",
             description: "Please try signing in again."
           });
+          setIsLoading(false);
           return;
         }
 
         if (!isMounted) return;
         await handleAuthChange(initialSession);
-
-        if (initialSession?.user) {
-          console.log("[useAuthState] Initial session found, checking navigation");
-          await checkAndNavigate(initialSession.user.id);
-        }
       }
     );
 
@@ -83,3 +89,4 @@ export const useAuthState = () => {
     session
   };
 };
+
