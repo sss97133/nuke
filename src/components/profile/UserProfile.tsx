@@ -42,8 +42,11 @@ export const UserProfile = () => {
     <div className="space-y-4">
       <div className="bg-background p-4 border rounded-lg shadow-sm">
         <UserProfileHeader 
+          userId={profile?.id || ''}
           fullName={profile?.full_name} 
-          username={profile?.username} 
+          username={profile?.username}
+          avatarUrl={profile?.avatar_url}
+          bio={profile?.bio}
         />
         
         <UserMetrics 
