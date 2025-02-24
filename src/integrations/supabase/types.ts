@@ -1094,6 +1094,7 @@ export type Database = {
         Row: {
           active_garage_id: string | null
           avatar_url: string | null
+          bio: string | null
           created_at: string
           default_garage_id: string | null
           email: string | null
@@ -1115,6 +1116,7 @@ export type Database = {
         Insert: {
           active_garage_id?: string | null
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           default_garage_id?: string | null
           email?: string | null
@@ -1136,6 +1138,7 @@ export type Database = {
         Update: {
           active_garage_id?: string | null
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           default_garage_id?: string | null
           email?: string | null

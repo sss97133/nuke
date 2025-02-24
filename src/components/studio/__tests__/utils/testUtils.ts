@@ -1,8 +1,9 @@
 
 import { vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
-import { render } from "@testing-library/react";
+import { render, RenderResult } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 
 export const mockUser = {
   data: {
@@ -37,7 +38,7 @@ export const createQueryClient = () => new QueryClient({
   },
 });
 
-export const renderWithQueryClient = (ui: React.ReactElement) => {
+export const renderWithQueryClient = (ui: React.ReactElement): RenderResult => {
   const queryClient = createQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
