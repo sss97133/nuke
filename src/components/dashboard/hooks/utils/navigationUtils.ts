@@ -105,3 +105,7 @@ export const handleProjectNavigation = async (navigate: NavigateFunction, toast:
     });
   }
 };
+
+export const handleNavigateToProfile = (navigate: NavigateFunction) => {
+  navigate('/dashboard/professional');
+};

@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Keyboard, HelpCircle, LogOut } from "lucide-react";
+import { Settings, Keyboard, HelpCircle, LogOut, UserCircle } from "lucide-react";
 import { NavigateFunction } from "react-router-dom";
-import { handleKeyboardShortcuts, handleProjectNavigation, handleSignOut } from "../../hooks/utils/navigationUtils";
+import { handleKeyboardShortcuts, handleProjectNavigation, handleSignOut, handleNavigateToProfile } from "../../hooks/utils/navigationUtils";
 import { ToastFunction } from "../../hooks/utils/types";
 
 interface UserMenuProps {
@@ -34,6 +34,10 @@ export const UserMenu = ({ navigate, toast, handleMenuAction }: UserMenuProps) =
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleNavigateToProfile(navigate)}>
+          <UserCircle className="mr-2 h-4 w-4" />
+          Profile
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleProjectNavigation(navigate, toast, 'preferences')}>
           <Settings className="mr-2 h-4 w-4" />
           Settings
