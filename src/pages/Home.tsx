@@ -1,8 +1,13 @@
 
+import { GarageDropdown } from "@/components/garage/GarageDropdown";
+
 export const Home = () => {
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Welcome to the Dashboard</h1>
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Welcome to the Dashboard</h1>
+        <GarageDropdown />
+      </div>
       <p>Select an option from the navigation menu to get started.</p>
     </div>
   );
