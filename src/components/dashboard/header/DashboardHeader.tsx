@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserMenu } from "./menu/UserMenu";
 import { MainMenu } from "./MainMenu";
 import { AppMenu } from "./AppMenu";
-import { GarageButton } from "./buttons/GarageButton";
+import { GarageDropdown } from "@/components/garage/GarageDropdown";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
@@ -24,10 +24,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
 
         <div className="flex-1" />
 
-        <GarageButton 
-          navigate={navigate}
-          toast={toast}
-        />
+        <GarageDropdown />
 
         <UserMenu 
           navigate={navigate}
