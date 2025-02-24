@@ -1,8 +1,5 @@
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { UserProfileHeader } from './UserProfileHeader';
 import { UserMetrics } from './UserMetrics';
 import { SocialLinksForm } from './SocialLinksForm';
@@ -12,10 +9,11 @@ import { TeamSection } from './TeamSection';
 import { ContributionsGraph } from './ContributionsGraph';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserRound, Users, Trophy, GitCommit } from 'lucide-react';
-import { SocialLinks, StreamingLinks, toSocialLinks, toStreamingLinks, toJson } from '@/types/profile';
+import { SocialLinks, StreamingLinks, toSocialLinks, toStreamingLinks } from '@/types/profile';
+import { useProfileData } from './hooks/useProfileData';
+import { useProfileActions } from './hooks/useProfileActions';
 
 export const UserProfile = () => {
-  const { toast } = useToast();
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({
     twitter: '',
     instagram: '',
@@ -28,111 +26,17 @@ export const UserProfile = () => {
     tiktok: ''
   });
   
-  const { data: profile, refetch } = useQuery({
-    queryKey: ['profile'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (error) {
-        toast({
-          title: 'Error loading profile',
-          description: error.message,
-          variant: 'destructive',
-        });
-        throw error;
-      }
+  const { profile, achievements, refetch } = useProfileData();
+  const { handleSocialLinksUpdate, handleStreamingLinksUpdate } = useProfileActions(refetch);
 
-      if (data?.social_links) {
-        setSocialLinks(toSocialLinks(data.social_links));
-      }
-      if (data?.streaming_links) {
-        setStreamingLinks(toStreamingLinks(data.streaming_links));
-      }
-      
-      return data;
-    },
-  });
-
-  const { data: achievements } = useQuery({
-    queryKey: ['achievements'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-      
-      const { data, error } = await supabase
-        .from('user_achievements')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('earned_at', { ascending: false });
-      
-      if (error) {
-        toast({
-          title: 'Error loading achievements',
-          description: error.message,
-          variant: 'destructive',
-        });
-        throw error;
-      }
-      return data || [];
-    },
-  });
-
-  const handleSocialLinksUpdate = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ social_links: toJson(socialLinks) })
-      .eq('id', user.id);
-
-    if (error) {
-      toast({
-        title: 'Error updating social links',
-        description: error.message,
-        variant: 'destructive',
-      });
-      return;
+  React.useEffect(() => {
+    if (profile?.social_links) {
+      setSocialLinks(toSocialLinks(profile.social_links));
     }
-
-    toast({
-      title: 'Social links updated',
-      description: 'Your social media links have been updated successfully.',
-    });
-    refetch();
-  };
-
-  const handleStreamingLinksUpdate = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ streaming_links: toJson(streamingLinks) })
-      .eq('id', user.id);
-
-    if (error) {
-      toast({
-        title: 'Error updating streaming links',
-        description: error.message,
-        variant: 'destructive',
-      });
-      return;
+    if (profile?.streaming_links) {
+      setStreamingLinks(toStreamingLinks(profile.streaming_links));
     }
-
-    toast({
-      title: 'Streaming links updated',
-      description: 'Your streaming platform links have been updated successfully.',
-    });
-    refetch();
-  };
+  }, [profile]);
 
   return (
     <div className="space-y-4">
@@ -178,13 +82,13 @@ export const UserProfile = () => {
             <SocialLinksForm 
               socialLinks={socialLinks}
               onSocialLinksChange={setSocialLinks}
-              onSubmit={handleSocialLinksUpdate}
+              onSubmit={() => handleSocialLinksUpdate(socialLinks)}
             />
             
             <StreamingLinksForm 
               streamingLinks={streamingLinks}
               onStreamingLinksChange={setStreamingLinks}
-              onSubmit={handleStreamingLinksUpdate}
+              onSubmit={() => handleStreamingLinksUpdate(streamingLinks)}
             />
           </TabsContent>
 
