@@ -1,7 +1,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Garage, MAX_GARAGES } from "../types";
+import { Garage, MAX_GARAGES, MAX_RETRIES } from "../types";
 import { assert } from "../utils/assertions";
 
 export const useGarages = () => {
@@ -74,3 +74,4 @@ const fetchGarages = async (): Promise<Garage[]> => {
     };
   });
 };
+
