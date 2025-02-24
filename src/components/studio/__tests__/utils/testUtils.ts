@@ -1,13 +1,13 @@
 
-import { render } from '@testing-library/react';
+import { render, RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // Create a custom render function that includes providers
-export function renderWithProviders<T>(
+export function renderWithProviders(
   ui: React.ReactElement,
   options: { queryClient?: QueryClient } = {}
-) {
+): RenderResult {
   const queryClient = options.queryClient || new QueryClient({
     defaultOptions: {
       queries: {
@@ -53,7 +53,9 @@ export const mockStudioScene = {
 };
 
 // Test utilities
-export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export const sleep = (ms: number): Promise<void> => 
+  new Promise(resolve => setTimeout(resolve, ms));
 
-export const generateMockId = () => Math.random().toString(36).substring(2, 9);
+export const generateMockId = (): string => 
+  Math.random().toString(36).substring(2, 9);
 
