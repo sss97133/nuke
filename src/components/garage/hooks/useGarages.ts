@@ -10,21 +10,27 @@ export const useGarages = () => {
     queryFn: fetchGarages,
     retry: MAX_RETRIES,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    onError: (error) => {
+      console.error("[GarageSelector] Error fetching garages:", error);
+    }
   });
 };
 
 const fetchGarages = async (): Promise<Garage[]> => {
-  console.log("[GarageSelector] Fetching garages for user");
+  console.log("[GarageSelector] Starting garage fetch");
   
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (!assert(!userError, "User fetch succeeded")) {
-    throw new Error("Failed to fetch user");
+  if (userError) {
+    console.error("[GarageSelector] User fetch failed:", userError);
+    throw userError;
   }
   
-  if (!assert(user?.id != null, "User ID exists")) {
+  if (!user?.id) {
+    console.error("[GarageSelector] No user ID found");
     throw new Error("No user ID found");
   }
 
+  console.log("[GarageSelector] Fetching memberships for user:", user.id);
   const { data: memberships, error: membershipError } = await supabase
     .from('garage_members')
     .select('garage_id, role, status')
@@ -32,35 +38,40 @@ const fetchGarages = async (): Promise<Garage[]> => {
     .eq('status', 'active')
     .limit(MAX_GARAGES);
 
-  if (!assert(!membershipError, "Membership fetch succeeded")) {
+  if (membershipError) {
+    console.error("[GarageSelector] Membership fetch failed:", membershipError);
     throw membershipError;
   }
 
-  if (!assert(Array.isArray(memberships), "Memberships is an array")) {
+  if (!Array.isArray(memberships)) {
+    console.error("[GarageSelector] Memberships is not an array");
     return [];
   }
 
   if (memberships.length === 0) {
+    console.log("[GarageSelector] No garage memberships found");
     return [];
   }
 
-  if (!assert(memberships.length <= MAX_GARAGES, "Membership count within bounds")) {
-    throw new Error("Too many garages");
-  }
+  console.log("[GarageSelector] Found memberships:", memberships);
 
   const { data: garages, error: garagesError } = await supabase
     .from('garages')
-    .select('*')
+    .select('id, name')
     .in('id', memberships.map(m => m.garage_id))
     .limit(MAX_GARAGES);
 
-  if (!assert(!garagesError, "Garage fetch succeeded")) {
+  if (garagesError) {
+    console.error("[GarageSelector] Garage fetch failed:", garagesError);
     throw garagesError;
   }
 
-  if (!assert(Array.isArray(garages), "Garages is an array")) {
+  if (!Array.isArray(garages)) {
+    console.error("[GarageSelector] Garages is not an array");
     return [];
   }
+
+  console.log("[GarageSelector] Successfully fetched garages:", garages);
 
   return garages.map(garage => {
     const membership = memberships.find(m => m.garage_id === garage.id);
@@ -74,4 +85,3 @@ const fetchGarages = async (): Promise<Garage[]> => {
     };
   });
 };
-
