@@ -1,8 +1,6 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Garage, MAX_GARAGES, MAX_RETRIES } from "../types";
-import { assert } from "../utils/assertions";
 
 export const useGarages = () => {
   return useQuery({
@@ -10,8 +8,10 @@ export const useGarages = () => {
     queryFn: fetchGarages,
     retry: MAX_RETRIES,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    onError: (error) => {
-      console.error("[GarageSelector] Error fetching garages:", error);
+    meta: {
+      onError: (error: Error) => {
+        console.error("[GarageSelector] Error fetching garages:", error);
+      }
     }
   });
 };
