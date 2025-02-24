@@ -5,6 +5,7 @@ import { StudioConfiguration } from "../StudioConfiguration";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "@testing-library/jest-dom/vitest";
 
 // Mock dependencies
 vi.mock("@/integrations/supabase/client", () => ({
@@ -65,7 +66,7 @@ describe("StudioConfiguration", () => {
     vi.clearAllMocks();
     
     // Setup default mocks
-    (useToast as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
+    (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
     (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
   });
 
@@ -216,4 +217,3 @@ describe("StudioConfiguration", () => {
     });
   });
 });
-
