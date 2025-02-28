@@ -84,6 +84,11 @@ export const useMenuActions = () => {
       return;
     }
 
+    if (action === "help") {
+      navigate("/dashboard/documentation");
+      return;
+    }
+
     // Default fallback for unimplemented actions
     toast({
       title: "Action Not Implemented",

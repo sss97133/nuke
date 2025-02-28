@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Keyboard, HelpCircle, LogOut, UserCircle } from "lucide-react";
+import { Settings, Keyboard, HelpCircle, LogOut, UserCircle, FileText } from "lucide-react";
 import { NavigateFunction } from "react-router-dom";
 import { handleKeyboardShortcuts, handleProjectNavigation, handleSignOut, handleNavigateToProfile } from "../../hooks/utils/navigationUtils";
 import { ToastFunction } from "../../hooks/utils/types";
@@ -45,6 +45,10 @@ export const UserMenu = ({ navigate, toast, handleMenuAction }: UserMenuProps) =
         <DropdownMenuItem onClick={() => handleKeyboardShortcuts(toast)}>
           <Keyboard className="mr-2 h-4 w-4" />
           Keyboard Shortcuts
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleProjectNavigation(navigate, toast, 'documentation')}>
+          <FileText className="mr-2 h-4 w-4" />
+          Documentation
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleMenuAction('help')}>
           <HelpCircle className="mr-2 h-4 w-4" />
