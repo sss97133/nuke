@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // Create a custom render function that includes providers
-export function renderWithProviders(
+export function renderWithQueryClient(
   ui: React.ReactElement,
   options: { queryClient?: QueryClient } = {}
 ): RenderResult {
@@ -27,18 +27,28 @@ export function renderWithProviders(
 }
 
 // Mock data for tests
+export const mockUser = {
+  data: {
+    user: {
+      id: 'test-user-id',
+      email: 'test@example.com',
+    }
+  },
+  error: null
+};
+
 export const mockStudioConfig = {
+  id: 'config-1',
+  user_id: 'test-user-id',
   dimensions: {
-    width: 1920,
-    height: 1080,
+    length: 30,
+    width: 20,
+    height: 16
   },
-  ptz: {
-    enabled: true,
-    positions: [
-      { id: 1, name: 'Position 1', pan: 0, tilt: 0, zoom: 1 },
-      { id: 2, name: 'Position 2', pan: 45, tilt: 10, zoom: 1.5 },
-    ],
-  },
+  ptz_tracks: [
+    { id: 1, name: 'Track 1', positions: [] }
+  ],
+  created_at: '2023-06-15T12:00:00Z'
 };
 
 export const mockStudioScene = {
@@ -58,4 +68,3 @@ export const sleep = (ms: number): Promise<void> =>
 
 export const generateMockId = (): string => 
   Math.random().toString(36).substring(2, 9);
-
