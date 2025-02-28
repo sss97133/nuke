@@ -1,144 +1,96 @@
 
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { handleExport } from "./utils/exportUtils";
-import { handleSignOut, handleKeyboardShortcuts, handleProjectNavigation } from "./utils/navigationUtils";
-import { handleToggleUIElement, handleDialogActions } from "./utils/uiUtils";
 
-export const useMenuActions = (
-  setShowNewVehicleDialog: (show: boolean) => void,
-  setShowNewInventoryDialog: (show: boolean) => void,
-  setShowAiAssistant: (show: boolean) => void,
-  setShowHelp: (show: boolean) => void,
-  setShowStudioConfig: (show: boolean) => void,
-  setShowWorkspacePreview: (show: boolean) => void,
-  showWorkspacePreview: boolean,
-  setShowActivityPanel: (show: boolean) => void,
-  showActivityPanel: boolean,
-  setShowSidebar: (show: boolean) => void,
-  showSidebar: boolean,
-  setDarkMode: (dark: boolean) => void,
-  darkMode: boolean
-) => {
-  const { toast } = useToast();
+export const useMenuActions = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleShowHelp = (section: string) => {
-    setShowHelp(true);
+  const handleMenuAction = (action: string) => {
+    console.log("Menu action:", action);
+
+    // Navigation actions
+    if (action === "sitemap") {
+      navigate("/dashboard/sitemap");
+      return;
+    }
+
+    if (action === "glossary") {
+      navigate("/dashboard/glossary");
+      return;
+    }
+
+    if (action === "documentation") {
+      navigate("/dashboard/documentation");
+      return;
+    }
+
+    if (action === "token_management") {
+      navigate("/dashboard/token-management");
+      return;
+    }
+
+    if (action === "dao_governance") {
+      navigate("/dashboard/dao-governance");
+      return;
+    }
+
+    if (action === "professional_dashboard") {
+      navigate("/dashboard/professional");
+      return;
+    }
+
+    if (action === "vin_scanner") {
+      navigate("/dashboard/vin-scanner");
+      return;
+    }
+
+    if (action === "market_analysis") {
+      navigate("/dashboard/market-analysis");
+      return;
+    }
+
+    if (action === "token_analytics") {
+      navigate("/dashboard/token-analytics");
+      return;
+    }
+
+    if (action === "access_control") {
+      navigate("/dashboard/access-control");
+      return;
+    }
+
+    if (action === "studio_config") {
+      navigate("/dashboard/studio-config");
+      return;
+    }
+
+    // Notification actions
+    if (action === "toggle_theme") {
+      toast({
+        title: "Theme Toggled",
+        description: "Application theme has been updated",
+      });
+      return;
+    }
+
+    if (action === "preferences") {
+      navigate("/dashboard/settings");
+      return;
+    }
+
+    if (action === "import") {
+      navigate("/dashboard/import");
+      return;
+    }
+
+    // Default fallback for unimplemented actions
     toast({
-      title: `Help for ${section}`,
-      description: `Showing help documentation for ${section}`,
+      title: "Action Not Implemented",
+      description: `The '${action}' action is not implemented yet.`,
+      variant: "destructive",
     });
   };
 
-  const handleMenuAction = async (action: string) => {
-    // Handle navigation actions using routes table
-    if (['new_project', 'professional_dashboard', 'skill_management', 
-         'achievements', 'preferences', 'inventory_view', 'service_view', 
-         'vin_scanner', 'market_analysis', 'studio_workspace', 
-         'streaming_setup', 'sitemap', 'glossary', 'token_management',
-         'dao_governance', 'token_analytics', 'access_control'].includes(action)) {
-      await handleProjectNavigation(navigate, toast, action);
-      return;
-    }
-
-    // Handle dialogs
-    if (['new_vehicle', 'new_inventory', 'studio_config'].includes(action)) {
-      handleDialogActions(
-        setShowNewVehicleDialog,
-        setShowNewInventoryDialog,
-        setShowStudioConfig,
-        setShowWorkspacePreview,
-        toast,
-        action
-      );
-      return;
-    }
-
-    // Handle remaining actions
-    switch (action) {
-      case 'import':
-        navigate('/import');
-        break;
-      case 'export':
-        await handleExport(toast);
-        break;
-      case 'toggle_assistant':
-        handleToggleUIElement(
-          setShowAiAssistant,
-          false,
-          {
-            title: "AI Assistant",
-            description: "AI Assistant status toggled"
-          },
-          toast
-        );
-        break;
-      case 'help':
-        setShowHelp(true);
-        break;
-      case 'exit':
-        await handleSignOut(navigate, toast);
-        break;
-      case 'toggle_workspace':
-        handleToggleUIElement(
-          setShowWorkspacePreview,
-          showWorkspacePreview,
-          {
-            title: "Workspace Preview",
-            description: `Workspace preview ${!showWorkspacePreview ? 'enabled' : 'disabled'}`
-          },
-          toast
-        );
-        break;
-      case 'toggle_theme':
-        handleToggleUIElement(
-          setDarkMode,
-          darkMode,
-          {
-            title: "Theme Updated",
-            description: `Switched to ${!darkMode ? 'dark' : 'light'} mode`
-          },
-          toast
-        );
-        document.documentElement.classList.toggle('dark');
-        break;
-      case 'toggle_sidebar':
-        handleToggleUIElement(
-          setShowSidebar,
-          showSidebar,
-          {
-            title: "Sidebar Toggled",
-            description: `Sidebar ${!showSidebar ? 'shown' : 'hidden'}`
-          },
-          toast
-        );
-        break;
-      case 'toggle_activity':
-        handleToggleUIElement(
-          setShowActivityPanel,
-          showActivityPanel,
-          {
-            title: "Activity Panel",
-            description: `Activity panel ${!showActivityPanel ? 'shown' : 'hidden'}`
-          },
-          toast
-        );
-        break;
-      case 'keyboard_shortcuts':
-        handleKeyboardShortcuts(toast);
-        break;
-      default:
-        toast({
-          title: "Coming Soon",
-          description: "This feature is under development",
-          variant: "destructive"
-        });
-    }
-  };
-
-  return {
-    handleShowHelp,
-    handleMenuAction,
-  };
+  return { handleMenuAction };
 };

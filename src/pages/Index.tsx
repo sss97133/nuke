@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,6 +23,7 @@ import { VehicleTokens } from "@/components/tokens/VehicleTokens";
 import { DAOProposals } from "@/components/dao/DAOProposals";
 import { AuctionList as Auctions } from "@/components/auctions/AuctionList";
 import { VideoAnalysis } from "./VideoAnalysis";
+import { Documentation } from "@/components/documentation/Documentation";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, isLoading } = useAuth();
@@ -73,6 +75,11 @@ export const Index = () => {
         console.log("[Index] Redirecting /sitemap to /dashboard/sitemap");
         navigate('/dashboard/sitemap', { replace: true });
       }
+
+      if (location.pathname === '/documentation') {
+        console.log("[Index] Redirecting /documentation to /dashboard/documentation");
+        navigate('/dashboard/documentation', { replace: true });
+      }
     }
   }, [session, isLoading, navigate, location.pathname]);
 
@@ -90,6 +97,7 @@ export const Index = () => {
         <Route path="import" element={<Import />} />
         <Route path="glossary" element={<Glossary />} />
         <Route path="sitemap" element={<Sitemap />} />
+        <Route path="documentation" element={<Documentation />} />
         <Route path="token-management" element={<TokenManagement />} />
         <Route path="dao-governance" element={<DAOGovernance />} />
         <Route path="studio-config" element={<StudioConfiguration />} />
@@ -117,6 +125,10 @@ export const Index = () => {
 
       <Route path="/sitemap" element={
         <Navigate to="/dashboard/sitemap" replace />
+      } />
+
+      <Route path="/documentation" element={
+        <Navigate to="/dashboard/documentation" replace />
       } />
 
       <Route path="/video-analysis/:jobId" element={
