@@ -265,10 +265,8 @@ export const handleHelpMenuAction = (
       });
       break;
     case 'about':
-      toast({
-        title: 'About This Application',
-        description: 'Version 1.0.0 - Built with React, Vite, and TailwindCSS'
-      });
+      // About is now handled by the popup, no navigation needed
+      console.log('About popup should be shown via the menu component');
       break;
     default:
       console.warn(`Unhandled help menu action: ${action}`);

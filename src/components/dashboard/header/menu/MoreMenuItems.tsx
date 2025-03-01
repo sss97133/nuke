@@ -3,6 +3,7 @@ import { MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "
 import { ShoppingBag, HelpCircle } from "lucide-react";
 import { useState } from "react";
 import { DocumentationDialog } from "@/components/documentation/DocumentationDialog";
+import { AboutDialog } from "@/components/documentation/AboutDialog";
 
 export const ToolsMenuItems = ({ handleMenuAction }: { handleMenuAction: (action: string) => void }) => {
   return (
@@ -52,6 +53,7 @@ export const WindowMenuItems = ({ handleMenuAction }: { handleMenuAction: (actio
 
 export const HelpMenuItems = ({ handleMenuAction }: { handleMenuAction: (action: string) => void }) => {
   const [docDialogOpen, setDocDialogOpen] = useState(false);
+  const [aboutDialogOpen, setAboutDialogOpen] = useState(false);
   
   return (
     <MenubarContent>
@@ -66,11 +68,12 @@ export const HelpMenuItems = ({ handleMenuAction }: { handleMenuAction: (action:
         AI Assistant
       </MenubarItem>
       <MenubarSeparator />
-      <MenubarItem onClick={() => handleMenuAction('about')}>
+      <MenubarItem onClick={() => setAboutDialogOpen(true)}>
         About
       </MenubarItem>
       
       <DocumentationDialog open={docDialogOpen} onOpenChange={setDocDialogOpen} />
+      <AboutDialog open={aboutDialogOpen} onOpenChange={setAboutDialogOpen} />
     </MenubarContent>
   );
 };
