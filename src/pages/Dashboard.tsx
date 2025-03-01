@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Activity, Users, Car, Wrench, TrendingUp } from "lucide-react";
@@ -14,27 +14,44 @@ const StatCard = ({
   value: string | number; 
   description: string; 
   icon: React.ElementType 
-}) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      <Icon className="h-4 w-4 text-muted-foreground" />
-    </CardHeader>
-    <CardContent>
-      <div className="text-2xl font-bold">{value}</div>
-      <p className="text-xs text-muted-foreground">{description}</p>
-    </CardContent>
-  </Card>
-);
-
-const Dashboard = () => {
-  // Add console log to help with debugging
-  console.log("Dashboard component rendering");
+}) => {
+  // Add console log to verify StatCard renders
+  console.log(`Rendering StatCard: ${title}`);
   
   return (
-    <div className="min-h-screen bg-background">
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+};
+
+const Dashboard = () => {
+  // Enhanced console logs for debugging
+  console.log("Dashboard component initial render");
+  
+  useEffect(() => {
+    console.log("Dashboard component mounted");
+    
+    // Check for DOM elements to see if they're rendering
+    const container = document.querySelector('.dashboard-container');
+    console.log("Dashboard container found:", !!container);
+    
+    return () => {
+      console.log("Dashboard component unmounted");
+    };
+  }, []);
+  
+  return (
+    <div className="min-h-screen bg-background dashboard-container">
       <ScrollArea className="h-[calc(100vh-4rem)]">
-        <div className="container max-w-7xl p-6 space-y-6">
+        <div className="container max-w-7xl mx-auto p-6 space-y-6">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
             <p className="text-muted-foreground">
