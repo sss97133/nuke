@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Award, MessageSquare, User, Users, Heart, ThumbsUp, Send, Camera, Mic, MicOff, Video, VideoOff, ScreenShare, Settings, Wrench, Package, Tag } from "lucide-react";
+import { OnboardingWizard, StreamingServiceConfig } from "@/components/streaming/OnboardingWizard";
 
 interface StreamMetadata {
   title: string;
@@ -35,6 +37,8 @@ export const Streaming = () => {
   const [streaming, setStreaming] = useState(false);
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [streamingServices, setStreamingServices] = useState<StreamingServiceConfig[]>([]);
   const [streamMetadata, setStreamMetadata] = useState<StreamMetadata>({
     title: "Professional Repair Demonstration",
     description: "Live tutorial on engine diagnostics",
@@ -142,10 +146,19 @@ export const Streaming = () => {
   };
 
   const toggleStreaming = () => {
+    if (!streaming && streamingServices.length === 0) {
+      setShowOnboarding(true);
+      return;
+    }
+    
     setStreaming(!streaming);
     toast({
       title: streaming ? "Stream Ended" : "Stream Started",
-      description: streaming ? "Your stream has been ended successfully." : "You are now live! Viewers can join your stream.",
+      description: streaming 
+        ? "Your stream has been ended successfully." 
+        : streamingServices.length > 0 
+          ? `You are now live on ${streamingServices.length} platform${streamingServices.length > 1 ? 's' : ''}!` 
+          : "You are now live! Viewers can join your stream.",
     });
   };
 
@@ -156,12 +169,51 @@ export const Streaming = () => {
     });
   };
 
+  const handleOnboardingComplete = (selectedServices: StreamingServiceConfig[]) => {
+    setStreamingServices(selectedServices);
+    setShowOnboarding(false);
+    
+    toast({
+      title: "Streaming Setup Complete",
+      description: `You've successfully configured ${selectedServices.length} streaming destination${selectedServices.length !== 1 ? 's' : ''}.`,
+    });
+  };
+
+  if (showOnboarding) {
+    return (
+      <div className="p-6">
+        <OnboardingWizard 
+          onComplete={handleOnboardingComplete}
+          onCancel={() => setShowOnboarding(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <ScrollArea className="h-[calc(100vh-4rem)] p-4">
       <div className="space-y-4 max-w-7xl mx-auto">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Streaming Studio</h1>
           <div className="flex items-center space-x-2">
+            {streamingServices.length > 0 && (
+              <div className="flex space-x-1 mr-2">
+                {streamingServices.map((service) => (
+                  <Badge key={service.id} variant="outline" className="flex items-center">
+                    {service.icon}
+                    <span className="ml-1">{service.name}</span>
+                  </Badge>
+                ))}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowOnboarding(true)}
+                >
+                  <Settings className="h-3.5 w-3.5 mr-1" />
+                  Manage
+                </Button>
+              </div>
+            )}
             <Badge variant={streaming ? "destructive" : "default"} className="px-3 py-1">
               {streaming ? "LIVE" : "OFFLINE"}
             </Badge>
@@ -243,7 +295,11 @@ export const Streaming = () => {
                   <Button variant="outline" size="sm">
                     <ScreenShare className="h-4 w-4 mr-1" /> Share Screen
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowOnboarding(true)}
+                  >
                     <Settings className="h-4 w-4 mr-1" /> Settings
                   </Button>
                 </div>
@@ -443,6 +499,24 @@ export const Streaming = () => {
                         )}
                       </div>
                       <Separator />
+                      
+                      {streamingServices.length > 0 && (
+                        <div>
+                          <h3 className="text-sm font-semibold mb-1">Streaming Destinations</h3>
+                          <div className="space-y-2 mt-2">
+                            {streamingServices.map(service => (
+                              <div key={service.id} className="flex items-center p-2 border rounded-md">
+                                {service.icon}
+                                <span className="ml-2 text-sm font-medium">{service.name}</span>
+                                <Badge variant="outline" className="ml-auto">
+                                  {streaming ? "Live" : "Ready"}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
                       <div>
                         <h3 className="text-sm font-semibold mb-1">Stream Quality</h3>
                         <p className="text-sm">1080p at 30fps</p>
