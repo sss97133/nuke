@@ -205,7 +205,7 @@ export const MarketAnalysis = ({
           </TabsContent>
 
           <TabsContent value="research">
-            <Card className="p-6">
+            <Card className="p-6 border-0">
               <h2 className="text-2xl font-semibold mb-4">Research Integration</h2>
               <div className="space-y-4">
                 <div>
