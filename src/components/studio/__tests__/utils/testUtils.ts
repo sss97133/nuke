@@ -70,15 +70,22 @@ export const renderWithProviders = (
     ...queryClientOptions
   });
 
-  const Wrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
-    return additionalWrappers.reduceRight(
-      (acc, Provider) => <Provider>{acc}</Provider>, 
+  const Wrapper = ({ children }: { children: React.ReactNode }) => {
+    // Start with the base providers
+    let wrappedChildren: React.ReactNode = (
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           {children}
         </BrowserRouter>
       </QueryClientProvider>
     );
+
+    // Apply additional wrappers from right to left
+    for (const Provider of [...additionalWrappers].reverse()) {
+      wrappedChildren = <Provider>{wrappedChildren}</Provider>;
+    }
+
+    return wrappedChildren;
   };
 
   return render(ui, { wrapper: Wrapper, ...renderOptions });
