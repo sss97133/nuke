@@ -74,7 +74,6 @@ export const Documentation = () => {
     
     // Convert code blocks
     html = html.replace(/```(.+?)```/gs, '<pre class="bg-muted p-4 rounded-md overflow-x-auto my-4"><code>$1</code></pre>');
-    html = html.replace(/```([^`]+)```/g, '<pre class="bg-muted p-4 rounded-md overflow-x-auto my-4"><code>$1</code></pre>');
     
     // Convert inline code
     html = html.replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-sm">$1</code>');

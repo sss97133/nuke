@@ -697,6 +697,57 @@ export type Database = {
           },
         ]
       }
+      discovered_vehicles: {
+        Row: {
+          created_at: string | null
+          id: string
+          location: string | null
+          make: string
+          model: string
+          notes: string | null
+          price: string | null
+          source: string
+          source_url: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+          vin: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          make: string
+          model: string
+          notes?: string | null
+          price?: string | null
+          source: string
+          source_url?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+          vin?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          make?: string
+          model?: string
+          notes?: string | null
+          price?: string | null
+          source?: string
+          source_url?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+          vin?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       engagement_metrics: {
         Row: {
           created_at: string | null
