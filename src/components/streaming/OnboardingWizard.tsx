@@ -14,12 +14,12 @@ import {
   ChevronRight, 
   LogIn, 
   User, 
-  BrandTwitch, 
+  Video, 
   Instagram, 
   Twitter, 
-  Video, 
   Gamepad2,
-  Camera
+  Camera,
+  ArrowUpRightSquare
 } from "lucide-react";
 
 export interface StreamingServiceConfig {
@@ -42,7 +42,7 @@ export const OnboardingWizard = ({ onComplete, onCancel }: OnboardingWizardProps
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [services, setServices] = useState<StreamingServiceConfig[]>([
-    { id: "twitch", name: "Twitch", icon: <BrandTwitch className="h-5 w-5 text-purple-500" />, active: false },
+    { id: "twitch", name: "Twitch", icon: <ArrowUpRightSquare className="h-5 w-5 text-purple-500" />, active: false },
     { id: "instagram", name: "Instagram", icon: <Instagram className="h-5 w-5 text-pink-500" />, active: false },
     { id: "twitter", name: "X / Twitter", icon: <Twitter className="h-5 w-5 text-blue-400" />, active: false },
     { id: "rtmp", name: "RTMP Server", icon: <Video className="h-5 w-5 text-red-500" />, active: false },
