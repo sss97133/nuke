@@ -65,9 +65,7 @@ const Index = () => {
       handleHelpMenuAction(navigate, toastWrapper, action);
     } else {
       toast({
-        title: "Unknown Action",
-        description: `The action "${action}" is not recognized.`,
-        variant: "destructive"
+        description: `The action "${action}" is not recognized.`
       });
     }
   };

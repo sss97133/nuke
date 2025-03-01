@@ -1,11 +1,12 @@
 
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { UserMenu } from "./menu/UserMenu";
 import { MainMenu } from "./MainMenu";
 import { AppMenu } from "./AppMenu";
 import { GarageDropdown } from "@/components/garage/GarageDropdown";
+import { ToastFunction } from "@/components/dashboard/hooks/utils/types";
 
 interface DashboardHeaderProps {
   handleMenuAction: (action: string) => void;
@@ -13,7 +14,18 @@ interface DashboardHeaderProps {
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuAction }) => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  
+  // Create a toast wrapper that conforms to our ToastFunction type
+  const toastWrapper: ToastFunction = (options) => {
+    if (typeof options === 'string') {
+      return toast(options);
+    }
+    return toast({
+      title: options.title,
+      description: options.description,
+      variant: options.variant
+    });
+  };
 
   return (
     <div className="border-b bg-secondary">
@@ -28,7 +40,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
 
         <UserMenu 
           navigate={navigate}
-          toast={toast}
+          toast={toastWrapper}
           handleMenuAction={handleMenuAction}
         />
       </div>

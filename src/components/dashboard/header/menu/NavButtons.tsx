@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Home, Compass, Activity, Briefcase, ShoppingBag, Video, Settings, FileInput, ChevronDown, Bell, PanelLeft, Save, Moon, Sun } from "lucide-react";
+import { Home, Compass, Briefcase, Video, ChevronDown, Activity, ShoppingBag, FileInput } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   DropdownMenu,
@@ -15,27 +15,23 @@ export const NavButtons = () => {
 
   return (
     <>
-      <Button asChild variant="ghost" size="sm" className="mr-2">
+      <Button asChild variant="ghost" size="icon" className="p-1">
         <Link to="/">
-          <Home className="h-4 w-4 mr-1" />
-          Home
+          <Home className="h-4 w-4" />
         </Link>
       </Button>
       
-      <Button asChild variant="ghost" size="sm" className="mr-2">
+      <Button asChild variant="ghost" size="icon" className="p-1">
         <Link to="/discover">
-          <Compass className="h-4 w-4 mr-1" />
-          Discover
+          <Compass className="h-4 w-4" />
         </Link>
       </Button>
       
       {/* Business Tools Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="mr-2">
-            <Briefcase className="h-4 w-4 mr-1" />
-            Business
-            <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+          <Button variant="ghost" size="icon" className="p-1">
+            <Briefcase className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="bg-popover">
@@ -63,10 +59,8 @@ export const NavButtons = () => {
       {/* Media Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="mr-2">
-            <Video className="h-4 w-4 mr-1" />
-            Media
-            <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+          <Button variant="ghost" size="icon" className="p-1">
+            <Video className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="bg-popover">
@@ -81,50 +75,6 @@ export const NavButtons = () => {
               <FileInput className="h-4 w-4 mr-2" />
               Import
             </Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Settings Dropdown */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="mr-2">
-            <Settings className="h-4 w-4 mr-1" />
-            Settings
-            <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="bg-popover">
-          <DropdownMenuItem asChild>
-            <Link to="/settings" className="flex items-center w-full">
-              <PanelLeft className="h-4 w-4 mr-2" />
-              Preferences
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/settings?tab=notifications" className="flex items-center w-full">
-              <Bell className="h-4 w-4 mr-2" />
-              Notifications
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/settings?tab=data" className="flex items-center w-full">
-              <Save className="h-4 w-4 mr-2" />
-              Data Management
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-            {theme === 'dark' ? (
-              <>
-                <Sun className="h-4 w-4 mr-2" />
-                Light Mode
-              </>
-            ) : (
-              <>
-                <Moon className="h-4 w-4 mr-2" />
-                Dark Mode
-              </>
-            )}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
