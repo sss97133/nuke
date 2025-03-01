@@ -3,7 +3,11 @@ import React from 'react';
 import { Trophy, Star, Award } from 'lucide-react';
 
 interface UserMetricsProps {
-  profile: any;
+  profile: {
+    user_type?: string;
+    reputation_score?: number;
+    achievements_count?: number;
+  };
 }
 
 export const UserMetrics = ({ profile }: UserMetricsProps) => {

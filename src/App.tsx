@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -29,12 +28,10 @@ function App() {
     return () => setIsMounted(false);
   }, []);
 
-  // Prevent rendering routes until the component is mounted
   if (!isMounted) {
     return null;
   }
 
-  // Show a loading indicator while the auth state is loading
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -46,12 +43,10 @@ function App() {
   const isAuthenticated = !!session;
   const isAuthPath = ['/login', '/register'].includes(location.pathname);
 
-  // If the user is authenticated and trying to access an auth page, redirect to the dashboard
   if (isAuthenticated && isAuthPath) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // If the user is not authenticated, redirect to the login page, except for the auth callback page
   if (!isAuthenticated && !isAuthPath && !location.pathname.startsWith('/auth/callback')) {
     return <Navigate to="/login" replace />;
   }

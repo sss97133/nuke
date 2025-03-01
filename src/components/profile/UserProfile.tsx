@@ -51,19 +51,25 @@ export const UserProfile = () => {
 
   useEffect(() => {
     if (profile?.social_links) {
-      setSocialLinks({
-        twitter: profile.social_links.twitter || '',
-        instagram: profile.social_links.instagram || '',
-        linkedin: profile.social_links.linkedin || '',
-        github: profile.social_links.github || ''
-      });
+      // Type guard to check if social_links is an object
+      if (typeof profile.social_links === 'object' && profile.social_links !== null && !Array.isArray(profile.social_links)) {
+        setSocialLinks({
+          twitter: (profile.social_links as any).twitter || '',
+          instagram: (profile.social_links as any).instagram || '',
+          linkedin: (profile.social_links as any).linkedin || '',
+          github: (profile.social_links as any).github || ''
+        });
+      }
     }
     if (profile?.streaming_links) {
-      setStreamingLinks({
-        twitch: profile.streaming_links.twitch || '',
-        youtube: profile.streaming_links.youtube || '',
-        tiktok: profile.streaming_links.tiktok || ''
-      });
+      // Type guard to check if streaming_links is an object
+      if (typeof profile.streaming_links === 'object' && profile.streaming_links !== null && !Array.isArray(profile.streaming_links)) {
+        setStreamingLinks({
+          twitch: (profile.streaming_links as any).twitch || '',
+          youtube: (profile.streaming_links as any).youtube || '',
+          tiktok: (profile.streaming_links as any).tiktok || ''
+        });
+      }
     }
   }, [profile]);
 
@@ -109,10 +115,10 @@ export const UserProfile = () => {
   }
 
   // Enrich profile with achievements count for UserMetrics
-  const enrichedProfile = {
+  const enrichedProfile = profile ? {
     ...profile,
     achievements_count: achievements?.length || 0
-  };
+  } : null;
 
   return (
     <div className="space-y-4">
@@ -125,7 +131,7 @@ export const UserProfile = () => {
           bio={profile?.bio}
         />
         
-        <UserMetrics profile={enrichedProfile} />
+        {enrichedProfile && <UserMetrics profile={enrichedProfile} />}
 
         {profile?.id && (
           <div className="mt-6 border rounded-lg p-4">

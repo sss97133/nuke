@@ -3,6 +3,24 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+// Define JSON type for type safety
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
+// Define interface for profile data from DB
+interface ProfileFromDB {
+  id: string;
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  user_type: 'viewer' | 'professional' | string;
+  reputation_score: number;
+  social_links: Json;
+  streaming_links: Json;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export const useProfileData = () => {
   const { toast } = useToast();
   
@@ -28,7 +46,7 @@ export const useProfileData = () => {
       }
       
       console.log('✅ Profile data received:', data);
-      return data;
+      return data as ProfileFromDB;
     },
   });
 
