@@ -30,27 +30,27 @@ export const MarketAnalysis = ({
 
         <Tabs defaultValue="mental-estate" className="w-full">
           <TabsList className="w-full grid grid-cols-3 md:grid-cols-6 mb-4">
-            <TabsTrigger value="mental-estate" className="flex items-center gap-2">
+            <TabsTrigger value="mental-estate" className="flex items-center gap-2 border-0">
               <BrainCircuit className="h-4 w-4" />
               <span className="hidden sm:inline">Mental Real Estate</span>
             </TabsTrigger>
-            <TabsTrigger value="brand" className="flex items-center gap-2">
+            <TabsTrigger value="brand" className="flex items-center gap-2 border-0">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Brand Analytics</span>
             </TabsTrigger>
-            <TabsTrigger value="consumer" className="flex items-center gap-2">
+            <TabsTrigger value="consumer" className="flex items-center gap-2 border-0">
               <Lightbulb className="h-4 w-4" />
               <span className="hidden sm:inline">Consumer Behavior</span>
             </TabsTrigger>
-            <TabsTrigger value="decision" className="flex items-center gap-2">
+            <TabsTrigger value="decision" className="flex items-center gap-2 border-0">
               <Zap className="h-4 w-4" />
               <span className="hidden sm:inline">Decision Making</span>
             </TabsTrigger>
-            <TabsTrigger value="market-share" className="flex items-center gap-2">
+            <TabsTrigger value="market-share" className="flex items-center gap-2 border-0">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Market Share</span>
             </TabsTrigger>
-            <TabsTrigger value="research" className="flex items-center gap-2">
+            <TabsTrigger value="research" className="flex items-center gap-2 border-0">
               <FileSearch className="h-4 w-4" />
               <span className="hidden sm:inline">Research</span>
             </TabsTrigger>
