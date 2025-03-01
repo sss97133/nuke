@@ -3,7 +3,7 @@ import React from 'react';
 import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import { PTZTrack, WorkspaceDimensions } from '@/types/studio';
+import { PTZTrack, WorkspaceDimensions, StudioConfiguration } from '@/types/studio';
 
 // Mock user data for testing
 export const mockUser = {
@@ -17,7 +17,7 @@ export const mockUser = {
 };
 
 // Mock studio configuration data
-export const mockStudioConfig = {
+export const mockStudioConfig: StudioConfiguration = {
   id: 'test-config-id',
   name: 'Test Studio Configuration',
   workspace_dimensions: {
