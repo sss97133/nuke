@@ -1,8 +1,8 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrainCircuit, Users, Lightbulb, BarChart3, Zap, FileSearch } from "lucide-react";
+
 export interface MarketAnalysisProps {
   vehicleData?: {
     make: string;
@@ -11,6 +11,7 @@ export interface MarketAnalysisProps {
     historical_data?: any;
   };
 }
+
 export const MarketAnalysis = ({
   vehicleData
 }: MarketAnalysisProps) => {
@@ -19,6 +20,7 @@ export const MarketAnalysis = ({
     model: "Vehicle",
     year: new Date().getFullYear()
   };
+
   return <ScrollArea className="h-[calc(100vh-4rem)] w-full">
       <div className="container max-w-6xl mx-auto py-6 px-4 space-y-6">
         <div className="flex flex-col space-y-2">
@@ -89,7 +91,7 @@ export const MarketAnalysis = ({
           </TabsContent>
 
           <TabsContent value="brand">
-            <Card className="p-6">
+            <Card className="p-6 border-0">
               <h2 className="text-2xl font-semibold mb-4">Brand Analytics</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -118,7 +120,7 @@ export const MarketAnalysis = ({
           </TabsContent>
 
           <TabsContent value="consumer">
-            <Card className="p-6">
+            <Card className="p-6 border-0">
               <h2 className="text-2xl font-semibold mb-4">Consumer Behavior</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -254,4 +256,5 @@ export const MarketAnalysis = ({
       </div>
     </ScrollArea>;
 };
+
 export default MarketAnalysis;
