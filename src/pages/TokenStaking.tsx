@@ -7,6 +7,9 @@ import StakeForm from "@/components/token-staking/StakeForm";
 import StakesList from "@/components/token-staking/StakesList";
 import StakingPortfolioStats from "@/components/token-staking/StakingPortfolioStats";
 import { useTokenStaking } from "@/components/token-staking/useTokenStaking";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const TokenStaking = () => {
   const {
@@ -18,8 +21,10 @@ const TokenStaking = () => {
     isLoadingStakes,
     stakingStats,
     isLoadingStats,
+    hasError,
     fetchUserStakes,
-    handleUnstake
+    handleUnstake,
+    retry
   } = useTokenStaking();
 
   const [activeTab, setActiveTab] = useState<string>("stake");
@@ -58,6 +63,18 @@ const TokenStaking = () => {
           </div>
         </div>
         
+        {hasError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex justify-between items-center">
+              <span>There was an error loading staking data</span>
+              <Button onClick={retry} variant="outline" size="sm" className="ml-2">
+                <RefreshCw className="h-4 w-4 mr-2" /> Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="stake">Stake Tokens</TabsTrigger>
@@ -79,13 +96,17 @@ const TokenStaking = () => {
           <TabsContent value="mystakes" className="space-y-4 pt-4">
             <StakingPortfolioStats 
               stats={stakingStats} 
-              isLoading={isLoadingStats} 
+              isLoading={isLoadingStats}
+              hasError={hasError}
+              onRetry={retry}
             />
             
             <StakesList
               userStakes={userStakes}
               isLoadingStakes={isLoadingStakes}
+              hasError={hasError}
               onUnstake={handleUnstake}
+              onRetry={retry}
             />
           </TabsContent>
         </Tabs>

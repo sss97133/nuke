@@ -1,13 +1,15 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader, TrendingUp } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Loader, TrendingUp, AlertCircle } from "lucide-react";
 import { Token, Vehicle } from "@/types/token";
 import { calculatePredictedROI } from "./utils/stakingUtils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 interface StakeFormProps {
   tokens: Token[];
@@ -29,15 +31,22 @@ const StakeForm = ({
   const [stakeAmount, setStakeAmount] = useState<string>("");
   const [stakeDuration, setStakeDuration] = useState<string>("30");
   const [isStaking, setIsStaking] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const clearError = () => {
+    if (errorMessage) setErrorMessage(null);
+  };
 
   const handleStake = async () => {
+    clearError();
+    
     if (!selectedToken || !selectedVehicle || !stakeAmount || !stakeDuration) {
-      toast("Please fill all required fields");
+      setErrorMessage("Please fill all required fields");
       return;
     }
 
     if (isNaN(Number(stakeAmount)) || Number(stakeAmount) <= 0) {
-      toast("Please enter a valid stake amount");
+      setErrorMessage("Please enter a valid stake amount");
       return;
     }
 
@@ -47,7 +56,7 @@ const StakeForm = ({
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        toast("You must be logged in to stake tokens");
+        setErrorMessage("You must be logged in to stake tokens");
         return;
       }
       
@@ -57,10 +66,14 @@ const StakeForm = ({
         .select('balance')
         .eq('user_id', user.id)
         .eq('token_id', selectedToken)
-        .single();
+        .single() as { data: any, error: Error | null };
       
       if (holdingsError) {
-        toast("Failed to verify token balance");
+        if (holdingsError.message.includes('no rows returned')) {
+          setErrorMessage(`You don't have any of these tokens to stake`);
+        } else {
+          setErrorMessage("Failed to verify token balance");
+        }
         return;
       }
       
@@ -68,7 +81,7 @@ const StakeForm = ({
       const stakeValue = Number(stakeAmount);
       
       if (balance < stakeValue) {
-        toast(`Insufficient balance. You have ${balance} tokens available.`);
+        setErrorMessage(`Insufficient balance. You have ${balance} tokens available.`);
         return;
       }
       
@@ -82,8 +95,6 @@ const StakeForm = ({
       const vehicleName = vehicleInfo ? `${vehicleInfo.year} ${vehicleInfo.make} ${vehicleInfo.model}` : "";
       
       try {
-        // Find vehicle name from the selected vehicle
-        
         const stakeData = {
           user_id: user.id,
           token_id: selectedToken,
@@ -96,12 +107,20 @@ const StakeForm = ({
           vehicle_name: vehicleName
         };
         
-        // Insert stake data directly since type checking for rpc is causing issues
-        const { error } = await supabase
-          .from('token_stakes')
-          .insert([stakeData]) as { error: Error | null };
+        // Try to use RPC function if available
+        try {
+          const { error: rpcError } = await supabase.rpc('create_token_stake', stakeData) as { error: Error | null };
+          if (rpcError) throw rpcError;
+        } catch (rpcError) {
+          console.warn('RPC function not available, falling back to direct insert:', rpcError);
           
-        if (error) throw error;
+          // Fallback to direct insert
+          const { error } = await supabase
+            .from('token_stakes')
+            .insert([stakeData]) as { error: Error | null };
+              
+          if (error) throw error;
+        }
       } catch (error) {
         console.error('Error creating stake:', error);
         throw new Error('Failed to create stake record');
@@ -112,7 +131,7 @@ const StakeForm = ({
         .from('token_holdings')
         .update({ balance: balance - stakeValue })
         .eq('user_id', user.id)
-        .eq('token_id', selectedToken);
+        .eq('token_id', selectedToken) as { error: Error | null };
 
       if (updateError) throw updateError;
 
@@ -129,7 +148,7 @@ const StakeForm = ({
       
     } catch (error) {
       console.error('Error staking tokens:', error);
-      toast("Failed to stake tokens");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to stake tokens");
     } finally {
       setIsStaking(false);
     }
@@ -144,9 +163,16 @@ const StakeForm = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {errorMessage && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
+        
         <div className="space-y-2">
           <label className="text-sm font-medium">Select Token</label>
-          <Select value={selectedToken} onValueChange={setSelectedToken}>
+          <Select value={selectedToken} onValueChange={(value) => { setSelectedToken(value); clearError(); }}>
             <SelectTrigger>
               <SelectValue placeholder="Select a token" />
             </SelectTrigger>
@@ -173,7 +199,7 @@ const StakeForm = ({
         
         <div className="space-y-2">
           <label className="text-sm font-medium">Select Vehicle</label>
-          <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
+          <Select value={selectedVehicle} onValueChange={(value) => { setSelectedVehicle(value); clearError(); }}>
             <SelectTrigger>
               <SelectValue placeholder="Select a vehicle" />
             </SelectTrigger>
@@ -204,14 +230,14 @@ const StakeForm = ({
             type="number" 
             placeholder="Enter amount to stake"
             value={stakeAmount}
-            onChange={(e) => setStakeAmount(e.target.value)}
+            onChange={(e) => { setStakeAmount(e.target.value); clearError(); }}
             min="0"
           />
         </div>
         
         <div className="space-y-2">
           <label className="text-sm font-medium">Stake Duration (Days)</label>
-          <Select value={stakeDuration} onValueChange={setStakeDuration}>
+          <Select value={stakeDuration} onValueChange={(value) => { setStakeDuration(value); clearError(); }}>
             <SelectTrigger>
               <SelectValue placeholder="Select duration" />
             </SelectTrigger>
