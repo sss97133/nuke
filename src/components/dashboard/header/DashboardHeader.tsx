@@ -20,10 +20,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ handleMenuActi
     if (typeof options === 'string') {
       return toast(options);
     }
-    return toast({
-      title: options.title,
-      description: options.description,
-      variant: options.variant
+    return toast(options.description || '', {
+      description: options.title,
     });
   };
 

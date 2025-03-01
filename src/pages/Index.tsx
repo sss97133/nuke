@@ -40,10 +40,8 @@ const Index = () => {
     if (typeof options === 'string') {
       return toast(options);
     }
-    return toast({
-      title: options.title,
-      description: options.description,
-      variant: options.variant
+    return toast(options.description || '', {
+      description: options.title,
     });
   };
 
@@ -64,7 +62,7 @@ const Index = () => {
     } else if (['documentation', 'keyboard_shortcuts', 'about'].includes(action)) {
       handleHelpMenuAction(navigate, toastWrapper, action);
     } else {
-      toast({
+      toast(action + " is not recognized", {
         description: `The action "${action}" is not recognized.`
       });
     }
