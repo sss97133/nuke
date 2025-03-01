@@ -4,22 +4,53 @@ import { render, RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, vi } from 'vitest';
-import { StudioConfiguration as StudioConfigType } from '@/types/studio';
+
+interface StudioConfig {
+  id: string;
+  name: string;
+  workspace_dimensions: {
+    length: number;
+    width: number;
+    height: number;
+  };
+  equipment?: {
+    cameras: Array<{
+      id: string;
+      name: string;
+      type: string;
+      position: {
+        x: number;
+        y: number;
+        z: number;
+      };
+    }>;
+    lightSources: Array<any>;
+    audioDevices: Array<any>;
+    surfaces: {
+      floor: any;
+      walls: any;
+      ceiling: any;
+    };
+    roboticArms: Array<any>;
+  };
+}
 
 // Mock user and config objects
 export const mockUser = {
-  data: {
-    user: {
-      id: 'test-user-id',
-      name: 'Test User',
-      email: 'test@example.com',
-      role: 'user'
-    }
-  },
+  id: 'test-user-id',
+  email: 'test@example.com',
+  app_metadata: {},
+  user_metadata: {
+    name: 'Test User'
+  }
+};
+
+export const mockUserResponse = {
+  data: { user: mockUser },
   error: null
 };
 
-export const mockStudioConfig: StudioConfigType = {
+export const mockStudioConfig: StudioConfig = {
   id: '1',
   name: 'Test Studio',
   workspace_dimensions: {
@@ -27,17 +58,20 @@ export const mockStudioConfig: StudioConfigType = {
     width: 20,
     height: 16
   },
-  ptz_configurations: {
-    tracks: [
+  equipment: {
+    cameras: [
       {
-        position: { x: 0, y: 0, z: 0 },
-        length: 10,
-        speed: 5,
-        coneAngle: 45
+        id: 'camera-1',
+        name: 'Main Camera',
+        type: 'PTZ',
+        position: { x: 15, y: 10, z: 5 }
       }
     ],
-    planes: {
-      walls: [],
+    lightSources: [],
+    audioDevices: [],
+    surfaces: {
+      floor: {},
+      walls: {},
       ceiling: {}
     },
     roboticArms: []
@@ -56,6 +90,7 @@ export const renderWithQueryClient = (
     defaultOptions: {
       queries: {
         retry: false,
+        cacheTime: 0,
       },
     },
   });

@@ -1,22 +1,11 @@
 
-import { vi } from "vitest";
+import { vi } from 'vitest';
+import { mockUser, mockStudioConfig } from "../utils/testUtils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { mockUser, mockStudioConfig } from "../utils/testUtils";
 
-// Mock toast function
-export const getMockToast = () => {
-  const mockToast = vi.fn();
-  (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
-  return mockToast;
-};
-
-// Set up all mocks
+// Mock dependencies
 export const setupMocks = () => {
-  vi.mock("@/hooks/use-toast", () => ({
-    useToast: vi.fn(),
-  }));
-
   vi.mock("@/integrations/supabase/client", () => ({
     supabase: {
       auth: {
@@ -30,11 +19,24 @@ export const setupMocks = () => {
       })),
     },
   }));
+
+  vi.mock("@/hooks/use-toast", () => ({
+    useToast: vi.fn(),
+  }));
 };
 
-// Set up supabase mocks
+export const getMockToast = () => {
+  const mockToast = vi.fn();
+  (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
+  return mockToast;
+};
+
 export const setupSupabaseMocks = () => {
-  (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+  (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ 
+    data: { user: mockUser }, 
+    error: null 
+  });
+
   (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
     select: () => ({
       eq: () => ({
