@@ -15,6 +15,8 @@ export interface Token {
   status: string;
   updated_at: string;
   vehicle_id?: string;
+  current_price?: number;
+  image_url?: string;
 }
 
 export interface NewToken {
@@ -33,6 +35,8 @@ export interface Vehicle {
   model: string;
   year: number;
   vin?: string;
+  description?: string;
+  image_url?: string;
 }
 
 export interface TokenStake {

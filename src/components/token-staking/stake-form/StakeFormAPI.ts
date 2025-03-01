@@ -55,7 +55,7 @@ export const createStake = async (
     
     const balance = holdings?.balance || 0;
     
-    if (balance < stakeAmount) {
+    if (Number(balance) < stakeAmount) {
       throw new Error(`Insufficient balance. You have ${balance} tokens available.`);
     }
     
@@ -64,22 +64,43 @@ export const createStake = async (
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + stakeDuration);
     
-    // Create the stake record
+    // Try to use an RPC function first
+    try {
+      const { error } = await supabase.rpc('create_stake', { 
+        user_id_param: user.id,
+        token_id_param: selectedToken,
+        vehicle_id_param: selectedVehicle,
+        amount_param: stakeAmount.toString(),
+        start_date_param: startDate.toISOString(),
+        end_date_param: endDate.toISOString(),
+        predicted_roi_param: parseFloat((stakeAmount * (0.05 + 0.02) / 365 * stakeDuration).toFixed(2)),
+        vehicle_name_param: vehicleName
+      });
+      
+      if (!error) {
+        return true;
+      }
+    } catch (rpcError) {
+      console.warn('RPC for creating stake not available:', rpcError);
+      // Continue with fallback implementation
+    }
+    
+    // Create the stake record (fallback)
     const stakeData = {
       user_id: user.id,
       token_id: selectedToken,
       vehicle_id: selectedVehicle,
-      amount: stakeAmount,
+      amount: stakeAmount.toString(),
       start_date: startDate.toISOString(),
       end_date: endDate.toISOString(),
       status: 'active',
-      predicted_roi: parseFloat(stakeAmount * (0.05 + 0.02) / 365 * stakeDuration),
+      predicted_roi: parseFloat((stakeAmount * (0.05 + 0.02) / 365 * stakeDuration).toFixed(2)),
       vehicle_name: vehicleName
     };
     
     // Direct insert
     const { error } = await supabase
-      .from('token_stakes')
+      .from('token_stakes' as any)
       .insert([stakeData]);
           
     if (error) throw error;
@@ -87,7 +108,7 @@ export const createStake = async (
     // Update the user's token holdings
     const { error: updateError } = await supabase
       .from('token_holdings')
-      .update({ balance: balance - stakeAmount })
+      .update({ balance: Number(balance) - stakeAmount })
       .eq('user_id', user.id)
       .eq('token_id', selectedToken);
 
