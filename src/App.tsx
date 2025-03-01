@@ -17,6 +17,7 @@ import Documentation from "./pages/Documentation"
 import Import from "./pages/Import"
 import DiscoveredVehicles from "./pages/DiscoveredVehicles"
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { NavSidebar } from './components/layout/NavSidebar'
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient();
@@ -55,27 +56,41 @@ function AppContent() {
     return <Navigate to="/login" replace />;
   }
 
+  // For auth pages, don't show the sidebar
+  if (isAuthPath || location.pathname.startsWith('/auth/callback')) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Routes>
+          <Route path="/login" element={<AuthForm />} />
+          <Route path="/register" element={<AuthForm />} />
+          <Route path="/auth/callback" element={<AuthForm />} />
+          <Route path="/" element={<AuthForm />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  // For authenticated pages, show the sidebar and content
   return (
-    <div className="min-h-screen bg-background">
-      <Routes>
-        <Route path="/login" element={<AuthForm />} />
-        <Route path="/register" element={<AuthForm />} />
-        <Route path="/auth/callback" element={<AuthForm />} />
-        <Route path="/" element={<AuthForm />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/skills" element={<Skills />} />
-        <Route path="/achievements" element={<Achievements />} />
-        <Route path="/studio" element={<Studio />} />
-        <Route path="/glossary" element={<Glossary />} />
-        <Route path="/sitemap" element={<Sitemap />} />
-        <Route path="/documentation" element={<Documentation />} />
-        <Route path="/import" element={<Import />} />
-        <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/professional-dashboard" element={<Profile />} />
-        <Route path="/service" element={<Dashboard />} />
-      </Routes>
+    <div className="flex min-h-screen bg-background">
+      <NavSidebar />
+      <div className="flex-1">
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/skills" element={<Skills />} />
+          <Route path="/achievements" element={<Achievements />} />
+          <Route path="/studio" element={<Studio />} />
+          <Route path="/glossary" element={<Glossary />} />
+          <Route path="/sitemap" element={<Sitemap />} />
+          <Route path="/documentation" element={<Documentation />} />
+          <Route path="/import" element={<Import />} />
+          <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/professional-dashboard" element={<Profile />} />
+          <Route path="/service" element={<Dashboard />} />
+        </Routes>
+      </div>
     </div>
   );
 }
