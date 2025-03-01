@@ -9,7 +9,7 @@ interface UserMetricsProps {
 export const UserMetrics = ({ profile }: UserMetricsProps) => {
   const userType = profile?.user_type || 'N/A';
   const reputationScore = profile?.reputation_score || 0;
-  const achievementsCount = 0; // This would come from achievements.length in a real implementation
+  const achievementsCount = profile?.achievements_count || 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
