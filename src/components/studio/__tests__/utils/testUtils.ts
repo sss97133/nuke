@@ -2,63 +2,56 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
+import { PTZTrack, WorkspaceDimensions } from '@/types/studio';
 
+// Mock user data for testing
 export const mockUser = {
-  id: 'test-user-id',
-  email: 'test@example.com',
-  app_metadata: {
-    provider: 'email',
+  data: {
+    user: {
+      id: 'test-user-id',
+      email: 'test@example.com',
+    }
   },
-  user_metadata: {
-    full_name: 'Test User',
-  },
+  error: null
 };
 
+// Mock studio configuration data
+export const mockStudioConfig = {
+  id: 'test-config-id',
+  name: 'Test Studio Configuration',
+  workspace_dimensions: {
+    length: 30,
+    width: 20,
+    height: 16
+  },
+  ptz_configurations: {
+    tracks: [{
+      position: { x: 0, y: 8, z: 0 },
+      length: 10,
+      speed: 1,
+      coneAngle: 45
+    }],
+    planes: { walls: [], ceiling: {} },
+    roboticArms: []
+  }
+};
+
+// Helper function to render components with QueryClient for testing
 export const renderWithQueryClient = (ui: React.ReactElement) => {
-  const testQueryClient = new QueryClient({
+  const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
       },
     },
   });
-
+  
   return render(
-    <QueryClientProvider client={testQueryClient}>
-      {ui}
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        {ui}
+      </BrowserRouter>
     </QueryClientProvider>
   );
-};
-
-// Mock for studio config
-export const mockStudioConfig = {
-  id: 'studio-config-id',
-  name: 'Test Studio',
-  workspace_dimensions: { width: 400, height: 300, length: 500 },
-  camera_config: { 
-    camera_type: 'fixed',
-    position: { x: 0, y: 0, z: 0 }
-  },
-  audio_config: {
-    microphone_type: 'condenser',
-    audio_input: 'xlr'
-  },
-  lighting_config: {
-    primary_light: 'key',
-    secondary_light: 'fill'
-  },
-  ptz_configurations: {
-    planes: {
-      walls: [],
-      ceiling: {}
-    },
-    tracks: [],
-    roboticArms: []
-  },
-  fixed_cameras: {
-    positions: []
-  },
-  user_id: 'test-user-id',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString()
 };

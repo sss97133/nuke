@@ -1,50 +1,45 @@
 
-import { mockStudioConfig } from '../utils/testUtils';
+import { vi } from 'vitest';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { mockUser, mockStudioConfig } from '../utils/testUtils';
 
-export const createMockConfiguration = () => {
-  return {
-    ...mockStudioConfig,
-    id: `config-${Date.now()}`,
-    name: `Studio ${Date.now()}`,
-    workspace_dimensions: {
-      width: 500,
-      height: 300,
-      length: 600
-    }
-  };
+export const setupMocks = () => {
+  // Mock the supabase client
+  vi.mock("@/integrations/supabase/client", () => ({
+    supabase: {
+      auth: {
+        getUser: vi.fn().mockResolvedValue(mockUser),
+      },
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        upsert: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn(),
+      })),
+    },
+  }));
+
+  // Mock the toast hook
+  vi.mock("@/hooks/use-toast", () => ({
+    useToast: vi.fn(),
+  }));
 };
 
-export const createMockPTZConfiguration = () => {
-  return {
-    ...mockStudioConfig,
-    id: `ptz-config-${Date.now()}`,
-    name: `PTZ Studio ${Date.now()}`,
-    ptz_configurations: {
-      planes: {
-        walls: [
-          {
-            id: 'wall-1',
-            name: 'North Wall',
-            position: { x: 0, y: 150, z: 300 },
-            dimensions: { width: 500, height: 300 },
-            orientation: 'front'
-          }
-        ],
-        ceiling: {
-          position: { x: 0, y: 300, z: 0 },
-          dimensions: { width: 500, length: 600 }
-        }
-      },
-      tracks: [
-        {
-          id: 'track-1',
-          name: 'Ceiling Track',
-          start: { x: -200, y: 280, z: 0 },
-          end: { x: 200, y: 280, z: 0 },
-          speed: 50
-        }
-      ],
-      roboticArms: []
-    }
-  };
+export const getMockToast = () => {
+  const mockToast = vi.fn();
+  (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
+  return mockToast;
+};
+
+export const setupSupabaseMocks = () => {
+  // Mock successful config fetch
+  (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () => Promise.resolve({ data: mockStudioConfig, error: null })
+      })
+    }),
+    upsert: () => Promise.resolve({ error: null })
+  }));
 };
