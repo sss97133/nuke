@@ -21,6 +21,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { NavSidebar } from './components/layout/NavSidebar'
 import TokensPage from "./pages/Tokens"
 import ServiceHistory from "./pages/ServiceHistory"
+import Parts from "./pages/Parts"
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient();
@@ -89,7 +90,7 @@ function AppContent() {
           <Route path="/analytics" element={<Dashboard />} />
           <Route path="/fuel" element={<Dashboard />} />
           <Route path="/diagnostics" element={<Dashboard />} />
-          <Route path="/parts" element={<Dashboard />} />
+          <Route path="/parts" element={<Parts />} />
           <Route path="/service-history" element={<ServiceHistory />} />
           <Route path="/token-staking" element={<TokenStaking />} />
           <Route path="/tokens" element={<TokensPage />} />
