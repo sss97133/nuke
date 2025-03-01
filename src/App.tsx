@@ -80,6 +80,14 @@ function AppContent() {
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/achievements" element={<Achievements />} />
+          <Route path="/maintenance" element={<Dashboard />} />
+          <Route path="/service" element={<Dashboard />} />
+          <Route path="/schedule" element={<Dashboard />} />
+          <Route path="/analytics" element={<Dashboard />} />
+          <Route path="/fuel" element={<Dashboard />} />
+          <Route path="/diagnostics" element={<Dashboard />} />
+          <Route path="/parts" element={<Dashboard />} />
+          <Route path="/service-history" element={<Dashboard />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/glossary" element={<Glossary />} />
           <Route path="/sitemap" element={<Sitemap />} />
@@ -88,7 +96,6 @@ function AppContent() {
           <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/professional-dashboard" element={<Profile />} />
-          <Route path="/service" element={<Dashboard />} />
         </Routes>
       </div>
     </div>

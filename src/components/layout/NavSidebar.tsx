@@ -14,7 +14,15 @@ import {
   Car, 
   User,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Settings,
+  Calendar,
+  BarChart3,
+  Timer,
+  Tool,
+  FuelPump,
+  Battery,
+  Gauge
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -55,6 +63,14 @@ export const NavSidebar = () => {
     { to: "/onboarding", icon: <Compass className="h-5 w-5" />, label: "Onboarding" },
     { to: "/skills", icon: <Wrench className="h-5 w-5" />, label: "Skills" },
     { to: "/achievements", icon: <Award className="h-5 w-5" />, label: "Achievements" },
+    { to: "/maintenance", icon: <Tool className="h-5 w-5" />, label: "Maintenance" },
+    { to: "/service", icon: <Settings className="h-5 w-5" />, label: "Service" },
+    { to: "/schedule", icon: <Calendar className="h-5 w-5" />, label: "Schedule" },
+    { to: "/analytics", icon: <BarChart3 className="h-5 w-5" />, label: "Analytics" },
+    { to: "/fuel", icon: <FuelPump className="h-5 w-5" />, label: "Fuel Tracking" },
+    { to: "/diagnostics", icon: <Gauge className="h-5 w-5" />, label: "Diagnostics" },
+    { to: "/parts", icon: <Battery className="h-5 w-5" />, label: "Parts" },
+    { to: "/service-history", icon: <Timer className="h-5 w-5" />, label: "Service History" },
     { to: "/studio", icon: <Video className="h-5 w-5" />, label: "Studio" },
     { to: "/glossary", icon: <Book className="h-5 w-5" />, label: "Glossary" },
     { to: "/sitemap", icon: <Map className="h-5 w-5" />, label: "Sitemap" },
