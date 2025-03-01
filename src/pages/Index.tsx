@@ -7,6 +7,7 @@ import Login from "./Login";
 import PluginDownload from "./PluginDownload";
 import NotFound from "./NotFound";
 import Crypto from "./Crypto";
+import Discover from "./Discover";
 
 const Index = () => {
   const handleMenuAction = (action: string) => {
@@ -23,6 +24,7 @@ const Index = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/plugin" element={<PluginDownload />} />
           <Route path="/crypto" element={<Crypto />} />
+          <Route path="/discover" element={<Discover />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
