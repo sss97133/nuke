@@ -98,10 +98,10 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
         throw new Error('You must be logged in to create a service record');
       }
       
-      // Supabase insert for a single record
+      // Supabase insert requires an array of objects
       const { error } = await supabase
         .from('service_tickets')
-        .insert({
+        .insert([{
           vehicle_id: formState.vehicleId,
           description: formState.description,
           service_type: formState.serviceType,
@@ -110,7 +110,7 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
           technician_notes: formState.technicianNotes,
           parts_used: formState.parts.length > 0 ? formState.parts : null,
           user_id: user.id
-        });
+        }]);
 
       if (error) throw error;
       
