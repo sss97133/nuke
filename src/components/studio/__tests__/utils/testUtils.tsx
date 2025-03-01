@@ -3,6 +3,8 @@ import React, { ReactElement } from 'react';
 import { render, RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
+import { expect, vi } from 'vitest';
+import { StudioConfiguration as StudioConfigType } from '@/types/studio';
 
 // Mock user and config objects
 export const mockUser = {
@@ -17,9 +19,8 @@ export const mockUser = {
   error: null
 };
 
-export const mockStudioConfig = {
+export const mockStudioConfig: StudioConfigType = {
   id: '1',
-  user_id: 'test-user-id',
   name: 'Test Studio',
   workspace_dimensions: {
     length: 30,
@@ -40,9 +41,7 @@ export const mockStudioConfig = {
       ceiling: {}
     },
     roboticArms: []
-  },
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString()
+  }
 };
 
 // Helper to render components with query client
@@ -52,7 +51,7 @@ export const renderWithQueryClient = (
     queryClient?: QueryClient;
     route?: string;
   }
-): RenderResult & { queryClient: QueryClient } => {
+): RenderResult => {
   const queryClient = options?.queryClient || new QueryClient({
     defaultOptions: {
       queries: {
@@ -69,8 +68,15 @@ export const renderWithQueryClient = (
     </QueryClientProvider>
   );
   
-  return {
-    ...render(ui, { wrapper }),
-    queryClient,
-  };
+  return render(ui, { wrapper });
+};
+
+// Test utility functions
+export const expectToBeInTheDocument = (element: HTMLElement) => {
+  expect(element).toBeDefined();
+  expect(element).not.toBeNull();
+};
+
+export const expectNotToBeInTheDocument = (element: HTMLElement | null) => {
+  expect(element).toBeNull();
 };

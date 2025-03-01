@@ -3,10 +3,9 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { StudioConfiguration } from "../StudioConfiguration";
 import "@testing-library/jest-dom/vitest";
-import { renderWithQueryClient } from "./utils/testUtils";
+import { renderWithQueryClient, mockStudioConfig } from "./utils/testUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { mockStudioConfig } from "./utils/testUtils";
 
 // Mock dependencies
 vi.mock("@/integrations/supabase/client", () => ({
