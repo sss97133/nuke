@@ -59,6 +59,7 @@ export const usePreferencesBase = () => {
           notificationsEnabled: preferencesData.notifications_enabled,
           autoSaveEnabled: preferencesData.auto_save_enabled,
           compactViewEnabled: preferencesData.compact_view_enabled,
+          theme: preferencesData.theme || 'system', // Added the theme property
           distanceUnit: preferencesData.distance_unit,
           currency: preferencesData.currency,
           defaultGarageView: preferencesData.default_garage_view,
