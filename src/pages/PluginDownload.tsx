@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Chrome, Browser, AlertCircle } from "lucide-react";
+import { Download, Chrome, Globe, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
@@ -85,7 +85,7 @@ export const PluginDownload = () => {
                 size="lg"
                 variant="outline"
               >
-                <Browser className="h-5 w-5" />
+                <Globe className="h-5 w-5" />
                 <span>Firefox</span>
               </Button>
               
