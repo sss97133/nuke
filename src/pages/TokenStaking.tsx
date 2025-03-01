@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StakingHeader from "@/components/token-staking/StakingHeader";
 import StakeForm from "@/components/token-staking/StakeForm";
 import StakesList from "@/components/token-staking/StakesList";
+import StakingPortfolioStats from "@/components/token-staking/StakingPortfolioStats";
 import { useTokenStaking } from "@/components/token-staking/useTokenStaking";
 
 const TokenStaking = () => {
@@ -15,6 +16,8 @@ const TokenStaking = () => {
     isLoadingVehicles,
     userStakes,
     isLoadingStakes,
+    stakingStats,
+    isLoadingStats,
     fetchUserStakes,
     handleUnstake
   } = useTokenStaking();
@@ -74,6 +77,11 @@ const TokenStaking = () => {
           </TabsContent>
           
           <TabsContent value="mystakes" className="space-y-4 pt-4">
+            <StakingPortfolioStats 
+              stats={stakingStats} 
+              isLoading={isLoadingStats} 
+            />
+            
             <StakesList
               userStakes={userStakes}
               isLoadingStakes={isLoadingStakes}

@@ -47,7 +47,22 @@ export interface TokenStake {
   predicted_roi: number;
   actual_roi?: number;
   created_at: string;
+  vehicle_name?: string;
   // References to related objects
   token?: Token;
   vehicle?: Vehicle;
+}
+
+export interface TokenStakeStats {
+  total_staked: number;
+  total_predicted_roi: number;
+  active_stakes: number;
+  completed_stakes: number;
+  avg_roi_percent: number;
+  vehicle_count?: number;
+  distribution_by_vehicle?: {
+    vehicle_name: string;
+    amount: number;
+    percentage: number;
+  }[];
 }

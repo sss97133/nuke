@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Token, Vehicle, TokenStake } from "@/types/token";
+import { Token, Vehicle, TokenStake, TokenStakeStats } from "@/types/token";
 
 export const useTokenStaking = () => {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -11,6 +11,8 @@ export const useTokenStaking = () => {
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
   const [userStakes, setUserStakes] = useState<TokenStake[]>([]);
   const [isLoadingStakes, setIsLoadingStakes] = useState(true);
+  const [stakingStats, setStakingStats] = useState<TokenStakeStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
     fetchTokens();
@@ -88,17 +90,88 @@ export const useTokenStaking = () => {
         predicted_roi: stake.predicted_roi,
         actual_roi: stake.actual_roi,
         created_at: stake.created_at,
+        vehicle_name: stake.vehicle_name,
         // Add the related objects
         token: stake.token,
         vehicle: stake.vehicle
       }));
 
       setUserStakes(stakes);
+      
+      // After loading stakes, fetch stats
+      fetchStakingStats(user.id);
     } catch (error) {
       console.error('Error fetching user stakes:', error);
       toast("Failed to load your stakes");
     } finally {
       setIsLoadingStakes(false);
+    }
+  };
+
+  const fetchStakingStats = async (userId: string) => {
+    setIsLoadingStats(true);
+    try {
+      // Run a query to aggregate counts and totals
+      const { data, error } = await supabase
+        .from('token_stakes')
+        .select(`
+          amount,
+          predicted_roi,
+          status,
+          vehicle_name
+        `)
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        setStakingStats(null);
+        return;
+      }
+      
+      // Calculate stats manually
+      const activeStakes = data.filter(stake => stake.status === 'active');
+      const totalStaked = data.reduce((sum, stake) => sum + Number(stake.amount), 0);
+      const totalPredictedRoi = data.reduce((sum, stake) => sum + Number(stake.predicted_roi), 0);
+      
+      // Get unique vehicle count
+      const uniqueVehicles = new Set(data
+        .filter(stake => stake.vehicle_name)
+        .map(stake => stake.vehicle_name));
+      
+      // Calculate distribution by vehicle
+      const vehicleMap = new Map<string, number>();
+      data.forEach(stake => {
+        if (stake.vehicle_name) {
+          const current = vehicleMap.get(stake.vehicle_name) || 0;
+          vehicleMap.set(stake.vehicle_name, current + Number(stake.amount));
+        }
+      });
+      
+      const distributionByVehicle = Array.from(vehicleMap.entries())
+        .map(([vehicle_name, amount]) => ({
+          vehicle_name,
+          amount,
+          percentage: (amount / totalStaked) * 100
+        }))
+        .sort((a, b) => b.amount - a.amount);
+      
+      const stats: TokenStakeStats = {
+        total_staked: totalStaked,
+        total_predicted_roi: totalPredictedRoi,
+        active_stakes: activeStakes.length,
+        completed_stakes: data.filter(stake => stake.status === 'completed').length,
+        avg_roi_percent: totalStaked > 0 ? (totalPredictedRoi / totalStaked) * 100 : 0,
+        vehicle_count: uniqueVehicles.size,
+        distribution_by_vehicle: distributionByVehicle
+      };
+      
+      setStakingStats(stats);
+    } catch (error) {
+      console.error('Error fetching staking stats:', error);
+      toast("Failed to load staking statistics");
+    } finally {
+      setIsLoadingStats(false);
     }
   };
 
@@ -186,6 +259,8 @@ export const useTokenStaking = () => {
     isLoadingVehicles,
     userStakes,
     isLoadingStakes,
+    stakingStats,
+    isLoadingStats,
     fetchUserStakes,
     handleUnstake
   };
