@@ -94,19 +94,7 @@ export const DiscoveredVehiclesList = () => {
   });
 
   const addVehicleMutation = useMutation({
-    mutationFn: async (newVehicle: Omit<DiscoveredVehicle, 'id' | 'created_at' | 'updated_at' | 'status'>) => {
-      const { data: userData } = await supabase.auth.getUser();
-      
-      if (!userData?.user) {
-        throw new Error("User not authenticated");
-      }
-      
-      const vehicleData = {
-        ...newVehicle,
-        user_id: userData.user.id,
-        status: 'unverified' as const
-      };
-      
+    mutationFn: async (vehicleData: Omit<DiscoveredVehicle, 'id' | 'created_at' | 'updated_at' | 'status'> & { user_id: string }) => {
       const { data, error } = await supabase
         .from('discovered_vehicles')
         .insert([vehicleData])
@@ -180,9 +168,31 @@ export const DiscoveredVehiclesList = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addVehicleMutation.mutate(newVehicle);
+    
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (!userData?.user) {
+        throw new Error("User not authenticated");
+      }
+      
+      const vehicleData = {
+        ...newVehicle,
+        user_id: userData.user.id,
+        status: 'unverified' as const
+      };
+      
+      addVehicleMutation.mutate(vehicleData);
+    } catch (error) {
+      console.error("Authentication error:", error);
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "Please log in to add vehicles."
+      });
+    }
   };
 
   if (error) {

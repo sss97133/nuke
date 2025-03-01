@@ -7,8 +7,9 @@ import { StreamingLinksForm } from './StreamingLinksForm';
 import { AchievementsList } from './AchievementsList';
 import { TeamSection } from './TeamSection';
 import { ContributionsGraph } from './ContributionsGraph';
+import { UserDiscoveredVehicles } from './UserDiscoveredVehicles';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Users, Trophy, GitCommit, AlertCircle } from 'lucide-react';
+import { UserRound, Users, Trophy, GitCommit, AlertCircle, Car } from 'lucide-react';
 import { SocialLinks, StreamingLinks, toSocialLinks, toStreamingLinks } from '@/types/profile';
 import { useProfileData } from './hooks/useProfileData';
 import { useProfileActions } from './hooks/useProfileActions';
@@ -109,6 +110,13 @@ export const UserProfile = () => {
           </div>
         )}
 
+        {/* Add Discovered Vehicles section */}
+        {profile?.id && (
+          <div className="mt-6">
+            <UserDiscoveredVehicles userId={profile.id} />
+          </div>
+        )}
+
         <Tabs defaultValue="profile" className="w-full mt-6">
           <TabsList>
             <TabsTrigger value="profile" className="flex items-center gap-2">
@@ -122,6 +130,10 @@ export const UserProfile = () => {
             <TabsTrigger value="achievements" className="flex items-center gap-2">
               <Trophy className="w-4 h-4" />
               Achievements
+            </TabsTrigger>
+            <TabsTrigger value="discoveries" className="flex items-center gap-2">
+              <Car className="w-4 h-4" />
+              Discoveries
             </TabsTrigger>
           </TabsList>
 
@@ -148,9 +160,19 @@ export const UserProfile = () => {
               <AchievementsList achievements={achievements} />
             )}
           </TabsContent>
+          
+          <TabsContent value="discoveries" className="mt-4">
+            {profile?.id && (
+              <div className="grid gap-4">
+                <p className="text-muted-foreground mb-2">
+                  All vehicles you have discovered across the web and added to our database.
+                </p>
+                <UserDiscoveredVehicles userId={profile.id} />
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
     </div>
   );
 };
-

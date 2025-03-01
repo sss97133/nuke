@@ -1,48 +1,30 @@
 
-import { useDialogState } from "./useDialogState";
-import { useUIState } from "./useUIState";
-import { useMenuActions } from "./useMenuActions";
+import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 export const useDashboardState = () => {
-  const {
-    showNewVehicleDialog,
-    setShowNewVehicleDialog,
-    showNewInventoryDialog,
-    setShowNewInventoryDialog,
-    showAiAssistant,
-    setShowAiAssistant,
-    showHelp,
-    setShowHelp,
-    showStudioConfig,
-    setShowStudioConfig,
-  } = useDialogState();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [menuItems, setMenuItems] = useState([]);
 
-  const {
-    showWorkspacePreview,
-    setShowWorkspacePreview,
-    showActivityPanel,
-    setShowActivityPanel,
-    showSidebar,
-    setShowSidebar,
-    darkMode,
-    setDarkMode,
-  } = useUIState();
-
-  // We're just passing the handleMenuAction function from useMenuActions
-  const { handleMenuAction } = useMenuActions();
+  const handleMenuAction = useCallback((action: string) => {
+    console.log(`Menu action: ${action}`);
+    
+    switch (action) {
+      case 'help':
+        toast({
+          title: 'Help',
+          description: 'Showing help information.',
+        });
+        break;
+      // Add other cases as needed
+      default:
+        console.log(`Unknown action: ${action}`);
+    }
+  }, [toast]);
 
   return {
-    showNewVehicleDialog,
-    setShowNewVehicleDialog,
-    showNewInventoryDialog,
-    setShowNewInventoryDialog,
-    showAiAssistant,
-    showHelp,
-    showStudioConfig,
-    showWorkspacePreview,
-    showActivityPanel,
-    showSidebar,
-    darkMode,
     handleMenuAction
   };
 };

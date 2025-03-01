@@ -1,40 +1,50 @@
 
-import { vi } from "vitest";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { mockStudioConfig } from "../utils/testUtils";
+import { mockStudioConfig } from '../utils/testUtils';
 
-// Mocks for Supabase client
-export const setupSupabaseMocks = () => {
-  vi.mock("@/integrations/supabase/client", () => ({
-    supabase: {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: "test-user-id" } },
-          error: null
-        })
-      },
-      from: vi.fn(() => ({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        upsert: vi.fn().mockResolvedValue({ error: null }),
-        maybeSingle: vi.fn().mockResolvedValue({ 
-          data: mockStudioConfig,
-          error: null 
-        })
-      }))
+export const createMockConfiguration = () => {
+  return {
+    ...mockStudioConfig,
+    id: `config-${Date.now()}`,
+    name: `Studio ${Date.now()}`,
+    workspace_dimensions: {
+      width: 500,
+      height: 300,
+      length: 600
     }
-  }));
+  };
 };
 
-// Mock for useToast hook
-const mockToastFunction = vi.fn();
-export const getMockToast = () => mockToastFunction;
-
-export const setupMocks = () => {
-  vi.mock("@/hooks/use-toast", () => ({
-    useToast: vi.fn().mockReturnValue({ toast: mockToastFunction })
-  }));
-
-  setupSupabaseMocks();
+export const createMockPTZConfiguration = () => {
+  return {
+    ...mockStudioConfig,
+    id: `ptz-config-${Date.now()}`,
+    name: `PTZ Studio ${Date.now()}`,
+    ptz_configurations: {
+      planes: {
+        walls: [
+          {
+            id: 'wall-1',
+            name: 'North Wall',
+            position: { x: 0, y: 150, z: 300 },
+            dimensions: { width: 500, height: 300 },
+            orientation: 'front'
+          }
+        ],
+        ceiling: {
+          position: { x: 0, y: 300, z: 0 },
+          dimensions: { width: 500, length: 600 }
+        }
+      },
+      tracks: [
+        {
+          id: 'track-1',
+          name: 'Ceiling Track',
+          start: { x: -200, y: 280, z: 0 },
+          end: { x: 200, y: 280, z: 0 },
+          speed: 50
+        }
+      ],
+      roboticArms: []
+    }
+  };
 };

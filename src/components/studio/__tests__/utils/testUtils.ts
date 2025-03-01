@@ -1,49 +1,64 @@
 
-// This file contains utility functions for testing studio components
-import { render, RenderOptions } from '@testing-library/react';
-import React, { ReactElement } from 'react';
+import React from 'react';
+import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Mock data for tests
 export const mockUser = {
-  data: {
-    user: {
-      id: 'test-user-id',
-      email: 'test@example.com'
-    }
+  id: 'test-user-id',
+  email: 'test@example.com',
+  app_metadata: {
+    provider: 'email',
   },
-  error: null
+  user_metadata: {
+    full_name: 'Test User',
+  },
 };
 
-export const mockStudioConfig = {
-  name: 'Test Studio',
-  workspace_dimensions: { width: 20, length: 30, height: 16 },
-  camera_config: { fov: 45, position: [0, 2, 5] },
-  audio_config: { gain: 0.8 },
-  lighting_config: { ambient: 0.5, key: 0.8 }
-};
-
-// Create a custom render function that includes react-query provider
-export const renderWithQueryClient = (
-  ui: ReactElement,
-  options?: Omit<RenderOptions, 'wrapper'>
-) => {
-  const queryClient = new QueryClient({
+export const renderWithQueryClient = (ui: React.ReactElement) => {
+  const testQueryClient = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
       },
     },
   });
-  
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
+
+  return render(
+    <QueryClientProvider client={testQueryClient}>
+      {ui}
     </QueryClientProvider>
   );
-  
-  return render(ui, { wrapper, ...options });
 };
 
-// Re-export everything from testing-library
-export * from '@testing-library/react';
+// Mock for studio config
+export const mockStudioConfig = {
+  id: 'studio-config-id',
+  name: 'Test Studio',
+  workspace_dimensions: { width: 400, height: 300, length: 500 },
+  camera_config: { 
+    camera_type: 'fixed',
+    position: { x: 0, y: 0, z: 0 }
+  },
+  audio_config: {
+    microphone_type: 'condenser',
+    audio_input: 'xlr'
+  },
+  lighting_config: {
+    primary_light: 'key',
+    secondary_light: 'fill'
+  },
+  ptz_configurations: {
+    planes: {
+      walls: [],
+      ceiling: {}
+    },
+    tracks: [],
+    roboticArms: []
+  },
+  fixed_cameras: {
+    positions: []
+  },
+  user_id: 'test-user-id',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString()
+};
