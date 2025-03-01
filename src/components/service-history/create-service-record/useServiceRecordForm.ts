@@ -91,18 +91,26 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
     setSubmitError(null);
     
     try {
-      // Supabase insert expects an array of objects, even for single record insertion
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('You must be logged in to create a service record');
+      }
+      
+      // Supabase insert for a single record
       const { error } = await supabase
         .from('service_tickets')
-        .insert([{
+        .insert({
           vehicle_id: formState.vehicleId,
           description: formState.description,
           service_type: formState.serviceType,
           status: formState.status,
           labor_hours: formState.laborHours,
           technician_notes: formState.technicianNotes,
-          parts_used: formState.parts.length > 0 ? formState.parts : null
-        }]);
+          parts_used: formState.parts.length > 0 ? formState.parts : null,
+          user_id: user.id
+        });
 
       if (error) throw error;
       
