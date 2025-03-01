@@ -2,6 +2,7 @@
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { DashboardHeader } from "@/components/dashboard/header/DashboardHeader";
+import Home from "./Home";
 import Login from "./Login";
 import PluginDownload from "./PluginDownload";
 import NotFound from "./NotFound";
@@ -18,7 +19,7 @@ const Index = () => {
       <DashboardHeader handleMenuAction={handleMenuAction} />
       <main className="flex-1">
         <Routes>
-          <Route path="/" element={<Navigate to="/plugin" />} />
+          <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/plugin" element={<PluginDownload />} />
           <Route path="/crypto" element={<Crypto />} />
