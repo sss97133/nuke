@@ -6,19 +6,17 @@ import { Toaster } from "@/components/ui/toaster"
 import { useAuthState } from './hooks/auth/use-auth-state'
 import { AuthForm } from './components/auth/AuthForm'
 import Profile from "./pages/Profile"
+import Dashboard from "./pages/Dashboard"
+import Onboarding from "./pages/Onboarding"
+import Skills from "./pages/Skills"
+import Achievements from "./pages/Achievements"
+import Studio from "./pages/Studio"
+import Glossary from "./pages/Glossary"
+import Sitemap from "./pages/Sitemap"
+import Documentation from "./pages/Documentation"
+import Import from "./pages/Import"
+import DiscoveredVehicles from "./pages/DiscoveredVehicles"
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-
-// Temporary placeholder components for missing pages
-const Dashboard = () => <div className="p-6"><h1 className="text-2xl font-bold">Dashboard</h1><p>Dashboard content will go here</p></div>;
-const Onboarding = () => <div className="p-6"><h1 className="text-2xl font-bold">Onboarding</h1><p>Onboarding content will go here</p></div>;
-const Skills = () => <div className="p-6"><h1 className="text-2xl font-bold">Skills</h1><p>Skills content will go here</p></div>;
-const Achievements = () => <div className="p-6"><h1 className="text-2xl font-bold">Achievements</h1><p>Achievements content will go here</p></div>;
-const Studio = () => <div className="p-6"><h1 className="text-2xl font-bold">Studio</h1><p>Studio content will go here</p></div>;
-const Glossary = () => <div className="p-6"><h1 className="text-2xl font-bold">Glossary</h1><p>Glossary content will go here</p></div>;
-const Sitemap = () => <div className="p-6"><h1 className="text-2xl font-bold">Sitemap</h1><p>Sitemap content will go here</p></div>;
-const Documentation = () => <div className="p-6"><h1 className="text-2xl font-bold">Documentation</h1><p>Documentation content will go here</p></div>;
-const Import = () => <div className="p-6"><h1 className="text-2xl font-bold">Import</h1><p>Import content will go here</p></div>;
-const DiscoveredVehicles = () => <div className="p-6"><h1 className="text-2xl font-bold">Discovered Vehicles</h1><p>Discovered vehicles content will go here</p></div>;
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient();
