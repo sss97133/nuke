@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
@@ -6,6 +5,7 @@ import { AutoSaveSettings } from "@/components/settings/AutoSaveSettings";
 import { DataManagement } from "@/components/settings/DataManagement";
 import { AlertSettings } from "@/components/settings/AlertSettings";
 import { DisplaySettings } from "@/components/settings/DisplaySettings";
+import { ThemeSettings } from "@/components/settings/ThemeSettings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -81,6 +81,15 @@ export const Settings = () => {
         
         <TabsContent value="preferences" className="mt-6">
           <Card className="p-6 space-y-6">
+            <ErrorBoundary>
+              <ThemeSettings
+                theme={preferences.theme}
+                onThemeChange={(value) => {
+                  savePreferences({ theme: value });
+                }}
+              />
+            </ErrorBoundary>
+
             <ErrorBoundary>
               <AppearanceSettings
                 compactViewEnabled={preferences.compactViewEnabled}

@@ -12,6 +12,7 @@ export const usePreferencesBase = () => {
     notificationsEnabled: true,
     autoSaveEnabled: true,
     compactViewEnabled: false,
+    theme: 'system',
     distanceUnit: 'miles',
     currency: 'USD',
     defaultGarageView: 'list',
