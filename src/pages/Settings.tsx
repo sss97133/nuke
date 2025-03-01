@@ -99,13 +99,13 @@ export const Settings = () => {
                 currency={preferences.currency}
                 defaultGarageView={preferences.defaultGarageView}
                 onDistanceUnitChange={(value) => {
-                  savePreferences({ distanceUnit: value });
+                  savePreferences({ distance_unit: value });
                 }}
                 onCurrencyChange={(value) => {
                   savePreferences({ currency: value });
                 }}
                 onDefaultGarageViewChange={(value) => {
-                  savePreferences({ defaultGarageView: value });
+                  savePreferences({ default_garage_view: value });
                 }}
               />
             </ErrorBoundary>
@@ -114,7 +114,7 @@ export const Settings = () => {
               <AutoSaveSettings
                 autoSaveEnabled={preferences.autoSaveEnabled}
                 onAutoSaveChange={(checked) => {
-                  savePreferences({ autoSaveEnabled: checked });
+                  savePreferences({ auto_save_enabled: checked });
                 }}
               />
             </ErrorBoundary>
@@ -127,7 +127,7 @@ export const Settings = () => {
               <AppearanceSettings
                 compactViewEnabled={preferences.compactViewEnabled}
                 onCompactViewChange={(checked) => {
-                  savePreferences({ compactViewEnabled: checked });
+                  savePreferences({ compact_view_enabled: checked });
                 }}
               />
             </ErrorBoundary>
@@ -138,13 +138,13 @@ export const Settings = () => {
                 secondaryColor={preferences.secondaryColor || "#7E69AB"}
                 accentColor={preferences.accentColor || "#8B5CF6"}
                 onPrimaryColorChange={(value) => {
-                  savePreferences({ primaryColor: value });
+                  savePreferences({ primary_color: value });
                 }}
                 onSecondaryColorChange={(value) => {
-                  savePreferences({ secondaryColor: value });
+                  savePreferences({ secondary_color: value });
                 }}
                 onAccentColorChange={(value) => {
-                  savePreferences({ accentColor: value });
+                  savePreferences({ accent_color: value });
                 }}
               />
             </ErrorBoundary>
@@ -157,7 +157,7 @@ export const Settings = () => {
               <NotificationSettings
                 notificationsEnabled={preferences.notificationsEnabled}
                 onNotificationsChange={(checked) => {
-                  savePreferences({ notificationsEnabled: checked });
+                  savePreferences({ notifications_enabled: checked });
                 }}
               />
             </ErrorBoundary>
@@ -168,13 +168,13 @@ export const Settings = () => {
                 inventoryAlertsEnabled={preferences.inventoryAlertsEnabled}
                 priceAlertsEnabled={preferences.priceAlertsEnabled}
                 onServiceRemindersChange={(checked) => {
-                  savePreferences({ serviceRemindersEnabled: checked });
+                  savePreferences({ service_reminders_enabled: checked });
                 }}
                 onInventoryAlertsChange={(checked) => {
-                  savePreferences({ inventoryAlertsEnabled: checked });
+                  savePreferences({ inventory_alerts_enabled: checked });
                 }}
                 onPriceAlertsChange={(checked) => {
-                  savePreferences({ priceAlertsEnabled: checked });
+                  savePreferences({ price_alerts_enabled: checked });
                 }}
               />
             </ErrorBoundary>

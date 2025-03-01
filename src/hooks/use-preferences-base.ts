@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { UserPreferences } from "@/types/preferences";
+import { UserPreferences, DbUserPreferences } from "@/types/preferences";
 import { useToast } from "@/hooks/use-toast";
 
 export const usePreferencesBase = () => {
@@ -60,6 +60,7 @@ export const usePreferencesBase = () => {
       }
 
       if (preferencesData) {
+        // Map the snake_case database fields to camelCase for the UI
         setPreferences({
           notificationsEnabled: preferencesData.notifications_enabled,
           autoSaveEnabled: preferencesData.auto_save_enabled,
@@ -78,9 +79,8 @@ export const usePreferencesBase = () => {
           fontSize: preferencesData.font_size || 'medium'
         });
       } else {
-        // Insert default preferences if none exist
-        const { error: insertError } = await supabase.from('user_preferences').insert({
-          user_id: user.id,
+        // Create default preferences if none exist
+        const defaultPreferences: DbUserPreferences = {
           notifications_enabled: true,
           auto_save_enabled: true,
           compact_view_enabled: false,
@@ -96,7 +96,14 @@ export const usePreferencesBase = () => {
           accent_color: '#8B5CF6',
           font_family: 'Inter',
           font_size: 'medium'
-        });
+        };
+
+        const { error: insertError } = await supabase
+          .from('user_preferences')
+          .insert({
+            user_id: user.id,
+            ...defaultPreferences
+          });
 
         if (insertError) {
           console.error('Error inserting default preferences:', insertError);

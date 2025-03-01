@@ -1,24 +1,12 @@
 
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-type PreferenceUpdates = Partial<{
-  notifications_enabled: boolean;
-  auto_save_enabled: boolean;
-  compact_view_enabled: boolean;
-  theme: string;
-  distance_unit: string;
-  currency: string;
-  default_garage_view: string;
-  service_reminders_enabled: boolean;
-  inventory_alerts_enabled: boolean;
-  price_alerts_enabled: boolean;
-}>;
+import { DbUserPreferences } from "@/types/preferences";
 
 export const usePreferencesSave = () => {
   const { toast } = useToast();
 
-  const savePreferences = async (updates: PreferenceUpdates) => {
+  const savePreferences = async (updates: Partial<DbUserPreferences>) => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
@@ -55,4 +43,3 @@ export const usePreferencesSave = () => {
 
   return { savePreferences };
 };
-
