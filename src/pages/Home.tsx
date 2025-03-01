@@ -3,7 +3,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Wallet, AlertCircle } from "lucide-react";
 
 const Home = () => {
   return (
@@ -18,10 +17,7 @@ const Home = () => {
       <div className="grid md:grid-cols-2 gap-8 mb-12">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Download className="h-5 w-5" />
-              Browser Plugin
-            </CardTitle>
+            <CardTitle>Browser Plugin</CardTitle>
             <CardDescription>
               Discover and save vehicles from anywhere on the web
             </CardDescription>
@@ -40,10 +36,7 @@ const Home = () => {
         
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Crypto Integration
-            </CardTitle>
+            <CardTitle>Crypto Integration</CardTitle>
             <CardDescription>
               Connect your crypto wallet for enhanced features
             </CardDescription>

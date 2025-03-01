@@ -1,124 +1,91 @@
 
-import React from 'react';
-import { render, RenderOptions } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { render, screen, RenderResult } from "@testing-library/react";
+import React, { ReactElement } from "react";
+import { StudioConfig, CameraConfig } from "../../../../types/studio";
 
-// Use more generic types if specific types are causing issues
-interface User {
-  id: string;
-  email: string;
-  [key: string]: any;
+/**
+ * Renders the component with any required providers
+ */
+export function renderWithProviders(
+  ui: ReactElement, 
+  { 
+    wrappers = [],
+    ...renderOptions 
+  }: { 
+    wrappers?: Array<(ui: ReactElement) => ReactElement>;
+    [key: string]: any;
+  } = {}
+): RenderResult {
+  // Apply all wrappers from outside to inside
+  const wrappedComponent = wrappers.reduce(
+    (wrapped, wrapper) => wrapper(wrapped),
+    ui
+  );
+  
+  return render(wrappedComponent, renderOptions);
 }
 
-interface WorkspaceDimensions {
-  length: number;
-  width: number;
-  height: number;
-}
-
-interface PTZTrack {
-  position: { x: number; y: number; z: number };
-  length: number;
-  speed: number;
-  coneAngle: number;
-}
-
-interface StudioConfiguration {
-  id: string;
-  name: string;
-  workspace_dimensions: WorkspaceDimensions;
-  ptz_configurations: {
-    tracks: PTZTrack[];
-    planes: {
-      walls: any[];
-      ceiling: Record<string, unknown>;
-    };
-    roboticArms: any[];
-  };
-}
-
-export const createMockUser = (overrides: Partial<User> = {}): User => {
+/**
+ * Creates a mock studio configuration object for testing
+ */
+export function createMockStudioConfig(): StudioConfig {
   return {
-    id: overrides.id || 'test-user-id',
-    email: overrides.email || `test-${Math.random().toString(36).substring(7)}@example.com`,
-    ...overrides
+    id: "test-studio-config-1",
+    name: "Test Studio Config",
+    dimensions: {
+      width: 600,
+      length: 800,
+      height: 300,
+    },
+    cameras: [
+      createMockCameraConfig({ id: "camera-1", name: "Main Camera" }),
+      createMockCameraConfig({ id: "camera-2", name: "Secondary Camera" }),
+    ],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    userId: "test-user-123",
   };
-};
+}
 
-export const createMockStudioConfig = (overrides: Partial<StudioConfiguration> = {}): StudioConfiguration => {
+/**
+ * Creates a mock camera configuration for testing
+ */
+export function createMockCameraConfig(
+  overrides: Partial<CameraConfig> = {}
+): CameraConfig {
   return {
-    id: overrides.id || 'test-config-id',
-    name: overrides.name || 'Test Studio Configuration',
-    workspace_dimensions: {
-      length: 30,
-      width: 20,
-      height: 16,
-      ...overrides.workspace_dimensions
+    id: "test-camera-1",
+    name: "Test Camera",
+    type: "PTZ",
+    position: { x: 0, y: 100, z: 200 },
+    rotation: { x: 0, y: 0, z: 0 },
+    settings: {
+      zoom: 1,
+      focus: 0.5,
+      aperture: 2.8,
     },
-    ptz_configurations: {
-      tracks: overrides.ptz_configurations?.tracks || [{
-        position: { x: 0, y: 8, z: 0 },
-        length: 10,
-        speed: 1,
-        coneAngle: 45
-      }],
-      planes: overrides.ptz_configurations?.planes || { 
-        walls: [], 
-        ceiling: {} 
-      },
-      roboticArms: overrides.ptz_configurations?.roboticArms || []
-    }
-  };
-};
-
-export const renderWithProviders = (
-  ui: React.ReactElement, 
-  options?: {
-    queryClientOptions?: ConstructorParameters<typeof QueryClient>[0],
-    renderOptions?: RenderOptions,
-    additionalWrappers?: React.ComponentType<{children: React.ReactNode}>[]
-  }
-) => {
-  const {
-    queryClientOptions = {},
-    renderOptions = {},
-    additionalWrappers = []
-  } = options || {};
-
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        ...queryClientOptions.defaultOptions?.queries
-      }
+    ptz: {
+      panRange: { min: -180, max: 180 },
+      tiltRange: { min: -90, max: 90 },
+      zoomRange: { min: 1, max: 10 },
+      presets: [
+        { id: "preset-1", name: "Wide Shot", pan: 0, tilt: 0, zoom: 1 },
+        { id: "preset-2", name: "Close-up", pan: 0, tilt: 0, zoom: 5 },
+      ],
     },
-    ...queryClientOptions
-  });
-
-  const Wrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
-    let wrappedChildren = (
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          {children}
-        </BrowserRouter>
-      </QueryClientProvider>
-    );
-
-    for (const Provider of [...additionalWrappers].reverse()) {
-      wrappedChildren = <Provider>{wrappedChildren}</Provider>;
-    }
-
-    return wrappedChildren;
+    ...overrides,
   };
+}
 
-  return render(ui, { wrapper: Wrapper, ...renderOptions });
-};
-
-export const mockUser = createMockUser();
-export const mockStudioConfig = createMockStudioConfig();
-
-// For backward compatibility with existing tests
-export const renderWithQueryClient = (ui: React.ReactElement) => {
-  return renderWithProviders(ui);
+/**
+ * Helper functions for test assertions
+ */
+export const testUtils = {
+  expectToBeInTheDocument: (element: HTMLElement) => {
+    expect(element).toBeInTheDocument();
+  },
+  
+  expectTextContent: (element: HTMLElement, text: string) => {
+    expect(element.textContent).toBe(text);
+  },
 };

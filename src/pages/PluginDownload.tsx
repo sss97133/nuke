@@ -2,7 +2,6 @@
 import React from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Chrome, Globe, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,7 +44,6 @@ export const PluginDownload = () => {
             <div className="grid gap-4">
               <div className="flex items-start gap-4">
                 <div className="bg-primary/10 p-3 rounded-full">
-                  <Download className="h-6 w-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-medium">Easy Vehicle Discovery</h3>
@@ -57,7 +55,6 @@ export const PluginDownload = () => {
               
               <div className="flex items-start gap-4">
                 <div className="bg-primary/10 p-3 rounded-full">
-                  <AlertCircle className="h-6 w-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-medium">Automatic Data Capture</h3>
@@ -75,7 +72,6 @@ export const PluginDownload = () => {
                 className="flex items-center gap-2"
                 size="lg"
               >
-                <Chrome className="h-5 w-5" />
                 <span>Chrome</span>
               </Button>
               
@@ -85,7 +81,6 @@ export const PluginDownload = () => {
                 size="lg"
                 variant="outline"
               >
-                <Globe className="h-5 w-5" />
                 <span>Firefox</span>
               </Button>
               
@@ -95,13 +90,11 @@ export const PluginDownload = () => {
                 size="lg"
                 variant="outline"
               >
-                <Chrome className="h-5 w-5" />
                 <span>Edge</span>
               </Button>
             </div>
             
             <Alert>
-              <AlertCircle className="h-4 w-4" />
               <AlertTitle>Installation Instructions</AlertTitle>
               <AlertDescription>
                 After downloading, follow your browser's instructions to install the extension.
