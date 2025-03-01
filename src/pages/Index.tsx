@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { DashboardHeader } from "@/components/dashboard/header/DashboardHeader";
 import Home from "./Home";
 import Login from "./Login";
@@ -21,11 +21,42 @@ import Inventory from "./Inventory";
 import Settings from "./Settings";
 import Achievements from "./Achievements";
 import ImportPage from "./ImportPage";
+import { toast } from "sonner";
+import { 
+  handleFileMenuAction, 
+  handleEditMenuAction, 
+  handleViewMenuAction, 
+  handleToolsMenuAction, 
+  handleWindowMenuAction, 
+  handleHelpMenuAction 
+} from "@/components/dashboard/hooks/utils/navigationUtils";
 
 const Index = () => {
+  const navigate = useNavigate();
+
   const handleMenuAction = (action: string) => {
     console.log('Menu action:', action);
-    // Menu actions can be implemented here
+    
+    // Determine which category the action belongs to based on naming patterns
+    if (action.startsWith('new_') || ['import', 'export', 'sitemap', 'glossary', 'exit'].includes(action)) {
+      handleFileMenuAction(navigate, toast, action);
+    } else if (['preferences', 'studio_config', 'workspace_settings'].includes(action)) {
+      handleEditMenuAction(navigate, toast, action);
+    } else if (action.startsWith('toggle_') || ['professional_dashboard', 'inventory_view', 'service_view', 'token_management', 'dao_governance', 'access_control'].includes(action)) {
+      handleViewMenuAction(navigate, toast, action);
+    } else if (['vin_scanner', 'market_analysis', 'skill_management', 'token_analytics'].includes(action)) {
+      handleToolsMenuAction(navigate, toast, action);
+    } else if (['studio_workspace', 'streaming_setup', 'achievements', 'reset_layout'].includes(action)) {
+      handleWindowMenuAction(navigate, toast, action);
+    } else if (['documentation', 'keyboard_shortcuts', 'about'].includes(action)) {
+      handleHelpMenuAction(navigate, toast, action);
+    } else {
+      toast({
+        title: "Unknown Action",
+        description: `The action "${action}" is not recognized.`,
+        variant: "destructive"
+      });
+    }
   };
 
   return (

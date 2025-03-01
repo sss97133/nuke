@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Home, Compass, Activity, Briefcase, ShoppingBag, Video, Settings, FileInput, ChevronDown, Bell, PanelLeft, Save } from "lucide-react";
+import { Home, Compass, Activity, Briefcase, ShoppingBag, Video, Settings, FileInput, ChevronDown, Bell, PanelLeft, Save, Moon, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   DropdownMenu,
@@ -8,8 +8,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useTheme } from "next-themes";
 
 export const NavButtons = () => {
+  const { theme, setTheme } = useTheme();
+
   return (
     <>
       <Button asChild variant="ghost" size="sm" className="mr-2">
@@ -109,6 +112,19 @@ export const NavButtons = () => {
               <Save className="h-4 w-4 mr-2" />
               Data Management
             </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? (
+              <>
+                <Sun className="h-4 w-4 mr-2" />
+                Light Mode
+              </>
+            ) : (
+              <>
+                <Moon className="h-4 w-4 mr-2" />
+                Dark Mode
+              </>
+            )}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
