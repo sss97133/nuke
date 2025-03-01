@@ -1,10 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { ServiceRecord } from './types';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wrench, Calendar, Clock, User, Car } from 'lucide-react';
+import { Wrench, Calendar, Clock, User, Car, ChevronDown, ChevronUp } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import PartsDetails from './PartsDetails';
 
 interface ServiceRecordCardProps {
   record: ServiceRecord;
@@ -36,6 +38,7 @@ const formatServiceType = (type?: string) => {
 };
 
 const ServiceRecordCard: React.FC<ServiceRecordCardProps> = ({ record }) => {
+  const [showPartsDetails, setShowPartsDetails] = useState(false);
   const totalPartsCost = record.parts_used?.reduce((sum, part) => sum + (part.cost * part.quantity), 0) || 0;
   
   return (
@@ -106,16 +109,20 @@ const ServiceRecordCard: React.FC<ServiceRecordCardProps> = ({ record }) => {
       
       {record.parts_used && record.parts_used.length > 0 && (
         <CardFooter className="pt-2 flex-col items-start">
-          <h4 className="text-sm font-medium mb-2">Parts:</h4>
-          <div className="w-full grid gap-1">
-            {record.parts_used.map((part, index) => (
-              <div key={index} className="text-xs border-t py-1 grid grid-cols-3">
-                <span>{part.name}</span>
-                <span>Qty: {part.quantity}</span>
-                <span className="text-right">${(part.cost * part.quantity).toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
+          <Button 
+            variant="ghost" 
+            className="px-0 text-sm font-medium flex items-center"
+            onClick={() => setShowPartsDetails(!showPartsDetails)}
+          >
+            {showPartsDetails ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}
+            {showPartsDetails ? "Hide Parts Details" : "Show Parts Details"}
+          </Button>
+          
+          {showPartsDetails && (
+            <div className="w-full mt-2">
+              <PartsDetails parts={record.parts_used} />
+            </div>
+          )}
         </CardFooter>
       )}
     </Card>

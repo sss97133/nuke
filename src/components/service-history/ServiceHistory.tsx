@@ -38,7 +38,7 @@ const ServiceHistory = () => {
           labor_hours,
           parts_used,
           vehicle_id,
-          vehicles (make, model, year)
+          vehicles:vehicle_id (make, model, year)
         `)
         .order('service_date', { ascending: false });
         

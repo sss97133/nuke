@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,7 +35,6 @@ const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({ isOpen, onClo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
       setDescription('');
@@ -51,7 +49,6 @@ const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({ isOpen, onClo
     }
   }, [isOpen]);
 
-  // Fetch vehicles for dropdown
   const { data: vehicles } = useQuery({
     queryKey: ['vehicles'],
     queryFn: async () => {
