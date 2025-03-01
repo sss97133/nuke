@@ -2442,48 +2442,63 @@ export type Database = {
       }
       user_preferences: {
         Row: {
+          accent_color: string | null
           auto_save_enabled: boolean | null
           compact_view_enabled: boolean | null
           created_at: string
           currency: string | null
           default_garage_view: string | null
           distance_unit: string | null
+          font_family: string | null
+          font_size: string | null
           id: string
           inventory_alerts_enabled: boolean | null
           notifications_enabled: boolean | null
           price_alerts_enabled: boolean | null
+          primary_color: string | null
+          secondary_color: string | null
           service_reminders_enabled: boolean | null
           theme: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          accent_color?: string | null
           auto_save_enabled?: boolean | null
           compact_view_enabled?: boolean | null
           created_at?: string
           currency?: string | null
           default_garage_view?: string | null
           distance_unit?: string | null
+          font_family?: string | null
+          font_size?: string | null
           id?: string
           inventory_alerts_enabled?: boolean | null
           notifications_enabled?: boolean | null
           price_alerts_enabled?: boolean | null
+          primary_color?: string | null
+          secondary_color?: string | null
           service_reminders_enabled?: boolean | null
           theme?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          accent_color?: string | null
           auto_save_enabled?: boolean | null
           compact_view_enabled?: boolean | null
           created_at?: string
           currency?: string | null
           default_garage_view?: string | null
           distance_unit?: string | null
+          font_family?: string | null
+          font_size?: string | null
           id?: string
           inventory_alerts_enabled?: boolean | null
           notifications_enabled?: boolean | null
           price_alerts_enabled?: boolean | null
+          primary_color?: string | null
+          secondary_color?: string | null
           service_reminders_enabled?: boolean | null
           theme?: string | null
           updated_at?: string
