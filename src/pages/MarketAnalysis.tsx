@@ -28,8 +28,8 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
   };
 
   return (
-    <ScrollArea className="h-[calc(100vh-4rem)] p-4">
-      <div className="space-y-6">
+    <ScrollArea className="h-[calc(100vh-4rem)] w-full">
+      <div className="container max-w-6xl mx-auto py-6 px-4 space-y-6">
         <div className="flex flex-col space-y-2">
           <h1 className="text-3xl font-bold">Market Analysis</h1>
           <p className="text-muted-foreground">
@@ -38,30 +38,30 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
         </div>
 
         <Tabs defaultValue="mental-estate" className="w-full">
-          <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-4">
+          <TabsList className="w-full grid grid-cols-3 md:grid-cols-6 mb-4">
             <TabsTrigger value="mental-estate" className="flex items-center gap-2">
               <BrainCircuit className="h-4 w-4" />
-              <span className="hidden md:inline">Mental Real Estate</span>
+              <span className="hidden sm:inline">Mental Real Estate</span>
             </TabsTrigger>
             <TabsTrigger value="brand" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              <span className="hidden md:inline">Brand Analytics</span>
+              <span className="hidden sm:inline">Brand Analytics</span>
             </TabsTrigger>
             <TabsTrigger value="consumer" className="flex items-center gap-2">
               <Lightbulb className="h-4 w-4" />
-              <span className="hidden md:inline">Consumer Behavior</span>
+              <span className="hidden sm:inline">Consumer Behavior</span>
             </TabsTrigger>
             <TabsTrigger value="decision" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
-              <span className="hidden md:inline">Decision Making</span>
+              <span className="hidden sm:inline">Decision Making</span>
             </TabsTrigger>
             <TabsTrigger value="market-share" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              <span className="hidden md:inline">Market Share</span>
+              <span className="hidden sm:inline">Market Share</span>
             </TabsTrigger>
             <TabsTrigger value="research" className="flex items-center gap-2">
               <FileSearch className="h-4 w-4" />
-              <span className="hidden md:inline">Research</span>
+              <span className="hidden sm:inline">Research</span>
             </TabsTrigger>
           </TabsList>
 
