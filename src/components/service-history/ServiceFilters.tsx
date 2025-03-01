@@ -4,23 +4,25 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePickerWithRange } from "./DatePickerWithRange";
+import { DateRange } from "react-day-picker";
 
 interface ServiceFiltersProps {
   searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  sortBy: string;
-  setSortBy: (value: string) => void;
-  dateRange: string;
-  setDateRange: (range: string) => void;
+  onSearchChange: (query: string) => void;
+  sortOption: string;
+  onSortChange: (value: string) => void;
+  dateRange: DateRange | undefined;
+  onDateRangeChange: (range: DateRange | undefined) => void;
 }
 
 const ServiceFilters = ({
   searchQuery,
-  setSearchQuery,
-  sortBy,
-  setSortBy,
+  onSearchChange,
+  sortOption,
+  onSortChange,
   dateRange,
-  setDateRange
+  onDateRangeChange
 }: ServiceFiltersProps) => {
   return (
     <div className="space-y-4 mb-6">
@@ -32,39 +34,30 @@ const ServiceFilters = ({
             placeholder="Search service records..."
             className="pl-8"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:w-2/5">
           <div className="space-y-1.5">
             <Label htmlFor="sortBy">Sort By</Label>
-            <Select value={sortBy} onValueChange={setSortBy}>
+            <Select value={sortOption} onValueChange={onSortChange}>
               <SelectTrigger id="sortBy">
                 <SelectValue placeholder="Select sort order" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="date-newest">Date (Newest First)</SelectItem>
-                <SelectItem value="date-oldest">Date (Oldest First)</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="type">Service Type</SelectItem>
+                <SelectItem value="date-desc">Date (Newest First)</SelectItem>
+                <SelectItem value="date-asc">Date (Oldest First)</SelectItem>
               </SelectContent>
             </Select>
           </div>
           
           <div className="space-y-1.5">
-            <Label htmlFor="dateRange">Date Range</Label>
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger id="dateRange">
-                <SelectValue placeholder="Select date range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="last-30">Last 30 Days</SelectItem>
-                <SelectItem value="last-90">Last 90 Days</SelectItem>
-                <SelectItem value="last-year">Last Year</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Date Range</Label>
+            <DatePickerWithRange 
+              date={dateRange} 
+              onDateChange={onDateRangeChange} 
+            />
           </div>
         </div>
       </div>

@@ -1,13 +1,18 @@
 
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useServiceRecordForm } from './useServiceRecordForm';
+import React from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import BasicInformation from './sections/BasicInformation';
 import ServiceDetails from './sections/ServiceDetails';
 import PartsSection from './sections/PartsSection';
+import { useServiceRecordForm } from './useServiceRecordForm';
 
 interface CreateServiceRecordProps {
   isOpen: boolean;
@@ -15,121 +20,84 @@ interface CreateServiceRecordProps {
   onSuccess: () => void;
 }
 
-const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-  
-  const { 
+const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({
+  isOpen,
+  onClose,
+  onSuccess
+}) => {
+  const {
     formState,
-    resetForm,
-    updateVehicle,
-    updateDescription,
-    updateServiceType,
-    updateStatus,
-    updateTechnicianNotes,
-    updateLaborHours,
+    updateFormState,
+    vehicles,
+    newPart,
+    updateNewPart,
     addPart,
     removePart,
-    updateNewPart,
-    newPart,
-    vehicles,
-    validateForm
-  } = useServiceRecordForm();
-
-  // Reset form when dialog opens
-  React.useEffect(() => {
-    if (isOpen) {
-      resetForm();
-      setError(null);
-    }
-  }, [isOpen, resetForm]);
-
-  const handleSubmit = async () => {
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const { error: insertError } = await supabase
-        .from('service_tickets')
-        .insert({
-          description: formState.description,
-          vehicle_id: formState.vehicleId,
-          service_type: formState.serviceType,
-          status: formState.status,
-          technician_notes: formState.technicianNotes || null,
-          labor_hours: formState.laborHours || 0,
-          parts_used: formState.parts.length > 0 ? formState.parts : null,
-          service_date: new Date().toISOString(),
-        });
-
-      if (insertError) throw insertError;
-      
-      onSuccess();
-    } catch (err: any) {
-      console.error('Error creating service record:', err);
-      setError(err.message || 'Failed to create service record');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    isSubmitting,
+    submitError,
+    handleSubmit,
+    vehiclesLoading
+  } = useServiceRecordForm(onClose, onSuccess);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Service Record</DialogTitle>
+          <DialogTitle>Add Service Record</DialogTitle>
         </DialogHeader>
 
-        {error && (
-          <div className="bg-destructive/15 text-destructive p-3 rounded-md mb-4">
-            {error}
-          </div>
-        )}
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          <fieldset disabled={isSubmitting} className="space-y-6">
+            <BasicInformation
+              vehicleId={formState.vehicleId}
+              description={formState.description}
+              vehicles={vehicles}
+              onVehicleChange={(id) => updateFormState('vehicleId', id)}
+              onDescriptionChange={(desc) => updateFormState('description', desc)}
+            />
 
-        <div className="grid gap-4 py-4">
-          <BasicInformation 
-            vehicleId={formState.vehicleId}
-            description={formState.description}
-            vehicles={vehicles}
-            onVehicleChange={updateVehicle}
-            onDescriptionChange={updateDescription}
-          />
+            <Separator />
 
-          <ServiceDetails 
-            serviceType={formState.serviceType}
-            status={formState.status}
-            laborHours={formState.laborHours}
-            technicianNotes={formState.technicianNotes}
-            onServiceTypeChange={updateServiceType}
-            onStatusChange={updateStatus}
-            onLaborHoursChange={updateLaborHours}
-            onTechnicianNotesChange={updateTechnicianNotes}
-          />
+            <ServiceDetails
+              serviceType={formState.serviceType}
+              status={formState.status}
+              laborHours={formState.laborHours}
+              technicianNotes={formState.technicianNotes}
+              onServiceTypeChange={(type) => updateFormState('serviceType', type)}
+              onStatusChange={(status) => updateFormState('status', status)}
+              onLaborHoursChange={(hours) => updateFormState('laborHours', hours)}
+              onTechnicianNotesChange={(notes) => updateFormState('technicianNotes', notes)}
+            />
 
-          <PartsSection 
-            parts={formState.parts}
-            newPart={newPart}
-            onNewPartChange={updateNewPart}
-            onAddPart={addPart}
-            onRemovePart={removePart}
-          />
-        </div>
+            <Separator />
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Service Record'}
-          </Button>
-        </DialogFooter>
+            <PartsSection
+              parts={formState.parts}
+              newPart={newPart}
+              onNewPartChange={updateNewPart}
+              onAddPart={addPart}
+              onRemovePart={removePart}
+            />
+          </fieldset>
+
+          {submitError && (
+            <div className="text-sm text-destructive">{submitError}</div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting || !formState.vehicleId || !formState.description || vehiclesLoading}>
+              {isSubmitting ? "Saving..." : "Save Record"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -1,8 +1,17 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PartItem } from '../types';
+
+interface FormState {
+  vehicleId: string;
+  description: string;
+  serviceType: string;
+  status: string;
+  laborHours?: number;
+  technicianNotes: string;
+  parts: PartItem[];
+}
 
 interface Vehicle {
   id: string;
@@ -11,72 +20,53 @@ interface Vehicle {
   year: number;
 }
 
-interface ServiceRecordFormState {
-  vehicleId: string;
-  description: string;
-  serviceType: string;
-  status: string;
-  technicianNotes: string;
-  laborHours?: number;
-  parts: PartItem[];
-}
-
-export function useServiceRecordForm() {
-  const [formState, setFormState] = useState<ServiceRecordFormState>({
+export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void) => {
+  const initialFormState: FormState = {
     vehicleId: '',
     description: '',
     serviceType: 'routine_maintenance',
     status: 'pending',
-    technicianNotes: '',
     laborHours: undefined,
+    technicianNotes: '',
     parts: []
-  });
+  };
 
-  const [newPart, setNewPart] = useState<PartItem>({ 
-    name: '', 
-    quantity: 1, 
-    cost: 0 
-  });
+  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
+  const [newPart, setNewPart] = useState<PartItem>({ name: '', quantity: 1, cost: 0 });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const resetForm = useCallback(() => {
-    setFormState({
-      vehicleId: '',
-      description: '',
-      serviceType: 'routine_maintenance',
-      status: 'pending',
-      technicianNotes: '',
-      laborHours: undefined,
-      parts: []
-    });
-    setNewPart({ name: '', quantity: 1, cost: 0 });
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      setVehiclesLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('id, make, model, year')
+          .order('year', { ascending: false });
+        
+        if (error) throw error;
+        setVehicles(data || []);
+      } catch (err: any) {
+        console.error('Error fetching vehicles:', err);
+      } finally {
+        setVehiclesLoading(false);
+      }
+    };
+
+    fetchVehicles();
   }, []);
 
-  // Form field updaters
-  const updateVehicle = (id: string) => {
-    setFormState(prev => ({ ...prev, vehicleId: id }));
+  const updateFormState = (key: keyof FormState, value: any) => {
+    setFormState(prev => ({ ...prev, [key]: value }));
   };
 
-  const updateDescription = (description: string) => {
-    setFormState(prev => ({ ...prev, description }));
+  const updateNewPart = (partialPart: Partial<PartItem>) => {
+    setNewPart(prev => ({ ...prev, ...partialPart }));
   };
 
-  const updateServiceType = (serviceType: string) => {
-    setFormState(prev => ({ ...prev, serviceType }));
-  };
-
-  const updateStatus = (status: string) => {
-    setFormState(prev => ({ ...prev, status }));
-  };
-
-  const updateTechnicianNotes = (technicianNotes: string) => {
-    setFormState(prev => ({ ...prev, technicianNotes }));
-  };
-
-  const updateLaborHours = (hours: number | undefined) => {
-    setFormState(prev => ({ ...prev, laborHours: hours }));
-  };
-
-  // Parts management
   const addPart = () => {
     if (newPart.name.trim() === '') return;
     
@@ -84,6 +74,7 @@ export function useServiceRecordForm() {
       ...prev,
       parts: [...prev.parts, { ...newPart }]
     }));
+    
     setNewPart({ name: '', quantity: 1, cost: 0 });
   };
 
@@ -94,51 +85,47 @@ export function useServiceRecordForm() {
     }));
   };
 
-  const updateNewPart = (part: Partial<PartItem>) => {
-    setNewPart(prev => ({ ...prev, ...part }));
-  };
-
-  // Form validation
-  const validateForm = (): string | null => {
-    if (!formState.description) {
-      return 'Description is required';
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitError(null);
     
-    if (!formState.vehicleId) {
-      return 'Please select a vehicle';
-    }
-    
-    return null;
-  };
+    try {
+      const { error } = await supabase
+        .from('service_tickets')
+        .insert({
+          vehicle_id: formState.vehicleId,
+          description: formState.description,
+          service_type: formState.serviceType,
+          status: formState.status,
+          labor_hours: formState.laborHours,
+          technician_notes: formState.technicianNotes,
+          parts_used: formState.parts.length > 0 ? formState.parts : null
+        });
 
-  // Fetch vehicles
-  const { data: vehicles = [] } = useQuery({
-    queryKey: ['vehicles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('id, make, model, year')
-        .order('make');
-        
       if (error) throw error;
-      return data as Vehicle[];
+      
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error('Error creating service record:', err);
+      setSubmitError(err.message || 'Failed to create service record');
+    } finally {
+      setIsSubmitting(false);
     }
-  });
+  };
 
   return {
     formState,
-    resetForm,
-    updateVehicle,
-    updateDescription,
-    updateServiceType,
-    updateStatus,
-    updateTechnicianNotes,
-    updateLaborHours,
+    updateFormState,
+    vehicles,
+    vehiclesLoading,
+    newPart,
+    updateNewPart,
     addPart,
     removePart,
-    updateNewPart,
-    newPart,
-    vehicles,
-    validateForm
+    isSubmitting,
+    submitError,
+    handleSubmit
   };
-}
+};

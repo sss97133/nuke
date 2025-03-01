@@ -2,8 +2,14 @@
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-const ErrorState = ({ error }: { error: Error | unknown }) => {
+interface ErrorStateProps {
+  error: string;
+  onRetry: () => void;
+}
+
+const ErrorState = ({ error, onRetry }: ErrorStateProps) => {
   return (
     <Card className="border-destructive/50">
       <CardContent className="pt-6">
@@ -13,9 +19,10 @@ const ErrorState = ({ error }: { error: Error | unknown }) => {
           <p className="text-muted-foreground mb-4">
             There was an error fetching your service records. Please try again later.
           </p>
-          <p className="text-xs text-muted-foreground border p-2 rounded bg-muted">
-            {error instanceof Error ? error.message : 'Unknown error'}
+          <p className="text-xs text-muted-foreground border p-2 rounded bg-muted mb-4">
+            {error}
           </p>
+          <Button onClick={onRetry} variant="outline">Try Again</Button>
         </div>
       </CardContent>
     </Card>

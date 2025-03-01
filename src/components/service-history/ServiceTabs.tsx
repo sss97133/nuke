@@ -1,78 +1,28 @@
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ServiceRecordCard from './ServiceRecordCard';
-import { ServiceRecord } from './types';
+import { ServiceStatus } from './types';
 
 interface ServiceTabsProps {
-  serviceRecords: ServiceRecord[];
+  activeTab: ServiceStatus | 'all';
+  onTabChange: (value: ServiceStatus | 'all') => void;
+  counts: {
+    all: number;
+    completed: number;
+    'in-progress': number;
+    pending: number;
+  }
 }
 
-const ServiceTabs = ({ serviceRecords }: ServiceTabsProps) => {
-  // Pre-calculate filtered records for each tab
-  const completedRecords = useMemo(() => 
-    serviceRecords.filter(record => record.status === 'completed'), 
-    [serviceRecords]
-  );
-
-  const inProgressRecords = useMemo(() => 
-    serviceRecords.filter(record => record.status === 'in-progress'), 
-    [serviceRecords]
-  );
-
-  const pendingRecords = useMemo(() => 
-    serviceRecords.filter(record => record.status === 'pending'), 
-    [serviceRecords]
-  );
-
+const ServiceTabs = ({ activeTab, onTabChange, counts }: ServiceTabsProps) => {
   return (
-    <Tabs defaultValue="all" className="w-full">
+    <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as ServiceStatus | 'all')} className="w-full">
       <TabsList className="mb-4">
-        <TabsTrigger value="all">All Records ({serviceRecords.length})</TabsTrigger>
-        <TabsTrigger value="completed">Completed ({completedRecords.length})</TabsTrigger>
-        <TabsTrigger value="in-progress">In Progress ({inProgressRecords.length})</TabsTrigger>
-        <TabsTrigger value="pending">Pending ({pendingRecords.length})</TabsTrigger>
+        <TabsTrigger value="all">All Records ({counts.all})</TabsTrigger>
+        <TabsTrigger value="completed">Completed ({counts.completed})</TabsTrigger>
+        <TabsTrigger value="in-progress">In Progress ({counts['in-progress']})</TabsTrigger>
+        <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
       </TabsList>
-      
-      <TabsContent value="all" className="space-y-4">
-        {serviceRecords.length === 0 ? (
-          <p className="text-center py-4 text-muted-foreground">No records to display.</p>
-        ) : (
-          serviceRecords.map((record) => (
-            <ServiceRecordCard key={record.id} record={record} />
-          ))
-        )}
-      </TabsContent>
-      
-      <TabsContent value="completed" className="space-y-4">
-        {completedRecords.length === 0 ? (
-          <p className="text-center py-4 text-muted-foreground">No completed service records.</p>
-        ) : (
-          completedRecords.map((record) => (
-            <ServiceRecordCard key={record.id} record={record} />
-          ))
-        )}
-      </TabsContent>
-      
-      <TabsContent value="in-progress" className="space-y-4">
-        {inProgressRecords.length === 0 ? (
-          <p className="text-center py-4 text-muted-foreground">No in-progress service records.</p>
-        ) : (
-          inProgressRecords.map((record) => (
-            <ServiceRecordCard key={record.id} record={record} />
-          ))
-        )}
-      </TabsContent>
-      
-      <TabsContent value="pending" className="space-y-4">
-        {pendingRecords.length === 0 ? (
-          <p className="text-center py-4 text-muted-foreground">No pending service records.</p>
-        ) : (
-          pendingRecords.map((record) => (
-            <ServiceRecordCard key={record.id} record={record} />
-          ))
-        )}
-      </TabsContent>
     </Tabs>
   );
 };
