@@ -1,13 +1,12 @@
 import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarShortcut, MenubarTrigger } from "@/components/ui/menubar";
 import { Atom } from "lucide-react";
-
 interface AppMenuProps {
   handleMenuAction: (action: string) => void;
 }
-
-export const AppMenu = ({ handleMenuAction }: AppMenuProps) => {
-  return (
-    <Menubar className="border-none bg-transparent">
+export const AppMenu = ({
+  handleMenuAction
+}: AppMenuProps) => {
+  return <Menubar className="border-none bg-transparent py-0">
       <MenubarMenu>
         <MenubarTrigger className="p-1">
           <Atom className="h-4 w-4 text-red-500" />
@@ -38,6 +37,5 @@ export const AppMenu = ({ handleMenuAction }: AppMenuProps) => {
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
-    </Menubar>
-  );
+    </Menubar>;
 };
