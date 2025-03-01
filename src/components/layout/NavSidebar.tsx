@@ -22,7 +22,8 @@ import {
   Hammer,
   Droplets,
   Battery,
-  Gauge
+  Gauge,
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ export const NavSidebar = () => {
     { to: "/diagnostics", icon: <Gauge className="h-5 w-5" />, label: "Diagnostics" },
     { to: "/parts", icon: <Battery className="h-5 w-5" />, label: "Parts" },
     { to: "/service-history", icon: <Timer className="h-5 w-5" />, label: "Service History" },
+    { to: "/token-staking", icon: <Wallet className="h-5 w-5" />, label: "Token Staking" },
     { to: "/studio", icon: <Video className="h-5 w-5" />, label: "Studio" },
     { to: "/glossary", icon: <Book className="h-5 w-5" />, label: "Glossary" },
     { to: "/sitemap", icon: <Map className="h-5 w-5" />, label: "Sitemap" },
