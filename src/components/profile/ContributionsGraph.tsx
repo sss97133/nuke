@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer } from 'recharts';
 import { format, parseISO, subMonths } from 'date-fns';
+import { GitCommit } from 'lucide-react';
 
 interface Contribution {
   date: string;
@@ -77,24 +78,31 @@ export const ContributionsGraph = ({ userId }: { userId: string }) => {
   };
 
   return (
-    <div className="w-full h-[200px] mt-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 10, right: 0, bottom: 20, left: 0 }}>
-          <XAxis
-            dataKey="date"
-            tickFormatter={(date) => format(parseISO(date), 'MMM')}
-            stroke="#888888"
-            fontSize={12}
-          />
-          <YAxis hide domain={[0, 'auto']} />
-          <Tooltip content={<CustomTooltip />} />
-          <Scatter data={formattedData} shape="square">
-            {formattedData.map((entry, index) => (
-              <Cell key={index} fill={entry.color} />
-            ))}
-          </Scatter>
-        </ScatterChart>
-      </ResponsiveContainer>
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <GitCommit className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-medium">Video Analysis Contributions</h3>
+      </div>
+      
+      <div className="h-[200px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 10, right: 0, bottom: 20, left: 0 }}>
+            <XAxis
+              dataKey="date"
+              tickFormatter={(date) => format(parseISO(date), 'MMM')}
+              stroke="#888888"
+              fontSize={12}
+            />
+            <YAxis hide domain={[0, 'auto']} />
+            <Tooltip content={<CustomTooltip />} />
+            <Scatter data={formattedData} shape="square">
+              {formattedData.map((entry, index) => (
+                <Cell key={index} fill={entry.color} />
+              ))}
+            </Scatter>
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };

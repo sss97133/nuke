@@ -1,19 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserProfileHeader } from './UserProfileHeader';
-import { UserMetrics } from './UserMetrics';
-import { SocialLinksForm } from './SocialLinksForm';
-import { StreamingLinksForm } from './StreamingLinksForm';
-import { AchievementsList } from './AchievementsList';
-import { TeamSection } from './TeamSection';
-import { ContributionsGraph } from './ContributionsGraph';
-import { UserDiscoveredVehicles } from './UserDiscoveredVehicles';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Users, Trophy, GitCommit, AlertCircle, Car } from 'lucide-react';
+import { ProfileContent } from './components/ProfileContent';
+import { ProfileLoadingState } from './components/ProfileLoadingState';
+import { ProfileErrorState } from './components/ProfileErrorState';
 import { SocialLinks, StreamingLinks } from './types';
 import { useProfileData } from './hooks/useProfileData';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export const UserProfile = () => {
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({
@@ -76,44 +67,11 @@ export const UserProfile = () => {
   }, [profile]);
 
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="bg-background p-4 border rounded-lg shadow-sm">
-          <div className="flex items-start gap-4 mb-6">
-            <Skeleton className="h-20 w-20 rounded-full" />
-            <div className="space-y-2 flex-1">
-              <Skeleton className="h-6 w-1/3" />
-              <Skeleton className="h-4 w-1/4" />
-              <Skeleton className="h-16 w-full mt-4" />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 mb-6">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-24" />
-            ))}
-          </div>
-          <Skeleton className="h-[200px] w-full" />
-        </div>
-      </div>
-    );
+    return <ProfileLoadingState />;
   }
 
   if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Error loading profile</AlertTitle>
-        <AlertDescription>
-          {error instanceof Error ? error.message : "An unknown error occurred"}
-          <button 
-            onClick={() => refetch()} 
-            className="ml-2 text-sm underline hover:text-foreground/70"
-          >
-            Try again
-          </button>
-        </AlertDescription>
-      </Alert>
-    );
+    return <ProfileErrorState error={error} onRetry={refetch} />;
   }
 
   // Enrich profile with achievements count for UserMetrics
@@ -125,110 +83,16 @@ export const UserProfile = () => {
   return (
     <div className="space-y-4">
       <div className="bg-background p-4 border rounded-lg shadow-sm">
-        {profile ? (
-          <>
-            <UserProfileHeader 
-              userId={profile?.id || ''}
-              fullName={profile?.full_name} 
-              username={profile?.username}
-              avatarUrl={profile?.avatar_url}
-              bio={profile?.bio}
-            />
-            
-            {enrichedProfile && <UserMetrics profile={enrichedProfile} />}
-
-            {profile?.id && (
-              <div className="mt-6 border rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <GitCommit className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-medium">Video Analysis Contributions</h3>
-                </div>
-                <ContributionsGraph userId={profile.id} />
-              </div>
-            )}
-
-            {profile?.id && (
-              <div className="mt-6">
-                <UserDiscoveredVehicles userId={profile.id} />
-              </div>
-            )}
-
-            <Tabs defaultValue="profile" className="w-full mt-6">
-              <TabsList>
-                <TabsTrigger value="profile" className="flex items-center gap-2">
-                  <UserRound className="w-4 h-4" />
-                  Profile
-                </TabsTrigger>
-                <TabsTrigger value="team" className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Team
-                </TabsTrigger>
-                <TabsTrigger value="achievements" className="flex items-center gap-2">
-                  <Trophy className="w-4 h-4" />
-                  Achievements
-                </TabsTrigger>
-                <TabsTrigger value="discoveries" className="flex items-center gap-2">
-                  <Car className="w-4 h-4" />
-                  Discoveries
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="profile" className="space-y-4 mt-4">
-                <SocialLinksForm 
-                  socialLinks={socialLinks}
-                  onSocialLinksChange={handleSocialLinksChange}
-                  onSubmit={handleSocialLinksSubmit}
-                />
-                
-                <StreamingLinksForm 
-                  streamingLinks={streamingLinks}
-                  onStreamingLinksChange={handleStreamingLinksChange}
-                  onSubmit={handleStreamingLinksSubmit}
-                />
-              </TabsContent>
-
-              <TabsContent value="team" className="mt-4">
-                <TeamSection />
-              </TabsContent>
-
-              <TabsContent value="achievements" className="mt-4">
-                {achievements && achievements.length > 0 ? (
-                  <AchievementsList achievements={achievements} />
-                ) : (
-                  <div className="text-center p-4 border rounded-lg">
-                    <Trophy className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-muted-foreground">No achievements yet</p>
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="discoveries" className="mt-4">
-                {profile?.id && (
-                  <div className="grid gap-4">
-                    <p className="text-muted-foreground mb-2">
-                      All vehicles you have discovered across the web and added to our database.
-                    </p>
-                    <UserDiscoveredVehicles userId={profile.id} />
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </>
-        ) : (
-          <div className="text-center py-8">
-            <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium">Profile Not Found</h3>
-            <p className="text-muted-foreground mt-2">
-              Unable to load profile information. Please try again later.
-            </p>
-            <button 
-              onClick={() => refetch()} 
-              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            >
-              Retry
-            </button>
-          </div>
-        )}
+        <ProfileContent
+          profile={enrichedProfile}
+          achievements={achievements}
+          socialLinks={socialLinks}
+          streamingLinks={streamingLinks}
+          onSocialLinksChange={handleSocialLinksChange}
+          onStreamingLinksChange={handleStreamingLinksChange}
+          onSocialLinksSubmit={handleSocialLinksSubmit}
+          onStreamingLinksSubmit={handleStreamingLinksSubmit}
+        />
       </div>
     </div>
   );
