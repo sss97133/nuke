@@ -247,7 +247,7 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
                   </div>
                 </div>
 
-                <div>
+                <div className="mt-8 pt-4">
                   <h3 className="text-lg font-medium mb-3">Historical Price Tracking</h3>
                   <div className="h-40 bg-muted rounded-md flex items-center justify-center">
                     <p className="text-muted-foreground text-sm">Price trend visualization will appear here</p>
