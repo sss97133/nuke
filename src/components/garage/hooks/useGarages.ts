@@ -12,13 +12,15 @@ export const useGarages = () => {
     queryFn: fetchGarages,
     retry: MAX_RETRIES,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    onError: (error: Error) => {
-      console.error("[GarageSelector] Error in useQuery:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load garages. Please try again.",
-        variant: "destructive"
-      });
+    meta: {
+      onError: (error: Error) => {
+        console.error("[GarageSelector] Error in useQuery:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load garages. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
   });
 };

@@ -28,21 +28,8 @@ export const useDashboardState = () => {
     setDarkMode,
   } = useUIState();
 
-  const { handleShowHelp, handleMenuAction } = useMenuActions(
-    setShowNewVehicleDialog,
-    setShowNewInventoryDialog,
-    setShowAiAssistant,
-    setShowHelp,
-    setShowStudioConfig,
-    setShowWorkspacePreview,
-    showWorkspacePreview,
-    setShowActivityPanel,
-    showActivityPanel,
-    setShowSidebar,
-    showSidebar,
-    setDarkMode,
-    darkMode
-  );
+  // We're just passing the handleMenuAction function from useMenuActions
+  const { handleMenuAction } = useMenuActions();
 
   return {
     showNewVehicleDialog,
@@ -56,7 +43,6 @@ export const useDashboardState = () => {
     showActivityPanel,
     showSidebar,
     darkMode,
-    handleShowHelp,
     handleMenuAction
   };
 };
