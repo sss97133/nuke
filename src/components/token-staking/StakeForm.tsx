@@ -87,23 +87,38 @@ const StakeForm = ({
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + Number(stakeDuration));
       
-      // Create the stake
-      const { error } = await supabase
-        .from('token_stakes')
-        .insert([
-          {
-            user_id: user.id,
-            token_id: selectedToken,
-            vehicle_id: selectedVehicle,
-            amount: stakeValue,
-            start_date: startDate.toISOString(),
-            end_date: endDate.toISOString(),
-            status: 'active',
-            predicted_roi: calculatePredictedROI(stakeValue, Number(stakeDuration)),
-          }
-        ]);
-
-      if (error) throw error;
+      // Create the stake using the rpc function or fallback to direct insert
+      const vehicleInfo = vehicles.find(v => v.id === selectedVehicle);
+      const vehicleName = vehicleInfo ? `${vehicleInfo.year} ${vehicleInfo.make} ${vehicleInfo.model}` : "";
+      
+      try {
+        // Find vehicle name from the selected vehicle
+        
+        const stakeData = {
+          user_id: user.id,
+          token_id: selectedToken,
+          vehicle_id: selectedVehicle,
+          amount: stakeValue,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          status: 'active',
+          predicted_roi: Number(calculatePredictedROI(stakeValue, Number(stakeDuration))),
+          vehicle_name: vehicleName
+        };
+        
+        // Try direct insert to token_stakes
+        const { error } = await supabase.rpc('create_token_stake', stakeData);
+        
+        if (error) {
+          console.log('RPC error, falling back to direct insert:', error);
+          // Fallback to direct insert
+          const { error: insertError } = await supabase.from('token_stakes').insert([stakeData]);
+          if (insertError) throw insertError;
+        }
+      } catch (error) {
+        console.error('Error creating stake:', error);
+        throw new Error('Failed to create stake record');
+      }
 
       // Update the user's token holdings
       const { error: updateError } = await supabase

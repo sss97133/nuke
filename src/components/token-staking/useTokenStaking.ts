@@ -66,43 +66,70 @@ export const useTokenStaking = () => {
         return;
       }
       
+      // Modify this to handle the token_stakes table by using a raw SQL query
       const { data, error } = await supabase
-        .from('token_stakes')
-        .select(`
-          *,
-          token:token_id(id, name, symbol),
-          vehicle:vehicle_id(id, make, model, year)
-        `)
-        .eq('user_id', user.id);
+        .rpc('get_user_stakes', { user_uuid: user.id });
 
-      if (error) throw error;
-      
-      // Process data into TokenStake objects with referenced data
-      const stakes: TokenStake[] = (data || []).map(stake => ({
-        id: stake.id,
-        user_id: stake.user_id,
-        token_id: stake.token_id,
-        vehicle_id: stake.vehicle_id,
-        amount: stake.amount,
-        start_date: stake.start_date,
-        end_date: stake.end_date,
-        status: stake.status,
-        predicted_roi: stake.predicted_roi,
-        actual_roi: stake.actual_roi,
-        created_at: stake.created_at,
-        vehicle_name: stake.vehicle_name,
-        // Add the related objects
-        token: stake.token,
-        vehicle: stake.vehicle
-      }));
-
-      setUserStakes(stakes);
+      if (error) {
+        console.error('Error in RPC call, falling back to direct query');
+        // Fallback to direct query if RPC is not available
+        const directQuery = await supabase.from('token_stakes')
+          .select(`
+            *,
+            tokens:token_id (id, name, symbol),
+            vehicles:vehicle_id (id, make, model, year)
+          `)
+          .eq('user_id', user.id);
+        
+        if (directQuery.error) throw directQuery.error;
+        
+        // Process the data
+        const processedStakes: TokenStake[] = (directQuery.data || []).map((stake: any) => ({
+          id: stake.id,
+          user_id: stake.user_id,
+          token_id: stake.token_id,
+          vehicle_id: stake.vehicle_id,
+          amount: stake.amount,
+          start_date: stake.start_date,
+          end_date: stake.end_date,
+          status: stake.status,
+          predicted_roi: stake.predicted_roi,
+          actual_roi: stake.actual_roi,
+          created_at: stake.created_at,
+          vehicle_name: stake.vehicle_name,
+          token: stake.tokens,
+          vehicle: stake.vehicles
+        }));
+        
+        setUserStakes(processedStakes);
+      } else {
+        // Process data from RPC call
+        const stakes: TokenStake[] = (data || []).map((stake: any) => ({
+          id: stake.id,
+          user_id: stake.user_id,
+          token_id: stake.token_id,
+          vehicle_id: stake.vehicle_id,
+          amount: stake.amount,
+          start_date: stake.start_date,
+          end_date: stake.end_date,
+          status: stake.status,
+          predicted_roi: stake.predicted_roi,
+          actual_roi: stake.actual_roi,
+          created_at: stake.created_at,
+          vehicle_name: stake.vehicle_name,
+          token: stake.token,
+          vehicle: stake.vehicle
+        }));
+        
+        setUserStakes(stakes);
+      }
       
       // After loading stakes, fetch stats
       fetchStakingStats(user.id);
     } catch (error) {
       console.error('Error fetching user stakes:', error);
       toast("Failed to load your stakes");
+      setUserStakes([]);
     } finally {
       setIsLoadingStakes(false);
     }
@@ -111,65 +138,71 @@ export const useTokenStaking = () => {
   const fetchStakingStats = async (userId: string) => {
     setIsLoadingStats(true);
     try {
-      // Run a query to aggregate counts and totals
-      const { data, error } = await supabase
-        .from('token_stakes')
-        .select(`
-          amount,
-          predicted_roi,
-          status,
-          vehicle_name
-        `)
-        .eq('user_id', userId);
+      // Try to use the get_user_staking_stats RPC function
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_user_staking_stats', { user_uuid: userId });
       
-      if (error) throw error;
-      
-      if (!data || data.length === 0) {
-        setStakingStats(null);
-        return;
-      }
-      
-      // Calculate stats manually
-      const activeStakes = data.filter(stake => stake.status === 'active');
-      const totalStaked = data.reduce((sum, stake) => sum + Number(stake.amount), 0);
-      const totalPredictedRoi = data.reduce((sum, stake) => sum + Number(stake.predicted_roi), 0);
-      
-      // Get unique vehicle count
-      const uniqueVehicles = new Set(data
-        .filter(stake => stake.vehicle_name)
-        .map(stake => stake.vehicle_name));
-      
-      // Calculate distribution by vehicle
-      const vehicleMap = new Map<string, number>();
-      data.forEach(stake => {
-        if (stake.vehicle_name) {
-          const current = vehicleMap.get(stake.vehicle_name) || 0;
-          vehicleMap.set(stake.vehicle_name, current + Number(stake.amount));
+      if (rpcError) {
+        console.error('RPC error:', rpcError);
+        // Fallback to calculating stats manually using a direct query
+        const { data, error } = await supabase
+          .from('token_stakes')
+          .select('amount, predicted_roi, status, vehicle_name')
+          .eq('user_id', userId);
+        
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+          setStakingStats(null);
+          return;
         }
-      });
-      
-      const distributionByVehicle = Array.from(vehicleMap.entries())
-        .map(([vehicle_name, amount]) => ({
-          vehicle_name,
-          amount,
-          percentage: (amount / totalStaked) * 100
-        }))
-        .sort((a, b) => b.amount - a.amount);
-      
-      const stats: TokenStakeStats = {
-        total_staked: totalStaked,
-        total_predicted_roi: totalPredictedRoi,
-        active_stakes: activeStakes.length,
-        completed_stakes: data.filter(stake => stake.status === 'completed').length,
-        avg_roi_percent: totalStaked > 0 ? (totalPredictedRoi / totalStaked) * 100 : 0,
-        vehicle_count: uniqueVehicles.size,
-        distribution_by_vehicle: distributionByVehicle
-      };
-      
-      setStakingStats(stats);
+        
+        // Calculate stats manually
+        const activeStakes = data.filter(stake => stake.status === 'active').length;
+        const totalStaked = data.reduce((sum, stake) => sum + Number(stake.amount), 0);
+        const totalPredictedRoi = data.reduce((sum, stake) => sum + Number(stake.predicted_roi), 0);
+        
+        // Get unique vehicle count
+        const uniqueVehicles = new Set(data
+          .filter(stake => stake.vehicle_name)
+          .map(stake => stake.vehicle_name));
+        
+        // Calculate distribution by vehicle
+        const vehicleMap = new Map<string, number>();
+        data.forEach(stake => {
+          if (stake.vehicle_name) {
+            const current = vehicleMap.get(stake.vehicle_name) || 0;
+            vehicleMap.set(stake.vehicle_name, current + Number(stake.amount));
+          }
+        });
+        
+        const distributionByVehicle = Array.from(vehicleMap.entries())
+          .map(([vehicle_name, amount]) => ({
+            vehicle_name,
+            amount,
+            percentage: (amount / totalStaked) * 100
+          }))
+          .sort((a, b) => b.amount - a.amount);
+        
+        const stats: TokenStakeStats = {
+          total_staked: totalStaked,
+          total_predicted_roi: totalPredictedRoi,
+          active_stakes: activeStakes,
+          completed_stakes: data.filter(stake => stake.status === 'completed').length,
+          avg_roi_percent: totalStaked > 0 ? (totalPredictedRoi / totalStaked) * 100 : 0,
+          vehicle_count: uniqueVehicles.size,
+          distribution_by_vehicle: distributionByVehicle
+        };
+        
+        setStakingStats(stats);
+      } else {
+        // Use RPC results
+        setStakingStats(rpcData as TokenStakeStats);
+      }
     } catch (error) {
       console.error('Error fetching staking stats:', error);
       toast("Failed to load staking statistics");
+      setStakingStats(null);
     } finally {
       setIsLoadingStats(false);
     }
