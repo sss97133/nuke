@@ -55,7 +55,7 @@ const SearchSection: React.FC<SearchSectionProps> = ({
                   <SelectValue placeholder="Any year" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any year</SelectItem>
+                  <SelectItem value="any">Any year</SelectItem>
                   {[...Array(30)].map((_, i) => (
                     <SelectItem key={i} value={(2023 - i).toString()}>
                       {2023 - i}
@@ -72,7 +72,7 @@ const SearchSection: React.FC<SearchSectionProps> = ({
                   <SelectValue placeholder="Any make" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any make</SelectItem>
+                  <SelectItem value="any">Any make</SelectItem>
                   {["Toyota", "Honda", "Ford", "BMW", "Mercedes", "Audi", "Tesla", "Porsche"].map((make) => (
                     <SelectItem key={make} value={make}>{make}</SelectItem>
                   ))}
