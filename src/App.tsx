@@ -19,6 +19,7 @@ import DiscoveredVehicles from "./pages/DiscoveredVehicles"
 import TokenStaking from "./pages/TokenStaking"
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { NavSidebar } from './components/layout/NavSidebar'
+import TokensPage from "./pages/Tokens"
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient();
@@ -90,6 +91,7 @@ function AppContent() {
           <Route path="/parts" element={<Dashboard />} />
           <Route path="/service-history" element={<Dashboard />} />
           <Route path="/token-staking" element={<TokenStaking />} />
+          <Route path="/tokens" element={<TokensPage />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/glossary" element={<Glossary />} />
           <Route path="/sitemap" element={<Sitemap />} />

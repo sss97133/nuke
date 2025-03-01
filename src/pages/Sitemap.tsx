@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Map, Layout, Navigation, ExternalLink, Home, Compass, Code, FileText, Upload, Car, User } from 'lucide-react';
+import { Map, Layout, Navigation, ExternalLink, Home, Compass, Code, FileText, Upload, Car, User, Coins, Wallet } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -60,6 +60,23 @@ const Sitemap = () => {
           title: "Achievements",
           description: "View your earned achievements",
           path: "/achievements"
+        }
+      ]
+    },
+    {
+      title: "Token Management",
+      items: [
+        {
+          icon: Coins,
+          title: "Token Management",
+          description: "Create and manage your tokens",
+          path: "/tokens"
+        },
+        {
+          icon: Wallet,
+          title: "Token Staking",
+          description: "Stake your tokens for rewards",
+          path: "/token-staking"
         }
       ]
     },
