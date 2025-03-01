@@ -117,6 +117,7 @@ export const TokensPage = () => {
           decimals: newToken.decimals,
           description: newToken.description,
           status: newToken.status,
+          vehicle_id: newToken.vehicle_id,
         }])
         .select();
 

@@ -8,6 +8,7 @@ import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import BasicInfoStep from "./steps/BasicInfoStep";
 import SupplyStep from "./steps/SupplyStep";
 import DetailsStep from "./steps/DetailsStep";
+import VehicleStep from "./steps/VehicleStep";
 import ReviewStep from "./steps/ReviewStep";
 
 interface TokenCreationWizardProps {
@@ -20,6 +21,7 @@ const steps = [
   { id: "basic-info", label: "Basic Info" },
   { id: "supply", label: "Supply" },
   { id: "details", label: "Details" },
+  { id: "vehicle", label: "Vehicle" },
   { id: "review", label: "Review" },
 ];
 
@@ -36,6 +38,7 @@ export const TokenCreationWizard = ({
     decimals: 18,
     description: "",
     status: "active",
+    vehicle_id: undefined,
   });
   
   const handleNext = () => {
@@ -66,6 +69,7 @@ export const TokenCreationWizard = ({
       decimals: 18,
       description: "",
       status: "active",
+      vehicle_id: undefined,
     });
     setCurrentStep("basic-info");
   };
@@ -96,7 +100,7 @@ export const TokenCreationWizard = ({
         {/* Progress indicators */}
         <div className="mb-4">
           <Tabs value={currentStep} className="w-full">
-            <TabsList className="grid grid-cols-4 w-full">
+            <TabsList className="grid grid-cols-5 w-full">
               {steps.map((step, index) => {
                 const isCompleted = currentStepIndex > index;
                 const isCurrent = currentStep === step.id;
@@ -145,6 +149,13 @@ export const TokenCreationWizard = ({
                 status={newToken.status}
                 onDescriptionChange={(value) => updateTokenField('description', value)}
                 onStatusChange={(value) => updateTokenField('status', value)}
+              />
+            </TabsContent>
+
+            <TabsContent value="vehicle">
+              <VehicleStep
+                selectedVehicleId={newToken.vehicle_id}
+                onVehicleSelect={(value) => updateTokenField('vehicle_id', value)}
               />
             </TabsContent>
             

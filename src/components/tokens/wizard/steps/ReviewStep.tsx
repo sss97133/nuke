@@ -1,12 +1,37 @@
 
-import { NewToken } from "@/types/token";
+import { useState, useEffect } from "react";
+import { NewToken, Vehicle } from "@/types/token";
 import { Card, CardContent } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ReviewStepProps {
   token: NewToken;
 }
 
 const ReviewStep = ({ token }: ReviewStepProps) => {
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  
+  useEffect(() => {
+    if (token.vehicle_id) {
+      fetchVehicle(token.vehicle_id);
+    }
+  }, [token.vehicle_id]);
+  
+  const fetchVehicle = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('id, make, model, year, vin')
+        .eq('id', id)
+        .single();
+        
+      if (error) throw error;
+      setVehicle(data);
+    } catch (error) {
+      console.error('Error fetching vehicle details:', error);
+    }
+  };
+  
   return (
     <div className="space-y-4 py-2">
       <p className="text-sm text-muted-foreground mb-4">
@@ -47,6 +72,18 @@ const ReviewStep = ({ token }: ReviewStepProps) => {
                 {token.description || "No description provided"}
               </p>
             </div>
+            
+            {token.vehicle_id && vehicle && (
+              <div className="col-span-2 mt-2">
+                <h3 className="text-sm font-medium text-muted-foreground">Linked Vehicle</h3>
+                <div className="mt-1 p-3 bg-muted rounded-md">
+                  <p className="text-sm font-semibold">
+                    {vehicle.year} {vehicle.make} {vehicle.model}
+                    {vehicle.vin && ` (VIN: ${vehicle.vin})`}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

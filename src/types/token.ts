@@ -14,6 +14,7 @@ export interface Token {
   owner_id: string;
   status: string;
   updated_at: string;
+  vehicle_id?: string;
 }
 
 export interface NewToken {
@@ -23,4 +24,13 @@ export interface NewToken {
   decimals: number;
   description: string;
   status: string;
+  vehicle_id?: string;
+}
+
+export interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin?: string;
 }
