@@ -34,3 +34,17 @@ export interface Vehicle {
   year: number;
   vin?: string;
 }
+
+export interface TokenStake {
+  id: string;
+  user_id: string;
+  token_id: string;
+  vehicle_id: string;
+  amount: number;
+  start_date: string;
+  end_date: string;
+  status: 'active' | 'completed' | 'cancelled';
+  predicted_roi: number;
+  actual_roi?: number;
+  created_at: string;
+}

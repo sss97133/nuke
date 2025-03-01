@@ -21,6 +21,7 @@ import Inventory from "./Inventory";
 import Settings from "./Settings";
 import Achievements from "./Achievements";
 import ImportPage from "./ImportPage";
+import TokenStaking from "./TokenStaking";
 import { toast } from "sonner";
 import { 
   handleFileMenuAction, 
@@ -80,6 +81,7 @@ const Index = () => {
           <Route path="/discover" element={<Discover />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/tokens" element={<Tokens />} />
+          <Route path="/token-staking" element={<TokenStaking />} />
           <Route path="/streaming" element={<Streaming />} />
           <Route path="/token-analytics" element={<TokenAnalytics />} />
           <Route path="/market-analysis" element={<MarketAnalysis />} />
