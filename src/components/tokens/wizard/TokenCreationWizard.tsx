@@ -19,9 +19,9 @@ interface TokenCreationWizardProps {
 
 const steps = [
   { id: "basic-info", label: "Basic Info" },
-  { id: "supply", label: "Supply" },
   { id: "details", label: "Details" },
   { id: "vehicle", label: "Vehicle" },
+  { id: "supply", label: "Supply" },
   { id: "review", label: "Review" },
 ];
 
@@ -134,15 +134,6 @@ export const TokenCreationWizard = ({
               />
             </TabsContent>
             
-            <TabsContent value="supply">
-              <SupplyStep
-                totalSupply={newToken.total_supply}
-                decimals={newToken.decimals}
-                onTotalSupplyChange={(value) => updateTokenField('total_supply', value)}
-                onDecimalsChange={(value) => updateTokenField('decimals', value)}
-              />
-            </TabsContent>
-            
             <TabsContent value="details">
               <DetailsStep
                 description={newToken.description}
@@ -156,6 +147,15 @@ export const TokenCreationWizard = ({
               <VehicleStep
                 selectedVehicleId={newToken.vehicle_id}
                 onVehicleSelect={(value) => updateTokenField('vehicle_id', value)}
+              />
+            </TabsContent>
+            
+            <TabsContent value="supply">
+              <SupplyStep
+                totalSupply={newToken.total_supply}
+                decimals={newToken.decimals}
+                onTotalSupplyChange={(value) => updateTokenField('total_supply', value)}
+                onDecimalsChange={(value) => updateTokenField('decimals', value)}
               />
             </TabsContent>
             
