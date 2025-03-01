@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Home, Compass, Activity, Briefcase, ShoppingBag, Badge, Video, Settings, Award, FileInput } from "lucide-react";
+import { Home, Compass, Activity, Briefcase, ShoppingBag, Video, Settings, Award, FileInput } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export const NavButtons = () => {
@@ -38,13 +38,6 @@ export const NavButtons = () => {
         <Link to="/tokens">
           <ShoppingBag className="h-4 w-4 mr-1" />
           Tokens
-        </Link>
-      </Button>
-
-      <Button asChild variant="ghost" size="sm" className="mr-2">
-        <Link to="/skills">
-          <Badge className="h-4 w-4 mr-1" />
-          Skills
         </Link>
       </Button>
 
