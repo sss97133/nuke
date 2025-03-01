@@ -1,4 +1,6 @@
 
+import { vi } from 'vitest';
+
 // Mock data for studio configuration tests
 export const mockUseStudioConfig = () => {
   return {

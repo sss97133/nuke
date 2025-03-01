@@ -51,7 +51,7 @@ const Index = () => {
           <Route path="/settings" element={<Settings />} />
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/import" element={<ImportPage />} />
-          <Route path="/track" element={<MarketAnalysis />} /> {/* Use MarketAnalysis as a placeholder for Track */}
+          <Route path="/track" element={<MarketAnalysis />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

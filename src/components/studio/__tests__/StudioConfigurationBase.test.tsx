@@ -2,7 +2,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
-import StudioConfiguration from '../StudioConfiguration';
+import { StudioConfiguration } from '../StudioConfiguration';
 import { renderWithQueryClient } from './utils/testUtils';
 import { mockUseStudioConfig } from './mocks/studioMocks';
 
