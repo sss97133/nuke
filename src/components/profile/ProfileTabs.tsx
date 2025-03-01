@@ -36,7 +36,7 @@ export const ProfileTabs = ({ profile, achievements, activeTab }: ProfileTabsPro
               <CardTitle>Contributions</CardTitle>
             </CardHeader>
             <CardContent>
-              <ContributionsGraph data={[]} />
+              <ContributionsGraph userId={profile?.id} />
             </CardContent>
           </Card>
         </div>
@@ -46,11 +46,23 @@ export const ProfileTabs = ({ profile, achievements, activeTab }: ProfileTabsPro
             <CardTitle>Social Links</CardTitle>
           </CardHeader>
           <CardContent>
-            <SocialLinksForm 
-              links={profile?.social_links} 
-              userId={profile?.id} 
-              readOnly={true} 
-            />
+            <div className="mb-4 bg-[#FFFFFF] p-2 border border-[#403E43]">
+              <h3 className="text-sm font-bold mb-2">Social Media Links</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="text-xs mb-1">
+                  <span className="font-bold">Twitter:</span> {profile?.social_links?.twitter || 'Not set'}
+                </div>
+                <div className="text-xs mb-1">
+                  <span className="font-bold">Instagram:</span> {profile?.social_links?.instagram || 'Not set'}
+                </div>
+                <div className="text-xs mb-1">
+                  <span className="font-bold">LinkedIn:</span> {profile?.social_links?.linkedin || 'Not set'}
+                </div>
+                <div className="text-xs mb-1">
+                  <span className="font-bold">GitHub:</span> {profile?.social_links?.github || 'Not set'}
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -59,11 +71,20 @@ export const ProfileTabs = ({ profile, achievements, activeTab }: ProfileTabsPro
             <CardTitle>Streaming Platforms</CardTitle>
           </CardHeader>
           <CardContent>
-            <StreamingLinksForm 
-              links={profile?.streaming_links} 
-              userId={profile?.id} 
-              readOnly={true} 
-            />
+            <div className="bg-[#FFFFFF] p-2 border border-[#403E43]">
+              <h3 className="text-sm font-bold mb-2">Streaming Platform Links</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="text-xs mb-1">
+                  <span className="font-bold">Twitch:</span> {profile?.streaming_links?.twitch || 'Not set'}
+                </div>
+                <div className="text-xs mb-1">
+                  <span className="font-bold">YouTube:</span> {profile?.streaming_links?.youtube || 'Not set'}
+                </div>
+                <div className="text-xs mb-1">
+                  <span className="font-bold">TikTok:</span> {profile?.streaming_links?.tiktok || 'Not set'}
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </TabsContent>
@@ -99,7 +120,7 @@ export const ProfileTabs = ({ profile, achievements, activeTab }: ProfileTabsPro
             <CardTitle>Team Members</CardTitle>
           </CardHeader>
           <CardContent>
-            <TeamSection profileId={profile?.id} />
+            <TeamSection />
           </CardContent>
         </Card>
       </TabsContent>

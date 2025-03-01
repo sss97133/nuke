@@ -1,13 +1,16 @@
+
 import React from 'react';
 import { Trophy, Star, Award } from 'lucide-react';
 
 interface UserMetricsProps {
-  userType: string | null;
-  reputationScore: number | null;
-  achievementsCount: number;
+  profile: any;
 }
 
-export const UserMetrics = ({ userType, reputationScore, achievementsCount }: UserMetricsProps) => {
+export const UserMetrics = ({ profile }: UserMetricsProps) => {
+  const userType = profile?.user_type || 'N/A';
+  const reputationScore = profile?.reputation_score || 0;
+  const achievementsCount = 0; // This would come from achievements.length in a real implementation
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
       <div className="bg-[#FFFFFF] p-2 border border-[#403E43]">
@@ -15,7 +18,7 @@ export const UserMetrics = ({ userType, reputationScore, achievementsCount }: Us
           <Trophy className="w-3 h-3 text-[#222222]" />
           <span className="text-[10px] font-mono text-[#222222]">ROLE</span>
         </div>
-        <p className="text-tiny font-mono text-[#403E43] uppercase">{userType || 'N/A'}</p>
+        <p className="text-tiny font-mono text-[#403E43] uppercase">{userType}</p>
       </div>
       
       <div className="bg-[#FFFFFF] p-2 border border-[#403E43]">
@@ -23,7 +26,7 @@ export const UserMetrics = ({ userType, reputationScore, achievementsCount }: Us
           <Star className="w-3 h-3 text-[#222222]" />
           <span className="text-[10px] font-mono text-[#222222]">REPUTATION_PTS</span>
         </div>
-        <p className="text-tiny font-mono text-[#403E43]">{reputationScore || '0'}</p>
+        <p className="text-tiny font-mono text-[#403E43]">{reputationScore}</p>
       </div>
       
       <div className="bg-[#FFFFFF] p-2 border border-[#403E43]">
