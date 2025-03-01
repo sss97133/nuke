@@ -1,4 +1,3 @@
-
 import { BookOpen, Award, Certificate, GraduationCap, ChevronRight, User } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";

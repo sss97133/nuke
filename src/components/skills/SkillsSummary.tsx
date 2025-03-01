@@ -1,7 +1,6 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, Award, Certificate } from "lucide-react";
+import { BookOpen, Award, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -57,7 +56,7 @@ export const SkillsSummary = () => {
                     {cert.status === "Completed" ? (
                       <Award className="h-3.5 w-3.5 mr-1.5 text-green-500" />
                     ) : (
-                      <Certificate className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+                      <GraduationCap className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
                     )}
                     <span>{cert.name}</span>
                   </div>
