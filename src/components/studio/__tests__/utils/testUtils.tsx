@@ -2,76 +2,85 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { expect, vi } from 'vitest';
+import { vi, expect } from 'vitest';
 
-// Mock types since we can't import from the actual types
-interface StudioConfig {
+// Type definitions
+export interface StudioConfig {
   id: string;
   name: string;
   width: number;
   height: number;
-  cameras: CameraConfig[];
+  createdAt: string;
+  updatedAt: string;
+  ptzCamera: CameraConfig;
 }
 
-interface CameraConfig {
-  id: string;
-  type: string;
-  position: {
-    x: number;
-    y: number;
-    z: number;
-  };
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
+export interface CameraConfig {
+  x: number;
+  y: number;
+  z: number;
+  rotation: number;
+  zoom: number;
 }
 
 // Mock data
-export const mockUser: User = {
-  id: '1',
+export const mockUser = {
+  id: 'test-user-1',
   name: 'Test User',
   email: 'test@example.com'
 };
 
 export const mockStudioConfig: StudioConfig = {
-  id: '1',
+  id: 'test-studio-1',
   name: 'Test Studio',
-  width: 800,
-  height: 600,
-  cameras: [
-    {
-      id: '1',
-      type: 'PTZ',
-      position: { x: 0, y: 0, z: 0 }
-    }
-  ]
+  width: 1920,
+  height: 1080,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  ptzCamera: {
+    x: 0,
+    y: 0,
+    z: 0,
+    rotation: 0,
+    zoom: 1
+  }
 };
 
-// Utility to render with QueryClient
-export const renderWithQueryClient = (ui: React.ReactElement) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
+// Function to create a wrapper with QueryClientProvider
+const createTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
     },
-  });
-  
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {ui}
-    </QueryClientProvider>
-  );
-};
+  },
+  logger: {
+    log: console.log,
+    warn: console.warn,
+    error: () => {},
+  },
+});
 
-// Test assertions
+// Render with query client
+export function renderWithQueryClient(ui: React.ReactElement) {
+  const testQueryClient = createTestQueryClient();
+  const { rerender, ...result } = render(
+    <QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>
+  );
+  
+  return {
+    ...result,
+    rerender: (rerenderUi: React.ReactElement) =>
+      rerender(
+        <QueryClientProvider client={testQueryClient}>{rerenderUi}</QueryClientProvider>
+      ),
+  };
+}
+
+// Test utilities for assertions
 export const assertElementExists = (element: HTMLElement | null) => {
   expect(element).not.toBeNull();
 };
 
-export const assertElementHasText = (element: HTMLElement | null, text: string) => {
-  expect(element?.textContent).toContain(text);
+export const assertTextContent = (element: HTMLElement | null, text: string) => {
+  expect(element).toHaveTextContent(text);
 };

@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import StudioConfiguration from '../StudioConfiguration';
-import { renderWithQueryClient, mockStudioConfig } from './utils/testUtils';
+import { renderWithQueryClient } from './utils/testUtils';
 import { mockUseStudioConfig } from './mocks/studioMocks';
 
 // Mock the hook
@@ -30,8 +30,9 @@ describe('StudioConfiguration - Base functionality', () => {
     renderWithQueryClient(<StudioConfiguration />);
     
     // Check form has correct values
-    expect(screen.getByLabelText(/Studio Name/i)).toHaveValue(mockStudioConfig.name);
-    expect(screen.getByLabelText(/Width/i)).toHaveValue(mockStudioConfig.width);
-    expect(screen.getByLabelText(/Height/i)).toHaveValue(mockStudioConfig.height);
+    const { name, width, height } = mockUseStudioConfig().studioConfig;
+    expect(screen.getByLabelText(/Studio Name/i)).toHaveValue(name);
+    expect(screen.getByLabelText(/Width/i)).toHaveValue(width);
+    expect(screen.getByLabelText(/Height/i)).toHaveValue(height);
   });
 });

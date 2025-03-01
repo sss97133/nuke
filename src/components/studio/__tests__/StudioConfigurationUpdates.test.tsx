@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import StudioConfiguration from '../StudioConfiguration';
-import { renderWithQueryClient, mockStudioConfig } from './utils/testUtils';
+import { renderWithQueryClient } from './utils/testUtils';
 import { mockUseStudioConfig, mockSaveStudioConfig } from './mocks/studioMocks';
 
 // Mock the hook
@@ -25,7 +25,7 @@ describe('StudioConfiguration - Update functionality', () => {
     
     // Check if save function was called
     expect(mockSaveStudioConfig).toHaveBeenCalledTimes(1);
-    expect(mockSaveStudioConfig).toHaveBeenCalledWith(mockStudioConfig);
+    expect(mockSaveStudioConfig).toHaveBeenCalledWith(mockUseStudioConfig().studioConfig);
   });
 
   it('updates form values when changed', () => {
