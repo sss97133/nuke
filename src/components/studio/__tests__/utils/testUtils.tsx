@@ -2,7 +2,7 @@
 import { render, RenderResult } from "@testing-library/react";
 import React, { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { vi } from "vitest";
+import { vi, expect } from "vitest";
 
 // Define the types directly in this file since the imports are failing
 interface StudioConfig {
@@ -110,10 +110,10 @@ export const renderWithQueryClient = (ui: ReactElement): RenderResult => {
 // Helper functions for test assertions
 export const testUtils = {
   expectToBeInTheDocument: (element: HTMLElement) => {
-    vi.fn(() => expect(element).toBeInTheDocument());
+    return expect(element).toBeInTheDocument();
   },
   
   expectTextContent: (element: HTMLElement, text: string) => {
-    vi.fn(() => expect(element.textContent).toBe(text));
+    return expect(element.textContent).toBe(text);
   },
 };
