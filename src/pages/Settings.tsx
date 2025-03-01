@@ -11,6 +11,9 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePreferences } from "@/hooks/use-preferences";
 import { ErrorBoundary } from "@/components/error-boundary/ErrorBoundary";
+import { useLocation } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from "react";
 
 export const Settings = () => {
   const {
@@ -21,6 +24,21 @@ export const Settings = () => {
     handleResetPreferences,
     handleClearData
   } = usePreferences();
+  
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState("preferences");
+  
+  // Parse the URL parameters to determine which tab should be active
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    
+    if (tab === "notifications" || tab === "data") {
+      setActiveTab(tab);
+    } else {
+      setActiveTab("preferences");
+    }
+  }, [location.search]);
 
   if (error) {
     return (
@@ -54,80 +72,95 @@ export const Settings = () => {
     <div className="container mx-auto p-6 space-y-8">
       <h1 className="text-3xl font-bold">System Preferences</h1>
       
-      <Card className="p-6 space-y-6">
-        <ErrorBoundary>
-          <AppearanceSettings
-            compactViewEnabled={preferences.compactViewEnabled}
-            onCompactViewChange={(checked) => {
-              savePreferences({ compact_view_enabled: checked });
-            }}
-          />
-        </ErrorBoundary>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="preferences">General Preferences</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="data">Data Management</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="preferences" className="mt-6">
+          <Card className="p-6 space-y-6">
+            <ErrorBoundary>
+              <AppearanceSettings
+                compactViewEnabled={preferences.compactViewEnabled}
+                onCompactViewChange={(checked) => {
+                  savePreferences({ compact_view_enabled: checked });
+                }}
+              />
+            </ErrorBoundary>
 
-        <ErrorBoundary>
-          <DisplaySettings
-            distanceUnit={preferences.distanceUnit}
-            currency={preferences.currency}
-            defaultGarageView={preferences.defaultGarageView}
-            onDistanceUnitChange={(value) => {
-              savePreferences({ distance_unit: value });
-            }}
-            onCurrencyChange={(value) => {
-              savePreferences({ currency: value });
-            }}
-            onDefaultGarageViewChange={(value) => {
-              savePreferences({ default_garage_view: value });
-            }}
-          />
-        </ErrorBoundary>
+            <ErrorBoundary>
+              <DisplaySettings
+                distanceUnit={preferences.distanceUnit}
+                currency={preferences.currency}
+                defaultGarageView={preferences.defaultGarageView}
+                onDistanceUnitChange={(value) => {
+                  savePreferences({ distance_unit: value });
+                }}
+                onCurrencyChange={(value) => {
+                  savePreferences({ currency: value });
+                }}
+                onDefaultGarageViewChange={(value) => {
+                  savePreferences({ default_garage_view: value });
+                }}
+              />
+            </ErrorBoundary>
 
-        <ErrorBoundary>
-          <NotificationSettings
-            notificationsEnabled={preferences.notificationsEnabled}
-            onNotificationsChange={(checked) => {
-              savePreferences({ notifications_enabled: checked });
-            }}
-          />
-        </ErrorBoundary>
+            <ErrorBoundary>
+              <AutoSaveSettings
+                autoSaveEnabled={preferences.autoSaveEnabled}
+                onAutoSaveChange={(checked) => {
+                  savePreferences({ auto_save_enabled: checked });
+                }}
+              />
+            </ErrorBoundary>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="notifications" className="mt-6">
+          <Card className="p-6 space-y-6">
+            <ErrorBoundary>
+              <NotificationSettings
+                notificationsEnabled={preferences.notificationsEnabled}
+                onNotificationsChange={(checked) => {
+                  savePreferences({ notifications_enabled: checked });
+                }}
+              />
+            </ErrorBoundary>
 
-        <ErrorBoundary>
-          <AlertSettings
-            serviceRemindersEnabled={preferences.serviceRemindersEnabled}
-            inventoryAlertsEnabled={preferences.inventoryAlertsEnabled}
-            priceAlertsEnabled={preferences.priceAlertsEnabled}
-            onServiceRemindersChange={(checked) => {
-              savePreferences({ service_reminders_enabled: checked });
-            }}
-            onInventoryAlertsChange={(checked) => {
-              savePreferences({ inventory_alerts_enabled: checked });
-            }}
-            onPriceAlertsChange={(checked) => {
-              savePreferences({ price_alerts_enabled: checked });
-            }}
-          />
-        </ErrorBoundary>
-
-        <ErrorBoundary>
-          <AutoSaveSettings
-            autoSaveEnabled={preferences.autoSaveEnabled}
-            onAutoSaveChange={(checked) => {
-              savePreferences({ auto_save_enabled: checked });
-            }}
-          />
-        </ErrorBoundary>
-      </Card>
-
-      <Card className="p-6">
-        <ErrorBoundary>
-          <DataManagement
-            onResetPreferences={handleResetPreferences}
-            onClearData={handleClearData}
-          />
-        </ErrorBoundary>
-      </Card>
+            <ErrorBoundary>
+              <AlertSettings
+                serviceRemindersEnabled={preferences.serviceRemindersEnabled}
+                inventoryAlertsEnabled={preferences.inventoryAlertsEnabled}
+                priceAlertsEnabled={preferences.priceAlertsEnabled}
+                onServiceRemindersChange={(checked) => {
+                  savePreferences({ service_reminders_enabled: checked });
+                }}
+                onInventoryAlertsChange={(checked) => {
+                  savePreferences({ inventory_alerts_enabled: checked });
+                }}
+                onPriceAlertsChange={(checked) => {
+                  savePreferences({ price_alerts_enabled: checked });
+                }}
+              />
+            </ErrorBoundary>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="data" className="mt-6">
+          <Card className="p-6">
+            <ErrorBoundary>
+              <DataManagement
+                onResetPreferences={handleResetPreferences}
+                onClearData={handleClearData}
+              />
+            </ErrorBoundary>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
 
 export default Settings;
-
