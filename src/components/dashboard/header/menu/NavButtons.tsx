@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Home, Compass, Activity, Briefcase, ShoppingBag, Video, Settings, FileInput, ChevronDown } from "lucide-react";
+import { Home, Compass, Activity, Briefcase, ShoppingBag, Video, Settings, FileInput, ChevronDown, Bell, PanelLeft, Save } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   DropdownMenu,
@@ -82,12 +82,36 @@ export const NavButtons = () => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button asChild variant="ghost" size="sm" className="mr-2">
-        <Link to="/settings">
-          <Settings className="h-4 w-4 mr-1" />
-          Settings
-        </Link>
-      </Button>
+      {/* Settings Dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="mr-2">
+            <Settings className="h-4 w-4 mr-1" />
+            Settings
+            <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="bg-popover">
+          <DropdownMenuItem asChild>
+            <Link to="/settings" className="flex items-center w-full">
+              <PanelLeft className="h-4 w-4 mr-2" />
+              Preferences
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/settings?tab=notifications" className="flex items-center w-full">
+              <Bell className="h-4 w-4 mr-2" />
+              Notifications
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/settings?tab=data" className="flex items-center w-full">
+              <Save className="h-4 w-4 mr-2" />
+              Data Management
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 };
