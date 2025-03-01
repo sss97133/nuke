@@ -1,8 +1,7 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader, AlertCircle, RefreshCw, CheckCircle, Clock, TrendingUp, Coins } from "lucide-react";
+import { Loader, AlertCircle, RefreshCw, CheckCircle, Clock, TrendingUp, Coins, Calendar, Car } from "lucide-react";
 import { TokenStake } from "@/types/token";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";

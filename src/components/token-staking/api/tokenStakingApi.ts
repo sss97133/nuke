@@ -2,11 +2,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Token, Vehicle, TokenStake, TokenStakeStats } from "@/types/token";
 
-// Type assertion helper for token stakes table
-const from = (table: string) => {
-  return supabase.from(table) as any;
-};
-
 /**
  * Fetches available tokens for staking
  */
@@ -56,22 +51,10 @@ export const fetchUserStakes = async (): Promise<TokenStake[]> => {
       return [];
     }
     
-    // First try to use the RPC function if it exists
+    // Direct query for stakes
     try {
-      const { data, error } = await supabase.rpc('get_user_stakes', {
-        user_id_param: user.id
-      }) as { data: TokenStake[] | null, error: Error | null };
-      
-      if (error) throw error;
-      if (data) return data;
-    } catch (rpcError) {
-      console.warn('RPC function get_user_stakes not available, falling back to direct query:', rpcError);
-    }
-    
-    // Fallback to direct query if RPC fails
-    try {
-      // We need to use type assertion here because of TypeScript limitations with Supabase
-      const { data, error } = await from('token_stakes')
+      const { data, error } = await supabase
+        .from('token_stakes')
         .select(`
           id, user_id, token_id, vehicle_id, amount, start_date, end_date, 
           status, predicted_roi, actual_roi, created_at, vehicle_name,
@@ -102,7 +85,7 @@ export const fetchUserStakes = async (): Promise<TokenStake[]> => {
       })) || [];
     } catch (queryError) {
       console.error('Error with direct query:', queryError);
-      throw new Error('Failed to fetch user stakes: ' + queryError.message);
+      throw new Error('Failed to fetch user stakes: ' + (queryError as Error).message);
     }
   } catch (error) {
     console.error('Error fetching user stakes:', error);
@@ -111,25 +94,13 @@ export const fetchUserStakes = async (): Promise<TokenStake[]> => {
 };
 
 /**
- * Fetches user's staking statistics with fallback
+ * Fetches user's staking statistics
  */
 export const fetchStakingStats = async (userId: string): Promise<TokenStakeStats> => {
   try {
-    // First try to use the RPC function if it exists
-    try {
-      const { data, error } = await supabase.rpc('get_user_staking_stats', {
-        user_id_param: userId
-      }) as { data: TokenStakeStats | null, error: Error | null };
-      
-      if (error) throw error;
-      if (data) return data;
-    } catch (rpcError) {
-      console.warn('RPC function get_user_staking_stats not available, falling back to calculations:', rpcError);
-    }
-    
-    // Fallback to manual calculation if RPC fails
     // Fetch user stakes
-    const { data: stakesData, error: stakesError } = await from('token_stakes')
+    const { data: stakesData, error: stakesError } = await supabase
+      .from('token_stakes')
       .select('*')
       .eq('user_id', userId);
     
@@ -206,10 +177,11 @@ export const fetchStakingStats = async (userId: string): Promise<TokenStakeStats
 export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
   try {
     // Get the stake details first
-    const { data: stakeData, error: stakeError } = await from('token_stakes')
+    const { data: stakeData, error: stakeError } = await supabase
+      .from('token_stakes')
       .select('*')
       .eq('id', stakeId)
-      .single();
+      .maybeSingle();
     
     if (stakeError) throw new Error(`Failed to find stake: ${stakeError.message}`);
     if (!stakeData) throw new Error('Stake not found');
@@ -234,11 +206,26 @@ export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
     }
     
     // Update the stake status
-    const { error: updateError } = await from('token_stakes')
+    const { error: updateError } = await supabase
+      .from('token_stakes')
       .update({ status: 'completed' })
       .eq('id', stakeId);
     
     if (updateError) throw updateError;
+    
+    // Get the current user balance
+    const { data: currentBalance, error: balanceError } = await supabase
+      .from('token_holdings')
+      .select('balance')
+      .eq('user_id', user.id)
+      .eq('token_id', stake.token_id)
+      .maybeSingle();
+      
+    if (balanceError && !balanceError.message.includes('No rows found')) {
+      throw balanceError;
+    }
+      
+    const newBalance = (currentBalance?.balance || 0) + stake.amount + stake.predicted_roi;
     
     // Update the user's token balance
     const { error: holdingsError } = await supabase
@@ -247,11 +234,7 @@ export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
         {
           user_id: user.id,
           token_id: stake.token_id,
-          balance: supabase.rpc('increment_balance', {
-            row_token_id: stake.token_id,
-            row_user_id: user.id,
-            amount_to_add: stake.amount + stake.predicted_roi
-          })
+          balance: newBalance
         }
       ]);
     
