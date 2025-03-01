@@ -1,3 +1,4 @@
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -146,7 +147,7 @@ export const MarketAnalysis = ({
           </TabsContent>
 
           <TabsContent value="decision">
-            <Card className="p-6 py-[10px] my-0 rounded-none">
+            <Card className="p-6">
               <h2 className="text-2xl font-semibold mb-4">Decision Making</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
