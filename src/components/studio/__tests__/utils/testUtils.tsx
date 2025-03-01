@@ -2,10 +2,10 @@
 import { render, RenderResult } from "@testing-library/react";
 import React, { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { vi, expect } from "vitest";
+import { expect } from "vitest";
 
 // Define the types directly in this file since the imports are failing
-interface StudioConfig {
+export interface StudioConfig {
   id: string;
   name: string;
   dimensions: {
@@ -19,7 +19,7 @@ interface StudioConfig {
   userId: string;
 }
 
-interface CameraConfig {
+export interface CameraConfig {
   id: string;
   name: string;
   type: string;

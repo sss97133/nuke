@@ -4,8 +4,18 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { mockUser, mockStudioConfig } from "../utils/testUtils";
 
+// Mock toast function
+export const getMockToast = () => {
+  const mockToast = vi.fn();
+  return mockToast;
+};
+
+// Set up all mocks
 export const setupMocks = () => {
-  // Mock dependencies
+  vi.mock("@/hooks/use-toast", () => ({
+    useToast: vi.fn(),
+  }));
+
   vi.mock("@/integrations/supabase/client", () => ({
     supabase: {
       auth: {
@@ -19,22 +29,11 @@ export const setupMocks = () => {
       })),
     },
   }));
-
-  vi.mock("@/hooks/use-toast", () => ({
-    useToast: vi.fn(),
-  }));
 };
 
-export const getMockToast = () => {
-  const mockToast = vi.fn();
-  (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
-  return mockToast;
-};
-
+// Set up supabase mocks
 export const setupSupabaseMocks = () => {
   (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
-  
-  // Mock successful config fetch
   (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
     select: () => ({
       eq: () => ({
