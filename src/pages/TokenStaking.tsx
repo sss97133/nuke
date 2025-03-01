@@ -9,8 +9,24 @@ import StakeForm from "@/components/token-staking/StakeForm";
 import StakesList from "@/components/token-staking/StakesList";
 import StakingHeader from "@/components/token-staking/StakingHeader";
 import StakingPortfolioStats from "@/components/token-staking/StakingPortfolioStats";
+import { useTokenStaking } from '@/components/token-staking/useTokenStaking';
 
 const TokenStaking = () => {
+  const {
+    tokens,
+    vehicles,
+    isLoadingTokens,
+    isLoadingVehicles,
+    userStakes,
+    isLoadingStakes,
+    stakingStats,
+    isLoadingStats,
+    hasError,
+    handleUnstake,
+    handleStakeCreated,
+    retry
+  } = useTokenStaking();
+
   return (
     <div className="min-h-screen bg-background">
       <ScrollArea className="h-[calc(100vh-4rem)]">
@@ -24,7 +40,9 @@ const TokenStaking = () => {
                 <Wallet className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">50,000 VTK</div>
+                <div className="text-2xl font-bold">
+                  {stakingStats ? `${stakingStats.total_staked.toFixed(0)} VTK` : "0 VTK"}
+                </div>
                 <p className="text-xs text-muted-foreground">+20% from last month</p>
               </CardContent>
             </Card>
@@ -35,8 +53,12 @@ const TokenStaking = () => {
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">12</div>
-                <p className="text-xs text-muted-foreground">Across 8 vehicles</p>
+                <div className="text-2xl font-bold">
+                  {stakingStats?.active_stakes || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Across {stakingStats?.vehicle_count || 0} vehicles
+                </p>
               </CardContent>
             </Card>
             
@@ -46,7 +68,9 @@ const TokenStaking = () => {
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">8.3%</div>
+                <div className="text-2xl font-bold">
+                  {stakingStats ? `${stakingStats.avg_roi_percent.toFixed(1)}%` : "0%"}
+                </div>
                 <p className="text-xs text-muted-foreground">Based on completed stakes</p>
               </CardContent>
             </Card>
@@ -57,7 +81,9 @@ const TokenStaking = () => {
                 <Coins className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">2,450 VTK</div>
+                <div className="text-2xl font-bold">
+                  {stakingStats ? `${stakingStats.total_predicted_roi.toFixed(0)} VTK` : "0 VTK"}
+                </div>
                 <p className="text-xs text-muted-foreground">Ready to claim</p>
               </CardContent>
             </Card>
@@ -74,7 +100,13 @@ const TokenStaking = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <StakeForm />
+                  <StakeForm 
+                    tokens={tokens}
+                    vehicles={vehicles}
+                    isLoadingTokens={isLoadingTokens}
+                    isLoadingVehicles={isLoadingVehicles}
+                    onStakeCreated={handleStakeCreated}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -89,7 +121,13 @@ const TokenStaking = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <StakesList />
+                  <StakesList 
+                    userStakes={userStakes}
+                    isLoadingStakes={isLoadingStakes}
+                    hasError={hasError}
+                    onUnstake={handleUnstake}
+                    onRetry={retry}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -104,7 +142,12 @@ const TokenStaking = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <StakingPortfolioStats />
+              <StakingPortfolioStats 
+                stats={stakingStats}
+                isLoading={isLoadingStats}
+                hasError={hasError}
+                onRetry={retry}
+              />
             </CardContent>
           </Card>
           
