@@ -3,7 +3,7 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { StudioConfiguration } from "../StudioConfiguration";
 import "@testing-library/jest-dom/vitest";
-import { mockUser, mockStudioConfig, renderWithQueryClient } from "./utils/testUtils";
+import { renderWithQueryClient } from "./utils/testUtils";
 import { setupMocks, getMockToast, setupSupabaseMocks } from "./mocks/studioMocks";
 
 // Set up all mocks
@@ -39,4 +39,3 @@ describe("StudioConfiguration - PTZ Features", () => {
     });
   });
 });
-

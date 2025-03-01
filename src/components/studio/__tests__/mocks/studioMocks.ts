@@ -7,6 +7,7 @@ import { mockUser, mockStudioConfig } from "../utils/testUtils";
 // Mock toast function
 export const getMockToast = () => {
   const mockToast = vi.fn();
+  (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
   return mockToast;
 };
 

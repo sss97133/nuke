@@ -2,10 +2,11 @@
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { StudioConfiguration } from "../StudioConfiguration";
+import "@testing-library/jest-dom/vitest";
+import { renderWithQueryClient } from "./utils/testUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import "@testing-library/jest-dom/vitest";
-import { mockUser, mockStudioConfig, renderWithQueryClient } from "./utils/testUtils";
+import { mockStudioConfig } from "./utils/testUtils";
 
 // Mock dependencies
 vi.mock("@/integrations/supabase/client", () => ({
@@ -32,7 +33,10 @@ describe("StudioConfiguration - Updates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
-    (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+    (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ 
+      data: { user: { id: 'test-user-id' } }, 
+      error: null 
+    });
   });
 
   it("should update studio dimensions", async () => {
@@ -95,4 +99,3 @@ describe("StudioConfiguration - Updates", () => {
     });
   });
 });
-
