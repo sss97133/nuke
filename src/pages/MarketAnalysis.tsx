@@ -1,16 +1,7 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  BrainCircuit, 
-  Users, 
-  Lightbulb, 
-  BarChart3, 
-  Zap, 
-  FileSearch 
-} from "lucide-react";
-
+import { BrainCircuit, Users, Lightbulb, BarChart3, Zap, FileSearch } from "lucide-react";
 export interface MarketAnalysisProps {
   vehicleData?: {
     make: string;
@@ -19,16 +10,15 @@ export interface MarketAnalysisProps {
     historical_data?: any;
   };
 }
-
-export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
+export const MarketAnalysis = ({
+  vehicleData
+}: MarketAnalysisProps) => {
   const defaultVehicleData = vehicleData || {
     make: "Generic",
     model: "Vehicle",
-    year: new Date().getFullYear(),
+    year: new Date().getFullYear()
   };
-
-  return (
-    <ScrollArea className="h-[calc(100vh-4rem)] w-full">
+  return <ScrollArea className="h-[calc(100vh-4rem)] w-full">
       <div className="container max-w-6xl mx-auto py-6 px-4 space-y-6">
         <div className="flex flex-col space-y-2">
           <h1 className="text-3xl font-bold">Market Analysis</h1>
@@ -156,7 +146,7 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
           </TabsContent>
 
           <TabsContent value="decision">
-            <Card className="p-6">
+            <Card className="p-6 py-[10px] my-0 rounded-none">
               <h2 className="text-2xl font-semibold mb-4">Decision Making</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -261,8 +251,6 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
           </TabsContent>
         </Tabs>
       </div>
-    </ScrollArea>
-  );
+    </ScrollArea>;
 };
-
 export default MarketAnalysis;
