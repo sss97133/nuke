@@ -146,7 +146,7 @@ export const MarketAnalysis = ({
           </TabsContent>
 
           <TabsContent value="decision">
-            <Card className="p-6 border-0">
+            <Card className="p-6 border-0 bg-transparent">
               <h2 className="text-2xl font-semibold mb-4">Decision Making</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
