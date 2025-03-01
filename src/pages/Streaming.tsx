@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,22 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Award, MessageSquare, User, Users, Heart, ThumbsUp, Send, Camera, Mic, MicOff, Video, VideoOff, ScreenShare, Settings } from "lucide-react";
+import { Award, MessageSquare, User, Users, Heart, ThumbsUp, Send, Camera, Mic, MicOff, Video, VideoOff, ScreenShare, Settings, Tool, Package, Tag } from "lucide-react";
+
+interface StreamMetadata {
+  title: string;
+  description: string;
+  category: string;
+}
+
+interface WorkstationItem {
+  id: string;
+  name: string;
+  type: "tool" | "product" | "part";
+  description: string;
+  price: string;
+  purchaseLink: string;
+}
 
 export const Streaming = () => {
   const [messages, setMessages] = useState<Array<{id: number, user: string, text: string, timestamp: string}>>([
@@ -21,7 +36,97 @@ export const Streaming = () => {
   const [streaming, setStreaming] = useState(false);
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [streamMetadata, setStreamMetadata] = useState<StreamMetadata>({
+    title: "Professional Repair Demonstration",
+    description: "Live tutorial on engine diagnostics",
+    category: "Automotive"
+  });
+  const [workstationItems, setWorkstationItems] = useState<WorkstationItem[]>([
+    {
+      id: "1",
+      name: "OBD-II Scanner Pro",
+      type: "tool",
+      description: "Professional diagnostic scanner for modern vehicles",
+      price: "$129.99",
+      purchaseLink: "https://example.com/obd-scanner"
+    },
+    {
+      id: "2",
+      name: "High-Performance Synthetic Oil",
+      type: "product",
+      description: "Full synthetic oil for maximum engine protection",
+      price: "$49.99",
+      purchaseLink: "https://example.com/synthetic-oil"
+    },
+    {
+      id: "3",
+      name: "Replacement Air Filter",
+      type: "part",
+      description: "Premium air filter for improved engine performance",
+      price: "$24.99",
+      purchaseLink: "https://example.com/air-filter"
+    }
+  ]);
   const { toast } = useToast();
+
+  // Simulated AWS Rekognition data processing
+  useEffect(() => {
+    if (streaming) {
+      // This would be an API call to your AWS Rekognition service in a real implementation
+      // For demo purposes, we're simulating delayed data from recognition
+      const timer = setTimeout(() => {
+        // Simulating updated data based on video content recognition
+        setStreamMetadata({
+          title: "Engine Timing Belt Replacement Guide",
+          description: "Step-by-step professional tutorial on replacing timing belts on 4-cylinder engines",
+          category: "Automotive Repair"
+        });
+
+        // Simulating detected items in the workstation
+        setWorkstationItems([
+          {
+            id: "1",
+            name: "Timing Belt Tool Kit",
+            type: "tool",
+            description: "Complete professional timing belt replacement toolkit",
+            price: "$89.99",
+            purchaseLink: "https://example.com/timing-belt-kit"
+          },
+          {
+            id: "2",
+            name: "OEM Timing Belt",
+            type: "part",
+            description: "Original equipment manufacturer timing belt",
+            price: "$45.99",
+            purchaseLink: "https://example.com/timing-belt"
+          },
+          {
+            id: "3",
+            name: "Engine Degreaser",
+            type: "product",
+            description: "Professional-grade engine degreaser spray",
+            price: "$12.99",
+            purchaseLink: "https://example.com/degreaser"
+          },
+          {
+            id: "4",
+            name: "Torque Wrench",
+            type: "tool",
+            description: "Precision torque wrench for accurate bolt tightening",
+            price: "$79.99",
+            purchaseLink: "https://example.com/torque-wrench"
+          }
+        ]);
+
+        toast({
+          title: "Stream Analysis Complete",
+          description: "Title, description, and workstation items have been updated based on video content.",
+        });
+      }, 5000); // Simulate a 5-second processing time
+
+      return () => clearTimeout(timer);
+    }
+  }, [streaming, toast]);
 
   const sendMessage = () => {
     if (newMessage.trim()) {
@@ -109,8 +214,12 @@ export const Streaming = () => {
                       <User className="h-6 w-6" />
                     </Avatar>
                     <div>
-                      <CardTitle>Professional Repair Demonstration</CardTitle>
-                      <CardDescription>Live tutorial on engine diagnostics</CardDescription>
+                      <CardTitle>{streamMetadata.title}</CardTitle>
+                      <CardDescription>{streamMetadata.description}</CardDescription>
+                      <div className="flex mt-1">
+                        <Badge className="mr-2">{streamMetadata.category}</Badge>
+                        {streaming && <Badge variant="outline" className="animate-pulse">Auto-updated by AI</Badge>}
+                      </div>
                     </div>
                   </div>
                   <div className="flex space-x-2">
@@ -145,6 +254,45 @@ export const Streaming = () => {
                   <Button variant="outline" size="sm">
                     <Settings className="h-4 w-4 mr-1" /> Settings
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Workstation/Supply Section - New Component */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center">
+                  <Tool className="h-5 w-5 mr-2" /> 
+                  Workstation & Supplies
+                  {streaming && <Badge variant="outline" className="ml-3 text-xs animate-pulse">Auto-detected</Badge>}
+                </CardTitle>
+                <CardDescription>
+                  Tools, products, and parts detected in your stream
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {workstationItems.map(item => (
+                    <div key={item.id} className="flex border rounded-lg p-3 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                      <div className="mr-3 mt-1">
+                        {item.type === "tool" && <Tool className="h-5 w-5 text-blue-500" />}
+                        {item.type === "product" && <Package className="h-5 w-5 text-green-500" />}
+                        {item.type === "part" && <Tag className="h-5 w-5 text-amber-500" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <p className="font-medium">{item.name}</p>
+                          <Badge variant="outline">{item.price}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
+                        <Button variant="link" size="sm" className="px-0 h-6 mt-1" asChild>
+                          <a href={item.purchaseLink} target="_blank" rel="noopener noreferrer">
+                            Purchase Link
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -287,17 +435,23 @@ export const Streaming = () => {
                     <div className="space-y-4">
                       <div>
                         <h3 className="text-sm font-semibold mb-1">Stream Title</h3>
-                        <p className="text-sm">Professional Repair Demonstration</p>
+                        <p className="text-sm">{streamMetadata.title}</p>
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold mb-1">Description</h3>
-                        <p className="text-sm">Complete walkthrough of engine diagnostic procedures for modern vehicles. Learn professional techniques and common troubleshooting methods.</p>
+                        <p className="text-sm">{streamMetadata.description}</p>
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold mb-1">Category</h3>
-                        <Badge>Automotive</Badge>
-                        <Badge className="ml-2">Repair</Badge>
-                        <Badge className="ml-2">Tutorial</Badge>
+                        <Badge>{streamMetadata.category}</Badge>
+                        {streaming && (
+                          <div className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded text-xs">
+                            <p className="font-medium">AI-Generated Content</p>
+                            <p className="mt-1 text-muted-foreground">
+                              Stream title, description, and category are automatically generated based on AWS Rekognition analysis of the video content.
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <Separator />
                       <div>
