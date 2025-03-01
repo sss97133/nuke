@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Check, ChevronRight, User, Building, Car, Tool, Target } from 'lucide-react';
+import { Check, ChevronRight, User, Building, Car, Wrench, Target } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -63,7 +62,7 @@ const Onboarding = () => {
       description: "Register a vehicle to your inventory"
     },
     {
-      icon: Tool,
+      icon: Wrench,
       title: "Create a Service Record",
       description: "Document your first maintenance or repair"
     },

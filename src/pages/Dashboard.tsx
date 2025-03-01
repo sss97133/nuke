@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Activity, Users, Car, Tool, TrendingUp } from "lucide-react";
+import { Activity, Users, Car, Wrench, TrendingUp } from "lucide-react";
 
 const StatCard = ({ 
   title, 
@@ -49,7 +48,7 @@ const Dashboard = () => {
             title="Active Services"
             value="4"
             description="1 pending completion"
-            icon={Tool}
+            icon={Wrench}
           />
           <StatCard
             title="Team Members"
