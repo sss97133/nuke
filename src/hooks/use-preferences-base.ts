@@ -74,7 +74,7 @@ export const usePreferencesBase = () => {
           notifications_enabled: true,
           auto_save_enabled: true,
           compact_view_enabled: false,
-          theme: 'system',
+          theme: 'system', // Make sure theme is included here as well
           distance_unit: 'miles',
           currency: 'USD',
           default_garage_view: 'list',
