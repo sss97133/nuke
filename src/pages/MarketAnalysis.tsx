@@ -57,7 +57,7 @@ export const MarketAnalysis = ({
           </TabsList>
 
           <TabsContent value="mental-estate">
-            <Card className="p-6">
+            <Card className="p-6 border-0">
               <h2 className="text-2xl font-semibold mb-4">Mental Real Estate in Automotive Market</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Mental real estate refers to the cognitive space that a brand or product occupies in a consumer's mind.
