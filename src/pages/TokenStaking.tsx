@@ -23,9 +23,14 @@ const TokenStaking = () => {
     isLoadingStats,
     hasError,
     handleUnstake,
-    handleStakeCreated,
+    fetchUserStakes,
     retry
   } = useTokenStaking();
+
+  // Function to handle when a new stake is created
+  const handleStakeCreated = () => {
+    fetchUserStakes();
+  };
 
   return (
     <div className="min-h-screen bg-background">
