@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -84,13 +83,13 @@ const AIInsightsPanel = () => {
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'recommendation':
-        return <LightBulb className="h-5 w-5" />;
+        return <Lightbulb className="h-5 w-5" />;
       case 'prediction':
         return <Brain className="h-5 w-5" />;
       case 'analysis':
         return <BarChart3 className="h-5 w-5" />;
       default:
-        return <Robot className="h-5 w-5" />;
+        return <Bot className="h-5 w-5" />;
     }
   };
 
@@ -117,7 +116,7 @@ const AIInsightsPanel = () => {
           </p>
         </div>
         <Button variant="outline" className="flex items-center gap-2">
-          <Robot className="h-4 w-4" />
+          <Bot className="h-4 w-4" />
           Refresh Insights
         </Button>
       </div>
