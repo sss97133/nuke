@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Vehicle } from "@/types/token";
 import { supabase } from "@/integrations/supabase/client";
-import { Spinner } from "lucide-react";
+import { Loader } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface VehicleStepProps {
@@ -106,7 +106,7 @@ const VehicleStep = ({
             disabled={isLoading}
             type="button"
           >
-            {isLoading ? <Spinner className="h-4 w-4 animate-spin" /> : "Search"}
+            {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : "Search"}
           </Button>
         </div>
         {error && (
