@@ -76,9 +76,9 @@ const Home = () => {
             Welcome to the Vehicle Discovery Platform. Here are a few ways to get started:
           </p>
           <ul className="list-disc pl-5 space-y-2">
-            <li>Install our <Link to="/plugin" className="text-primary underline">browser plugin</Link> to discover vehicles from any website</li>
-            <li>Check out the <Link to="/crypto" className="text-primary underline">crypto features</Link> for blockchain-based vehicle tracking</li>
-            <li>View your <Link to="/dashboard" className="text-primary underline">personal dashboard</Link> for saved vehicles</li>
+            <li>Explore vehicles in the <Link to="/discover" className="text-primary underline">discover section</Link></li>
+            <li>Check out your <Link to="/dashboard" className="text-primary underline">personal dashboard</Link> for saved vehicles</li>
+            <li>Learn about our <Link to="/crypto" className="text-primary underline">crypto features</Link> for blockchain-based vehicle tracking</li>
           </ul>
         </CardContent>
       </Card>
