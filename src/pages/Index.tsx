@@ -24,6 +24,7 @@ import { DAOProposals } from "@/components/dao/DAOProposals";
 import { AuctionList as Auctions } from "@/components/auctions/AuctionList";
 import { VideoAnalysis } from "./VideoAnalysis";
 import { Documentation } from "@/components/documentation/Documentation";
+import { DiscoveredVehicles } from "@/components/vehicles/discovery/DiscoveredVehicles";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, isLoading } = useAuth();
@@ -113,6 +114,7 @@ export const Index = () => {
         <Route path="vehicle-tokens" element={<VehicleTokens />} />
         <Route path="dao-proposals" element={<DAOProposals />} />
         <Route path="auctions" element={<Auctions />} />
+        <Route path="discovered-vehicles" element={<DiscoveredVehicles />} />
       </Route>
 
       <Route path="/import" element={

@@ -27,6 +27,9 @@ export const handleProjectNavigation = (navigate: NavigateFunction, toast: Toast
     case 'documentation':
       navigate('/dashboard/documentation');
       break;
+    case 'discovered-vehicles':
+      navigate('/dashboard/discovered-vehicles');
+      break;
     default:
       toast({
         title: "Navigation Error",
