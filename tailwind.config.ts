@@ -89,7 +89,7 @@ export default {
         'doc': ['0.8125rem', '1.25rem'],
       },
       fontFamily: {
-        'system': ['Apple Symbols', 'Monaco', 'Consolas', 'monospace'],
+        'system': ['Monaco', 'Consolas', 'monospace'],
       },
       borderRadius: {
         lg: '0px',
