@@ -91,10 +91,10 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
     setSubmitError(null);
     
     try {
-      // Create a single object for Supabase (not an array)
+      // Supabase insert expects an array of objects, even for single record insertion
       const { error } = await supabase
         .from('service_tickets')
-        .insert({
+        .insert([{
           vehicle_id: formState.vehicleId,
           description: formState.description,
           service_type: formState.serviceType,
@@ -102,7 +102,7 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
           labor_hours: formState.laborHours,
           technician_notes: formState.technicianNotes,
           parts_used: formState.parts.length > 0 ? formState.parts : null
-        });
+        }]);
 
       if (error) throw error;
       
