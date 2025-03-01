@@ -3,19 +3,20 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet, Clock, TrendingUp, Coins } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import StakeForm from "@/components/token-staking/StakeForm";
+import StakesList from "@/components/token-staking/StakesList";
+import StakingHeader from "@/components/token-staking/StakingHeader";
+import StakingPortfolioStats from "@/components/token-staking/StakingPortfolioStats";
 
 const TokenStaking = () => {
   return (
     <div className="min-h-screen bg-background">
       <ScrollArea className="h-[calc(100vh-4rem)]">
         <div className="container max-w-7xl mx-auto p-6 space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">Predictive Vehicle Token Staking</h1>
-            <p className="text-muted-foreground">
-              Stake tokens on vehicle performance and earn rewards based on predictive analytics.
-            </p>
-          </div>
-
+          <StakingHeader />
+          
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -62,6 +63,51 @@ const TokenStaking = () => {
             </Card>
           </div>
           
+          <div className="grid gap-6 md:grid-cols-12">
+            {/* Staking Form Section */}
+            <div className="md:col-span-5">
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle>Create New Stake</CardTitle>
+                  <CardDescription>
+                    Stake your tokens on vehicle performance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <StakeForm />
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Active Stakes Section */}
+            <div className="md:col-span-7">
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle>Your Active Stakes</CardTitle>
+                  <CardDescription>
+                    Manage your current vehicle token stakes
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <StakesList />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          
+          {/* Portfolio Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Staking Portfolio</CardTitle>
+              <CardDescription>
+                Performance metrics for your vehicle token stakes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <StakingPortfolioStats />
+            </CardContent>
+          </Card>
+          
           <Card>
             <CardHeader>
               <CardTitle>About Vehicle Predictive Staking</CardTitle>
@@ -85,6 +131,9 @@ const TokenStaking = () => {
                 predict future performance, evaluating risk factors and market correlations to 
                 determine appropriate reward levels.
               </p>
+              <div className="mt-6">
+                <Button variant="outline">Read Full Documentation</Button>
+              </div>
             </CardContent>
           </Card>
         </div>
