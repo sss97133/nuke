@@ -30,26 +30,39 @@ import {
   handleWindowMenuAction, 
   handleHelpMenuAction 
 } from "@/components/dashboard/hooks/utils/navigationUtils";
+import { ToastFunction } from "@/components/dashboard/hooks/utils/types";
 
 const Index = () => {
   const navigate = useNavigate();
+
+  // Create a wrapper for the toast function to match the expected type
+  const toastWrapper: ToastFunction = (options) => {
+    if (typeof options === 'string') {
+      return toast(options);
+    }
+    return toast({
+      title: options.title,
+      description: options.description,
+      variant: options.variant
+    });
+  };
 
   const handleMenuAction = (action: string) => {
     console.log('Menu action:', action);
     
     // Determine which category the action belongs to based on naming patterns
     if (action.startsWith('new_') || ['import', 'export', 'sitemap', 'glossary', 'exit'].includes(action)) {
-      handleFileMenuAction(navigate, toast, action);
+      handleFileMenuAction(navigate, toastWrapper, action);
     } else if (['preferences', 'studio_config', 'workspace_settings'].includes(action)) {
-      handleEditMenuAction(navigate, toast, action);
+      handleEditMenuAction(navigate, toastWrapper, action);
     } else if (action.startsWith('toggle_') || ['professional_dashboard', 'inventory_view', 'service_view', 'token_management', 'dao_governance', 'access_control'].includes(action)) {
-      handleViewMenuAction(navigate, toast, action);
+      handleViewMenuAction(navigate, toastWrapper, action);
     } else if (['vin_scanner', 'market_analysis', 'skill_management', 'token_analytics'].includes(action)) {
-      handleToolsMenuAction(navigate, toast, action);
+      handleToolsMenuAction(navigate, toastWrapper, action);
     } else if (['studio_workspace', 'streaming_setup', 'achievements', 'reset_layout'].includes(action)) {
-      handleWindowMenuAction(navigate, toast, action);
+      handleWindowMenuAction(navigate, toastWrapper, action);
     } else if (['documentation', 'keyboard_shortcuts', 'about'].includes(action)) {
-      handleHelpMenuAction(navigate, toast, action);
+      handleHelpMenuAction(navigate, toastWrapper, action);
     } else {
       toast({
         title: "Unknown Action",

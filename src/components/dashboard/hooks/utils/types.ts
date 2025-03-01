@@ -1,5 +1,11 @@
 
-import { toast as Toast } from "@/hooks/use-toast";
+export type ToastVariant = "default" | "destructive" | "success";
 
-export type ToastFunction = typeof Toast;
+export interface ToastOptions {
+  title?: string;
+  description?: string;
+  variant?: ToastVariant;
+}
 
+// Define a type for the toast function
+export type ToastFunction = (options: ToastOptions | string) => void;
