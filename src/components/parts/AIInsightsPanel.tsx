@@ -1,18 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
-import { Brain, Lightbulb, BarChart3, Bot } from 'lucide-react';
 
-interface AIInsight {
-  id: string;
-  title: string;
-  description: string;
-  category: 'recommendation' | 'prediction' | 'analysis';
-  relatedVehicle?: string;
-  confidence: number;
-}
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { Bot } from 'lucide-react';
+import { InsightsList } from './insights/InsightsList';
+import { AIAnalysisModels } from './insights/AIAnalysisModels';
+import { AIInsight } from './insights/InsightCard';
 
 const AIInsightsPanel = () => {
   const [insights, setInsights] = useState<AIInsight[]>([]);
@@ -80,32 +73,6 @@ const AIInsightsPanel = () => {
     fetchAIInsights();
   }, [toast]);
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'recommendation':
-        return <Lightbulb className="h-5 w-5" />;
-      case 'prediction':
-        return <Brain className="h-5 w-5" />;
-      case 'analysis':
-        return <BarChart3 className="h-5 w-5" />;
-      default:
-        return <Bot className="h-5 w-5" />;
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'recommendation':
-        return 'bg-blue-100 text-blue-700';
-      case 'prediction':
-        return 'bg-purple-100 text-purple-700';
-      case 'analysis':
-        return 'bg-green-100 text-green-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -121,98 +88,9 @@ const AIInsightsPanel = () => {
         </Button>
       </div>
       
-      {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} className="h-32 w-full" />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {insights.map(insight => (
-            <Card key={insight.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className={`p-2 rounded-full ${getCategoryColor(insight.category)}`}>
-                    {getCategoryIcon(insight.category)}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium mb-1">{insight.title}</h3>
-                    {insight.relatedVehicle && (
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        {insight.relatedVehicle}
-                      </p>
-                    )}
-                    <p className="text-sm text-muted-foreground mb-3">{insight.description}</p>
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-muted-foreground">
-                        <span className="font-medium">AI Confidence:</span> {(insight.confidence * 100).toFixed(0)}%
-                      </div>
-                      <Button size="sm">View Details</Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <InsightsList insights={insights} loading={loading} />
       
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>AI Analysis Models</CardTitle>
-              <CardDescription>The systems powering your insights</CardDescription>
-            </div>
-            <div className="p-2 bg-purple-100 rounded-full">
-              <Brain className="h-5 w-5 text-purple-700" />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="border rounded-md p-4">
-              <h4 className="font-medium mb-1">Maintenance Prediction</h4>
-              <p className="text-sm text-muted-foreground mb-2">
-                Analyzes vehicle history, manufacturer recommendations, and usage patterns to predict maintenance needs.
-              </p>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-blue-600 h-2 rounded-full" style={{ width: '95%' }}></div>
-              </div>
-              <div className="flex justify-end mt-1">
-                <span className="text-xs text-muted-foreground">95% accuracy</span>
-              </div>
-            </div>
-            
-            <div className="border rounded-md p-4">
-              <h4 className="font-medium mb-1">Budget Optimization</h4>
-              <p className="text-sm text-muted-foreground mb-2">
-                Identifies cost-saving opportunities and optimal purchase timing based on market trends and service schedules.
-              </p>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-green-600 h-2 rounded-full" style={{ width: '87%' }}></div>
-              </div>
-              <div className="flex justify-end mt-1">
-                <span className="text-xs text-muted-foreground">87% accuracy</span>
-              </div>
-            </div>
-            
-            <div className="border rounded-md p-4">
-              <h4 className="font-medium mb-1">Parts Compatibility</h4>
-              <p className="text-sm text-muted-foreground mb-2">
-                Cross-references your vehicles with our parts database to ensure perfect compatibility and optimal performance.
-              </p>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-purple-600 h-2 rounded-full" style={{ width: '99%' }}></div>
-              </div>
-              <div className="flex justify-end mt-1">
-                <span className="text-xs text-muted-foreground">99% accuracy</span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <AIAnalysisModels />
     </div>
   );
 };
