@@ -109,7 +109,8 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
           labor_hours: formState.laborHours,
           technician_notes: formState.technicianNotes,
           parts_used: formState.parts.length > 0 ? formState.parts : null,
-          user_id: user.id
+          user_id: user.id,
+          priority: 'medium' // Adding required priority field based on the database schema
         });
 
       if (error) throw error;
