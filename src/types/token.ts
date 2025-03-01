@@ -47,4 +47,7 @@ export interface TokenStake {
   predicted_roi: number;
   actual_roi?: number;
   created_at: string;
+  // References to related objects
+  token?: Token;
+  vehicle?: Vehicle;
 }
