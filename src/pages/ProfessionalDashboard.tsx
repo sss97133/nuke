@@ -1,4 +1,6 @@
 
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,8 +8,29 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BarChart, LineChart, Clock, Award, BookOpen, Calendar, CheckSquare, BriefcaseBusiness, GraduationCap, Users } from "lucide-react";
+import { ProfessionalSkillsTab } from "@/components/skills/ProfessionalSkillsTab";
+import { SkillsSummary } from "@/components/skills/SkillsSummary";
 
 export const ProfessionalDashboard = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("overview");
+
+  // Parse and handle tab from URL query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get("tab");
+    if (tabParam && ["overview", "skills", "certifications", "schedule"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location]);
+
+  // Update URL when tab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    navigate(`/professional-dashboard?tab=${value}`);
+  };
+
   return (
     <ScrollArea className="h-[calc(100vh-4rem)] p-4">
       <div className="container max-w-6xl mx-auto space-y-6">
@@ -57,7 +80,7 @@ export const ProfessionalDashboard = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid grid-cols-4 mb-4">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart className="h-4 w-4" />
@@ -106,101 +129,50 @@ export const ProfessionalDashboard = () => {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Tasks</CardTitle>
-                  <CardDescription>Your next priorities</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-start">
-                      <Checkbox id="task-1" className="mt-1" />
-                      <div className="ml-3">
-                        <label htmlFor="task-1" className="text-sm font-medium">Complete ASE Certification Module 3</label>
-                        <p className="text-xs text-muted-foreground">Due in 3 days</p>
+              <div className="space-y-6">
+                <SkillsSummary />
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Upcoming Tasks</CardTitle>
+                    <CardDescription>Your next priorities</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-start">
+                        <Checkbox id="task-1" className="mt-1" />
+                        <div className="ml-3">
+                          <label htmlFor="task-1" className="text-sm font-medium">Complete ASE Certification Module 3</label>
+                          <p className="text-xs text-muted-foreground">Due in 3 days</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-start">
-                      <Checkbox id="task-2" className="mt-1" />
-                      <div className="ml-3">
-                        <label htmlFor="task-2" className="text-sm font-medium">Submit quarterly skill assessment</label>
-                        <p className="text-xs text-muted-foreground">Due in 1 week</p>
+                      <div className="flex items-start">
+                        <Checkbox id="task-2" className="mt-1" />
+                        <div className="ml-3">
+                          <label htmlFor="task-2" className="text-sm font-medium">Submit quarterly skill assessment</label>
+                          <p className="text-xs text-muted-foreground">Due in 1 week</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-start">
-                      <Checkbox id="task-3" className="mt-1" />
-                      <div className="ml-3">
-                        <label htmlFor="task-3" className="text-sm font-medium">Review diagnostic techniques update</label>
-                        <p className="text-xs text-muted-foreground">Due in 2 weeks</p>
+                      <div className="flex items-start">
+                        <Checkbox id="task-3" className="mt-1" />
+                        <div className="ml-3">
+                          <label htmlFor="task-3" className="text-sm font-medium">Review diagnostic techniques update</label>
+                          <p className="text-xs text-muted-foreground">Due in 2 weeks</p>
+                        </div>
                       </div>
+                      <Button variant="outline" className="w-full mt-2">
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        View All Tasks
+                      </Button>
                     </div>
-                    <div className="flex items-start">
-                      <Checkbox id="task-4" className="mt-1" />
-                      <div className="ml-3">
-                        <label htmlFor="task-4" className="text-sm font-medium">Renew professional membership</label>
-                        <p className="text-xs text-muted-foreground">Due in 3 weeks</p>
-                      </div>
-                    </div>
-                  </div>
-                  <Button variant="outline" className="w-full mt-4">
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    View All Tasks
-                  </Button>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 
           <TabsContent value="skills">
-            <Card>
-              <CardHeader>
-                <CardTitle>Professional Skills</CardTitle>
-                <CardDescription>Your current skill development progress</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-5">
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Diagnostic Skills</span>
-                      <span className="text-sm font-medium">85%</span>
-                    </div>
-                    <Progress value={85} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Technical Documentation</span>
-                      <span className="text-sm font-medium">72%</span>
-                    </div>
-                    <Progress value={72} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Client Communication</span>
-                      <span className="text-sm font-medium">90%</span>
-                    </div>
-                    <Progress value={90} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Advanced Repairs</span>
-                      <span className="text-sm font-medium">65%</span>
-                    </div>
-                    <Progress value={65} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Digital Tools Proficiency</span>
-                      <span className="text-sm font-medium">78%</span>
-                    </div>
-                    <Progress value={78} className="h-2" />
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full mt-6">
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Explore Skills Development
-                </Button>
-              </CardContent>
-            </Card>
+            <ProfessionalSkillsTab />
           </TabsContent>
 
           <TabsContent value="certifications">

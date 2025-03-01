@@ -42,7 +42,7 @@ export const NavButtons = () => {
       </Button>
 
       <Button asChild variant="ghost" size="sm" className="mr-2">
-        <Link to="/skills">
+        <Link to="/professional-dashboard?tab=skills">
           <Badge className="h-4 w-4 mr-1" />
           Skills
         </Link>
