@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { toast } from "sonner";
 import { Loader, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Token, Vehicle } from "@/types/token";
+import { calculatePredictedROI } from "./utils/stakingUtils";
 
 interface StakeFormProps {
   tokens: Token[];
@@ -29,16 +29,6 @@ const StakeForm = ({
   const [stakeAmount, setStakeAmount] = useState<string>("");
   const [stakeDuration, setStakeDuration] = useState<string>("30");
   const [isStaking, setIsStaking] = useState(false);
-
-  const calculatePredictedROI = (amount: number, days: number) => {
-    // Simple calculation - in a real app, this would be more sophisticated based on vehicle performance, market data, etc.
-    const baseRate = 0.05; // 5% base annual rate
-    const vehicleBonus = 0.02; // 2% bonus for vehicle-based stakes
-    const annualRate = baseRate + vehicleBonus;
-    const dailyRate = annualRate / 365;
-    
-    return (amount * dailyRate * days).toFixed(4);
-  };
 
   const handleStake = async () => {
     if (!selectedToken || !selectedVehicle || !stakeAmount || !stakeDuration) {
@@ -106,15 +96,12 @@ const StakeForm = ({
           vehicle_name: vehicleName
         };
         
-        // Try direct insert to token_stakes
-        const { error } = await supabase.rpc('create_token_stake', stakeData);
-        
-        if (error) {
-          console.log('RPC error, falling back to direct insert:', error);
-          // Fallback to direct insert
-          const { error: insertError } = await supabase.from('token_stakes').insert([stakeData]);
-          if (insertError) throw insertError;
-        }
+        // Insert stake data directly since type checking for rpc is causing issues
+        const { error } = await supabase
+          .from('token_stakes')
+          .insert([stakeData]) as { error: Error | null };
+          
+        if (error) throw error;
       } catch (error) {
         console.error('Error creating stake:', error);
         throw new Error('Failed to create stake record');
