@@ -8,7 +8,7 @@ import { TokenSearch } from "@/components/tokens/TokenSearch";
 import { TokenList } from "@/components/tokens/TokenList";
 import { TokenDetailsDialog } from "@/components/tokens/TokenDetailsDialog";
 import { TokenFilterDialog } from "@/components/tokens/TokenFilterDialog";
-import { TokenCreateDialog } from "@/components/tokens/TokenCreateDialog";
+import { TokenCreationWizard } from "@/components/tokens/wizard/TokenCreationWizard";
 import { Token, NewToken } from "@/types/token";
 
 export const TokensPage = () => {
@@ -227,7 +227,7 @@ export const TokensPage = () => {
         setShowOnlyActive={setShowOnlyActive}
       />
 
-      <TokenCreateDialog 
+      <TokenCreationWizard
         isOpen={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onCreateToken={handleCreateToken}
