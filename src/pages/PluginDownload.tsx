@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Chrome, Firefox, Edge, AlertCircle } from "lucide-react";
+import { Download, Chrome, Firefox, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
@@ -95,7 +95,7 @@ export const PluginDownload = () => {
                 size="lg"
                 variant="outline"
               >
-                <Edge className="h-5 w-5" />
+                <Chrome className="h-5 w-5" />
                 <span>Edge</span>
               </Button>
             </div>
