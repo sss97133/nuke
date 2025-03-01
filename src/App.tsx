@@ -56,24 +56,27 @@ function AppContent() {
   }
 
   return (
-    <Routes>
-      <Route path="/login" element={<AuthForm />} />
-      <Route path="/register" element={<AuthForm />} />
-      <Route path="/auth/callback" element={<AuthForm />} />
-      <Route path="/" element={<AuthForm />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/onboarding" element={<Onboarding />} />
-      <Route path="/skills" element={<Skills />} />
-      <Route path="/achievements" element={<Achievements />} />
-      <Route path="/studio" element={<Studio />} />
-      <Route path="/glossary" element={<Glossary />} />
-      <Route path="/sitemap" element={<Sitemap />} />
-      <Route path="/documentation" element={<Documentation />} />
-      <Route path="/import" element={<Import />} />
-      <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
-      <Route path="/profile" element={<Profile />} />
-      <Route path="/professional-dashboard" element={<Profile />} />
-    </Routes>
+    <div className="min-h-screen bg-background">
+      <Routes>
+        <Route path="/login" element={<AuthForm />} />
+        <Route path="/register" element={<AuthForm />} />
+        <Route path="/auth/callback" element={<AuthForm />} />
+        <Route path="/" element={<AuthForm />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/skills" element={<Skills />} />
+        <Route path="/achievements" element={<Achievements />} />
+        <Route path="/studio" element={<Studio />} />
+        <Route path="/glossary" element={<Glossary />} />
+        <Route path="/sitemap" element={<Sitemap />} />
+        <Route path="/documentation" element={<Documentation />} />
+        <Route path="/import" element={<Import />} />
+        <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/professional-dashboard" element={<Profile />} />
+        <Route path="/service" element={<Dashboard />} />
+      </Routes>
+    </div>
   );
 }
 
