@@ -47,7 +47,12 @@ const ServiceHistory = () => {
         .order('service_date', { ascending: false });
         
       if (error) throw error;
-      return data as ServiceRecord[];
+      
+      // Transform the data to match our ServiceRecord interface
+      return data.map(record => ({
+        ...record,
+        vehicle: record.vehicles, // Map 'vehicles' property to 'vehicle'
+      })) as ServiceRecord[];
     }
   });
 
