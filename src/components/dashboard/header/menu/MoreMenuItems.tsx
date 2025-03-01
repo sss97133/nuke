@@ -1,6 +1,8 @@
 
 import { MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
 import { ShoppingBag, HelpCircle } from "lucide-react";
+import { useState } from "react";
+import { DocumentationDialog } from "@/components/documentation/DocumentationDialog";
 
 export const ToolsMenuItems = ({ handleMenuAction }: { handleMenuAction: (action: string) => void }) => {
   return (
@@ -49,9 +51,11 @@ export const WindowMenuItems = ({ handleMenuAction }: { handleMenuAction: (actio
 };
 
 export const HelpMenuItems = ({ handleMenuAction }: { handleMenuAction: (action: string) => void }) => {
+  const [docDialogOpen, setDocDialogOpen] = useState(false);
+  
   return (
     <MenubarContent>
-      <MenubarItem onClick={() => handleMenuAction('documentation')}>
+      <MenubarItem onClick={() => setDocDialogOpen(true)}>
         Documentation
         <MenubarShortcut>⌘H</MenubarShortcut>
       </MenubarItem>
@@ -65,6 +69,8 @@ export const HelpMenuItems = ({ handleMenuAction }: { handleMenuAction: (action:
       <MenubarItem onClick={() => handleMenuAction('about')}>
         About
       </MenubarItem>
+      
+      <DocumentationDialog open={docDialogOpen} onOpenChange={setDocDialogOpen} />
     </MenubarContent>
   );
 };

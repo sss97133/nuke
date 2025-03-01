@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { NavigateFunction } from "react-router-dom";
 import type { ToastFunction } from "./types";
@@ -249,38 +248,30 @@ export const handleWindowMenuAction = (navigate: NavigateFunction, toast: ToastF
 };
 
 // Handle Help Menu Actions
-export const handleHelpMenuAction = (navigate: NavigateFunction, toast: ToastFunction, action: string) => {
+export const handleHelpMenuAction = (
+  navigate: NavigateFunction,
+  toast: ToastFunction,
+  action: string
+) => {
   switch (action) {
     case 'documentation':
-      toast({
-        title: "Documentation",
-        description: "Opening application documentation"
-      });
-      window.open('/documentation', '_blank');
+      // Documentation is now handled by the popup, no navigation needed
+      console.log('Documentation popup should be shown via the menu component');
       break;
     case 'keyboard_shortcuts':
-      handleKeyboardShortcuts(toast);
-      break;
-    case 'toggle_assistant':
       toast({
-        title: "AI Assistant",
-        description: "AI assistant toggled"
+        title: 'Keyboard Shortcuts',
+        description: 'Coming soon: Keyboard shortcuts documentation'
       });
-      // This would typically toggle the AI assistant visibility
       break;
     case 'about':
       toast({
-        title: "About",
-        description: "Information about the application"
+        title: 'About This Application',
+        description: 'Version 1.0.0 - Built with React, Vite, and TailwindCSS'
       });
-      // This would typically open an about dialog or modal
       break;
     default:
-      toast({
-        title: "Action Not Implemented",
-        description: `The ${action} action is not yet implemented.`,
-        variant: "destructive"
-      });
+      console.warn(`Unhandled help menu action: ${action}`);
   }
 };
 
