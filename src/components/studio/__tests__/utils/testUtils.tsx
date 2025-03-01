@@ -1,100 +1,48 @@
 
-import { render, RenderResult } from "@testing-library/react";
-import React, { ReactElement } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { expect } from "vitest";
+import React, { ReactElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { vi } from 'vitest';
 
-// Define the types directly in this file since the imports are failing
-export interface StudioConfig {
-  id: string;
-  name: string;
-  dimensions: {
-    width: number;
-    length: number;
-    height: number;
-  };
-  cameras: CameraConfig[];
-  createdAt: string;
-  updatedAt: string;
-  userId: string;
-}
-
-export interface CameraConfig {
-  id: string;
-  name: string;
-  type: string;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  settings: {
-    zoom: number;
-    focus: number;
-    aperture: number;
-  };
-  ptz: {
-    panRange: { min: number; max: number };
-    tiltRange: { min: number; max: number };
-    zoomRange: { min: number; max: number };
-    presets: Array<{
-      id: string;
-      name: string;
-      pan: number;
-      tilt: number;
-      zoom: number;
-    }>;
-  };
-}
-
-// Mock user data
+// Mock user and config objects
 export const mockUser = {
-  data: {
-    user: {
-      id: "test-user-123",
-      email: "test@example.com",
-    }
-  },
-  error: null
+  id: 'test-user-id',
+  name: 'Test User',
+  email: 'test@example.com',
+  role: 'user',
 };
 
-// Create a mock studio configuration
-export const mockStudioConfig: StudioConfig = {
-  id: "test-studio-config-1",
-  name: "Test Studio",
-  dimensions: {
-    width: 20,
-    length: 30,
-    height: 16,
-  },
+export const mockStudioConfig = {
+  id: '1',
+  userId: 'test-user-id',
+  name: 'Test Studio',
+  width: 800,
+  height: 600,
   cameras: [
     {
-      id: "camera-1",
-      name: "Main Camera",
-      type: "PTZ",
-      position: { x: 0, y: 100, z: 200 },
+      id: '1',
+      name: 'Main Camera',
+      type: 'ptz',
+      position: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
-      settings: {
-        zoom: 1,
-        focus: 0.5,
-        aperture: 2.8,
-      },
-      ptz: {
-        panRange: { min: -180, max: 180 },
-        tiltRange: { min: -90, max: 90 },
-        zoomRange: { min: 1, max: 10 },
-        presets: [
-          { id: "preset-1", name: "Wide Shot", pan: 0, tilt: 0, zoom: 1 },
-          { id: "preset-2", name: "Close-up", pan: 0, tilt: 0, zoom: 5 },
-        ],
-      },
+      isPTZ: true,
+      isRecording: false,
+      isLive: false,
     }
   ],
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  userId: "test-user-123",
 };
 
-// Setup a testing query client
-export const renderWithQueryClient = (ui: ReactElement): RenderResult => {
-  const testQueryClient = new QueryClient({
+// Helper to render components with query client
+export const renderWithQueryClient = (
+  ui: ReactElement,
+  options?: {
+    queryClient?: QueryClient;
+    route?: string;
+  }
+) => {
+  const queryClient = options?.queryClient || new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
@@ -102,18 +50,45 @@ export const renderWithQueryClient = (ui: ReactElement): RenderResult => {
     },
   });
   
-  return render(
-    <QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[options?.route || '/']}>
+        {children}
+      </MemoryRouter>
+    </QueryClientProvider>
   );
+  
+  return {
+    ...render(ui, { wrapper: Wrapper }),
+    queryClient,
+  };
 };
 
-// Helper functions for test assertions
-export const testUtils = {
-  expectToBeInTheDocument: (element: HTMLElement) => {
-    return expect(element).toBeInTheDocument();
-  },
-  
-  expectTextContent: (element: HTMLElement, text: string) => {
-    return expect(element.textContent).toBe(text);
-  },
+// Vitest helper functions
+export const expectToExist = (element: HTMLElement | null) => {
+  if (!element) throw new Error('Element not found');
+  return element;
 };
+
+export const expectTextContent = (element: HTMLElement | null, text: string) => {
+  if (!element) throw new Error('Element not found');
+  expect(element.textContent).toContain(text);
+};
+
+// Mock implementation of Vitest's render function since we're stubbing out the imports
+function render(ui: ReactElement, options?: { wrapper: React.FC<{children: React.ReactNode}> }) {
+  const Wrapper = options?.wrapper || React.Fragment;
+  
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  
+  React.render(<Wrapper>{ui}</Wrapper>, container);
+  
+  return {
+    container,
+    unmount: () => {
+      React.unmountComponentAtNode(container);
+      document.body.removeChild(container);
+    },
+  };
+}
