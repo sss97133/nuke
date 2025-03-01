@@ -34,7 +34,7 @@ export const UserMenu = ({ navigate, toast, handleMenuAction }: UserMenuProps) =
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => handleNavigateToProfile(navigate)}>
+        <DropdownMenuItem onClick={() => navigate('/profile')}>
           <UserCircle className="mr-2 h-4 w-4" />
           Profile
         </DropdownMenuItem>

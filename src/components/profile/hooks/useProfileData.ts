@@ -68,4 +68,3 @@ export const useProfileData = () => {
     refetch
   };
 };
-
