@@ -64,28 +64,7 @@ export const createStake = async (
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + stakeDuration);
     
-    // Try to use an RPC function first
-    try {
-      const { error } = await supabase.rpc('create_stake', { 
-        user_id_param: user.id,
-        token_id_param: selectedToken,
-        vehicle_id_param: selectedVehicle,
-        amount_param: stakeAmount.toString(),
-        start_date_param: startDate.toISOString(),
-        end_date_param: endDate.toISOString(),
-        predicted_roi_param: parseFloat((stakeAmount * (0.05 + 0.02) / 365 * stakeDuration).toFixed(2)),
-        vehicle_name_param: vehicleName
-      });
-      
-      if (!error) {
-        return true;
-      }
-    } catch (rpcError) {
-      console.warn('RPC for creating stake not available:', rpcError);
-      // Continue with fallback implementation
-    }
-    
-    // Create the stake record (fallback)
+    // Create the stake record directly
     const stakeData = {
       user_id: user.id,
       token_id: selectedToken,

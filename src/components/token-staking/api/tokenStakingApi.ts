@@ -53,45 +53,37 @@ export const fetchUserStakes = async (): Promise<TokenStake[]> => {
     
     // Direct query for stakes
     try {
-      // Using a raw query approach to avoid TypeScript errors with table recognition
-      const { data, error } = await supabase
-        .rpc('get_user_stakes', { user_id_param: user.id });
+      // Using a direct query with casting
+      const { data: stakesData, error: stakesError } = await supabase
+        .from('token_stakes' as any)
+        .select(`
+          id, user_id, token_id, vehicle_id, amount, start_date, end_date, 
+          status, predicted_roi, actual_roi, created_at, vehicle_name,
+          tokens:token_id (id, name, symbol, description, total_supply, current_price, image_url),
+          vehicles:vehicle_id (id, make, model, year, description, image_url)
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('RPC error:', error);
-        // Fallback to direct query with casting
-        const { data: stakesData, error: stakesError } = await supabase
-          .from('token_stakes' as any)
-          .select(`
-            id, user_id, token_id, vehicle_id, amount, start_date, end_date, 
-            status, predicted_roi, actual_roi, created_at, vehicle_name,
-            tokens:token_id (id, name, symbol, description, total_supply, current_price, image_url),
-            vehicles:vehicle_id (id, make, model, year, description, image_url)
-          `)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-        
-        if (stakesError) throw stakesError;
-        
-        return stakesData ? stakesData.map((stake: any) => ({
-          id: stake.id,
-          user_id: stake.user_id,
-          token_id: stake.token_id,
-          vehicle_id: stake.vehicle_id,
-          amount: stake.amount,
-          start_date: stake.start_date,
-          end_date: stake.end_date,
-          status: stake.status,
-          predicted_roi: stake.predicted_roi,
-          actual_roi: stake.actual_roi,
-          created_at: stake.created_at,
-          vehicle_name: stake.vehicle_name,
-          token: stake.tokens,
-          vehicle: stake.vehicles
-        })) : [];
-      }
+      if (stakesError) throw stakesError;
       
-      return data || [];
+      return stakesData ? stakesData.map((stake: any) => ({
+        id: stake.id,
+        user_id: stake.user_id,
+        token_id: stake.token_id,
+        vehicle_id: stake.vehicle_id,
+        amount: stake.amount,
+        start_date: stake.start_date,
+        end_date: stake.end_date,
+        status: stake.status,
+        predicted_roi: stake.predicted_roi,
+        actual_roi: stake.actual_roi,
+        created_at: stake.created_at,
+        vehicle_name: stake.vehicle_name,
+        token: stake.tokens,
+        vehicle: stake.vehicles
+      })) : [];
+      
     } catch (queryError) {
       console.error('Error with direct query:', queryError);
       throw new Error('Failed to fetch user stakes: ' + (queryError as Error).message);
@@ -107,17 +99,6 @@ export const fetchUserStakes = async (): Promise<TokenStake[]> => {
  */
 export const fetchStakingStats = async (userId: string): Promise<TokenStakeStats> => {
   try {
-    // Try to use an RPC function first
-    try {
-      const { data, error } = await supabase.rpc('get_staking_stats', { user_id_param: userId });
-      if (!error && data) {
-        return data as TokenStakeStats;
-      }
-    } catch (rpcError) {
-      console.warn('RPC for staking stats not available:', rpcError);
-      // Continue with fallback implementation
-    }
-    
     // Fallback: Fetch user stakes
     const { data: stakesData, error: stakesError } = await supabase
       .from('token_stakes' as any)
@@ -150,7 +131,7 @@ export const fetchStakingStats = async (userId: string): Promise<TokenStakeStats
     );
     
     const totalStaked = stakes.reduce((sum, stake) => sum + parseFloat(stake.amount), 0);
-    const totalPredictedROI = stakes.reduce((sum, stake) => sum + parseFloat(stake.predicted_roi), 0);
+    const totalPredictedROI = stakes.reduce((sum, stake) => sum + parseFloat(stake.predicted_roi || 0), 0);
     
     // Calculate average ROI
     const avgRoiPercent = totalStaked > 0 
@@ -196,17 +177,6 @@ export const fetchStakingStats = async (userId: string): Promise<TokenStakeStats
  */
 export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
   try {
-    // Try to use an RPC function first
-    try {
-      const { data, error } = await supabase.rpc('unstake_tokens', { stake_id_param: stakeId });
-      if (!error) {
-        return true;
-      }
-    } catch (rpcError) {
-      console.warn('RPC for unstaking not available:', rpcError);
-      // Continue with fallback implementation
-    }
-    
     // Get the stake details first
     const { data: stakeData, error: stakeError } = await supabase
       .from('token_stakes' as any)
