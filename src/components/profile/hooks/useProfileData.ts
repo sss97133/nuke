@@ -70,7 +70,7 @@ export const useProfileData = () => {
           description: error.message,
           variant: 'destructive',
         });
-        throw error;
+        return [];
       }
 
       console.log('✅ Achievements data received:', data);

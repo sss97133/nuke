@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -25,8 +26,9 @@ function App() {
 
   useEffect(() => {
     setIsMounted(true);
+    console.log("App mounted, session:", session);
     return () => setIsMounted(false);
-  }, []);
+  }, [session]);
 
   if (!isMounted) {
     return null;
@@ -53,7 +55,7 @@ function App() {
 
   return (
     <div className="App">
-      <ThemeProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
         <Toaster />
         <Routes>
           <Route path="/login" element={<AuthForm />} />

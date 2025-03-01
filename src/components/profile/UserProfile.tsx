@@ -30,6 +30,8 @@ export const UserProfile = () => {
   
   const { profile, achievements, isLoading, error, refetch } = useProfileData();
 
+  console.log('Profile render:', { profile, achievements, isLoading, error });
+
   // Create wrapper functions that match the expected prop types
   const handleSocialLinksChange = (links: SocialLinks) => {
     setSocialLinks(links);
@@ -123,87 +125,110 @@ export const UserProfile = () => {
   return (
     <div className="space-y-4">
       <div className="bg-background p-4 border rounded-lg shadow-sm">
-        <UserProfileHeader 
-          userId={profile?.id || ''}
-          fullName={profile?.full_name} 
-          username={profile?.username}
-          avatarUrl={profile?.avatar_url}
-          bio={profile?.bio}
-        />
-        
-        {enrichedProfile && <UserMetrics profile={enrichedProfile} />}
-
-        {profile?.id && (
-          <div className="mt-6 border rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <GitCommit className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-medium">Video Analysis Contributions</h3>
-            </div>
-            <ContributionsGraph userId={profile.id} />
-          </div>
-        )}
-
-        {profile?.id && (
-          <div className="mt-6">
-            <UserDiscoveredVehicles userId={profile.id} />
-          </div>
-        )}
-
-        <Tabs defaultValue="profile" className="w-full mt-6">
-          <TabsList>
-            <TabsTrigger value="profile" className="flex items-center gap-2">
-              <UserRound className="w-4 h-4" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="team" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Team
-            </TabsTrigger>
-            <TabsTrigger value="achievements" className="flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
-              Achievements
-            </TabsTrigger>
-            <TabsTrigger value="discoveries" className="flex items-center gap-2">
-              <Car className="w-4 h-4" />
-              Discoveries
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="profile" className="space-y-4 mt-4">
-            <SocialLinksForm 
-              socialLinks={socialLinks}
-              onSocialLinksChange={handleSocialLinksChange}
-              onSubmit={handleSocialLinksSubmit}
+        {profile ? (
+          <>
+            <UserProfileHeader 
+              userId={profile?.id || ''}
+              fullName={profile?.full_name} 
+              username={profile?.username}
+              avatarUrl={profile?.avatar_url}
+              bio={profile?.bio}
             />
             
-            <StreamingLinksForm 
-              streamingLinks={streamingLinks}
-              onStreamingLinksChange={handleStreamingLinksChange}
-              onSubmit={handleStreamingLinksSubmit}
-            />
-          </TabsContent>
+            {enrichedProfile && <UserMetrics profile={enrichedProfile} />}
 
-          <TabsContent value="team" className="mt-4">
-            <TeamSection />
-          </TabsContent>
-
-          <TabsContent value="achievements" className="mt-4">
-            {achievements && achievements.length > 0 && (
-              <AchievementsList achievements={achievements} />
-            )}
-          </TabsContent>
-          
-          <TabsContent value="discoveries" className="mt-4">
             {profile?.id && (
-              <div className="grid gap-4">
-                <p className="text-muted-foreground mb-2">
-                  All vehicles you have discovered across the web and added to our database.
-                </p>
+              <div className="mt-6 border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <GitCommit className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-medium">Video Analysis Contributions</h3>
+                </div>
+                <ContributionsGraph userId={profile.id} />
+              </div>
+            )}
+
+            {profile?.id && (
+              <div className="mt-6">
                 <UserDiscoveredVehicles userId={profile.id} />
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+
+            <Tabs defaultValue="profile" className="w-full mt-6">
+              <TabsList>
+                <TabsTrigger value="profile" className="flex items-center gap-2">
+                  <UserRound className="w-4 h-4" />
+                  Profile
+                </TabsTrigger>
+                <TabsTrigger value="team" className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Team
+                </TabsTrigger>
+                <TabsTrigger value="achievements" className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4" />
+                  Achievements
+                </TabsTrigger>
+                <TabsTrigger value="discoveries" className="flex items-center gap-2">
+                  <Car className="w-4 h-4" />
+                  Discoveries
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="profile" className="space-y-4 mt-4">
+                <SocialLinksForm 
+                  socialLinks={socialLinks}
+                  onSocialLinksChange={handleSocialLinksChange}
+                  onSubmit={handleSocialLinksSubmit}
+                />
+                
+                <StreamingLinksForm 
+                  streamingLinks={streamingLinks}
+                  onStreamingLinksChange={handleStreamingLinksChange}
+                  onSubmit={handleStreamingLinksSubmit}
+                />
+              </TabsContent>
+
+              <TabsContent value="team" className="mt-4">
+                <TeamSection />
+              </TabsContent>
+
+              <TabsContent value="achievements" className="mt-4">
+                {achievements && achievements.length > 0 ? (
+                  <AchievementsList achievements={achievements} />
+                ) : (
+                  <div className="text-center p-4 border rounded-lg">
+                    <Trophy className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground">No achievements yet</p>
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="discoveries" className="mt-4">
+                {profile?.id && (
+                  <div className="grid gap-4">
+                    <p className="text-muted-foreground mb-2">
+                      All vehicles you have discovered across the web and added to our database.
+                    </p>
+                    <UserDiscoveredVehicles userId={profile.id} />
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+            <h3 className="text-lg font-medium">Profile Not Found</h3>
+            <p className="text-muted-foreground mt-2">
+              Unable to load profile information. Please try again later.
+            </p>
+            <button 
+              onClick={() => refetch()} 
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
