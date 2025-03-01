@@ -11,6 +11,7 @@ export interface ServiceRecord {
   technician_notes?: string;
   labor_hours?: number;
   parts_used?: {name: string; quantity: number; cost: number}[];
+  vehicle_id: string;
   vehicle: {
     make: string;
     model: string;
@@ -19,6 +20,12 @@ export interface ServiceRecord {
 }
 
 export type ServiceStatus = 'completed' | 'in-progress' | 'pending';
+
+export interface PartItem {
+  name: string;
+  quantity: number;
+  cost: number;
+}
 
 // Helper function to safely parse JSON parts data
 export const parsePartsUsed = (partsJson: Json | null): {name: string; quantity: number; cost: number}[] => {

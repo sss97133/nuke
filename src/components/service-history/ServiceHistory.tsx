@@ -9,14 +9,20 @@ import EmptyState from './EmptyState';
 import ServiceTabs from './ServiceTabs';
 import ServiceFilters from './ServiceFilters';
 import { parseISO, isAfter, subDays, subMonths, subYears } from 'date-fns';
+import CreateServiceRecord from './CreateServiceRecord';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { PlusCircle } from 'lucide-react';
 
 const ServiceHistory = () => {
   // Filter and sort states
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('date-newest');
   const [dateRange, setDateRange] = useState('all');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { toast } = useToast();
 
-  const { data: serviceRecords, isLoading, error } = useQuery({
+  const { data: serviceRecords, isLoading, error, refetch } = useQuery({
     queryKey: ['service-history'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -31,7 +37,8 @@ const ServiceHistory = () => {
           technician_notes,
           labor_hours,
           parts_used,
-          vehicles:vehicle_id (make, model, year)
+          vehicle_id,
+          vehicles (make, model, year)
         `)
         .order('service_date', { ascending: false });
         
@@ -40,11 +47,24 @@ const ServiceHistory = () => {
       // Transform the data to match our ServiceRecord interface
       return data.map(record => ({
         ...record,
-        vehicle: record.vehicles, // Map 'vehicles' property to 'vehicle'
+        vehicle: {
+          make: record.vehicles?.make || 'Unknown',
+          model: record.vehicles?.model || 'Unknown',
+          year: record.vehicles?.year || 0
+        },
         parts_used: parsePartsUsed(record.parts_used) // Parse the JSON parts data
       })) as ServiceRecord[];
     }
   });
+
+  const handleCreateSuccess = () => {
+    setIsCreateModalOpen(false);
+    refetch(); // Refresh the service records list
+    toast({
+      title: "Service record created",
+      description: "The service record has been added successfully.",
+    });
+  };
 
   // Filtering and sorting logic
   const filteredAndSortedRecords = useMemo(() => {
@@ -119,7 +139,21 @@ const ServiceHistory = () => {
     return (
       <div className="container mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6">Service History</h1>
+        <div className="flex justify-end mb-4">
+          <Button 
+            onClick={() => setIsCreateModalOpen(true)} 
+            className="flex items-center gap-2"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Add Service Record
+          </Button>
+        </div>
         <EmptyState />
+        <CreateServiceRecord 
+          isOpen={isCreateModalOpen} 
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={handleCreateSuccess}
+        />
       </div>
     );
   }
@@ -128,6 +162,13 @@ const ServiceHistory = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Service History</h1>
+        <Button 
+          onClick={() => setIsCreateModalOpen(true)} 
+          className="flex items-center gap-2"
+        >
+          <PlusCircle className="h-4 w-4" />
+          Add Service Record
+        </Button>
       </div>
       
       <ServiceFilters 
@@ -146,6 +187,12 @@ const ServiceHistory = () => {
       ) : (
         <ServiceTabs serviceRecords={filteredAndSortedRecords} />
       )}
+
+      <CreateServiceRecord 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </div>
   );
 };
