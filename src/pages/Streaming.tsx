@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +8,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Award, MessageSquare, User, Users, Heart, ThumbsUp, Send, Camera, Mic, MicOff, Video, VideoOff, ScreenShare, Settings, Tool, Package, Tag } from "lucide-react";
+import { Award, MessageSquare, User, Users, Heart, ThumbsUp, Send, Camera, Mic, MicOff, Video, VideoOff, ScreenShare, Settings, Wrench, Package, Tag } from "lucide-react";
 
 interface StreamMetadata {
   title: string;
@@ -69,20 +68,15 @@ export const Streaming = () => {
   ]);
   const { toast } = useToast();
 
-  // Simulated AWS Rekognition data processing
   useEffect(() => {
     if (streaming) {
-      // This would be an API call to your AWS Rekognition service in a real implementation
-      // For demo purposes, we're simulating delayed data from recognition
       const timer = setTimeout(() => {
-        // Simulating updated data based on video content recognition
         setStreamMetadata({
           title: "Engine Timing Belt Replacement Guide",
           description: "Step-by-step professional tutorial on replacing timing belts on 4-cylinder engines",
           category: "Automotive Repair"
         });
 
-        // Simulating detected items in the workstation
         setWorkstationItems([
           {
             id: "1",
@@ -122,7 +116,7 @@ export const Streaming = () => {
           title: "Stream Analysis Complete",
           description: "Title, description, and workstation items have been updated based on video content.",
         });
-      }, 5000); // Simulate a 5-second processing time
+      }, 5000);
 
       return () => clearTimeout(timer);
     }
@@ -181,7 +175,6 @@ export const Streaming = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Main Stream View */}
           <div className="md:col-span-2 space-y-4">
             <Card className="overflow-hidden">
               <div className="bg-slate-900 aspect-video relative flex items-center justify-center">
@@ -226,7 +219,6 @@ export const Streaming = () => {
                     <Button variant="outline" size="sm">
                       <ThumbsUp className="h-4 w-4 mr-1" /> 42
                     </Button>
-                    {/* Sponsor button removed from here, moved to viewer section */}
                   </div>
                 </div>
               </CardHeader>
@@ -258,11 +250,10 @@ export const Streaming = () => {
               </CardContent>
             </Card>
 
-            {/* Workstation/Supply Section - New Component */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center">
-                  <Tool className="h-5 w-5 mr-2" /> 
+                  <Wrench className="h-5 w-5 mr-2" /> 
                   Workstation & Supplies
                   {streaming && <Badge variant="outline" className="ml-3 text-xs animate-pulse">Auto-detected</Badge>}
                 </CardTitle>
@@ -275,7 +266,7 @@ export const Streaming = () => {
                   {workstationItems.map(item => (
                     <div key={item.id} className="flex border rounded-lg p-3 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
                       <div className="mr-3 mt-1">
-                        {item.type === "tool" && <Tool className="h-5 w-5 text-blue-500" />}
+                        {item.type === "tool" && <Wrench className="h-5 w-5 text-blue-500" />}
                         {item.type === "product" && <Package className="h-5 w-5 text-green-500" />}
                         {item.type === "part" && <Tag className="h-5 w-5 text-amber-500" />}
                       </div>
@@ -330,7 +321,6 @@ export const Streaming = () => {
             </Card>
           </div>
 
-          {/* Chat and Info Panel */}
           <div className="space-y-4">
             <Tabs defaultValue="chat">
               <TabsList className="w-full">
@@ -409,7 +399,6 @@ export const Streaming = () => {
                         ))}
                       </div>
 
-                      {/* Added viewer actions section with sponsor button */}
                       <div className="mt-6 pt-4 border-t">
                         <h3 className="text-sm font-semibold mb-3">Viewer Actions</h3>
                         <div className="flex space-x-2">
