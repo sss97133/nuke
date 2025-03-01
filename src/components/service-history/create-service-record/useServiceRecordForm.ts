@@ -91,6 +91,7 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
     setSubmitError(null);
     
     try {
+      // Fix: Use a single object instead of an array of objects for insert
       const { error } = await supabase
         .from('service_tickets')
         .insert({
