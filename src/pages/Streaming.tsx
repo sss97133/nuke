@@ -50,6 +50,13 @@ export const Streaming = () => {
     });
   };
 
+  const handleSponsor = () => {
+    toast({
+      title: "Sponsorship",
+      description: "Thank you for sponsoring this stream! Your support helps create more content.",
+    });
+  };
+
   return (
     <ScrollArea className="h-[calc(100vh-4rem)] p-4">
       <div className="space-y-4 max-w-7xl mx-auto">
@@ -110,9 +117,7 @@ export const Streaming = () => {
                     <Button variant="outline" size="sm">
                       <ThumbsUp className="h-4 w-4 mr-1" /> 42
                     </Button>
-                    <Button variant="outline" size="sm">
-                      <Heart className="h-4 w-4 mr-1" /> Sponsor
-                    </Button>
+                    {/* Sponsor button removed from here, moved to viewer section */}
                   </div>
                 </div>
               </CardHeader>
@@ -254,6 +259,19 @@ export const Streaming = () => {
                             </Badge>
                           </div>
                         ))}
+                      </div>
+
+                      {/* Added viewer actions section with sponsor button */}
+                      <div className="mt-6 pt-4 border-t">
+                        <h3 className="text-sm font-semibold mb-3">Viewer Actions</h3>
+                        <div className="flex space-x-2">
+                          <Button variant="outline" size="sm" onClick={handleSponsor}>
+                            <Heart className="h-4 w-4 mr-1" /> Sponsor
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <ThumbsUp className="h-4 w-4 mr-1" /> Like
+                          </Button>
+                        </div>
                       </div>
                     </ScrollArea>
                   </CardContent>
