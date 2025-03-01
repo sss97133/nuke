@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Brain, LightBulb, BarChart3, Robot } from 'lucide-react';
+import { Brain, Lightbulb, BarChart3, Bot } from 'lucide-react';
 
 interface AIInsight {
   id: string;
