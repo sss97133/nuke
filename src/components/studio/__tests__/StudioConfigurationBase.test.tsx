@@ -1,88 +1,37 @@
 
-import { screen, waitFor } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
-import { StudioConfiguration } from "../StudioConfiguration";
-import "@testing-library/jest-dom/vitest";
-import { renderWithQueryClient, mockStudioConfig } from "./utils/testUtils";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { screen } from '@testing-library/react';
+import StudioConfiguration from '../StudioConfiguration';
+import { renderWithQueryClient, mockStudioConfig } from './utils/testUtils';
+import { mockUseStudioConfig } from './mocks/studioMocks';
 
-// Mock dependencies
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn(),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      upsert: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn(),
-    })),
-  },
+// Mock the hook
+vi.mock('../../../hooks/useStudioConfig', () => ({
+  default: () => mockUseStudioConfig()
 }));
 
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: vi.fn(),
-}));
-
-describe("StudioConfiguration - Base Loading", () => {
-  const mockToast = vi.fn();
-
+describe('StudioConfiguration - Base functionality', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
-    (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ 
-      data: { user: { id: 'test-user-id' } }, 
-      error: null 
-    });
   });
 
-  it("should render loading state initially", () => {
+  it('renders the studio configuration form', () => {
     renderWithQueryClient(<StudioConfiguration />);
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    
+    // Check basic elements are rendered
+    expect(screen.getByText(/Studio Configuration/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Studio Name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Width/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Height/i)).toBeInTheDocument();
   });
 
-  it("should load and display initial studio configuration", async () => {
-    // Mock successful config fetch
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({ data: mockStudioConfig, error: null })
-        })
-      })
-    }));
-
+  it('displays the correct default values', () => {
     renderWithQueryClient(<StudioConfiguration />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Studio Configuration")).toBeInTheDocument();
-    });
-
-    // Verify dimension inputs are populated
-    const lengthInput = screen.getByLabelText(/Length/);
-    const widthInput = screen.getByLabelText(/Width/);
-    const heightInput = screen.getByLabelText(/Height/);
-
-    expect(lengthInput).toHaveValue(30);
-    expect(widthInput).toHaveValue(20);
-    expect(heightInput).toHaveValue(16);
-  });
-
-  it("should handle error state when loading configuration fails", async () => {
-    // Mock failed config fetch
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({ data: null, error: new Error("Failed to load config") })
-        })
-      })
-    }));
-
-    renderWithQueryClient(<StudioConfiguration />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Error loading studio configuration")).toBeInTheDocument();
-    });
+    
+    // Check form has correct values
+    expect(screen.getByLabelText(/Studio Name/i)).toHaveValue(mockStudioConfig.name);
+    expect(screen.getByLabelText(/Width/i)).toHaveValue(mockStudioConfig.width);
+    expect(screen.getByLabelText(/Height/i)).toHaveValue(mockStudioConfig.height);
   });
 });

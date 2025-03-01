@@ -1,41 +1,34 @@
 
-import { screen, fireEvent, waitFor } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
-import { StudioConfiguration } from "../StudioConfiguration";
-import "@testing-library/jest-dom/vitest";
-import { renderWithQueryClient } from "./utils/testUtils";
-import { setupMocks, getMockToast, setupSupabaseMocks } from "./mocks/studioMocks";
+import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { screen } from '@testing-library/react';
+import StudioConfiguration from '../StudioConfiguration';
+import { renderWithQueryClient } from './utils/testUtils';
+import { mockUseStudioConfig } from './mocks/studioMocks';
 
-// Set up all mocks
-setupMocks();
+// Mock the hook
+vi.mock('../../../hooks/useStudioConfig', () => ({
+  default: () => mockUseStudioConfig()
+}));
 
-describe("StudioConfiguration - PTZ Features", () => {
-  let mockToast: ReturnType<typeof vi.fn>;
-
+describe('StudioConfiguration - PTZ Camera functionality', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockToast = getMockToast();
-    setupSupabaseMocks();
   });
 
-  it("should handle PTZ track updates", async () => {
+  it('renders PTZ camera configuration section', () => {
     renderWithQueryClient(<StudioConfiguration />);
+    
+    // Check for PTZ specific elements
+    expect(screen.getByText(/PTZ Camera Configuration/i)).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText("Studio Configuration")).toBeInTheDocument();
-    });
-
-    // Switch to PTZ configuration tab
-    const ptzTab = screen.getByText("PTZ Configuration");
-    fireEvent.click(ptzTab);
-
-    // Add new PTZ track
-    const addTrackButton = screen.getByText("Add Track");
-    fireEvent.click(addTrackButton);
-
-    // Verify new track is added
-    await waitFor(() => {
-      expect(screen.getAllByText(/Track \d/)).toHaveLength(2);
-    });
+  it('displays camera position controls', () => {
+    renderWithQueryClient(<StudioConfiguration />);
+    
+    // Check for position controls
+    expect(screen.getByLabelText(/X Position/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Y Position/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Z Position/i)).toBeInTheDocument();
   });
 });

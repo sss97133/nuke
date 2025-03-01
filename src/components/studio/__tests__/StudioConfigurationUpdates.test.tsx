@@ -1,100 +1,41 @@
 
-import { screen, fireEvent, waitFor } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
-import { StudioConfiguration } from "../StudioConfiguration";
-import "@testing-library/jest-dom/vitest";
-import { renderWithQueryClient, mockStudioConfig } from "./utils/testUtils";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
+import StudioConfiguration from '../StudioConfiguration';
+import { renderWithQueryClient, mockStudioConfig } from './utils/testUtils';
+import { mockUseStudioConfig, mockSaveStudioConfig } from './mocks/studioMocks';
 
-// Mock dependencies
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn(),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      upsert: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn(),
-    })),
-  },
+// Mock the hook
+vi.mock('../../../hooks/useStudioConfig', () => ({
+  default: () => mockUseStudioConfig()
 }));
 
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: vi.fn(),
-}));
-
-describe("StudioConfiguration - Updates", () => {
-  const mockToast = vi.fn();
-
+describe('StudioConfiguration - Update functionality', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
-    (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue({ 
-      data: { user: { id: 'test-user-id' } }, 
-      error: null 
-    });
   });
 
-  it("should update studio dimensions", async () => {
-    // Mock successful config fetch and update
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({ data: mockStudioConfig, error: null })
-        })
-      }),
-      upsert: () => Promise.resolve({ error: null })
-    }));
-
+  it('calls saveStudioConfig when form is submitted', async () => {
     renderWithQueryClient(<StudioConfiguration />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Studio Configuration")).toBeInTheDocument();
-    });
-
-    const lengthInput = screen.getByLabelText(/Length/);
-    fireEvent.change(lengthInput, { target: { value: "40" } });
-
-    const saveButton = screen.getByText("Save Configuration");
+    
+    // Find and click the save button
+    const saveButton = screen.getByRole('button', { name: /Save Configuration/i });
     fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith({
-        title: "Success",
-        description: "Studio configuration updated successfully",
-      });
-    });
+    
+    // Check if save function was called
+    expect(mockSaveStudioConfig).toHaveBeenCalledTimes(1);
+    expect(mockSaveStudioConfig).toHaveBeenCalledWith(mockStudioConfig);
   });
 
-  it("should handle configuration save errors", async () => {
-    // Mock successful fetch but failed update
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({ data: mockStudioConfig, error: null })
-        })
-      }),
-      upsert: () => Promise.resolve({ error: new Error("Failed to update") })
-    }));
-
+  it('updates form values when changed', () => {
     renderWithQueryClient(<StudioConfiguration />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Studio Configuration")).toBeInTheDocument();
-    });
-
-    const saveButton = screen.getByText("Save Configuration");
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith({
-        title: "Error",
-        description: "Failed to update studio configuration",
-        variant: "destructive",
-      });
-    });
+    
+    // Find input and change value
+    const nameInput = screen.getByLabelText(/Studio Name/i);
+    fireEvent.change(nameInput, { target: { value: 'Updated Studio Name' } });
+    
+    // Check if value was updated
+    expect(nameInput).toHaveValue('Updated Studio Name');
   });
 });

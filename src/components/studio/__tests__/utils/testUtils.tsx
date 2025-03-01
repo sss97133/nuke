@@ -1,117 +1,77 @@
 
-import React, { ReactElement } from 'react';
-import { render, RenderResult } from '@testing-library/react';
+import React from 'react';
+import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
 import { expect, vi } from 'vitest';
 
+// Mock types since we can't import from the actual types
 interface StudioConfig {
   id: string;
   name: string;
-  workspace_dimensions: {
-    length: number;
-    width: number;
-    height: number;
-  };
-  equipment?: {
-    cameras: Array<{
-      id: string;
-      name: string;
-      type: string;
-      position: {
-        x: number;
-        y: number;
-        z: number;
-      };
-    }>;
-    lightSources: Array<any>;
-    audioDevices: Array<any>;
-    surfaces: {
-      floor: any;
-      walls: any;
-      ceiling: any;
-    };
-    roboticArms: Array<any>;
+  width: number;
+  height: number;
+  cameras: CameraConfig[];
+}
+
+interface CameraConfig {
+  id: string;
+  type: string;
+  position: {
+    x: number;
+    y: number;
+    z: number;
   };
 }
 
-// Mock user and config objects
-export const mockUser = {
-  id: 'test-user-id',
-  email: 'test@example.com',
-  app_metadata: {},
-  user_metadata: {
-    name: 'Test User'
-  }
-};
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
 
-export const mockUserResponse = {
-  data: { user: mockUser },
-  error: null
+// Mock data
+export const mockUser: User = {
+  id: '1',
+  name: 'Test User',
+  email: 'test@example.com'
 };
 
 export const mockStudioConfig: StudioConfig = {
   id: '1',
   name: 'Test Studio',
-  workspace_dimensions: {
-    length: 30,
-    width: 20,
-    height: 16
-  },
-  equipment: {
-    cameras: [
-      {
-        id: 'camera-1',
-        name: 'Main Camera',
-        type: 'PTZ',
-        position: { x: 15, y: 10, z: 5 }
-      }
-    ],
-    lightSources: [],
-    audioDevices: [],
-    surfaces: {
-      floor: {},
-      walls: {},
-      ceiling: {}
-    },
-    roboticArms: []
-  }
+  width: 800,
+  height: 600,
+  cameras: [
+    {
+      id: '1',
+      type: 'PTZ',
+      position: { x: 0, y: 0, z: 0 }
+    }
+  ]
 };
 
-// Helper to render components with query client
-export const renderWithQueryClient = (
-  ui: ReactElement,
-  options?: {
-    queryClient?: QueryClient;
-    route?: string;
-  }
-): RenderResult => {
-  const queryClient = options?.queryClient || new QueryClient({
+// Utility to render with QueryClient
+export const renderWithQueryClient = (ui: React.ReactElement) => {
+  const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
-        cacheTime: 0,
       },
     },
   });
   
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
+  return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[options?.route || '/']}>
-        {children}
-      </MemoryRouter>
+      {ui}
     </QueryClientProvider>
   );
-  
-  return render(ui, { wrapper });
 };
 
-// Test utility functions
-export const expectToBeInTheDocument = (element: HTMLElement) => {
-  expect(element).toBeDefined();
+// Test assertions
+export const assertElementExists = (element: HTMLElement | null) => {
   expect(element).not.toBeNull();
 };
 
-export const expectNotToBeInTheDocument = (element: HTMLElement | null) => {
-  expect(element).toBeNull();
+export const assertElementHasText = (element: HTMLElement | null, text: string) => {
+  expect(element?.textContent).toContain(text);
 };
