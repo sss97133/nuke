@@ -18,7 +18,12 @@ export const usePreferencesBase = () => {
     defaultGarageView: 'list',
     serviceRemindersEnabled: true,
     inventoryAlertsEnabled: true,
-    priceAlertsEnabled: true
+    priceAlertsEnabled: true,
+    primaryColor: '#9b87f5',
+    secondaryColor: '#7E69AB',
+    accentColor: '#8B5CF6',
+    fontFamily: 'Inter',
+    fontSize: 'medium'
   });
 
   useEffect(() => {
@@ -59,13 +64,18 @@ export const usePreferencesBase = () => {
           notificationsEnabled: preferencesData.notifications_enabled,
           autoSaveEnabled: preferencesData.auto_save_enabled,
           compactViewEnabled: preferencesData.compact_view_enabled,
-          theme: preferencesData.theme || 'system', // Added the theme property
+          theme: preferencesData.theme || 'system',
           distanceUnit: preferencesData.distance_unit,
           currency: preferencesData.currency,
           defaultGarageView: preferencesData.default_garage_view,
           serviceRemindersEnabled: preferencesData.service_reminders_enabled,
           inventoryAlertsEnabled: preferencesData.inventory_alerts_enabled,
-          priceAlertsEnabled: preferencesData.price_alerts_enabled
+          priceAlertsEnabled: preferencesData.price_alerts_enabled,
+          primaryColor: preferencesData.primary_color || '#9b87f5',
+          secondaryColor: preferencesData.secondary_color || '#7E69AB',
+          accentColor: preferencesData.accent_color || '#8B5CF6',
+          fontFamily: preferencesData.font_family || 'Inter',
+          fontSize: preferencesData.font_size || 'medium'
         });
       } else {
         // Insert default preferences if none exist
@@ -74,13 +84,18 @@ export const usePreferencesBase = () => {
           notifications_enabled: true,
           auto_save_enabled: true,
           compact_view_enabled: false,
-          theme: 'system', // Make sure theme is included here as well
+          theme: 'system',
           distance_unit: 'miles',
           currency: 'USD',
           default_garage_view: 'list',
           service_reminders_enabled: true,
           inventory_alerts_enabled: true,
-          price_alerts_enabled: true
+          price_alerts_enabled: true,
+          primary_color: '#9b87f5',
+          secondary_color: '#7E69AB',
+          accent_color: '#8B5CF6',
+          font_family: 'Inter',
+          font_size: 'medium'
         });
 
         if (insertError) {

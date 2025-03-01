@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
@@ -6,6 +7,7 @@ import { DataManagement } from "@/components/settings/DataManagement";
 import { AlertSettings } from "@/components/settings/AlertSettings";
 import { DisplaySettings } from "@/components/settings/DisplaySettings";
 import { ThemeSettings } from "@/components/settings/ThemeSettings";
+import { ColorSettings } from "@/components/settings/ColorSettings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -33,7 +35,7 @@ export const Settings = () => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
     
-    if (tab === "notifications" || tab === "data") {
+    if (tab === "notifications" || tab === "data" || tab === "appearance") {
       setActiveTab(tab);
     } else {
       setActiveTab("preferences");
@@ -73,8 +75,9 @@ export const Settings = () => {
       <h1 className="text-3xl font-bold">System Preferences</h1>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="preferences">General Preferences</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="preferences">General</TabsTrigger>
+          <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="data">Data Management</TabsTrigger>
         </TabsList>
@@ -86,15 +89,6 @@ export const Settings = () => {
                 theme={preferences.theme}
                 onThemeChange={(value) => {
                   savePreferences({ theme: value });
-                }}
-              />
-            </ErrorBoundary>
-
-            <ErrorBoundary>
-              <AppearanceSettings
-                compactViewEnabled={preferences.compactViewEnabled}
-                onCompactViewChange={(checked) => {
-                  savePreferences({ compact_view_enabled: checked });
                 }}
               />
             </ErrorBoundary>
@@ -121,6 +115,36 @@ export const Settings = () => {
                 autoSaveEnabled={preferences.autoSaveEnabled}
                 onAutoSaveChange={(checked) => {
                   savePreferences({ auto_save_enabled: checked });
+                }}
+              />
+            </ErrorBoundary>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="appearance" className="mt-6">
+          <Card className="p-6 space-y-6">
+            <ErrorBoundary>
+              <AppearanceSettings
+                compactViewEnabled={preferences.compactViewEnabled}
+                onCompactViewChange={(checked) => {
+                  savePreferences({ compact_view_enabled: checked });
+                }}
+              />
+            </ErrorBoundary>
+            
+            <ErrorBoundary>
+              <ColorSettings
+                primaryColor={preferences.primaryColor || "#9b87f5"}
+                secondaryColor={preferences.secondaryColor || "#7E69AB"}
+                accentColor={preferences.accentColor || "#8B5CF6"}
+                onPrimaryColorChange={(value) => {
+                  savePreferences({ primary_color: value });
+                }}
+                onSecondaryColorChange={(value) => {
+                  savePreferences({ secondary_color: value });
+                }}
+                onAccentColorChange={(value) => {
+                  savePreferences({ accent_color: value });
                 }}
               />
             </ErrorBoundary>

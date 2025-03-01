@@ -1,6 +1,6 @@
 
 import { MenubarContent, MenubarItem, MenubarSeparator, MenubarShortcut } from "@/components/ui/menubar";
-import { ShoppingBag, HelpCircle } from "lucide-react";
+import { ShoppingBag, HelpCircle, Settings } from "lucide-react";
 import { useState } from "react";
 import { DocumentationDialog } from "@/components/documentation/DocumentationDialog";
 import { AboutDialog } from "@/components/documentation/AboutDialog";
@@ -26,6 +26,11 @@ export const ToolsMenuItems = ({ handleMenuAction }: { handleMenuAction: (action
       <MenubarItem onClick={() => handleMenuAction('toggle_assistant')}>
         AI Assistant
         <MenubarShortcut>⌘A</MenubarShortcut>
+      </MenubarItem>
+      <MenubarItem onClick={() => handleMenuAction('preferences')}>
+        <Settings className="mr-2 h-4 w-4" />
+        System Preferences
+        <MenubarShortcut>⌘,</MenubarShortcut>
       </MenubarItem>
     </MenubarContent>
   );

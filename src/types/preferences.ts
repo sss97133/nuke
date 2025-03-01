@@ -10,4 +10,9 @@ export interface UserPreferences {
   serviceRemindersEnabled: boolean;
   inventoryAlertsEnabled: boolean;
   priceAlertsEnabled: boolean;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  fontFamily: string;
+  fontSize: string;
 }
