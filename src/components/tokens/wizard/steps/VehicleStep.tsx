@@ -7,6 +7,7 @@ import { Vehicle } from "@/types/token";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface VehicleStepProps {
   selectedVehicleId: string | undefined;
@@ -20,15 +21,58 @@ const VehicleStep = ({
   const [searchVin, setSearchVin] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [garageVehicles, setGarageVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [error, setError] = useState("");
+  const [isLoadingGarage, setIsLoadingGarage] = useState(false);
 
   useEffect(() => {
     // If there's already a selected vehicle ID, fetch that vehicle
     if (selectedVehicleId) {
       fetchVehicleById(selectedVehicleId);
     }
+
+    // Fetch vehicles from user's active garage
+    fetchGarageVehicles();
   }, [selectedVehicleId]);
+
+  const fetchGarageVehicles = async () => {
+    setIsLoadingGarage(true);
+    try {
+      // First, get the active garage id from the user's profile
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) throw new Error("No authenticated user");
+      
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('active_garage_id')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError) throw profileError;
+      
+      if (!profileData.active_garage_id) {
+        console.log("No active garage set");
+        setGarageVehicles([]);
+        return;
+      }
+      
+      // Now fetch vehicles associated with that garage
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('id, make, model, year, vin')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      setGarageVehicles(data || []);
+    } catch (error) {
+      console.error('Error fetching garage vehicles:', error);
+    } finally {
+      setIsLoadingGarage(false);
+    }
+  };
 
   const fetchVehicleById = async (id: string) => {
     setIsLoading(true);
@@ -85,6 +129,19 @@ const VehicleStep = ({
     onVehicleSelect(vehicle.id);
   };
 
+  const handleGarageVehicleSelect = (vehicleId: string) => {
+    if (!vehicleId) {
+      clearSelection();
+      return;
+    }
+    
+    const vehicle = garageVehicles.find(v => v.id === vehicleId);
+    if (vehicle) {
+      setSelectedVehicle(vehicle);
+      onVehicleSelect(vehicle.id);
+    }
+  };
+
   const clearSelection = () => {
     setSelectedVehicle(null);
     onVehicleSelect(undefined);
@@ -92,6 +149,48 @@ const VehicleStep = ({
 
   return (
     <div className="space-y-4 py-2">
+      {/* Garage Vehicles Dropdown */}
+      <div className="space-y-2">
+        <Label htmlFor="garage-vehicle">Select from your garage</Label>
+        <Select 
+          onValueChange={handleGarageVehicleSelect} 
+          value={selectedVehicleId}
+          disabled={isLoadingGarage}
+        >
+          <SelectTrigger id="garage-vehicle" className="w-full">
+            <SelectValue placeholder={isLoadingGarage ? "Loading garage vehicles..." : "Select a vehicle"} />
+          </SelectTrigger>
+          <SelectContent>
+            {garageVehicles.length === 0 ? (
+              <SelectItem value="no-vehicles" disabled>
+                No vehicles in garage
+              </SelectItem>
+            ) : (
+              <>
+                <SelectItem value="">Select a vehicle</SelectItem>
+                {garageVehicles.map(vehicle => (
+                  <SelectItem key={vehicle.id} value={vehicle.id}>
+                    {vehicle.year} {vehicle.make} {vehicle.model} {vehicle.vin ? `(${vehicle.vin})` : ''}
+                  </SelectItem>
+                ))}
+              </>
+            )}
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground">
+          Choose a vehicle from your garage or search by VIN below
+        </p>
+      </div>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t"></span>
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">Or</span>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="vehicle-search">Search for a Vehicle by VIN</Label>
         <div className="flex gap-2">
