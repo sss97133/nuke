@@ -9,8 +9,8 @@ interface StudioPreviewProps {
   ptzTracks: PTZTrack[];
   selectedCameraIndex: number | null;
   onCameraSelect: (index: number) => void;
-  lightMode: 'basic' | 'product';
-  setLightMode: (mode: 'basic' | 'product') => void;
+  lightMode: 'basic' | 'product' | 'visualization';
+  setLightMode: (mode: 'basic' | 'product' | 'visualization') => void;
 }
 
 export const StudioPreview: React.FC<StudioPreviewProps> = ({ 
@@ -21,7 +21,7 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
   lightMode,
   setLightMode
 }) => {
-  const handleLightModeChange = (mode: 'basic' | 'product') => {
+  const handleLightModeChange = (mode: 'basic' | 'product' | 'visualization') => {
     setLightMode(mode);
   };
 

@@ -61,6 +61,33 @@ export const createProductLighting = (scene: THREE.Scene) => {
   scene.add(backLight);
 };
 
+// Create dramatic lighting setup for visualization
+export const createVisualizationLighting = (scene: THREE.Scene) => {
+  // Clean existing lights first
+  removeExistingLights(scene);
+  
+  // Soft ambient light
+  const ambientLight = new THREE.AmbientLight(0x404080, 0.3);
+  scene.add(ambientLight);
+  
+  // Main directional light with blue tint
+  const mainLight = new THREE.DirectionalLight(0x6080ff, 0.7);
+  mainLight.position.set(5, 10, 7);
+  mainLight.castShadow = true;
+  mainLight.shadow.mapSize.width = 512; // Lower resolution for performance
+  mainLight.shadow.mapSize.height = 512;
+  scene.add(mainLight);
+  
+  // Accent light with contrasting color
+  const accentLight = new THREE.DirectionalLight(0xff8030, 0.5);
+  accentLight.position.set(-7, 3, -5);
+  scene.add(accentLight);
+  
+  // Add hemisphere light for better overall illumination
+  const hemiLight = new THREE.HemisphereLight(0x8080ff, 0x404040, 0.6);
+  scene.add(hemiLight);
+};
+
 // Add alias for compatibility with existing code
 export const createLighting = createBasicStudioLighting;
 

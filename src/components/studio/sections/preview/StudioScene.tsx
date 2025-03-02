@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { createBasicStudioLighting, createProductLighting } from '@/components/studio/utils/studioLighting';
+import { createBasicStudioLighting, createProductLighting, createVisualizationLighting } from '@/components/studio/utils/studioLighting';
 import type { WorkspaceDimensions, PTZTrack } from '../../types/workspace';
 
 interface StudioSceneProps {
@@ -10,7 +9,7 @@ interface StudioSceneProps {
   ptzTracks: PTZTrack[];
   selectedCameraIndex: number | null;
   onCameraSelect: (index: number) => void;
-  lightMode: 'basic' | 'product';
+  lightMode: 'basic' | 'product' | 'visualization';
 }
 
 export const StudioScene: React.FC<StudioSceneProps> = ({
@@ -70,15 +69,21 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
     // Create camera models for each PTZ track with cones for FOV
     createCameraModels(scene, ptzTracks);
 
-    // Basic lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambientLight);
+    // Apply lighting based on mode
+    switch (lightMode) {
+      case 'basic':
+        createBasicStudioLighting(scene);
+        break;
+      case 'product':
+        createProductLighting(scene);
+        break;
+      case 'visualization':
+        createVisualizationLighting(scene);
+        break;
+      default:
+        createBasicStudioLighting(scene);
+    }
     
-    // Directional light to add some shadows/dimension
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    dirLight.position.set(5, 10, 5);
-    scene.add(dirLight);
-
     // Handle camera selection through raycasting
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -156,7 +161,26 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
         rendererRef.current.dispose();
       }
     };
-  }, [dimensions, ptzTracks, onCameraSelect]);
+  }, [dimensions, ptzTracks, onCameraSelect, lightMode]);
+
+  // Update lighting when lightMode changes
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    
+    switch (lightMode) {
+      case 'basic':
+        createBasicStudioLighting(sceneRef.current);
+        break;
+      case 'product':
+        createProductLighting(sceneRef.current);
+        break;
+      case 'visualization':
+        createVisualizationLighting(sceneRef.current);
+        break;
+      default:
+        createBasicStudioLighting(sceneRef.current);
+    }
+  }, [lightMode]);
 
   // Function to create a wireframe room
   const createWireframeRoom = (scene: THREE.Scene, dimensions: WorkspaceDimensions) => {
