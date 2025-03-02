@@ -5,7 +5,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Skill, UserSkill } from '@/types/skills';
 import SceneInitializer from './quantum/components/SceneInitializer';
 import CentralStar, { AnimationHandler } from './quantum/components/CentralStar';
-import SceneLighting from './quantum/components/SceneLighting';
 import SkillOrbitals from './quantum/components/SkillOrbitals';
 import SkillInteractions from './quantum/components/SkillInteractions';
 import { useQuantumAnimation } from './quantum/hooks/useQuantumAnimation';
@@ -77,7 +76,7 @@ export const EnhancedQuantumSkillVis: React.FC<EnhancedQuantumSkillVisProps> = (
       
       {isInitialized && refs.scene && (
         <>
-          <SceneLighting scene={refs.scene} />
+          {/* SceneLighting component removed */}
           
           {skills.length > 0 && userSkills.length > 0 && (
             <>
