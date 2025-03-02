@@ -14,12 +14,22 @@ const OutputTab = ({ theoremData }: OutputTabProps) => {
   return (
     <div className="space-y-4">
       <Card className="border overflow-hidden">
-        <div className="aspect-video relative bg-black rounded-md overflow-hidden">
-          <img 
-            src="/lovable-uploads/4b9269d1-9638-4eb3-8139-c63f53e73d75.png" 
-            alt="IEEE Floating Point Visualization" 
-            className="w-full h-full object-contain"
-          />
+        <div className="aspect-video relative bg-slate-100 dark:bg-slate-800 rounded-md overflow-hidden flex items-center justify-center">
+          {/* Using a fallback message when no visualization is available */}
+          <div className="p-8 text-center">
+            <h3 className="text-xl font-semibold mb-2">Visualization Preview</h3>
+            <p className="text-muted-foreground mb-4">
+              {theoremData ? 
+                `Interactive visualization for "${theoremData.name}" theorem` : 
+                "Select a theorem and generate a visualization to see the preview here"}
+            </p>
+            <img 
+              src="/lovable-uploads/4b9269d1-9638-4eb3-8139-c63f53e73d75.png" 
+              alt="IEEE Floating Point Visualization" 
+              className="w-full max-w-xl mx-auto h-auto object-contain"
+            />
+          </div>
+          
           <div className="absolute bottom-4 right-4 flex gap-2">
             <Button size="icon" variant="secondary" className="rounded-full h-10 w-10 bg-black/70 backdrop-blur">
               <Volume2 className="h-5 w-5" />

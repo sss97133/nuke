@@ -33,6 +33,9 @@ const TheoremExplainAgent = () => {
     const fetchTheoremData = async () => {
       try {
         setFetchingData(true);
+        // Log the fetch attempt
+        console.log("Fetching theorem data from HuggingFace...");
+        
         const response = await fetch(
           "https://datasets-server.huggingface.co/rows?dataset=TIGER-Lab%2FTheoremExplainBench&config=default&split=train&offset=0&length=5"
         );
@@ -42,6 +45,7 @@ const TheoremExplainAgent = () => {
         }
         
         const data = await response.json();
+        console.log("Data received:", data);
         
         // Transform the data into our format
         if (data && data.rows) {
@@ -53,6 +57,7 @@ const TheoremExplainAgent = () => {
             category: row.row.category || undefined
           }));
           
+          console.log("Transformed data:", transformedData);
           setTheoremData(transformedData);
           
           // Set the first theorem as selected
