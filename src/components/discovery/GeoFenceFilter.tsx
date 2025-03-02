@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Settings } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
@@ -36,9 +35,16 @@ export const GeoFenceFilter = ({ onFilterChange, className }: GeoFenceFilterProp
             .single();
             
           if (profile?.home_location) {
-            setUserLocation(profile.home_location);
-            setLocationStatus('success');
-            return;
+            // Parse the home_location to ensure it's in the correct format
+            const locationData = typeof profile.home_location === 'string' 
+              ? JSON.parse(profile.home_location) 
+              : profile.home_location;
+            
+            if (locationData && typeof locationData.lat === 'number' && typeof locationData.lng === 'number') {
+              setUserLocation({ lat: locationData.lat, lng: locationData.lng });
+              setLocationStatus('success');
+              return;
+            }
           }
         }
         

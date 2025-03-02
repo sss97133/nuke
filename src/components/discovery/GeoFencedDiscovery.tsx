@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,8 +5,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Map, AlertCircle } from 'lucide-react';
 import { GeoFenceFilter } from './GeoFenceFilter';
 import { supabase } from '@/integrations/supabase/client';
-import { VehicleCard } from '@/pages/DiscoveredVehicles';
 import { Button } from '@/components/ui/button';
+
+const VehicleCard = ({ vehicle }: { vehicle: any }) => (
+  <Card>
+    <CardHeader className="pb-2">
+      <CardTitle className="text-lg">{vehicle.year} {vehicle.make} {vehicle.model}</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <span>Price</span>
+          <span className="font-bold">${vehicle.price.toLocaleString()}</span>
+        </div>
+        <div className="text-sm text-muted-foreground">{vehicle.location}</div>
+        <div className="flex gap-2">
+          {vehicle.tags.map((tag: string, i: number) => (
+            <span key={i} className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">{tag}</span>
+          ))}
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
 
 interface NearbyContentProps {
   contentType?: 'vehicles' | 'auctions' | 'garages' | 'events' | 'all';
@@ -31,7 +51,13 @@ export const GeoFencedDiscovery = ({ contentType = 'all' }: NearbyContentProps) 
             .single();
             
           if (profile?.home_location) {
-            setUserLocation(profile.home_location);
+            const locationData = typeof profile.home_location === 'string' 
+              ? JSON.parse(profile.home_location) 
+              : profile.home_location;
+            
+            if (locationData && typeof locationData.lat === 'number' && typeof locationData.lng === 'number') {
+              setUserLocation({ lat: locationData.lat, lng: locationData.lng });
+            }
           }
         }
       } catch (error) {
@@ -47,15 +73,12 @@ export const GeoFencedDiscovery = ({ contentType = 'all' }: NearbyContentProps) 
     setGeoFilterEnabled(enabled);
   };
   
-  // Fetch nearby discovered vehicles
   const { data: nearbyVehicles, isLoading: vehiclesLoading, isError: vehiclesError, refetch: refetchVehicles } = 
     useQuery({
       queryKey: ['nearby-vehicles', radius, geoFilterEnabled, userLocation],
       queryFn: async () => {
-        // Only fetch if geofencing is enabled and we have user location
         if (!geoFilterEnabled || !userLocation) return [];
         
-        // Call Supabase edge function to search for nearby entities
         const { data, error } = await supabase.functions.invoke('search-local-garages', {
           body: {
             lat: userLocation.lat,
@@ -71,15 +94,12 @@ export const GeoFencedDiscovery = ({ contentType = 'all' }: NearbyContentProps) 
       enabled: geoFilterEnabled && !!userLocation
     });
   
-  // Fetch nearby garages
   const { data: nearbyGarages, isLoading: garagesLoading, isError: garagesError, refetch: refetchGarages } = 
     useQuery({
       queryKey: ['nearby-garages', radius, geoFilterEnabled, userLocation],
       queryFn: async () => {
-        // Only fetch if geofencing is enabled and we have user location
         if (!geoFilterEnabled || !userLocation) return [];
         
-        // Call Supabase edge function to search for nearby entities
         const { data, error } = await supabase.functions.invoke('search-local-garages', {
           body: {
             lat: userLocation.lat,
