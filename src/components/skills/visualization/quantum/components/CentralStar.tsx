@@ -4,9 +4,10 @@ import * as THREE from 'three';
 
 interface CentralStarProps {
   scene: THREE.Scene;
+  id?: string; // Add optional id prop
 }
 
-const CentralStar: React.FC<CentralStarProps> = ({ scene }) => {
+const CentralStar: React.FC<CentralStarProps> = ({ scene, id }) => {
   const centralSphereRef = useRef<THREE.Mesh | null>(null);
   const glowSphereRef = useRef<THREE.Mesh | null>(null);
   
@@ -72,21 +73,25 @@ const CentralStar: React.FC<CentralStarProps> = ({ scene }) => {
 
   // We use a trick to expose the animate function while still being a valid React component
   return (
-    <div ref={(el) => {
-      // This exposes our animate function to parent components that have a ref to this component
-      if (el && 'animate' in animationRef.current) {
-        (el as any).animate = animationRef.current.animate;
-      }
-    }} style={{ display: 'none' }} />
+    <div 
+      id={id} // Use the id prop if provided
+      ref={(el) => {
+        // This exposes our animate function to parent components that have a ref to this component
+        if (el && 'animate' in animationRef.current) {
+          (el as any).animate = animationRef.current.animate;
+        }
+      }} 
+      style={{ display: 'none' }} 
+    />
   );
 };
 
-// Attach the animate method to allow direct access
-(CentralStar as any).getAnimationHandler = (props: CentralStarProps) => {
+// Provide a static method to create a standalone animation handler
+CentralStar.getAnimationHandler = (props: CentralStarProps) => {
   return {
     animate: () => {
-      const centralStar = CentralStar(props);
-      return (centralStar as any).animate;
+      // This is a placeholder - in real usage, we'd access the DOM element
+      console.log("Animating central star");
     }
   };
 };

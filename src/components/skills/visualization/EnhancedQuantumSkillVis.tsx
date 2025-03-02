@@ -67,8 +67,15 @@ export const EnhancedQuantumSkillVis: React.FC<EnhancedQuantumSkillVisProps> = (
   useEffect(() => {
     if (!isInitialized || !refs.scene) return;
     
-    // Add central star
-    const centralStarComponent = CentralStar({ scene: refs.scene });
+    // Add central star - Fix for Error #1: Using the proper way to access the component's animation method
+    const centralStarComponent = {
+      animate: () => {
+        const centralStarEl = document.getElementById('central-star-component');
+        if (centralStarEl && 'animate' in centralStarEl) {
+          (centralStarEl as any).animate();
+        }
+      }
+    };
     centralStarRef.current = centralStarComponent;
     
     return () => {
@@ -94,20 +101,48 @@ export const EnhancedQuantumSkillVis: React.FC<EnhancedQuantumSkillVisProps> = (
           
           {skills.length > 0 && userSkills.length > 0 && (
             <>
-              {/* Create the skill orbitals */}
+              {/* Fix for Error #1: Use a proper id to reference the component */}
+              <CentralStar scene={refs.scene} id="central-star-component" />
+              
+              {/* Fix for Error #2: Create a proper controller object */}
               <div ref={(el) => {
                 if (el) {
-                  // Initialize skill orbitals
-                  const orbitalsController = SkillOrbitals({ 
+                  // Initialize skill orbitals and get direct references to the controller methods
+                  const skillOrbitsEl = document.createElement('div');
+                  const orbitalsInstance = SkillOrbitals({ 
                     scene: refs.scene!, 
                     skills, 
                     userSkills 
                   });
                   
-                  // Store reference to controller
-                  skillOrbitalsRef.current = orbitalsController;
+                  // Create a controller object with the required properties
+                  const controller = {
+                    animateSkills: (time: number) => {
+                      // Find the orbital element and call its animate method
+                      const orbitalEl = document.getElementById('skill-orbitals-component');
+                      if (orbitalEl && 'animateSkills' in orbitalEl) {
+                        (orbitalEl as any).animateSkills(time);
+                      }
+                    },
+                    skillObjectsRef: {
+                      current: skillObjectsGroupRef.current
+                    } as React.RefObject<THREE.Group>
+                  };
+                  
+                  // Store reference to the controller
+                  skillOrbitalsRef.current = controller;
                 }
               }} />
+              
+              {/* Render the actual SkillOrbitals component with a unique id to reference it */}
+              <div style={{ display: 'none' }}>
+                <SkillOrbitals 
+                  scene={refs.scene} 
+                  skills={skills} 
+                  userSkills={userSkills}
+                  id="skill-orbitals-component"
+                />
+              </div>
               
               {refs.camera && skillOrbitalsRef.current && (
                 <SkillInteractions

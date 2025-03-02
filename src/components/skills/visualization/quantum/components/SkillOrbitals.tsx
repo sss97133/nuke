@@ -10,12 +10,14 @@ interface SkillOrbitalsProps {
   scene: THREE.Scene;
   skills: Skill[];
   userSkills: UserSkill[];
+  id?: string; // Add optional id prop
 }
 
 const SkillOrbitals = ({ 
   scene, 
   skills, 
-  userSkills 
+  userSkills,
+  id 
 }: SkillOrbitalsProps) => {
   const skillObjectsRef = useRef<THREE.Group>(new THREE.Group());
   const orbitLinesRef = useRef<THREE.Line[]>([]);
@@ -99,14 +101,36 @@ const SkillOrbitals = ({
 
   // We use a div with a ref to expose our animation functions
   return (
-    <div ref={(el) => {
-      // Expose our animation methods and refs to parent components
-      if (el) {
-        (el as any).animateSkills = animationRef.current.animateSkills;
-        (el as any).skillObjectsRef = skillObjectsRef;
-      }
-    }} style={{ display: 'none' }} />
+    <div 
+      id={id} // Use the id prop if provided
+      ref={(el) => {
+        // Expose our animation methods and refs to parent components
+        if (el) {
+          (el as any).animateSkills = animationRef.current.animateSkills;
+          (el as any).skillObjectsRef = skillObjectsRef;
+        }
+      }} 
+      style={{ display: 'none' }} 
+    />
   );
+};
+
+// Provide a static method to get a controller
+SkillOrbitals.getController = (props: SkillOrbitalsProps) => {
+  // Create a group to hold skill objects
+  const skillObjectsGroup = new THREE.Group();
+  
+  // Initialize the scene if provided
+  if (props.scene) {
+    props.scene.add(skillObjectsGroup);
+  }
+  
+  return {
+    animateSkills: (time: number) => {
+      animateSkills(time, { current: skillObjectsGroup }, props.userSkills);
+    },
+    skillObjectsRef: { current: skillObjectsGroup } as React.RefObject<THREE.Group>
+  };
 };
 
 export default SkillOrbitals;
