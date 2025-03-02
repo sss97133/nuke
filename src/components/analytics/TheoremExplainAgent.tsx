@@ -1,145 +1,33 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlanStep, TheoremData } from './theorem-explain/types';
 import TheoremCard from './theorem-explain/TheoremCard';
 import PlannerTab from './theorem-explain/PlannerTab';
 import CodeTab from './theorem-explain/CodeTab';
 import OutputTab from './theorem-explain/OutputTab';
 import DocumentationSection from './theorem-explain/DocumentationSection';
+import { useTheoremData } from './theorem-explain/hooks/useTheoremData';
+import { usePlanner } from './theorem-explain/hooks/usePlanner';
+import { useCodeGenerator } from './theorem-explain/hooks/useCodeGenerator';
+import { useTabState } from './theorem-explain/hooks/useTabState';
 
 const TheoremExplainAgent = () => {
-  const [activeTab, setActiveTab] = useState("planner");
-  const [loading, setLoading] = useState(false);
-  const [planning, setPlanning] = useState(false);
-  const [planCompleted, setPlanCompleted] = useState(false);
-  const [codeGenerated, setCodeGenerated] = useState(false);
-  const [codeError, setCodeError] = useState(false);
-  const [codeFixed, setCodeFixed] = useState(false);
-  const [theoremData, setTheoremData] = useState<TheoremData[]>([]);
-  const [selectedTheorem, setSelectedTheorem] = useState<TheoremData | undefined>(undefined);
-  const [fetchingData, setFetchingData] = useState(false);
+  // Use our custom hooks to manage state
+  const { theoremData, selectedTheorem, fetchingData } = useTheoremData();
+  const { activeTab, setActiveTab } = useTabState();
+  const { loading: plannerLoading, planning, planCompleted, planSteps, startPlanning } = usePlanner(selectedTheorem);
+  const { 
+    loading: codeLoading, 
+    codeGenerated, 
+    codeError, 
+    codeFixed, 
+    generateCode, 
+    fixCode 
+  } = useCodeGenerator(selectedTheorem);
   
-  const [planSteps, setPlanSteps] = useState<PlanStep[]>([
-    { title: "Scene Outline", description: "Initial context and scope", completed: false },
-    { title: "Vision Storyboard Plan", description: "Visual representation flow", completed: false },
-    { title: "Technical Implementation Plan", description: "Code structure and algorithms", completed: false },
-    { title: "Animation & Narration Plan", description: "User experience details", completed: false }
-  ]);
-  
-  // Fetch data from Hugging Face dataset
-  useEffect(() => {
-    const fetchTheoremData = async () => {
-      try {
-        setFetchingData(true);
-        // Log the fetch attempt
-        console.log("Fetching theorem data from HuggingFace...");
-        
-        const response = await fetch(
-          "https://datasets-server.huggingface.co/rows?dataset=TIGER-Lab%2FTheoremExplainBench&config=default&split=train&offset=0&length=5"
-        );
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch data: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log("Data received:", data);
-        
-        // Transform the data into our format
-        if (data && data.rows) {
-          const transformedData: TheoremData[] = data.rows.map((row: any) => ({
-            id: row.row_idx.toString(),
-            name: row.row.theorem_name || "Unnamed Theorem",
-            definition: row.row.theorem_statement || "No definition available",
-            explanation: row.row.explanation || undefined,
-            category: row.row.category || undefined
-          }));
-          
-          console.log("Transformed data:", transformedData);
-          setTheoremData(transformedData);
-          
-          // Set the first theorem as selected
-          if (transformedData.length > 0) {
-            console.log("Setting selected theorem:", transformedData[0]);
-            setSelectedTheorem(transformedData[0]);
-          }
-        } else {
-          console.error("No rows found in data:", data);
-        }
-      } catch (error) {
-        console.error("Error fetching theorem data:", error);
-      } finally {
-        setFetchingData(false);
-      }
-    };
-    
-    fetchTheoremData();
-  }, []);
-  
-  // Debug output whenever selectedTheorem changes
-  useEffect(() => {
-    console.log("Selected theorem changed:", selectedTheorem);
-  }, [selectedTheorem]);
-  
-  // Simulates the planning process
-  const startPlanning = () => {
-    console.log("Starting planning with theorem:", selectedTheorem);
-    setLoading(true);
-    setPlanning(true);
-    
-    // Simulate API calls with timeouts
-    let stepIndex = 0;
-    const interval = setInterval(() => {
-      if (stepIndex < planSteps.length) {
-        setPlanSteps(prev => {
-          const updated = [...prev];
-          updated[stepIndex].completed = true;
-          return updated;
-        });
-        stepIndex++;
-      } else {
-        clearInterval(interval);
-        setPlanCompleted(true);
-        setPlanning(false);
-      }
-    }, 1000);
-    
-    // Simulate completion
-    setTimeout(() => {
-      setLoading(false);
-    }, 5000);
-  };
-  
-  const generateCode = () => {
-    console.log("Generating code for theorem:", selectedTheorem);
-    setLoading(true);
-    
-    // Simulate code generation
-    setTimeout(() => {
-      setCodeGenerated(true);
-      setCodeError(true);
-      setLoading(false);
-    }, 2000);
-  };
-  
-  const fixCode = () => {
-    console.log("Fixing code for theorem:", selectedTheorem);
-    setLoading(true);
-    
-    // Simulate code fixing
-    setTimeout(() => {
-      setCodeError(false);
-      setCodeFixed(true);
-      setLoading(false);
-    }, 2000);
-  };
-  
-  // Debug tracking active tab
-  useEffect(() => {
-    console.log("Active tab changed to:", activeTab);
-  }, [activeTab]);
+  // Combine loading states
+  const loading = plannerLoading || codeLoading;
   
   return (
     <div className="space-y-6">
