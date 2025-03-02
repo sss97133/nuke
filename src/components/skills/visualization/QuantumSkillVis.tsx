@@ -7,7 +7,7 @@ import { createQuantumParticles } from './quantum/QuantumParticles';
 import { 
   calculateCareerMomentum, 
   calculateQuantumState 
-} from './quantum/QuantumCalculations';
+} from './quantum/calculations';
 import { categoryColors } from './quantum/QuantumColors';
 
 interface QuantumSkillVisProps {

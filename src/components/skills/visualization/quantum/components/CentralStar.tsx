@@ -9,6 +9,24 @@ interface CentralStarProps {
 const CentralStar: React.FC<CentralStarProps> = ({ scene }) => {
   const centralSphereRef = useRef<THREE.Mesh | null>(null);
   const glowSphereRef = useRef<THREE.Mesh | null>(null);
+  
+  // Instantiate objects that will store our animation logic
+  const animationRef = useRef({
+    animate: () => {
+      if (centralSphereRef.current) {
+        centralSphereRef.current.rotation.y += 0.005;
+      }
+      
+      if (glowSphereRef.current) {
+        glowSphereRef.current.rotation.y -= 0.003;
+        
+        // Pulse effect
+        const time = Date.now() * 0.001;
+        const pulseScale = 1 + 0.05 * Math.sin(time * 0.5);
+        glowSphereRef.current.scale.set(pulseScale, pulseScale, pulseScale);
+      }
+    }
+  });
 
   useEffect(() => {
     if (!scene) return;
@@ -52,23 +70,25 @@ const CentralStar: React.FC<CentralStarProps> = ({ scene }) => {
     };
   }, [scene]);
 
-  // Animation function to be called in the main component's animation loop
-  const animate = () => {
-    if (centralSphereRef.current) {
-      centralSphereRef.current.rotation.y += 0.005;
-    }
-    
-    if (glowSphereRef.current) {
-      glowSphereRef.current.rotation.y -= 0.003;
-      
-      // Pulse effect
-      const time = Date.now() * 0.001;
-      const pulseScale = 1 + 0.05 * Math.sin(time * 0.5);
-      glowSphereRef.current.scale.set(pulseScale, pulseScale, pulseScale);
+  // We use a trick to expose the animate function while still being a valid React component
+  return (
+    <div ref={(el) => {
+      // This exposes our animate function to parent components that have a ref to this component
+      if (el && 'animate' in animationRef.current) {
+        (el as any).animate = animationRef.current.animate;
+      }
+    }} style={{ display: 'none' }} />
+  );
+};
+
+// Attach the animate method to allow direct access
+(CentralStar as any).getAnimationHandler = (props: CentralStarProps) => {
+  return {
+    animate: () => {
+      const centralStar = CentralStar(props);
+      return (centralStar as any).animate;
     }
   };
-
-  return { animate };
 };
 
 export default CentralStar;
