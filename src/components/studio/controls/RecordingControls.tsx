@@ -4,13 +4,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Record, Square, FileVideo, Clock } from 'lucide-react';
+import { Mic, Square, FileVideo, Clock } from 'lucide-react';
 import type { RecordingControlsProps } from '../types/componentTypes';
 
 export const RecordingControls: React.FC<RecordingControlsProps> = ({ onStart, onStop }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [quality, setQuality] = useState('1080p');
+  const [timerId, setTimerId] = useState<number | null>(null);
   
   const handleStartRecording = () => {
     setIsRecording(true);
@@ -23,8 +24,8 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({ onStart, o
       setRecordingTime(prev => prev + 1);
     }, 1000);
     
-    // Store timer id for cleanup
-    setTimerId(timer);
+    // Store timer id for cleanup - converting to number for state
+    setTimerId(Number(timer));
   };
   
   const handleStopRecording = () => {
@@ -37,8 +38,6 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({ onStart, o
       setTimerId(null);
     }
   };
-  
-  const [timerId, setTimerId] = useState<number | null>(null);
   
   // Format seconds as MM:SS
   const formatTime = (seconds: number) => {
@@ -80,7 +79,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({ onStart, o
               onClick={handleStartRecording}
               className="flex items-center gap-1 bg-red-500 text-white hover:bg-red-600"
             >
-              <Record className="h-4 w-4" />
+              <Mic className="h-4 w-4" />
               Start Recording
             </Button>
           ) : (

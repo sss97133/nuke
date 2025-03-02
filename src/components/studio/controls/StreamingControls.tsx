@@ -12,6 +12,7 @@ export const StreamingControls: React.FC<StreamingControlsProps> = ({ onStart, o
   const [streamTitle, setStreamTitle] = useState('Studio Session');
   const [viewerCount, setViewerCount] = useState(0);
   const [streamTime, setStreamTime] = useState(0);
+  const [timerId, setTimerId] = useState<number | null>(null);
   
   const handleStartStreaming = () => {
     setIsStreaming(true);
@@ -33,8 +34,8 @@ export const StreamingControls: React.FC<StreamingControlsProps> = ({ onStart, o
       }
     }, 1000);
     
-    // Store timer id for cleanup
-    setTimerId(timer);
+    // Store timer id for cleanup - converting to number for state
+    setTimerId(Number(timer));
   };
   
   const handleStopStreaming = () => {
@@ -47,8 +48,6 @@ export const StreamingControls: React.FC<StreamingControlsProps> = ({ onStart, o
       setTimerId(null);
     }
   };
-  
-  const [timerId, setTimerId] = useState<number | null>(null);
   
   // Format seconds as HH:MM:SS
   const formatTime = (seconds: number) => {
