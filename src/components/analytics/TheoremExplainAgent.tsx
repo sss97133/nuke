@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlanStep } from './theorem-explain/types';
+import { PlanStep, TheoremData } from './theorem-explain/types';
 import TheoremCard from './theorem-explain/TheoremCard';
 import PlannerTab from './theorem-explain/PlannerTab';
 import CodeTab from './theorem-explain/CodeTab';
@@ -17,6 +17,9 @@ const TheoremExplainAgent = () => {
   const [codeGenerated, setCodeGenerated] = useState(false);
   const [codeError, setCodeError] = useState(false);
   const [codeFixed, setCodeFixed] = useState(false);
+  const [theoremData, setTheoremData] = useState<TheoremData[]>([]);
+  const [selectedTheorem, setSelectedTheorem] = useState<TheoremData | undefined>(undefined);
+  const [fetchingData, setFetchingData] = useState(false);
   
   const [planSteps, setPlanSteps] = useState<PlanStep[]>([
     { title: "Scene Outline", description: "Initial context and scope", completed: false },
@@ -24,6 +27,48 @@ const TheoremExplainAgent = () => {
     { title: "Technical Implementation Plan", description: "Code structure and algorithms", completed: false },
     { title: "Animation & Narration Plan", description: "User experience details", completed: false }
   ]);
+  
+  // Fetch data from Hugging Face dataset
+  useEffect(() => {
+    const fetchTheoremData = async () => {
+      try {
+        setFetchingData(true);
+        const response = await fetch(
+          "https://datasets-server.huggingface.co/rows?dataset=TIGER-Lab%2FTheoremExplainBench&config=default&split=train&offset=0&length=5"
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch data: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Transform the data into our format
+        if (data && data.rows) {
+          const transformedData: TheoremData[] = data.rows.map((row: any) => ({
+            id: row.row_idx.toString(),
+            name: row.row.theorem_name || "Unnamed Theorem",
+            definition: row.row.theorem_statement || "No definition available",
+            explanation: row.row.explanation || undefined,
+            category: row.row.category || undefined
+          }));
+          
+          setTheoremData(transformedData);
+          
+          // Set the first theorem as selected
+          if (transformedData.length > 0) {
+            setSelectedTheorem(transformedData[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching theorem data:", error);
+      } finally {
+        setFetchingData(false);
+      }
+    };
+    
+    fetchTheoremData();
+  }, []);
   
   // Simulates the planning process
   const startPlanning = () => {
@@ -80,7 +125,7 @@ const TheoremExplainAgent = () => {
       <div>
         <h2 className="text-2xl font-bold mb-2">Theorem Explain Agent</h2>
         <p className="text-muted-foreground">
-          Uses AI planning and code generation to create educational visualizations
+          Uses AI planning and code generation to create educational visualizations from the TIGER-Lab/TheoremExplainBench dataset
         </p>
       </div>
       
@@ -89,6 +134,8 @@ const TheoremExplainAgent = () => {
           onStartPlanning={startPlanning}
           planning={planning}
           planCompleted={planCompleted}
+          selectedTheorem={selectedTheorem}
+          isLoading={fetchingData}
         />
         
         <Card className="lg:col-span-2">
@@ -126,7 +173,7 @@ const TheoremExplainAgent = () => {
               </TabsContent>
               
               <TabsContent value="output">
-                <OutputTab />
+                <OutputTab theoremData={selectedTheorem} />
               </TabsContent>
             </Tabs>
           </CardContent>
