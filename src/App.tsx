@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -26,8 +25,8 @@ import FuelTracking from "./pages/FuelTracking"
 import Diagnostics from "./pages/Diagnostics"
 import Analytics from "./pages/Analytics"
 import Schedule from "./pages/Schedule"
+import Service from "./pages/Service"
 
-// Create a new QueryClient instance
 const queryClient = new QueryClient();
 
 function AppContent() {
@@ -64,7 +63,6 @@ function AppContent() {
     return <Navigate to="/login" replace />;
   }
 
-  // For auth pages, don't show the sidebar
   if (isAuthPath || location.pathname.startsWith('/auth/callback')) {
     return (
       <div className="min-h-screen bg-background">
@@ -78,7 +76,6 @@ function AppContent() {
     );
   }
 
-  // For authenticated pages, show the sidebar and content
   return (
     <div className="flex min-h-screen bg-background">
       <NavSidebar />
@@ -89,7 +86,7 @@ function AppContent() {
           <Route path="/skills" element={<Skills />} />
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/maintenance" element={<Dashboard />} />
-          <Route path="/service" element={<Dashboard />} />
+          <Route path="/service" element={<Service />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/fuel" element={<FuelTracking />} />
