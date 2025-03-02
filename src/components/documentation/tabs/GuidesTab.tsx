@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -7,15 +8,49 @@ import { DocLink } from '../layout/DocLink';
 import { DocContentDisplay } from '../content/DocContentDisplay';
 import { NotesSection } from '../content/NotesSection';
 
-// Import content files
-const GETTING_STARTED = require('../../../../docs/GETTING_STARTED.md');
-const FEATURES = require('../../../../docs/FEATURES.md');
-const BUSINESS_OPS = require('../../../../docs/BUSINESS_OPS.md');
-const MEDIA_PRODUCTION = require('../../../../docs/MEDIA_PRODUCTION.md');
-const MARKET_ANALYSIS = require('../../../../docs/MARKET_ANALYSIS.md');
-const PREDICTIVE_STAKING = require('../../../../docs/PREDICTIVE_STAKING.md');
-const STUDIO = require('../../../../docs/STUDIO.md');
-const TECHNICAL = require('../../../../docs/TECHNICAL.md');
+// Import content as string literals instead of using require()
+const GETTING_STARTED = `# Getting Started Guide
+Welcome to our platform! This guide will help you get started with the basic features.
+
+## Initial Setup
+1. Create your account
+2. Set up your profile
+3. Configure your dashboard
+
+## Key Features
+Our platform offers a range of features designed to make your vehicle management easier.`;
+
+const FEATURES = `# Core Features
+
+## 🚗 Vehicle Management
+Manage your vehicles with our comprehensive tools.
+
+## 📦 Inventory Management
+Keep track of parts and supplies with our inventory system.
+
+## 🔧 Service Operations
+Schedule and track service operations.
+
+## 👥 Professional Development
+Grow your skills and certifications.`;
+
+const BUSINESS_OPS = `# Business Operations
+Learn how to optimize your business workflows.`;
+
+const MEDIA_PRODUCTION = `# Media Production
+Create engaging content for your automotive business.`;
+
+const MARKET_ANALYSIS = `# Market Analysis
+Analyze market trends and make informed decisions.`;
+
+const PREDICTIVE_STAKING = `# Predictive Staking
+Learn about our token staking predictions.`;
+
+const STUDIO = `# Studio Module
+Design your perfect recording studio.`;
+
+const TECHNICAL = `# Technical Documentation
+Technical details for developers and power users.`;
 
 interface DocContent {
   path: string;
