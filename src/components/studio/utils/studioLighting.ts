@@ -61,6 +61,9 @@ export const createProductLighting = (scene: THREE.Scene) => {
   scene.add(backLight);
 };
 
+// Add alias for compatibility with existing code
+export const createLighting = createBasicStudioLighting;
+
 // Helper function to remove existing lights
 const removeExistingLights = (scene: THREE.Scene) => {
   scene.children.forEach((child) => {

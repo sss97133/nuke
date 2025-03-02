@@ -52,13 +52,15 @@ export const useStudioConfigForm = (initialData: InitialFormData, onUpdate: (dat
       width: Number(formData.width),
       height: Number(formData.height),
       ptzTracks: formData.ptzTracks.map((track, index) => ({
-        id: initialData.ptzTracks[index]?.id || `track-${index}`,
+        id: initialData.ptzTracks[index]?.id || `track-${index + 1}`,
         name: initialData.ptzTracks[index]?.name || `Camera ${index + 1}`,
         position: {
           x: Number(track.position.x),
           y: Number(track.position.y),
           z: Number(track.position.z)
         },
+        rotation: initialData.ptzTracks[index]?.rotation || { x: 0, y: 0, z: 0 },
+        target: initialData.ptzTracks[index]?.target || { x: 0, y: 5, z: 0 },
         length: Number(track.length),
         speed: Number(track.speed),
         coneAngle: Number(track.coneAngle),
