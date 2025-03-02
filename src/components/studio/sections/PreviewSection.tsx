@@ -1,42 +1,38 @@
+
 import React from 'react';
-import { Card } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { StudioWorkspace } from '../StudioWorkspace';
+import type { WorkspaceDimensions, PTZTrack } from '../types/workspace';
 
 interface PreviewSectionProps {
-  selectedCamera: number | null;
-  setSelectedCamera: (id: number) => void;
+  dimensions: WorkspaceDimensions;
+  ptzTracks: PTZTrack[];
+  selectedCameraIndex: number | null;
+  onCameraSelect: (index: number) => void;
 }
 
-export const PreviewSection = ({ selectedCamera, setSelectedCamera }: PreviewSectionProps) => {
-  const { toast } = useToast();
-
+export const PreviewSection: React.FC<PreviewSectionProps> = ({ 
+  dimensions, 
+  ptzTracks,
+  selectedCameraIndex,
+  onCameraSelect
+}) => {
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {[1, 2, 3, 4].map((cameraId) => (
-        <Card 
-          key={cameraId}
-          className={`p-4 cursor-pointer transition-all ${
-            selectedCamera === cameraId ? 'ring-2 ring-primary' : ''
-          }`}
-          onClick={() => {
-            setSelectedCamera(cameraId);
-            toast({
-              title: "Camera Selected",
-              description: `Switched to camera ${cameraId}`,
-            });
-          }}
-        >
-          <div className="aspect-video bg-muted flex items-center justify-center">
-            <p className="text-muted-foreground">Camera {cameraId} Feed</p>
-          </div>
-          <div className="mt-2 flex justify-between items-center">
-            <span className="text-sm font-medium">PTZ Camera {cameraId}</span>
-            <span className="text-xs text-muted-foreground">
-              {selectedCamera === cameraId ? 'Selected' : 'Click to select'}
-            </span>
-          </div>
-        </Card>
-      ))}
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Studio Simulator</CardTitle>
+        <CardDescription>
+          Interactive 3D view of your studio setup. Click on cameras to select them for control.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <StudioWorkspace 
+          dimensions={dimensions} 
+          ptzTracks={ptzTracks}
+          selectedCameraIndex={selectedCameraIndex}
+          onCameraSelect={onCameraSelect}
+        />
+      </CardContent>
+    </Card>
   );
 };

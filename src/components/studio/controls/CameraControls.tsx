@@ -1,78 +1,81 @@
 
 import React, { useState } from 'react';
-import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Camera, Image, RefreshCw } from 'lucide-react';
 import type { CameraControlsProps } from '../types/componentTypes';
 
 export const CameraControls: React.FC<CameraControlsProps> = ({ onZoom }) => {
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [focusDistance, setFocusDistance] = useState(50);
-  const [aperture, setAperture] = useState(5.6);
-  
-  const handleZoomChange = (value: number[]) => {
-    const newZoom = value[0];
-    setZoomLevel(newZoom);
-    onZoom(newZoom);
-  };
-  
-  const handleFocusChange = (value: number[]) => {
-    setFocusDistance(value[0]);
-  };
-  
-  const handleApertureChange = (value: number[]) => {
-    setAperture(value[0]);
-  };
+  const [exposureValue, setExposureValue] = useState(50);
+  const [focusValue, setFocusValue] = useState(70);
+  const [isAutoFocus, setIsAutoFocus] = useState(true);
   
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <Label>Zoom</Label>
-          <span className="text-xs text-muted-foreground">{zoomLevel.toFixed(1)}x</span>
+    <Card>
+      <CardHeader>
+        <CardTitle>Camera Controls</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <Label>Exposure</Label>
+            <span className="text-xs text-muted-foreground">{exposureValue}%</span>
+          </div>
+          <Slider
+            value={[exposureValue]}
+            min={0}
+            max={100}
+            step={1}
+            onValueChange={(value) => setExposureValue(value[0])}
+          />
         </div>
-        <Slider
-          value={[zoomLevel]}
-          min={1}
-          max={10}
-          step={0.1}
-          onValueChange={handleZoomChange}
-        />
-      </div>
-      
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <Label>Focus</Label>
-          <span className="text-xs text-muted-foreground">{focusDistance.toFixed(1)} cm</span>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <Label>Focus</Label>
+            <span className="text-xs text-muted-foreground">{focusValue}%</span>
+          </div>
+          <Slider
+            value={[focusValue]}
+            min={0}
+            max={100}
+            step={1}
+            onValueChange={(value) => setFocusValue(value[0])}
+            disabled={isAutoFocus}
+          />
         </div>
-        <Slider
-          value={[focusDistance]}
-          min={10}
-          max={500}
-          step={1}
-          onValueChange={handleFocusChange}
-        />
-      </div>
-      
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <Label>Aperture</Label>
-          <span className="text-xs text-muted-foreground">f/{aperture.toFixed(1)}</span>
+        
+        <div className="flex items-center justify-between">
+          <Label htmlFor="auto-focus">Auto Focus</Label>
+          <Switch 
+            id="auto-focus" 
+            checked={isAutoFocus} 
+            onCheckedChange={setIsAutoFocus}
+          />
         </div>
-        <Slider
-          value={[aperture]}
-          min={1.4}
-          max={22}
-          step={0.1}
-          onValueChange={handleApertureChange}
-        />
-      </div>
-      
-      <Button variant="outline" size="sm" className="w-full">
-        <RefreshCw className="h-4 w-4 mr-2" />
-        Auto Focus
-      </Button>
-    </div>
+        
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex items-center gap-1"
+          >
+            <Camera className="h-4 w-4" />
+            Take Snapshot
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="flex items-center gap-1"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Reset Settings
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };

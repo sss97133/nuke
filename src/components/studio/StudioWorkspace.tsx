@@ -1,254 +1,247 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { createBasicStudioLighting } from './utils/studioLighting';
+import { createLighting } from './utils/studioLighting';
 import { createPTZCamera } from './components/PTZCamera';
-import { useStudioAnimation } from './hooks/useStudioAnimation';
-import { HumanFigure } from './components/HumanFigure';
-import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
+import { createHumanFigure } from './components/HumanFigure';
 import type { StudioWorkspaceProps } from './types/componentTypes';
 
 export const StudioWorkspace: React.FC<StudioWorkspaceProps> = ({
   dimensions,
   ptzTracks,
-  onSelectCamera,
+  onCameraSelect,
   selectedCameraIndex
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const humanRef = useRef<THREE.Group | null>(null);
-  const ptzCamerasRef = useRef<THREE.Group[]>([]);
-  const trackMeshesRef = useRef<THREE.Mesh[]>([]);
-  const [isAnimating, setIsAnimating] = useState(true);
+  const ptzCamerasRef = useRef<{ trackMesh: THREE.Mesh, ptzGroup: THREE.Group }[]>([]);
+  const humanFigureRef = useRef<THREE.Group | null>(null);
+  const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
+  const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
+  const [isInitialized, setIsInitialized] = useState(false);
 
+  // Initialize scene
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || isInitialized) return;
 
-    // Initialize Scene
+    // Create scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111111);
+    scene.background = new THREE.Color(0x1a1a1a);
     sceneRef.current = scene;
 
-    // Initialize Camera
+    // Create camera
     const camera = new THREE.PerspectiveCamera(
       75,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
       0.1,
       1000
     );
-    camera.position.set(dimensions.width / 2, dimensions.height * 0.7, dimensions.length * 0.7);
+    camera.position.set(0, dimensions.height / 2, dimensions.length);
+    camera.lookAt(0, dimensions.height / 2, 0);
     cameraRef.current = camera;
 
-    // Initialize Renderer
+    // Create renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
     renderer.shadowMap.enabled = true;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+
+    // Set scene to userdata for easier reference
     scene.userData.renderer = renderer;
 
-    // Initialize Controls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.target.set(0, dimensions.height / 4, 0);
-    controlsRef.current = controls;
+    // Handle resize
+    const handleResize = () => {
+      if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
+      
+      cameraRef.current.aspect = containerRef.current.clientWidth / containerRef.current.clientHeight;
+      cameraRef.current.updateProjectionMatrix();
+      rendererRef.current.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
+    };
 
-    // Create Studio Floor
+    window.addEventListener('resize', handleResize);
+    
+    // Animation loop
+    const animate = () => {
+      requestAnimationFrame(animate);
+      
+      if (rendererRef.current && sceneRef.current && cameraRef.current) {
+        rendererRef.current.render(sceneRef.current, cameraRef.current);
+      }
+    };
+    animate();
+
+    setIsInitialized(true);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      
+      if (rendererRef.current && containerRef.current) {
+        containerRef.current.removeChild(rendererRef.current.domElement);
+        rendererRef.current.dispose();
+      }
+    };
+  }, [dimensions.height, dimensions.length, isInitialized]);
+
+  // Create or update studio elements
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    
+    const scene = sceneRef.current;
+    
+    // Clear previous objects
+    scene.children = scene.children.filter(child => 
+      child.type === 'Camera' || 
+      child.type === 'AmbientLight' || 
+      child.type === 'DirectionalLight'
+    );
+    
+    // Create floor
     const floorGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.length);
-    const floorMaterial = new THREE.MeshStandardMaterial({
-      color: 0x333333,
-      roughness: 0.8
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x333333, 
+      roughness: 0.8,
+      metalness: 0.2
     });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
     floor.receiveShadow = true;
     scene.add(floor);
-
-    // Create Studio Walls
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
     
-    const backWall = new THREE.Mesh(
-      new THREE.PlaneGeometry(dimensions.width, dimensions.height),
-      wallMaterial
-    );
-    backWall.position.z = -dimensions.length / 2;
-    backWall.position.y = dimensions.height / 2;
+    // Create walls
+    const wallMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x555555,
+      roughness: 0.7,
+      metalness: 0.1
+    });
+    
+    // Back wall
+    const backWallGeometry = new THREE.PlaneGeometry(dimensions.width, dimensions.height);
+    const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
+    backWall.position.set(0, dimensions.height/2, -dimensions.length/2);
     backWall.receiveShadow = true;
     scene.add(backWall);
     
-    const leftWall = new THREE.Mesh(
-      new THREE.PlaneGeometry(dimensions.length, dimensions.height),
-      wallMaterial
-    );
-    leftWall.position.x = -dimensions.width / 2;
-    leftWall.position.y = dimensions.height / 2;
+    // Left wall
+    const leftWallGeometry = new THREE.PlaneGeometry(dimensions.length, dimensions.height);
+    const leftWall = new THREE.Mesh(leftWallGeometry, wallMaterial);
+    leftWall.position.set(-dimensions.width/2, dimensions.height/2, 0);
     leftWall.rotation.y = Math.PI / 2;
     leftWall.receiveShadow = true;
     scene.add(leftWall);
     
-    const rightWall = new THREE.Mesh(
-      new THREE.PlaneGeometry(dimensions.length, dimensions.height),
-      wallMaterial
-    );
-    rightWall.position.x = dimensions.width / 2;
-    rightWall.position.y = dimensions.height / 2;
+    // Right wall
+    const rightWallGeometry = new THREE.PlaneGeometry(dimensions.length, dimensions.height);
+    const rightWall = new THREE.Mesh(rightWallGeometry, wallMaterial);
+    rightWall.position.set(dimensions.width/2, dimensions.height/2, 0);
     rightWall.rotation.y = -Math.PI / 2;
     rightWall.receiveShadow = true;
     scene.add(rightWall);
-
-    // Create Human Figure
-    const human = new HumanFigure();
-    human.position.y = 0;
-    scene.add(human);
-    humanRef.current = human;
-
-    // Clear previous PTZ cameras if any
-    ptzCamerasRef.current = [];
-    trackMeshesRef.current = [];
-
-    // Create PTZ Cameras
-    ptzTracks.forEach((track, index) => {
-      const isActive = selectedCameraIndex === index;
-      const { trackMesh, ptzGroup } = createPTZCamera(scene, track, Math.max(dimensions.width, dimensions.length), isActive);
-      
-      // Store references for animation
-      ptzCamerasRef.current.push(ptzGroup);
-      trackMeshesRef.current.push(trackMesh);
-      
-      // Add click handler for camera selection
-      if (onSelectCamera) {
-        const clickableParts = ptzGroup.children.filter(child => child instanceof THREE.Mesh);
-        clickableParts.forEach(part => {
-          if (part instanceof THREE.Mesh) {
-            part.userData.clickable = true;
-            part.userData.cameraIndex = index;
-          }
-        });
-      }
-    });
-
-    // Add Studio Lighting
-    createBasicStudioLighting(scene);
-
-    // Handle click events for camera selection
-    if (onSelectCamera) {
-      const raycaster = new THREE.Raycaster();
-      const mouse = new THREE.Vector2();
-
-      const handleMouseClick = (event: MouseEvent) => {
-        // Calculate mouse position in normalized device coordinates
-        const rect = renderer.domElement.getBoundingClientRect();
-        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-        // Update the picking ray with the camera and mouse position
-        raycaster.setFromCamera(mouse, camera);
-
-        // Calculate objects intersecting the picking ray
-        const intersects = raycaster.intersectObjects(scene.children, true);
-        
-        for (let i = 0; i < intersects.length; i++) {
-          const object = intersects[i].object;
-          if (object.userData?.clickable && object.userData?.cameraIndex !== undefined) {
-            onSelectCamera(object.userData.cameraIndex);
-            break;
-          }
-        }
-      };
-
-      renderer.domElement.addEventListener('click', handleMouseClick);
+    
+    // Add lighting
+    createLighting(scene, dimensions);
+    
+    // Add human figure
+    if (humanFigureRef.current) {
+      scene.remove(humanFigureRef.current);
     }
-
-    // Handle window resize
-    const handleResize = () => {
-      if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
-      
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
-      
-      cameraRef.current.aspect = width / height;
-      cameraRef.current.updateProjectionMatrix();
-      rendererRef.current.setSize(width, height);
-    };
+    humanFigureRef.current = createHumanFigure();
+    humanFigureRef.current.position.set(0, 0, 0);
+    scene.add(humanFigureRef.current);
     
-    window.addEventListener('resize', handleResize);
-
-    // Animation
-    const { resetAnimation } = useStudioAnimation(
-      humanRef,
-      ptzCamerasRef,
-      ptzTracks,
-      dimensions,
-      isAnimating
-    );
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      
-      if (containerRef.current && rendererRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
-      }
-      
-      if (controlsRef.current) {
-        controlsRef.current.dispose();
-      }
-      
-      if (rendererRef.current) {
-        rendererRef.current.dispose();
-      }
-    };
-  }, [dimensions, ptzTracks, onSelectCamera, selectedCameraIndex]);
-
-  // Update selected camera visuals when selection changes
-  useEffect(() => {
-    if (!sceneRef.current) return;
-    
-    ptzTracks.forEach((track, index) => {
-      // Remove existing cameras
-      sceneRef.current?.children.forEach(child => {
-        if (child.userData?.cameraIndex === index) {
-          sceneRef.current?.remove(child);
-        }
+    // Clear old PTZ cameras
+    if (ptzCamerasRef.current.length > 0) {
+      ptzCamerasRef.current.forEach(({ trackMesh, ptzGroup }) => {
+        scene.remove(trackMesh);
+        scene.remove(ptzGroup);
       });
+    }
+    
+    // Add PTZ cameras
+    ptzCamerasRef.current = ptzTracks.map((track, index) => {
+      // Calculate the longest dimension for camera cone
+      const maxDimension = Math.max(dimensions.length, dimensions.width, dimensions.height);
       
-      // Create new camera with updated active state
-      const isActive = selectedCameraIndex === index;
-      const { trackMesh, ptzGroup } = createPTZCamera(sceneRef.current, track, Math.max(dimensions.width, dimensions.length), isActive);
+      // Create PTZ camera
+      const ptzCamera = createPTZCamera(
+        scene, 
+        track, 
+        maxDimension, 
+        selectedCameraIndex === index
+      );
       
-      // Store references
-      ptzCamerasRef.current[index] = ptzGroup;
-      trackMeshesRef.current[index] = trackMesh;
+      // Add user data for raycasting
+      ptzCamera.ptzGroup.userData = { 
+        type: 'ptzCamera',
+        index: index
+      };
       
-      // Add click handler
-      if (onSelectCamera) {
-        ptzGroup.children.forEach(part => {
-          if (part instanceof THREE.Mesh) {
-            part.userData.clickable = true;
-            part.userData.cameraIndex = index;
-          }
-        });
-      }
+      return ptzCamera;
     });
-  }, [selectedCameraIndex]);
+    
+  }, [dimensions, ptzTracks, selectedCameraIndex]);
 
-  // Toggle animation
-  const toggleAnimation = () => {
-    setIsAnimating(!isAnimating);
-  };
+  // Handle camera selection via raycasting
+  useEffect(() => {
+    if (!containerRef.current || !sceneRef.current || !cameraRef.current) return;
+    
+    const handleMouseDown = (event: MouseEvent) => {
+      if (!containerRef.current || !sceneRef.current || !cameraRef.current) return;
+      
+      const rect = containerRef.current.getBoundingClientRect();
+      mouseRef.current.x = ((event.clientX - rect.left) / containerRef.current.clientWidth) * 2 - 1;
+      mouseRef.current.y = -((event.clientY - rect.top) / containerRef.current.clientHeight) * 2 + 1;
+      
+      raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+      
+      // Find all objects intersecting with the ray
+      const intersects = raycasterRef.current.intersectObjects(
+        sceneRef.current.children, 
+        true
+      );
+      
+      // Find the first camera that was clicked
+      for (let i = 0; i < intersects.length; i++) {
+        // Walk up the parent chain to find the root object with userData
+        let currentObject = intersects[i].object;
+        while (currentObject && !currentObject.userData?.type) {
+          currentObject = currentObject.parent as THREE.Object3D;
+        }
+        
+        if (currentObject && currentObject.userData?.type === 'ptzCamera') {
+          if (onCameraSelect) {
+            onCameraSelect(currentObject.userData.index);
+          }
+          break;
+        }
+      }
+    };
+    
+    containerRef.current.addEventListener('mousedown', handleMouseDown);
+    
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.removeEventListener('mousedown', handleMouseDown);
+      }
+    };
+  }, [onCameraSelect]);
 
   return (
-    <div ref={containerRef} className="w-full h-full relative bg-black">
-      {/* Optional UI overlays can be added here */}
-      <button 
-        className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-md text-sm"
-        onClick={toggleAnimation}
-      >
-        {isAnimating ? 'Pause Animation' : 'Resume Animation'}
-      </button>
+    <div 
+      ref={containerRef} 
+      className="w-full h-[500px] border rounded-md overflow-hidden"
+      style={{ position: 'relative' }}
+    >
+      {/* Studio workspace will render here */}
+      {selectedCameraIndex !== null && selectedCameraIndex !== undefined && (
+        <div className="absolute top-4 right-4 bg-black/50 px-3 py-1 rounded text-white text-sm">
+          Camera {selectedCameraIndex + 1} Selected
+        </div>
+      )}
     </div>
   );
 };

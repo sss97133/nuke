@@ -1,83 +1,116 @@
 
 import * as THREE from 'three';
 
-export const HumanFigure = (): THREE.Group => {
+export const createHumanFigure = (): THREE.Group => {
   const humanGroup = new THREE.Group();
   
-  // Create a simple human figure
-  const bodyColor = new THREE.Color(0x3366bb);
+  // Constants
+  const headRadius = 0.4;
+  const neckHeight = 0.1;
+  const torsoHeight = 1.5;
+  const torsoWidth = 0.8;
+  const torsoDepth = 0.4;
+  const armLength = 1.2;
+  const armWidth = 0.25;
+  const legLength = 1.8;
+  const legWidth = 0.3;
+  
+  // Materials
+  const skinMaterial = new THREE.MeshPhongMaterial({ 
+    color: 0xE0AC69, 
+    specular: 0x111111,
+    shininess: 30
+  });
+  
+  const clothesMaterial = new THREE.MeshPhongMaterial({ 
+    color: 0x3366CC, 
+    specular: 0x333333,
+    shininess: 30
+  });
+  
+  const pantsMaterial = new THREE.MeshPhongMaterial({ 
+    color: 0x333333, 
+    specular: 0x222222,
+    shininess: 30
+  });
   
   // Head
-  const headGeometry = new THREE.SphereGeometry(0.4, 16, 16);
-  const headMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xffdbac,
-    roughness: 0.7,
-  });
-  const head = new THREE.Mesh(headGeometry, headMaterial);
-  head.position.y = 3;
+  const headGeometry = new THREE.SphereGeometry(headRadius, 16, 16);
+  const head = new THREE.Mesh(headGeometry, skinMaterial);
+  head.position.y = torsoHeight + neckHeight + headRadius;
   head.castShadow = true;
   humanGroup.add(head);
   
-  // Body
-  const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.5, 1.5, 8);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ 
-    color: bodyColor,
-    roughness: 0.9,
-  });
-  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-  body.position.y = 2;
-  body.castShadow = true;
-  humanGroup.add(body);
+  // Neck
+  const neckGeometry = new THREE.CylinderGeometry(0.15, 0.15, neckHeight, 16);
+  const neck = new THREE.Mesh(neckGeometry, skinMaterial);
+  neck.position.y = torsoHeight + neckHeight/2;
+  neck.castShadow = true;
+  humanGroup.add(neck);
   
-  // Lower body
-  const lowerBodyGeometry = new THREE.CylinderGeometry(0.5, 0.4, 0.8, 8);
-  const lowerBodyMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x333333,
-    roughness: 0.9,
-  });
-  const lowerBody = new THREE.Mesh(lowerBodyGeometry, lowerBodyMaterial);
-  lowerBody.position.y = 1.1;
-  lowerBody.castShadow = true;
-  humanGroup.add(lowerBody);
+  // Torso
+  const torsoGeometry = new THREE.BoxGeometry(torsoWidth, torsoHeight, torsoDepth);
+  const torso = new THREE.Mesh(torsoGeometry, clothesMaterial);
+  torso.position.y = torsoHeight/2;
+  torso.castShadow = true;
+  humanGroup.add(torso);
   
-  // Arms
-  const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1.2, 8);
+  // Left Arm
+  const leftArm = new THREE.Group();
   
-  // Left arm
-  const leftArm = new THREE.Mesh(armGeometry, bodyMaterial);
-  leftArm.position.set(0.65, 2.3, 0);
-  leftArm.rotation.z = -0.3;
-  leftArm.castShadow = true;
+  const leftShoulderGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+  const leftShoulder = new THREE.Mesh(leftShoulderGeometry, clothesMaterial);
+  leftShoulder.position.x = -torsoWidth/2;
+  leftShoulder.position.y = torsoHeight - 0.2;
+  leftArm.add(leftShoulder);
+  
+  const leftArmGeometry = new THREE.CylinderGeometry(armWidth/2, armWidth/2, armLength, 16);
+  const leftArmMesh = new THREE.Mesh(leftArmGeometry, skinMaterial);
+  leftArmMesh.rotation.z = -Math.PI/16;
+  leftArmMesh.position.x = -torsoWidth/2 - armLength/2 * Math.sin(Math.PI/16);
+  leftArmMesh.position.y = torsoHeight - 0.2 - armLength/2 * Math.cos(Math.PI/16);
+  leftArmMesh.castShadow = true;
+  leftArm.add(leftArmMesh);
+  
   humanGroup.add(leftArm);
   
-  // Right arm
-  const rightArm = new THREE.Mesh(armGeometry, bodyMaterial);
-  rightArm.position.set(-0.65, 2.3, 0);
-  rightArm.rotation.z = 0.3;
-  rightArm.castShadow = true;
+  // Right Arm
+  const rightArm = new THREE.Group();
+  
+  const rightShoulderGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+  const rightShoulder = new THREE.Mesh(rightShoulderGeometry, clothesMaterial);
+  rightShoulder.position.x = torsoWidth/2;
+  rightShoulder.position.y = torsoHeight - 0.2;
+  rightArm.add(rightShoulder);
+  
+  const rightArmGeometry = new THREE.CylinderGeometry(armWidth/2, armWidth/2, armLength, 16);
+  const rightArmMesh = new THREE.Mesh(rightArmGeometry, skinMaterial);
+  rightArmMesh.rotation.z = Math.PI/16;
+  rightArmMesh.position.x = torsoWidth/2 + armLength/2 * Math.sin(Math.PI/16);
+  rightArmMesh.position.y = torsoHeight - 0.2 - armLength/2 * Math.cos(Math.PI/16);
+  rightArmMesh.castShadow = true;
+  rightArm.add(rightArmMesh);
+  
   humanGroup.add(rightArm);
   
   // Legs
-  const legGeometry = new THREE.CylinderGeometry(0.2, 0.15, 1.2, 8);
-  const legMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x333333,
-    roughness: 0.9,
-  });
-  
-  // Left leg
-  const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-  leftLeg.position.set(0.3, 0.2, 0);
+  const leftLegGeometry = new THREE.CylinderGeometry(legWidth/2, legWidth/2, legLength, 16);
+  const leftLeg = new THREE.Mesh(leftLegGeometry, pantsMaterial);
+  leftLeg.position.set(-torsoWidth/4, -legLength/2, 0);
   leftLeg.castShadow = true;
   humanGroup.add(leftLeg);
   
-  // Right leg
-  const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-  rightLeg.position.set(-0.3, 0.2, 0);
+  const rightLegGeometry = new THREE.CylinderGeometry(legWidth/2, legWidth/2, legLength, 16);
+  const rightLeg = new THREE.Mesh(rightLegGeometry, pantsMaterial);
+  rightLeg.position.set(torsoWidth/4, -legLength/2, 0);
   rightLeg.castShadow = true;
   humanGroup.add(rightLeg);
   
-  // Set the pivot point at the bottom of the model
-  humanGroup.position.y = 0.6;
+  // Adjust scale to human height (around 5.5-6 feet)
+  humanGroup.scale.set(0.5, 0.5, 0.5);
+  
+  // Set position so the feet are on the ground
+  humanGroup.position.y = legLength * 0.5 / 2;
   
   return humanGroup;
 };

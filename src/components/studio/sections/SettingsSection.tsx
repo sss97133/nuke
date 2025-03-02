@@ -1,38 +1,37 @@
+
 import React from 'react';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { StudioConfigForm } from '../StudioConfigForm';
-import { StudioWorkspace } from '../StudioWorkspace';
-import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
+import type { WorkspaceDimensions, PTZTrack } from '../types/workspace';
 
 interface SettingsSectionProps {
   dimensions: WorkspaceDimensions;
-  setDimensions: (dimensions: WorkspaceDimensions) => void;
   ptzTracks: PTZTrack[];
+  onUpdate: (data: {
+    length: number;
+    width: number;
+    height: number;
+    ptzTracks: PTZTrack[];
+  }) => void;
 }
 
-export const SettingsSection = ({ dimensions, setDimensions, ptzTracks }: SettingsSectionProps) => {
+export const SettingsSection: React.FC<SettingsSectionProps> = ({ 
+  dimensions, 
+  ptzTracks, 
+  onUpdate 
+}) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Studio Configuration</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>Studio Configuration</CardTitle>
+        <CardDescription>Configure your studio dimensions and camera setup</CardDescription>
+      </CardHeader>
+      <CardContent>
         <StudioConfigForm 
-          onUpdate={(data) => {
-            setDimensions({
-              length: Number(data.length),
-              width: Number(data.width),
-              height: Number(data.height),
-            });
-          }}
           initialData={{ dimensions, ptzTracks }}
+          onUpdate={onUpdate}
         />
-      </Card>
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Workspace Preview</h2>
-        <StudioWorkspace 
-          dimensions={dimensions} 
-          ptzTracks={ptzTracks}
-        />
-      </Card>
-    </div>
+      </CardContent>
+    </Card>
   );
 };

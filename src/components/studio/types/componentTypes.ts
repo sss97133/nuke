@@ -1,40 +1,49 @@
 
 import { Dispatch, SetStateAction } from 'react';
-import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
+import type { WorkspaceDimensions, PTZTrack } from '../types/workspace';
 
 export interface StudioWorkspaceProps {
   dimensions: WorkspaceDimensions;
   ptzTracks: PTZTrack[];
-  onSelectCamera?: (index: number) => void;
+  onCameraSelect?: (index: number) => void;
   selectedCameraIndex?: number | null;
+  activeCamera?: number | null;
 }
 
 export interface StudioConfigFormProps {
-  initialDimensions: WorkspaceDimensions;
-  initialPTZTracks: PTZTrack[];
-  onUpdateDimensions: Dispatch<SetStateAction<WorkspaceDimensions>>;
-  onUpdatePTZTracks: Dispatch<SetStateAction<PTZTrack[]>>;
+  initialData: {
+    dimensions: WorkspaceDimensions;
+    ptzTracks: PTZTrack[];
+  };
+  onUpdate: (data: {
+    length: number;
+    width: number;
+    height: number;
+    ptzTracks: PTZTrack[];
+  }) => void;
 }
 
 export interface PTZControlsProps {
-  onMove: (direction: string) => void;
+  selectedCamera?: PTZTrack;
+  onUpdate?: (updatedCamera: PTZTrack) => void;
+  onMove?: (direction: string) => void;
 }
 
 export interface CameraControlsProps {
-  onZoom: (level: number) => void;
+  onZoom?: (level: number) => void;
 }
 
 export interface AudioControlsProps {
-  levels: number[];
-  onLevelChange: (index: number, level: number) => void;
+  audioLevel: number[];
+  setAudioLevel: Dispatch<SetStateAction<number[]>>;
 }
 
 export interface RecordingControlsProps {
-  onStart: () => void;
-  onStop: () => void;
+  onStart?: () => void;
+  onStop?: () => void;
 }
 
 export interface StreamingControlsProps {
-  onStart: () => void;
-  onStop: () => void;
+  onStart?: () => void;
+  onStop?: () => void;
 }

@@ -1,266 +1,258 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trash2, Plus } from 'lucide-react';
-import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
+import { Separator } from '@/components/ui/separator';
+import { Plus, Trash } from 'lucide-react';
 import type { StudioConfigFormProps } from './types/componentTypes';
+import type { PTZTrack } from './types/workspace';
 
-export const StudioConfigForm: React.FC<StudioConfigFormProps> = ({
-  initialDimensions,
-  initialPTZTracks,
-  onUpdateDimensions,
-  onUpdatePTZTracks
+export const StudioConfigForm: React.FC<StudioConfigFormProps> = ({ 
+  initialData,
+  onUpdate
 }) => {
-  const [studioName, setStudioName] = useState('Default Studio');
-  const [width, setWidth] = useState(initialDimensions.width);
-  const [length, setLength] = useState(initialDimensions.length);
-  const [height, setHeight] = useState(initialDimensions.height);
-  const [tracks, setTracks] = useState<PTZTrack[]>(initialPTZTracks);
-
-  useEffect(() => {
-    setWidth(initialDimensions.width);
-    setLength(initialDimensions.length);
-    setHeight(initialDimensions.height);
-  }, [initialDimensions]);
-
-  useEffect(() => {
-    setTracks(initialPTZTracks);
-  }, [initialPTZTracks]);
-
-  const handleDimensionChange = () => {
-    onUpdateDimensions({
-      width,
-      length,
-      height
+  const [formData, setFormData] = useState({
+    length: initialData.dimensions.length.toString(),
+    width: initialData.dimensions.width.toString(),
+    height: initialData.dimensions.height.toString(),
+    ptzTracks: initialData.ptzTracks.map(track => ({
+      position: {
+        x: track.position.x.toString(),
+        y: track.position.y.toString(),
+        z: track.position.z.toString()
+      },
+      length: track.length.toString(),
+      speed: track.speed.toString(),
+      coneAngle: track.coneAngle.toString()
+    }))
+  });
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    onUpdate({
+      length: Number(formData.length),
+      width: Number(formData.width),
+      height: Number(formData.height),
+      ptzTracks: formData.ptzTracks.map(track => ({
+        position: {
+          x: Number(track.position.x),
+          y: Number(track.position.y),
+          z: Number(track.position.z)
+        },
+        length: Number(track.length),
+        speed: Number(track.speed),
+        coneAngle: Number(track.coneAngle)
+      }))
     });
   };
-
-  const handleTrackChange = (index: number, field: keyof PTZTrack, value: any) => {
-    const updatedTracks = [...tracks];
-    
-    if (field === 'position.x' || field === 'position.y' || field === 'position.z') {
-      // Handle nested position object
-      const positionField = field.split('.')[1] as keyof typeof updatedTracks[0]['position'];
-      updatedTracks[index] = {
-        ...updatedTracks[index],
-        position: {
-          ...updatedTracks[index].position,
-          [positionField]: value
+  
+  const handleDimensionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleTrackChange = (index: number, field: string, value: string) => {
+    setFormData(prev => {
+      const updatedTracks = [...prev.ptzTracks];
+      
+      // Handle nested position properties
+      if (field.startsWith('position.')) {
+        const posKey = field.split('.')[1] as 'x' | 'y' | 'z';
+        updatedTracks[index] = {
+          ...updatedTracks[index],
+          position: {
+            ...updatedTracks[index].position,
+            [posKey]: value
+          }
+        };
+      } else {
+        updatedTracks[index] = {
+          ...updatedTracks[index],
+          [field]: value
+        };
+      }
+      
+      return {
+        ...prev,
+        ptzTracks: updatedTracks
+      };
+    });
+  };
+  
+  const addTrack = () => {
+    setFormData(prev => ({
+      ...prev,
+      ptzTracks: [
+        ...prev.ptzTracks,
+        {
+          position: { x: '0', y: '8', z: '0' },
+          length: '10',
+          speed: '1',
+          coneAngle: '45'
         }
-      };
-    } else {
-      // Handle direct fields
-      updatedTracks[index] = {
-        ...updatedTracks[index],
-        [field]: value
-      };
-    }
-    
-    setTracks(updatedTracks);
-    onUpdatePTZTracks(updatedTracks);
+      ]
+    }));
   };
-
-  const handleAddTrack = () => {
-    const newTrack: PTZTrack = {
-      position: { x: 0, y: height / 2, z: 0 },
-      length: 10,
-      speed: 1,
-      coneAngle: 45
-    };
-    
-    const updatedTracks = [...tracks, newTrack];
-    setTracks(updatedTracks);
-    onUpdatePTZTracks(updatedTracks);
-  };
-
-  const handleDeleteTrack = (index: number) => {
-    const updatedTracks = tracks.filter((_, i) => i !== index);
-    setTracks(updatedTracks);
-    onUpdatePTZTracks(updatedTracks);
+  
+  const removeTrack = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      ptzTracks: prev.ptzTracks.filter((_, i) => i !== index)
+    }));
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-6">
-        <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-4">Studio Dimensions</h3>
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <Label htmlFor="studioName">Studio Name</Label>
-            <Input 
-              id="studioName" 
-              value={studioName} 
-              onChange={e => setStudioName(e.target.value)} 
+            <Label htmlFor="length">Length (feet)</Label>
+            <Input
+              id="length"
+              name="length"
+              type="number"
+              value={formData.length}
+              onChange={handleDimensionChange}
+              min="1"
+              max="100"
             />
           </div>
-          
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Workspace Dimensions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="width">Width</Label>
-                    <span className="text-sm text-muted-foreground">{width} units</span>
-                  </div>
-                  <Slider
-                    id="width"
-                    value={[width]}
-                    min={5}
-                    max={50}
-                    step={1}
-                    onValueChange={values => setWidth(values[0])}
-                    onValueCommit={handleDimensionChange}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="length">Length</Label>
-                    <span className="text-sm text-muted-foreground">{length} units</span>
-                  </div>
-                  <Slider
-                    id="length"
-                    value={[length]}
-                    min={5}
-                    max={50}
-                    step={1}
-                    onValueChange={values => setLength(values[0])}
-                    onValueCommit={handleDimensionChange}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="height">Height</Label>
-                    <span className="text-sm text-muted-foreground">{height} units</span>
-                  </div>
-                  <Slider
-                    id="height"
-                    value={[height]}
-                    min={3}
-                    max={30}
-                    step={1}
-                    onValueChange={values => setHeight(values[0])}
-                    onValueCommit={handleDimensionChange}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          <div>
+            <Label htmlFor="width">Width (feet)</Label>
+            <Input
+              id="width"
+              name="width"
+              type="number"
+              value={formData.width}
+              onChange={handleDimensionChange}
+              min="1"
+              max="100"
+            />
+          </div>
+          <div>
+            <Label htmlFor="height">Height (feet)</Label>
+            <Input
+              id="height"
+              name="height"
+              type="number"
+              value={formData.height}
+              onChange={handleDimensionChange}
+              min="1"
+              max="50"
+            />
           </div>
         </div>
-        
-        <div>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>PTZ Camera Tracks</CardTitle>
-              <Button variant="outline" size="sm" onClick={handleAddTrack}>
-                <Plus className="h-4 w-4 mr-1" /> Add Track
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {tracks.map((track, index) => (
-                <Card key={index} className="p-4">
-                  <div className="flex justify-between mb-2">
-                    <h4 className="font-medium">Camera Track {index + 1}</h4>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-6 w-6 text-destructive"
-                      onClick={() => handleDeleteTrack(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label htmlFor={`track-${index}-x`}>Position X</Label>
-                      <Input
-                        id={`track-${index}-x`}
-                        type="number"
-                        value={track.position.x}
-                        onChange={e => handleTrackChange(index, 'position.x', parseFloat(e.target.value))}
-                      />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <Label htmlFor={`track-${index}-y`}>Position Y</Label>
-                      <Input
-                        id={`track-${index}-y`}
-                        type="number"
-                        value={track.position.y}
-                        onChange={e => handleTrackChange(index, 'position.y', parseFloat(e.target.value))}
-                      />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <Label htmlFor={`track-${index}-z`}>Position Z</Label>
-                      <Input
-                        id={`track-${index}-z`}
-                        type="number"
-                        value={track.position.z}
-                        onChange={e => handleTrackChange(index, 'position.z', parseFloat(e.target.value))}
-                      />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <Label htmlFor={`track-${index}-length`}>Track Length</Label>
-                      <Input
-                        id={`track-${index}-length`}
-                        type="number"
-                        value={track.length}
-                        onChange={e => handleTrackChange(index, 'length', parseFloat(e.target.value))}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <Label htmlFor={`track-${index}-speed`}>Camera Speed</Label>
-                        <span className="text-sm text-muted-foreground">{track.speed}x</span>
-                      </div>
-                      <Slider
-                        id={`track-${index}-speed`}
-                        value={[track.speed]}
-                        min={0.1}
-                        max={5}
-                        step={0.1}
-                        onValueChange={values => handleTrackChange(index, 'speed', values[0])}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <Label htmlFor={`track-${index}-cone`}>Cone Angle</Label>
-                        <span className="text-sm text-muted-foreground">{track.coneAngle}°</span>
-                      </div>
-                      <Slider
-                        id={`track-${index}-cone`}
-                        value={[track.coneAngle]}
-                        min={10}
-                        max={120}
-                        step={1}
-                        onValueChange={values => handleTrackChange(index, 'coneAngle', values[0])}
-                      />
-                    </div>
-                  </div>
-                </Card>
-              ))}
-              
-              {tracks.length === 0 && (
-                <div className="text-center py-4 text-muted-foreground">
-                  <p>No camera tracks configured.</p>
-                  <p className="text-sm">Click "Add Track" to create a new camera track.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
       </div>
-    </div>
+      
+      <Separator />
+      
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium">PTZ Camera Tracks</h3>
+          <Button 
+            type="button" 
+            onClick={addTrack}
+            size="sm"
+            className="flex items-center gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            Add Track
+          </Button>
+        </div>
+        
+        {formData.ptzTracks.map((track, index) => (
+          <div key={index} className="border p-4 rounded-md mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-medium">Track {index + 1}</h4>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => removeTrack(index)}
+                className="flex items-center gap-1"
+              >
+                <Trash className="h-4 w-4" />
+                Remove
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor={`track-${index}-pos-x`}>Position X</Label>
+                <Input
+                  id={`track-${index}-pos-x`}
+                  type="number"
+                  value={track.position.x}
+                  onChange={(e) => handleTrackChange(index, 'position.x', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`track-${index}-pos-y`}>Position Y</Label>
+                <Input
+                  id={`track-${index}-pos-y`}
+                  type="number"
+                  value={track.position.y}
+                  onChange={(e) => handleTrackChange(index, 'position.y', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`track-${index}-pos-z`}>Position Z</Label>
+                <Input
+                  id={`track-${index}-pos-z`}
+                  type="number"
+                  value={track.position.z}
+                  onChange={(e) => handleTrackChange(index, 'position.z', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`track-${index}-length`}>Track Length</Label>
+                <Input
+                  id={`track-${index}-length`}
+                  type="number"
+                  value={track.length}
+                  onChange={(e) => handleTrackChange(index, 'length', e.target.value)}
+                  min="1"
+                />
+              </div>
+              <div>
+                <Label htmlFor={`track-${index}-speed`}>Camera Speed</Label>
+                <Input
+                  id={`track-${index}-speed`}
+                  type="number"
+                  value={track.speed}
+                  onChange={(e) => handleTrackChange(index, 'speed', e.target.value)}
+                  min="0.1"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div>
+                <Label htmlFor={`track-${index}-cone`}>Cone Angle (°)</Label>
+                <Input
+                  id={`track-${index}-cone`}
+                  type="number"
+                  value={track.coneAngle}
+                  onChange={(e) => handleTrackChange(index, 'coneAngle', e.target.value)}
+                  min="10"
+                  max="120"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="flex justify-end">
+        <Button type="submit">
+          Update Configuration
+        </Button>
+      </div>
+    </form>
   );
 };

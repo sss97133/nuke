@@ -3,24 +3,23 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { StudioConfigForm } from './StudioConfigForm';
-import { StudioWorkspace } from './StudioWorkspace';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { AudioControls } from './controls/AudioControls';
-import { CameraControls } from './controls/CameraControls';
-import { PTZControls } from './controls/PTZControls';
-import { RecordingControls } from './controls/RecordingControls';
-import { StreamingControls } from './controls/StreamingControls';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Info, Settings, Save, Camera } from 'lucide-react';
+import { AlertCircle, Info } from 'lucide-react';
 import { useStudioConfig } from '@/hooks/useStudioConfig';
-import type { WorkspaceDimensions, PTZTrack } from '@/types/studio';
+import type { WorkspaceDimensions, PTZTrack } from './types/workspace';
 import { toJson } from '@/types/json';
+
+// Import sections
+import { PreviewSection } from './sections/PreviewSection';
+import { SettingsSection } from './sections/SettingsSection';
+import { ControlButtons } from './sections/ControlButtons';
+
+// Import controls
+import { PTZControls } from './controls/PTZControls';
+import { AudioControls } from './controls/AudioControls';
+import { RecordingControls } from './controls/RecordingControls';
+import { CameraControls } from './controls/CameraControls';
+import { StreamingControls } from './controls/StreamingControls';
 
 export const StudioConfiguration = () => {
   const { toast } = useToast();
@@ -107,7 +106,7 @@ export const StudioConfiguration = () => {
         ptzTracks
       });
     }
-  }, [dimensions, ptzTracks, isAutoSave]);
+  }, [dimensions, ptzTracks, isAutoSave, lastSaved]);
 
   // Handle camera selection
   const handleCameraSelect = (index: number) => {
@@ -132,59 +131,30 @@ export const StudioConfiguration = () => {
     }
   };
 
-  // Camera control handlers
-  const handlePTZMove = (direction: string) => {
-    console.log(`Moving camera ${selectedCameraIndex} in direction: ${direction}`);
-    // Implement actual camera movement logic here
-  };
-
-  const handleCameraZoom = (level: number) => {
-    console.log(`Setting zoom level to: ${level}`);
-    // Implement actual zoom logic here
-  };
-
-  const handleAudioLevelChange = (index: number, level: number) => {
-    const newLevels = [...audioLevel];
-    newLevels[index] = level;
-    setAudioLevel(newLevels);
-    console.log(`Setting audio channel ${index} to level: ${level}`);
-  };
-
-  const handleStartRecording = () => {
-    console.log('Started recording');
-    toast({
-      title: "Recording Started",
-      description: "Studio recording is now in progress",
+  const handleSaveConfiguration = () => {
+    handleUpdate({
+      length: dimensions.length,
+      width: dimensions.width,
+      height: dimensions.height,
+      ptzTracks
     });
   };
-
-  const handleStopRecording = () => {
-    console.log('Stopped recording');
+  
+  // Handle PTZ camera movement
+  const handleCameraMove = (direction: string) => {
+    if (selectedCameraIndex === null) return;
+    
+    // Update camera position based on direction
+    // This is a simplified version - in a real app, you would adjust the camera's actual position
     toast({
-      title: "Recording Stopped",
-      description: "Studio recording has been stopped",
-    });
-  };
-
-  const handleStartStreaming = () => {
-    console.log('Started streaming');
-    toast({
-      title: "Stream Started",
-      description: "Studio stream is now live",
-    });
-  };
-
-  const handleStopStreaming = () => {
-    console.log('Stopped streaming');
-    toast({
-      title: "Stream Ended",
-      description: "Studio stream has been stopped",
+      title: "Camera Movement",
+      description: `Camera ${selectedCameraIndex + 1} moved ${direction}`,
     });
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
           <p>Loading studio configuration...</p>
@@ -195,185 +165,84 @@ export const StudioConfiguration = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Card className="w-[500px]">
-          <CardHeader>
-            <CardTitle className="flex items-center text-destructive">
-              <AlertCircle className="h-5 w-5 mr-2" /> Error
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Failed to load studio configuration. Please try again later.</p>
-            <Button className="mt-4" onClick={() => window.location.reload()}>Retry</Button>
-          </CardContent>
-        </Card>
+      <div className="p-6 border border-destructive rounded-lg text-destructive">
+        <div className="flex items-center gap-2 mb-2">
+          <AlertCircle className="h-5 w-5" />
+          <h3 className="font-semibold">Error loading studio configuration</h3>
+        </div>
+        <p className="text-sm">{error.message || "Please try refreshing the page."}</p>
       </div>
     );
   }
 
   return (
-    <div className="container py-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Studio Configuration</h1>
-          <p className="text-muted-foreground">Configure your virtual studio for production</p>
+          <h1 className="text-2xl font-bold">Studio Configuration</h1>
+          <p className="text-muted-foreground">Design and manage your studio setup</p>
         </div>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center space-x-2">
-            <Switch 
-              id="auto-save" 
-              checked={isAutoSave} 
-              onCheckedChange={setIsAutoSave}
-            />
-            <Label htmlFor="auto-save">Auto-save</Label>
-          </div>
-          <Button onClick={handleSavePreset} variant="outline">
-            <Save className="h-4 w-4 mr-2" />
-            Save as Preset
-          </Button>
-          <Button onClick={() => handleUpdate({
-            length: dimensions.length,
-            width: dimensions.width,
-            height: dimensions.height,
-            ptzTracks
-          })}>
-            Save Configuration
-          </Button>
-        </div>
+        
+        <ControlButtons 
+          isAutoSave={isAutoSave}
+          setIsAutoSave={setIsAutoSave}
+          handleSavePreset={handleSavePreset}
+          handleSaveConfiguration={handleSaveConfiguration}
+        />
       </div>
       
       {lastSaved && (
-        <p className="text-xs text-muted-foreground text-right">
+        <div className="flex items-center text-sm text-muted-foreground">
+          <Info className="h-4 w-4 mr-1" />
           Last saved: {lastSaved.toLocaleTimeString()}
-        </p>
+        </div>
       )}
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="simulator">
-            <Camera className="h-4 w-4 mr-2" />
-            Simulator
-          </TabsTrigger>
-          <TabsTrigger value="settings">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </TabsTrigger>
+        <TabsList className="grid grid-cols-3 w-80">
+          <TabsTrigger value="simulator">Simulator</TabsTrigger>
+          <TabsTrigger value="controls">Controls</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="simulator" className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
-              <Card className="h-[600px]">
-                <CardContent className="p-0 h-full">
-                  <StudioWorkspace 
-                    dimensions={dimensions}
-                    ptzTracks={ptzTracks}
-                    onSelectCamera={handleCameraSelect}
-                    selectedCameraIndex={selectedCameraIndex}
-                  />
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    Camera Controls
-                    {selectedCameraIndex !== null && (
-                      <Badge variant="outline">Camera {selectedCameraIndex + 1}</Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {selectedCameraIndex === null ? (
-                    <div className="text-center py-6 text-muted-foreground">
-                      <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Select a camera in the simulator to control it</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div>
-                        <h4 className="font-medium mb-2">PTZ Controls</h4>
-                        <PTZControls onMove={handlePTZMove} />
-                      </div>
-                      
-                      <Separator />
-                      
-                      <div>
-                        <h4 className="font-medium mb-2">Camera Settings</h4>
-                        <CameraControls onZoom={handleCameraZoom} />
-                      </div>
-                      
-                      <Separator />
-                      
-                      <div>
-                        <h4 className="font-medium mb-2">Audio Levels</h4>
-                        <AudioControls 
-                          levels={audioLevel} 
-                          onLevelChange={handleAudioLevelChange} 
-                        />
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recording</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RecordingControls 
-                    onStart={handleStartRecording} 
-                    onStop={handleStopRecording} 
-                  />
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Streaming</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <StreamingControls 
-                    onStart={handleStartStreaming} 
-                    onStop={handleStopStreaming} 
-                  />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center">
-                <Info className="h-4 w-4 mr-2" />
-                Tips for Studio Setup
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="list-disc pl-5 space-y-1 text-sm">
-                <li>Click on cameras in the simulator to select and control them</li>
-                <li>Use PTZ controls to adjust camera position and angle</li>
-                <li>Adjust recording settings before starting a session</li>
-                <li>Save your configuration as a preset for future use</li>
-              </ul>
-            </CardContent>
-          </Card>
+        <TabsContent value="simulator" className="mt-6">
+          <PreviewSection 
+            dimensions={dimensions}
+            ptzTracks={ptzTracks}
+            selectedCameraIndex={selectedCameraIndex}
+            onCameraSelect={handleCameraSelect}
+          />
         </TabsContent>
         
-        <TabsContent value="settings">
-          <Card>
-            <CardContent className="pt-6">
-              <StudioConfigForm 
-                initialDimensions={dimensions}
-                initialPTZTracks={ptzTracks}
-                onUpdateDimensions={setDimensions}
-                onUpdatePTZTracks={setPTZTracks}
-              />
-            </CardContent>
-          </Card>
+        <TabsContent value="controls" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <PTZControls 
+              selectedCamera={selectedCameraIndex !== null ? ptzTracks[selectedCameraIndex] : undefined}
+              onMove={handleCameraMove}
+            />
+            <AudioControls 
+              audioLevel={audioLevel}
+              setAudioLevel={setAudioLevel}
+            />
+            <RecordingControls />
+            <CameraControls />
+            <StreamingControls />
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="settings" className="mt-6">
+          <SettingsSection 
+            dimensions={dimensions}
+            ptzTracks={ptzTracks}
+            onUpdate={(data) => {
+              setDimensions({
+                length: Number(data.length),
+                width: Number(data.width),
+                height: Number(data.height),
+              });
+              setPTZTracks(data.ptzTracks);
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>

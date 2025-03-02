@@ -199,6 +199,11 @@ export const createPTZCamera = (
   }
 
   scene.add(ptzGroup);
+  
+  // Add user data for raycasting
+  ptzGroup.userData = { type: 'ptzCamera' };
+  mount.userData = { type: 'ptzCamera' };
+  cameraBody.userData = { type: 'ptzCamera' };
 
   return { trackMesh, ptzGroup };
 };
