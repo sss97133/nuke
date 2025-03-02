@@ -25,6 +25,7 @@ import Parts from "./pages/Parts"
 import FuelTracking from "./pages/FuelTracking"
 import Diagnostics from "./pages/Diagnostics"
 import Analytics from "./pages/Analytics"
+import Schedule from "./pages/Schedule"
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient();
@@ -89,7 +90,7 @@ function AppContent() {
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/maintenance" element={<Dashboard />} />
           <Route path="/service" element={<Dashboard />} />
-          <Route path="/schedule" element={<Dashboard />} />
+          <Route path="/schedule" element={<Schedule />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/fuel" element={<FuelTracking />} />
           <Route path="/diagnostics" element={<Diagnostics />} />
