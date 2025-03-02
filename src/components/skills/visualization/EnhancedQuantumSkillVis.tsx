@@ -97,28 +97,17 @@ export const EnhancedQuantumSkillVis: React.FC<EnhancedQuantumSkillVisProps> = (
               {/* Create the skill orbitals */}
               <div ref={(el) => {
                 if (el) {
-                  // Initialize components
-                  const skillOrbitalsComponent = SkillOrbitals({ 
+                  // Initialize skill orbitals
+                  const orbitalsController = SkillOrbitals({ 
                     scene: refs.scene!, 
                     skills, 
                     userSkills 
                   });
                   
-                  // Store references to the animation methods and objects
-                  if (el) {
-                    skillOrbitalsRef.current = {
-                      animateSkills: (el as any).animateSkills,
-                      skillObjectsRef: (el as any).skillObjectsRef
-                    };
-                  }
+                  // Store reference to controller
+                  skillOrbitalsRef.current = orbitalsController;
                 }
-              }}>
-                <SkillOrbitals 
-                  scene={refs.scene} 
-                  skills={skills} 
-                  userSkills={userSkills} 
-                />
-              </div>
+              }} />
               
               {refs.camera && skillOrbitalsRef.current && (
                 <SkillInteractions
