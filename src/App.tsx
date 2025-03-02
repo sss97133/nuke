@@ -18,7 +18,7 @@ import DiscoveredVehicles from "./pages/DiscoveredVehicles"
 import TokenStaking from "./pages/TokenStaking"
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { NavSidebar } from './components/layout/NavSidebar'
-import TokensPage from "./pages/Tokens"
+import TokensPage from "./pages/Tokens"  // Make sure it's imported as default export
 import ServiceHistory from "./pages/ServiceHistory"
 import Parts from "./pages/Parts"
 import FuelTracking from "./pages/FuelTracking"
