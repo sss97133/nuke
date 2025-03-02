@@ -157,7 +157,7 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
         created_at: new Date().toISOString()
       };
 
-      // Add type assertion to tell TypeScript this is a valid table
+      // Use type assertion to tell TypeScript this is a valid table
       const { error } = await supabase
         .from('service_records' as any)
         .insert([serviceRecord]);
@@ -188,6 +188,7 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
     formState,
     updateFormState,
     vehicles,
+    vehiclesLoading,
     newPart,
     updateNewPart,
     addPart,
@@ -195,6 +196,6 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
     isSubmitting,
     submitError,
     handleSubmit,
-    vehiclesLoading
+    calculateTotalCost
   };
 };
