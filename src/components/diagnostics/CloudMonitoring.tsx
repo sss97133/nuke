@@ -1,10 +1,11 @@
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AreaChart, BarChart } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Wifi, Clock, AlertTriangle } from "lucide-react";
+import { LineChart, BarChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface AlertItem {
   id: string;
@@ -16,8 +17,8 @@ interface AlertItem {
 const CloudMonitoring = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const [performanceData, setPerformanceData] = useState<number[]>([]);
-  const [connectionHistory, setConnectionHistory] = useState<number[]>([]);
+  const [performanceData, setPerformanceData] = useState<{ time: string; value: number }[]>([]);
+  const [connectionHistory, setConnectionHistory] = useState<{ hour: string; value: number }[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // Generate mock data on component mount
@@ -28,14 +29,16 @@ const CloudMonitoring = () => {
       // Simulate API call delay
       setTimeout(() => {
         // Generate performance data points (response times in ms)
-        const newPerformanceData = Array.from({ length: 24 }, () => 
-          Math.floor(Math.random() * 150) + 50
-        );
+        const newPerformanceData = Array.from({ length: 24 }, (_, i) => ({
+          time: `${i}:00`,
+          value: Math.floor(Math.random() * 150) + 50
+        }));
         
         // Generate connection stability (percentage)
-        const newConnectionHistory = Array.from({ length: 12 }, () => 
-          Math.min(100, Math.max(60, Math.floor(Math.random() * 40) + 60))
-        );
+        const newConnectionHistory = Array.from({ length: 12 }, (_, i) => ({
+          hour: `${i * 2}:00`,
+          value: Math.min(100, Math.max(60, Math.floor(Math.random() * 40) + 60))
+        }));
         
         // Generate alerts
         const newAlerts: AlertItem[] = [
@@ -77,12 +80,18 @@ const CloudMonitoring = () => {
     setTimeout(() => {
       // Update performance data with new random values
       setPerformanceData(prev => 
-        prev.map(value => Math.max(50, Math.min(200, value + Math.floor(Math.random() * 40) - 20)))
+        prev.map(item => ({
+          ...item,
+          value: Math.max(50, Math.min(200, item.value + Math.floor(Math.random() * 40) - 20))
+        }))
       );
       
       // Update connection history
       setConnectionHistory(prev => 
-        prev.map(value => Math.min(100, Math.max(60, value + Math.floor(Math.random() * 10) - 5)))
+        prev.map(item => ({
+          ...item,
+          value: Math.min(100, Math.max(60, item.value + Math.floor(Math.random() * 10) - 5))
+        }))
       );
       
       setLastUpdated(new Date());
@@ -120,17 +129,18 @@ const CloudMonitoring = () => {
           </CardHeader>
           <CardContent className="h-[200px]">
             {!isLoading && (
-              <AreaChart 
-                data={performanceData.map((value, index) => ({ 
-                  time: `${index}:00`, 
-                  value 
-                }))}
-                index="time"
-                categories={["value"]}
-                colors={["blue"]}
-                yAxisWidth={40}
-                showLegend={false}
-              />
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={performanceData}
+                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="value" stroke="#3b82f6" activeDot={{ r: 8 }} />
+                </LineChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
@@ -142,18 +152,18 @@ const CloudMonitoring = () => {
           </CardHeader>
           <CardContent className="h-[200px]">
             {!isLoading && (
-              <BarChart 
-                data={connectionHistory.map((value, index) => ({ 
-                  hour: `${index * 2}:00`, 
-                  value 
-                }))}
-                index="hour"
-                categories={["value"]}
-                colors={["green"]}
-                yAxisWidth={40}
-                valueFormatter={(value) => `${value}%`}
-                showLegend={false}
-              />
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={connectionHistory}
+                  margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="hour" />
+                  <YAxis />
+                  <Tooltip formatter={(value: number) => [`${value}%`, 'Value']} />
+                  <Bar dataKey="value" fill="#22c55e" />
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>

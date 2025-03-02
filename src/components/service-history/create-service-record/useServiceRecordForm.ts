@@ -98,10 +98,10 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
         throw new Error('You must be logged in to create a service record');
       }
       
-      // Fixed Supabase insert - changed to match the expected types
+      // Fixed Supabase insert - don't use array syntax for a single record
       const { error } = await supabase
         .from('service_tickets')
-        .insert([{  // Notice the array syntax here, which was the issue
+        .insert({
           vehicle_id: formState.vehicleId,
           description: formState.description,
           service_type: formState.serviceType,
@@ -111,7 +111,7 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
           parts_used: formState.parts.length > 0 ? formState.parts : null,
           user_id: user.id,
           priority: 'medium' // Adding required priority field based on the database schema
-        }]);
+        });
 
       if (error) throw error;
       
