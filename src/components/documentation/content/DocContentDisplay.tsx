@@ -7,9 +7,45 @@ interface DocContentDisplayProps {
   content: string;
   title: string;
   onBack: () => void;
+  section?: string;
 }
 
-export const DocContentDisplay = ({ content, title, onBack }: DocContentDisplayProps) => {
+export const DocContentDisplay = ({ content, title, onBack, section }: DocContentDisplayProps) => {
+  // If a specific section is requested, extract just that section from the content
+  const displayContent = React.useMemo(() => {
+    if (!section) return content;
+    
+    // Parse the markdown to find the requested section
+    const lines = content.split('\n');
+    const sectionStartPattern = new RegExp(`^###\\s+.*${section}.*$`, 'i');
+    
+    let sectionStart = -1;
+    let sectionEnd = lines.length;
+    
+    // Find the start of the requested section
+    for (let i = 0; i < lines.length; i++) {
+      if (sectionStartPattern.test(lines[i])) {
+        sectionStart = i;
+        break;
+      }
+    }
+    
+    // If section is found, find where it ends (next ### or end of content)
+    if (sectionStart !== -1) {
+      for (let i = sectionStart + 1; i < lines.length; i++) {
+        if (lines[i].startsWith('### ')) {
+          sectionEnd = i;
+          break;
+        }
+      }
+      
+      return lines.slice(sectionStart, sectionEnd).join('\n');
+    }
+    
+    // If section not found, return full content
+    return content;
+  }, [content, section]);
+
   return (
     <Card className="w-full">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -27,7 +63,7 @@ export const DocContentDisplay = ({ content, title, onBack }: DocContentDisplayP
       </CardHeader>
       <CardContent>
         <div className="prose dark:prose-invert max-w-none">
-          {content.split('\n').map((paragraph, index) => {
+          {displayContent.split('\n').map((paragraph, index) => {
             // Handle headers
             if (paragraph.startsWith('# ')) {
               return <h1 key={index} className="text-2xl font-bold mt-6 mb-4">{paragraph.replace('# ', '')}</h1>;

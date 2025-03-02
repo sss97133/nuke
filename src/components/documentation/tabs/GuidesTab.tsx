@@ -21,14 +21,19 @@ interface DocContent {
   path: string;
   title: string;
   content: string;
+  section?: string;
 }
 
 export const GuidesTab = () => {
   const [activeDoc, setActiveDoc] = useState<DocContent | null>(null);
 
-  const docContents: Record<string, { title: string, content: string }> = {
+  const docContents: Record<string, { title: string, content: string, section?: string }> = {
     '/docs/getting-started': { title: 'Getting Started Guide', content: GETTING_STARTED },
     '/docs/features': { title: 'Core Features', content: FEATURES },
+    '/docs/features/vehicle-management': { title: 'Vehicle Management', content: FEATURES, section: '🚗 Vehicle Management' },
+    '/docs/features/inventory-management': { title: 'Inventory Management', content: FEATURES, section: '📦 Inventory Management' },
+    '/docs/features/service-operations': { title: 'Service Operations', content: FEATURES, section: '🔧 Service Operations' },
+    '/docs/features/professional-development': { title: 'Professional Development', content: FEATURES, section: '👥 Professional Development' },
     '/docs/business-ops': { title: 'Business Operations', content: BUSINESS_OPS },
     '/docs/media-production': { title: 'Media Production', content: MEDIA_PRODUCTION },
     '/docs/market-analysis': { title: 'Market Analysis', content: MARKET_ANALYSIS },
@@ -45,7 +50,8 @@ export const GuidesTab = () => {
       setActiveDoc({
         path,
         title: docContents[path].title,
-        content: docContents[path].content
+        content: docContents[path].content,
+        section: docContents[path].section
       });
     }
   };
@@ -60,6 +66,7 @@ export const GuidesTab = () => {
         title={activeDoc.title}
         content={activeDoc.content}
         onBack={handleBackClick}
+        section={activeDoc.section}
       />
     );
   }
@@ -79,10 +86,10 @@ export const GuidesTab = () => {
             
             <DocSection icon={<BookOpen className="h-5 w-5 text-blue-500" />} title="Core Features">
               <div className="grid gap-3 mt-2">
-                <DocLink href="/docs/features" onClick={handleDocLinkClick}>Vehicle Management Guide</DocLink>
-                <DocLink href="/docs/features" onClick={handleDocLinkClick}>Inventory Management</DocLink>
-                <DocLink href="/docs/features" onClick={handleDocLinkClick}>Service Operations</DocLink>
-                <DocLink href="/docs/features" onClick={handleDocLinkClick}>Professional Development</DocLink>
+                <DocLink href="/docs/features/vehicle-management" onClick={handleDocLinkClick}>Vehicle Management Guide</DocLink>
+                <DocLink href="/docs/features/inventory-management" onClick={handleDocLinkClick}>Inventory Management</DocLink>
+                <DocLink href="/docs/features/service-operations" onClick={handleDocLinkClick}>Service Operations</DocLink>
+                <DocLink href="/docs/features/professional-development" onClick={handleDocLinkClick}>Professional Development</DocLink>
               </div>
             </DocSection>
             
