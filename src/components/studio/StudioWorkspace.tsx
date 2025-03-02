@@ -14,7 +14,7 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
   const humanRef = useRef<THREE.Group | null>(null);
 
   const { sceneRef, cameraRef, rendererRef, controlsRef } = useStudioScene(containerRef, dimensions);
-  useStudioAnimation(humanRef, ptzCamerasRef, ptzTracks, dimensions);
+  const { resetAnimation } = useStudioAnimation(humanRef, ptzCamerasRef, ptzTracks, dimensions);
 
   useEffect(() => {
     if (!sceneRef.current) return;
@@ -51,9 +51,10 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     humanRef.current = createHuman(sceneRef.current);
 
     // Add PTZ tracks and cameras
-    ptzTracks.forEach(track => {
+    ptzTracks.forEach((track, index) => {
       const maxDistance = Math.max(dimensions.length, dimensions.width) * 2;
-      const { trackMesh, ptzGroup } = createPTZCamera(sceneRef.current!, track, maxDistance);
+      const isActive = index === 0; // Make the first camera active
+      const { trackMesh, ptzGroup } = createPTZCamera(sceneRef.current!, track, maxDistance, isActive);
       objectsRef.current.push(trackMesh);
       ptzCamerasRef.current.push(ptzGroup);
     });
@@ -80,4 +81,3 @@ export const StudioWorkspace = ({ dimensions, ptzTracks = [] }: StudioWorkspaceP
     />
   );
 };
-
