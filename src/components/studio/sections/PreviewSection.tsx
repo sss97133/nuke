@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { StudioScene } from './preview/StudioScene';
 import { LightingControls } from './preview/LightingControls';
 import type { WorkspaceDimensions, PTZTrack } from '../types/workspace';
@@ -21,11 +21,7 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
   lightMode,
   setLightMode
 }) => {
-  const handleLightModeChange = (mode: 'basic' | 'product' | 'visualization') => {
-    setLightMode(mode);
-  };
-
-  // Handle zoom controls
+  // Handle zoom controls - these will be passed to StudioScene
   const handleZoomIn = () => {
     if ((window as any).zoomIn) {
       (window as any).zoomIn();
@@ -45,20 +41,26 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
   };
 
   return (
-    <div className="relative h-full">
-      <StudioScene
-        dimensions={dimensions}
-        ptzTracks={ptzTracks}
-        selectedCameraIndex={selectedCameraIndex}
-        onCameraSelect={onCameraSelect}
-        lightMode={lightMode}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-      />
-      <div className="absolute top-1/2 right-4 transform -translate-y-1/2">
+    <div className="grid grid-cols-6 gap-4 h-full">
+      <div className="col-span-5 relative h-full">
+        <StudioScene
+          dimensions={dimensions}
+          ptzTracks={ptzTracks}
+          selectedCameraIndex={selectedCameraIndex}
+          onCameraSelect={onCameraSelect}
+          lightMode={lightMode}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+        />
+      </div>
+      
+      <div className="col-span-1 flex items-center justify-center">
         <LightingControls 
           lightMode={lightMode}
-          onLightModeChange={handleLightModeChange}
+          onLightModeChange={setLightMode}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onToggleLayout={handleToggleLayout}
         />
       </div>
     </div>

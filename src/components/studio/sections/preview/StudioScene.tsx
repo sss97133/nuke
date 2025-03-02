@@ -1,12 +1,10 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { createBasicStudioLighting, createProductLighting, createVisualizationLighting } from '@/components/studio/utils/studioLighting';
-import { createWireframeRoom, createHumanFigure, createCNCTracks } from './scene-utils/BasicElements';
-import { createCameraModels, updateCameraModels } from './scene-utils/CameraModels';
 import { setupThreeJsScene, setupEventHandlers, setupFieldOfViewControls } from './scene-utils/SceneSetup';
-import type { WorkspaceDimensions, PTZTrack } from '../../types/workspace';
+import { createWalls, createFloor } from './scene-utils/BasicElements';
+import { createCameraModel } from './scene-utils/CameraModels';
+import { WorkspaceDimensions, PTZTrack } from '../../types/workspace';
 
 interface StudioSceneProps {
   dimensions: WorkspaceDimensions;
@@ -14,8 +12,8 @@ interface StudioSceneProps {
   selectedCameraIndex: number | null;
   onCameraSelect: (index: number) => void;
   lightMode: 'basic' | 'product' | 'visualization';
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
 }
 
 export const StudioScene: React.FC<StudioSceneProps> = ({
@@ -31,176 +29,161 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const cameraModelsRef = useRef<THREE.Group[]>([]);
-  const trackModelsRef = useRef<THREE.Line[]>([]);
-  const coneModelsRef = useRef<THREE.Mesh[]>([]);
-  const cleanupRef = useRef<() => void>(() => {});
-  const [ptzTracksState, setPtzTracksState] = useState<PTZTrack[]>(ptzTracks);
-
-  // Update internal state when ptzTracks prop changes
-  useEffect(() => {
-    setPtzTracksState(ptzTracks);
-  }, [ptzTracks]);
-
-  // Callback to update camera cones
-  const updateCameraCones = useCallback((updatedTracks: PTZTrack[]) => {
-    setPtzTracksState(updatedTracks);
-    if (sceneRef.current) {
-      updateCameraModels(
-        cameraModelsRef.current,
-        coneModelsRef.current,
-        updatedTracks,
-        selectedCameraIndex
-      );
-    }
-  }, [selectedCameraIndex]);
+  const controlsRef = useRef<any>(null);
+  const camerasRef = useRef<THREE.Group[]>([]);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   // Initialize Three.js scene
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Setup basic Three.js components
+    // Setup scene, camera, renderer, and controls
     const { scene, camera, renderer, controls } = setupThreeJsScene(containerRef) || {};
     if (!scene || !camera || !renderer || !controls) return;
-    
+
     sceneRef.current = scene;
     cameraRef.current = camera;
     rendererRef.current = renderer;
     controlsRef.current = controls;
-    
-    // Create wireframe studio room
-    createWireframeRoom(scene, dimensions);
-    
-    // Create CNC tracks along the walls and ceiling
-    const tracks = createCNCTracks(scene, dimensions);
-    trackModelsRef.current = tracks;
-    
-    // Add a reference object in the center
-    const humanFigure = createHumanFigure();
-    scene.add(humanFigure);
 
-    // Create camera models
-    const { cameraModels, coneMeshes } = createCameraModels(
-      scene, 
-      ptzTracksState, 
-      selectedCameraIndex, 
-      onCameraSelect
-    );
-    cameraModelsRef.current = cameraModels;
-    coneModelsRef.current = coneMeshes;
+    // Setup basic environment
+    createFloor(scene, dimensions);
+    createWalls(scene, dimensions);
 
-    // Apply lighting based on mode
-    applyLighting(scene, lightMode);
-    
-    // Setup event handlers
-    const { cleanup } = setupEventHandlers(
-      containerRef,
-      camera,
-      scene,
-      renderer,
-      onCameraSelect
-    );
+    // Setup initial lighting
+    setupLighting(scene, 'basic');
+
+    // Setup event handlers and cleanup
+    const { cleanup } = setupEventHandlers(containerRef, camera, scene, renderer, onCameraSelect);
     cleanupRef.current = cleanup;
 
-    // Field of view controls setup
-    const { zoomIn, zoomOut } = setupFieldOfViewControls(
-      camera,
-      ptzTracksState,
-      selectedCameraIndex,
-      updateCameraCones
-    );
-
-    // Expose zoom functions to parent component if callbacks provided
-    if (onZoomIn) {
-      (window as any).zoomIn = zoomIn;
-    }
-    if (onZoomOut) {
-      (window as any).zoomOut = zoomOut;
-    }
+    // Setup field of view controls for zooming
+    const { zoomIn, zoomOut } = setupFieldOfViewControls(camera, ptzTracks, selectedCameraIndex, updateCameraCones);
+    
+    // Expose zoom functions to the window object for external access
+    (window as any).zoomIn = zoomIn;
+    (window as any).zoomOut = zoomOut;
 
     // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
-      
-      if (controlsRef.current) {
-        controlsRef.current.update();
-      }
-      
-      if (rendererRef.current && cameraRef.current && sceneRef.current) {
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
-      }
+      controls.update();
+      renderer.render(scene, camera);
     };
     animate();
 
     // Cleanup function
     return () => {
-      cleanupRef.current();
-      
-      if (containerRef.current && rendererRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
+      cleanup && cleanup();
+      if (renderer && containerRef.current) {
+        containerRef.current.removeChild(renderer.domElement);
       }
-      
-      if (controlsRef.current) {
-        controlsRef.current.dispose();
-      }
-      
-      if (rendererRef.current) {
-        rendererRef.current.dispose();
-      }
-
-      // Remove zoom functions
-      delete (window as any).zoomIn;
-      delete (window as any).zoomOut;
+      (window as any).zoomIn = undefined;
+      (window as any).zoomOut = undefined;
     };
-  }, [dimensions, ptzTracksState, selectedCameraIndex, onCameraSelect, lightMode, updateCameraCones, onZoomIn, onZoomOut]);
+  }, [dimensions]);
 
-  // Update lighting when lightMode changes
+  // Update camera cones when ptzTracks or selectedCamera changes
   useEffect(() => {
     if (!sceneRef.current) return;
-    applyLighting(sceneRef.current, lightMode);
+    updateCameraCones(ptzTracks);
+  }, [ptzTracks, selectedCameraIndex]);
+
+  // Handle lighting mode changes
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    setupLighting(sceneRef.current, lightMode);
   }, [lightMode]);
 
-  // Update camera positions when ptzTracks or selection changes
-  useEffect(() => {
+  // Function to update camera cone visualizations
+  const updateCameraCones = (tracks: PTZTrack[]) => {
     if (!sceneRef.current) return;
-    
-    updateCameraModels(
-      cameraModelsRef.current,
-      coneModelsRef.current,
-      ptzTracksState,
-      selectedCameraIndex
-    );
-  }, [ptzTracksState, selectedCameraIndex]);
 
-  // Helper function to apply lighting based on mode
-  const applyLighting = (scene: THREE.Scene, mode: 'basic' | 'product' | 'visualization') => {
-    // First, remove any existing lights
+    // Remove existing camera models
+    camerasRef.current.forEach(camera => {
+      sceneRef.current?.remove(camera);
+    });
+    camerasRef.current = [];
+
+    // Create new camera models
+    tracks.forEach((track, index) => {
+      const isSelected = selectedCameraIndex === index;
+      const cameraGroup = createCameraModel(track, isSelected, index);
+      sceneRef.current?.add(cameraGroup);
+      camerasRef.current.push(cameraGroup);
+    });
+  };
+
+  // Setup different lighting scenarios based on the selected mode
+  const setupLighting = (scene: THREE.Scene, mode: 'basic' | 'product' | 'visualization') => {
+    // Remove existing lights
     scene.children.forEach(child => {
-      if (child.isLight) {
+      // Check if the object is a light by checking its type
+      if (child instanceof THREE.Light) {
         scene.remove(child);
       }
     });
-    
+
+    // Create new lights based on the selected mode
     switch (mode) {
       case 'basic':
-        createBasicStudioLighting(scene);
+        // Basic lighting setup
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        mainLight.position.set(5, 10, 7);
+        mainLight.castShadow = true;
+        scene.add(mainLight);
         break;
+
       case 'product':
-        createProductLighting(scene);
+        // Product photography style lighting
+        const softAmbient = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(softAmbient);
+
+        // Key light (main light)
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1);
+        keyLight.position.set(5, 5, 5);
+        keyLight.castShadow = true;
+        scene.add(keyLight);
+
+        // Fill light (softer light from opposite side)
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        fillLight.position.set(-5, 3, 5);
+        scene.add(fillLight);
+
+        // Rim light (highlight edges)
+        const rimLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        rimLight.position.set(0, 5, -5);
+        scene.add(rimLight);
         break;
+
       case 'visualization':
-        createVisualizationLighting(scene);
+        // Enhanced visualization lighting
+        const brightAmbient = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(brightAmbient);
+
+        const overheadLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        overheadLight.position.set(0, 10, 0);
+        overheadLight.castShadow = true;
+        scene.add(overheadLight);
+
+        // Add colored point lights for visual interest
+        const redLight = new THREE.PointLight(0xff0000, 0.5, 10);
+        redLight.position.set(-5, 2, -5);
+        scene.add(redLight);
+
+        const blueLight = new THREE.PointLight(0x0000ff, 0.5, 10);
+        blueLight.position.set(5, 2, -5);
+        scene.add(blueLight);
         break;
-      default:
-        createBasicStudioLighting(scene);
     }
   };
 
   return (
-    <div 
-      ref={containerRef} 
-      className="w-full aspect-video bg-white rounded-md overflow-hidden"
-    />
+    <div ref={containerRef} className="w-full h-full relative">
+      {/* Three.js canvas will be injected here */}
+    </div>
   );
 };

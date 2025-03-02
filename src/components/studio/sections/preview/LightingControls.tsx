@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   Camera,
-  Eye,
+  Eye, 
   ZoomIn, 
   ZoomOut, 
   LayoutGrid,
@@ -12,30 +12,18 @@ import {
 interface LightingControlsProps {
   lightMode: 'basic' | 'product' | 'visualization';
   onLightModeChange: (mode: 'basic' | 'product' | 'visualization') => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onToggleLayout: () => void;
 }
 
 export const LightingControls: React.FC<LightingControlsProps> = ({
   lightMode,
-  onLightModeChange
+  onLightModeChange,
+  onZoomIn,
+  onZoomOut,
+  onToggleLayout
 }) => {
-  // Zoom functions
-  const handleZoomIn = () => {
-    if ((window as any).zoomIn) {
-      (window as any).zoomIn();
-    }
-  };
-
-  const handleZoomOut = () => {
-    if ((window as any).zoomOut) {
-      (window as any).zoomOut();
-    }
-  };
-
-  // Layout toggle
-  const handleToggleLayout = () => {
-    console.log("Toggle workspace layout");
-  };
-
   return (
     <div className="bg-background/80 backdrop-blur-sm p-5 rounded-lg shadow-md">
       {/* Light Mode Buttons */}
@@ -69,7 +57,7 @@ export const LightingControls: React.FC<LightingControlsProps> = ({
           size="sm" 
           className="h-14 w-14 p-0" 
           title="Toggle Layout"
-          onClick={handleToggleLayout}
+          onClick={onToggleLayout}
         >
           <LayoutGrid className="h-6 w-6" />
         </Button>
@@ -84,7 +72,7 @@ export const LightingControls: React.FC<LightingControlsProps> = ({
             size="sm" 
             className="h-14 w-14 p-0" 
             title="Zoom Out"
-            onClick={handleZoomOut}
+            onClick={onZoomOut}
           >
             <ZoomOut className="h-6 w-6" />
           </Button>
@@ -93,7 +81,7 @@ export const LightingControls: React.FC<LightingControlsProps> = ({
             size="sm" 
             className="h-14 w-14 p-0" 
             title="Zoom In"
-            onClick={handleZoomIn}
+            onClick={onZoomIn}
           >
             <ZoomIn className="h-6 w-6" />
           </Button>
