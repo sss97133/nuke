@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Wrench, Code, BookOpen, Speech, PenTool, Lightbulb, Atom, ChevronDown, ChevronUp } from 'lucide-react';
 import { QuantumSkillVis } from "@/components/skills/visualization/QuantumSkillVis";
+import { Skill, UserSkill } from '@/types/skills';
 
 interface SkillProps {
+  id: string; // Added id property to match Skill type
   icon: React.ReactNode;
   name: string;
   level: number;
@@ -44,8 +46,10 @@ const SkillCard = ({ skill }: { skill: SkillProps }) => (
 const Skills = () => {
   const [showQuantumView, setShowQuantumView] = useState(false);
 
+  // Updated skillsData with id property for each skill
   const skillsData: SkillProps[] = [
     {
+      id: "skill-1",
       icon: <Wrench className="h-4 w-4 text-blue-500" />,
       name: "Vehicle Repair",
       level: 4,
@@ -53,6 +57,7 @@ const Skills = () => {
       description: "Ability to diagnose and repair vehicle mechanical issues"
     },
     {
+      id: "skill-2",
       icon: <Code className="h-4 w-4 text-green-500" />,
       name: "Diagnostic Software",
       level: 3,
@@ -60,6 +65,7 @@ const Skills = () => {
       description: "Using software tools to diagnose vehicle electronic systems"
     },
     {
+      id: "skill-3",
       icon: <BookOpen className="h-4 w-4 text-yellow-500" />,
       name: "Technical Documentation",
       level: 5,
@@ -67,6 +73,7 @@ const Skills = () => {
       description: "Creating and interpreting technical vehicle documentation"
     },
     {
+      id: "skill-4",
       icon: <Speech className="h-4 w-4 text-purple-500" />,
       name: "Customer Communication",
       level: 2,
@@ -74,6 +81,7 @@ const Skills = () => {
       description: "Effectively communicating technical information to clients"
     },
     {
+      id: "skill-5",
       icon: <PenTool className="h-4 w-4 text-red-500" />,
       name: "Detailing",
       level: 3,
@@ -81,6 +89,7 @@ const Skills = () => {
       description: "Vehicle cleaning and aesthetic improvement techniques"
     },
     {
+      id: "skill-6",
       icon: <Lightbulb className="h-4 w-4 text-orange-500" />,
       name: "Problem Solving",
       level: 4,
@@ -88,6 +97,18 @@ const Skills = () => {
       description: "Creative approaches to difficult mechanical problems"
     }
   ];
+
+  // Create mock UserSkill objects for the visualization
+  const userSkills: UserSkill[] = skillsData.map(skill => ({
+    id: `us-${skill.id}`,
+    user_id: "current-user",
+    skill_id: skill.id,
+    level: skill.level,
+    experience_points: skill.level * 100,
+    completed_at: skill.level >= 5 ? new Date().toISOString() : undefined,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }));
 
   const categories = ["all", "technical", "knowledge", "soft"];
 
@@ -116,7 +137,7 @@ const Skills = () => {
 
           {showQuantumView && (
             <div className="mt-4 h-[300px] border rounded-md p-4 bg-black/5 dark:bg-white/5">
-              <QuantumSkillVis skills={skillsData} />
+              <QuantumSkillVis skills={skillsData} userSkills={userSkills} />
             </div>
           )}
         </div>
