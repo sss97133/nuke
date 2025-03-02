@@ -3,24 +3,33 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Volume2, VolumeX, Plus } from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import type { AudioControlsProps } from '../types/componentTypes';
 
 export const AudioControls: React.FC<AudioControlsProps> = ({ 
-  audioLevel, 
-  setAudioLevel 
+  audioLevel,
+  setAudioLevel
 }) => {
-  const handleAddChannel = () => {
-    setAudioLevel(prev => [...prev, 50]);
+  const [isMuted, setIsMuted] = React.useState(false);
+  const [prevLevel, setPrevLevel] = React.useState(audioLevel);
+  
+  const handleMuteToggle = () => {
+    if (isMuted) {
+      // Unmute - restore previous level
+      setAudioLevel(prevLevel);
+    } else {
+      // Mute - save current level and set to 0
+      setPrevLevel(audioLevel);
+      setAudioLevel(0);
+    }
+    setIsMuted(!isMuted);
   };
   
-  const handleMuteChannel = (index: number) => {
-    setAudioLevel(prev => {
-      const newLevels = [...prev];
-      newLevels[index] = 0;
-      return newLevels;
-    });
+  const handleVolumeChange = (value: number[]) => {
+    setAudioLevel(value[0]);
+    if (value[0] > 0 && isMuted) {
+      setIsMuted(false);
+    }
   };
   
   return (
@@ -29,53 +38,38 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
         <CardTitle>Audio Controls</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {audioLevel.map((level, index) => (
-          <div key={index} className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label>Channel {index + 1}</Label>
-              <span className="text-xs text-muted-foreground">{level}%</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => handleMuteChannel(index)}
-              >
-                <VolumeX className="h-4 w-4" />
-              </Button>
-              <Slider
-                value={[level]}
-                min={0}
-                max={100}
-                step={1}
-                className="flex-1"
-                onValueChange={(value) => {
-                  const newLevels = [...audioLevel];
-                  newLevels[index] = value[0];
-                  setAudioLevel(newLevels);
-                }}
-              />
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="h-8 w-8"
-              >
-                <Volume2 className="h-4 w-4" />
-              </Button>
-            </div>
+        <div className="flex items-center space-x-4">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={handleMuteToggle}
+          >
+            {isMuted ? <VolumeX /> : <Volume2 />}
+          </Button>
+          
+          <div className="flex-1">
+            <Slider
+              value={[audioLevel]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={handleVolumeChange}
+            />
           </div>
-        ))}
+          
+          <div className="w-8 text-center text-sm">
+            {audioLevel}%
+          </div>
+        </div>
         
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full"
-          onClick={handleAddChannel}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Audio Channel
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="text-xs text-muted-foreground">
+            Input: Default Microphone
+          </div>
+          <div className="text-xs text-muted-foreground text-right">
+            Level: {isMuted ? "Muted" : "Active"}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

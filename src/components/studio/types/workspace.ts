@@ -1,24 +1,27 @@
 
+export interface Vector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface WorkspaceDimensions {
   length: number;
   width: number;
   height: number;
 }
 
-export interface PTZTrackPosition {
-  x: number;
-  y: number;
-  z: number;
-}
-
 export interface PTZTrack {
-  position: PTZTrackPosition;
-  length: number;
+  id: string;
+  name: string;
+  position: Vector3;
+  rotation?: Vector3;
+  target?: Vector3;
   speed: number;
-  coneAngle: number;
+  zoom: number;
 }
 
-export interface StudioWorkspaceProps {
+export interface StudioConfig {
   dimensions: WorkspaceDimensions;
-  ptzTracks?: PTZTrack[];
+  ptzTracks: PTZTrack[];
 }
