@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { StudioScene } from './preview/StudioScene';
 import { LightingControls } from './preview/LightingControls';
 import type { WorkspaceDimensions, PTZTrack } from '../types/workspace';
