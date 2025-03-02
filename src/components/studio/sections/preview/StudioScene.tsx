@@ -1,10 +1,10 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { setupThreeJsScene, setupEventHandlers, setupFieldOfViewControls } from './scene-utils/SceneSetup';
 import { createWalls, createFloor } from './scene-utils/BasicElements';
-import { createCameraModel } from './scene-utils/CameraModels';
-import { WorkspaceDimensions, PTZTrack } from '../../types/workspace';
+import { createCameraModels } from './scene-utils/CameraModels';
+import type { WorkspaceDimensions, PTZTrack } from '../../types/workspace';
 
 interface StudioSceneProps {
   dimensions: WorkspaceDimensions;
@@ -30,7 +30,7 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<any>(null);
-  const camerasRef = useRef<THREE.Group[]>([]);
+  const cameraModelsRef = useRef<THREE.Group[]>([]);
   const cleanupRef = useRef<(() => void) | null>(null);
 
   // Initialize Three.js scene
@@ -58,7 +58,7 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
     cleanupRef.current = cleanup;
 
     // Setup field of view controls for zooming
-    const { zoomIn, zoomOut } = setupFieldOfViewControls(camera, ptzTracks, selectedCameraIndex, updateCameraCones);
+    const { zoomIn, zoomOut } = setupFieldOfViewControls(camera, ptzTracks, selectedCameraIndex);
     
     // Expose zoom functions to the window object for external access
     (window as any).zoomIn = zoomIn;
@@ -83,11 +83,23 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
     };
   }, [dimensions]);
 
-  // Update camera cones when ptzTracks or selectedCamera changes
+  // Update camera models when ptzTracks or selectedCamera changes
   useEffect(() => {
     if (!sceneRef.current) return;
-    updateCameraCones(ptzTracks);
-  }, [ptzTracks, selectedCameraIndex]);
+    
+    // Remove existing camera models
+    cameraModelsRef.current.forEach(model => {
+      sceneRef.current?.remove(model);
+    });
+    
+    // Create new camera models
+    cameraModelsRef.current = createCameraModels(
+      sceneRef.current, 
+      ptzTracks, 
+      selectedCameraIndex, 
+      onCameraSelect
+    );
+  }, [ptzTracks, selectedCameraIndex, onCameraSelect]);
 
   // Handle lighting mode changes
   useEffect(() => {
@@ -95,30 +107,11 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
     setupLighting(sceneRef.current, lightMode);
   }, [lightMode]);
 
-  // Function to update camera cone visualizations
-  const updateCameraCones = (tracks: PTZTrack[]) => {
-    if (!sceneRef.current) return;
-
-    // Remove existing camera models
-    camerasRef.current.forEach(camera => {
-      sceneRef.current?.remove(camera);
-    });
-    camerasRef.current = [];
-
-    // Create new camera models
-    tracks.forEach((track, index) => {
-      const isSelected = selectedCameraIndex === index;
-      const cameraGroup = createCameraModel(track, isSelected, index);
-      sceneRef.current?.add(cameraGroup);
-      camerasRef.current.push(cameraGroup);
-    });
-  };
-
   // Setup different lighting scenarios based on the selected mode
   const setupLighting = (scene: THREE.Scene, mode: 'basic' | 'product' | 'visualization') => {
     // Remove existing lights
     scene.children.forEach(child => {
-      // Check if the object is a light by checking its type
+      // Check if the object is a light
       if (child instanceof THREE.Light) {
         scene.remove(child);
       }

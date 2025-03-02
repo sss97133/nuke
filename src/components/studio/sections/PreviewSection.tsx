@@ -41,8 +41,8 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-6 gap-4 h-full">
-      <div className="col-span-5 relative h-full">
+    <div className="grid grid-cols-4 gap-4 h-full">
+      <div className="col-span-3 relative h-full">
         <StudioScene
           dimensions={dimensions}
           ptzTracks={ptzTracks}
@@ -54,7 +54,7 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
         />
       </div>
       
-      <div className="col-span-1 flex items-center justify-center">
+      <div className="col-span-1">
         <LightingControls 
           lightMode={lightMode}
           onLightModeChange={setLightMode}
