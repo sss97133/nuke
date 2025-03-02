@@ -1,4 +1,7 @@
 
+// This is a fix for the build error in service-history useServiceRecordForm.ts
+// The issue is that supabase.from('service_records').insert is being called with an object instead of an array
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -89,7 +92,7 @@ export const useServiceRecordForm = () => {
         created_at: new Date().toISOString()
       };
 
-      // Fix: Insert as an array of records instead of a single object
+      // FIX: Insert serviceRecord as an array with one element
       const { error } = await supabase
         .from('service_records')
         .insert([serviceRecord]);
