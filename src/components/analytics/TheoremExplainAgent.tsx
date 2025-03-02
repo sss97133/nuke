@@ -62,8 +62,11 @@ const TheoremExplainAgent = () => {
           
           // Set the first theorem as selected
           if (transformedData.length > 0) {
+            console.log("Setting selected theorem:", transformedData[0]);
             setSelectedTheorem(transformedData[0]);
           }
+        } else {
+          console.error("No rows found in data:", data);
         }
       } catch (error) {
         console.error("Error fetching theorem data:", error);
@@ -75,8 +78,14 @@ const TheoremExplainAgent = () => {
     fetchTheoremData();
   }, []);
   
+  // Debug output whenever selectedTheorem changes
+  useEffect(() => {
+    console.log("Selected theorem changed:", selectedTheorem);
+  }, [selectedTheorem]);
+  
   // Simulates the planning process
   const startPlanning = () => {
+    console.log("Starting planning with theorem:", selectedTheorem);
     setLoading(true);
     setPlanning(true);
     
@@ -104,6 +113,7 @@ const TheoremExplainAgent = () => {
   };
   
   const generateCode = () => {
+    console.log("Generating code for theorem:", selectedTheorem);
     setLoading(true);
     
     // Simulate code generation
@@ -115,6 +125,7 @@ const TheoremExplainAgent = () => {
   };
   
   const fixCode = () => {
+    console.log("Fixing code for theorem:", selectedTheorem);
     setLoading(true);
     
     // Simulate code fixing
@@ -124,6 +135,11 @@ const TheoremExplainAgent = () => {
       setLoading(false);
     }, 2000);
   };
+  
+  // Debug tracking active tab
+  useEffect(() => {
+    console.log("Active tab changed to:", activeTab);
+  }, [activeTab]);
   
   return (
     <div className="space-y-6">

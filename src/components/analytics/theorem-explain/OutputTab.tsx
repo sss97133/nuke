@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Volume2, Play, Download } from "lucide-react";
@@ -11,6 +11,11 @@ interface OutputTabProps {
 }
 
 const OutputTab = ({ theoremData }: OutputTabProps) => {
+  // Debug: Log when theoremData changes
+  useEffect(() => {
+    console.log("OutputTab received theoremData:", theoremData);
+  }, [theoremData]);
+
   return (
     <div className="space-y-4">
       <Card className="border overflow-hidden">
@@ -41,7 +46,7 @@ const OutputTab = ({ theoremData }: OutputTabProps) => {
         </div>
       </Card>
 
-      {theoremData && (
+      {theoremData ? (
         <Card>
           <CardHeader>
             <CardTitle>Theorem Details</CardTitle>
@@ -76,6 +81,14 @@ const OutputTab = ({ theoremData }: OutputTabProps) => {
               <Download className="mr-2 h-4 w-4" />
               Download Full Data
             </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="p-8 text-center">
+          <CardContent>
+            <p className="text-muted-foreground">
+              No theorem selected. Please select a theorem and complete the planning process.
+            </p>
           </CardContent>
         </Card>
       )}
