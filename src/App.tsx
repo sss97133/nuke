@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -26,6 +25,7 @@ import Diagnostics from "./pages/Diagnostics"
 import Analytics from "./pages/Analytics"
 import Schedule from "./pages/Schedule"
 import Service from "./pages/Service"
+import Studio from "./pages/Studio"
 
 const queryClient = new QueryClient();
 
@@ -102,6 +102,7 @@ function AppContent() {
           <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/professional-dashboard" element={<Profile />} />
+          <Route path="/studio" element={<Studio />} />
         </Routes>
       </div>
     </div>
