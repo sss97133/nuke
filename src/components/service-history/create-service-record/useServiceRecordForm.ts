@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PartItem } from '../types';
@@ -97,10 +98,10 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
         throw new Error('You must be logged in to create a service record');
       }
       
-      // Fixed Supabase insert - use the correct table name and field names
+      // Fixed Supabase insert - don't use array syntax for single insert
       const { error } = await supabase
         .from('service_tickets')
-        .insert([{  // Use array syntax for insert
+        .insert({
           vehicle_id: formState.vehicleId,
           description: formState.description,
           service_type: formState.serviceType,
@@ -110,7 +111,7 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
           parts_used: formState.parts.length > 0 ? formState.parts : null,
           user_id: user.id,
           priority: 'medium' // Adding required priority field based on the database schema
-        }]);
+        });
 
       if (error) throw error;
       
