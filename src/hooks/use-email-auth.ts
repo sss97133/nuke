@@ -2,9 +2,11 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 export const useEmailAuth = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleEmailLogin = async (email: string, password: string, isSignUp: boolean, avatarUrl?: string) => {
@@ -17,7 +19,7 @@ export const useEmailAuth = () => {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/login`
+            emailRedirectTo: `${window.location.origin}/auth/callback`
           }
         });
 
@@ -76,6 +78,7 @@ export const useEmailAuth = () => {
             title: "Welcome Back!",
             description: "Successfully logged in"
           });
+          navigate('/dashboard');
         }
       }
     } catch (error) {

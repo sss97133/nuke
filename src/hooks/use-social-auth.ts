@@ -20,8 +20,7 @@ export const useSocialAuth = () => {
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-          },
-          skipBrowserRedirect: false // Ensure redirect happens automatically
+          }
         }
       });
 
@@ -46,6 +45,8 @@ export const useSocialAuth = () => {
       }
 
       console.log("[useSocialAuth] Opening OAuth URL:", data.url);
+      // Navigate to the auth URL returned by Supabase
+      window.location.href = data.url;
       
     } catch (error) {
       console.error("[useSocialAuth] Unexpected error:", error);

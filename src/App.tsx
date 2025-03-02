@@ -71,8 +71,8 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<AuthForm />} />
           <Route path="/register" element={<AuthForm />} />
-          <Route path="/auth/callback" element={<AuthForm />} />
-          <Route path="/" element={<AuthForm />} />
+          <Route path="/auth/callback" element={<div className="flex items-center justify-center h-screen">Completing login...</div>} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>
     );

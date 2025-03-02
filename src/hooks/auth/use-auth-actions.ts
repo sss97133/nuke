@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Provider } from "@supabase/supabase-js";
-import { getRedirectBase } from "./use-auth-config";
 
 export const useAuthActions = () => {
   const { toast } = useToast();
@@ -11,7 +10,8 @@ export const useAuthActions = () => {
 
   const handleSocialLogin = async (provider: Provider) => {
     try {
-      const redirectTo = `${getRedirectBase()}/auth/callback`;
+      console.log("[useAuthActions] Starting social login with provider:", provider);
+      const redirectTo = `${window.location.origin}/auth/callback`;
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -24,7 +24,15 @@ export const useAuthActions = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("[useAuthActions] Social login error:", error);
+        throw error;
+      }
+      
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+      
       return data;
     } catch (error: any) {
       console.error("[useAuthActions] Social login error:", error);

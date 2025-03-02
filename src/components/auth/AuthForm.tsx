@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ClassicWindow } from "./ClassicWindow";
@@ -11,7 +12,7 @@ import { PasswordResetForm } from "./password-reset/PasswordResetForm";
 import { EmailLoginForm } from "./email-form/EmailLoginForm";
 
 export const AuthForm = () => {
-  const { isLoading, handlePhoneLogin, verifyOtp } = useAuth();
+  const { isLoading, handlePhoneLogin, verifyOtp, handleSocialLogin } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -33,7 +34,7 @@ export const AuthForm = () => {
       return `+1${cleaned}`;
     }
     if (phone.startsWith("+")) {
-      return cleaned;
+      return phone;
     }
     return `+${cleaned}`;
   };
@@ -50,7 +51,7 @@ export const AuthForm = () => {
   };
 
   const handleContinueWithoutLogin = () => {
-    navigate('/');
+    navigate('/dashboard');
   };
 
   if (isResetFlow) {
@@ -76,7 +77,7 @@ export const AuthForm = () => {
                 <Separator/>
 
                 <SocialLoginButtons 
-                  onSocialLogin={() => {}} // Pass through auth.handleSocialLogin
+                  onSocialLogin={handleSocialLogin}
                   isLoading={isLoading}
                 />
 

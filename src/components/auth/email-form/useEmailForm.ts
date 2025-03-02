@@ -11,11 +11,16 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (showForgotPassword) {
-      await handleForgotPassword(email);
-      return;
+    
+    try {
+      if (showForgotPassword) {
+        await handleForgotPassword(email);
+        return;
+      }
+      await handleEmailLogin(email, password, isSignUp, avatarUrl);
+    } catch (error) {
+      console.error("Email auth error:", error);
     }
-    await handleEmailLogin(email, password, isSignUp, avatarUrl);
   };
 
   return {
