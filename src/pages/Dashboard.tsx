@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Activity, Users, Car, Wrench, TrendingUp } from "lucide-react";
+import { GeoFencedDiscovery } from '@/components/discovery/GeoFencedDiscovery';
 
 const StatCard = ({ 
   title, 
@@ -85,6 +86,16 @@ const Dashboard = () => {
               icon={TrendingUp}
             />
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Discover Nearby</CardTitle>
+              <CardDescription>Find vehicles, garages, auctions and events in your area</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <GeoFencedDiscovery />
+            </CardContent>
+          </Card>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card className="col-span-2">

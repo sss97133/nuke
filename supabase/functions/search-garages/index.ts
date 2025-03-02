@@ -1,91 +1,104 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { lat, lng, radius = 5000 } = await req.json()
+    const { query, location, radius, type, limit = 20 } = await req.json();
 
-    if (!lat || !lng) {
-      throw new Error('Latitude and longitude are required')
-    }
-
-    console.log(`Searching for garages near ${lat},${lng} within ${radius}m`)
-
-    const GOOGLE_PLACES_API_KEY = Deno.env.get('GOOGLE_PLACES_API_KEY')
-    if (!GOOGLE_PLACES_API_KEY) {
-      throw new Error('Google Places API key not configured')
-    }
-
-    // Search for auto repair shops nearby
-    const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=car_repair&key=${GOOGLE_PLACES_API_KEY}`
-    const response = await fetch(placesUrl)
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch places from Google API')
-    }
-
-    // Create Supabase client
+    // Create a Supabase client with the Auth context of the function
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
+    );
 
-    // Process and insert each place
-    const garages = await Promise.all(
-      data.results.map(async (place: any) => {
-        const { error } = await supabaseClient
-          .from('garages')
-          .upsert({
-            name: place.name,
-            google_place_id: place.place_id,
-            location: { lat: place.geometry.location.lat, lng: place.geometry.location.lng },
-            address: place.vicinity,
-            rating: place.rating
-          })
-          .select()
-          .single()
+    // Build the query based on provided parameters
+    let garageQuery = supabaseClient
+      .from('garages')
+      .select('*')
+      .limit(limit);
 
-        if (error && error.code !== '23505') { // Ignore unique constraint violations
-          console.error('Error inserting garage:', error)
-          return null
-        }
+    // Add filters if provided
+    if (query) {
+      garageQuery = garageQuery.ilike('name', `%${query}%`);
+    }
 
-        return place
-      })
-    )
+    if (type) {
+      // Assuming there's a 'type' column in the garages table
+      garageQuery = garageQuery.eq('type', type);
+    }
+
+    // Execute the query
+    const { data, error } = await garageQuery;
+
+    if (error) throw error;
+
+    // If location and radius are provided, filter results by distance
+    let results = data;
+    if (location && radius) {
+      const { lat, lng } = location;
+      const radiusMiles = radius;
+
+      results = data.filter(garage => {
+        if (!garage.location || !garage.location.lat || !garage.location.lng) return false;
+        
+        // Calculate distance using Haversine formula
+        const distance = calculateHaversineDistance(
+          lat, 
+          lng, 
+          garage.location.lat, 
+          garage.location.lng
+        );
+        
+        // Convert distance to miles (Haversine returns km)
+        const distanceMiles = distance * 0.621371;
+        
+        return distanceMiles <= radiusMiles;
+      });
+    }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: `Successfully processed ${garages.filter(Boolean).length} garages`,
-        garages: garages.filter(Boolean)
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
-
+      JSON.stringify(results),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    );
   } catch (error) {
+    console.error("Error processing request:", error);
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
   }
-})
+});
+
+// Haversine formula to calculate distance between two points on Earth
+function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = degToRad(lat2 - lat1);
+  const dLon = degToRad(lon2 - lon1);
+  
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(degToRad(lat1)) * Math.cos(degToRad(lat2)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c;
+  
+  return distance;
+}
+
+function degToRad(deg: number): number {
+  return deg * (Math.PI / 180);
+}
