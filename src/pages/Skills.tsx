@@ -1,11 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Wrench, Code, BookOpen, Speech, PenTool, Lightbulb } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Wrench, Code, BookOpen, Speech, PenTool, Lightbulb, Atom, ChevronDown, ChevronUp } from 'lucide-react';
+import { QuantumSkillVis } from "@/components/skills/visualization/QuantumSkillVis";
 
 interface SkillProps {
   icon: React.ReactNode;
@@ -40,6 +42,8 @@ const SkillCard = ({ skill }: { skill: SkillProps }) => (
 );
 
 const Skills = () => {
+  const [showQuantumView, setShowQuantumView] = useState(false);
+
   const skillsData: SkillProps[] = [
     {
       icon: <Wrench className="h-4 w-4 text-blue-500" />,
@@ -95,6 +99,26 @@ const Skills = () => {
           <p className="text-muted-foreground">
             Track and develop your professional capabilities
           </p>
+        </div>
+
+        <div className="border rounded-md p-3 mb-4">
+          <Button 
+            variant="ghost" 
+            className="flex w-full justify-between items-center"
+            onClick={() => setShowQuantumView(!showQuantumView)}
+          >
+            <div className="flex items-center gap-2">
+              <Atom className="h-5 w-5 text-blue-500" />
+              <span>Quantum Skill Visualization</span>
+            </div>
+            {showQuantumView ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+
+          {showQuantumView && (
+            <div className="mt-4 h-[300px] border rounded-md p-4 bg-black/5 dark:bg-white/5">
+              <QuantumSkillVis skills={skillsData} />
+            </div>
+          )}
         </div>
 
         <Tabs defaultValue="all">
