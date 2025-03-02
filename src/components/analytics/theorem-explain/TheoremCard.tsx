@@ -20,6 +20,11 @@ const TheoremCard = ({
   selectedTheorem,
   isLoading = false
 }: TheoremCardProps) => {
+  console.log("TheoremCard rendering with props:", { 
+    planning, planCompleted, isLoading, 
+    selectedTheoremName: selectedTheorem?.name 
+  });
+
   return (
     <Card className="lg:col-span-1 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
       <CardHeader>
