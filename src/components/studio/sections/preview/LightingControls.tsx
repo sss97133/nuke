@@ -11,7 +11,8 @@ import {
   ZoomIn, 
   ZoomOut, 
   Camera, 
-  Eye
+  Eye,
+  LineChart
 } from 'lucide-react';
 
 interface LightingControlsProps {
@@ -34,6 +35,14 @@ export const LightingControls: React.FC<LightingControlsProps> = ({
           <ToggleGroupItem value="basic" aria-label="Basic Lighting" title="Basic Studio Lighting">
             <Sun className="h-4 w-4 mr-1" />
             <span className="sr-only md:not-sr-only md:text-xs">Basic</span>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="product" aria-label="Product Lighting" title="Enhanced Product Lighting">
+            <Camera className="h-4 w-4 mr-1" />
+            <span className="sr-only md:not-sr-only md:text-xs">Product</span>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="visualization" aria-label="Visualization Lighting" title="Data Visualization Lighting">
+            <LineChart className="h-4 w-4 mr-1" />
+            <span className="sr-only md:not-sr-only md:text-xs">Visual</span>
           </ToggleGroupItem>
         </ToggleGroup>
       </div>

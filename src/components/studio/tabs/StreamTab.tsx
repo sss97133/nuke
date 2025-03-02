@@ -12,8 +12,8 @@ interface StreamTabProps {
   ptzTracks: PTZTrack[];
   selectedCameraIndex: number | null;
   onCameraSelect: (index: number) => void;
-  lightMode: 'basic' | 'product';
-  setLightMode: (mode: 'basic' | 'product') => void;
+  lightMode: 'basic' | 'product' | 'visualization';
+  setLightMode: (mode: 'basic' | 'product' | 'visualization') => void;
   isLive: boolean;
   toggleLive: () => void;
 }
