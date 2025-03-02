@@ -2,6 +2,22 @@
 import { useState, useEffect } from 'react';
 import { TheoremData } from '../types';
 
+/**
+ * Custom hook to fetch and manage theorem data from the Hugging Face dataset
+ * 
+ * This hook handles fetching theorem data from the TIGER-Lab/TheoremExplainBench
+ * dataset, transforming the response into our application's format, and managing
+ * the selected theorem state.
+ * 
+ * The hook automatically fetches data on mount and selects the first theorem
+ * by default when data is available.
+ * 
+ * @returns {Object} Object containing theorem data and selection state
+ * @returns {Array<TheoremData>} theoremData - Array of all fetched theorems
+ * @returns {TheoremData | undefined} selectedTheorem - The currently selected theorem
+ * @returns {Function} setSelectedTheorem - Function to update the selected theorem
+ * @returns {boolean} fetchingData - Whether data is currently being fetched
+ */
 export const useTheoremData = () => {
   const [theoremData, setTheoremData] = useState<TheoremData[]>([]);
   const [selectedTheorem, setSelectedTheorem] = useState<TheoremData | undefined>(undefined);
