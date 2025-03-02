@@ -1,5 +1,5 @@
 
-import { TheoremExplainAgent } from '@/components/analytics/TheoremExplainAgent';
+import TheoremExplainAgent from '@/components/analytics/TheoremExplainAgent';
 import { StudioAnalytics } from '@/components/studio/analytics/StudioAnalytics';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from 'react';
