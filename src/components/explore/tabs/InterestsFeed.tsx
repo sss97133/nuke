@@ -35,7 +35,7 @@ export const InterestsFeed = ({ filter }: InterestsFeedProps) => {
           subtitle: 'Ends in 2 days',
           image: 'https://images.unsplash.com/photo-1581134723003-f910e6e8231f?auto=format&fit=crop&w=600&q=80',
           tags: ['Vintage', 'Auction', 'Rare'],
-          reason: 'Similar to auctions you've participated in',
+          reason: 'Similar to auctions you\'ve participated in',
           location: 'Los Angeles, CA',
           relevanceScore: 94
         },
