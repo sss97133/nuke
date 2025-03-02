@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Wrench, Code, BookOpen, Speech, PenTool, Lightbulb } from 'lucide-react';
 import { QuantumSkillPanel } from "@/components/skills/QuantumSkillPanel";
+import { SkillTree } from "@/components/skills/SkillTree";
 import { Skill, UserSkill, SkillCategory } from '@/types/skills';
 
 interface SkillProps {
@@ -148,7 +149,7 @@ const Skills = () => {
           ))}
         </Tabs>
 
-        {/* Quantum Skill Visualization Panel */}
+        {/* Quantum Skill Visualization Panel moved below the skill boxes */}
         <div className="mt-8">
           <QuantumSkillPanel skills={skills} userSkills={userSkills} />
         </div>

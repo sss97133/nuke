@@ -1,11 +1,12 @@
-import React from 'react';
-import { Gauge } from 'lucide-react';
 
-export const LoadingState = () => {
+import React from 'react';
+import { Loader2 } from 'lucide-react';
+
+export const LoadingState: React.FC = () => {
   return (
-    <div className="flex items-center justify-center p-8 text-foreground">
-      <Gauge className="w-6 h-6 animate-spin mr-2" />
-      <span className="animate-pulse">Loading developometer...</span>
+    <div className="flex flex-col items-center justify-center h-[400px] w-full">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <p className="mt-4 text-muted-foreground">Loading skills data...</p>
     </div>
   );
 };

@@ -7,11 +7,20 @@ import { LoadingState } from './LoadingState';
 import { SkillHeader } from './SkillHeader';
 import { SkillCategory } from './SkillCategory';
 import { AIToolsPanel } from './ai/AIToolsPanel';
-import { QuantumSkillVis } from './visualization/QuantumSkillVis';
+import { QuantumSkillPanel } from './QuantumSkillPanel';
 import { Skill, UserSkill } from '@/types/skills';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const SkillTree = () => {
   const { toast } = useToast();
+  const [visualizationMode, setVisualizationMode] = React.useState('enhanced'); // 'enhanced', 'legacy', or 'disabled'
 
   const { data: skills, isLoading: skillsLoading, error: skillsError } = useQuery({
     queryKey: ['skills'],
@@ -128,28 +137,56 @@ export const SkillTree = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <SkillHeader totalProgress={calculateTotalProgress()} />
+      <div className="flex justify-between items-center">
+        <SkillHeader totalProgress={calculateTotalProgress()} />
+        
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-muted-foreground">Visualization:</span>
+          <Select 
+            value={visualizationMode} 
+            onValueChange={setVisualizationMode}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select visualization" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="enhanced">Enhanced Quantum</SelectItem>
+              <SelectItem value="legacy">Legacy Quantum</SelectItem>
+              <SelectItem value="disabled">Disabled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
       
-      {skills && userSkills && (
+      {/* Visualization Panel - Only show if not disabled */}
+      {visualizationMode !== 'disabled' && (
         <div className="mb-8">
-          <h2 className="text-lg font-medium mb-4">Quantum Skill Visualization</h2>
-          <QuantumSkillVis skills={skills} userSkills={userSkills} />
+          <QuantumSkillPanel skills={skills} userSkills={userSkills || []} />
         </div>
       )}
       
-      <AIToolsPanel />
-      
-      <div className="space-y-12 mt-8">
-        {skillsByCategory && Object.entries(skillsByCategory).map(([category, categorySkills]) => (
-          <SkillCategory
-            key={category}
-            category={category}
-            skills={categorySkills}
-            getSkillStatus={getSkillStatus}
-          />
-        ))}
-      </div>
+      {/* AI Tools Panel */}
+      <Tabs defaultValue="skills" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="skills">Skills Overview</TabsTrigger>
+          <TabsTrigger value="ai-tools">AI Development Tools</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="skills" className="space-y-12">
+          {skillsByCategory && Object.entries(skillsByCategory).map(([category, categorySkills]) => (
+            <SkillCategory
+              key={category}
+              category={category}
+              skills={categorySkills}
+              getSkillStatus={getSkillStatus}
+            />
+          ))}
+        </TabsContent>
+
+        <TabsContent value="ai-tools">
+          <AIToolsPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
-
