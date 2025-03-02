@@ -10,7 +10,7 @@ import type { WorkspaceDimensions, PTZTrack } from './types/workspace';
 import { toJson } from '@/types/json';
 
 // Import sections
-import { PreviewSection } from './sections/PreviewSection';
+import { StudioPreview } from './sections/PreviewSection';
 import { SettingsSection } from './sections/SettingsSection';
 import { ControlButtons } from './sections/ControlButtons';
 
@@ -32,14 +32,19 @@ export const StudioConfiguration = () => {
   const { data: studioConfig, isLoading, error } = useStudioConfig(defaultDimensions);
   const [dimensions, setDimensions] = useState<WorkspaceDimensions>(defaultDimensions);
   const [ptzTracks, setPTZTracks] = useState<PTZTrack[]>([{
+    id: '1',
+    name: 'Default Camera',
     position: { x: 0, y: 8, z: 0 },
-    length: 10,
+    rotation: { x: 0, y: 0, z: 0 },
+    target: { x: 0, y: 5, z: 0 },
     speed: 1,
+    zoom: 1,
+    length: 10,
     coneAngle: 45,
   }]);
   
   const [selectedCameraIndex, setSelectedCameraIndex] = useState<number | null>(null);
-  const [audioLevel, setAudioLevel] = useState<number[]>([50]);
+  const [audioLevel, setAudioLevel] = useState<number>(50);
   const [activeTab, setActiveTab] = useState('simulator');
   const [isAutoSave, setIsAutoSave] = useState(true);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -183,12 +188,17 @@ export const StudioConfiguration = () => {
           <p className="text-muted-foreground">Design and manage your studio setup</p>
         </div>
         
-        <ControlButtons 
-          isAutoSave={isAutoSave}
-          setIsAutoSave={setIsAutoSave}
-          handleSavePreset={handleSavePreset}
-          handleSaveConfiguration={handleSaveConfiguration}
-        />
+        <div className="flex space-x-2">
+          <Button variant="outline" size="sm" onClick={() => setIsAutoSave(!isAutoSave)}>
+            Auto-Save: {isAutoSave ? 'On' : 'Off'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleSavePreset}>
+            Save Preset
+          </Button>
+          <Button size="sm" onClick={handleSaveConfiguration}>
+            Save
+          </Button>
+        </div>
       </div>
       
       {lastSaved && (
@@ -206,11 +216,13 @@ export const StudioConfiguration = () => {
         </TabsList>
         
         <TabsContent value="simulator" className="mt-6">
-          <PreviewSection 
+          <StudioPreview 
             dimensions={dimensions}
             ptzTracks={ptzTracks}
             selectedCameraIndex={selectedCameraIndex}
             onCameraSelect={handleCameraSelect}
+            lightMode="basic"
+            setLightMode={() => {}}
           />
         </TabsContent>
         
@@ -218,15 +230,26 @@ export const StudioConfiguration = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <PTZControls 
               selectedCamera={selectedCameraIndex !== null ? ptzTracks[selectedCameraIndex] : undefined}
-              onMove={handleCameraMove}
+              onUpdate={(updatedCamera) => {
+                if (selectedCameraIndex === null) return;
+                const newTracks = [...ptzTracks];
+                newTracks[selectedCameraIndex] = updatedCamera;
+                setPTZTracks(newTracks);
+              }}
             />
             <AudioControls 
               audioLevel={audioLevel}
-              setAudioLevel={setAudioLevel}
+              setAudioLevel={(level) => setAudioLevel(level)}
             />
-            <RecordingControls />
+            <RecordingControls 
+              onStart={() => {}}
+              onStop={() => {}}
+            />
             <CameraControls />
-            <StreamingControls />
+            <StreamingControls 
+              onStart={() => {}}
+              onStop={() => {}}
+            />
           </div>
         </TabsContent>
         
