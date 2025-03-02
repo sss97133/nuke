@@ -7,6 +7,11 @@ interface CentralStarProps {
   id?: string; // Add optional id prop
 }
 
+// Define an animation handler interface to maintain type safety
+export interface AnimationHandler {
+  animate: () => void;
+}
+
 const CentralStar: React.FC<CentralStarProps> = ({ scene, id }) => {
   const centralSphereRef = useRef<THREE.Mesh | null>(null);
   const glowSphereRef = useRef<THREE.Mesh | null>(null);
@@ -86,8 +91,13 @@ const CentralStar: React.FC<CentralStarProps> = ({ scene, id }) => {
   );
 };
 
-// Provide a static method to create a standalone animation handler
-CentralStar.getAnimationHandler = (props: CentralStarProps) => {
+// Properly define the static method with TypeScript
+const CentralStarWithHandler = CentralStar as typeof CentralStar & {
+  getAnimationHandler: (props: CentralStarProps) => AnimationHandler;
+};
+
+// Implement the static method
+CentralStarWithHandler.getAnimationHandler = (props: CentralStarProps): AnimationHandler => {
   return {
     animate: () => {
       // This is a placeholder - in real usage, we'd access the DOM element
@@ -96,4 +106,4 @@ CentralStar.getAnimationHandler = (props: CentralStarProps) => {
   };
 };
 
-export default CentralStar;
+export default CentralStarWithHandler;
