@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -22,6 +23,7 @@ import TokensPage from "./pages/Tokens"
 import ServiceHistory from "./pages/ServiceHistory"
 import Parts from "./pages/Parts"
 import FuelTracking from "./pages/FuelTracking"
+import Diagnostics from "./pages/Diagnostics"
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient();
@@ -89,7 +91,7 @@ function AppContent() {
           <Route path="/schedule" element={<Dashboard />} />
           <Route path="/analytics" element={<Dashboard />} />
           <Route path="/fuel" element={<FuelTracking />} />
-          <Route path="/diagnostics" element={<Dashboard />} />
+          <Route path="/diagnostics" element={<Diagnostics />} />
           <Route path="/parts" element={<Parts />} />
           <Route path="/service-history" element={<ServiceHistory />} />
           <Route path="/token-staking" element={<TokenStaking />} />

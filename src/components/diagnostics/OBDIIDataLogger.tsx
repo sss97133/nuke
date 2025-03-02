@@ -1,210 +1,163 @@
 
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { Terminal, Database, Plug } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Gauge, AlertTriangle } from "lucide-react";
+
+interface SensorData {
+  name: string;
+  value: number;
+  unit: string;
+  min: number;
+  max: number;
+  isWarning: boolean;
+}
 
 const OBDIIDataLogger = () => {
-  const { toast } = useToast();
-  const [isConnected, setIsConnected] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState("");
-  const [isLogging, setIsLogging] = useState(false);
+  const [sensorData, setSensorData] = useState<Record<string, SensorData[]>>({
+    engine: [
+      { name: "RPM", value: 0, unit: "rpm", min: 0, max: 8000, isWarning: false },
+      { name: "Temperature", value: 0, unit: "°C", min: 0, max: 120, isWarning: false },
+      { name: "Oil Pressure", value: 0, unit: "psi", min: 0, max: 100, isWarning: false },
+      { name: "MAP", value: 0, unit: "kPa", min: 0, max: 200, isWarning: false },
+    ],
+    emissions: [
+      { name: "O2", value: 0, unit: "V", min: 0, max: 1, isWarning: false },
+      { name: "CO2", value: 0, unit: "g/km", min: 0, max: 200, isWarning: false },
+      { name: "NOx", value: 0, unit: "ppm", min: 0, max: 1000, isWarning: false },
+    ],
+    performance: [
+      { name: "Throttle", value: 0, unit: "%", min: 0, max: 100, isWarning: false },
+      { name: "Intake Air", value: 0, unit: "g/s", min: 0, max: 100, isWarning: false },
+      { name: "Fuel Pressure", value: 0, unit: "kPa", min: 0, max: 500, isWarning: false },
+    ]
+  });
   
-  // Mock vehicle data
-  const vehicles = [
-    { id: "1", name: "2019 Toyota Camry" },
-    { id: "2", name: "2020 Honda Civic" },
-    { id: "3", name: "2018 Ford F-150" }
-  ];
-  
-  // Mock OBD-II parameters data
-  const obdParameters = [
-    { id: "1", name: "Engine RPM", value: "1240", unit: "rpm" },
-    { id: "2", name: "Vehicle Speed", value: "0", unit: "km/h" },
-    { id: "3", name: "Coolant Temperature", value: "89", unit: "°C" },
-    { id: "4", name: "Engine Load", value: "23", unit: "%" },
-    { id: "5", name: "Fuel Level", value: "78", unit: "%" },
-    { id: "6", name: "Throttle Position", value: "15", unit: "%" },
-  ];
-  
-  const handleConnect = () => {
-    if (!selectedVehicle) {
-      toast({
-        title: "Error",
-        description: "Please select a vehicle first",
-        variant: "destructive"
-      });
-      return;
-    }
+  const [connected, setConnected] = useState(false);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
-    setIsConnected(true);
-    toast({
-      title: "Connected",
-      description: `Successfully connected to OBD-II interface for ${vehicles.find(v => v.id === selectedVehicle)?.name}`,
-    });
-  };
-  
-  const handleDisconnect = () => {
-    setIsConnected(false);
-    setIsLogging(false);
-    toast({
-      title: "Disconnected",
-      description: "OBD-II interface disconnected",
-    });
-  };
-  
-  const toggleLogging = () => {
-    setIsLogging(!isLogging);
-    toast({
-      title: isLogging ? "Logging Stopped" : "Logging Started",
-      description: isLogging 
-        ? "OBD-II data logging has been stopped" 
-        : "OBD-II data is now being logged to your vehicle service history",
-    });
-  };
+  useEffect(() => {
+    // Simulate OBD-II connection
+    const timer = setTimeout(() => {
+      setConnected(true);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!connected) return;
+
+    // Simulate live data from OBD-II
+    const interval = setInterval(() => {
+      const newWarnings: string[] = [];
+      
+      setSensorData(prev => {
+        const newData = { ...prev };
+        
+        Object.keys(newData).forEach(category => {
+          newData[category] = newData[category].map(sensor => {
+            // Generate realistic but random values
+            let newValue: number;
+            
+            if (sensor.name === "RPM") {
+              newValue = Math.floor(Math.random() * 2000) + 800;
+            } else if (sensor.name === "Temperature") {
+              newValue = Math.floor(Math.random() * 30) + 80;
+              if (newValue > 110) {
+                newWarnings.push("Engine temperature too high");
+              }
+            } else if (sensor.name === "O2") {
+              newValue = Math.random() * 0.5 + 0.2;
+            } else {
+              // Random value between 30% and 70% of max for other sensors
+              newValue = sensor.max * (0.3 + Math.random() * 0.4);
+            }
+            
+            const isWarning = newValue > sensor.max * 0.85;
+            if (isWarning && !sensor.isWarning) {
+              newWarnings.push(`${sensor.name} is approaching critical level`);
+            }
+            
+            return { ...sensor, value: newValue, isWarning };
+          });
+        });
+        
+        return newData;
+      });
+      
+      if (newWarnings.length > 0) {
+        setWarnings(prev => [...prev, ...newWarnings]);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [connected]);
+
+  if (!connected) {
+    return (
+      <Card className="w-full">
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <Gauge className="h-10 w-10 text-muted-foreground animate-pulse" />
+            <p>Connecting to OBD-II interface...</p>
+            <Progress value={45} className="w-[60%]" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>OBD-II Connection</CardTitle>
-              <CardDescription>Connect to your vehicle's onboard diagnostics</CardDescription>
-            </div>
-            <div className="p-2 bg-blue-100 rounded-full">
-              <Plug className="h-5 w-5 text-blue-700" />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-1 block">Select Vehicle</label>
-              <Select 
-                value={selectedVehicle} 
-                onValueChange={setSelectedVehicle}
-                disabled={isConnected}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a vehicle" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vehicles.map(vehicle => (
-                    <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {vehicle.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {!isConnected ? (
-              <Button onClick={handleConnect} disabled={!selectedVehicle}>
-                Connect
-              </Button>
-            ) : (
-              <Button variant="destructive" onClick={handleDisconnect}>
-                Disconnect
-              </Button>
-            )}
-          </div>
-          
-          {isConnected && (
-            <div className="flex justify-between items-center pt-4 border-t">
-              <span className="text-sm">Status: <span className="text-green-600 font-medium">Connected</span></span>
-              <Button 
-                variant={isLogging ? "destructive" : "default"}
-                onClick={toggleLogging}
-              >
-                {isLogging ? "Stop Logging" : "Start Logging"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {isConnected && (
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>Live OBD-II Data</CardTitle>
-                <CardDescription>
-                  Real-time parameters from {vehicles.find(v => v.id === selectedVehicle)?.name}
-                </CardDescription>
-              </div>
-              <div className="p-2 bg-green-100 rounded-full">
-                <Terminal className="h-5 w-5 text-green-700" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Parameter</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Unit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {obdParameters.map(param => (
-                  <TableRow key={param.id}>
-                    <TableCell className="font-medium">{param.name}</TableCell>
-                    <TableCell>{param.value}</TableCell>
-                    <TableCell>{param.unit}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            
-            <div className="mt-4">
-              <Button variant="outline" className="w-full">
-                View Historical Data
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {warnings.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {warnings[warnings.length - 1]}
+          </AlertDescription>
+        </Alert>
       )}
-      
-      {isConnected && isLogging && (
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>Data Logging</CardTitle>
-                <CardDescription>Recording OBD-II parameters</CardDescription>
-              </div>
-              <div className="p-2 bg-purple-100 rounded-full">
-                <Database className="h-5 w-5 text-purple-700" />
-              </div>
+
+      <Tabs defaultValue="engine">
+        <TabsList className="grid grid-cols-3 mb-4">
+          <TabsTrigger value="engine">Engine</TabsTrigger>
+          <TabsTrigger value="emissions">Emissions</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
+        </TabsList>
+
+        {Object.keys(sensorData).map((category) => (
+          <TabsContent key={category} value={category} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {sensorData[category].map((sensor) => (
+                <Card key={sensor.name}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      {sensor.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <span className={sensor.isWarning ? 'text-orange-500 font-bold' : ''}>
+                        {sensor.value.toFixed(1)} {sensor.unit}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Range: {sensor.min}-{sensor.max} {sensor.unit}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(sensor.value / sensor.max) * 100} 
+                      className={`mt-2 ${sensor.isWarning ? 'bg-orange-200' : ''}`} 
+                    />
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <span>Log duration:</span>
-                <span className="font-medium">00:05:32</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Data points collected:</span>
-                <span className="font-medium">342</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Log file size:</span>
-                <span className="font-medium">1.2 MB</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline">Export Data</Button>
-                <Button variant="outline">Share to Cloud</Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 };

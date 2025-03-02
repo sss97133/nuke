@@ -1,160 +1,136 @@
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Code, Terminal, Gauge, Monitor } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Link, ExternalLink, Download, CheckCircle2, XCircle } from "lucide-react";
+
+interface Tool {
+  id: string;
+  name: string;
+  description: string;
+  status: "connected" | "disconnected";
+  isInstalled: boolean;
+  url: string;
+}
 
 const ThirdPartyTools = () => {
-  const { toast } = useToast();
-  
-  const handleToolLaunch = (toolName: string) => {
-    toast({
-      title: `Launching ${toolName}`,
-      description: `Opening ${toolName} application...`,
-    });
+  const [tools, setTools] = useState<Tool[]>([
+    {
+      id: "1",
+      name: "OBD Auto Doctor",
+      description: "Professional car diagnostics software for OBD-2 compliant vehicles",
+      status: "disconnected",
+      isInstalled: true,
+      url: "https://www.obdautodoctor.com/"
+    },
+    {
+      id: "2",
+      name: "Torque Pro",
+      description: "Vehicle diagnostics app that uses OBD2 adapter to connect to your car",
+      status: "connected",
+      isInstalled: true,
+      url: "https://torque-bhp.com/"
+    },
+    {
+      id: "3",
+      name: "FORScan",
+      description: "Software scanner for Ford, Mazda, Lincoln and Mercury vehicles",
+      status: "disconnected",
+      isInstalled: false,
+      url: "https://forscan.org/"
+    },
+    {
+      id: "4",
+      name: "EOBD Facile",
+      description: "Complete diagnostic software for all vehicles",
+      status: "disconnected",
+      isInstalled: false,
+      url: "https://www.eobd-facile.com/"
+    }
+  ]);
+
+  const toggleConnection = (id: string) => {
+    setTools(currentTools => 
+      currentTools.map(tool => 
+        tool.id === id 
+          ? { ...tool, status: tool.status === "connected" ? "disconnected" : "connected" } 
+          : tool
+      )
+    );
+  };
+
+  const installTool = (id: string) => {
+    setTools(currentTools => 
+      currentTools.map(tool => 
+        tool.id === id 
+          ? { ...tool, isInstalled: true } 
+          : tool
+      )
+    );
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Third-Party Diagnostic Tools</h2>
-        <p className="text-muted-foreground">
-          Connect with your favorite diagnostic software and hardware tools
-        </p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {tools.map(tool => (
+        <Card key={tool.id}>
           <CardHeader>
-            <div className="flex items-start justify-between">
+            <div className="flex justify-between items-start">
               <div>
-                <CardTitle>MoTeC i2 Pro</CardTitle>
-                <CardDescription>Professional data analysis software</CardDescription>
+                <CardTitle className="text-lg">{tool.name}</CardTitle>
+                <CardDescription className="mt-1">{tool.description}</CardDescription>
               </div>
-              <div className="p-2 bg-blue-100 rounded-full">
-                <Monitor className="h-5 w-5 text-blue-700" />
-              </div>
+              {tool.isInstalled && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-muted-foreground">Connect</span>
+                  <Switch 
+                    checked={tool.status === "connected"}
+                    onCheckedChange={() => toggleConnection(tool.id)}
+                  />
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Advanced data logging and analysis for professional motorsport and performance tuning.
-            </p>
-            <div className="flex gap-2">
-              <Button 
-                variant="default" 
-                onClick={() => handleToolLaunch('MoTeC i2 Pro')}
-                className="flex-1"
-              >
-                Launch Application
-              </Button>
-              <Button variant="outline" className="flex-1">Import Data</Button>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm">Status:</span>
+              <span className="flex items-center">
+                {tool.status === "connected" ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mr-1" />
+                    <span className="text-green-500">Connected</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 text-muted-foreground mr-1" />
+                    <span className="text-muted-foreground">Disconnected</span>
+                  </>
+                )}
+              </span>
             </div>
           </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>OBDFusion</CardTitle>
-                <CardDescription>Comprehensive OBD-II scanner app</CardDescription>
-              </div>
-              <div className="p-2 bg-green-100 rounded-full">
-                <Gauge className="h-5 w-5 text-green-700" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Complete vehicle diagnostics with real-time dashboards and custom views.
-            </p>
-            <div className="flex gap-2">
-              <Button 
-                variant="default" 
-                onClick={() => handleToolLaunch('OBDFusion')}
-                className="flex-1"
-              >
-                Launch Application
+          <CardFooter className="flex justify-between">
+            <Button variant="outline" size="sm" className="flex items-center" asChild>
+              <a href={tool.url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Website
+              </a>
+            </Button>
+            
+            {!tool.isInstalled ? (
+              <Button size="sm" className="flex items-center" onClick={() => installTool(tool.id)}>
+                <Download className="h-4 w-4 mr-2" />
+                Install
               </Button>
-              <Button variant="outline" className="flex-1">Sync Data</Button>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>Tech2Win</CardTitle>
-                <CardDescription>Manufacturer-specific diagnostics</CardDescription>
-              </div>
-              <div className="p-2 bg-purple-100 rounded-full">
-                <Terminal className="h-5 w-5 text-purple-700" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Factory-level diagnostic capabilities for General Motors vehicles.
-            </p>
-            <div className="flex gap-2">
-              <Button 
-                variant="default" 
-                onClick={() => handleToolLaunch('Tech2Win')}
-                className="flex-1"
-              >
-                Launch Application
+            ) : (
+              <Button size="sm" variant="secondary" className="flex items-center" disabled={tool.status !== "connected"}>
+                <Link className="h-4 w-4 mr-2" />
+                Connect Data
               </Button>
-              <Button variant="outline" className="flex-1">View Reports</Button>
-            </div>
-          </CardContent>
+            )}
+          </CardFooter>
         </Card>
-        
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>TunerPro RT</CardTitle>
-                <CardDescription>ECU tuning and calibration</CardDescription>
-              </div>
-              <div className="p-2 bg-orange-100 rounded-full">
-                <Code className="h-5 w-5 text-orange-700" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Real-time ECU tuning and calibration for performance optimization.
-            </p>
-            <div className="flex gap-2">
-              <Button 
-                variant="default" 
-                onClick={() => handleToolLaunch('TunerPro RT')}
-                className="flex-1"
-              >
-                Launch Application
-              </Button>
-              <Button variant="outline" className="flex-1">Open Maps</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Add New Tool</CardTitle>
-          <CardDescription>Connect additional diagnostic software</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Configure new diagnostic tools by providing the connection details and integration settings.
-          </p>
-          <Button className="w-full">
-            Configure New Tool
-          </Button>
-        </CardContent>
-      </Card>
+      ))}
     </div>
   );
 };
