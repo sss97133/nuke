@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import BasicInformation from './sections/BasicInformation';
 import ServiceDetails from './sections/ServiceDetails';
 import PartsSection from './sections/PartsSection';
+import TotalCost from './sections/TotalCost';
 import { useServiceRecordForm } from './useServiceRecordForm';
 
 interface CreateServiceRecordProps {
@@ -29,6 +30,7 @@ const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({
     formState,
     updateFormState,
     vehicles,
+    vehiclesLoading,
     newPart,
     updateNewPart,
     addPart,
@@ -36,8 +38,10 @@ const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({
     isSubmitting,
     submitError,
     handleSubmit,
-    vehiclesLoading
+    calculateTotalCost
   } = useServiceRecordForm(onClose, onSuccess);
+
+  const totalCost = useMemo(() => calculateTotalCost(), [formState.parts, formState.laborHours]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -78,6 +82,8 @@ const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({
               onAddPart={addPart}
               onRemovePart={removePart}
             />
+
+            <TotalCost totalCost={totalCost} />
           </fieldset>
 
           {submitError && (
@@ -93,7 +99,10 @@ const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || !formState.vehicleId || !formState.description || vehiclesLoading}>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting || !formState.vehicleId || !formState.description || vehiclesLoading}
+            >
               {isSubmitting ? "Saving..." : "Save Record"}
             </Button>
           </DialogFooter>
