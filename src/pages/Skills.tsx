@@ -1,12 +1,12 @@
+
 import React, { useState } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Wrench, Code, BookOpen, Speech, PenTool, Lightbulb, Atom, ChevronDown, ChevronUp } from 'lucide-react';
-import { QuantumSkillVis } from "@/components/skills/visualization/QuantumSkillVis";
+import { Wrench, Code, BookOpen, Speech, PenTool, Lightbulb } from 'lucide-react';
+import { QuantumSkillPanel } from "@/components/skills/QuantumSkillPanel";
 import { Skill, UserSkill, SkillCategory } from '@/types/skills';
 
 interface SkillProps {
@@ -43,8 +43,6 @@ const SkillCard = ({ skill }: { skill: SkillProps }) => (
 );
 
 const Skills = () => {
-  const [showQuantumView, setShowQuantumView] = useState(false);
-
   const skillsData: SkillProps[] = [
     {
       id: "skill-1",
@@ -107,6 +105,14 @@ const Skills = () => {
     updated_at: new Date().toISOString()
   }));
 
+  // Convert SkillProps to Skill for the visualization component
+  const skills: Skill[] = skillsData.map(skill => ({
+    id: skill.id,
+    name: skill.name,
+    description: skill.description,
+    category: skill.category
+  }));
+
   const categories = ["all", "technical", "soft_skills"];
 
   return (
@@ -142,24 +148,9 @@ const Skills = () => {
           ))}
         </Tabs>
 
-        <div className="border rounded-md p-3 mt-8">
-          <Button 
-            variant="ghost" 
-            className="flex w-full justify-between items-center"
-            onClick={() => setShowQuantumView(!showQuantumView)}
-          >
-            <div className="flex items-center gap-2">
-              <Atom className="h-5 w-5 text-blue-500" />
-              <span>Quantum Skill Visualization</span>
-            </div>
-            {showQuantumView ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-
-          {showQuantumView && (
-            <div className="mt-4 h-[300px] border rounded-md p-4 bg-black/5 dark:bg-white/5">
-              <QuantumSkillVis skills={skillsData as Skill[]} userSkills={userSkills} />
-            </div>
-          )}
+        {/* Quantum Skill Visualization Panel */}
+        <div className="mt-8">
+          <QuantumSkillPanel skills={skills} userSkills={userSkills} />
         </div>
       </div>
     </ScrollArea>

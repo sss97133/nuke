@@ -98,7 +98,7 @@ export const useServiceRecordForm = (onClose: () => void, onSuccess: () => void)
         throw new Error('You must be logged in to create a service record');
       }
       
-      // Fixed Supabase insert - don't use array syntax for single insert
+      // Fixed Supabase insert syntax - use proper column names matching the database schema
       const { error } = await supabase
         .from('service_tickets')
         .insert({
