@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -9,7 +10,6 @@ import Dashboard from "./pages/Dashboard"
 import Onboarding from "./pages/Onboarding"
 import Skills from "./pages/Skills"
 import Achievements from "./pages/Achievements"
-import Studio from "./pages/Studio"
 import Glossary from "./pages/Glossary"
 import Sitemap from "./pages/Sitemap"
 import Documentation from "./pages/Documentation"
@@ -95,7 +95,6 @@ function AppContent() {
           <Route path="/service-history" element={<ServiceHistory />} />
           <Route path="/token-staking" element={<TokenStaking />} />
           <Route path="/tokens" element={<TokensPage />} />
-          <Route path="/studio" element={<Studio />} />
           <Route path="/glossary" element={<Glossary />} />
           <Route path="/sitemap" element={<Sitemap />} />
           <Route path="/documentation" element={<Documentation />} />
