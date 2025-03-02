@@ -4,6 +4,7 @@ import { FormDialogs } from "../dialogs/FormDialogs";
 import { MendableChat } from "../../ai/MendableChat";
 import { StudioConfiguration } from "../../studio/StudioConfiguration";
 import { StudioWorkspace } from "../../studio/StudioWorkspace";
+import type { PTZTrack } from "@/components/studio/types/workspace";
 
 interface MainContentProps {
   showNewVehicleDialog: boolean;
@@ -40,10 +41,15 @@ export const MainContent = ({
               <StudioWorkspace 
                 dimensions={{ length: 30, width: 20, height: 16 }}
                 ptzTracks={[{
+                  id: "preview-camera-1",
+                  name: "Preview Camera",
                   position: { x: 0, y: 8, z: 0 },
+                  rotation: { x: 0, y: 0, z: 0 },
+                  target: { x: 0, y: 5, z: 0 },
                   length: 10,
                   speed: 1,
-                  coneAngle: 45
+                  coneAngle: 45,
+                  zoom: 1
                 }]}
               />
             </div>
