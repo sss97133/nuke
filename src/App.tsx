@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -55,6 +56,12 @@ function AppContent() {
 
   const isAuthenticated = !!session;
   const isAuthPath = ['/login', '/register'].includes(location.pathname);
+  const isRootPath = location.pathname === '/';
+
+  // Handle root path explicitly
+  if (isRootPath) {
+    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+  }
 
   if (isAuthenticated && isAuthPath) {
     return <Navigate to="/dashboard" replace />;
@@ -105,6 +112,7 @@ function AppContent() {
           <Route path="/professional-dashboard" element={<Profile />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/explore" element={<Explore />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </div>
     </div>
