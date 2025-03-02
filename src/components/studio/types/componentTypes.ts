@@ -24,3 +24,31 @@ export interface PTZControlsProps {
   selectedCamera?: PTZTrack;
   onUpdate: (updatedCamera: PTZTrack) => void;
 }
+
+export interface StudioConfigFormProps {
+  initialData: {
+    dimensions: {
+      length: number;
+      width: number;
+      height: number;
+    };
+    ptzTracks: PTZTrack[];
+  };
+  onUpdate: (data: any) => void;
+}
+
+export interface StudioWorkspaceProps {
+  dimensions: {
+    length: number;
+    width: number;
+    height: number;
+  };
+  ptzTracks: PTZTrack[];
+  activeCamera?: number | null;
+  onCameraSelect?: (index: number) => void;
+}
+
+export interface ControlButtonsProps {
+  isRecording: boolean;
+  toggleRecording: () => void;
+}
