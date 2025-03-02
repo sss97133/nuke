@@ -22,9 +22,9 @@ export const StudioConfigForm: React.FC<StudioConfigFormProps> = ({
         y: track.position.y.toString(),
         z: track.position.z.toString()
       },
-      length: track.length.toString(),
+      length: (track.length || 10).toString(),  // Default to 10 if undefined
       speed: track.speed.toString(),
-      coneAngle: track.coneAngle.toString()
+      coneAngle: (track.coneAngle || 45).toString()  // Default to 45 if undefined
     }))
   });
   
@@ -35,7 +35,9 @@ export const StudioConfigForm: React.FC<StudioConfigFormProps> = ({
       length: Number(formData.length),
       width: Number(formData.width),
       height: Number(formData.height),
-      ptzTracks: formData.ptzTracks.map(track => ({
+      ptzTracks: formData.ptzTracks.map((track, index) => ({
+        id: initialData.ptzTracks[index]?.id || `track-${index}`,
+        name: initialData.ptzTracks[index]?.name || `Camera ${index + 1}`,
         position: {
           x: Number(track.position.x),
           y: Number(track.position.y),
@@ -43,7 +45,8 @@ export const StudioConfigForm: React.FC<StudioConfigFormProps> = ({
         },
         length: Number(track.length),
         speed: Number(track.speed),
-        coneAngle: Number(track.coneAngle)
+        coneAngle: Number(track.coneAngle),
+        zoom: initialData.ptzTracks[index]?.zoom || 1
       }))
     });
   };

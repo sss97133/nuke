@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfDay, addDays, isSameDay } from 'date-fns';
@@ -164,13 +163,14 @@ export const CalendarView = ({
           onSelect={date => date && onDateSelect(date)}
           className="rounded-md border"
           components={{
-            DayContent: ({ day }) => {
-              const dateKey = format(day.date, 'yyyy-MM-dd');
+            DayContent: (props) => {
+              const date = props.date;
+              const dateKey = format(date, 'yyyy-MM-dd');
               const dayAppointments = appointmentsByDate[dateKey] || [];
               
               return (
                 <div className="w-full h-full">
-                  <div className="text-center">{day.date.getDate()}</div>
+                  <div className="text-center">{date.getDate()}</div>
                   {dayAppointments.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {dayAppointments.slice(0, 2).map(app => (

@@ -28,8 +28,12 @@ export const AppointmentForm = ({
   const [endDate, setEndDate] = useState<Date>(appointment?.endTime || new Date());
   const [selectedVehicle, setSelectedVehicle] = useState(appointment?.vehicleId || '');
   const [selectedTechnician, setSelectedTechnician] = useState(appointment?.technicianId || '');
-  const [status, setStatus] = useState(appointment?.status || 'scheduled');
-  const [type, setType] = useState(appointment?.type || 'maintenance');
+  const [status, setStatus] = useState<'scheduled' | 'in-progress' | 'completed' | 'cancelled'>(
+    appointment?.status || 'scheduled'
+  );
+  const [type, setType] = useState<'maintenance' | 'repair' | 'inspection' | 'other'>(
+    appointment?.type || 'maintenance'
+  );
   const [location, setLocation] = useState(appointment?.location || '');
   const [notes, setNotes] = useState(appointment?.notes || '');
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -54,8 +58,8 @@ export const AppointmentForm = ({
       vehicleName: vehicles.find(v => v.id === selectedVehicle)?.name,
       technicianId: selectedTechnician,
       technicianName: technicians.find(t => t.id === selectedTechnician)?.name,
-      status: status as 'scheduled' | 'in-progress' | 'completed' | 'cancelled',
-      type: type as 'maintenance' | 'repair' | 'inspection' | 'other',
+      status: status,
+      type: type,
       location,
       notes,
       color: appointment?.color || '#2196F3'
@@ -95,7 +99,10 @@ export const AppointmentForm = ({
             <Label htmlFor="type" className="text-right pt-2">
               Type
             </Label>
-            <Select value={type} onValueChange={setType}>
+            <Select 
+              value={type} 
+              onValueChange={(value: 'maintenance' | 'repair' | 'inspection' | 'other') => setType(value)}
+            >
               <SelectTrigger className="col-span-3">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -215,7 +222,10 @@ export const AppointmentForm = ({
               <Label htmlFor="status" className="text-right pt-2">
                 Status
               </Label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select 
+                value={status} 
+                onValueChange={(value: 'scheduled' | 'in-progress' | 'completed' | 'cancelled') => setStatus(value)}
+              >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>

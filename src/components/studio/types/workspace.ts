@@ -19,6 +19,8 @@ export interface PTZTrack {
   target?: Vector3;
   speed: number;
   zoom: number;
+  length?: number;  // Adding the missing property
+  coneAngle?: number;  // Adding the missing property
 }
 
 export interface StudioConfig {

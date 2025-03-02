@@ -35,7 +35,7 @@ export const PTZControls: React.FC<PTZControlsProps> = ({
     const updatedCamera = { ...selectedCamera };
     
     // Create a new target object to avoid direct mutation
-    const newTarget = { ...updatedCamera.target } || { x: 0, y: 0, z: 0 };
+    const newTarget = { ...(updatedCamera.target || { x: 0, y: 0, z: 0 }) };
     const step = 1 * selectedCamera.speed;
     
     // Adjust target based on direction
