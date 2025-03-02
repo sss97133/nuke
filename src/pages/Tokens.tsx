@@ -11,7 +11,8 @@ import { TokenFilterDialog } from "@/components/tokens/TokenFilterDialog";
 import { TokenCreationWizard } from "@/components/tokens/wizard/TokenCreationWizard";
 import { Token, NewToken } from "@/types/token";
 
-export const TokensPage = () => {
+const TokensPage = () => {
+  console.log("Tokens page rendering");  // Debug log to verify component rendering
   const [tokens, setTokens] = useState<Token[]>([]);
   const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +27,7 @@ export const TokensPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log("Fetching tokens...");  // Debug log
     fetchTokens();
   }, []);
 
@@ -82,6 +84,7 @@ export const TokensPage = () => {
 
       if (error) throw error;
 
+      console.log("Fetched tokens:", data);  // Debug log to check data
       setTokens(data || []);
       setFilteredTokens(data || []);
     } catch (error) {
