@@ -36,13 +36,12 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
 
   // Handle workspace layout toggle
   const handleToggleLayout = () => {
-    // Implementation would go here
     console.log("Toggle workspace layout");
   };
 
   return (
-    <div className="grid grid-cols-4 gap-4 h-full">
-      <div className="col-span-3 relative h-full">
+    <div className="flex w-full h-full">
+      <div className="w-3/4 h-full relative">
         <StudioScene
           dimensions={dimensions}
           ptzTracks={ptzTracks}
@@ -54,7 +53,7 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
         />
       </div>
       
-      <div className="col-span-1">
+      <div className="w-1/4 h-full pl-4">
         <LightingControls 
           lightMode={lightMode}
           onLightModeChange={setLightMode}

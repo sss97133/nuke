@@ -26,78 +26,78 @@ export const LightingControls: React.FC<LightingControlsProps> = ({
   onToggleLayout
 }) => {
   return (
-    <div className="bg-background/80 backdrop-blur-sm p-5 rounded-lg shadow-md h-full">
-      {/* Light Mode Buttons */}
-      <div className="mb-6">
-        <h3 className="text-base font-medium mb-3 text-muted-foreground">Lighting</h3>
-        <div className="grid grid-cols-2 gap-2">
+    <div className="bg-background/80 backdrop-blur-sm p-5 rounded-lg shadow-md h-full flex flex-col">
+      {/* Light Mode Section */}
+      <div className="mb-8">
+        <h3 className="text-base font-medium mb-4 text-muted-foreground">Lighting Mode</h3>
+        <div className="grid grid-cols-2 gap-3">
           <Button 
             variant={lightMode === 'basic' ? "default" : "outline"} 
             size="lg" 
-            className="h-14 w-full p-0" 
+            className="h-16 w-full flex flex-col items-center justify-center" 
             onClick={() => onLightModeChange('basic')}
-            title="Basic Lighting"
           >
-            <Camera className="h-6 w-6" />
+            <Camera className="h-5 w-5 mb-1" />
+            <span className="text-xs">Basic</span>
           </Button>
           
           <Button 
             variant={lightMode === 'product' ? "default" : "outline"} 
             size="lg" 
-            className="h-14 w-full p-0" 
+            className="h-16 w-full flex flex-col items-center justify-center" 
             onClick={() => onLightModeChange('product')}
-            title="Product Lighting"
           >
-            <Eye className="h-6 w-6" />
+            <Eye className="h-5 w-5 mb-1" />
+            <span className="text-xs">Product</span>
           </Button>
           
           <Button 
             variant={lightMode === 'visualization' ? "default" : "outline"} 
             size="lg" 
-            className="h-14 w-full p-0 col-span-2" 
+            className="h-16 w-full flex flex-col items-center justify-center col-span-2" 
             onClick={() => onLightModeChange('visualization')}
-            title="Visualization Lighting"
           >
-            <BarChart3 className="h-6 w-6" />
+            <BarChart3 className="h-5 w-5 mb-1" />
+            <span className="text-xs">Visualization</span>
           </Button>
         </div>
       </div>
 
       {/* Workspace Section */}
-      <div className="mb-6">
-        <h3 className="text-base font-medium mb-3 text-muted-foreground">Workspace</h3>
+      <div className="mb-8">
+        <h3 className="text-base font-medium mb-4 text-muted-foreground">Workspace</h3>
         <Button 
           variant="outline" 
           size="lg" 
-          className="h-14 w-full p-0" 
-          title="Toggle Layout"
+          className="h-16 w-full flex flex-col items-center justify-center" 
           onClick={onToggleLayout}
         >
-          <LayoutGrid className="h-6 w-6" />
+          <LayoutGrid className="h-5 w-5 mb-1" />
+          <span className="text-xs">Toggle Layout</span>
         </Button>
       </div>
       
       {/* Field of View Section */}
-      <div>
-        <h3 className="text-base font-medium mb-3 text-muted-foreground">Field of View</h3>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="mb-8">
+        <h3 className="text-base font-medium mb-4 text-muted-foreground">Field of View</h3>
+        <div className="grid grid-cols-2 gap-3">
           <Button 
             variant="outline" 
             size="lg" 
-            className="h-14 w-full p-0" 
-            title="Zoom Out"
+            className="h-16 w-full flex flex-col items-center justify-center" 
             onClick={onZoomOut}
           >
-            <ZoomOut className="h-6 w-6" />
+            <ZoomOut className="h-5 w-5 mb-1" />
+            <span className="text-xs">Zoom Out</span>
           </Button>
           <Button 
             variant="outline" 
             size="lg" 
-            className="h-14 w-full p-0" 
-            title="Zoom In"
+            className="h-16 w-full flex flex-col items-center justify-center" 
             onClick={onZoomIn}
           >
-            <ZoomIn className="h-6 w-6" />
+            <ZoomIn className="h-5 w-5 mb-1" />
+            <span className="text-xs">Zoom In</span>
           </Button>
         </div>
       </div>
