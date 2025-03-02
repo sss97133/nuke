@@ -109,3 +109,55 @@ export const setupEventHandlers = (
     }
   };
 };
+
+/**
+ * Setup field of view controls for zooming in and out
+ */
+export const setupFieldOfViewControls = (
+  camera: THREE.PerspectiveCamera,
+  ptzTracks: any[],
+  selectedCameraIndex: number | null,
+  updateCameraCones: (tracks: any[]) => void
+) => {
+  // Zoom in function
+  const zoomIn = () => {
+    // Adjust main camera FOV
+    camera.fov = Math.max(45, camera.fov - 5); 
+    camera.updateProjectionMatrix();
+
+    // If there's a selected camera, adjust its cone angle
+    if (selectedCameraIndex !== null && ptzTracks[selectedCameraIndex]) {
+      const updatedTracks = [...ptzTracks];
+      const currentCamera = updatedTracks[selectedCameraIndex];
+      
+      // Decrease FOV angle (narrower cone)
+      currentCamera.coneAngle = Math.max(15, (currentCamera.coneAngle || 45) - 5);
+      // Increase effective zoom
+      currentCamera.zoom = Math.min(3, currentCamera.zoom + 0.2);
+      
+      updateCameraCones(updatedTracks);
+    }
+  };
+
+  // Zoom out function
+  const zoomOut = () => {
+    // Adjust main camera FOV
+    camera.fov = Math.min(95, camera.fov + 5);
+    camera.updateProjectionMatrix();
+
+    // If there's a selected camera, adjust its cone angle
+    if (selectedCameraIndex !== null && ptzTracks[selectedCameraIndex]) {
+      const updatedTracks = [...ptzTracks];
+      const currentCamera = updatedTracks[selectedCameraIndex];
+      
+      // Increase FOV angle (wider cone)
+      currentCamera.coneAngle = Math.min(95, (currentCamera.coneAngle || 45) + 5);
+      // Decrease effective zoom
+      currentCamera.zoom = Math.max(0.5, currentCamera.zoom - 0.2);
+      
+      updateCameraCones(updatedTracks);
+    }
+  };
+
+  return { zoomIn, zoomOut };
+};

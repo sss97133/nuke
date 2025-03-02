@@ -1,18 +1,12 @@
 
 import React from 'react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { 
-  Sun, 
-  Sliders, 
-  RotateCw, 
-  LayoutGrid, 
+  Camera,
+  Eye,
   ZoomIn, 
   ZoomOut, 
-  Camera, 
-  Eye,
-  LineChart
+  LayoutGrid,
 } from 'lucide-react';
 
 interface LightingControlsProps {
@@ -24,76 +18,84 @@ export const LightingControls: React.FC<LightingControlsProps> = ({
   lightMode,
   onLightModeChange
 }) => {
+  // Zoom functions
+  const handleZoomIn = () => {
+    if ((window as any).zoomIn) {
+      (window as any).zoomIn();
+    }
+  };
+
+  const handleZoomOut = () => {
+    if ((window as any).zoomOut) {
+      (window as any).zoomOut();
+    }
+  };
+
+  // Layout toggle
+  const handleToggleLayout = () => {
+    console.log("Toggle workspace layout");
+  };
+
   return (
-    <div className="bg-background/80 backdrop-blur-sm p-3 rounded-lg shadow-md space-y-3">
-      {/* Lighting Toggle - Render Controls */}
-      <div>
-        <div className="text-xs font-medium mb-1.5 text-muted-foreground">Lighting</div>
-        <ToggleGroup type="single" value={lightMode} onValueChange={(value) => {
-          if (value) onLightModeChange(value as 'basic' | 'product' | 'visualization');
-        }}>
-          <ToggleGroupItem value="basic" aria-label="Basic Lighting" title="Basic Studio Lighting">
-            <Sun className="h-4 w-4 mr-1" />
-            <span className="sr-only md:not-sr-only md:text-xs">Basic</span>
-          </ToggleGroupItem>
-          <ToggleGroupItem value="product" aria-label="Product Lighting" title="Enhanced Product Lighting">
-            <Camera className="h-4 w-4 mr-1" />
-            <span className="sr-only md:not-sr-only md:text-xs">Product</span>
-          </ToggleGroupItem>
-          <ToggleGroupItem value="visualization" aria-label="Visualization Lighting" title="Data Visualization Lighting">
-            <LineChart className="h-4 w-4 mr-1" />
-            <span className="sr-only md:not-sr-only md:text-xs">Visual</span>
-          </ToggleGroupItem>
-        </ToggleGroup>
+    <div className="bg-background/80 backdrop-blur-sm p-5 rounded-lg shadow-md">
+      {/* Light Mode Buttons */}
+      <div className="flex space-x-2 mb-4">
+        <Button 
+          variant={lightMode === 'basic' ? "default" : "outline"} 
+          size="sm" 
+          className="h-14 w-14 p-0" 
+          onClick={() => onLightModeChange('basic')}
+          title="Basic Lighting"
+        >
+          <Camera className="h-6 w-6" />
+        </Button>
+        
+        <Button 
+          variant={lightMode === 'product' ? "default" : "outline"} 
+          size="sm" 
+          className="h-14 w-14 p-0" 
+          onClick={() => onLightModeChange('product')}
+          title="Product Lighting"
+        >
+          <Eye className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* Workspace Section */}
+      <div className="mb-6">
+        <h3 className="text-base font-medium mb-3 text-muted-foreground">Workspace</h3>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-14 w-14 p-0" 
+          title="Toggle Layout"
+          onClick={handleToggleLayout}
+        >
+          <LayoutGrid className="h-6 w-6" />
+        </Button>
       </div>
       
-      <Separator className="my-1" />
-      
-      {/* Modify Controls */}
+      {/* Field of View Section */}
       <div>
-        <div className="text-xs font-medium mb-1.5 text-muted-foreground">Modify</div>
-        <div className="flex space-x-1">
-          <Button variant="outline" size="sm" className="flex items-center justify-center h-9 w-9 p-0" title="Adjust Settings">
-            <Sliders className="h-4 w-4" />
+        <h3 className="text-base font-medium mb-3 text-muted-foreground">Field of View</h3>
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-14 w-14 p-0" 
+            title="Zoom Out"
+            onClick={handleZoomOut}
+          >
+            <ZoomOut className="h-6 w-6" />
           </Button>
-          <Button variant="outline" size="sm" className="flex items-center justify-center h-9 w-9 p-0" title="Reset View">
-            <RotateCw className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      
-      {/* Camera Controls */}
-      <div>
-        <div className="text-xs font-medium mb-1.5 text-muted-foreground">Camera</div>
-        <div className="flex space-x-1">
-          <Button variant="outline" size="sm" className="flex items-center justify-center h-9 w-9 p-0" title="Switch Camera">
-            <Camera className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" className="flex items-center justify-center h-9 w-9 p-0" title="Toggle View Mode">
-            <Eye className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      
-      {/* Workspace Controls */}
-      <div>
-        <div className="text-xs font-medium mb-1.5 text-muted-foreground">Workspace</div>
-        <div className="flex space-x-1">
-          <Button variant="outline" size="sm" className="flex items-center justify-center h-9 w-9 p-0" title="Workspace Layout">
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      
-      {/* Field of View Controls */}
-      <div>
-        <div className="text-xs font-medium mb-1.5 text-muted-foreground">Field of View</div>
-        <div className="flex space-x-1">
-          <Button variant="outline" size="sm" className="flex items-center justify-center h-9 w-9 p-0" title="Zoom Out">
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" className="flex items-center justify-center h-9 w-9 p-0" title="Zoom In">
-            <ZoomIn className="h-4 w-4" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-14 w-14 p-0" 
+            title="Zoom In"
+            onClick={handleZoomIn}
+          >
+            <ZoomIn className="h-6 w-6" />
           </Button>
         </div>
       </div>

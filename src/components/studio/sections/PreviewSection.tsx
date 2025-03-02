@@ -25,6 +25,25 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
     setLightMode(mode);
   };
 
+  // Handle zoom controls
+  const handleZoomIn = () => {
+    if ((window as any).zoomIn) {
+      (window as any).zoomIn();
+    }
+  };
+
+  const handleZoomOut = () => {
+    if ((window as any).zoomOut) {
+      (window as any).zoomOut();
+    }
+  };
+
+  // Handle workspace layout toggle
+  const handleToggleLayout = () => {
+    // Implementation would go here
+    console.log("Toggle workspace layout");
+  };
+
   return (
     <div className="relative h-full">
       <StudioScene
@@ -33,8 +52,10 @@ export const StudioPreview: React.FC<StudioPreviewProps> = ({
         selectedCameraIndex={selectedCameraIndex}
         onCameraSelect={onCameraSelect}
         lightMode={lightMode}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
       />
-      <div className="absolute bottom-4 right-4">
+      <div className="absolute top-1/2 right-4 transform -translate-y-1/2">
         <LightingControls 
           lightMode={lightMode}
           onLightModeChange={handleLightModeChange}

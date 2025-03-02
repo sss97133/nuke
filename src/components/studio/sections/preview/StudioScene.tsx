@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createBasicStudioLighting, createProductLighting, createVisualizationLighting } from '@/components/studio/utils/studioLighting';
 import { createWireframeRoom, createHumanFigure, createCNCTracks } from './scene-utils/BasicElements';
 import { createCameraModels, updateCameraModels } from './scene-utils/CameraModels';
-import { setupThreeJsScene, setupEventHandlers } from './scene-utils/SceneSetup';
+import { setupThreeJsScene, setupEventHandlers, setupFieldOfViewControls } from './scene-utils/SceneSetup';
 import type { WorkspaceDimensions, PTZTrack } from '../../types/workspace';
 
 interface StudioSceneProps {
@@ -14,6 +14,8 @@ interface StudioSceneProps {
   selectedCameraIndex: number | null;
   onCameraSelect: (index: number) => void;
   lightMode: 'basic' | 'product' | 'visualization';
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
 }
 
 export const StudioScene: React.FC<StudioSceneProps> = ({
@@ -21,7 +23,9 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
   ptzTracks,
   selectedCameraIndex,
   onCameraSelect,
-  lightMode
+  lightMode,
+  onZoomIn,
+  onZoomOut
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -32,6 +36,25 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
   const trackModelsRef = useRef<THREE.Line[]>([]);
   const coneModelsRef = useRef<THREE.Mesh[]>([]);
   const cleanupRef = useRef<() => void>(() => {});
+  const [ptzTracksState, setPtzTracksState] = useState<PTZTrack[]>(ptzTracks);
+
+  // Update internal state when ptzTracks prop changes
+  useEffect(() => {
+    setPtzTracksState(ptzTracks);
+  }, [ptzTracks]);
+
+  // Callback to update camera cones
+  const updateCameraCones = useCallback((updatedTracks: PTZTrack[]) => {
+    setPtzTracksState(updatedTracks);
+    if (sceneRef.current) {
+      updateCameraModels(
+        cameraModelsRef.current,
+        coneModelsRef.current,
+        updatedTracks,
+        selectedCameraIndex
+      );
+    }
+  }, [selectedCameraIndex]);
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -60,7 +83,7 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
     // Create camera models
     const { cameraModels, coneMeshes } = createCameraModels(
       scene, 
-      ptzTracks, 
+      ptzTracksState, 
       selectedCameraIndex, 
       onCameraSelect
     );
@@ -79,6 +102,22 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
       onCameraSelect
     );
     cleanupRef.current = cleanup;
+
+    // Field of view controls setup
+    const { zoomIn, zoomOut } = setupFieldOfViewControls(
+      camera,
+      ptzTracksState,
+      selectedCameraIndex,
+      updateCameraCones
+    );
+
+    // Expose zoom functions to parent component if callbacks provided
+    if (onZoomIn) {
+      (window as any).zoomIn = zoomIn;
+    }
+    if (onZoomOut) {
+      (window as any).zoomOut = zoomOut;
+    }
 
     // Animation loop
     const animate = () => {
@@ -109,8 +148,12 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
       if (rendererRef.current) {
         rendererRef.current.dispose();
       }
+
+      // Remove zoom functions
+      delete (window as any).zoomIn;
+      delete (window as any).zoomOut;
     };
-  }, [dimensions, ptzTracks, onCameraSelect]);
+  }, [dimensions, ptzTracksState, selectedCameraIndex, onCameraSelect, lightMode, updateCameraCones, onZoomIn, onZoomOut]);
 
   // Update lighting when lightMode changes
   useEffect(() => {
@@ -125,13 +168,20 @@ export const StudioScene: React.FC<StudioSceneProps> = ({
     updateCameraModels(
       cameraModelsRef.current,
       coneModelsRef.current,
-      ptzTracks,
+      ptzTracksState,
       selectedCameraIndex
     );
-  }, [ptzTracks, selectedCameraIndex]);
+  }, [ptzTracksState, selectedCameraIndex]);
 
   // Helper function to apply lighting based on mode
   const applyLighting = (scene: THREE.Scene, mode: 'basic' | 'product' | 'visualization') => {
+    // First, remove any existing lights
+    scene.children.forEach(child => {
+      if (child.isLight) {
+        scene.remove(child);
+      }
+    });
+    
     switch (mode) {
       case 'basic':
         createBasicStudioLighting(scene);
