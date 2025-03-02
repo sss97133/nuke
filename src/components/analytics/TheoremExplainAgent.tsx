@@ -29,6 +29,14 @@ const TheoremExplainAgent = () => {
   // Combine loading states
   const loading = plannerLoading || codeLoading;
   
+  // Add console log to track component rendering
+  console.log("TheoremExplainAgent rendering", { 
+    activeTab, 
+    selectedTheorem, 
+    planCompleted, 
+    codeGenerated 
+  });
+  
   return (
     <div className="space-y-6">
       <div>
