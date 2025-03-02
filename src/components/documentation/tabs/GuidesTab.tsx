@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -6,6 +5,7 @@ import { BookOpen, FileText, Settings } from 'lucide-react';
 import { DocSection } from '../layout/DocSection';
 import { DocLink } from '../layout/DocLink';
 import { DocContentDisplay } from '../content/DocContentDisplay';
+import { NotesSection } from '../content/NotesSection';
 
 // Import content files
 const GETTING_STARTED = require('../../../../docs/GETTING_STARTED.md');
@@ -74,6 +74,8 @@ export const GuidesTab = () => {
   return (
     <div className="grid gap-6 md:grid-cols-3">
       <div className="md:col-span-2 space-y-6">
+        <NotesSection />
+        
         <Card>
           <CardHeader>
             <CardTitle>Getting Started</CardTitle>

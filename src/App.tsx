@@ -26,6 +26,7 @@ import Analytics from "./pages/Analytics"
 import Schedule from "./pages/Schedule"
 import Service from "./pages/Service"
 import Studio from "./pages/Studio"
+import Explore from "./pages/Explore"
 
 const queryClient = new QueryClient();
 
@@ -103,6 +104,7 @@ function AppContent() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/professional-dashboard" element={<Profile />} />
           <Route path="/studio" element={<Studio />} />
+          <Route path="/explore" element={<Explore />} />
         </Routes>
       </div>
     </div>
