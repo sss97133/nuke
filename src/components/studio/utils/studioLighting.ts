@@ -25,7 +25,9 @@ export const createLighting = (scene: THREE.Scene, dimensions: WorkspaceDimensio
   // Configure shadow properties
   keyLight.shadow.mapSize.width = 2048;
   keyLight.shadow.mapSize.height = 2048;
-  keyLight.shadow.mapSize.far = dimensions.length * 3;
+  // Fix: Remove the incorrect property assignment
+  keyLight.shadow.camera.near = 0.5;
+  keyLight.shadow.camera.far = dimensions.length * 3;
   
   // Set up shadow camera bounds
   const d = Math.max(dimensions.width, dimensions.length) / 2;
