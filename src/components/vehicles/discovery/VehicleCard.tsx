@@ -8,6 +8,7 @@ import {
   Heart, Share, MapPin, Clock, Calendar, Edit, Trash2, CheckCircle
 } from 'lucide-react';
 import { Vehicle, VehicleActionHandlers } from './types';
+import { VerificationDialog } from './VerificationDialog';
 
 interface VehicleCardProps extends VehicleActionHandlers {
   vehicle: Vehicle;
@@ -115,13 +116,17 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
         </div>
       </CardContent>
       <CardFooter className="border-t px-3 py-2 flex flex-wrap gap-1">
-        <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={(e) => {
-          e.stopPropagation(); // Prevent navigation to detail page
-          onVerify(vehicle.id);
-        }}>
-          <CheckCircle className="h-3.5 w-3.5 mr-1" />
-          Verify
-        </Button>
+        <VerificationDialog
+          vehicleId={vehicle.id}
+          vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+          onComplete={() => onVerify(vehicle.id)}
+        >
+          <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+            <CheckCircle className="h-3.5 w-3.5 mr-1" />
+            Verify
+          </Button>
+        </VerificationDialog>
+        
         <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={(e) => {
           e.stopPropagation(); // Prevent navigation to detail page
           onEdit(vehicle.id);

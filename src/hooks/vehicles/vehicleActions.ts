@@ -2,11 +2,14 @@
 import { toast } from "sonner";
 import { Vehicle } from '../../components/vehicles/discovery/types';
 
-// Functions for handling vehicle actions
+// Function to handle verification with a dialog
 export const handleVerify = (id: number) => {
-  console.log(`Verifying vehicle ${id}`);
-  toast.success(`Vehicle #${id} verified successfully`, {
-    description: "The vehicle has been marked as verified in the system."
+  console.log(`Verification dialog for vehicle ${id}`);
+  // The actual verification dialog will be triggered from this function
+  // but we'll implement it in a Dialog component that gets shown
+  // The toast is a temporary fallback in case the dialog fails to open
+  toast.info(`Starting verification process for vehicle #${id}`, {
+    description: "Please follow the verification wizard to complete the process."
   });
 };
 
@@ -64,4 +67,3 @@ export const toggleVehicleSelection = (
     setSelectedVehicles([...selectedVehicles, id]);
   }
 };
-
