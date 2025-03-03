@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { mockFetchICloudImages } from '@/utils/icloud-integration';
+import { mockFetchICloudImages } from '@/utils/icloud';
 
 /**
  * Fetch car images

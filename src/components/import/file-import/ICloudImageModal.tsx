@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogClose
 } from "@/components/ui/dialog";
-import { parseICloudSharedLink } from '../../../utils/icloud-integration';
+import { parseICloudSharedLink } from '@/utils/icloud';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ICloudImageModalProps {
