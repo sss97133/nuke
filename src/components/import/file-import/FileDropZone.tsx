@@ -1,9 +1,12 @@
 
 import React, { useCallback, useRef, useState } from 'react';
-import { Upload, FileText, UploadCloud } from 'lucide-react';
+import { Upload, FileText, UploadCloud, Cloud, Check } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { ICloudImageModal } from './ICloudImageModal';
+import { parseCarCsv, importCarsToSupabase, connectICloudImages, saveCarImages } from '@/utils/car-import';
+import { useToast } from "@/hooks/use-toast";
 
 interface FileDropZoneProps {
   selectedFile: File | null;
@@ -19,7 +22,13 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   handleImport
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isICloudModalOpen, setIsICloudModalOpen] = useState(false);
+  const [importedCars, setImportedCars] = useState<any[]>([]);
+  const [selectedCar, setSelectedCar] = useState<any>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isConnectingImages, setIsConnectingImages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -63,6 +72,117 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
     if (fileInputRef.current) {
       console.log("Triggering file input click");
       fileInputRef.current.click();
+    }
+  };
+
+  const processCsvImport = async () => {
+    if (!selectedFile) return;
+    
+    setIsProcessing(true);
+    try {
+      // Parse the CSV file
+      const carsData = await parseCarCsv(selectedFile);
+      
+      // Import cars to Supabase
+      const importedIds = await importCarsToSupabase(carsData);
+      
+      if (importedIds.length > 0) {
+        toast({
+          title: "Import successful",
+          description: `Imported ${importedIds.length} vehicles from CSV`,
+        });
+        
+        // Find cars that have iCloud links
+        const carsWithICloud = carsData.filter(car => car.icloud_album_link);
+        
+        // Connect iCloud albums if present
+        if (carsWithICloud.length > 0) {
+          for (const car of carsWithICloud) {
+            if (car.id) {
+              await connectICloudImages(
+                car.id.toString(), 
+                car.icloud_album_link, 
+                car.icloud_folder_id
+              );
+            }
+          }
+          
+          toast({
+            title: "iCloud albums connected",
+            description: `Connected ${carsWithICloud.length} vehicles to iCloud albums`,
+          });
+        }
+        
+        // Store the imported cars for further actions
+        setImportedCars(carsData.map((car, index) => ({
+          ...car,
+          id: importedIds[index] || car.id
+        })));
+        
+        handleImport();
+      } else {
+        toast({
+          title: "Import failed",
+          description: "No vehicles were imported. Please check your CSV format.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Import error",
+        description: error.message || "An error occurred during import",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConnectImages = (car: any) => {
+    setSelectedCar(car);
+    setIsICloudModalOpen(true);
+  };
+
+  const handleImageConnection = async (data: {
+    vehicleId: string;
+    icloudLink?: string;
+    icloudFolderId?: string;
+    uploadedImages?: string[];
+  }) => {
+    setIsConnectingImages(true);
+    
+    try {
+      // Connect iCloud album if provided
+      if (data.icloudLink && data.icloudFolderId) {
+        await connectICloudImages(
+          data.vehicleId, 
+          data.icloudLink,
+          data.icloudFolderId
+        );
+        
+        toast({
+          title: "iCloud album connected",
+          description: "Successfully connected vehicle to iCloud shared album",
+        });
+      }
+      
+      // Save uploaded images if provided
+      if (data.uploadedImages && data.uploadedImages.length > 0) {
+        await saveCarImages(data.vehicleId, data.uploadedImages);
+        
+        toast({
+          title: "Images uploaded",
+          description: `Successfully uploaded ${data.uploadedImages.length} images`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Connection error",
+        description: error.message || "An error occurred connecting images",
+        variant: "destructive",
+      });
+    } finally {
+      setIsConnectingImages(false);
     }
   };
 
@@ -114,12 +234,61 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
             <Button variant="outline" size="sm" onClick={resetImport}>
               Choose Different File
             </Button>
-            <Button size="sm" onClick={handleImport}>
-              Import Now
+            <Button 
+              size="sm" 
+              onClick={processCsvImport} 
+              disabled={isProcessing}
+            >
+              {isProcessing ? 'Processing...' : 'Import Now'}
             </Button>
           </div>
+          
+          {/* Car list with iCloud connect option */}
+          {importedCars.length > 0 && (
+            <div className="mt-4 border rounded-md p-4">
+              <h4 className="text-sm font-medium mb-2">Imported Vehicles</h4>
+              <ul className="space-y-2 text-sm">
+                {importedCars.map((car, index) => (
+                  <li key={index} className="flex justify-between items-center border-b pb-2">
+                    <span>{car.year} {car.make} {car.model}</span>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => handleConnectImages(car)}
+                      className="h-8"
+                    >
+                      {car.icloud_album_link ? (
+                        <>
+                          <Check className="h-3 w-3 mr-1" />
+                          <Cloud className="h-3 w-3" />
+                        </>
+                      ) : (
+                        <>
+                          <Cloud className="h-3 w-3 mr-1" />
+                          Connect Images
+                        </>
+                      )}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
+      
+      {/* iCloud Image Connection Modal */}
+      <ICloudImageModal
+        open={isICloudModalOpen}
+        onOpenChange={setIsICloudModalOpen}
+        vehicleId={selectedCar?.id}
+        vehicleInfo={selectedCar ? {
+          make: selectedCar.make,
+          model: selectedCar.model,
+          year: selectedCar.year
+        } : undefined}
+        onConnect={handleImageConnection}
+      />
     </div>
   );
 };

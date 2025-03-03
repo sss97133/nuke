@@ -1,123 +1,226 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+// Define types
+interface VehicleImport {
+  make: string;
+  model: string;
+  year: number | string;
+  color?: string;
+  purchase_date?: string;
+  purchase_price?: number | string;
+  current_value?: number | string;
+  mileage?: number | string;
+  condition?: string;
+  location?: string;
+  vin?: string;
+  license_plate?: string;
+  insurance_policy?: string;
+  notes?: string;
+  icloud_album_link?: string;
+  icloud_folder_id?: string;
+}
+
+// CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+// Helper function to validate a vehicle record
+function validateVehicle(vehicle: any): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  // Required fields
+  if (!vehicle.make) errors.push('Make is required');
+  if (!vehicle.model) errors.push('Model is required');
+  if (!vehicle.year) errors.push('Year is required');
+  
+  // Basic validation
+  if (vehicle.year && (isNaN(Number(vehicle.year)) || Number(vehicle.year) < 1900 || Number(vehicle.year) > new Date().getFullYear() + 1)) {
+    errors.push('Year must be a valid year');
   }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
 
+// Process iCloud links
+function processICloudLink(vehicle: VehicleImport): VehicleImport {
+  // If no iCloud link, return vehicle as is
+  if (!vehicle.icloud_album_link) return vehicle;
+  
+  // If no folder ID provided, generate one
+  if (!vehicle.icloud_folder_id) {
+    vehicle.icloud_folder_id = `${vehicle.make}${vehicle.model}${vehicle.year}_FOLDER`.toUpperCase();
+  }
+  
+  return vehicle;
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders, status: 204 });
+  }
+  
   try {
-    console.log('🔄 Processing vehicle import request...');
+    // Initialize Supabase client with service role for admin access
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
     
-    const { data, fileType } = await req.json();
-    const apiKey = Deno.env.get('PERPLEXITY_API_KEY');
-
-    if (!apiKey) {
-      console.error('❌ PERPLEXITY_API_KEY is not configured');
-      throw new Error('PERPLEXITY_API_KEY is not configured');
-    }
-
-    console.log(`📄 Processing ${fileType} data...`);
-    console.log('📊 Raw data sample:', JSON.stringify(data).substring(0, 200) + '...');
-
-    // Normalize the data using Perplexity AI
-    const prompt = `Analyze and normalize this vehicle data to match this structure:
-    {
-      make: string (required),
-      model: string (required),
-      year: number (required),
-      vin?: string (optional),
-      notes?: string (optional)
-    }
-    
-    Raw data: ${JSON.stringify(data)}
-    File type: ${fileType}
-    
-    Return ONLY a JSON array of normalized vehicles. Each vehicle must have at least make, model, and year.
-    Do not include any explanatory text, just the JSON array.`;
-
-    console.log('🤖 Sending request to Perplexity API...');
-    
-    const response = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-sonar-small-128k-online',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a data normalization expert. Return only valid JSON arrays of vehicle data.'
+    // Initialize Supabase client with the user's auth token
+    const authHeader = req.headers.get('Authorization')!;
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
           },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 1000,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('❌ Perplexity API error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('Error details:', errorText);
-      throw new Error(`Perplexity API error: ${response.statusText}`);
+        },
+      }
+    );
+    
+    // Get the current user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Unauthorized' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401 
+        }
+      );
     }
-
-    const aiResponse = await response.json();
-    console.log('✅ Received response from Perplexity API');
-
-    let normalizedData;
-    try {
-      const content = aiResponse.choices[0].message.content;
-      // Clean the content string to ensure it only contains the JSON array
-      const jsonStr = content.trim().replace(/```json\n?|\n?```/g, '').trim();
-      console.log('🔍 Cleaned JSON string:', jsonStr);
-      normalizedData = JSON.parse(jsonStr);
+    
+    // Parse the request body
+    const { vehicles } = await req.json();
+    
+    if (!vehicles || !Array.isArray(vehicles) || vehicles.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid request: No vehicles provided' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+    
+    // Process each vehicle
+    const results = [];
+    const errors = [];
+    
+    for (const vehicle of vehicles) {
+      // Validate vehicle data
+      const validation = validateVehicle(vehicle);
       
-      // Validate the normalized data
-      if (!Array.isArray(normalizedData)) {
-        throw new Error('Response is not an array');
+      if (!validation.isValid) {
+        errors.push({
+          vehicle,
+          errors: validation.errors
+        });
+        continue;
       }
       
-      normalizedData.forEach((vehicle, index) => {
-        if (!vehicle.make || !vehicle.model || !vehicle.year) {
-          throw new Error(`Vehicle at index ${index} is missing required fields`);
-        }
-        if (typeof vehicle.year !== 'number') {
-          throw new Error(`Vehicle at index ${index} has invalid year type`);
-        }
+      // Process iCloud link information
+      const processedVehicle = processICloudLink(vehicle);
+      
+      // Add user_id to the vehicle
+      const vehicleWithUser = {
+        ...processedVehicle,
+        user_id: user.id
+      };
+      
+      // Insert the vehicle into the cars table
+      const { data, error } = await supabase
+        .from('cars')
+        .upsert(vehicleWithUser)
+        .select('id')
+        .single();
+      
+      if (error) {
+        errors.push({
+          vehicle: processedVehicle,
+          error: error.message
+        });
+        continue;
+      }
+      
+      const vehicleId = data.id;
+      
+      // Process iCloud images if link is provided
+      if (processedVehicle.icloud_album_link) {
+        // In a production environment, you might:
+        // 1. Fetch the shared album data
+        // 2. Process the images
+        // 3. Store references in the car_images table
+        
+        // For now, we'll just log that we would process the iCloud album
+        console.log(`Processing iCloud album for vehicle ${vehicleId}: ${processedVehicle.icloud_album_link}`);
+        
+        // Add a record in the car_images table to indicate iCloud source
+        await supabase
+          .from('car_images')
+          .insert({
+            car_id: vehicleId,
+            file_path: processedVehicle.icloud_album_link,
+            file_name: 'icloud_album',
+            source: 'icloud',
+            user_id: user.id
+          });
+      }
+      
+      results.push({
+        id: vehicleId,
+        make: processedVehicle.make,
+        model: processedVehicle.model,
+        year: processedVehicle.year
       });
-      
-      console.log('✅ Successfully normalized vehicle data');
-      console.log('📊 Sample of normalized data:', JSON.stringify(normalizedData[0]));
-      
-    } catch (error) {
-      console.error('❌ Error parsing AI response:', error);
-      console.error('Raw content:', aiResponse.choices[0]?.message?.content);
-      throw new Error('Failed to parse normalized vehicle data');
     }
-
+    
     return new Response(
-      JSON.stringify({ vehicles: normalizedData }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: true,
+        imported: results.length,
+        results,
+        errors: errors.length > 0 ? errors : undefined
+      }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
     );
-
+    
   } catch (error) {
-    console.error('❌ Error processing vehicle import:', error);
     return new Response(
-      JSON.stringify({ 
-        error: 'Failed to normalize vehicle data',
-        details: error.message 
+      JSON.stringify({
+        success: false,
+        error: error.message
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
