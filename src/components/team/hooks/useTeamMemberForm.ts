@@ -54,7 +54,7 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       console.log("Session retrieved", session ? "Valid session" : "No session");
       
       console.log("Checking for existing profile with email:", formData.email);
-      // Create a new user profile or use an existing one
+      // Check if profile already exists with this email
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select('id')
