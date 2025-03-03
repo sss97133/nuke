@@ -96,8 +96,8 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       });
 
       // Close dialog and trigger success callback if provided
-      onOpenChange(false);
       if (onSuccess) onSuccess();
+      onOpenChange(false);
       
     } catch (error: any) {
       console.error('Error adding team member:', error);

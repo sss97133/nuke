@@ -11,7 +11,7 @@ export const FormActions: React.FC<FormActionsProps> = ({ isSubmitting }) => {
   return (
     <DialogFooter>
       <DialogClose asChild>
-        <Button type="button" variant="outline">Cancel</Button>
+        <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
       </DialogClose>
       <Button type="submit" disabled={isSubmitting}>
         {isSubmitting ? 'Adding...' : 'Add Team Member'}
