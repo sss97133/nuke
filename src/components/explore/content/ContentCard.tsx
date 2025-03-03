@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Info, ExternalLink } from 'lucide-react';
+import { MapPin, Info, ThumbsUp, Share2, Bookmark, ExternalLink } from 'lucide-react';
 
 interface ContentCardItem {
   id: string;
@@ -19,10 +19,20 @@ interface ContentCardItem {
 
 interface ContentCardProps {
   item: ContentCardItem;
+  onView?: (id: string) => void;
+  onLike?: (id: string) => void;
+  onShare?: (id: string) => void;
+  onSave?: (id: string) => void;
 }
 
-export const ContentCard = ({ item }: ContentCardProps) => {
-  const { title, subtitle, image, tags, location, reason, type } = item;
+export const ContentCard = ({ 
+  item, 
+  onView,
+  onLike,
+  onShare,
+  onSave 
+}: ContentCardProps) => {
+  const { id, title, subtitle, image, tags, location, reason, type } = item;
   
   // Choose background color based on content type
   const getBgColor = () => {
@@ -35,10 +45,19 @@ export const ContentCard = ({ item }: ContentCardProps) => {
         return 'bg-green-50 dark:bg-green-950/20';
       case 'garage':
         return 'bg-purple-50 dark:bg-purple-950/20';
+      case 'article':
+        return 'bg-teal-50 dark:bg-teal-950/20';
       default:
         return 'bg-gray-50 dark:bg-gray-800/20';
     }
   };
+
+  // Track view when card is rendered
+  React.useEffect(() => {
+    if (onView) {
+      onView(id);
+    }
+  }, [id, onView]);
   
   return (
     <Card className={`overflow-hidden ${getBgColor()} border-0 shadow-md`}>
@@ -80,11 +99,40 @@ export const ContentCard = ({ item }: ContentCardProps) => {
         </div>
       </CardContent>
       
-      <CardFooter className="pt-0">
+      <CardFooter className="pt-0 flex flex-col gap-2">
         <Button variant="secondary" size="sm" className="w-full">
           View Details
           <ExternalLink className="ml-1 h-3 w-3" />
         </Button>
+        
+        <div className="flex justify-between w-full">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex-1"
+            onClick={() => onLike && onLike(id)}
+          >
+            <ThumbsUp className="h-4 w-4" />
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex-1"
+            onClick={() => onShare && onShare(id)}
+          >
+            <Share2 className="h-4 w-4" />
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex-1"
+            onClick={() => onSave && onSave(id)}
+          >
+            <Bookmark className="h-4 w-4" />
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );
