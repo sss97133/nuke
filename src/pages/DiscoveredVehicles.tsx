@@ -182,19 +182,15 @@ const DiscoveredVehicles = () => {
     }
   ];
   
-  // Functions to handle vehicle actions
   const handleVerify = (id: number) => {
-    // Implement verification logic
     console.log(`Verifying vehicle ${id}`);
   };
   
   const handleEdit = (id: number) => {
-    // Open edit form/modal
     console.log(`Editing vehicle ${id}`);
   };
   
   const handleRemove = (id: number) => {
-    // Remove vehicle
     console.log(`Removing vehicle ${id}`);
   };
   
@@ -208,21 +204,18 @@ const DiscoveredVehicles = () => {
   
   const handleBulkVerify = () => {
     console.log(`Verifying vehicles: ${selectedVehicles.join(', ')}`);
-    // Implement bulk verification
     setSelectedVehicles([]);
     setBulkActionOpen(false);
   };
   
   const handleBulkAddToGarage = () => {
     console.log(`Adding vehicles to garage: ${selectedVehicles.join(', ')}`);
-    // Implement bulk add to garage
     setSelectedVehicles([]);
     setBulkActionOpen(false);
   };
   
   const handleBulkRemove = () => {
     console.log(`Removing vehicles: ${selectedVehicles.join(', ')}`);
-    // Implement bulk removal
     setSelectedVehicles([]);
     setBulkActionOpen(false);
   };
@@ -441,7 +434,13 @@ const DiscoveredVehicles = () => {
               {vehicles
                 .filter(v => v.year < 1990)
                 .map((vehicle) => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                  <VehicleCard 
+                    key={vehicle.id} 
+                    vehicle={vehicle}
+                    onVerify={handleVerify}
+                    onEdit={handleEdit}
+                    onRemove={handleRemove}
+                  />
                 ))
               }
             </div>
@@ -452,7 +451,13 @@ const DiscoveredVehicles = () => {
               {vehicles
                 .filter(v => v.tags.includes("Sports Car"))
                 .map((vehicle) => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                  <VehicleCard 
+                    key={vehicle.id} 
+                    vehicle={vehicle}
+                    onVerify={handleVerify}
+                    onEdit={handleEdit}
+                    onRemove={handleRemove}
+                  />
                 ))
               }
             </div>
@@ -463,7 +468,13 @@ const DiscoveredVehicles = () => {
               {vehicles
                 .filter(v => v.tags.includes("Modified"))
                 .map((vehicle) => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                  <VehicleCard 
+                    key={vehicle.id} 
+                    vehicle={vehicle}
+                    onVerify={handleVerify}
+                    onEdit={handleEdit}
+                    onRemove={handleRemove}
+                  />
                 ))
               }
             </div>
@@ -474,7 +485,13 @@ const DiscoveredVehicles = () => {
               {vehicles
                 .filter(v => v.tags.includes("Rare"))
                 .map((vehicle) => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                  <VehicleCard 
+                    key={vehicle.id} 
+                    vehicle={vehicle}
+                    onVerify={handleVerify}
+                    onEdit={handleEdit}
+                    onRemove={handleRemove}
+                  />
                 ))
               }
             </div>
