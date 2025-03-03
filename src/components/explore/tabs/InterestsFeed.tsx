@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { ContentCard } from '../content/ContentCard';
 import { Loader2 } from 'lucide-react';
 import { useExploreFeed } from '../hooks/useExploreFeed';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface InterestsFeedProps {
   filter: string;
@@ -20,7 +21,13 @@ export const InterestsFeed = ({ filter }: InterestsFeedProps) => {
     likeContent,
     shareContent,
     saveContent
-  } = useExploreFeed({ filter, limit: 9 });
+  } = useExploreFeed({ 
+    filter: filter === 'vehicles' ? 'vehicle' : 
+           filter === 'auctions' ? 'auction' : 
+           filter === 'events' ? 'event' : 
+           filter === 'garages' ? 'garage' : 'all', 
+    limit: 9 
+  });
 
   // Create a ref for the sentinel element (last item)
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -51,10 +58,35 @@ export const InterestsFeed = ({ filter }: InterestsFeedProps) => {
     };
   }, []);
   
+  // Loading state with skeleton UI
   if (isLoading && feedItems.length === 0) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xl font-medium">Based on Your Interests</h3>
+          <span className="text-sm text-muted-foreground">
+            (Loading...)
+          </span>
+        </div>
+        
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array(6).fill(0).map((_, index) => (
+            <div key={index} className="bg-muted/30 rounded-lg overflow-hidden">
+              <Skeleton className="h-48 w-full" />
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <div className="flex gap-1 flex-wrap">
+                  {Array(3).fill(0).map((_, i) => (
+                    <Skeleton key={i} className="h-4 w-16 rounded-full" />
+                  ))}
+                </div>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

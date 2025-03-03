@@ -34,14 +34,16 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
   } = useInfiniteQuery({
     queryKey: ['explore-feed', filter],
     queryFn: async ({ pageParam = 0 }) => {
+      console.log('Fetching explore feed:', { filter, pageParam, limit });
+      
       // Build query based on filter and pagination
-      const query = supabase
+      let query = supabase
         .from('explore_content')
         .select('*');
       
       // Apply type filter if not 'all'
       if (filter !== 'all') {
-        query.eq('type', filter);
+        query = query.eq('type', filter);
       }
       
       // Apply pagination
@@ -53,7 +55,12 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
         .order('created_at', { ascending: false })
         .range(from, to);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching explore feed:', error);
+        throw error;
+      }
+      
+      console.log('Explore feed data:', data);
       
       // Return empty array if no data found
       return data || [];
@@ -68,15 +75,27 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
   // Track content interaction
   const { mutate: trackInteraction } = useMutation({
     mutationFn: async ({ contentId, interactionType }: { contentId: string, interactionType: 'view' | 'like' | 'share' | 'save' | 'comment' }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      
+      if (!userId) {
+        console.warn('User not authenticated, skipping interaction tracking');
+        return { success: false };
+      }
+      
       const { error } = await supabase
         .from('content_interactions')
         .insert({
           content_id: contentId,
           interaction_type: interactionType,
-          user_id: (await supabase.auth.getUser()).data.user?.id
+          user_id: userId
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error tracking interaction:', error);
+        throw error;
+      }
+      
       return { success: true };
     },
   });

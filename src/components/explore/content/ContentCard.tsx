@@ -69,6 +69,11 @@ export const ContentCard = ({
           src={image} 
           alt={title}
           className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+          onError={(e) => {
+            // Use a placeholder image if the original image fails to load
+            const target = e.target as HTMLImageElement;
+            target.src = 'https://images.unsplash.com/photo-1550615306-a605768c7323?auto=format&fit=crop&w=600&q=80';
+          }}
         />
         <div className="absolute top-2 left-2">
           <Badge variant="secondary" className="capitalize font-medium">
@@ -92,16 +97,20 @@ export const ContentCard = ({
       
       <CardContent className="space-y-3 pb-2">
         <div className="flex flex-wrap gap-1">
-          {tags.map((tag, index) => (
+          {tags && tags.length > 0 ? tags.map((tag, index) => (
             <Badge key={index} variant="outline" className="text-xs">
               {tag}
             </Badge>
-          ))}
+          )) : (
+            <Badge variant="outline" className="text-xs">
+              Automotive
+            </Badge>
+          )}
         </div>
         
         <div className="flex items-start gap-1">
           <MapPin className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
-          <span className="text-sm">{location}</span>
+          <span className="text-sm">{location || "Unknown location"}</span>
         </div>
         
         <div className="flex items-start gap-1">
