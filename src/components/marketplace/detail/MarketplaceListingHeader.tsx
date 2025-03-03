@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Share2, Flag, MapPin, Clock, Eye } from 'lucide-react';
+import { Heart, Share2, MapPin, Clock, Eye } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
 import { formatDistanceToNow } from 'date-fns';
 import { MarketplaceListing } from '../hooks/useMarketplaceListing';
@@ -106,11 +106,6 @@ const MarketplaceListingHeader: React.FC<MarketplaceListingHeaderProps> = ({ lis
             <Button variant="outline" size="sm" onClick={handleShare}>
               <Share2 className="h-4 w-4 mr-1" />
               Share
-            </Button>
-            
-            <Button variant="ghost" size="sm">
-              <Flag className="h-4 w-4 mr-1" />
-              Report
             </Button>
           </div>
         </div>
