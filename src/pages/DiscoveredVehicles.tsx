@@ -1,14 +1,9 @@
 
 import React from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VehicleFilters from '../components/vehicles/discovery/VehicleFilters';
 import BulkActions from '../components/vehicles/discovery/BulkActions';
-import AllVehiclesTab from '../components/vehicles/discovery/tabs/AllVehiclesTab';
-import ClassicVehiclesTab from '../components/vehicles/discovery/tabs/ClassicVehiclesTab';
-import SportsVehiclesTab from '../components/vehicles/discovery/tabs/SportsVehiclesTab';
-import ModifiedVehiclesTab from '../components/vehicles/discovery/tabs/ModifiedVehiclesTab';
-import RareVehiclesTab from '../components/vehicles/discovery/tabs/RareVehiclesTab';
+import VehicleTabs from '../components/vehicles/discovery/VehicleTabs';
 import { useVehiclesData } from '../hooks/useVehiclesData';
 
 const DiscoveredVehicles = () => {
@@ -66,86 +61,18 @@ const DiscoveredVehicles = () => {
           onBulkRemove={handleBulkRemove}
         />
         
-        <Tabs defaultValue="all">
-          <TabsList className="mb-4">
-            <TabsTrigger value="all">All Vehicles</TabsTrigger>
-            <TabsTrigger value="classic">Classic</TabsTrigger>
-            <TabsTrigger value="sports">Sports Cars</TabsTrigger>
-            <TabsTrigger value="modified">Modified</TabsTrigger>
-            <TabsTrigger value="rare">Rare Finds</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="all" className="m-0">
-            <AllVehiclesTab 
-              vehicles={vehicles}
-              searchTerm={searchTerm}
-              viewMode={viewMode}
-              selectedVehicles={selectedVehicles}
-              toggleVehicleSelection={toggleVehicleSelection}
-              onVerify={handleVerify}
-              onEdit={handleEdit}
-              onRemove={handleRemove}
-              sortField={sortField}
-              sortDirection={sortDirection}
-            />
-          </TabsContent>
-          
-          <TabsContent value="classic" className="m-0">
-            <ClassicVehiclesTab 
-              vehicles={vehicles}
-              viewMode={viewMode}
-              selectedVehicles={selectedVehicles}
-              toggleVehicleSelection={toggleVehicleSelection}
-              onVerify={handleVerify}
-              onEdit={handleEdit}
-              onRemove={handleRemove}
-              sortField={sortField}
-              sortDirection={sortDirection}
-            />
-          </TabsContent>
-          
-          <TabsContent value="sports" className="m-0">
-            <SportsVehiclesTab 
-              vehicles={vehicles}
-              viewMode={viewMode}
-              selectedVehicles={selectedVehicles}
-              toggleVehicleSelection={toggleVehicleSelection}
-              onVerify={handleVerify}
-              onEdit={handleEdit}
-              onRemove={handleRemove}
-              sortField={sortField}
-              sortDirection={sortDirection}
-            />
-          </TabsContent>
-          
-          <TabsContent value="modified" className="m-0">
-            <ModifiedVehiclesTab 
-              vehicles={vehicles}
-              viewMode={viewMode}
-              selectedVehicles={selectedVehicles}
-              toggleVehicleSelection={toggleVehicleSelection}
-              onVerify={handleVerify}
-              onEdit={handleEdit}
-              onRemove={handleRemove}
-              sortField={sortField}
-              sortDirection={sortDirection}
-            />
-          </TabsContent>
-          
-          <TabsContent value="rare" className="m-0">
-            <RareVehiclesTab 
-              vehicles={vehicles}
-              viewMode={viewMode}
-              selectedVehicles={selectedVehicles}
-              toggleVehicleSelection={toggleVehicleSelection}
-              onVerify={handleVerify}
-              onEdit={handleEdit}
-              onRemove={handleRemove}
-              sortField={sortField}
-              sortDirection={sortDirection}
-            />
-          </TabsContent>
-        </Tabs>
+        <VehicleTabs 
+          vehicles={vehicles}
+          searchTerm={searchTerm}
+          viewMode={viewMode}
+          selectedVehicles={selectedVehicles}
+          toggleVehicleSelection={toggleVehicleSelection}
+          onVerify={handleVerify}
+          onEdit={handleEdit}
+          onRemove={handleRemove}
+          sortField={sortField}
+          sortDirection={sortDirection}
+        />
       </div>
     </ScrollArea>
   );
