@@ -5,8 +5,10 @@ import { ProfileLoadingState } from './components/ProfileLoadingState';
 import { ProfileErrorState } from './components/ProfileErrorState';
 import { SocialLinks, StreamingLinks } from './types';
 import { useProfileData } from './hooks/useProfileData';
+import { useToast } from '@/hooks/use-toast';
 
 export const UserProfile = () => {
+  const { toast } = useToast();
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({
     twitter: '',
     instagram: '',
@@ -34,11 +36,19 @@ export const UserProfile = () => {
 
   const handleSocialLinksSubmit = () => {
     console.log('Submitting social links:', socialLinks);
+    toast({
+      title: "Social Links Updated",
+      description: "Your social links have been successfully updated.",
+    });
     // Actual implementation would call API to update social links
   };
 
   const handleStreamingLinksSubmit = () => {
     console.log('Submitting streaming links:', streamingLinks);
+    toast({
+      title: "Streaming Links Updated",
+      description: "Your streaming links have been successfully updated.",
+    });
     // Actual implementation would call API to update streaming links
   };
 
@@ -74,14 +84,20 @@ export const UserProfile = () => {
     return <ProfileErrorState error={error} onRetry={refetch} />;
   }
 
-  // Enrich profile with achievements count for UserMetrics
+  // Add additional mock data for the development spectrum visualization
+  // This would come from the API in a real implementation
   const enrichedProfile = profile ? {
     ...profile,
-    achievements_count: achievements?.length || 0
+    achievements_count: achievements?.length || 0,
+    viewer_percentile: 15,
+    owner_percentile: 22,
+    technician_percentile: 8,
+    investor_percentile: 30,
+    discovery_count: 12
   } : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="bg-background p-4 border rounded-lg shadow-sm">
         <ProfileContent
           profile={enrichedProfile}
