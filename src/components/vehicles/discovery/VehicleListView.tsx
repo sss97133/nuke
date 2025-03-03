@@ -33,8 +33,8 @@ const VehicleListView = ({
   };
   
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-muted font-medium text-sm rounded-md">
+    <div className="space-y-2">
+      <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-muted font-medium text-xs rounded-md">
         <div className="col-span-1">
           <input 
             type="checkbox"
@@ -73,7 +73,7 @@ const VehicleListView = ({
       </div>
       
       {vehicles.map(vehicle => (
-        <Card key={vehicle.id} className="p-3">
+        <Card key={vehicle.id} className="p-2">
           <div className="grid grid-cols-12 gap-4 items-center">
             <div className="col-span-1">
               <input 
@@ -83,44 +83,46 @@ const VehicleListView = ({
               />
             </div>
             <div className="col-span-2">
-              <div className="aspect-[4/3] rounded-md bg-muted overflow-hidden relative">
+              <div className="aspect-video w-full h-16 rounded-md bg-muted overflow-hidden relative">
                 <div className="absolute bottom-1 left-1">
                   {vehicle.tags.slice(0, 1).map((tag, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs">
+                    <Badge key={i} variant="secondary" className="text-[10px]">
                       {tag}
                     </Badge>
                   ))}
                 </div>
+                <div className="absolute top-1 left-1">
+                  <CheckCircle 
+                    className={`h-4 w-4 ${vehicle.id % 2 === 0 ? 'text-blue-500' : 'text-gray-400'}`}
+                  />
+                </div>
               </div>
             </div>
             <div className="col-span-2">
-              <div className="font-medium">{vehicle.make} {vehicle.model}</div>
-              <div className="text-xs text-muted-foreground">{vehicle.location}</div>
+              <div className="font-medium text-xs">{vehicle.make} {vehicle.model}</div>
+              <div className="text-[10px] text-muted-foreground">{vehicle.location}</div>
             </div>
-            <div className="col-span-1">{vehicle.year}</div>
-            <div className="col-span-2 font-semibold">${vehicle.price.toLocaleString()}</div>
-            <div className="col-span-1">{vehicle.mileage.toLocaleString()} mi</div>
-            <div className="col-span-1">{vehicle.added}</div>
+            <div className="col-span-1 text-xs">{vehicle.year}</div>
+            <div className="col-span-2 font-semibold text-xs">${vehicle.price.toLocaleString()}</div>
+            <div className="col-span-1 text-xs">{vehicle.mileage.toLocaleString()} mi</div>
+            <div className="col-span-1 text-xs">{vehicle.added}</div>
             <div className="col-span-2 flex justify-end gap-1">
-              <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={() => onVerify(vehicle.id)}>
-                <CheckCircle className="h-4 w-4" />
-                Verify
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onVerify(vehicle.id)}>
+                <CheckCircle className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={() => onEdit(vehicle.id)}>
-                <Edit className="h-4 w-4" />
-                Edit
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(vehicle.id)}>
+                <Edit className="h-3.5 w-3.5" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 gap-1 text-destructive hover:text-destructive" 
+                className="h-7 px-2 text-destructive hover:text-destructive" 
                 onClick={() => onRemove(vehicle.id)}
               >
-                <Trash2 className="h-4 w-4" />
-                Remove
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="outline" size="sm" className="h-8 gap-1 ml-1">
-                <Plus className="h-4 w-4" />
+              <Button variant="outline" size="sm" className="h-7 px-2 ml-1 text-xs">
+                <Plus className="h-3.5 w-3.5 mr-1" />
                 Add
               </Button>
             </div>
