@@ -1,152 +1,172 @@
 
 import { useState, useEffect } from 'react';
-import { useToast } from "@/components/ui/use-toast";
+import { supabase } from '@/integrations/supabase/client';
 
-// This is a temporary type - we'll need to create a proper type definition file
-// that matches our database schema
 export interface MarketplaceListing {
   id: string;
   title: string;
-  description: string;
   price: number;
+  description: string;
   condition: string;
-  imageUrl: string;
-  images?: { id: number; url: string; type: string }[];
-  location: {
-    city: string;
-    state: string;
-    latitude?: number;
-    longitude?: number;
-  };
   created_at: string;
-  updated_at?: string;
+  updated_at: string;
   seller: {
     id: string;
     name: string;
-    avatar?: string;
-    rating?: number;
+    avatar: string;
+    rating: number;
+    listings_count: number;
     joinedDate: string;
-    listings_count?: number;
   };
   vehicle: {
+    id: string;
     make: string;
     model: string;
     year: number;
+    trim: string;
+    type: string;
+    vin: string;
     mileage: number;
-    vin?: string;
-    engine?: string;
-    transmission?: string;
-    drivetrain?: string;
-    exterior_color?: string;
-    interior_color?: string;
+    fuel_type: string;
+    transmission: string;
+    engine: string;
+    exterior_color: string;
+    interior_color: string;
   };
+  location: {
+    city: string;
+    state: string;
+    country: string;
+    postal_code: string;
+  };
+  features: string[];
+  specifications: Record<string, string | number>;
+  images?: string[];
   views_count: number;
   is_featured: boolean;
-  is_watched?: boolean;
-  commentCount: number;
+  is_watched: boolean;
 }
-
-// Mock data for a single listing
-const getMockListing = (id: string): MarketplaceListing => {
-  console.log("Creating mock listing with ID:", id);
-  
-  return {
-    id,
-    title: `${new Date().getFullYear() - Math.floor(Math.random() * 20)} Honda Civic Type R - Low Miles, Excellent Condition`,
-    description: "This Honda Civic Type R is in excellent condition with low miles. Recently serviced, new tires, and a clean title. No accidents and one owner from new. The Championship White exterior is pristine with no significant scratches or dents. Interior is well-maintained with minimal wear. Comes with all original documentation, two keys, and service history.",
-    price: 32995,
-    condition: "Excellent",
-    imageUrl: "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-    images: [
-      { id: 1, url: "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3", type: "Exterior Front" },
-      { id: 2, url: "https://images.unsplash.com/photo-1581062123282-36e55aef7f83?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3", type: "Interior Dashboard" },
-      { id: 3, url: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3", type: "Exterior Side" },
-    ],
-    location: {
-      city: "San Francisco",
-      state: "CA",
-      latitude: 37.7749,
-      longitude: -122.4194
-    },
-    created_at: "2025-02-15T14:22:10.556Z",
-    seller: {
-      id: "user123",
-      name: "Alex Johnson",
-      avatar: "https://i.pravatar.cc/150?u=alex",
-      rating: 4.8,
-      joinedDate: "2024-03-21T00:00:00.000Z",
-      listings_count: 12
-    },
-    vehicle: {
-      make: "Honda",
-      model: "Civic Type R",
-      year: 2021,
-      mileage: 18500,
-      vin: "1HGBH41JXMN109186",
-      engine: "2.0L Turbocharged 4-Cylinder",
-      transmission: "6-Speed Manual",
-      drivetrain: "FWD",
-      exterior_color: "Championship White",
-      interior_color: "Red/Black"
-    },
-    views_count: 142,
-    is_featured: true,
-    is_watched: false,
-    commentCount: 8
-  };
-};
 
 export function useMarketplaceListing(id: string) {
   const [listing, setListing] = useState<MarketplaceListing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-  
+  const [error, setError] = useState<Error | null>(null);
+
   useEffect(() => {
+    console.log("useMarketplaceListing hook called with id:", id);
+    if (!id) {
+      console.error("No listing ID provided to useMarketplaceListing");
+      setIsLoading(false);
+      setError(new Error("No listing ID provided"));
+      return;
+    }
+
     const fetchListing = async () => {
-      console.log("Fetching marketplace listing with ID:", id);
       try {
         setIsLoading(true);
-        setError(null);
+        console.log("Fetching listing data from API for ID:", id);
         
-        // Simulate API request latency
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Try to get data from supabase first
+        const { data, error } = await supabase
+          .from('marketplace_listings')
+          .select('*')
+          .eq('id', id)
+          .single();
         
-        // In a real implementation, this would be a Supabase or API call
-        // const { data, error } = await supabase
-        //   .from('marketplace_listings')
-        //   .select('*, seller:user_id(*), vehicle(*)')
-        //   .eq('id', id)
-        //   .single();
+        if (error || !data) {
+          console.log("Supabase error or no data, falling back to mock:", error);
+          // Use mock data for testing
+          const mockListing: MarketplaceListing = {
+            id,
+            title: "2019 Porsche 911 Carrera S",
+            price: 124900,
+            description: "This beautiful Porsche 911 Carrera S is in excellent condition with low mileage. It features a twin-turbocharged 3.0L flat-six engine producing 443 horsepower, paired with a PDK transmission. The car comes with sport chrono package, sport exhaust, and PASM sport suspension.",
+            condition: "Excellent",
+            created_at: "2023-08-15T14:30:00Z",
+            updated_at: "2023-09-01T10:15:00Z",
+            seller: {
+              id: "seller123",
+              name: "Premium Auto Sales",
+              avatar: "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80",
+              rating: 4.8,
+              listings_count: 27,
+              joinedDate: "2020-03-15T00:00:00Z"
+            },
+            vehicle: {
+              id: "veh789",
+              make: "Porsche",
+              model: "911",
+              year: 2019,
+              trim: "Carrera S",
+              type: "Coupe",
+              vin: "WP0AB2A99KS123456",
+              mileage: 12450,
+              fuel_type: "Gasoline",
+              transmission: "Automatic",
+              engine: "3.0L Twin-Turbo Flat-Six",
+              exterior_color: "GT Silver Metallic",
+              interior_color: "Black"
+            },
+            location: {
+              city: "Beverly Hills",
+              state: "CA",
+              country: "USA",
+              postal_code: "90210"
+            },
+            features: [
+              "Sport Chrono Package",
+              "Sport Exhaust System",
+              "PASM Sport Suspension",
+              "Panoramic Roof",
+              "Premium Audio System",
+              "Heated and Ventilated Seats",
+              "Navigation System",
+              "Bluetooth Connectivity",
+              "Apple CarPlay",
+              "Backup Camera"
+            ],
+            specifications: {
+              horsepower: 443,
+              torque: 390,
+              acceleration: 3.5,
+              top_speed: 191,
+              weight: 3382,
+              length: 177.9,
+              width: 72.9,
+              height: 51.3,
+              wheelbase: 96.5,
+              ground_clearance: 4.9
+            },
+            images: [
+              "https://images.unsplash.com/photo-1584060622420-0673aad46068?auto=format&fit=crop&w=1200&q=80",
+              "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80",
+              "https://images.unsplash.com/photo-1626668893537-fc08bf57d5d7?auto=format&fit=crop&w=1200&q=80",
+              "https://images.unsplash.com/photo-1542282088-fe8426682b8f?auto=format&fit=crop&w=1200&q=80"
+            ],
+            views_count: 342,
+            is_featured: true,
+            is_watched: false
+          };
+          
+          console.log("Setting mock listing data:", mockListing);
+          setListing(mockListing);
+        } else {
+          console.log("Successfully fetched listing data from supabase:", data);
+          // Transform supabase data to match our interface if needed
+          setListing(data as unknown as MarketplaceListing);
+        }
         
-        // if (error) throw error;
-        
-        // For now, we'll use mock data
-        const mockListing = getMockListing(id);
-        console.log("Mock listing created:", mockListing);
-        setListing(mockListing);
-      } catch (err) {
-        console.error("Error fetching marketplace listing:", err);
-        setError('Failed to load listing details');
-        toast({
-          title: "Error",
-          description: "Failed to load listing details. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
         setIsLoading(false);
-        console.log("Finished fetching marketplace listing");
+      } catch (err) {
+        console.error("Error in useMarketplaceListing hook:", err);
+        setError(err instanceof Error ? err : new Error(String(err)));
+        setIsLoading(false);
       }
     };
-    
-    if (id) {
-      fetchListing();
-    } else {
-      console.error("No listing ID provided to useMarketplaceListing hook");
-      setError("No listing ID provided");
-      setIsLoading(false);
-    }
-  }, [id, toast]);
-  
+
+    fetchListing();
+  }, [id]);
+
+  console.log("useMarketplaceListing hook returning:", { listing, isLoading, error });
   return { listing, isLoading, error };
 }

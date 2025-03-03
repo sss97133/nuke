@@ -22,6 +22,11 @@ const MarketplaceListingDetail = () => {
     console.log("Current listing data:", listing);
     console.log("Loading state:", isLoading);
     console.log("Error state:", error);
+    
+    // Additional debugging to check if component is rendering properly
+    return () => {
+      console.log("MarketplaceListingDetail unmounted");
+    };
   }, [id, listing, isLoading, error]);
 
   if (isLoading) {
@@ -36,12 +41,14 @@ const MarketplaceListingDetail = () => {
   if (error || !listing) {
     console.error("Marketplace listing error or not found:", error);
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-4">
-        <h1 className="text-2xl font-bold">Listing Not Found</h1>
-        <p className="text-muted-foreground">The marketplace listing you are looking for does not exist.</p>
-        <Button onClick={() => navigate("/marketplace")}>
-          Return to Marketplace
-        </Button>
+      <div className="container max-w-7xl p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center h-screen gap-4">
+          <h1 className="text-2xl font-bold">Listing Not Found</h1>
+          <p className="text-muted-foreground">The marketplace listing you are looking for does not exist.</p>
+          <Button onClick={() => navigate("/marketplace")}>
+            Return to Marketplace
+          </Button>
+        </div>
       </div>
     );
   }

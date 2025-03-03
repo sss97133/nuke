@@ -1,123 +1,110 @@
 
 import React, { useState, useEffect } from 'react';
+import { 
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 interface MarketplaceListingGalleryProps {
   listingId: string;
-  images: { id: number; url: string; type: string }[];
+  images: string[];
 }
 
 const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({ 
   listingId, 
   images 
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   
   useEffect(() => {
-    console.log("MarketplaceListingGallery mounted", { listingId, imageCount: images.length });
+    console.log("MarketplaceListingGallery mounted with ID:", listingId);
+    console.log("Gallery images:", images);
+    
+    // Check if images are loading correctly
+    if (images.length > 0) {
+      const img = new Image();
+      img.onload = () => console.log("First image loaded successfully");
+      img.onerror = (e) => console.error("Error loading first image:", e);
+      img.src = images[0];
+    }
+    
+    return () => {
+      console.log("MarketplaceListingGallery unmounted");
+    };
   }, [listingId, images]);
-  
-  const nextImage = () => {
-    console.log("Next image clicked", { currentIndex, total: images.length });
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
-  };
-  
-  const prevImage = () => {
-    console.log("Previous image clicked", { currentIndex, total: images.length });
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
-  };
-  
-  if (images.length === 0) {
-    console.log("No images available for gallery");
+
+  if (!images || images.length === 0) {
+    console.log("No images provided for gallery");
     return (
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <div className="bg-muted h-64 flex items-center justify-center">
-            <p className="text-muted-foreground">No images available</p>
-          </div>
+      <Card>
+        <CardContent className="p-1">
+          <AspectRatio ratio={16/9}>
+            <div className="flex items-center justify-center h-full bg-muted">
+              <p className="text-muted-foreground">No images available</p>
+            </div>
+          </AspectRatio>
         </CardContent>
       </Card>
     );
   }
-  
-  console.log("Rendering gallery with current image:", currentIndex, images[currentIndex]);
+
+  console.log("Rendering gallery with", images.length, "images");
   
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-0 relative">
-        {/* Main image */}
-        <div className="relative">
-          <div className="aspect-video w-full bg-muted">
-            <img 
-              src={images[currentIndex].url} 
-              alt={images[currentIndex].type} 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                console.error("Image failed to load:", images[currentIndex].url);
-                e.currentTarget.src = 'https://via.placeholder.com/800x450?text=Image+Not+Available';
-              }}
-            />
-          </div>
-          
-          {/* Image navigation buttons */}
-          <div className="absolute inset-0 flex items-center justify-between p-2">
-            <Button 
-              variant="secondary" 
-              size="icon" 
-              className="opacity-80 hover:opacity-100"
-              onClick={prevImage}
-              disabled={images.length <= 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
-            <Button 
-              variant="secondary" 
-              size="icon"
-              className="opacity-80 hover:opacity-100"
-              onClick={nextImage}
-              disabled={images.length <= 1}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          {/* Caption/info */}
-          <div className="absolute bottom-2 left-2">
-            <span className="bg-background/80 text-foreground px-2 py-1 rounded text-sm">
-              {images[currentIndex].type} ({currentIndex + 1}/{images.length})
-            </span>
-          </div>
-        </div>
-        
-        {/* Thumbnails */}
-        {images.length > 1 && (
-          <div className="p-2 flex gap-2 overflow-x-auto">
+    <Card>
+      <CardContent className="p-1">
+        <Carousel
+          opts={{
+            loop: true,
+          }}
+          className="w-full"
+          onSelect={(index) => setSelectedIndex(index)}
+        >
+          <CarouselContent>
             {images.map((image, index) => (
-              <div 
-                key={image.id} 
-                className={`w-16 h-16 flex-shrink-0 cursor-pointer transition-all rounded overflow-hidden
-                  ${currentIndex === index ? 'ring-2 ring-primary' : 'opacity-70 hover:opacity-100'}`}
-                onClick={() => {
-                  console.log("Thumbnail clicked, switching to image index:", index);
-                  setCurrentIndex(index);
-                }}
-              >
-                <img 
-                  src={image.url} 
-                  alt={image.type}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    console.error("Thumbnail failed to load:", image.url);
-                    e.currentTarget.src = 'https://via.placeholder.com/100?text=Error';
-                  }}
-                />
-              </div>
+              <CarouselItem key={`${listingId}-image-${index}`}>
+                <AspectRatio ratio={16/9}>
+                  <img
+                    src={image}
+                    alt={`Vehicle image ${index + 1}`}
+                    className="object-cover w-full h-full rounded-sm"
+                    onLoad={() => console.log(`Image ${index + 1} loaded successfully`)}
+                    onError={(e) => console.error(`Error loading image ${index + 1}:`, e)}
+                  />
+                </AspectRatio>
+              </CarouselItem>
             ))}
-          </div>
-        )}
+          </CarouselContent>
+          <CarouselPrevious className="left-2" />
+          <CarouselNext className="right-2" />
+        </Carousel>
+        
+        <div className="flex mt-2 overflow-x-auto gap-2 px-1 py-2">
+          {images.map((image, index) => (
+            <div 
+              key={`thumb-${index}`}
+              className={`relative cursor-pointer transition-all duration-200 ${
+                selectedIndex === index 
+                  ? 'ring-2 ring-primary ring-offset-2' 
+                  : 'opacity-70 hover:opacity-100'
+              }`}
+              onClick={() => setSelectedIndex(index)}
+            >
+              <AspectRatio ratio={16/9} className="w-20">
+                <img
+                  src={image}
+                  alt={`Thumbnail ${index + 1}`}
+                  className="object-cover w-full h-full rounded-sm"
+                />
+              </AspectRatio>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
