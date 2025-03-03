@@ -2,7 +2,6 @@
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GeoFencedDiscovery } from '@/components/discovery/GeoFencedDiscovery';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import DashboardContent from '@/components/dashboard/DashboardContent';
@@ -36,7 +35,9 @@ const Dashboard = () => {
               <CardDescription>Find vehicles, garages, auctions and events in your area</CardDescription>
             </CardHeader>
             <CardContent>
-              <GeoFencedDiscovery />
+              <div className="h-[300px]">
+                {/* GeoFencedDiscovery will be rendered here */}
+              </div>
             </CardContent>
           </Card>
 
