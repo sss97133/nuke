@@ -2736,6 +2736,53 @@ export type Database = {
           },
         ]
       }
+      vehicle_images: {
+        Row: {
+          car_id: string | null
+          file_name: string
+          file_path: string
+          id: string
+          image_type: string | null
+          is_primary: boolean | null
+          public_url: string | null
+          source: string | null
+          uploaded_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          car_id?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          image_type?: string | null
+          is_primary?: boolean | null
+          public_url?: string | null
+          source?: string | null
+          uploaded_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          car_id?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          image_type?: string | null
+          is_primary?: boolean | null
+          public_url?: string | null
+          source?: string | null
+          uploaded_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_images_car_id_fkey"
+            columns: ["car_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_probability_zones: {
         Row: {
           confidence_level: number
@@ -2880,6 +2927,8 @@ export type Database = {
           bulk_upload_batch_id: string | null
           created_at: string
           historical_data: Json | null
+          icloud_album_link: string | null
+          icloud_folder_id: string | null
           id: string
           location: Json | null
           make: string
@@ -2900,6 +2949,8 @@ export type Database = {
           bulk_upload_batch_id?: string | null
           created_at?: string
           historical_data?: Json | null
+          icloud_album_link?: string | null
+          icloud_folder_id?: string | null
           id?: string
           location?: Json | null
           make: string
@@ -2920,6 +2971,8 @@ export type Database = {
           bulk_upload_batch_id?: string | null
           created_at?: string
           historical_data?: Json | null
+          icloud_album_link?: string | null
+          icloud_folder_id?: string | null
           id?: string
           location?: Json | null
           make?: string
