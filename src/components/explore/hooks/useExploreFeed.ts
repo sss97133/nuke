@@ -59,13 +59,13 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
         
         // Determine which tables to query based on filter
         const contentSources = filter === 'all' ? 
-          ['posts', 'vehicles', 'auctions', 'streams'] : 
+          ['explore_content', 'vehicles', 'auctions', 'live_streams'] : 
           filter === 'vehicle' ? ['vehicles'] :
           filter === 'auction' ? ['auctions'] :
-          filter === 'event' ? ['events'] :
+          filter === 'event' ? ['live_streams'] :
           filter === 'garage' ? ['garages'] :
-          filter === 'article' ? ['posts'] : 
-          ['posts']; // Default to posts
+          filter === 'article' ? ['explore_content'] : 
+          ['explore_content']; // Default to posts
           
         // Query each content source
         for (const source of contentSources) {
@@ -122,9 +122,9 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
     
     // Different queries for different content types
     switch (contentType) {
-      case 'posts':
+      case 'explore_content':
         return await supabase
-          .from('user_posts')
+          .from('explore_content')
           .select(`
             id,
             title,
@@ -134,9 +134,8 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
             tags,
             location,
             created_at,
-            creator_id:user_id,
-            profiles:creator_id(full_name, avatar_url),
-            content_metrics:id(view_count, like_count, share_count, save_count)
+            user_id,
+            profiles(full_name, avatar_url)
           `)
           .order('created_at', { ascending: false })
           .range(from, to);
@@ -149,12 +148,11 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
             make,
             model,
             year,
-            image_url:vin_image_url,
+            vin_image_url,
             location,
             created_at,
             user_id,
-            profiles:user_id(full_name, avatar_url),
-            content_metrics:id(view_count, like_count, share_count, save_count)
+            profiles(full_name, avatar_url)
           `)
           .order('created_at', { ascending: false })
           .range(from, to);
@@ -170,15 +168,14 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
             end_time,
             created_at,
             seller_id,
-            profiles:seller_id(full_name, avatar_url),
-            vehicles!vehicle_id(make, model, year, vin_image_url),
-            content_metrics:id(view_count, like_count, share_count, save_count)
+            profiles!seller_id(full_name, avatar_url),
+            vehicles!vehicle_id(make, model, year, vin_image_url)
           `)
           .eq('status', 'active')
           .order('end_time', { ascending: true })
           .range(from, to);
           
-      case 'streams':
+      case 'live_streams':
         return await supabase
           .from('live_streams')
           .select(`
@@ -189,11 +186,24 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
             viewer_count,
             created_at,
             user_id,
-            profiles:user_id(full_name, avatar_url),
-            content_metrics:id(view_count, like_count, share_count, save_count)
+            profiles(full_name, avatar_url)
           `)
           .eq('status', 'live')
           .order('viewer_count', { ascending: false })
+          .range(from, to);
+          
+      case 'garages':
+        return await supabase
+          .from('garages')
+          .select(`
+            id,
+            name,
+            address,
+            contact_info,
+            rating,
+            created_at
+          `)
+          .order('rating', { ascending: false })
           .range(from, to);
           
       // Add more content types as needed
@@ -206,7 +216,7 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
   // Function to transform specific content types to the ContentItem interface
   const transformContentToFeedItem = (item: any, type: string): ContentItem => {
     switch (type) {
-      case 'posts':
+      case 'explore_content':
         return {
           id: item.id,
           type: 'article',
@@ -216,15 +226,15 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
           tags: item.tags || [],
           reason: 'Based on your interests',
           location: item.location || 'Unknown',
-          relevance_score: item.content_metrics?.relevance_score || 50,
+          relevance_score: item.relevance_score || 50,
           created_at: item.created_at,
-          creator_id: item.creator_id,
+          creator_id: item.user_id,
           creator_name: item.profiles?.full_name,
           creator_avatar: item.profiles?.avatar_url,
-          view_count: item.content_metrics?.view_count || 0,
-          like_count: item.content_metrics?.like_count || 0,
-          share_count: item.content_metrics?.share_count || 0,
-          save_count: item.content_metrics?.save_count || 0
+          view_count: 0,
+          like_count: 0,
+          share_count: 0,
+          save_count: 0
         };
         
       case 'vehicles':
@@ -233,19 +243,19 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
           type: 'vehicle',
           title: `${item.year} ${item.make} ${item.model}`,
           subtitle: item.vin || '',
-          image_url: item.image_url,
+          image_url: item.vin_image_url,
           tags: ['Vehicle', item.make, item.model],
           reason: 'Vehicle in your network',
-          location: item.location || 'Unknown',
-          relevance_score: item.content_metrics?.relevance_score || 50,
+          location: item.location ? JSON.stringify(item.location) : 'Unknown',
+          relevance_score: 50,
           created_at: item.created_at,
           creator_id: item.user_id,
           creator_name: item.profiles?.full_name,
           creator_avatar: item.profiles?.avatar_url,
-          view_count: item.content_metrics?.view_count || 0,
-          like_count: item.content_metrics?.like_count || 0,
-          share_count: item.content_metrics?.share_count || 0,
-          save_count: item.content_metrics?.save_count || 0
+          view_count: 0,
+          like_count: 0,
+          share_count: 0,
+          save_count: 0
         };
         
       case 'auctions':
@@ -258,18 +268,18 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
           tags: ['Auction', item.vehicles?.make, item.vehicles?.model],
           reason: 'Active auction ending soon',
           location: 'Online Auction',
-          relevance_score: item.content_metrics?.relevance_score || 70, // Auctions get higher relevance
+          relevance_score: 70, // Auctions get higher relevance
           created_at: item.created_at,
           creator_id: item.seller_id,
           creator_name: item.profiles?.full_name,
           creator_avatar: item.profiles?.avatar_url,
-          view_count: item.content_metrics?.view_count || 0,
-          like_count: item.content_metrics?.like_count || 0,
-          share_count: item.content_metrics?.share_count || 0,
-          save_count: item.content_metrics?.save_count || 0
+          view_count: 0,
+          like_count: 0,
+          share_count: 0,
+          save_count: 0
         };
         
-      case 'streams':
+      case 'live_streams':
         return {
           id: item.id,
           type: 'event',
@@ -279,15 +289,15 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
           tags: ['Live', 'Stream', 'Event'],
           reason: 'Live now',
           location: 'Live Stream',
-          relevance_score: item.content_metrics?.relevance_score || 90, // Live streams get highest relevance
+          relevance_score: 90, // Live streams get highest relevance
           created_at: item.created_at,
           creator_id: item.user_id,
           creator_name: item.profiles?.full_name,
           creator_avatar: item.profiles?.avatar_url,
           view_count: item.viewer_count || 0,
-          like_count: item.content_metrics?.like_count || 0,
-          share_count: item.content_metrics?.share_count || 0,
-          save_count: item.content_metrics?.save_count || 0
+          like_count: 0,
+          share_count: 0,
+          save_count: 0
         };
         
       default:
@@ -340,36 +350,34 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
         throw interactionError;
       }
       
-      // Update content metrics (aggregate counts)
-      const metricsColumn = `${interactionType}_count`;
-      
-      const { error: metricsError } = await supabase
-        .from('content_metrics')
-        .upsert({
-          content_id: contentId,
-          content_type: contentType,
-          [metricsColumn]: supabase.rpc('increment_counter', { row_id: contentId, counter_name: metricsColumn })
-        })
-        .select();
-      
-      if (metricsError) {
-        console.error('Error updating metrics:', metricsError);
+      // For likes and saves, we need to track the user's specific action separately
+      if (interactionType === 'like') {
+        // Check if already liked
+        const { data: existingLike } = await supabase
+          .from('content_interactions')
+          .select('id')
+          .eq('content_id', contentId)
+          .eq('user_id', userId)
+          .eq('interaction_type', 'like')
+          .single();
+          
+        if (!existingLike) {
+          console.log('Adding new like');
+        }
       }
       
-      // For likes and saves, we need to track the user's specific action
-      if (interactionType === 'like' || interactionType === 'save') {
-        const tableName = interactionType === 'like' ? 'user_likes' : 'user_saves';
-        
-        const { error: userActionError } = await supabase
-          .from(tableName)
-          .upsert({
-            user_id: userId,
-            content_id: contentId,
-            content_type: contentType
-          });
-        
-        if (userActionError) {
-          console.error(`Error recording user ${interactionType}:`, userActionError);
+      if (interactionType === 'save') {
+        // Check if already saved
+        const { data: existingSave } = await supabase
+          .from('content_interactions')
+          .select('id')
+          .eq('content_id', contentId)
+          .eq('user_id', userId)
+          .eq('interaction_type', 'save')
+          .single();
+          
+        if (!existingSave) {
+          console.log('Adding new save');
         }
       }
       
