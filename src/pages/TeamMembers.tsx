@@ -22,7 +22,7 @@ import {
   Laptop,
   Car,
   ClipboardCheck,
-  Tool
+  Settings
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -201,7 +201,7 @@ const RoleReferenceTable = ({ category }: { category: string }) => {
       { icon: <PenTool className="h-4 w-4" />, role: 'Custom Fabricator', description: 'Creates custom parts and modifications' },
       { icon: <Car className="h-4 w-4" />, role: 'Performance Tuner', description: 'Specializes in performance optimization' },
       { icon: <Brush className="h-4 w-4" />, role: 'Paint/Body Specialist', description: 'Bodywork and finishing expert' },
-      { icon: <Tool className="h-4 w-4" />, role: 'Specialty Technician', description: 'Focused on specific systems (transmission, electrical, etc.)' }
+      { icon: <Settings className="h-4 w-4" />, role: 'Specialty Technician', description: 'Focused on specific systems (transmission, electrical, etc.)' }
     ],
     garages: [
       { icon: <Building2 className="h-4 w-4" />, role: 'Independent Garage', description: 'Small to medium-sized repair shop' },
