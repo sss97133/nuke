@@ -3,7 +3,7 @@ import React from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Edit, Trash2, Plus, ArrowUp, ArrowDown } from 'lucide-react';
+import { CheckCircle, Edit, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { Vehicle, VehicleActionHandlers } from './types';
 
 interface VehicleListViewProps extends VehicleActionHandlers {
@@ -120,10 +120,6 @@ const VehicleListView = ({
                 onClick={() => onRemove(vehicle.id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 px-2 ml-1 text-xs">
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Add
               </Button>
             </div>
           </div>

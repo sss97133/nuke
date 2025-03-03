@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Heart, Share, MapPin, Clock, Calendar, Edit, Trash2, Plus, CheckCircle
+  Heart, Share, MapPin, Clock, Calendar, Edit, Trash2, CheckCircle
 } from 'lucide-react';
 import { Vehicle, VehicleActionHandlers } from './types';
 
@@ -76,10 +76,6 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
         </Button>
         <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-destructive hover:text-destructive" onClick={() => onRemove(vehicle.id)}>
           <Trash2 className="h-3.5 w-3.5 mr-1" />
-        </Button>
-        <Button size="sm" className="h-7 text-xs px-2 ml-auto">
-          <Plus className="h-3.5 w-3.5 mr-1" />
-          Add
         </Button>
       </CardFooter>
     </Card>
