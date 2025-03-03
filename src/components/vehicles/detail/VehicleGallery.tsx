@@ -3,9 +3,9 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Vehicle } from '@/components/vehicles/discovery/types';
 import { Button } from '@/components/ui/button';
-import { Camera, View, Upload, UserCircle2, CheckCircle2 } from 'lucide-react';
+import { Camera, View, Upload, CheckCircle2 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
-import { ImageUploadModal } from './ImageUploadModal';
+import { ImageUploadModal } from './image-upload/ImageUploadModal';
 import { useToast } from "@/components/ui/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
