@@ -45,7 +45,7 @@ const VehicleListView = ({
   
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-muted font-medium text-xs rounded-md">
+      <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-muted font-medium text-xs rounded-md hidden md:grid">
         <div className="col-span-1">
           <input 
             type="checkbox"
@@ -85,16 +85,21 @@ const VehicleListView = ({
       
       {vehicles.map(vehicle => (
         <Card key={vehicle.id} className="p-2">
-          <div className="grid grid-cols-12 gap-4 items-center">
-            <div className="col-span-1">
+          <div className="grid grid-cols-12 md:gap-4 gap-2 items-center">
+            <div className="col-span-1 md:block flex justify-between items-center">
               <input 
                 type="checkbox"
                 checked={selectedVehicles.includes(vehicle.id)}
                 onChange={() => toggleVehicleSelection(vehicle.id)}
               />
+              <div className="md:hidden">
+                <CheckCircle 
+                  className={`h-4 w-4 ${vehicle.id % 2 === 0 ? 'text-blue-500' : 'text-gray-400'}`}
+                />
+              </div>
             </div>
-            <div className="col-span-2">
-              <div className="aspect-video w-full h-16 rounded-md bg-muted overflow-hidden relative">
+            <div className="col-span-11 md:col-span-2 flex md:block">
+              <div className="aspect-video w-16 h-16 md:w-full md:h-16 rounded-md bg-muted overflow-hidden relative">
                 <div className="absolute bottom-1 left-1">
                   {vehicle.tags.slice(0, 1).map((tag, i) => (
                     <Badge key={i} variant="secondary" className="text-[10px]">
@@ -102,22 +107,27 @@ const VehicleListView = ({
                     </Badge>
                   ))}
                 </div>
-                <div className="absolute top-1 left-1">
+                <div className="absolute top-1 left-1 hidden md:block">
                   <CheckCircle 
                     className={`h-4 w-4 ${vehicle.id % 2 === 0 ? 'text-blue-500' : 'text-gray-400'}`}
                   />
                 </div>
               </div>
+              <div className="ml-2 md:ml-0 md:hidden">
+                <div className="font-medium text-xs">{vehicle.make} {vehicle.model} ({vehicle.year})</div>
+                <div className="text-[10px] text-muted-foreground">{vehicle.location}</div>
+                <div className="font-semibold text-xs">${vehicle.price.toLocaleString()}</div>
+              </div>
             </div>
-            <div className="col-span-2">
+            <div className="col-span-2 hidden md:block">
               <div className="font-medium text-xs">{vehicle.make} {vehicle.model}</div>
               <div className="text-[10px] text-muted-foreground">{vehicle.location}</div>
             </div>
-            <div className="col-span-1 text-xs">{vehicle.year}</div>
-            <div className="col-span-2 font-semibold text-xs">${vehicle.price.toLocaleString()}</div>
-            <div className="col-span-1 text-xs">{formatMileage(vehicle.mileage)}</div>
-            <div className="col-span-1 text-xs">{extractDays(vehicle.added)}</div>
-            <div className="col-span-2 flex justify-end gap-1">
+            <div className="col-span-1 text-xs hidden md:block">{vehicle.year}</div>
+            <div className="col-span-2 font-semibold text-xs hidden md:block">${vehicle.price.toLocaleString()}</div>
+            <div className="col-span-1 text-xs hidden md:block">{formatMileage(vehicle.mileage)}</div>
+            <div className="col-span-1 text-xs hidden md:block">{extractDays(vehicle.added)}</div>
+            <div className="col-span-12 md:col-span-2 flex justify-end gap-1 mt-2 md:mt-0">
               <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onVerify(vehicle.id)}>
                 <CheckCircle className="h-3.5 w-3.5" />
               </Button>

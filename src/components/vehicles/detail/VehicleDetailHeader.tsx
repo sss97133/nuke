@@ -14,7 +14,7 @@ interface VehicleDetailHeaderProps {
 const VehicleDetailHeader: React.FC<VehicleDetailHeaderProps> = ({ vehicle }) => {
   return (
     <Card className="overflow-hidden">
-      <div className="relative h-64 bg-muted">
+      <div className="relative h-48 md:h-64 bg-muted">
         {/* Vehicle main image would go here, using placeholder for now */}
         <div 
           className="w-full h-full bg-center bg-cover" 
@@ -30,37 +30,37 @@ const VehicleDetailHeader: React.FC<VehicleDetailHeaderProps> = ({ vehicle }) =>
         </div>
       </div>
 
-      <CardContent className="p-6">
+      <CardContent className="p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">
+            <h1 className="text-xl md:text-3xl font-bold mb-2">
               {vehicle.year} {vehicle.make} {vehicle.model}
             </h1>
             <div className="flex items-center text-muted-foreground mb-2">
               <MapPin className="h-4 w-4 mr-2" />
               <span>{vehicle.location}</span>
             </div>
-            <div className="flex flex-wrap gap-4 text-sm">
+            <div className="flex flex-wrap gap-3 md:gap-4 text-xs md:text-sm">
               <div className="flex items-center">
-                <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                <Clock className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2 text-muted-foreground" />
                 <span>{vehicle.mileage.toLocaleString()} miles</span>
               </div>
               <div className="flex items-center">
-                <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                <Calendar className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2 text-muted-foreground" />
                 <span>Added {vehicle.added}</span>
               </div>
               <div className="flex items-center">
-                <Star className="h-4 w-4 mr-2 text-muted-foreground" />
+                <Star className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2 text-muted-foreground" />
                 <span>Condition: {vehicle.condition_rating}/10</span>
               </div>
             </div>
           </div>
           
-          <div className="text-right">
-            <div className="text-3xl font-bold">
+          <div className="text-left md:text-right mt-2 md:mt-0">
+            <div className="text-2xl md:text-3xl font-bold">
               ${vehicle.price?.toLocaleString()}
             </div>
-            <div className={`text-sm ${
+            <div className={`text-xs md:text-sm ${
               vehicle.price_trend === 'up' ? 'text-green-500' : 
               vehicle.price_trend === 'down' ? 'text-red-500' : 
               'text-muted-foreground'
@@ -72,11 +72,11 @@ const VehicleDetailHeader: React.FC<VehicleDetailHeaderProps> = ({ vehicle }) =>
           </div>
         </div>
         
-        <Separator className="my-6" />
+        <Separator className="my-4 md:my-6" />
         
-        <div className="flex flex-wrap gap-3">
-          <Button title="Add this vehicle to your personal collection">Add to Collection</Button>
-          <Button variant="outline">Contact Seller</Button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button className="w-full sm:w-auto" title="Add this vehicle to your personal collection">Add to Collection</Button>
+          <Button variant="outline" className="w-full sm:w-auto">Contact Seller</Button>
         </div>
       </CardContent>
     </Card>

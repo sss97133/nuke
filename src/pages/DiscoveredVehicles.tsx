@@ -32,10 +32,10 @@ const DiscoveredVehicles = () => {
   
   return (
     <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="container max-w-7xl p-6 space-y-6">
+      <div className="container px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-6">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Vehicles</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Vehicles</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Organize and manage vehicles discovered by our system and community
           </p>
         </div>

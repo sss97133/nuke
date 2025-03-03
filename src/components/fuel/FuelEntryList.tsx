@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Pencil, Trash2, Calendar, DropletFilled, DollarSign, Car } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface FuelEntry {
@@ -77,41 +78,96 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
     return <div className="p-4 text-center text-muted-foreground">No fuel entries found. Add your first entry above.</div>;
   }
 
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Vehicle</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Price</TableHead>
-            <TableHead>Total</TableHead>
-            <TableHead>Odometer</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {entries.map((entry) => (
-            <TableRow key={entry.id}>
-              <TableCell>{entry.date}</TableCell>
-              <TableCell>{entry.vehicleName}</TableCell>
-              <TableCell>{entry.amount.toFixed(2)} gal</TableCell>
-              <TableCell>${entry.price.toFixed(2)}</TableCell>
-              <TableCell>${entry.total.toFixed(2)}</TableCell>
-              <TableCell>{entry.odometer.toLocaleString()}</TableCell>
-              <TableCell className="space-x-2">
+  // For mobile view, we'll show cards instead of a table
+  const renderMobileView = () => {
+    return (
+      <div className="space-y-4 md:hidden">
+        {entries.map((entry) => (
+          <Card key={entry.id} className="p-4">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center space-x-2 mb-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{entry.date}</span>
+              </div>
+              <div className="flex space-x-1">
                 <Button variant="ghost" size="icon" onClick={() => handleEdit(entry.id)}>
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              </TableCell>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2 mb-2 text-sm">
+              <Car className="h-4 w-4 text-muted-foreground" />
+              <span>{entry.vehicleName}</span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="flex items-center space-x-2">
+                <DropletFilled className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">{entry.amount.toFixed(2)} gal</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">${entry.price.toFixed(2)}/gal</span>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">Total:</span>
+                <span className="text-sm font-medium ml-2">${entry.total.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">Odometer:</span>
+                <span className="text-sm font-medium ml-2">{entry.odometer.toLocaleString()}</span>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  // For desktop view, we'll show the table
+  return (
+    <div>
+      {renderMobileView()}
+      
+      <div className="overflow-x-auto hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Vehicle</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Total</TableHead>
+              <TableHead>Odometer</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {entries.map((entry) => (
+              <TableRow key={entry.id}>
+                <TableCell>{entry.date}</TableCell>
+                <TableCell>{entry.vehicleName}</TableCell>
+                <TableCell>{entry.amount.toFixed(2)} gal</TableCell>
+                <TableCell>${entry.price.toFixed(2)}</TableCell>
+                <TableCell>${entry.total.toFixed(2)}</TableCell>
+                <TableCell>{entry.odometer.toLocaleString()}</TableCell>
+                <TableCell className="space-x-2">
+                  <Button variant="ghost" size="icon" onClick={() => handleEdit(entry.id)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 };

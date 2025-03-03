@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -32,6 +33,7 @@ import Explore from "./pages/Explore"
 import ExploreContentManagement from './pages/ExploreContentManagement'
 import VehicleDetail from './pages/VehicleDetail'
 import TeamMembers from './pages/TeamMembers'
+import { Helmet } from 'react-helmet'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -139,6 +141,12 @@ function App() {
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+          <Helmet>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+            <meta name="theme-color" content="#1A1F2C" />
+            <meta name="apple-mobile-web-app-capable" content="yes" />
+            <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+          </Helmet>
           <div className="App">
             <Toaster />
             <NetworkStatus />
