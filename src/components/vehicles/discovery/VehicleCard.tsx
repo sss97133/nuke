@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +34,7 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden shadow-sm hover:shadow transition-shadow duration-200">
       <div 
         className="aspect-video bg-muted relative overflow-hidden h-40 cursor-pointer"
         onClick={handleCardClick}

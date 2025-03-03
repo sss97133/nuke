@@ -44,7 +44,7 @@ const VehicleTable = ({
   };
 
   return (
-    <Card className="overflow-x-auto">
+    <Card className="overflow-x-auto shadow-sm">
       <div className="min-w-[700px]">
         <Table>
           <TableHeader>

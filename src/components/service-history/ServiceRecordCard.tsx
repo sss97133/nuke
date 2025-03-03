@@ -42,17 +42,17 @@ const ServiceRecordCard: React.FC<ServiceRecordCardProps> = ({ record }) => {
   const totalPartsCost = record.parts_used?.reduce((sum, part) => sum + (part.cost * part.quantity), 0) || 0;
   
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-sm">
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
           <div>
-            <CardTitle>{record.description}</CardTitle>
+            <CardTitle className="text-lg md:text-xl">{record.description}</CardTitle>
             <CardDescription className="mt-1 flex items-center gap-1">
               <Car className="h-4 w-4 text-muted-foreground" />
               {record.vehicle.year} {record.vehicle.make} {record.vehicle.model}
             </CardDescription>
           </div>
-          <Badge className={`${getStatusColor(record.status)} text-white`}>
+          <Badge className={`${getStatusColor(record.status)} text-white mt-1 sm:mt-0`}>
             {record.status}
           </Badge>
         </div>
@@ -119,7 +119,7 @@ const ServiceRecordCard: React.FC<ServiceRecordCardProps> = ({ record }) => {
           </Button>
           
           {showPartsDetails && (
-            <div className="w-full mt-2">
+            <div className="w-full mt-2 overflow-x-auto">
               <PartsDetails parts={record.parts_used} />
             </div>
           )}

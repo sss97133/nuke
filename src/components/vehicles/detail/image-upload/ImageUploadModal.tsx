@@ -39,7 +39,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       if (!newOpen) resetForm();
       onOpenChange(newOpen);
     }}>
-      <DialogContent className="sm:max-w-md md:max-w-lg">
+      <DialogContent className="w-[95vw] max-w-md md:max-w-lg mx-auto">
         <DialogHeader>
           <DialogTitle>Upload Vehicle Images</DialogTitle>
           <DialogDescription>

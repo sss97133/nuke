@@ -45,7 +45,7 @@ const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Service Record</DialogTitle>
         </DialogHeader>
@@ -90,18 +90,20 @@ const CreateServiceRecord: React.FC<CreateServiceRecordProps> = ({
             <div className="text-sm text-destructive">{submitError}</div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={isSubmitting}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={isSubmitting || !formState.vehicleId || !formState.description || vehiclesLoading}
+              className="w-full sm:w-auto"
             >
               {isSubmitting ? "Saving..." : "Save Record"}
             </Button>

@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Pencil, Trash2, Calendar, DropletFilled, DollarSign, Car } from "lucide-react";
+import { Pencil, Trash2, Calendar, Droplet, DollarSign, Car } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface FuelEntry {
@@ -24,8 +23,6 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
     const fetchEntries = async () => {
       setLoading(true);
       try {
-        // This would normally fetch from Supabase
-        // For now, let's use mock data
         const mockEntries: FuelEntry[] = [
           {
             id: "1",
@@ -61,12 +58,10 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
   }, [refreshTrigger]);
 
   const handleEdit = (id: string) => {
-    // Would open edit form in a real implementation
     console.log(`Edit entry ${id}`);
   };
 
   const handleDelete = (id: string) => {
-    // Would delete entry in a real implementation
     console.log(`Delete entry ${id}`);
   };
 
@@ -78,7 +73,6 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
     return <div className="p-4 text-center text-muted-foreground">No fuel entries found. Add your first entry above.</div>;
   }
 
-  // For mobile view, we'll show cards instead of a table
   const renderMobileView = () => {
     return (
       <div className="space-y-4 md:hidden">
@@ -106,7 +100,7 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
             
             <div className="grid grid-cols-2 gap-2 mt-2">
               <div className="flex items-center space-x-2">
-                <DropletFilled className="h-4 w-4 text-muted-foreground" />
+                <Droplet className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">{entry.amount.toFixed(2)} gal</span>
               </div>
               <div className="flex items-center space-x-2">
@@ -128,7 +122,6 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
     );
   };
 
-  // For desktop view, we'll show the table
   return (
     <div>
       {renderMobileView()}
