@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TeamSection } from '@/components/profile/TeamSection';
@@ -17,18 +16,30 @@ import { AddTeamMemberForm } from '@/components/team/AddTeamMemberForm';
 import { useQueryClient } from '@tanstack/react-query';
 
 const TeamMembers = () => {
+  console.log("TeamMembers component rendering");
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    console.log("TeamMembers dialog state changed:", isAddMemberDialogOpen);
+  }, [isAddMemberDialogOpen]);
+
   const handleAddTeamMember = () => {
+    console.log("Add Team Member button clicked");
     setIsAddMemberDialogOpen(true);
   };
 
   const handleFormSuccess = () => {
+    console.log("Form success callback triggered");
     // Refresh the team members data
     queryClient.invalidateQueries({ queryKey: ['team-members'] });
-    setIsAddMemberDialogOpen(false);
+    console.log("Team members query invalidated");
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    console.log("Dialog open state changing to:", open);
+    setIsAddMemberDialogOpen(open);
   };
 
   return (
@@ -99,10 +110,9 @@ const TeamMembers = () => {
           </Card>
         )}
         
-        {/* Add Team Member Dialog */}
         <AddTeamMemberForm 
           open={isAddMemberDialogOpen} 
-          onOpenChange={setIsAddMemberDialogOpen}
+          onOpenChange={handleDialogOpenChange}
           onSuccess={handleFormSuccess} 
         />
       </div>

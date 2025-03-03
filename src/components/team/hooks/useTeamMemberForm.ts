@@ -20,21 +20,34 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    console.log(`Input changed: ${name} = ${value}`);
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
+    console.log(`Select changed: ${name} = ${value}`);
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Form submission started", formData);
+    
+    if (isSubmitting) {
+      console.log("Already submitting, ignoring duplicate submission");
+      return;
+    }
+    
     setIsSubmitting(true);
+    console.log("Set isSubmitting to true");
 
     try {
+      console.log("Getting current user session");
       // Get the current user to use their auth session
       const { data: { session } } = await supabase.auth.getSession();
+      console.log("Session retrieved", session ? "Valid session" : "No session");
       
+      console.log("Checking for existing profile with email:", formData.email);
       // Create a new user profile or use an existing one
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
@@ -42,28 +55,46 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
         .eq('email', formData.email)
         .maybeSingle();
 
+      if (fetchError) {
+        console.error("Error fetching profile:", fetchError);
+        throw fetchError;
+      }
+      
+      console.log("Existing profile check result:", existingProfile);
+      
       let profileId;
       
       if (existingProfile) {
         // Use existing profile
         profileId = existingProfile.id;
+        console.log("Using existing profile ID:", profileId);
       } else {
         // Create a new profile
+        console.log("Creating new profile for:", formData.fullName);
+        const newId = crypto.randomUUID();
+        console.log("Generated new profile ID:", newId);
+        
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({
-            id: crypto.randomUUID(), // Generate a UUID for the new profile
+            id: newId,
             full_name: formData.fullName,
             email: formData.email
           })
           .select('id')
           .single();
 
-        if (createError) throw createError;
+        if (createError) {
+          console.error("Error creating profile:", createError);
+          throw createError;
+        }
+        
+        console.log("New profile created:", newProfile);
         profileId = newProfile.id;
       }
 
       // Now create the team member with reference to profile
+      console.log("Creating team member with profile ID:", profileId);
       const { error: teamMemberError } = await supabase
         .from('team_members')
         .insert({
@@ -75,9 +106,15 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
           start_date: new Date().toISOString(),
         });
 
-      if (teamMemberError) throw teamMemberError;
+      if (teamMemberError) {
+        console.error("Error creating team member:", teamMemberError);
+        throw teamMemberError;
+      }
 
+      console.log("Team member created successfully");
+      
       // Invalidate team members query to refresh data
+      console.log("Invalidating team members query");
       queryClient.invalidateQueries({ queryKey: ['team-members'] });
 
       toast({
@@ -86,6 +123,7 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       });
       
       // Reset form
+      console.log("Resetting form data");
       setFormData({
         fullName: '',
         email: '',
@@ -95,8 +133,11 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
         status: 'active',
       });
 
-      // Close dialog and trigger success callback if provided
+      // Call success callback first, then close dialog
+      console.log("Calling onSuccess callback:", !!onSuccess);
       if (onSuccess) onSuccess();
+      
+      console.log("Closing dialog");
       onOpenChange(false);
       
     } catch (error: any) {
@@ -107,6 +148,7 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
         variant: "destructive",
       });
     } finally {
+      console.log("Setting isSubmitting to false in finally block");
       setIsSubmitting(false);
     }
   };

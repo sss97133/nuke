@@ -8,12 +8,25 @@ interface FormActionsProps {
 }
 
 export const FormActions: React.FC<FormActionsProps> = ({ isSubmitting }) => {
+  console.log("FormActions rendering, isSubmitting:", isSubmitting);
+  
   return (
     <DialogFooter>
       <DialogClose asChild>
-        <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
+        <Button 
+          type="button" 
+          variant="outline" 
+          disabled={isSubmitting}
+          onClick={() => console.log("Cancel button clicked")}
+        >
+          Cancel
+        </Button>
       </DialogClose>
-      <Button type="submit" disabled={isSubmitting}>
+      <Button 
+        type="submit" 
+        disabled={isSubmitting}
+        onClick={() => console.log("Submit button clicked - this should NOT trigger if form is handled correctly")}
+      >
         {isSubmitting ? 'Adding...' : 'Add Team Member'}
       </Button>
     </DialogFooter>

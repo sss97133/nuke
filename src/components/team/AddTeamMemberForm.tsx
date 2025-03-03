@@ -17,6 +17,8 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
   onOpenChange,
   onSuccess
 }) => {
+  console.log("AddTeamMemberForm rendering, open:", open);
+  
   const {
     formData,
     isSubmitting,
@@ -25,8 +27,17 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
     handleSubmit,
   } = useTeamMemberForm(onOpenChange, onSuccess);
 
+  console.log("Form state - isSubmitting:", isSubmitting);
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpenState) => {
+      console.log("Dialog onOpenChange triggered:", newOpenState);
+      if (isSubmitting) {
+        console.log("Preventing dialog close while submitting");
+        return; // Prevent closing while submitting
+      }
+      onOpenChange(newOpenState);
+    }}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add Team Member</DialogTitle>
@@ -35,7 +46,10 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={(e) => {
+          console.log("Form onSubmit triggered");
+          handleSubmit(e);
+        }}>
           <FormFields 
             formData={formData}
             handleInputChange={handleInputChange}
