@@ -36,18 +36,21 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
           </Button>
         </div>
         <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
-          {vehicle.tags.map((tag, i) => (
+          {vehicle.tags?.map((tag, i) => (
             <Badge key={i} variant="secondary" className="text-xs bg-background/80 backdrop-blur-sm">
               {tag}
             </Badge>
           ))}
         </div>
         
-        {/* Verification status indicator */}
-        <div className="absolute top-2 left-2">
+        {/* Status indicators */}
+        <div className="absolute top-2 left-2 flex gap-1">
           <CheckCircle 
-            className={`h-5 w-5 ${vehicle.id % 2 === 0 ? 'text-blue-500' : 'text-gray-400'}`} 
+            className={`h-5 w-5 ${vehicle.condition_rating > 7 ? 'text-green-500' : vehicle.condition_rating > 4 ? 'text-yellow-500' : 'text-red-500'}`} 
           />
+          {vehicle.rarity_score > 8 && (
+            <Badge variant="secondary" className="text-xs bg-purple-500/80">Rare</Badge>
+          )}
         </div>
       </div>
       <CardHeader className="p-3 pb-0">
@@ -55,38 +58,58 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
           <div>
             <CardTitle className="text-sm font-medium">
               {vehicle.year} {vehicle.make} {vehicle.model}
+              {vehicle.trim && <span className="text-muted-foreground"> {vehicle.trim}</span>}
             </CardTitle>
             <div className="flex items-center text-xs text-muted-foreground mt-1">
               <MapPin className="h-3 w-3 mr-1" />
               <span>{vehicle.location}</span>
             </div>
           </div>
-          <div className="font-semibold text-base">
-            ${vehicle.price.toLocaleString()}
+          <div className="text-right">
+            <div className="font-semibold text-base">
+              ${vehicle.market_value?.toLocaleString() || vehicle.price?.toLocaleString()}
+            </div>
+            {vehicle.price_trend && (
+              <div className={`text-xs ${vehicle.price_trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
+                {vehicle.price_trend === 'up' ? '↑' : '↓'} Market trend
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>
       <CardContent className="p-3 pb-1">
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="flex items-center">
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="flex items-center" title="Mileage">
             <Clock className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
             <span>{formatMileage(vehicle.mileage)}</span>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center" title="Days listed">
             <Calendar className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
             <span>{extractDays(vehicle.added)}</span>
+          </div>
+          <div className="flex items-center" title="Condition">
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              vehicle.condition_rating > 7 ? 'bg-green-100 text-green-700' :
+              vehicle.condition_rating > 4 ? 'bg-yellow-100 text-yellow-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              {vehicle.condition_rating}/10
+            </span>
           </div>
         </div>
       </CardContent>
       <CardFooter className="border-t px-3 py-2 flex flex-wrap gap-1">
         <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => onVerify(vehicle.id)}>
           <CheckCircle className="h-3.5 w-3.5 mr-1" />
+          Verify
         </Button>
         <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => onEdit(vehicle.id)}>
           <Edit className="h-3.5 w-3.5 mr-1" />
+          Edit
         </Button>
         <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-destructive hover:text-destructive" onClick={() => onRemove(vehicle.id)}>
           <Trash2 className="h-3.5 w-3.5 mr-1" />
+          Remove
         </Button>
       </CardFooter>
     </Card>
