@@ -44,7 +44,13 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
     try {
       console.log("Getting current user session");
       // Get the current user to use their auth session
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("Session error:", sessionError);
+        throw sessionError;
+      }
+      
       console.log("Session retrieved", session ? "Valid session" : "No session");
       
       console.log("Checking for existing profile with email:", formData.email);
@@ -95,7 +101,7 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
 
       // Now create the team member with reference to profile
       console.log("Creating team member with profile ID:", profileId);
-      const { error: teamMemberError } = await supabase
+      const { data: teamMember, error: teamMemberError } = await supabase
         .from('team_members')
         .insert({
           profile_id: profileId,
@@ -104,14 +110,16 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
           department: formData.department || null,
           status: formData.status,
           start_date: new Date().toISOString(),
-        });
+        })
+        .select()
+        .single();
 
       if (teamMemberError) {
         console.error("Error creating team member:", teamMemberError);
         throw teamMemberError;
       }
 
-      console.log("Team member created successfully");
+      console.log("Team member created successfully:", teamMember);
       
       // Invalidate team members query to refresh data
       console.log("Invalidating team members query");

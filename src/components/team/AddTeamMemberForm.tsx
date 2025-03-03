@@ -17,7 +17,7 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
   onOpenChange,
   onSuccess
 }) => {
-  console.log("AddTeamMemberForm rendering, open:", open);
+  console.log("AddTeamMemberForm rendering, open:", open, "with props:", { open, onSuccess });
   
   const {
     formData,
@@ -31,7 +31,7 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={(newOpenState) => {
-      console.log("Dialog onOpenChange triggered:", newOpenState);
+      console.log("Dialog onOpenChange triggered:", newOpenState, "isSubmitting:", isSubmitting);
       if (isSubmitting) {
         console.log("Preventing dialog close while submitting");
         return; // Prevent closing while submitting
@@ -48,6 +48,7 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
         
         <form onSubmit={(e) => {
           console.log("Form onSubmit triggered");
+          e.preventDefault(); // Ensure default form submission is prevented
           handleSubmit(e);
         }}>
           <FormFields 

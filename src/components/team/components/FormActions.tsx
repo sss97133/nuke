@@ -25,7 +25,6 @@ export const FormActions: React.FC<FormActionsProps> = ({ isSubmitting }) => {
       <Button 
         type="submit" 
         disabled={isSubmitting}
-        onClick={() => console.log("Submit button clicked - this should NOT trigger if form is handled correctly")}
       >
         {isSubmitting ? 'Adding...' : 'Add Team Member'}
       </Button>
