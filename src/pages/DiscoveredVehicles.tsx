@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -90,7 +89,6 @@ const DiscoveredVehicles = () => {
     }
   ];
   
-  // Handle various vehicle actions
   const handleVerify = (id: number) => {
     console.log(`Verifying vehicle ${id}`);
   };
@@ -105,7 +103,6 @@ const DiscoveredVehicles = () => {
   
   const toggleVehicleSelection = (id: number) => {
     if (id === -1) {
-      // Special case to clear all
       setSelectedVehicles([]);
       return;
     }
@@ -117,7 +114,6 @@ const DiscoveredVehicles = () => {
     }
   };
   
-  // Handle bulk actions
   const handleBulkVerify = () => {
     console.log(`Verifying vehicles: ${selectedVehicles.join(', ')}`);
     setSelectedVehicles([]);
@@ -136,22 +132,17 @@ const DiscoveredVehicles = () => {
     setBulkActionOpen(false);
   };
   
-  // Filter and sort vehicles
   const filteredAndSortedVehicles = useMemo(() => {
-    // First filter
     let result = vehicles.filter(vehicle => {
       const searchString = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.location}`.toLowerCase();
       return searchString.includes(searchTerm.toLowerCase());
     });
     
-    // Then sort
     return result.sort((a, b) => {
       const field = sortField;
       const direction = sortDirection === 'asc' ? 1 : -1;
       
       if (field === 'added') {
-        // Simplistic comparison for the mock data
-        // In a real app, we'd parse dates properly
         return direction * (a[field].localeCompare(b[field]));
       }
       
@@ -219,71 +210,63 @@ const DiscoveredVehicles = () => {
           </TabsContent>
           
           <TabsContent value="classic" className="m-0">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {vehicles
-                .filter(v => v.year < 1990)
-                .map((vehicle) => (
-                  <VehicleCard 
-                    key={vehicle.id} 
-                    vehicle={vehicle}
-                    onVerify={handleVerify}
-                    onEdit={handleEdit}
-                    onRemove={handleRemove}
-                  />
-                ))
-              }
-            </div>
+            <VehicleTabContent 
+              vehicles={vehicles}
+              filteredVehicles={vehicles.filter(v => v.year < 1990)}
+              viewMode={viewMode}
+              selectedVehicles={selectedVehicles}
+              toggleVehicleSelection={toggleVehicleSelection}
+              onVerify={handleVerify}
+              onEdit={handleEdit}
+              onRemove={handleRemove}
+              sortField={sortField}
+              sortDirection={sortDirection}
+            />
           </TabsContent>
           
           <TabsContent value="sports" className="m-0">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {vehicles
-                .filter(v => v.tags.includes("Sports Car"))
-                .map((vehicle) => (
-                  <VehicleCard 
-                    key={vehicle.id} 
-                    vehicle={vehicle}
-                    onVerify={handleVerify}
-                    onEdit={handleEdit}
-                    onRemove={handleRemove}
-                  />
-                ))
-              }
-            </div>
+            <VehicleTabContent 
+              vehicles={vehicles}
+              filteredVehicles={vehicles.filter(v => v.tags.includes("Sports Car"))}
+              viewMode={viewMode}
+              selectedVehicles={selectedVehicles}
+              toggleVehicleSelection={toggleVehicleSelection}
+              onVerify={handleVerify}
+              onEdit={handleEdit}
+              onRemove={handleRemove}
+              sortField={sortField}
+              sortDirection={sortDirection}
+            />
           </TabsContent>
           
           <TabsContent value="modified" className="m-0">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {vehicles
-                .filter(v => v.tags.includes("Modified"))
-                .map((vehicle) => (
-                  <VehicleCard 
-                    key={vehicle.id} 
-                    vehicle={vehicle}
-                    onVerify={handleVerify}
-                    onEdit={handleEdit}
-                    onRemove={handleRemove}
-                  />
-                ))
-              }
-            </div>
+            <VehicleTabContent 
+              vehicles={vehicles}
+              filteredVehicles={vehicles.filter(v => v.tags.includes("Modified"))}
+              viewMode={viewMode}
+              selectedVehicles={selectedVehicles}
+              toggleVehicleSelection={toggleVehicleSelection}
+              onVerify={handleVerify}
+              onEdit={handleEdit}
+              onRemove={handleRemove}
+              sortField={sortField}
+              sortDirection={sortDirection}
+            />
           </TabsContent>
           
           <TabsContent value="rare" className="m-0">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {vehicles
-                .filter(v => v.tags.includes("Rare"))
-                .map((vehicle) => (
-                  <VehicleCard 
-                    key={vehicle.id} 
-                    vehicle={vehicle}
-                    onVerify={handleVerify}
-                    onEdit={handleEdit}
-                    onRemove={handleRemove}
-                  />
-                ))
-              }
-            </div>
+            <VehicleTabContent 
+              vehicles={vehicles}
+              filteredVehicles={vehicles.filter(v => v.tags.includes("Rare"))}
+              viewMode={viewMode}
+              selectedVehicles={selectedVehicles}
+              toggleVehicleSelection={toggleVehicleSelection}
+              onVerify={handleVerify}
+              onEdit={handleEdit}
+              onRemove={handleRemove}
+              sortField={sortField}
+              sortDirection={sortDirection}
+            />
           </TabsContent>
         </Tabs>
       </div>
