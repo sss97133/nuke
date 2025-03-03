@@ -71,7 +71,10 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       const newId = crypto.randomUUID();
       console.log("Generated new profile ID:", newId);
       
-      const { data: newProfile, error: createError } = await supabase
+      // Declare a variable to hold the profile data
+      let profileData;
+      
+      const { data, error: createError } = await supabase
         .from('profiles')
         .insert({
           id: newId,
@@ -104,18 +107,21 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
           
           console.log("Found existing profile:", existingProfile);
           // Use existing profile ID
-          newProfile = existingProfile;
+          profileData = existingProfile;
         } else {
           throw createError;
         }
+      } else {
+        // Use the newly created profile
+        profileData = data;
       }
       
-      if (!newProfile) {
+      if (!profileData) {
         throw new Error("Failed to create profile - no profile data returned");
       }
       
-      console.log("Profile created/found successfully:", newProfile);
-      const profileId = newProfile.id;
+      console.log("Profile created/found successfully:", profileData);
+      const profileId = profileData.id;
 
       // Now create the team member with reference to profile
       console.log("Creating team member with profile ID:", profileId);
