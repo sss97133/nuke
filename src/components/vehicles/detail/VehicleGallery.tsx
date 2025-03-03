@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Vehicle } from '@/components/vehicles/discovery/types';
 import { Button } from '@/components/ui/button';
 import { Camera, View, Upload } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
 
 interface VehicleGalleryProps {
   vehicle: Vehicle;
@@ -68,8 +69,5 @@ const VehicleGallery: React.FC<VehicleGalleryProps> = ({ vehicle }) => {
     </Card>
   );
 };
-
-// Missing Badge component import
-import { Badge } from "@/components/ui/badge";
 
 export default VehicleGallery;
