@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, TrendingUp, ThumbsUp, Eye, Bookmark, Share2, Compass } from 'lucide-react';
+import { MapPin, Info, ExternalLink } from 'lucide-react';
 
-interface ContentItem {
+interface ContentCardItem {
   id: string;
   type: string;
   title: string;
@@ -14,110 +14,78 @@ interface ContentItem {
   tags: string[];
   reason: string;
   location: string;
-  relevanceScore?: number;
-  trending?: string;
+  relevanceScore: number;
 }
 
 interface ContentCardProps {
-  item: ContentItem;
-  showTrending?: boolean;
-  isDiscovery?: boolean;
+  item: ContentCardItem;
 }
 
-export const ContentCard = ({ item, showTrending, isDiscovery }: ContentCardProps) => {
-  const getTypeIcon = () => {
-    switch (item.type) {
+export const ContentCard = ({ item }: ContentCardProps) => {
+  const { title, subtitle, image, tags, location, reason, type } = item;
+  
+  // Choose background color based on content type
+  const getBgColor = () => {
+    switch (type) {
       case 'vehicle':
-        return <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-200">Vehicle</Badge>;
+        return 'bg-blue-50 dark:bg-blue-950/20';
       case 'auction':
-        return <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-200">Auction</Badge>;
+        return 'bg-amber-50 dark:bg-amber-950/20';
       case 'event':
-        return <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-200">Event</Badge>;
+        return 'bg-green-50 dark:bg-green-950/20';
       case 'garage':
-        return <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-200">Garage</Badge>;
+        return 'bg-purple-50 dark:bg-purple-950/20';
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return 'bg-gray-50 dark:bg-gray-800/20';
     }
   };
   
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative h-48">
+    <Card className={`overflow-hidden ${getBgColor()} border-0 shadow-md`}>
+      <div className="relative h-48 overflow-hidden">
         <img 
-          src={item.image} 
-          alt={item.title}
-          className="w-full h-full object-cover"
+          src={image} 
+          alt={title}
+          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
         />
         <div className="absolute top-2 left-2">
-          {getTypeIcon()}
+          <Badge variant="secondary" className="capitalize font-medium">
+            {type}
+          </Badge>
         </div>
-        {showTrending && item.trending && (
-          <div className="absolute top-2 right-2">
-            <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-200 flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              {item.trending}
-            </Badge>
-          </div>
-        )}
-        {isDiscovery && (
-          <div className="absolute top-2 right-2">
-            <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-200 flex items-center gap-1">
-              <Compass className="h-3 w-3" />
-              New Discovery
-            </Badge>
-          </div>
-        )}
       </div>
       
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-lg line-clamp-1">{item.title}</CardTitle>
-          {item.relevanceScore && (
-            <Badge variant="secondary" className="ml-2">
-              {item.relevanceScore}% match
-            </Badge>
-          )}
-        </div>
-        <CardDescription>{item.subtitle}</CardDescription>
+        <h3 className="text-lg font-semibold leading-tight">{title}</h3>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
       </CardHeader>
       
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 pb-2">
         <div className="flex flex-wrap gap-1">
-          {item.tags.map((tag, index) => (
+          {tags.map((tag, index) => (
             <Badge key={index} variant="outline" className="text-xs">
               {tag}
             </Badge>
           ))}
         </div>
         
-        <div className="text-sm text-muted-foreground italic">
-          "{item.reason}"
+        <div className="flex items-start gap-1">
+          <MapPin className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+          <span className="text-sm">{location}</span>
         </div>
         
-        <div className="flex items-center text-sm text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5 mr-1" />
-          {item.location}
+        <div className="flex items-start gap-1">
+          <Info className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+          <span className="text-xs text-muted-foreground">{reason}</span>
         </div>
       </CardContent>
       
-      <CardFooter className="flex justify-between pt-1">
-        <div className="flex gap-1">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <ThumbsUp className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <Eye className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <Bookmark className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <Share2 className="h-4 w-4" />
-          </Button>
-        </div>
+      <CardFooter className="pt-0">
+        <Button variant="secondary" size="sm" className="w-full">
+          View Details
+          <ExternalLink className="ml-1 h-3 w-3" />
+        </Button>
       </CardFooter>
     </Card>
   );
-};
+}

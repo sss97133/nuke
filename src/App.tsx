@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -28,6 +27,7 @@ import Schedule from "./pages/Schedule"
 import Service from "./pages/Service"
 import Studio from "./pages/Studio"
 import Explore from "./pages/Explore"
+import ExploreContentManagement from './pages/ExploreContentManagement'
 
 const queryClient = new QueryClient();
 
@@ -112,6 +112,7 @@ function AppContent() {
           <Route path="/professional-dashboard" element={<Profile />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/explore" element={<Explore />} />
+          <Route path="/explore/manage" element={<ExploreContentManagement />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </div>
