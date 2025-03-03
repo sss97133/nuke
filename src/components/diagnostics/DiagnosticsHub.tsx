@@ -11,12 +11,12 @@ const DiagnosticsHub = () => {
   const [activeTab, setActiveTab] = useState("obd-ii");
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
       <DiagnosticsHeader />
       
       <Tabs defaultValue="obd-ii" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6 md:mb-8 w-full">
-          <TabsTrigger value="obd-ii">OBD-II Data</TabsTrigger>
+        <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-4 md:mb-8 w-full">
+          <TabsTrigger value="obd-ii">OBD-II</TabsTrigger>
           <TabsTrigger value="third-party">3rd Party</TabsTrigger>
           <TabsTrigger value="cloud">Cloud</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>

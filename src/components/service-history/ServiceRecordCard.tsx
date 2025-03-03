@@ -58,7 +58,7 @@ const ServiceRecordCard: React.FC<ServiceRecordCardProps> = ({ record }) => {
         </div>
       </CardHeader>
       <CardContent className="pb-2">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <div className="space-y-2">
             <div className="flex items-center text-sm">
               <Wrench className="h-4 w-4 mr-2 text-muted-foreground" />

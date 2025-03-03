@@ -26,8 +26,8 @@ const ServiceFilters = ({
 }: ServiceFiltersProps) => {
   return (
     <div className="space-y-4 mb-6">
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-4">
+        <div className="relative w-full">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
@@ -38,7 +38,7 @@ const ServiceFilters = ({
           />
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:w-2/5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="sortBy">Sort By</Label>
             <Select value={sortOption} onValueChange={onSortChange}>

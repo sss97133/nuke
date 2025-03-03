@@ -10,7 +10,7 @@ export const GalleryImages: React.FC<GalleryImagesProps> = ({ images, onOpenUplo
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-3 md:space-y-6">
       {/* Featured/main image */}
       {images.length > 0 && (
         <div className="w-full aspect-video overflow-hidden rounded-lg">

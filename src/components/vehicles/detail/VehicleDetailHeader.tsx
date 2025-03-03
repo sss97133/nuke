@@ -14,7 +14,7 @@ interface VehicleDetailHeaderProps {
 const VehicleDetailHeader: React.FC<VehicleDetailHeaderProps> = ({ vehicle }) => {
   return (
     <Card className="overflow-hidden">
-      <div className="relative h-48 md:h-64 bg-muted">
+      <div className="relative h-40 sm:h-48 md:h-64 bg-muted">
         {/* Vehicle main image would go here, using placeholder for now */}
         <div 
           className="w-full h-full bg-center bg-cover" 

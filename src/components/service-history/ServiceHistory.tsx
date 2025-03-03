@@ -37,7 +37,7 @@ const ServiceHistory = () => {
 
   return (
     <div className="container mx-auto py-4 md:py-6 px-4 md:px-6 max-w-5xl">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Service History</h1>
         <Button onClick={handleAddServiceRecord} className="w-full sm:w-auto flex gap-1 justify-center">
           <Plus className="h-4 w-4" />

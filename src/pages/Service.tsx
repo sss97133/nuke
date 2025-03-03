@@ -12,26 +12,26 @@ const Service = () => {
 
   return (
     <ScrollArea className="h-[calc(100vh-4rem)] p-4">
-      <div className="container mx-auto py-6 max-w-5xl">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Service Management</h1>
-          <Button className="flex gap-1">
+      <div className="container mx-auto py-4 md:py-6 max-w-5xl">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">Service Management</h1>
+          <Button className="w-full sm:w-auto flex gap-1 justify-center">
             <Plus className="h-4 w-4" />
             Create Service Ticket
           </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-6">
-          <TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-4 md:mb-6">
+          <TabsList className="w-full grid grid-cols-2 md:grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="tickets">Active Tickets</TabsTrigger>
+            <TabsTrigger value="tickets">Tickets</TabsTrigger>
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
         </Tabs>
 
         {activeTab === "overview" && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <ServiceCard 
               title="Active Tickets"
               description="Manage current service tickets" 
