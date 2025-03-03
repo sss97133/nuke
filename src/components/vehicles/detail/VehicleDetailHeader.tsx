@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Vehicle } from '@/components/vehicles/discovery/types';
-import { Calendar, Clock, Heart, MapPin, Share, Star } from 'lucide-react';
+import { Calendar, Clock, MapPin, Star } from 'lucide-react';
 
 interface VehicleDetailHeaderProps {
   vehicle: Vehicle;
@@ -20,17 +20,6 @@ const VehicleDetailHeader: React.FC<VehicleDetailHeaderProps> = ({ vehicle }) =>
           className="w-full h-full bg-center bg-cover" 
           style={{ backgroundImage: `url(${vehicle.image})` }}
         />
-        
-        <div className="absolute top-4 right-4 flex space-x-2">
-          <Button size="sm" variant="secondary">
-            <Heart className="h-4 w-4 mr-2" />
-            Save
-          </Button>
-          <Button size="sm" variant="secondary">
-            <Share className="h-4 w-4 mr-2" />
-            Share
-          </Button>
-        </div>
         
         <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
           {vehicle.tags?.map((tag, index) => (
@@ -86,7 +75,7 @@ const VehicleDetailHeader: React.FC<VehicleDetailHeaderProps> = ({ vehicle }) =>
         <Separator className="my-6" />
         
         <div className="flex flex-wrap gap-3">
-          <Button>Add to Garage</Button>
+          <Button title="Add this vehicle to your personal collection">Add to Collection</Button>
           <Button variant="outline">Contact Seller</Button>
           <Button variant="secondary">Make Offer</Button>
         </div>
