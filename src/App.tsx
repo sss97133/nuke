@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -89,7 +90,7 @@ function AppContent() {
   return (
     <div className="flex min-h-screen bg-background">
       <NavSidebar />
-      <div className="flex-1">
+      <div className="flex-1 pt-14 md:pt-0">
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/onboarding" element={<Onboarding />} />

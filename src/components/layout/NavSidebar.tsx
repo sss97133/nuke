@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Home, 
@@ -26,11 +26,13 @@ import {
   Coins,
   Video,
   Atom,
-  Users
+  Users,
+  Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface NavItemProps {
   to: string;
@@ -38,9 +40,10 @@ interface NavItemProps {
   label: string;
   isActive: boolean;
   isCollapsed: boolean;
+  onClick?: () => void;
 }
 
-const NavItem = ({ to, icon, label, isActive, isCollapsed }: NavItemProps) => {
+const NavItem = ({ to, icon, label, isActive, isCollapsed, onClick }: NavItemProps) => {
   return (
     <Link 
       to={to} 
@@ -51,6 +54,7 @@ const NavItem = ({ to, icon, label, isActive, isCollapsed }: NavItemProps) => {
           ? "bg-primary text-primary-foreground" 
           : "hover:bg-primary/10 text-foreground"
       )}
+      onClick={onClick}
     >
       {icon}
       {!isCollapsed && <span>{label}</span>}
@@ -60,7 +64,24 @@ const NavItem = ({ to, icon, label, isActive, isCollapsed }: NavItemProps) => {
 
 export const NavSidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  
+  // Check for mobile viewport on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        setIsCollapsed(true);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   const navItems = [
     { to: "/dashboard", icon: <Home className="h-5 w-5" />, label: "Dashboard" },
@@ -91,11 +112,53 @@ export const NavSidebar = () => {
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
   };
+  
+  const closeMenu = () => {
+    setIsOpen(false);
+  };
 
+  // For mobile, render a sheet instead of the sidebar
+  if (isMobile) {
+    return (
+      <>
+        <div className="fixed top-4 left-4 z-40">
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="md:hidden">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-[270px]">
+              <div className="p-4 flex items-center justify-between border-b">
+                <span className="font-semibold">Vehicle Manager</span>
+              </div>
+              <ScrollArea className="h-[calc(100vh-65px)]">
+                <div className="p-2 space-y-1">
+                  {navItems.map((item) => (
+                    <NavItem
+                      key={item.to}
+                      to={item.to}
+                      icon={item.icon}
+                      label={item.label}
+                      isActive={location.pathname === item.to}
+                      isCollapsed={false}
+                      onClick={closeMenu}
+                    />
+                  ))}
+                </div>
+              </ScrollArea>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </>
+    );
+  }
+
+  // For desktop, render the regular sidebar
   return (
     <div 
       className={cn(
-        "flex flex-col h-screen border-r border-border bg-background transition-all",
+        "flex flex-col h-screen border-r border-border bg-background transition-all hidden md:flex",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
