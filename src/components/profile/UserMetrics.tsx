@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Trophy, Star, Award, Users, Car, Tools, CreditCard, TrendingUp } from 'lucide-react';
+import { Trophy, Star, Award, Users, Car, Wrench, CreditCard, TrendingUp } from 'lucide-react';
 import { 
   Tooltip,
   TooltipContent,
@@ -129,7 +129,7 @@ export const UserMetrics = ({ profile }: UserMetricsProps) => {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                <Tools className="h-3.5 w-3.5" />
+                <Wrench className="h-3.5 w-3.5" />
                 Technician
                 {technicianPercentile !== undefined && (
                   <span className="text-xs bg-muted px-1.5 py-0.5 rounded-sm">
