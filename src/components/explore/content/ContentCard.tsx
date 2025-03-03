@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Info, ThumbsUp, Share2, Bookmark, ExternalLink } from 'lucide-react';
 
-interface ContentCardItem {
+export interface ContentCardItem {
   id: string;
   type: string;
   title: string;
@@ -15,10 +15,12 @@ interface ContentCardItem {
   reason: string;
   location: string;
   relevanceScore: number;
+  trending?: string;
 }
 
 interface ContentCardProps {
   item: ContentCardItem;
+  showTrending?: boolean;
   onView?: (id: string) => void;
   onLike?: (id: string) => void;
   onShare?: (id: string) => void;
@@ -27,12 +29,13 @@ interface ContentCardProps {
 
 export const ContentCard = ({ 
   item, 
+  showTrending,
   onView,
   onLike,
   onShare,
   onSave 
 }: ContentCardProps) => {
-  const { id, title, subtitle, image, tags, location, reason, type } = item;
+  const { id, title, subtitle, image, tags, location, reason, type, trending } = item;
   
   // Choose background color based on content type
   const getBgColor = () => {
@@ -72,6 +75,14 @@ export const ContentCard = ({
             {type}
           </Badge>
         </div>
+        
+        {showTrending && trending && (
+          <div className="absolute top-2 right-2">
+            <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+              {trending}
+            </Badge>
+          </div>
+        )}
       </div>
       
       <CardHeader className="pb-2">

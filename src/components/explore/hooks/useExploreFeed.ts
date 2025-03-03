@@ -35,22 +35,23 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
     queryKey: ['explore-feed', filter],
     queryFn: async ({ pageParam = 0 }) => {
       // Build query based on filter and pagination
-      let query = supabase
+      const query = supabase
         .from('explore_content')
         .select('*');
       
       // Apply type filter if not 'all'
       if (filter !== 'all') {
-        query = query.eq('type', filter);
+        query.eq('type', filter);
       }
       
       // Apply pagination
-      query = query
+      const from = pageParam * limit;
+      const to = from + limit - 1;
+      
+      const { data, error } = await query
         .order('relevance_score', { ascending: false })
         .order('created_at', { ascending: false })
-        .range(pageParam * limit, (pageParam + 1) * limit - 1);
-      
-      const { data, error } = await query;
+        .range(from, to);
       
       if (error) throw error;
       
@@ -67,15 +68,16 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
   // Track content interaction
   const { mutate: trackInteraction } = useMutation({
     mutationFn: async ({ contentId, interactionType }: { contentId: string, interactionType: 'view' | 'like' | 'share' | 'save' | 'comment' }) => {
-      const { data, error } = await supabase.functions.invoke('track-content-interaction', {
-        body: {
+      const { error } = await supabase
+        .from('content_interactions')
+        .insert({
           content_id: contentId,
           interaction_type: interactionType,
-        },
-      });
+          user_id: (await supabase.auth.getUser()).data.user?.id
+        });
       
       if (error) throw error;
-      return data;
+      return { success: true };
     },
   });
 

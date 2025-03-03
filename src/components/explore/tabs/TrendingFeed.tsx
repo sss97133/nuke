@@ -26,7 +26,8 @@ export const TrendingFeed = ({ filter }: TrendingFeedProps) => {
           tags: ['Supercar', 'Collector', 'Trending'],
           reason: 'Gaining significant attention this week',
           location: 'Miami, FL',
-          trending: '+248% views'
+          trending: '+248% views',
+          relevanceScore: 95
         },
         {
           id: '2',
@@ -37,7 +38,8 @@ export const TrendingFeed = ({ filter }: TrendingFeedProps) => {
           tags: ['Exhibition', 'New Models', 'Industry'],
           reason: 'Hot topic in the automotive community',
           location: 'New York, NY',
-          trending: '+186% registrations'
+          trending: '+186% registrations',
+          relevanceScore: 90
         },
         {
           id: '3',
@@ -48,7 +50,8 @@ export const TrendingFeed = ({ filter }: TrendingFeedProps) => {
           tags: ['Electric', 'Off-road', 'Innovative'],
           reason: 'Rapidly gaining interest in the market',
           location: 'Denver, CO',
-          trending: '+162% searches'
+          trending: '+162% searches',
+          relevanceScore: 88
         },
         {
           id: '4',
@@ -59,7 +62,8 @@ export const TrendingFeed = ({ filter }: TrendingFeedProps) => {
           tags: ['Performance', 'Innovation', 'Premium'],
           reason: 'Becoming popular among enthusiasts',
           location: 'Austin, TX',
-          trending: '+153% reviews'
+          trending: '+153% reviews',
+          relevanceScore: 85
         },
         {
           id: '5',
@@ -70,7 +74,8 @@ export const TrendingFeed = ({ filter }: TrendingFeedProps) => {
           tags: ['Luxury', 'Electric', 'High-performance'],
           reason: 'Trending in luxury vehicle segment',
           location: 'San Diego, CA',
-          trending: '+118% inquiries'
+          trending: '+118% inquiries',
+          relevanceScore: 82
         }
       ].filter(item => filter === 'all' || item.type === filter);
     }
@@ -104,7 +109,11 @@ export const TrendingFeed = ({ filter }: TrendingFeedProps) => {
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {data.map(item => (
-          <ContentCard key={item.id} item={item} showTrending />
+          <ContentCard 
+            key={item.id} 
+            item={item}
+            showTrending
+          />
         ))}
       </div>
     </div>

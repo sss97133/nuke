@@ -25,7 +25,8 @@ export const DiscoverFeed = ({ filter }: DiscoverFeedProps) => {
           image: 'https://images.unsplash.com/photo-1550616543-4f6b3d16c38e?auto=format&fit=crop&w=600&q=80',
           tags: ['Vintage', 'Collector', 'Iconic'],
           reason: 'Expand your knowledge of classic vehicles',
-          location: 'Portland, OR'
+          location: 'Portland, OR',
+          relevanceScore: 75
         },
         {
           id: '2',
@@ -35,7 +36,8 @@ export const DiscoverFeed = ({ filter }: DiscoverFeedProps) => {
           image: 'https://images.unsplash.com/photo-1697527025456-c79ab0a15ab5?auto=format&fit=crop&w=600&q=80',
           tags: ['Off-road', 'Adventure', 'Experience'],
           reason: 'Something different you might enjoy',
-          location: 'Moab, UT'
+          location: 'Moab, UT',
+          relevanceScore: 72
         },
         {
           id: '3',
@@ -45,7 +47,8 @@ export const DiscoverFeed = ({ filter }: DiscoverFeedProps) => {
           image: 'https://images.unsplash.com/photo-1607603750909-408e193868c7?auto=format&fit=crop&w=600&q=80',
           tags: ['Restoration', 'Vintage', 'Craftsmanship'],
           reason: 'Discover master craftspeople in automotive restoration',
-          location: 'Charleston, SC'
+          location: 'Charleston, SC',
+          relevanceScore: 68
         },
         {
           id: '4',
@@ -55,7 +58,8 @@ export const DiscoverFeed = ({ filter }: DiscoverFeedProps) => {
           image: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=600&q=80',
           tags: ['Motorcycles', 'Vintage', 'Collection'],
           reason: 'Broaden your automotive interests',
-          location: 'Milwaukee, WI'
+          location: 'Milwaukee, WI',
+          relevanceScore: 65
         },
         {
           id: '5',
@@ -65,7 +69,8 @@ export const DiscoverFeed = ({ filter }: DiscoverFeedProps) => {
           image: 'https://images.unsplash.com/photo-1637511180523-99be8034700c?auto=format&fit=crop&w=600&q=80',
           tags: ['Custom', 'Hot Rod', 'Unique'],
           reason: 'Explore custom automotive culture',
-          location: 'Las Vegas, NV'
+          location: 'Las Vegas, NV',
+          relevanceScore: 62
         }
       ].filter(item => filter === 'all' || item.type === filter);
     }
@@ -99,7 +104,7 @@ export const DiscoverFeed = ({ filter }: DiscoverFeedProps) => {
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {data.map(item => (
-          <ContentCard key={item.id} item={item} isDiscovery />
+          <ContentCard key={item.id} item={item} />
         ))}
       </div>
     </div>

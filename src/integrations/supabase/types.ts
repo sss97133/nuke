@@ -493,6 +493,41 @@ export type Database = {
           },
         ]
       }
+      content_interactions: {
+        Row: {
+          content_id: string
+          id: string
+          interaction_time: string | null
+          interaction_type: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          content_id: string
+          id?: string
+          interaction_time?: string | null
+          interaction_type: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          content_id?: string
+          id?: string
+          interaction_time?: string | null
+          interaction_type?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_interactions_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "explore_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_schedules: {
         Row: {
           content_type: string
@@ -785,6 +820,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      explore_content: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          id: string
+          image_url: string
+          location: string | null
+          metadata: Json | null
+          reason: string | null
+          relevance_score: number | null
+          subtitle: string
+          tags: string[]
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          image_url: string
+          location?: string | null
+          metadata?: Json | null
+          reason?: string | null
+          relevance_score?: number | null
+          subtitle: string
+          tags?: string[]
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          image_url?: string
+          location?: string | null
+          metadata?: Json | null
+          reason?: string | null
+          relevance_score?: number | null
+          subtitle?: string
+          tags?: string[]
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       feed_interactions: {
         Row: {
@@ -2408,6 +2491,45 @@ export type Database = {
           },
         ]
       }
+      user_content_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          interaction_history: Json | null
+          preferred_locations: string[] | null
+          preferred_tags: string[] | null
+          preferred_technical_level: number | null
+          preferred_types: string[] | null
+          updated_at: string | null
+          user_id: string
+          view_history: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interaction_history?: Json | null
+          preferred_locations?: string[] | null
+          preferred_tags?: string[] | null
+          preferred_technical_level?: number | null
+          preferred_types?: string[] | null
+          updated_at?: string | null
+          user_id: string
+          view_history?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interaction_history?: Json | null
+          preferred_locations?: string[] | null
+          preferred_tags?: string[] | null
+          preferred_technical_level?: number | null
+          preferred_types?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+          view_history?: Json | null
+        }
+        Relationships: []
+      }
       user_interactions: {
         Row: {
           created_at: string
@@ -3044,6 +3166,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      calculate_content_relevance: {
+        Args: {
+          p_content_id: string
+          p_user_id: string
+        }
+        Returns: number
+      }
       cube:
         | {
             Args: {
@@ -3108,6 +3237,28 @@ export type Database = {
           "": number
         }
         Returns: number
+      }
+      get_personalized_feed: {
+        Args: {
+          p_user_id: string
+          p_limit?: number
+          p_type?: string
+        }
+        Returns: {
+          content: string | null
+          created_at: string | null
+          id: string
+          image_url: string
+          location: string | null
+          metadata: Json | null
+          reason: string | null
+          relevance_score: number | null
+          subtitle: string
+          tags: string[]
+          title: string
+          type: string
+          user_id: string | null
+        }[]
       }
       has_role: {
         Args: {
