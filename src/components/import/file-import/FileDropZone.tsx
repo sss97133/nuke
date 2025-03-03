@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ICloudImageModal } from './ICloudImageModal';
-import { parseCarCsv, importCarsToSupabase, connectICloudImages, saveCarImages } from '@/utils/car-import';
+import { parseCarCsv, importCarsToSupabase, connectICloudImages, saveCarImages } from '@/utils/vehicle';
 import { useToast } from "@/hooks/use-toast";
 
 interface FileDropZoneProps {
