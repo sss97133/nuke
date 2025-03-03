@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Upload, FileText, UploadCloud } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +18,62 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   resetImport,
   handleImport
 }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      // Create a synthetic event to pass to the handleFileChange function
+      const file = e.dataTransfer.files[0];
+      
+      // Create a new event with the file
+      const event = {
+        target: {
+          files: e.dataTransfer.files
+        }
+      } as unknown as React.ChangeEvent<HTMLInputElement>;
+      
+      handleFileChange(event);
+    }
+  }, [handleFileChange]);
+
+  const handleBrowseClick = () => {
+    console.log("Browse button clicked");
+    if (fileInputRef.current) {
+      console.log("Triggering file input click");
+      fileInputRef.current.click();
+    }
+  };
+
   return (
-    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+    <div
+      className={`border-2 ${isDragging ? 'border-primary bg-primary/5' : 'border-dashed'} rounded-lg p-6 text-center transition-colors`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {!selectedFile ? (
         <>
           <UploadCloud className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
@@ -31,11 +85,16 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
             type="file"
             className="hidden"
             id="file-upload"
+            ref={fileInputRef}
             onChange={handleFileChange}
             accept=".csv,.xlsx,.json,.xml"
           />
           <Label htmlFor="file-upload" className="cursor-pointer">
-            <Button variant="outline" type="button">
+            <Button 
+              variant="outline" 
+              type="button"
+              onClick={handleBrowseClick}
+            >
               <Upload className="h-4 w-4 mr-2" />
               Browse Files
             </Button>
