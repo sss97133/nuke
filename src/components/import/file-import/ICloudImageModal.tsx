@@ -1,21 +1,23 @@
 
 import React, { useState } from 'react';
-import { Cloud, Upload, X, Check, AlertCircle, Image } from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-  DialogClose
+  DialogTitle
 } from "@/components/ui/dialog";
 import { parseICloudSharedLink } from '@/utils/icloud';
 import { supabase } from '@/integrations/supabase/client';
+
+// Import refactored components
+import { ICloudLinkInput } from './components/icloud-modal/ICloudLinkInput';
+import { FileUploader } from './components/icloud-modal/FileUploader';
+import { ImagePreview } from './components/icloud-modal/ImagePreview';
+import { UploadProgress } from './components/icloud-modal/UploadProgress';
+import { ErrorDisplay } from './components/icloud-modal/ErrorDisplay';
+import { ModalActions } from './components/icloud-modal/ModalActions';
 
 interface ICloudImageModalProps {
   open: boolean;
@@ -47,11 +49,6 @@ export const ICloudImageModal: React.FC<ICloudImageModalProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [linkValidation, setLinkValidation] = useState<'valid' | 'invalid' | null>(null);
-
-  // Preview selected images
-  const previewImages = selectedFiles 
-    ? Array.from(selectedFiles).map(file => URL.createObjectURL(file))
-    : [];
 
   // Validate iCloud link
   const validateLink = () => {
@@ -164,13 +161,6 @@ export const ICloudImageModal: React.FC<ICloudImageModalProps> = ({
     onOpenChange(false);
   };
 
-  // Clean up object URLs when component unmounts or files change
-  React.useEffect(() => {
-    return () => {
-      previewImages.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, [previewImages]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md md:max-w-lg">
@@ -184,30 +174,13 @@ export const ICloudImageModal: React.FC<ICloudImageModalProps> = ({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
-          {/* iCloud Shared Album Option */}
-          <div className="space-y-2">
-            <Label htmlFor="icloud-link" className="text-base font-medium">
-              <Cloud className="h-4 w-4 inline mr-2" />
-              Connect iCloud Shared Album
-            </Label>
-            <Input
-              id="icloud-link"
-              placeholder="https://share.icloud.com/photos/..."
-              value={sharedAlbumLink}
-              onChange={(e) => setSharedAlbumLink(e.target.value)}
-              onBlur={validateLink}
-              className={`${
-                linkValidation === 'valid' ? 'border-green-500 focus-visible:ring-green-500' :
-                linkValidation === 'invalid' ? 'border-red-500 focus-visible:ring-red-500' : ''
-              }`}
-            />
-            {linkValidation === 'valid' && (
-              <p className="text-sm text-green-500 flex items-center">
-                <Check className="h-4 w-4 mr-1" />
-                Valid iCloud shared album link
-              </p>
-            )}
-          </div>
+          {/* iCloud Shared Album Input */}
+          <ICloudLinkInput 
+            sharedAlbumLink={sharedAlbumLink}
+            setSharedAlbumLink={setSharedAlbumLink}
+            linkValidation={linkValidation}
+            validateLink={validateLink}
+          />
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -219,90 +192,20 @@ export const ICloudImageModal: React.FC<ICloudImageModalProps> = ({
           </div>
 
           {/* File Upload Option */}
-          <div className="space-y-2">
-            <Label htmlFor="car-images" className="text-base font-medium">
-              <Upload className="h-4 w-4 inline mr-2" />
-              Upload Images
-            </Label>
-            <div className="border-2 border-dashed rounded-lg p-4 text-center">
-              <Input
-                id="car-images"
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <Label htmlFor="car-images" className="cursor-pointer block">
-                <Button type="button" variant="outline" className="w-full">
-                  <Image className="h-4 w-4 mr-2" />
-                  Select Photos
-                </Button>
-              </Label>
-              <p className="text-sm text-muted-foreground mt-2">
-                Supported formats: JPG, PNG, HEIC (Max 10MB each)
-              </p>
-            </div>
-          </div>
+          <FileUploader handleFileChange={handleFileChange} />
 
           {/* Image Preview */}
-          {previewImages.length > 0 && (
-            <div>
-              <Label className="text-sm font-medium">Selected Images ({previewImages.length})</Label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {previewImages.map((url, index) => (
-                  <div key={index} className="relative aspect-square rounded-md overflow-hidden">
-                    <img 
-                      src={url} 
-                      alt={`Preview ${index}`} 
-                      className="object-cover w-full h-full"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <ImagePreview selectedFiles={selectedFiles} />
 
           {/* Upload Progress */}
-          {isUploading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Uploading images...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-2.5 dark:bg-slate-700">
-                <div 
-                  className="bg-primary h-2.5 rounded-full" 
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
+          <UploadProgress isUploading={isUploading} uploadProgress={uploadProgress} />
 
           {/* Error Message */}
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <ErrorDisplay error={error} />
         </div>
 
-        <DialogFooter className="sm:justify-between">
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              <X className="h-4 w-4 mr-2" />
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button 
-            type="button" 
-            onClick={handleConnect}
-            disabled={isUploading}
-          >
-            <Check className="h-4 w-4 mr-2" />
-            Connect
-          </Button>
+        <DialogFooter>
+          <ModalActions handleConnect={handleConnect} isUploading={isUploading} />
         </DialogFooter>
       </DialogContent>
     </Dialog>
