@@ -32,6 +32,17 @@ const VehicleListView = ({
     return null;
   };
   
+  // Function to format mileage to k format
+  const formatMileage = (miles: number) => {
+    return miles >= 1000 ? `${Math.round(miles / 1000)}k` : miles.toString();
+  };
+
+  // Function to extract just the number from "X days ago"
+  const extractDays = (timeString: string) => {
+    const match = timeString.match(/^(\d+)/);
+    return match ? match[1] : timeString;
+  };
+  
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-muted font-medium text-xs rounded-md">
@@ -104,8 +115,8 @@ const VehicleListView = ({
             </div>
             <div className="col-span-1 text-xs">{vehicle.year}</div>
             <div className="col-span-2 font-semibold text-xs">${vehicle.price.toLocaleString()}</div>
-            <div className="col-span-1 text-xs">{vehicle.mileage.toLocaleString()} mi</div>
-            <div className="col-span-1 text-xs">{vehicle.added}</div>
+            <div className="col-span-1 text-xs">{formatMileage(vehicle.mileage)} mi</div>
+            <div className="col-span-1 text-xs">{extractDays(vehicle.added)}</div>
             <div className="col-span-2 flex justify-end gap-1">
               <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onVerify(vehicle.id)}>
                 <CheckCircle className="h-3.5 w-3.5" />

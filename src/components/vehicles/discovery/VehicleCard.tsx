@@ -13,6 +13,17 @@ interface VehicleCardProps extends VehicleActionHandlers {
 }
 
 const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) => {
+  // Function to format mileage to k format
+  const formatMileage = (miles: number) => {
+    return miles >= 1000 ? `${Math.round(miles / 1000)}k` : miles.toString();
+  };
+
+  // Function to extract just the number from "X days ago"
+  const extractDays = (timeString: string) => {
+    const match = timeString.match(/^(\d+)/);
+    return match ? match[1] : timeString;
+  };
+
   return (
     <Card className="overflow-hidden">
       <div className="aspect-video bg-muted relative overflow-hidden h-40">
@@ -59,11 +70,11 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="flex items-center">
             <Clock className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-            <span>{vehicle.mileage.toLocaleString()} miles</span>
+            <span>{formatMileage(vehicle.mileage)} mi</span>
           </div>
           <div className="flex items-center">
             <Calendar className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-            <span>Added {vehicle.added}</span>
+            <span>{extractDays(vehicle.added)}</span>
           </div>
         </div>
       </CardContent>

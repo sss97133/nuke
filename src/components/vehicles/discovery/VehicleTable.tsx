@@ -32,6 +32,17 @@ const VehicleTable = ({
     return null;
   };
 
+  // Function to format mileage to k format
+  const formatMileage = (miles: number) => {
+    return miles >= 1000 ? `${Math.round(miles / 1000)}k` : miles.toString();
+  };
+
+  // Function to extract just the number from "X days ago"
+  const extractDays = (timeString: string) => {
+    const match = timeString.match(/^(\d+)/);
+    return match ? match[1] : timeString;
+  };
+
   return (
     <Card>
       <Table>
@@ -104,8 +115,8 @@ const VehicleTable = ({
               <TableCell>{vehicle.year}</TableCell>
               <TableCell>{vehicle.location}</TableCell>
               <TableCell>${vehicle.price.toLocaleString()}</TableCell>
-              <TableCell>{vehicle.mileage.toLocaleString()} mi</TableCell>
-              <TableCell>{vehicle.added}</TableCell>
+              <TableCell>{formatMileage(vehicle.mileage)} mi</TableCell>
+              <TableCell>{extractDays(vehicle.added)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
                   <Button variant="ghost" size="icon" onClick={() => onVerify(vehicle.id)} title="Verify">
