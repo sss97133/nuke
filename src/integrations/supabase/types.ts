@@ -1224,6 +1224,187 @@ export type Database = {
         }
         Relationships: []
       }
+      marketplace_comments: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_offer: boolean | null
+          is_question: boolean | null
+          listing_id: string
+          message: string
+          metadata: Json | null
+          offer_amount: number | null
+          parent_comment_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_offer?: boolean | null
+          is_question?: boolean | null
+          listing_id: string
+          message: string
+          metadata?: Json | null
+          offer_amount?: number | null
+          parent_comment_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_offer?: boolean | null
+          is_question?: boolean | null
+          listing_id?: string
+          message?: string
+          metadata?: Json | null
+          offer_amount?: number | null
+          parent_comment_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_comments_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_listings: {
+        Row: {
+          condition: string | null
+          created_at: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          is_featured: boolean | null
+          listing_status: string
+          location: Json | null
+          metadata: Json | null
+          price: number | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          vehicle_id: string
+          views_count: number | null
+        }
+        Insert: {
+          condition?: string | null
+          created_at?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_featured?: boolean | null
+          listing_status?: string
+          location?: Json | null
+          metadata?: Json | null
+          price?: number | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          vehicle_id: string
+          views_count?: number | null
+        }
+        Update: {
+          condition?: string | null
+          created_at?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_featured?: boolean | null
+          listing_status?: string
+          location?: Json | null
+          metadata?: Json | null
+          price?: number | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          vehicle_id?: string
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_listings_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_preferences: {
+        Row: {
+          created_at: string | null
+          geographic_preferences: Json | null
+          id: string
+          keywords: Json | null
+          notification_enabled: boolean | null
+          saved_searches: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          geographic_preferences?: Json | null
+          id?: string
+          keywords?: Json | null
+          notification_enabled?: boolean | null
+          saved_searches?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          geographic_preferences?: Json | null
+          id?: string
+          keywords?: Json | null
+          notification_enabled?: boolean | null
+          saved_searches?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      marketplace_saved_listings: {
+        Row: {
+          created_at: string | null
+          id: string
+          listing_id: string
+          notification_preferences: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          listing_id: string
+          notification_preferences?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          listing_id?: string
+          notification_preferences?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_saved_listings_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           active_garage_id: string | null

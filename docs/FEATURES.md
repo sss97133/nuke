@@ -68,6 +68,18 @@
 - Health monitoring
 - Theorem explanation agent
 
+### 🛒 Marketplace
+- Public vehicle listings
+- User-controlled marketplace presence
+- Transparent public comments and discussions
+- Interest-based recommendations
+- Location-based discovery
+- Saved/watched listings
+- Proximity-based search
+- Feature promotion options
+- Real-time listing updates
+- Integrated messaging system
+
 For additional features, see:
 - [Business Operations](./BUSINESS_OPS.md)
 - [Media Production](./MEDIA_PRODUCTION.md)
