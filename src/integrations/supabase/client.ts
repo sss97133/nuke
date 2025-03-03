@@ -14,6 +14,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
 }
 
+// Track database errors to prevent duplicate notifications
+const recentServerErrors = new Set<string>();
+const SERVER_ERROR_DEBOUNCE_TIME = 10000; // 10 seconds
+
 // Create supabase client with enhanced options for reliability
 export const supabase = createClient<Database>(
   supabaseUrl,
@@ -27,13 +31,13 @@ export const supabase = createClient<Database>(
     global: {
       fetch: async (url, options) => {
         // Implement custom fetch with retry logic
-        const MAX_RETRIES = 3;
+        const MAX_RETRIES = 2; // Reduced from 3 to 2
         let retries = 0;
         let error;
         
         // Progressive backoff delay calculation
         const getBackoffDelay = (attempt: number) => {
-          return Math.min(1000 * Math.pow(2, attempt), 10000); // Cap at 10 seconds
+          return Math.min(1000 * Math.pow(2, attempt), 5000); // Cap at 5 seconds (reduced from 10)
         };
         
         while (retries < MAX_RETRIES) {
@@ -76,13 +80,24 @@ export const supabase = createClient<Database>(
         // All retries failed
         console.error(`Failed to fetch after ${MAX_RETRIES} attempts:`, error);
         
-        // Show a toast when all retries have failed
+        // Show a toast when all retries have failed, but only if we haven't shown this error recently
         if (typeof window !== 'undefined') {
-          toast({
-            title: "Connection Error",
-            description: "Could not connect to the database. Please check your connection and try again.",
-            variant: "destructive",
-          });
+          const errorMessage = error?.message || "Network error";
+          
+          if (!recentServerErrors.has(errorMessage)) {
+            recentServerErrors.add(errorMessage);
+            
+            toast({
+              title: "Connection Error",
+              description: "Could not connect to the database. Please try again later.",
+              variant: "destructive",
+            });
+            
+            // Remove from recent errors after debounce time
+            setTimeout(() => {
+              recentServerErrors.delete(errorMessage);
+            }, SERVER_ERROR_DEBOUNCE_TIME);
+          }
         }
         
         // Return a valid Response object that will indicate the error
@@ -105,11 +120,22 @@ export const handleSupabaseError = (error: any, defaultMessage = "An error occur
   console.error("Supabase error:", error);
   
   const message = error?.message || defaultMessage;
-  toast({
-    title: "Database Error",
-    description: message,
-    variant: "destructive",
-  });
+  
+  // Only show toast if we haven't shown this error recently
+  if (!recentServerErrors.has(message)) {
+    recentServerErrors.add(message);
+    
+    toast({
+      title: "Database Error",
+      description: message,
+      variant: "destructive",
+    });
+    
+    // Remove from recent errors after debounce time
+    setTimeout(() => {
+      recentServerErrors.delete(message);
+    }, SERVER_ERROR_DEBOUNCE_TIME);
+  }
   
   return null;
 };
