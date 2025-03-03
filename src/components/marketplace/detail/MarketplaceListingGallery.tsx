@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -15,15 +15,22 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
+  useEffect(() => {
+    console.log("MarketplaceListingGallery mounted", { listingId, imageCount: images.length });
+  }, [listingId, images]);
+  
   const nextImage = () => {
+    console.log("Next image clicked", { currentIndex, total: images.length });
     setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
   };
   
   const prevImage = () => {
+    console.log("Previous image clicked", { currentIndex, total: images.length });
     setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
   };
   
   if (images.length === 0) {
+    console.log("No images available for gallery");
     return (
       <Card className="overflow-hidden">
         <CardContent className="p-0">
@@ -35,6 +42,8 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
     );
   }
   
+  console.log("Rendering gallery with current image:", currentIndex, images[currentIndex]);
+  
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0 relative">
@@ -45,6 +54,10 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
               src={images[currentIndex].url} 
               alt={images[currentIndex].type} 
               className="w-full h-full object-cover"
+              onError={(e) => {
+                console.error("Image failed to load:", images[currentIndex].url);
+                e.currentTarget.src = 'https://via.placeholder.com/800x450?text=Image+Not+Available';
+              }}
             />
           </div>
           
@@ -87,12 +100,19 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
                 key={image.id} 
                 className={`w-16 h-16 flex-shrink-0 cursor-pointer transition-all rounded overflow-hidden
                   ${currentIndex === index ? 'ring-2 ring-primary' : 'opacity-70 hover:opacity-100'}`}
-                onClick={() => setCurrentIndex(index)}
+                onClick={() => {
+                  console.log("Thumbnail clicked, switching to image index:", index);
+                  setCurrentIndex(index);
+                }}
               >
                 <img 
                   src={image.url} 
                   alt={image.type}
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    console.error("Thumbnail failed to load:", image.url);
+                    e.currentTarget.src = 'https://via.placeholder.com/100?text=Error';
+                  }}
                 />
               </div>
             ))}

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,8 +16,16 @@ const MarketplaceListingDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { listing, isLoading, error } = useMarketplaceListing(id || '');
+  
+  useEffect(() => {
+    console.log("MarketplaceListingDetail mounted with id:", id);
+    console.log("Current listing data:", listing);
+    console.log("Loading state:", isLoading);
+    console.log("Error state:", error);
+  }, [id, listing, isLoading, error]);
 
   if (isLoading) {
+    console.log("Rendering loading state for marketplace listing");
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -26,6 +34,7 @@ const MarketplaceListingDetail = () => {
   }
 
   if (error || !listing) {
+    console.error("Marketplace listing error or not found:", error);
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
         <h1 className="text-2xl font-bold">Listing Not Found</h1>
@@ -37,6 +46,8 @@ const MarketplaceListingDetail = () => {
     );
   }
 
+  console.log("Rendering marketplace listing detail:", listing.id, listing.title);
+  
   return (
     <>
       <Helmet>

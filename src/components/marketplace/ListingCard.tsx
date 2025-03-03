@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Card, 
   CardContent,
@@ -46,6 +46,7 @@ export const ListingCard = ({
   isFeatured = false
 }: ListingCardProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isWatched, setIsWatched] = React.useState(false);
   
   const handleWatchToggle = (e: React.MouseEvent) => {
@@ -59,11 +60,21 @@ export const ListingCard = ({
     });
   };
   
+  const handleCardClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    console.log("Card clicked, navigating to listing detail:", id);
+    navigate(`/marketplace/listing/${id}`);
+  };
+  
   const formattedDate = formatDistanceToNow(new Date(createdAt), { addSuffix: true });
   
   return (
     <Card className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow">
-      <Link to={`/marketplace/listing/${id}`} className="relative block">
+      <Link 
+        to={`/marketplace/listing/${id}`} 
+        className="relative block"
+        onClick={handleCardClick}
+      >
         <div 
           className="h-48 bg-cover bg-center w-full"
           style={{ backgroundImage: `url(${imageUrl})` }}
@@ -77,7 +88,11 @@ export const ListingCard = ({
       
       <CardHeader className="pb-2">
         <CardTitle className="text-lg truncate">
-          <Link to={`/marketplace/listing/${id}`} className="hover:underline">
+          <Link 
+            to={`/marketplace/listing/${id}`} 
+            className="hover:underline"
+            onClick={handleCardClick}
+          >
             {title}
           </Link>
         </CardTitle>

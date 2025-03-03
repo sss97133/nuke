@@ -48,6 +48,8 @@ export interface MarketplaceListing {
 
 // Mock data for a single listing
 const getMockListing = (id: string): MarketplaceListing => {
+  console.log("Creating mock listing with ID:", id);
+  
   return {
     id,
     title: `${new Date().getFullYear() - Math.floor(Math.random() * 20)} Honda Civic Type R - Low Miles, Excellent Condition`,
@@ -102,6 +104,7 @@ export function useMarketplaceListing(id: string) {
   
   useEffect(() => {
     const fetchListing = async () => {
+      console.log("Fetching marketplace listing with ID:", id);
       try {
         setIsLoading(true);
         setError(null);
@@ -120,6 +123,7 @@ export function useMarketplaceListing(id: string) {
         
         // For now, we'll use mock data
         const mockListing = getMockListing(id);
+        console.log("Mock listing created:", mockListing);
         setListing(mockListing);
       } catch (err) {
         console.error("Error fetching marketplace listing:", err);
@@ -131,11 +135,16 @@ export function useMarketplaceListing(id: string) {
         });
       } finally {
         setIsLoading(false);
+        console.log("Finished fetching marketplace listing");
       }
     };
     
     if (id) {
       fetchListing();
+    } else {
+      console.error("No listing ID provided to useMarketplaceListing hook");
+      setError("No listing ID provided");
+      setIsLoading(false);
     }
   }, [id, toast]);
   
