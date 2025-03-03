@@ -54,7 +54,15 @@ const BulkEntryForm: React.FC<BulkEntryFormProps> = ({
 
         const [title, vehicle] = parts;
         const date = parts[2] || new Date().toLocaleDateString();
-        const status = parts[3]?.toLowerCase() as "upcoming" | "completed" | "overdue" || "upcoming";
+        
+        // Ensure status is one of the allowed values
+        let status: "upcoming" | "completed" | "overdue" = "upcoming";
+        if (parts[3]) {
+          const inputStatus = parts[3].toLowerCase();
+          if (inputStatus === "completed" || inputStatus === "overdue") {
+            status = inputStatus;
+          }
+        }
         
         // Check for duplicates based on title and vehicle
         const key = `${title.toLowerCase()}-${vehicle.toLowerCase()}`;

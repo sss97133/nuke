@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -134,14 +133,13 @@ const Maintenance = () => {
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const { toast } = useToast();
 
-  // Function to handle new items from bulk entry
   const handleBulkEntry = (newItems: MaintenanceItem[]) => {
     if (activeTab === "upcoming") {
       setMaintenanceItems(prev => [
         ...prev,
         ...newItems.map(item => ({
           ...item,
-          status: "upcoming"
+          status: "upcoming" as "upcoming" | "completed" | "overdue"
         }))
       ]);
     } else if (activeTab === "history") {
@@ -149,7 +147,7 @@ const Maintenance = () => {
         ...prev,
         ...newItems.map(item => ({
           ...item,
-          status: "completed"
+          status: "completed" as "upcoming" | "completed" | "overdue"
         }))
       ]);
     }
@@ -160,7 +158,6 @@ const Maintenance = () => {
     });
   };
 
-  // Function to handle updates from bulk edit
   const handleBulkEdit = (updatedItems: MaintenanceItem[]) => {
     if (activeTab === "upcoming") {
       setMaintenanceItems(updatedItems);
@@ -300,14 +297,12 @@ const Maintenance = () => {
         )}
       </div>
 
-      {/* Bulk Entry Dialog */}
       <BulkEntryForm 
         isOpen={isBulkEntryOpen}
         onClose={() => setIsBulkEntryOpen(false)}
         onSubmit={handleBulkEntry}
       />
 
-      {/* Bulk Edit Dialog */}
       <BulkEditForm 
         isOpen={isBulkEditOpen}
         onClose={() => setIsBulkEditOpen(false)}
