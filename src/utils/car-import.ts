@@ -73,6 +73,8 @@ export async function importCarsToSupabase(carData: CarImportData[]): Promise<st
       const carRecord = {
         ...car,
         user_id: user.id,
+        // Ensure year is a number for Supabase schema
+        year: typeof car.year === 'string' ? parseInt(car.year, 10) : car.year
       };
       
       // Insert or update the car record
