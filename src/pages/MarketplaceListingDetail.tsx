@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,11 +11,13 @@ import MarketplaceListingGallery from '@/components/marketplace/detail/Marketpla
 import MarketplaceListingDetails from '@/components/marketplace/detail/MarketplaceListingDetails';
 import MarketplaceListingComments from '@/components/marketplace/detail/MarketplaceListingComments';
 import MarketplaceListingContact from '@/components/marketplace/detail/MarketplaceListingContact';
+import ModificationAssessment from '@/components/marketplace/detail/ModificationAssessment';
 
 const MarketplaceListingDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { listing, isLoading, error } = useMarketplaceListing(id || '');
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   
   useEffect(() => {
     console.log("MarketplaceListingDetail mounted with id:", id);
@@ -55,6 +57,10 @@ const MarketplaceListingDetail = () => {
 
   console.log("Rendering marketplace listing detail:", listing.id, listing.title);
   
+  const handleImageSelect = (index: number) => {
+    setSelectedImageIndex(index);
+  };
+  
   return (
     <>
       <Helmet>
@@ -73,7 +79,20 @@ const MarketplaceListingDetail = () => {
             {/* Main content - 2/3 width on desktop */}
             <div className="lg:col-span-2 space-y-6">
               <MarketplaceListingHeader listing={listing} />
-              <MarketplaceListingGallery listingId={listing.id} images={listing.images || []} />
+              <MarketplaceListingGallery 
+                listingId={listing.id} 
+                images={listing.images || []} 
+                onImageSelect={handleImageSelect}
+              />
+              <ModificationAssessment 
+                listingId={listing.id}
+                images={listing.images || []}
+                selectedIndex={selectedImageIndex}
+                vehicleMake={listing.vehicle.make}
+                vehicleModel={listing.vehicle.model}
+                vehicleYear={listing.vehicle.year}
+                initialValue={listing.price}
+              />
               <MarketplaceListingDetails listing={listing} />
               <MarketplaceListingComments listingId={listing.id} />
             </div>

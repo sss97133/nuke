@@ -13,11 +13,13 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 interface MarketplaceListingGalleryProps {
   listingId: string;
   images: string[];
+  onImageSelect?: (index: number) => void;
 }
 
 const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({ 
   listingId, 
-  images 
+  images,
+  onImageSelect
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   
@@ -37,6 +39,13 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
       console.log("MarketplaceListingGallery unmounted");
     };
   }, [listingId, images]);
+
+  // Update parent component when selected image changes
+  useEffect(() => {
+    if (onImageSelect) {
+      onImageSelect(selectedIndex);
+    }
+  }, [selectedIndex, onImageSelect]);
 
   if (!images || images.length === 0) {
     console.log("No images provided for gallery");
