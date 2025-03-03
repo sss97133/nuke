@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ const WebImportTab: React.FC<WebImportTabProps> = ({ className }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUrl(e.target.value);
@@ -96,6 +97,7 @@ const WebImportTab: React.FC<WebImportTabProps> = ({ className }) => {
   }, [toast]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("File input change triggered");
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
@@ -132,6 +134,14 @@ const WebImportTab: React.FC<WebImportTabProps> = ({ className }) => {
 
   const clearFile = () => {
     setSelectedFile(null);
+  };
+
+  const handleBrowseClick = () => {
+    console.log("Browse button clicked");
+    if (fileInputRef.current) {
+      console.log("Triggering file input click");
+      fileInputRef.current.click();
+    }
   };
 
   return (
@@ -175,13 +185,16 @@ const WebImportTab: React.FC<WebImportTabProps> = ({ className }) => {
                   id="web-file-upload"
                   onChange={handleFileChange}
                   accept=".html,.xml,.json,.csv"
+                  ref={fileInputRef}
                 />
-                <Label htmlFor="web-file-upload" className="cursor-pointer">
-                  <Button variant="outline" type="button">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Browse Web Files
-                  </Button>
-                </Label>
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={handleBrowseClick}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Browse Web Files
+                </Button>
                 <p className="text-xs text-muted-foreground mt-2">
                   Supported formats: HTML, XML, JSON, CSV (Max 10MB)
                 </p>
