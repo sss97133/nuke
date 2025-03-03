@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,8 @@ interface VehicleCardProps extends VehicleActionHandlers {
 }
 
 const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) => {
+  const navigate = useNavigate();
+  
   // Function to format mileage to k format
   const formatMileage = (miles: number) => {
     return miles >= 1000 ? `${Math.round(miles / 1000)}k` : miles.toString();
@@ -24,9 +27,16 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
     return match ? match[1] : timeString;
   };
 
+  const handleCardClick = () => {
+    navigate(`/vehicle/${vehicle.id}`);
+  };
+
   return (
     <Card className="overflow-hidden">
-      <div className="aspect-video bg-muted relative overflow-hidden h-40">
+      <div 
+        className="aspect-video bg-muted relative overflow-hidden h-40 cursor-pointer"
+        onClick={handleCardClick}
+      >
         <div className="absolute top-2 right-2 flex gap-2">
           <Button variant="outline" size="icon" className="h-7 w-7 bg-background/80 backdrop-blur-sm">
             <Heart className="h-3.5 w-3.5" />
@@ -53,7 +63,10 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
           )}
         </div>
       </div>
-      <CardHeader className="p-3 pb-0">
+      <CardHeader 
+        className="p-3 pb-0 cursor-pointer"
+        onClick={handleCardClick}
+      >
         <div className="flex justify-between items-start">
           <div>
             <CardTitle className="text-sm font-medium">
@@ -77,7 +90,10 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-3 pb-1">
+      <CardContent 
+        className="p-3 pb-1 cursor-pointer"
+        onClick={handleCardClick}
+      >
         <div className="grid grid-cols-3 gap-2 text-xs">
           <div className="flex items-center" title="Mileage">
             <Clock className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
@@ -99,15 +115,24 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
         </div>
       </CardContent>
       <CardFooter className="border-t px-3 py-2 flex flex-wrap gap-1">
-        <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => onVerify(vehicle.id)}>
+        <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={(e) => {
+          e.stopPropagation(); // Prevent navigation to detail page
+          onVerify(vehicle.id);
+        }}>
           <CheckCircle className="h-3.5 w-3.5 mr-1" />
           Verify
         </Button>
-        <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => onEdit(vehicle.id)}>
+        <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={(e) => {
+          e.stopPropagation(); // Prevent navigation to detail page
+          onEdit(vehicle.id);
+        }}>
           <Edit className="h-3.5 w-3.5 mr-1" />
           Edit
         </Button>
-        <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-destructive hover:text-destructive" onClick={() => onRemove(vehicle.id)}>
+        <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-destructive hover:text-destructive" onClick={(e) => {
+          e.stopPropagation(); // Prevent navigation to detail page
+          onRemove(vehicle.id);
+        }}>
           <Trash2 className="h-3.5 w-3.5 mr-1" />
           Remove
         </Button>

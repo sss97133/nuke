@@ -28,6 +28,7 @@ import Service from "./pages/Service"
 import Studio from "./pages/Studio"
 import Explore from "./pages/Explore"
 import ExploreContentManagement from './pages/ExploreContentManagement'
+import VehicleDetail from './pages/VehicleDetail' // Add the import for the new page
 
 const queryClient = new QueryClient();
 
@@ -108,6 +109,7 @@ function AppContent() {
           <Route path="/documentation" element={<Documentation />} />
           <Route path="/import" element={<Import />} />
           <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
+          <Route path="/vehicle/:id" element={<VehicleDetail />} /> {/* Add the new route */}
           <Route path="/profile" element={<Profile />} />
           <Route path="/professional-dashboard" element={<Profile />} />
           <Route path="/studio" element={<Studio />} />

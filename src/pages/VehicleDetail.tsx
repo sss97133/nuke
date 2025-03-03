@@ -1,0 +1,188 @@
+
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useToast } from "@/components/ui/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Vehicle } from '@/components/vehicles/discovery/types';
+import VehicleDetailHeader from '@/components/vehicles/detail/VehicleDetailHeader';
+import VehicleSpecifications from '@/components/vehicles/detail/VehicleSpecifications';
+import VehicleHistory from '@/components/vehicles/detail/VehicleHistory';
+import VehicleMarketData from '@/components/vehicles/detail/VehicleMarketData';
+import VehicleGallery from '@/components/vehicles/detail/VehicleGallery';
+import { ArrowLeft } from 'lucide-react';
+
+const VehicleDetail = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // In a real app, this would fetch from your API
+  useEffect(() => {
+    // Simulating API fetch for now
+    const fetchVehicle = async () => {
+      try {
+        setLoading(true);
+        
+        // Mock data - in a real app, this would be an API call
+        // This is just to simulate fetching a specific vehicle by ID
+        const mockVehicles = [
+          {
+            id: 1,
+            make: "Toyota",
+            model: "Supra",
+            year: 1998,
+            price: 62500,
+            market_value: 65000,
+            price_trend: "up",
+            mileage: 42000,
+            image: "/placeholder.png",
+            location: "Los Angeles, CA",
+            added: "2 days ago",
+            tags: ["Rare", "Sports Car"],
+            condition_rating: 8,
+            vehicle_type: "sports car",
+            body_type: "Coupe",
+            transmission: "Manual",
+            drivetrain: "RWD",
+            rarity_score: 7
+          },
+          {
+            id: 2,
+            make: "Ford",
+            model: "Mustang",
+            year: 1967,
+            price: 78900,
+            market_value: 80000,
+            price_trend: "stable",
+            mileage: 89000,
+            image: "/placeholder.png",
+            location: "Chicago, IL",
+            added: "5 days ago",
+            tags: ["Classic", "American"],
+            condition_rating: 7,
+            vehicle_type: "muscle car",
+            body_type: "Coupe",
+            transmission: "Manual",
+            drivetrain: "RWD",
+            era: "Classic",
+            rarity_score: 6
+          },
+          {
+            id: 3,
+            make: "Honda",
+            model: "Civic Type R",
+            year: 2021,
+            price: 42000,
+            market_value: 40000,
+            price_trend: "down",
+            mileage: 12000,
+            image: "/placeholder.png",
+            location: "Seattle, WA",
+            added: "1 week ago",
+            tags: ["Hot Hatch", "Modified"],
+            condition_rating: 9,
+            vehicle_type: "hatchback",
+            body_type: "Hatchback",
+            transmission: "Manual",
+            drivetrain: "FWD",
+            restoration_status: "modified"
+          },
+        ];
+        
+        const foundVehicle = mockVehicles.find(v => v.id === parseInt(id || '0'));
+        
+        if (foundVehicle) {
+          setVehicle(foundVehicle as Vehicle);
+        } else {
+          toast({
+            title: "Vehicle not found",
+            description: "The requested vehicle could not be found.",
+            variant: "destructive",
+          });
+          navigate("/discovered-vehicles");
+        }
+      } catch (error) {
+        console.error("Error fetching vehicle:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load vehicle details. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchVehicle();
+    }
+  }, [id, navigate, toast]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!vehicle) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
+        <h1 className="text-2xl font-bold">Vehicle Not Found</h1>
+        <p className="text-muted-foreground">The vehicle you are looking for does not exist.</p>
+        <Button onClick={() => navigate("/discovered-vehicles")}>
+          Return to Vehicles
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-screen">
+      <div className="container max-w-6xl p-6 space-y-6">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate("/discovered-vehicles")}
+          className="mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Vehicles
+        </Button>
+        
+        <VehicleDetailHeader vehicle={vehicle} />
+        
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid grid-cols-4 md:w-[400px]">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="gallery">Gallery</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="market">Market</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="details" className="mt-6">
+            <VehicleSpecifications vehicle={vehicle} />
+          </TabsContent>
+          
+          <TabsContent value="gallery" className="mt-6">
+            <VehicleGallery vehicle={vehicle} />
+          </TabsContent>
+          
+          <TabsContent value="history" className="mt-6">
+            <VehicleHistory vehicle={vehicle} />
+          </TabsContent>
+          
+          <TabsContent value="market" className="mt-6">
+            <VehicleMarketData vehicle={vehicle} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </ScrollArea>
+  );
+};
+
+export default VehicleDetail;
