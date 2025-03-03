@@ -11,6 +11,7 @@ import VehicleSpecifications from '@/components/vehicles/detail/VehicleSpecifica
 import VehicleHistory from '@/components/vehicles/detail/VehicleHistory';
 import VehicleMarketData from '@/components/vehicles/detail/VehicleMarketData';
 import VehicleGallery from '@/components/vehicles/detail/VehicleGallery';
+import VehicleComments from '@/components/vehicles/detail/VehicleComments';
 import { ArrowLeft } from 'lucide-react';
 import { mockVehicles } from '@/hooks/vehicles/mockVehicleData';
 import { useVehicleDetail } from '@/hooks/vehicles/useVehicleDetail';
@@ -56,11 +57,12 @@ const VehicleDetail = () => {
         <VehicleDetailHeader vehicle={vehicle} />
         
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid grid-cols-4 md:w-[400px]">
+          <TabsList className="grid grid-cols-5 md:w-[500px]">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="gallery">Gallery</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="market">Market</TabsTrigger>
+            <TabsTrigger value="comments">Comments</TabsTrigger>
           </TabsList>
           
           <TabsContent value="details" className="mt-6">
@@ -77,6 +79,10 @@ const VehicleDetail = () => {
           
           <TabsContent value="market" className="mt-6">
             <VehicleMarketData vehicle={vehicle} />
+          </TabsContent>
+          
+          <TabsContent value="comments" className="mt-6">
+            <VehicleComments vehicle={vehicle} />
           </TabsContent>
         </Tabs>
       </div>
