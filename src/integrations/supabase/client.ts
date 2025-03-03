@@ -31,27 +31,59 @@ export const supabase = createClient<Database>(
         let retries = 0;
         let error;
         
+        // Progressive backoff delay calculation
+        const getBackoffDelay = (attempt: number) => {
+          return Math.min(1000 * Math.pow(2, attempt), 10000); // Cap at 10 seconds
+        };
+        
         while (retries < MAX_RETRIES) {
           try {
             const response = await fetch(url, options);
-            if (!response.ok) {
-              throw new Error(`HTTP error! Status: ${response.status}`);
+            
+            // Handle rate limiting (429) with special retry logic
+            if (response.status === 429) {
+              retries++;
+              const retryAfter = response.headers.get('Retry-After');
+              const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : getBackoffDelay(retries);
+              console.warn(`Rate limited. Retrying after ${waitTime}ms`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+              continue;
             }
+            
+            // For other server errors, check if we should retry
+            if (response.status >= 500) {
+              if (retries < MAX_RETRIES - 1) {
+                retries++;
+                console.warn(`Server error (${response.status}). Attempt ${retries}/${MAX_RETRIES}. Retrying...`);
+                await new Promise(resolve => setTimeout(resolve, getBackoffDelay(retries)));
+                continue;
+              }
+            }
+            
             return response;
           } catch (err) {
             error = err;
             retries++;
-            console.warn(`Fetch attempt ${retries} failed: ${url}`, err);
+            console.warn(`Network error on attempt ${retries}/${MAX_RETRIES}:`, err);
             
             // Wait before retry (exponential backoff)
             if (retries < MAX_RETRIES) {
-              await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retries)));
+              await new Promise(resolve => setTimeout(resolve, getBackoffDelay(retries)));
             }
           }
         }
         
         // All retries failed
         console.error(`Failed to fetch after ${MAX_RETRIES} attempts:`, error);
+        
+        // Show a toast when all retries have failed
+        if (typeof window !== 'undefined') {
+          toast({
+            title: "Connection Error",
+            description: "Could not connect to the database. Please check your connection and try again.",
+            variant: "destructive",
+          });
+        }
         
         // Return a valid Response object that will indicate the error
         return new Response(JSON.stringify({
