@@ -1,10 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VehicleFilters from '../components/vehicles/discovery/VehicleFilters';
 import BulkActions from '../components/vehicles/discovery/BulkActions';
-import VehicleTabContent from '../components/vehicles/discovery/VehicleTabContent';
 import { Vehicle, SortDirection, SortField } from '../components/vehicles/discovery/types';
+import AllVehiclesTab from '../components/vehicles/discovery/tabs/AllVehiclesTab';
+import ClassicVehiclesTab from '../components/vehicles/discovery/tabs/ClassicVehiclesTab';
+import SportsVehiclesTab from '../components/vehicles/discovery/tabs/SportsVehiclesTab';
+import ModifiedVehiclesTab from '../components/vehicles/discovery/tabs/ModifiedVehiclesTab';
+import RareVehiclesTab from '../components/vehicles/discovery/tabs/RareVehiclesTab';
 
 const DiscoveredVehicles = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -132,28 +136,6 @@ const DiscoveredVehicles = () => {
     setBulkActionOpen(false);
   };
   
-  const filteredAndSortedVehicles = useMemo(() => {
-    let result = vehicles.filter(vehicle => {
-      const searchString = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.location}`.toLowerCase();
-      return searchString.includes(searchTerm.toLowerCase());
-    });
-    
-    return result.sort((a, b) => {
-      const field = sortField;
-      const direction = sortDirection === 'asc' ? 1 : -1;
-      
-      if (field === 'added') {
-        return direction * (a[field].localeCompare(b[field]));
-      }
-      
-      if (typeof a[field] === 'string' && typeof b[field] === 'string') {
-        return direction * (a[field] as string).localeCompare(b[field] as string);
-      }
-      
-      return direction * ((a[field] as number) - (b[field] as number));
-    });
-  }, [vehicles, searchTerm, sortField, sortDirection]);
-  
   return (
     <ScrollArea className="h-[calc(100vh-4rem)]">
       <div className="container max-w-7xl p-6 space-y-6">
@@ -195,9 +177,9 @@ const DiscoveredVehicles = () => {
           </TabsList>
           
           <TabsContent value="all" className="m-0">
-            <VehicleTabContent 
+            <AllVehiclesTab 
               vehicles={vehicles}
-              filteredVehicles={filteredAndSortedVehicles}
+              searchTerm={searchTerm}
               viewMode={viewMode}
               selectedVehicles={selectedVehicles}
               toggleVehicleSelection={toggleVehicleSelection}
@@ -210,9 +192,8 @@ const DiscoveredVehicles = () => {
           </TabsContent>
           
           <TabsContent value="classic" className="m-0">
-            <VehicleTabContent 
+            <ClassicVehiclesTab 
               vehicles={vehicles}
-              filteredVehicles={vehicles.filter(v => v.year < 1990)}
               viewMode={viewMode}
               selectedVehicles={selectedVehicles}
               toggleVehicleSelection={toggleVehicleSelection}
@@ -225,9 +206,8 @@ const DiscoveredVehicles = () => {
           </TabsContent>
           
           <TabsContent value="sports" className="m-0">
-            <VehicleTabContent 
+            <SportsVehiclesTab 
               vehicles={vehicles}
-              filteredVehicles={vehicles.filter(v => v.tags.includes("Sports Car"))}
               viewMode={viewMode}
               selectedVehicles={selectedVehicles}
               toggleVehicleSelection={toggleVehicleSelection}
@@ -240,9 +220,8 @@ const DiscoveredVehicles = () => {
           </TabsContent>
           
           <TabsContent value="modified" className="m-0">
-            <VehicleTabContent 
+            <ModifiedVehiclesTab 
               vehicles={vehicles}
-              filteredVehicles={vehicles.filter(v => v.tags.includes("Modified"))}
               viewMode={viewMode}
               selectedVehicles={selectedVehicles}
               toggleVehicleSelection={toggleVehicleSelection}
@@ -255,9 +234,8 @@ const DiscoveredVehicles = () => {
           </TabsContent>
           
           <TabsContent value="rare" className="m-0">
-            <VehicleTabContent 
+            <RareVehiclesTab 
               vehicles={vehicles}
-              filteredVehicles={vehicles.filter(v => v.tags.includes("Rare"))}
               viewMode={viewMode}
               selectedVehicles={selectedVehicles}
               toggleVehicleSelection={toggleVehicleSelection}
