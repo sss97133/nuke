@@ -3,7 +3,9 @@ import React from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Info, ThumbsUp, Share2, Bookmark, ExternalLink } from 'lucide-react';
+import { MapPin, Info, ThumbsUp, Share2, Bookmark, ExternalLink, User, Eye, Clock } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export interface ContentCardItem {
   id: string;
@@ -16,15 +18,25 @@ export interface ContentCardItem {
   location: string;
   relevanceScore: number;
   trending?: string;
+  created_at?: string;
+  creator_id?: string;
+  creator_name?: string;
+  creator_avatar?: string;
+  view_count?: number;
+  like_count?: number;
+  share_count?: number;
+  save_count?: number;
+  is_liked?: boolean;
+  is_saved?: boolean;
 }
 
 interface ContentCardProps {
   item: ContentCardItem;
   showTrending?: boolean;
-  onView?: (id: string) => void;
-  onLike?: (id: string) => void;
-  onShare?: (id: string) => void;
-  onSave?: (id: string) => void;
+  onView?: (id: string, type: string) => void;
+  onLike?: (id: string, type: string) => void;
+  onShare?: (id: string, type: string) => void;
+  onSave?: (id: string, type: string) => void;
 }
 
 export const ContentCard = ({ 
@@ -35,7 +47,27 @@ export const ContentCard = ({
   onShare,
   onSave 
 }: ContentCardProps) => {
-  const { id, title, subtitle, image, tags, location, reason, type, trending } = item;
+  const { 
+    id, 
+    title, 
+    subtitle, 
+    image, 
+    tags, 
+    location, 
+    reason, 
+    type, 
+    trending,
+    created_at,
+    creator_id,
+    creator_name,
+    creator_avatar,
+    view_count,
+    like_count,
+    share_count,
+    save_count,
+    is_liked,
+    is_saved
+  } = item;
   
   // Choose background color based on content type
   const getBgColor = () => {
@@ -58,9 +90,19 @@ export const ContentCard = ({
   // Track view when card is rendered
   React.useEffect(() => {
     if (onView) {
-      onView(id);
+      onView(id, type);
     }
-  }, [id, onView]);
+  }, [id, type, onView]);
+
+  // Format timestamp to relative time
+  const getRelativeTime = (timestamp?: string) => {
+    if (!timestamp) return '';
+    try {
+      return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+    } catch (e) {
+      return '';
+    }
+  };
   
   return (
     <Card className={`overflow-hidden ${getBgColor()} border-0 shadow-md`}>
@@ -75,6 +117,8 @@ export const ContentCard = ({
             target.src = 'https://images.unsplash.com/photo-1550615306-a605768c7323?auto=format&fit=crop&w=600&q=80';
           }}
         />
+        
+        {/* Content type badge */}
         <div className="absolute top-2 left-2">
           <Badge variant="secondary" className="capitalize font-medium">
             {type}
@@ -88,9 +132,36 @@ export const ContentCard = ({
             </Badge>
           </div>
         )}
+        
+        {/* View count badge */}
+        {view_count && view_count > 0 && (
+          <div className="absolute bottom-2 right-2">
+            <Badge variant="outline" className="bg-black/60 text-white dark:bg-white/20 flex items-center gap-1">
+              <Eye className="h-3 w-3" />
+              {view_count > 1000 ? `${(view_count / 1000).toFixed(1)}K` : view_count}
+            </Badge>
+          </div>
+        )}
       </div>
       
       <CardHeader className="pb-2">
+        {/* Creator info */}
+        {creator_id && (
+          <div className="flex items-center gap-2 mb-2">
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={creator_avatar} />
+              <AvatarFallback>{creator_name?.charAt(0) || 'U'}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium truncate">{creator_name || 'Unknown user'}</span>
+            {created_at && (
+              <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {getRelativeTime(created_at)}
+              </span>
+            )}
+          </div>
+        )}
+        
         <h3 className="text-lg font-semibold leading-tight">{title}</h3>
         <p className="text-sm text-muted-foreground">{subtitle}</p>
       </CardHeader>
@@ -127,30 +198,33 @@ export const ContentCard = ({
         
         <div className="flex justify-between w-full">
           <Button 
-            variant="ghost" 
+            variant={is_liked ? "default" : "ghost"}
             size="sm" 
-            className="flex-1"
-            onClick={() => onLike && onLike(id)}
+            className="flex-1 flex items-center gap-1"
+            onClick={() => onLike && onLike(id, type)}
           >
             <ThumbsUp className="h-4 w-4" />
+            {like_count && like_count > 0 && <span className="text-xs">{like_count}</span>}
           </Button>
           
           <Button 
             variant="ghost" 
             size="sm" 
-            className="flex-1"
-            onClick={() => onShare && onShare(id)}
+            className="flex-1 flex items-center gap-1"
+            onClick={() => onShare && onShare(id, type)}
           >
             <Share2 className="h-4 w-4" />
+            {share_count && share_count > 0 && <span className="text-xs">{share_count}</span>}
           </Button>
           
           <Button 
-            variant="ghost" 
+            variant={is_saved ? "default" : "ghost"}
             size="sm" 
-            className="flex-1"
-            onClick={() => onSave && onSave(id)}
+            className="flex-1 flex items-center gap-1"
+            onClick={() => onSave && onSave(id, type)}
           >
             <Bookmark className="h-4 w-4" />
+            {save_count && save_count > 0 && <span className="text-xs">{save_count}</span>}
           </Button>
         </div>
       </CardFooter>

@@ -135,12 +135,22 @@ export const InterestsFeed = ({ filter }: InterestsFeedProps) => {
                   tags: item.tags,
                   reason: item.reason || "Based on your interests",
                   location: item.location,
-                  relevanceScore: item.relevance_score
+                  relevanceScore: item.relevance_score,
+                  created_at: item.created_at,
+                  creator_id: item.creator_id,
+                  creator_name: item.creator_name,
+                  creator_avatar: item.creator_avatar,
+                  view_count: item.view_count,
+                  like_count: item.like_count,
+                  share_count: item.share_count,
+                  save_count: item.save_count,
+                  is_liked: item.is_liked,
+                  is_saved: item.is_saved
                 }} 
-                onView={trackContentView}
-                onLike={likeContent}
-                onShare={shareContent}
-                onSave={saveContent}
+                onView={(id, type) => trackContentView(id, type)}
+                onLike={(id, type) => likeContent(id, type)}
+                onShare={(id, type) => shareContent(id, type)}
+                onSave={(id, type) => saveContent(id, type)}
               />
             </div>
           );
