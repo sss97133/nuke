@@ -25,7 +25,8 @@ import {
   Wallet,
   Coins,
   Video,
-  Atom
+  Atom,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -83,6 +84,7 @@ export const NavSidebar = () => {
     { to: "/documentation", icon: <FileText className="h-5 w-5" />, label: "Documentation" },
     { to: "/import", icon: <FileInput className="h-5 w-5" />, label: "Import" },
     { to: "/discovered-vehicles", icon: <Car className="h-5 w-5" />, label: "Vehicles" },
+    { to: "/team-members", icon: <Users className="h-5 w-5" />, label: "Team Members" },
     { to: "/profile", icon: <User className="h-5 w-5" />, label: "Profile" },
   ];
 

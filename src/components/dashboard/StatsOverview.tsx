@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Car, Wrench, Users, TrendingUp } from "lucide-react";
 import StatCard from './StatCard';
@@ -112,7 +111,7 @@ const StatsOverview = () => {
         value={isLoading ? "Loading..." : statsData.teamMembers}
         description={isLoading ? "" : parseInt(statsData.teamMembers) > 0 ? "Click to manage your team" : "No team members yet"}
         icon={Users}
-        onClick={() => handleNavigate('/profile')}
+        onClick={() => handleNavigate('/team-members')}
       />
       <StatCard
         title="Market Value"

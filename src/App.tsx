@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -28,7 +29,8 @@ import Service from "./pages/Service"
 import Studio from "./pages/Studio"
 import Explore from "./pages/Explore"
 import ExploreContentManagement from './pages/ExploreContentManagement'
-import VehicleDetail from './pages/VehicleDetail' // Add the import for the new page
+import VehicleDetail from './pages/VehicleDetail'
+import TeamMembers from './pages/TeamMembers' // Add the import for TeamMembers page
 
 const queryClient = new QueryClient();
 
@@ -109,8 +111,9 @@ function AppContent() {
           <Route path="/documentation" element={<Documentation />} />
           <Route path="/import" element={<Import />} />
           <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
-          <Route path="/vehicle/:id" element={<VehicleDetail />} /> {/* Add the new route */}
+          <Route path="/vehicle/:id" element={<VehicleDetail />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/team-members" element={<TeamMembers />} />
           <Route path="/professional-dashboard" element={<Profile />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/explore" element={<Explore />} />
