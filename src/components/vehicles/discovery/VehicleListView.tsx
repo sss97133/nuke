@@ -115,7 +115,7 @@ const VehicleListView = ({
             </div>
             <div className="col-span-1 text-xs">{vehicle.year}</div>
             <div className="col-span-2 font-semibold text-xs">${vehicle.price.toLocaleString()}</div>
-            <div className="col-span-1 text-xs">{formatMileage(vehicle.mileage)} mi</div>
+            <div className="col-span-1 text-xs">{formatMileage(vehicle.mileage)}</div>
             <div className="col-span-1 text-xs">{extractDays(vehicle.added)}</div>
             <div className="col-span-2 flex justify-end gap-1">
               <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onVerify(vehicle.id)}>

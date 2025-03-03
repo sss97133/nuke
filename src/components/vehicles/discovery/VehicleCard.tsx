@@ -70,7 +70,7 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="flex items-center">
             <Clock className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-            <span>{formatMileage(vehicle.mileage)} mi</span>
+            <span>{formatMileage(vehicle.mileage)}</span>
           </div>
           <div className="flex items-center">
             <Calendar className="h-3.5 w-3.5 mr-1 text-muted-foreground" />

@@ -115,7 +115,7 @@ const VehicleTable = ({
               <TableCell>{vehicle.year}</TableCell>
               <TableCell>{vehicle.location}</TableCell>
               <TableCell>${vehicle.price.toLocaleString()}</TableCell>
-              <TableCell>{formatMileage(vehicle.mileage)} mi</TableCell>
+              <TableCell>{formatMileage(vehicle.mileage)}</TableCell>
               <TableCell>{extractDays(vehicle.added)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
