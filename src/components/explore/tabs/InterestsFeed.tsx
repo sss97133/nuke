@@ -63,7 +63,6 @@ export const InterestsFeed = ({ filter }: InterestsFeedProps) => {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
-          <h3 className="text-xl font-medium">Based on Your Interests</h3>
           <span className="text-sm text-muted-foreground">
             (Loading...)
           </span>
@@ -110,7 +109,6 @@ export const InterestsFeed = ({ filter }: InterestsFeedProps) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <h3 className="text-xl font-medium">Based on Your Interests</h3>
         <span className="text-sm text-muted-foreground">
           ({feedItems.length} items)
         </span>
