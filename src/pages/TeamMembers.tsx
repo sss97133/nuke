@@ -13,9 +13,21 @@ import { BusinessPartnersList } from '@/components/team/BusinessPartnersList';
 import { MediaList } from '@/components/team/MediaList';
 import { OtherMembersList } from '@/components/team/OtherMembersList';
 import { RoleReferenceTable } from '@/components/team/RoleReferenceTable';
+import { AddTeamMemberForm } from '@/components/team/AddTeamMemberForm';
 
 const TeamMembers = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
+
+  const handleAddTeamMember = () => {
+    setIsAddMemberDialogOpen(true);
+  };
+
+  const handleFormSuccess = () => {
+    // This is where we would refresh the team members list
+    // For now, we'll just close the dialog
+    setIsAddMemberDialogOpen(false);
+  };
 
   return (
     <ScrollArea className="h-[calc(100vh-4rem)]">
@@ -25,7 +37,7 @@ const TeamMembers = () => {
             <h1 className="text-3xl font-bold">Team Members</h1>
             <p className="text-muted-foreground">Manage your network of professionals and collaborators</p>
           </div>
-          <Button>
+          <Button onClick={handleAddTeamMember}>
             <UserPlus className="h-4 w-4 mr-2" />
             Add Team Member
           </Button>
@@ -84,6 +96,13 @@ const TeamMembers = () => {
             </CardContent>
           </Card>
         )}
+        
+        {/* Add Team Member Dialog */}
+        <AddTeamMemberForm 
+          open={isAddMemberDialogOpen} 
+          onOpenChange={setIsAddMemberDialogOpen}
+          onSuccess={handleFormSuccess} 
+        />
       </div>
     </ScrollArea>
   );
