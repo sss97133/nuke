@@ -11,13 +11,16 @@ interface StatCardProps {
 }
 
 export const StatCard = ({ title, value, description, icon: Icon, onClick }: StatCardProps) => {
-  // Add console log to verify StatCard renders
-  console.log(`Rendering StatCard: ${title}`);
+  // Add console log to verify when card is clicked
+  const handleClick = () => {
+    console.log(`StatCard clicked: ${title}`);
+    if (onClick) onClick();
+  };
   
   return (
     <Card 
       className={`${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-      onClick={onClick}
+      onClick={handleClick}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>

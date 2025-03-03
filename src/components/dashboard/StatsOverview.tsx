@@ -87,6 +87,7 @@ const StatsOverview = () => {
   }, [toast]);
 
   const handleNavigate = (path: string) => {
+    console.log(`Navigating to: ${path}`);
     navigate(path);
   };
 
