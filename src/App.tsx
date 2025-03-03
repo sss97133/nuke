@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { useAuthState } from './hooks/auth/use-auth-state'
 import { AuthForm } from './components/auth/AuthForm'
+import { NetworkStatus } from './components/ui/network-status'
 import Profile from "./pages/Profile"
 import Dashboard from "./pages/Dashboard"
 import Onboarding from "./pages/Onboarding"
@@ -33,7 +33,16 @@ import ExploreContentManagement from './pages/ExploreContentManagement'
 import VehicleDetail from './pages/VehicleDetail'
 import TeamMembers from './pages/TeamMembers'
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 3,
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false
+    }
+  }
+});
 
 function AppContent() {
   const { loading, session } = useAuthState();
@@ -132,6 +141,7 @@ function App() {
         <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
           <div className="App">
             <Toaster />
+            <NetworkStatus />
             <AppContent />
           </div>
         </ThemeProvider>
