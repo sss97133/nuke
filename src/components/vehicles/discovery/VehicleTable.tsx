@@ -3,13 +3,15 @@ import React from 'react';
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Edit, Trash2 } from 'lucide-react';
+import { CheckCircle, Edit, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { Vehicle, VehicleActionHandlers } from './types';
 
 interface VehicleTableProps extends VehicleActionHandlers {
   vehicles: Vehicle[];
   selectedVehicles: number[];
   toggleVehicleSelection: (id: number) => void;
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
 }
 
 const VehicleTable = ({ 
@@ -18,8 +20,18 @@ const VehicleTable = ({
   toggleVehicleSelection,
   onVerify,
   onEdit,
-  onRemove
+  onRemove,
+  sortField,
+  sortDirection
 }: VehicleTableProps) => {
+  // Helper function to render sort icon
+  const renderSortIcon = (field: string) => {
+    if (sortField === field) {
+      return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4 ml-1" /> : <ArrowDown className="h-4 w-4 ml-1" />;
+    }
+    return null;
+  };
+
   return (
     <Card>
       <Table>
@@ -29,7 +41,7 @@ const VehicleTable = ({
               <input 
                 type="checkbox"
                 className="translate-y-[2px]"
-                checked={selectedVehicles.length === vehicles.length}
+                checked={selectedVehicles.length === vehicles.length && vehicles.length > 0}
                 onChange={() => {
                   if (selectedVehicles.length === vehicles.length) {
                     toggleVehicleSelection(-1); // Special signal to clear all
@@ -43,12 +55,36 @@ const VehicleTable = ({
                 }}
               />
             </TableHead>
-            <TableHead>Vehicle</TableHead>
-            <TableHead>Year</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>Price</TableHead>
-            <TableHead>Mileage</TableHead>
-            <TableHead>Added</TableHead>
+            <TableHead className="cursor-pointer">
+              <div className="flex items-center">
+                Vehicle {renderSortIcon('make')}
+              </div>
+            </TableHead>
+            <TableHead className="cursor-pointer">
+              <div className="flex items-center">
+                Year {renderSortIcon('year')}
+              </div>
+            </TableHead>
+            <TableHead className="cursor-pointer">
+              <div className="flex items-center">
+                Location {renderSortIcon('location')}
+              </div>
+            </TableHead>
+            <TableHead className="cursor-pointer">
+              <div className="flex items-center">
+                Price {renderSortIcon('price')}
+              </div>
+            </TableHead>
+            <TableHead className="cursor-pointer">
+              <div className="flex items-center">
+                Mileage {renderSortIcon('mileage')}
+              </div>
+            </TableHead>
+            <TableHead className="cursor-pointer">
+              <div className="flex items-center">
+                Added {renderSortIcon('added')}
+              </div>
+            </TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>

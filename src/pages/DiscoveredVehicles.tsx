@@ -1,18 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import VehicleCard from '../components/vehicles/discovery/VehicleCard';
 import VehicleFilters from '../components/vehicles/discovery/VehicleFilters';
 import BulkActions from '../components/vehicles/discovery/BulkActions';
 import VehicleTabContent from '../components/vehicles/discovery/VehicleTabContent';
-import { Vehicle } from '../components/vehicles/discovery/types';
+import { Vehicle, SortDirection, SortField } from '../components/vehicles/discovery/types';
 
 const DiscoveredVehicles = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVehicles, setSelectedVehicles] = useState<number[]>([]);
   const [bulkActionOpen, setBulkActionOpen] = useState(false);
   const [viewMode, setViewMode] = useState("grid");
+  const [sortField, setSortField] = useState<SortField>("added");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   
   const vehicles: Vehicle[] = [
     {
@@ -89,6 +90,7 @@ const DiscoveredVehicles = () => {
     }
   ];
   
+  // Handle various vehicle actions
   const handleVerify = (id: number) => {
     console.log(`Verifying vehicle ${id}`);
   };
@@ -115,6 +117,7 @@ const DiscoveredVehicles = () => {
     }
   };
   
+  // Handle bulk actions
   const handleBulkVerify = () => {
     console.log(`Verifying vehicles: ${selectedVehicles.join(', ')}`);
     setSelectedVehicles([]);
@@ -133,16 +136,38 @@ const DiscoveredVehicles = () => {
     setBulkActionOpen(false);
   };
   
-  const filteredVehicles = vehicles.filter(vehicle => {
-    const searchString = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.location}`.toLowerCase();
-    return searchString.includes(searchTerm.toLowerCase());
-  });
+  // Filter and sort vehicles
+  const filteredAndSortedVehicles = useMemo(() => {
+    // First filter
+    let result = vehicles.filter(vehicle => {
+      const searchString = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.location}`.toLowerCase();
+      return searchString.includes(searchTerm.toLowerCase());
+    });
+    
+    // Then sort
+    return result.sort((a, b) => {
+      const field = sortField;
+      const direction = sortDirection === 'asc' ? 1 : -1;
+      
+      if (field === 'added') {
+        // Simplistic comparison for the mock data
+        // In a real app, we'd parse dates properly
+        return direction * (a[field].localeCompare(b[field]));
+      }
+      
+      if (typeof a[field] === 'string' && typeof b[field] === 'string') {
+        return direction * (a[field] as string).localeCompare(b[field] as string);
+      }
+      
+      return direction * ((a[field] as number) - (b[field] as number));
+    });
+  }, [vehicles, searchTerm, sortField, sortDirection]);
   
   return (
     <ScrollArea className="h-[calc(100vh-4rem)]">
       <div className="container max-w-7xl p-6 space-y-6">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Discovered Vehicles</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Vehicles</h1>
           <p className="text-muted-foreground">
             Organize and manage vehicles discovered by our system and community
           </p>
@@ -153,6 +178,10 @@ const DiscoveredVehicles = () => {
           setSearchTerm={setSearchTerm}
           viewMode={viewMode}
           setViewMode={setViewMode}
+          sortField={sortField}
+          setSortField={setSortField}
+          sortDirection={sortDirection}
+          setSortDirection={setSortDirection}
         />
         
         <BulkActions 
@@ -177,13 +206,15 @@ const DiscoveredVehicles = () => {
           <TabsContent value="all" className="m-0">
             <VehicleTabContent 
               vehicles={vehicles}
-              filteredVehicles={filteredVehicles}
+              filteredVehicles={filteredAndSortedVehicles}
               viewMode={viewMode}
               selectedVehicles={selectedVehicles}
               toggleVehicleSelection={toggleVehicleSelection}
               onVerify={handleVerify}
               onEdit={handleEdit}
               onRemove={handleRemove}
+              sortField={sortField}
+              sortDirection={sortDirection}
             />
           </TabsContent>
           

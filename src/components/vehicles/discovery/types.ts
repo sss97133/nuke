@@ -17,3 +17,6 @@ export interface VehicleActionHandlers {
   onEdit: (id: number) => void;
   onRemove: (id: number) => void;
 }
+
+export type SortDirection = 'asc' | 'desc';
+export type SortField = 'make' | 'model' | 'year' | 'price' | 'mileage' | 'added' | 'location';

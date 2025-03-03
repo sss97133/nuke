@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import VehicleCard from './VehicleCard';
 import VehicleTable from './VehicleTable';
 import VehicleStats from './VehicleStats';
+import VehicleListView from './VehicleListView';
 import { Vehicle, VehicleActionHandlers } from './types';
 
 interface VehicleTabContentProps extends VehicleActionHandlers {
@@ -12,6 +13,8 @@ interface VehicleTabContentProps extends VehicleActionHandlers {
   viewMode: string;
   selectedVehicles: number[];
   toggleVehicleSelection: (id: number) => void;
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
 }
 
 const VehicleTabContent = ({ 
@@ -22,13 +25,15 @@ const VehicleTabContent = ({
   toggleVehicleSelection,
   onVerify,
   onEdit,
-  onRemove
+  onRemove,
+  sortField,
+  sortDirection
 }: VehicleTabContentProps) => {
   return (
     <>
       <VehicleStats vehicles={vehicles} filteredCount={filteredVehicles.length} />
       
-      {viewMode === "grid" ? (
+      {viewMode === "grid" && (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredVehicles.map((vehicle) => (
             <VehicleCard 
@@ -40,7 +45,9 @@ const VehicleTabContent = ({
             />
           ))}
         </div>
-      ) : (
+      )}
+      
+      {viewMode === "table" && (
         <VehicleTable 
           vehicles={filteredVehicles}
           selectedVehicles={selectedVehicles}
@@ -48,6 +55,21 @@ const VehicleTabContent = ({
           onVerify={onVerify}
           onEdit={onEdit}
           onRemove={onRemove}
+          sortField={sortField}
+          sortDirection={sortDirection}
+        />
+      )}
+      
+      {viewMode === "list" && (
+        <VehicleListView 
+          vehicles={filteredVehicles}
+          selectedVehicles={selectedVehicles}
+          toggleVehicleSelection={toggleVehicleSelection}
+          onVerify={onVerify}
+          onEdit={onEdit}
+          onRemove={onRemove}
+          sortField={sortField}
+          sortDirection={sortDirection}
         />
       )}
       
