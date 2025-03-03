@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import Papa from 'papaparse';
+import { mockFetchICloudImages } from '@/utils/icloud-integration';
 
 export interface CarImportData {
   id?: string;
@@ -76,7 +77,7 @@ export async function importCarsToSupabase(carData: CarImportData[]): Promise<st
       
       // Insert or update the car record
       const { data, error } = await supabase
-        .from('cars')
+        .from('vehicles')
         .upsert(carRecord, { onConflict: 'id' })
         .select('id')
         .single();
@@ -115,7 +116,7 @@ export async function connectICloudImages(
     
     // Update the car with iCloud information
     const { error } = await supabase
-      .from('cars')
+      .from('vehicles')
       .update({ 
         icloud_album_link: icloudLink,
         icloud_folder_id: folderId
@@ -179,7 +180,7 @@ export async function saveCarImages(
     
     // Insert image records
     const { error } = await supabase
-      .from('car_images')
+      .from('vehicle_images')
       .insert(imageRecords.map(record => ({
         ...record,
         user_id: user.id
@@ -199,7 +200,7 @@ export async function fetchCarImages(carId: string) {
   try {
     // Get car details
     const { data: car, error: carError } = await supabase
-      .from('cars')
+      .from('vehicles')
       .select('*')
       .eq('id', carId)
       .single();
@@ -208,7 +209,7 @@ export async function fetchCarImages(carId: string) {
     
     // Get Supabase-stored images
     const { data: storedImages, error: imagesError } = await supabase
-      .from('car_images')
+      .from('vehicle_images')
       .select('*')
       .eq('car_id', carId)
       .order('uploaded_at', { ascending: false });
@@ -217,7 +218,7 @@ export async function fetchCarImages(carId: string) {
     
     // For iCloud integration, we'll use a mock function for now
     let iCloudImages: any[] = [];
-    if (car.icloud_album_link) {
+    if (car && car.icloud_album_link) {
       // This would use the actual iCloud API in a production environment
       iCloudImages = mockFetchICloudImages(car.icloud_album_link);
     }
