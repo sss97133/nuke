@@ -14,18 +14,20 @@ import { MediaList } from '@/components/team/MediaList';
 import { OtherMembersList } from '@/components/team/OtherMembersList';
 import { RoleReferenceTable } from '@/components/team/RoleReferenceTable';
 import { AddTeamMemberForm } from '@/components/team/AddTeamMemberForm';
+import { useQueryClient } from '@tanstack/react-query';
 
 const TeamMembers = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleAddTeamMember = () => {
     setIsAddMemberDialogOpen(true);
   };
 
   const handleFormSuccess = () => {
-    // This is where we would refresh the team members list
-    // For now, we'll just close the dialog
+    // Refresh the team members data
+    queryClient.invalidateQueries(['team-members']);
     setIsAddMemberDialogOpen(false);
   };
 

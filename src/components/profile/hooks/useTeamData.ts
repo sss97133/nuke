@@ -9,7 +9,7 @@ export const useTeamData = () => {
   const { toast } = useToast();
   const [memberTypeFilter, setMemberTypeFilter] = useState('all');
 
-  const { data: teamMembers, isLoading, error } = useQuery({
+  const { data: teamMembers, isLoading, error, refetch } = useQuery({
     queryKey: ['team-members'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -77,6 +77,7 @@ export const useTeamData = () => {
     memberTypeCount,
     isLoading,
     error,
-    formatMembersForDisplay
+    formatMembersForDisplay,
+    refetch
   };
 };
