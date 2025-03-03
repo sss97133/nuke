@@ -1,18 +1,21 @@
 
 import React from 'react';
-import { RefreshCcw, Check, AlertCircle } from 'lucide-react';
+import { RefreshCcw, Check, AlertCircle, ListChecks } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 interface ImportStatusProps {
   status: 'idle' | 'processing' | 'success' | 'error';
   resetImport: () => void;
   fileName?: string;
+  importedCount?: number;
 }
 
 export const ImportStatus: React.FC<ImportStatusProps> = ({ 
   status, 
   resetImport,
-  fileName 
+  fileName,
+  importedCount = 0
 }) => {
   if (status === 'processing') {
     return (
@@ -31,10 +34,20 @@ export const ImportStatus: React.FC<ImportStatusProps> = ({
       <div className="text-center py-6">
         <Check className="h-10 w-10 text-green-500 mx-auto mb-4" />
         <h3 className="font-medium mb-1">Import Successful</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Your data has been successfully imported
+        <p className="text-sm text-muted-foreground mb-2">
+          Successfully imported {importedCount} vehicles from {fileName}
         </p>
-        <Button onClick={resetImport}>Import Another File</Button>
+        <div className="flex flex-col space-y-2 items-center">
+          <Link to="/discovered-vehicles" className="w-full max-w-xs">
+            <Button variant="default" className="w-full">
+              <ListChecks className="mr-2 h-4 w-4" />
+              View Imported Vehicles
+            </Button>
+          </Link>
+          <Button variant="outline" onClick={resetImport} className="w-full max-w-xs">
+            Import Another File
+          </Button>
+        </div>
       </div>
     );
   }

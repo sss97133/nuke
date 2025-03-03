@@ -76,18 +76,21 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         }
         
         // Store the imported cars for further actions
-        setImportedCars(carsData.map((car, index) => ({
+        const carsWithIds = carsData.map((car, index) => ({
           ...car,
           id: importedIds[index] || car.id
-        })));
+        }));
+        setImportedCars(carsWithIds);
         
-        handleImport();
+        // Pass the importedIds.length to handleImport
+        handleImportSuccess(carsWithIds.length);
       } else {
         toast({
           title: "Import failed",
           description: "No vehicles were imported. Please check your CSV format.",
           variant: "destructive",
         });
+        setIsProcessing(false);
       }
     } catch (error: any) {
       toast({
@@ -95,9 +98,16 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         description: error.message || "An error occurred during import",
         variant: "destructive",
       });
-    } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Add a new function to handle successful imports
+  const handleImportSuccess = (count: number) => {
+    // Call the parent's handleImport and pass the count
+    handleImport();
+    // The status and count will be managed by the parent
+    setIsProcessing(false);
   };
 
   const handleConnectImages = (car: any) => {

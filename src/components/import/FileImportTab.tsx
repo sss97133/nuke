@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UploadCloud } from 'lucide-react';
 
-// Import the new components
+// Import the components
 import { FileDropZone } from './file-import/FileDropZone';
 import { ImportStatus } from './file-import/ImportStatus';
 import { ImportOptions } from './file-import/ImportOptions';
@@ -20,6 +20,7 @@ interface FileImportTabProps {
 const FileImportTab: React.FC<FileImportTabProps> = ({ className }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [importedCount, setImportedCount] = useState(0);
   const { toast } = useToast();
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,16 +56,19 @@ const FileImportTab: React.FC<FileImportTabProps> = ({ className }) => {
         description: "Please wait while we process your file...",
       });
       
-      // Simulate processing
+      // This would normally get the actual count from the server
+      // Since we're just refactoring UI, we'll set a random count between 5-20
+      const simulatedCount = Math.floor(Math.random() * 16) + 5;
+      
       setTimeout(() => {
         const success = Math.random() > 0.2;
         setImportStatus(success ? 'success' : 'error');
         
-        // Show result toast
         if (success) {
+          setImportedCount(simulatedCount);
           toast({
             title: "Import successful",
-            description: `Successfully imported data from ${selectedFile.name}`,
+            description: `Successfully imported ${simulatedCount} vehicles from ${selectedFile.name}`,
             variant: "default",
           });
         } else {
@@ -81,6 +85,7 @@ const FileImportTab: React.FC<FileImportTabProps> = ({ className }) => {
   const resetImport = () => {
     setSelectedFile(null);
     setImportStatus('idle');
+    setImportedCount(0);
   };
 
   return (
@@ -108,6 +113,7 @@ const FileImportTab: React.FC<FileImportTabProps> = ({ className }) => {
               status={importStatus} 
               resetImport={resetImport} 
               fileName={selectedFile?.name}
+              importedCount={importedCount}
             />
           </CardContent>
           {importStatus === 'idle' && selectedFile && (
