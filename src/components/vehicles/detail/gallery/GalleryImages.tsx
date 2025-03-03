@@ -10,14 +10,30 @@ export const GalleryImages: React.FC<GalleryImagesProps> = ({ images, onOpenUplo
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      {images.map((image) => (
-        <GalleryImageItem 
-          key={image.id} 
-          image={image} 
-          vehicleName={`${image.type}`} 
-        />
-      ))}
+    <div className="space-y-6">
+      {/* Featured/main image */}
+      {images.length > 0 && (
+        <div className="w-full aspect-video overflow-hidden rounded-lg">
+          <img 
+            src={images[0].url} 
+            alt={`${images[0].type}`}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+      
+      {/* Gallery grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {images.map((image, index) => (
+          index === 0 ? null : (
+            <GalleryImageItem 
+              key={image.id} 
+              image={image} 
+              vehicleName={`${image.type}`} 
+            />
+          )
+        ))}
+      </div>
     </div>
   );
 };

@@ -44,7 +44,7 @@ const VehicleDetail = () => {
 
   return (
     <ScrollArea className="h-screen">
-      <div className="container max-w-6xl p-6 space-y-6">
+      <div className="container max-w-6xl p-6 space-y-8">
         <Button 
           variant="ghost" 
           onClick={() => navigate("/discovered-vehicles")}
@@ -56,21 +56,17 @@ const VehicleDetail = () => {
         
         <VehicleDetailHeader vehicle={vehicle} />
         
+        {/* Main Vehicle Information Tabs */}
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid grid-cols-5 md:w-[500px]">
+          <TabsList className="grid grid-cols-4 md:w-[400px]">
             <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="gallery">Gallery</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="market">Market</TabsTrigger>
-            <TabsTrigger value="comments">Comments</TabsTrigger>
+            <TabsTrigger value="gallery">Gallery</TabsTrigger>
           </TabsList>
           
           <TabsContent value="details" className="mt-6">
             <VehicleSpecifications vehicle={vehicle} />
-          </TabsContent>
-          
-          <TabsContent value="gallery" className="mt-6">
-            <VehicleGallery vehicle={vehicle} />
           </TabsContent>
           
           <TabsContent value="history" className="mt-6">
@@ -81,10 +77,16 @@ const VehicleDetail = () => {
             <VehicleMarketData vehicle={vehicle} />
           </TabsContent>
           
-          <TabsContent value="comments" className="mt-6">
-            <VehicleComments vehicle={vehicle} />
+          <TabsContent value="gallery" className="mt-6">
+            <VehicleGallery vehicle={vehicle} />
           </TabsContent>
         </Tabs>
+        
+        {/* Comments Section - Always visible, not in tabs */}
+        <div className="mt-12 pt-6 border-t border-border">
+          <h2 className="text-2xl font-bold mb-6">Vehicle Discussion</h2>
+          <VehicleComments vehicle={vehicle} />
+        </div>
       </div>
     </ScrollArea>
   );
