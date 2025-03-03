@@ -27,7 +27,7 @@ const TeamMembers = () => {
 
   const handleFormSuccess = () => {
     // Refresh the team members data
-    queryClient.invalidateQueries(['team-members']);
+    queryClient.invalidateQueries({ queryKey: ['team-members'] });
     setIsAddMemberDialogOpen(false);
   };
 

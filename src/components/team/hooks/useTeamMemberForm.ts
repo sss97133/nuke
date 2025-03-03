@@ -32,23 +32,42 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
     setIsSubmitting(true);
 
     try {
-      // Create a profile record first
-      const { data: profileData, error: profileError } = await supabase
+      // Get the current user to use their auth session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Create a new user profile or use an existing one
+      const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
-        .insert({
-          full_name: formData.fullName,
-          email: formData.email,
-        })
         .select('id')
-        .single();
+        .eq('email', formData.email)
+        .maybeSingle();
 
-      if (profileError) throw profileError;
+      let profileId;
+      
+      if (existingProfile) {
+        // Use existing profile
+        profileId = existingProfile.id;
+      } else {
+        // Create a new profile
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: crypto.randomUUID(), // Generate a UUID for the new profile
+            full_name: formData.fullName,
+            email: formData.email
+          })
+          .select('id')
+          .single();
+
+        if (createError) throw createError;
+        profileId = newProfile.id;
+      }
 
       // Now create the team member with reference to profile
       const { error: teamMemberError } = await supabase
         .from('team_members')
         .insert({
-          profile_id: profileData.id,
+          profile_id: profileId,
           position: formData.position,
           member_type: formData.memberType as MemberType,
           department: formData.department || null,
@@ -59,7 +78,7 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       if (teamMemberError) throw teamMemberError;
 
       // Invalidate team members query to refresh data
-      queryClient.invalidateQueries(['team-members']);
+      queryClient.invalidateQueries({ queryKey: ['team-members'] });
 
       toast({
         title: "Team member added",
