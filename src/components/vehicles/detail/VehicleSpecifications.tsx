@@ -48,23 +48,23 @@ const VehicleSpecifications: React.FC<VehicleSpecificationsProps> = ({ vehicle }
   ];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Vehicle Specifications</CardTitle>
+    <Card className="h-full sticky top-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Vehicle Specifications</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="text-xs space-y-4">
         {specSections.map((section, index) => (
           <div key={index}>
-            <h3 className="font-medium text-lg mb-4">{section.title}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <h3 className="font-medium text-sm mb-2">{section.title}</h3>
+            <div className="grid grid-cols-2 gap-2">
               {section.specs.map((spec, specIndex) => (
-                <div key={specIndex} className="space-y-1">
-                  <p className="text-sm text-muted-foreground">{spec.label}</p>
-                  <p className="font-medium">{spec.value}</p>
+                <div key={specIndex} className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">{spec.label}</p>
+                  <p className="font-medium text-xs">{spec.value}</p>
                 </div>
               ))}
             </div>
-            {index < specSections.length - 1 && <Separator className="mt-6" />}
+            {index < specSections.length - 1 && <Separator className="mt-3" />}
           </div>
         ))}
       </CardContent>

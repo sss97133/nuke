@@ -14,20 +14,10 @@ import { ArrowLeft } from 'lucide-react';
 import { useVehicleDetail } from '@/hooks/vehicles/useVehicleDetail';
 
 const VehicleDetail = () => {
-  const {
-    id
-  } = useParams<{
-    id: string;
-  }>();
+  const { id } = useParams<{ id: string; }>();
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
-  const {
-    vehicle,
-    loading,
-    error
-  } = useVehicleDetail(id || '');
+  const { toast } = useToast();
+  const { vehicle, loading, error } = useVehicleDetail(id || '');
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen">
@@ -45,8 +35,9 @@ const VehicleDetail = () => {
       </div>;
   }
 
-  return <ScrollArea className="h-screen">
-      <div className="container max-w-6xl p-6 space-y-8">
+  return (
+    <ScrollArea className="h-screen">
+      <div className="container max-w-7xl p-4 space-y-6">
         <Button variant="ghost" onClick={() => navigate("/discovered-vehicles")} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Vehicles
@@ -54,39 +45,55 @@ const VehicleDetail = () => {
         
         <VehicleDetailHeader vehicle={vehicle} />
         
-        {/* Main Vehicle Information Tabs */}
-        <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid grid-cols-3 md:w-[300px]">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-            <TabsTrigger value="market">Market</TabsTrigger>
-          </TabsList>
+        {/* Main content area with editorial layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main content column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Tabs for vehicle details, history, market data */}
+            <Tabs defaultValue="editorial" className="w-full">
+              <TabsList className="grid grid-cols-3 w-full lg:w-auto">
+                <TabsTrigger value="editorial">Editorial</TabsTrigger>
+                <TabsTrigger value="history">History</TabsTrigger>
+                <TabsTrigger value="market">Market</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="editorial" className="mt-4 prose max-w-none">
+                <h2 className="text-xl font-semibold mb-3">About this {vehicle.make} {vehicle.model}</h2>
+                <p>This {vehicle.year} {vehicle.make} {vehicle.model} represents one of the finest examples of automotive craftsmanship from its era. With its distinctive {vehicle.body_type} styling and powerful {vehicle.engine_type} engine, this vehicle combines performance and aesthetics in a package that continues to captivate enthusiasts today.</p>
+                
+                <p>Maintained in excellent condition with a rating of {vehicle.condition_rating}/10, this vehicle showcases the enduring appeal of {vehicle.era || "classic"} automotive design. The {vehicle.transmission} transmission paired with its {vehicle.drivetrain} drivetrain delivers a driving experience that remains engaging and responsive.</p>
+                
+                <p>With {vehicle.mileage.toLocaleString()} miles on the odometer, this vehicle has been well-used but carefully maintained throughout its life. Its current market value of ${vehicle.market_value?.toLocaleString()} reflects both its inherent quality and the growing collector interest in vehicles of this type.</p>
+              </TabsContent>
+              
+              <TabsContent value="history" className="mt-4">
+                <VehicleHistory vehicle={vehicle} />
+              </TabsContent>
+              
+              <TabsContent value="market" className="mt-4">
+                <VehicleMarketData vehicle={vehicle} />
+              </TabsContent>
+            </Tabs>
+            
+            {/* Gallery Section - Always visible, without redundant headers */}
+            <div className="space-y-4">
+              <VehicleGallery vehicle={vehicle} />
+            </div>
+            
+            {/* Comments Section - Always follows the gallery */}
+            <div className="space-y-4">
+              <VehicleComments vehicle={vehicle} />
+            </div>
+          </div>
           
-          <TabsContent value="details" className="mt-6">
+          {/* Sidebar with specifications */}
+          <div className="lg:col-span-1">
             <VehicleSpecifications vehicle={vehicle} />
-          </TabsContent>
-          
-          <TabsContent value="history" className="mt-6">
-            <VehicleHistory vehicle={vehicle} />
-          </TabsContent>
-          
-          <TabsContent value="market" className="mt-6">
-            <VehicleMarketData vehicle={vehicle} />
-          </TabsContent>
-        </Tabs>
-        
-        {/* Gallery Section - Always visible */}
-        <div className="mt-8 pt-4 border-t border-border">
-          <h2 className="text-2xl font-bold mb-6">Vehicle Gallery</h2>
-          <VehicleGallery vehicle={vehicle} />
-        </div>
-        
-        {/* Comments Section - Always follows the gallery */}
-        <div className="mt-8 pt-4 border-t border-border">
-          <VehicleComments vehicle={vehicle} />
+          </div>
         </div>
       </div>
-    </ScrollArea>;
+    </ScrollArea>
+  );
 };
 
 export default VehicleDetail;

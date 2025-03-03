@@ -2,10 +2,11 @@
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { useGalleryData } from './gallery/useGalleryData';
-import { GalleryHeader } from './gallery/GalleryHeader';
 import { GalleryImages } from './gallery/GalleryImages';
 import { ImageUploadModal } from './image-upload/ImageUploadModal';
 import { VehicleGalleryProps } from './gallery/types';
+import { Upload } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 const VehicleGallery: React.FC<VehicleGalleryProps> = ({ vehicle }) => {
   const { 
@@ -16,15 +17,22 @@ const VehicleGallery: React.FC<VehicleGalleryProps> = ({ vehicle }) => {
   } = useGalleryData(vehicle);
 
   return (
-    <Card>
-      <GalleryHeader onOpenUploadModal={() => setIsUploadModalOpen(true)} />
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Button 
+          size="sm" 
+          variant="outline"
+          onClick={() => setIsUploadModalOpen(true)}
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Images
+        </Button>
+      </div>
       
-      <CardContent>
-        <GalleryImages 
-          images={images} 
-          onOpenUploadModal={() => setIsUploadModalOpen(true)} 
-        />
-      </CardContent>
+      <GalleryImages 
+        images={images} 
+        onOpenUploadModal={() => setIsUploadModalOpen(true)} 
+      />
       
       <ImageUploadModal 
         open={isUploadModalOpen} 
@@ -36,7 +44,7 @@ const VehicleGallery: React.FC<VehicleGalleryProps> = ({ vehicle }) => {
           year: vehicle.year
         }}
       />
-    </Card>
+    </div>
   );
 };
 

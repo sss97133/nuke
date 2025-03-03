@@ -77,7 +77,6 @@ const VehicleDetailHeader: React.FC<VehicleDetailHeaderProps> = ({ vehicle }) =>
         <div className="flex flex-wrap gap-3">
           <Button title="Add this vehicle to your personal collection">Add to Collection</Button>
           <Button variant="outline">Contact Seller</Button>
-          <Button variant="secondary">Make Offer</Button>
         </div>
       </CardContent>
     </Card>
