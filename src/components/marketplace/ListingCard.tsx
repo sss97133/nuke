@@ -1,31 +1,38 @@
 
 import React from 'react';
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Link } from 'react-router-dom';
+import { 
+  Card, 
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { 
+  Eye, 
+  MessageSquare, 
+  Clock, 
+  MapPin,
+  Heart
+} from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Heart, 
-  MessageCircle, 
-  Eye, 
-  Share2
-} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Link } from 'react-router-dom';
 
 interface ListingCardProps {
   id: string;
   title: string;
-  price: number | null;
+  price: number;
   imageUrl: string;
   location: string;
   createdAt: string;
-  condition?: string;
+  condition: string;
   viewCount: number;
-  commentCount?: number;
+  commentCount: number;
   isFeatured?: boolean;
 }
 
-export const ListingCard: React.FC<ListingCardProps> = ({
+export const ListingCard = ({
   id,
   title,
   price,
@@ -34,69 +41,65 @@ export const ListingCard: React.FC<ListingCardProps> = ({
   createdAt,
   condition,
   viewCount,
-  commentCount = 0,
+  commentCount,
   isFeatured = false
-}) => {
+}: ListingCardProps) => {
+  const formattedDate = formatDistanceToNow(new Date(createdAt), { addSuffix: true });
+  
   return (
     <Card className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow">
-      <Link to={`/marketplace/listing/${id}`} className="relative">
+      <Link to={`/marketplace/listing/${id}`} className="relative block">
+        <div 
+          className="h-48 bg-cover bg-center w-full"
+          style={{ backgroundImage: `url(${imageUrl})` }}
+        />
         {isFeatured && (
-          <Badge variant="secondary" className="absolute top-2 right-2 z-10">
+          <Badge className="absolute top-2 right-2" variant="secondary">
             Featured
           </Badge>
         )}
-        <div className="aspect-video relative overflow-hidden bg-muted">
-          <img 
-            src={imageUrl || '/placeholder.svg'} 
-            alt={title}
-            className="object-cover w-full h-full transition-transform hover:scale-105"
-          />
-        </div>
       </Link>
       
-      <CardContent className="p-4 flex-grow">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="font-medium text-lg line-clamp-2">
-            <Link to={`/marketplace/listing/${id}`} className="hover:underline">
-              {title}
-            </Link>
-          </h3>
-          <span className="font-semibold whitespace-nowrap">
-            {price ? `$${price.toLocaleString()}` : 'Price on request'}
-          </span>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg truncate">
+          <Link to={`/marketplace/listing/${id}`} className="hover:underline">
+            {title}
+          </Link>
+        </CardTitle>
+        <div className="flex justify-between items-center">
+          <p className="text-2xl font-bold">${price.toLocaleString()}</p>
+          <Badge variant="outline">{condition}</Badge>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="pb-0 flex-grow">
+        <div className="flex items-center text-muted-foreground text-sm mb-2">
+          <MapPin className="h-3.5 w-3.5 mr-1" />
+          <span className="truncate">{location}</span>
         </div>
         
-        <div className="text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 mb-1">
-            <span>{location}</span>
-            <span>•</span>
-            <span>{formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
-          </div>
-          {condition && (
-            <Badge variant="outline" className="mr-2">
-              {condition}
-            </Badge>
-          )}
+        <div className="flex items-center text-muted-foreground text-sm">
+          <Clock className="h-3.5 w-3.5 mr-1" />
+          <span>{formattedDate}</span>
         </div>
       </CardContent>
       
-      <CardFooter className="p-4 pt-0 flex justify-between border-t mt-auto">
-        <div className="flex gap-3 text-muted-foreground text-sm">
-          <span className="flex items-center gap-1">
-            <Eye className="h-4 w-4" /> {viewCount}
-          </span>
-          <span className="flex items-center gap-1">
-            <MessageCircle className="h-4 w-4" /> {commentCount}
-          </span>
+      <CardFooter className="pt-4 flex justify-between">
+        <div className="flex space-x-3 text-sm text-muted-foreground">
+          <div className="flex items-center">
+            <Eye className="h-3.5 w-3.5 mr-1" />
+            <span>{viewCount}</span>
+          </div>
+          <div className="flex items-center">
+            <MessageSquare className="h-3.5 w-3.5 mr-1" />
+            <span>{commentCount}</span>
+          </div>
         </div>
-        <div className="flex gap-1">
-          <Button size="icon" variant="ghost" className="h-8 w-8">
-            <Heart className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-8 w-8">
-            <Share2 className="h-4 w-4" />
-          </Button>
-        </div>
+        
+        <Button variant="ghost" size="sm" className="p-0 h-auto">
+          <Heart className="h-4 w-4 mr-1" />
+          <span className="text-xs">Watch</span>
+        </Button>
       </CardFooter>
     </Card>
   );

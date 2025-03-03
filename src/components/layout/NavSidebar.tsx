@@ -86,6 +86,7 @@ export const NavSidebar = () => {
   const navItems = [
     { to: "/dashboard", icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Dashboard" },
     { to: "/explore", icon: <Atom className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Explore" },
+    { to: "/marketplace", icon: <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Marketplace" },
     { to: "/onboarding", icon: <Compass className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Onboarding" },
     { to: "/skills", icon: <Wrench className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Skills" },
     { to: "/achievements", icon: <Award className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Achievements" },
@@ -98,7 +99,6 @@ export const NavSidebar = () => {
     { to: "/parts", icon: <Battery className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Parts" },
     { to: "/service-history", icon: <Timer className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Service History" },
     { to: "/studio", icon: <Video className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Studio" },
-    { to: "/marketplace", icon: <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Marketplace" },
     { to: "/tokens", icon: <Coins className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Token Management" },
     { to: "/token-staking", icon: <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Token Staking" },
     { to: "/glossary", icon: <Book className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Glossary" },

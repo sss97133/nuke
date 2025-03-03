@@ -57,7 +57,7 @@ export const AllListings = () => {
             title={listing.title}
             price={listing.price}
             imageUrl={listing.imageUrl}
-            location={listing.location}
+            location={`${listing.location.city}, ${listing.location.state}`}
             createdAt={listing.created_at}
             condition={listing.condition}
             viewCount={listing.views_count || 0}

@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 
 export const MarketplaceHeader = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const { isAuthenticated } = useAuth();
+  const { session } = useAuth();
   const navigate = useNavigate();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -30,7 +30,7 @@ export const MarketplaceHeader = () => {
   };
 
   const handleCreateListing = () => {
-    if (isAuthenticated) {
+    if (session) {
       navigate('/marketplace/create');
     } else {
       navigate('/login?redirect=/marketplace/create');
