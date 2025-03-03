@@ -2736,6 +2736,82 @@ export type Database = {
           },
         ]
       }
+      vehicle_engagement: {
+        Row: {
+          created_at: string | null
+          id: string
+          interested_users_count: number | null
+          last_viewed_at: string | null
+          saves_count: number | null
+          vehicle_id: string | null
+          views_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interested_users_count?: number | null
+          last_viewed_at?: string | null
+          saves_count?: number | null
+          vehicle_id?: string | null
+          views_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interested_users_count?: number | null
+          last_viewed_at?: string | null
+          saves_count?: number | null
+          vehicle_id?: string | null
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_engagement_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_history: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          documentation_urls: string[] | null
+          event_date: string | null
+          event_type: string
+          id: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          documentation_urls?: string[] | null
+          event_date?: string | null
+          event_type: string
+          id?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          documentation_urls?: string[] | null
+          event_date?: string | null
+          event_type?: string
+          id?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_history_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_images: {
         Row: {
           car_id: string | null
@@ -2777,6 +2853,85 @@ export type Database = {
           {
             foreignKeyName: "vehicle_images_car_id_fkey"
             columns: ["car_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_issues: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          issue_type: string
+          reported_at: string | null
+          severity: number | null
+          status: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          issue_type: string
+          reported_at?: string | null
+          severity?: number | null
+          status?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          issue_type?: string
+          reported_at?: string | null
+          severity?: number | null
+          status?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_issues_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_market_data: {
+        Row: {
+          id: string
+          last_updated: string | null
+          market_trends: Json | null
+          parts_availability: string | null
+          price_history: Json | null
+          similar_sales: Json | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          id?: string
+          last_updated?: string | null
+          market_trends?: Json | null
+          parts_availability?: string | null
+          price_history?: Json | null
+          similar_sales?: Json | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          id?: string
+          last_updated?: string | null
+          market_trends?: Json | null
+          parts_availability?: string | null
+          price_history?: Json | null
+          similar_sales?: Json | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_market_data_vehicle_id_fkey"
+            columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
@@ -2924,21 +3079,36 @@ export type Database = {
       }
       vehicles: {
         Row: {
+          body_type: string | null
           bulk_upload_batch_id: string | null
+          condition_description: string | null
+          condition_rating: number | null
           created_at: string
+          drivetrain: string | null
+          engine_type: string | null
+          era: string | null
           historical_data: Json | null
           icloud_album_link: string | null
           icloud_folder_id: string | null
           id: string
           location: Json | null
           make: string
+          market_value: number | null
           model: string
           notes: string | null
+          price_trend: string | null
+          rarity_score: number | null
+          relevance_score: number | null
+          restoration_status: string | null
           source: string | null
           source_url: string | null
+          special_edition: boolean | null
           status: string | null
+          transmission: string | null
+          trim: string | null
           updated_at: string
           user_id: string
+          vehicle_type: string
           vin: string | null
           vin_image_url: string | null
           vin_processing_status: string | null
@@ -2946,21 +3116,36 @@ export type Database = {
           year: number
         }
         Insert: {
+          body_type?: string | null
           bulk_upload_batch_id?: string | null
+          condition_description?: string | null
+          condition_rating?: number | null
           created_at?: string
+          drivetrain?: string | null
+          engine_type?: string | null
+          era?: string | null
           historical_data?: Json | null
           icloud_album_link?: string | null
           icloud_folder_id?: string | null
           id?: string
           location?: Json | null
           make: string
+          market_value?: number | null
           model: string
           notes?: string | null
+          price_trend?: string | null
+          rarity_score?: number | null
+          relevance_score?: number | null
+          restoration_status?: string | null
           source?: string | null
           source_url?: string | null
+          special_edition?: boolean | null
           status?: string | null
+          transmission?: string | null
+          trim?: string | null
           updated_at?: string
           user_id: string
+          vehicle_type?: string
           vin?: string | null
           vin_image_url?: string | null
           vin_processing_status?: string | null
@@ -2968,21 +3153,36 @@ export type Database = {
           year: number
         }
         Update: {
+          body_type?: string | null
           bulk_upload_batch_id?: string | null
+          condition_description?: string | null
+          condition_rating?: number | null
           created_at?: string
+          drivetrain?: string | null
+          engine_type?: string | null
+          era?: string | null
           historical_data?: Json | null
           icloud_album_link?: string | null
           icloud_folder_id?: string | null
           id?: string
           location?: Json | null
           make?: string
+          market_value?: number | null
           model?: string
           notes?: string | null
+          price_trend?: string | null
+          rarity_score?: number | null
+          relevance_score?: number | null
+          restoration_status?: string | null
           source?: string | null
           source_url?: string | null
+          special_edition?: boolean | null
           status?: string | null
+          transmission?: string | null
+          trim?: string | null
           updated_at?: string
           user_id?: string
+          vehicle_type?: string
           vin?: string | null
           vin_image_url?: string | null
           vin_processing_status?: string | null
