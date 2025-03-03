@@ -82,7 +82,7 @@ const MarketplaceListingDetails: React.FC<MarketplaceListingDetailsProps> = ({
               </div>
               <div className="text-sm">
                 <span className="text-muted-foreground">Drivetrain:</span>{" "}
-                <span className="font-medium">{listing.vehicle.drivetrain || 'Not provided'}</span>
+                <span className="font-medium">{listing.specifications?.drivetrain || 'Not provided'}</span>
               </div>
               <div className="text-sm">
                 <span className="text-muted-foreground">Exterior Color:</span>{" "}
@@ -99,12 +99,20 @@ const MarketplaceListingDetails: React.FC<MarketplaceListingDetailsProps> = ({
             <div>
               <h4 className="font-medium mb-2">Features</h4>
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">Bluetooth</Badge>
-                <Badge variant="outline">Navigation</Badge>
-                <Badge variant="outline">Backup Camera</Badge>
-                <Badge variant="outline">Leather Seats</Badge>
-                <Badge variant="outline">Heated Seats</Badge>
-                <Badge variant="outline">Sunroof</Badge>
+                {listing.features && listing.features.length > 0 ? (
+                  listing.features.map((feature, index) => (
+                    <Badge key={index} variant="outline">{feature}</Badge>
+                  ))
+                ) : (
+                  <>
+                    <Badge variant="outline">Bluetooth</Badge>
+                    <Badge variant="outline">Navigation</Badge>
+                    <Badge variant="outline">Backup Camera</Badge>
+                    <Badge variant="outline">Leather Seats</Badge>
+                    <Badge variant="outline">Heated Seats</Badge>
+                    <Badge variant="outline">Sunroof</Badge>
+                  </>
+                )}
               </div>
             </div>
           </TabsContent>
