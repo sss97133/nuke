@@ -2,13 +2,15 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { TeamMemberCard } from './TeamMemberCard';
 import { Button } from '@/components/ui/button';
-import { Plus, Users, Building2, Wrench, UserPlus, UserCog } from 'lucide-react';
+import { UserPlus, Users, Building2, Wrench, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { TeamMemberGrid } from '@/components/team/components/TeamMemberGrid';
+import { EmptyTeamState } from '@/components/team/components/EmptyTeamState';
+import { TeamMemberDisplayProps } from '@/components/team/components/TeamMemberDisplay';
 
 export const TeamSection = () => {
   const { toast } = useToast();
@@ -94,6 +96,18 @@ export const TeamSection = () => {
     navigate('/team-members');
   };
 
+  // Convert to the format expected by TeamMemberDisplay
+  const formatMembersForDisplay = (members: any[]): TeamMemberDisplayProps[] => {
+    return members.map(member => ({
+      memberType: member.member_type,
+      department: member.department,
+      position: member.position,
+      startDate: member.start_date,
+      status: member.status,
+      profile: member.profile
+    }));
+  };
+
   if (error) {
     return (
       <Card className="p-6">
@@ -115,6 +129,49 @@ export const TeamSection = () => {
       </Card>
     );
   }
+
+  const getEmptyStateForType = (type: string) => {
+    switch (type) {
+      case 'technician':
+        return (
+          <EmptyTeamState
+            icon={<Wrench className="w-12 h-12 mb-4" />}
+            title="No technicians added yet"
+            description="Add technicians who work on your vehicles"
+            onAddMember={handleAddMember}
+            buttonText="Add Technician"
+          />
+        );
+      case 'garage':
+        return (
+          <EmptyTeamState
+            icon={<Building2 className="w-12 h-12 mb-4" />}
+            title="No garages added yet"
+            description="Connect with service centers and repair shops"
+            onAddMember={handleAddMember}
+            buttonText="Add Garage"
+          />
+        );
+      case 'consultant':
+        return (
+          <EmptyTeamState
+            icon={<UserCog className="w-12 h-12 mb-4" />}
+            title="No consultants added yet"
+            description="Add specialized advisors for your vehicle projects"
+            onAddMember={handleAddMember}
+            buttonText="Add Consultant"
+          />
+        );
+      default:
+        return (
+          <EmptyTeamState
+            title="No team members found"
+            description="Add team members to collaborate on your vehicle projects"
+            onAddMember={handleAddMember}
+          />
+        );
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -160,70 +217,42 @@ export const TeamSection = () => {
             Other ({memberTypeCount['other'] || 0})
           </TabsTrigger>
         </TabsList>
-      </Tabs>
 
-      {filteredMembers && filteredMembers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredMembers.map((member) => (
-            <TeamMemberCard
-              key={member.id}
-              memberType={member.member_type}
-              department={member.department}
-              position={member.position}
-              startDate={member.start_date}
-              status={member.status}
-              profile={member.profile}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card className="p-6">
-          <div className="flex flex-col items-center justify-center text-muted-foreground py-8">
-            {memberTypeFilter === 'all' ? (
-              <>
-                <Users className="w-12 h-12 mb-4" />
-                <p>No team members found</p>
-                <p className="text-sm mt-2">Add team members to collaborate on your vehicle projects</p>
-              </>
-            ) : memberTypeFilter === 'technician' ? (
-              <>
-                <Wrench className="w-12 h-12 mb-4" />
-                <p>No technicians added yet</p>
-                <p className="text-sm mt-2">Add technicians who work on your vehicles</p>
-              </>
-            ) : memberTypeFilter === 'garage' ? (
-              <>
-                <Building2 className="w-12 h-12 mb-4" />
-                <p>No garages added yet</p>
-                <p className="text-sm mt-2">Connect with service centers and repair shops</p>
-              </>
-            ) : memberTypeFilter === 'consultant' ? (
-              <>
-                <UserCog className="w-12 h-12 mb-4" />
-                <p>No consultants added yet</p>
-                <p className="text-sm mt-2">Add specialized advisors for your vehicle projects</p>
-              </>
-            ) : (
-              <>
-                <Users className="w-12 h-12 mb-4" />
-                <p>No other team members found</p>
-              </>
-            )}
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={handleAddMember}
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Add {memberTypeFilter === 'all' ? 'Team Member' : 
-                memberTypeFilter === 'technician' ? 'Technician' : 
-                memberTypeFilter === 'garage' ? 'Garage' : 
-                memberTypeFilter === 'consultant' ? 'Consultant' : 
-                'Team Member'}
-            </Button>
-          </div>
-        </Card>
-      )}
+        <TabsContent value="all">
+          <TeamMemberGrid 
+            members={formatMembersForDisplay(filteredMembers)}
+            emptyState={getEmptyStateForType('all')}
+          />
+        </TabsContent>
+        
+        <TabsContent value="technician">
+          <TeamMemberGrid 
+            members={formatMembersForDisplay(filteredMembers)}
+            emptyState={getEmptyStateForType('technician')}
+          />
+        </TabsContent>
+        
+        <TabsContent value="garage">
+          <TeamMemberGrid 
+            members={formatMembersForDisplay(filteredMembers)}
+            emptyState={getEmptyStateForType('garage')}
+          />
+        </TabsContent>
+        
+        <TabsContent value="consultant">
+          <TeamMemberGrid 
+            members={formatMembersForDisplay(filteredMembers)}
+            emptyState={getEmptyStateForType('consultant')}
+          />
+        </TabsContent>
+        
+        <TabsContent value="other">
+          <TeamMemberGrid 
+            members={formatMembersForDisplay(filteredMembers)}
+            emptyState={getEmptyStateForType('other')}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
