@@ -9,6 +9,8 @@ interface Profile {
   username?: string;
   full_name?: string;
   avatar_url?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface TeamMemberDisplayProps {
@@ -18,18 +20,22 @@ export interface TeamMemberDisplayProps {
   startDate: string;
   status: string;
   profile?: Profile;
+  joinedDate?: string;
+  skills?: string[];
+  bio?: string;
 }
 
-export const TeamMemberDisplay: React.FC<TeamMemberDisplayProps> = ({
+export const TeamMemberDisplay: React.FC<TeamMemberDisplayProps & { onClick?: () => void }> = ({
   memberType,
   department,
   position,
   startDate,
   status,
-  profile
+  profile,
+  onClick
 }) => {
   return (
-    <Card className="w-full">
+    <Card className="w-full cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
       <div className="p-6">
         <div className="flex items-center space-x-4">
           <Avatar>

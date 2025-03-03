@@ -19,7 +19,9 @@ export const useTeamData = () => {
           profile:profile_id (
             username,
             full_name,
-            avatar_url
+            avatar_url,
+            email,
+            phone
           )
         `)
         .order('created_at', { ascending: false });
@@ -59,7 +61,11 @@ export const useTeamData = () => {
       position: member.position,
       startDate: member.start_date,
       status: member.status,
-      profile: member.profile
+      profile: member.profile,
+      // Add additional fields for detail view
+      joinedDate: member.created_at,
+      skills: member.skills || [],
+      bio: member.bio
     }));
   };
 
