@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from 'date-fns';
+import { useToast } from "@/components/ui/use-toast";
 
 interface ListingCardProps {
   id: string;
@@ -44,6 +45,20 @@ export const ListingCard = ({
   commentCount,
   isFeatured = false
 }: ListingCardProps) => {
+  const { toast } = useToast();
+  const [isWatched, setIsWatched] = React.useState(false);
+  
+  const handleWatchToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setIsWatched(!isWatched);
+    toast({
+      title: isWatched ? "Removed from watchlist" : "Added to watchlist",
+      description: isWatched ? "This listing has been removed from your watchlist." : "This listing has been added to your watchlist.",
+    });
+  };
+  
   const formattedDate = formatDistanceToNow(new Date(createdAt), { addSuffix: true });
   
   return (
@@ -96,9 +111,17 @@ export const ListingCard = ({
           </div>
         </div>
         
-        <Button variant="ghost" size="sm" className="p-0 h-auto">
-          <Heart className="h-4 w-4 mr-1" />
-          <span className="text-xs">Watch</span>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="p-0 h-auto"
+          onClick={handleWatchToggle}
+        >
+          <Heart 
+            className="h-4 w-4 mr-1" 
+            fill={isWatched ? "currentColor" : "none"} 
+          />
+          <span className="text-xs">{isWatched ? "Watching" : "Watch"}</span>
         </Button>
       </CardFooter>
     </Card>

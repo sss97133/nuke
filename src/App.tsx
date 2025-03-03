@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -34,6 +35,7 @@ import VehicleDetail from './pages/VehicleDetail'
 import TeamMembers from './pages/TeamMembers'
 import { Helmet } from 'react-helmet'
 import Marketplace from './pages/Marketplace'
+import MarketplaceListingDetail from './pages/MarketplaceListingDetail'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -130,6 +132,7 @@ function AppContent() {
           <Route path="/explore" element={<Explore />} />
           <Route path="/explore/manage" element={<ExploreContentManagement />} />
           <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/marketplace/listing/:id" element={<MarketplaceListingDetail />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </div>
