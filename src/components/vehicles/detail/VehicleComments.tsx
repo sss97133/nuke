@@ -17,7 +17,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicle }) => {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center">
           <MessageSquare className="h-5 w-5 mr-2" />
-          Vehicle Discussion
+          {/* Removed "Vehicle Discussion" text */}
         </CardTitle>
         <div className="flex items-center space-x-2">
           <Badge variant="outline" className="ml-2 bg-gray-500 text-white">
