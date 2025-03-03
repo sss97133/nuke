@@ -98,7 +98,7 @@ const StatsOverview = () => {
         value={isLoading ? "Loading..." : statsData.totalVehicles}
         description={isLoading ? "" : parseInt(statsData.totalVehicles) > 0 ? "Click to view your vehicles" : "No vehicles added yet"}
         icon={Car}
-        onClick={() => handleNavigate('/vehicles')}
+        onClick={() => handleNavigate('/discovered-vehicles')}
       />
       <StatCard
         title="Active Services"
@@ -112,7 +112,7 @@ const StatsOverview = () => {
         value={isLoading ? "Loading..." : statsData.teamMembers}
         description={isLoading ? "" : parseInt(statsData.teamMembers) > 0 ? "Click to manage your team" : "No team members yet"}
         icon={Users}
-        onClick={() => handleNavigate('/profile/team')}
+        onClick={() => handleNavigate('/profile')}
       />
       <StatCard
         title="Market Value"
