@@ -37,6 +37,9 @@ interface AddTeamMemberFormProps {
   onSuccess?: () => void;
 }
 
+// Define valid member types according to the database schema
+type MemberType = "employee" | "contractor" | "intern" | "partner" | "collaborator";
+
 export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({ 
   open, 
   onOpenChange,
@@ -49,7 +52,7 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
     fullName: '',
     email: '',
     position: '',
-    memberType: 'technician', // Default value
+    memberType: 'employee' as MemberType, // Default to a valid enum value
     department: '',
     status: 'active', // Default value
   });
@@ -69,20 +72,17 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
 
     try {
       // For this example, we'll directly create a team member entry
-      // In a real app, you might want to create a user account first
       const { data, error } = await supabase
         .from('team_members')
-        .insert([
-          {
-            full_name: formData.fullName,
-            email: formData.email,
-            position: formData.position,
-            member_type: formData.memberType,
-            department: formData.department || null,
-            status: formData.status,
-            start_date: new Date().toISOString(),
-          }
-        ])
+        .insert({
+          full_name: formData.fullName,
+          email: formData.email,
+          position: formData.position,
+          member_type: formData.memberType as MemberType, // Ensure correct type
+          department: formData.department || null,
+          status: formData.status,
+          start_date: new Date().toISOString(),
+        })
         .select();
 
       if (error) throw error;
@@ -97,7 +97,7 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
         fullName: '',
         email: '',
         position: '',
-        memberType: 'technician',
+        memberType: 'employee',
         department: '',
         status: 'active',
       });
@@ -184,12 +184,11 @@ export const AddTeamMemberForm: React.FC<AddTeamMemberFormProps> = ({
                   <SelectValue placeholder="Select member type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="technician">Technician</SelectItem>
-                  <SelectItem value="garage">Service Business</SelectItem>
-                  <SelectItem value="consultant">Consultant</SelectItem>
-                  <SelectItem value="partner">Business Partner</SelectItem>
-                  <SelectItem value="media">Media & Documentation</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="contractor">Contractor</SelectItem>
+                  <SelectItem value="intern">Intern</SelectItem>
+                  <SelectItem value="partner">Partner</SelectItem>
+                  <SelectItem value="collaborator">Collaborator</SelectItem>
                 </SelectContent>
               </Select>
             </div>
