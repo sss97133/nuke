@@ -36,9 +36,9 @@ const ServiceHistory = () => {
   };
 
   return (
-    <div className="container mx-auto py-4 md:py-6 px-4 md:px-6 max-w-5xl">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Service History</h1>
+    <div className="container mx-auto py-3 sm:py-4 md:py-6 px-3 sm:px-4 md:px-6 max-w-5xl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 mb-3 sm:mb-4 md:mb-6">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Service History</h1>
         <Button onClick={handleAddServiceRecord} className="w-full sm:w-auto flex gap-1 justify-center">
           <Plus className="h-4 w-4" />
           Add Service Record
@@ -78,7 +78,7 @@ const ServiceHistory = () => {
           onAction={tabCounts.all > 0 ? undefined : handleAddServiceRecord}
         />
       ) : (
-        <div className="space-y-4 mt-4">
+        <div className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
           {filteredRecords.map(record => (
             <ServiceRecordCard key={record.id} record={record} />
           ))}

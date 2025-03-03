@@ -48,7 +48,7 @@ const NavItem = ({ to, icon, label, isActive, isCollapsed, onClick }: NavItemPro
     <Link 
       to={to} 
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+        "flex items-center gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md transition-colors",
         isCollapsed ? "justify-center" : "",
         isActive 
           ? "bg-primary text-primary-foreground" 
@@ -57,7 +57,7 @@ const NavItem = ({ to, icon, label, isActive, isCollapsed, onClick }: NavItemPro
       onClick={onClick}
     >
       {icon}
-      {!isCollapsed && <span>{label}</span>}
+      {!isCollapsed && <span className="text-sm sm:text-base truncate">{label}</span>}
     </Link>
   );
 };
@@ -84,29 +84,29 @@ export const NavSidebar = () => {
   }, []);
   
   const navItems = [
-    { to: "/dashboard", icon: <Home className="h-5 w-5" />, label: "Dashboard" },
-    { to: "/explore", icon: <Atom className="h-5 w-5" />, label: "Explore" },
-    { to: "/onboarding", icon: <Compass className="h-5 w-5" />, label: "Onboarding" },
-    { to: "/skills", icon: <Wrench className="h-5 w-5" />, label: "Skills" },
-    { to: "/achievements", icon: <Award className="h-5 w-5" />, label: "Achievements" },
-    { to: "/maintenance", icon: <Hammer className="h-5 w-5" />, label: "Maintenance" },
-    { to: "/service", icon: <Settings className="h-5 w-5" />, label: "Service" },
-    { to: "/schedule", icon: <Calendar className="h-5 w-5" />, label: "Schedule" },
-    { to: "/analytics", icon: <BarChart3 className="h-5 w-5" />, label: "Analytics" },
-    { to: "/fuel", icon: <Droplets className="h-5 w-5" />, label: "Fuel Tracking" },
-    { to: "/diagnostics", icon: <Gauge className="h-5 w-5" />, label: "Diagnostics" },
-    { to: "/parts", icon: <Battery className="h-5 w-5" />, label: "Parts" },
-    { to: "/service-history", icon: <Timer className="h-5 w-5" />, label: "Service History" },
-    { to: "/studio", icon: <Video className="h-5 w-5" />, label: "Studio" },
-    { to: "/tokens", icon: <Coins className="h-5 w-5" />, label: "Token Management" },
-    { to: "/token-staking", icon: <Wallet className="h-5 w-5" />, label: "Token Staking" },
-    { to: "/glossary", icon: <Book className="h-5 w-5" />, label: "Glossary" },
-    { to: "/sitemap", icon: <Map className="h-5 w-5" />, label: "Sitemap" },
-    { to: "/documentation", icon: <FileText className="h-5 w-5" />, label: "Documentation" },
-    { to: "/import", icon: <FileInput className="h-5 w-5" />, label: "Import" },
-    { to: "/discovered-vehicles", icon: <Car className="h-5 w-5" />, label: "Vehicles" },
-    { to: "/team-members", icon: <Users className="h-5 w-5" />, label: "Team Members" },
-    { to: "/profile", icon: <User className="h-5 w-5" />, label: "Profile" },
+    { to: "/dashboard", icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Dashboard" },
+    { to: "/explore", icon: <Atom className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Explore" },
+    { to: "/onboarding", icon: <Compass className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Onboarding" },
+    { to: "/skills", icon: <Wrench className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Skills" },
+    { to: "/achievements", icon: <Award className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Achievements" },
+    { to: "/maintenance", icon: <Hammer className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Maintenance" },
+    { to: "/service", icon: <Settings className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Service" },
+    { to: "/schedule", icon: <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Schedule" },
+    { to: "/analytics", icon: <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Analytics" },
+    { to: "/fuel", icon: <Droplets className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Fuel Tracking" },
+    { to: "/diagnostics", icon: <Gauge className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Diagnostics" },
+    { to: "/parts", icon: <Battery className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Parts" },
+    { to: "/service-history", icon: <Timer className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Service History" },
+    { to: "/studio", icon: <Video className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Studio" },
+    { to: "/tokens", icon: <Coins className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Token Management" },
+    { to: "/token-staking", icon: <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Token Staking" },
+    { to: "/glossary", icon: <Book className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Glossary" },
+    { to: "/sitemap", icon: <Map className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Sitemap" },
+    { to: "/documentation", icon: <FileText className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Documentation" },
+    { to: "/import", icon: <FileInput className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Import" },
+    { to: "/discovered-vehicles", icon: <Car className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Vehicles" },
+    { to: "/team-members", icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Team Members" },
+    { to: "/profile", icon: <User className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Profile" },
   ];
 
   const toggleCollapse = () => {
@@ -121,18 +121,18 @@ export const NavSidebar = () => {
   if (isMobile) {
     return (
       <>
-        <div className="fixed top-4 left-4 z-40">
+        <div className="fixed top-3 left-3 z-40">
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
+              <Button variant="outline" size="icon" className="md:hidden h-9 w-9">
+                <Menu className="h-4 w-4" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-[270px]">
-              <div className="p-4 flex items-center justify-between border-b">
-                <span className="font-semibold">Vehicle Manager</span>
+            <SheetContent side="left" className="p-0 w-64 sm:w-[270px]">
+              <div className="p-3 sm:p-4 flex items-center justify-between border-b">
+                <span className="font-semibold text-sm sm:text-base">Vehicle Manager</span>
               </div>
-              <ScrollArea className="h-[calc(100vh-65px)]">
+              <ScrollArea className="h-[calc(100vh-57px)]">
                 <div className="p-2 space-y-1">
                   {navItems.map((item) => (
                     <NavItem
@@ -159,18 +159,18 @@ export const NavSidebar = () => {
     <div 
       className={cn(
         "flex flex-col h-screen border-r border-border bg-background transition-all hidden md:flex",
-        isCollapsed ? "w-16" : "w-64"
+        isCollapsed ? "w-14 sm:w-16" : "w-48 sm:w-64"
       )}
     >
-      <div className="p-4 flex items-center justify-between border-b">
-        {!isCollapsed && <span className="font-semibold">Vehicle Manager</span>}
+      <div className="p-3 sm:p-4 flex items-center justify-between border-b">
+        {!isCollapsed && <span className="font-semibold text-sm sm:text-base">Vehicle Manager</span>}
         <Button 
           variant="ghost" 
           size="icon" 
           onClick={toggleCollapse}
-          className="ml-auto"
+          className="ml-auto h-7 w-7 sm:h-8 sm:w-8"
         >
-          {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
       

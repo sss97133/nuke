@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -66,54 +67,54 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
   };
 
   if (loading) {
-    return <div className="p-4 text-center">Loading entries...</div>;
+    return <div className="p-3 sm:p-4 text-center">Loading entries...</div>;
   }
 
   if (entries.length === 0) {
-    return <div className="p-4 text-center text-muted-foreground">No fuel entries found. Add your first entry above.</div>;
+    return <div className="p-3 sm:p-4 text-center text-muted-foreground text-sm">No fuel entries found. Add your first entry above.</div>;
   }
 
   const renderMobileView = () => {
     return (
-      <div className="space-y-4 md:hidden">
+      <div className="space-y-3 md:hidden">
         {entries.map((entry) => (
-          <Card key={entry.id} className="p-4">
+          <Card key={entry.id} className="p-3">
             <div className="flex justify-between items-start">
-              <div className="flex items-center space-x-2 mb-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{entry.date}</span>
+              <div className="flex items-center space-x-1.5 mb-2">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium">{entry.date}</span>
               </div>
               <div className="flex space-x-1">
-                <Button variant="ghost" size="icon" onClick={() => handleEdit(entry.id)}>
-                  <Pencil className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(entry.id)}>
+                  <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)}>
-                  <Trash2 className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(entry.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
             
-            <div className="flex items-center space-x-2 mb-2 text-sm">
-              <Car className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center space-x-1.5 mb-2 text-xs">
+              <Car className="h-3.5 w-3.5 text-muted-foreground" />
               <span>{entry.vehicleName}</span>
             </div>
             
             <div className="grid grid-cols-2 gap-2 mt-2">
-              <div className="flex items-center space-x-2">
-                <Droplet className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{entry.amount.toFixed(2)} gal</span>
+              <div className="flex items-center space-x-1.5">
+                <Droplet className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs">{entry.amount.toFixed(2)} gal</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">${entry.price.toFixed(2)}/gal</span>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Total:</span>
-                <span className="text-sm font-medium ml-2">${entry.total.toFixed(2)}</span>
+              <div className="flex items-center space-x-1.5">
+                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs">${entry.price.toFixed(2)}/gal</span>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground">Odometer:</span>
-                <span className="text-sm font-medium ml-2">{entry.odometer.toLocaleString()}</span>
+                <span className="text-[10px] text-muted-foreground">Total:</span>
+                <span className="text-xs font-medium ml-1.5">${entry.total.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground">Odometer:</span>
+                <span className="text-xs font-medium ml-1.5">{entry.odometer.toLocaleString()}</span>
               </div>
             </div>
           </Card>

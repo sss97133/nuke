@@ -25,8 +25,8 @@ const ServiceFilters = ({
   onDateRangeChange
 }: ServiceFiltersProps) => {
   return (
-    <div className="space-y-4 mb-6">
-      <div className="flex flex-col gap-4">
+    <div className="space-y-4 mb-4 sm:mb-6">
+      <div className="flex flex-col gap-3 sm:gap-4">
         <div className="relative w-full">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -38,11 +38,11 @@ const ServiceFilters = ({
           />
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="sortBy">Sort By</Label>
             <Select value={sortOption} onValueChange={onSortChange}>
-              <SelectTrigger id="sortBy">
+              <SelectTrigger id="sortBy" className="w-full">
                 <SelectValue placeholder="Select sort order" />
               </SelectTrigger>
               <SelectContent>

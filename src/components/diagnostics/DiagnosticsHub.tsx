@@ -16,10 +16,10 @@ const DiagnosticsHub = () => {
       
       <Tabs defaultValue="obd-ii" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-4 md:mb-8 w-full">
-          <TabsTrigger value="obd-ii">OBD-II</TabsTrigger>
-          <TabsTrigger value="third-party">3rd Party</TabsTrigger>
-          <TabsTrigger value="cloud">Cloud</TabsTrigger>
-          <TabsTrigger value="status">Status</TabsTrigger>
+          <TabsTrigger value="obd-ii" className="text-xs sm:text-sm">OBD-II</TabsTrigger>
+          <TabsTrigger value="third-party" className="text-xs sm:text-sm">3rd Party</TabsTrigger>
+          <TabsTrigger value="cloud" className="text-xs sm:text-sm">Cloud</TabsTrigger>
+          <TabsTrigger value="status" className="text-xs sm:text-sm">Status</TabsTrigger>
         </TabsList>
         
         <TabsContent value="obd-ii" className="space-y-4">

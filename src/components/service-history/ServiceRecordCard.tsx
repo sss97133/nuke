@@ -43,55 +43,55 @@ const ServiceRecordCard: React.FC<ServiceRecordCardProps> = ({ record }) => {
   
   return (
     <Card className="w-full shadow-sm">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
         <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
           <div>
-            <CardTitle className="text-lg md:text-xl">{record.description}</CardTitle>
-            <CardDescription className="mt-1 flex items-center gap-1">
-              <Car className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-base sm:text-lg md:text-xl">{record.description}</CardTitle>
+            <CardDescription className="mt-1 flex items-center gap-1 text-xs sm:text-sm">
+              <Car className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               {record.vehicle.year} {record.vehicle.make} {record.vehicle.model}
             </CardDescription>
           </div>
-          <Badge className={`${getStatusColor(record.status)} text-white mt-1 sm:mt-0`}>
+          <Badge className={`${getStatusColor(record.status)} text-white mt-1 sm:mt-0 text-xs sm:text-sm`}>
             {record.status}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="pb-2">
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-          <div className="space-y-2">
-            <div className="flex items-center text-sm">
-              <Wrench className="h-4 w-4 mr-2 text-muted-foreground" />
+      <CardContent className="pb-2 px-3 sm:px-6">
+        <div className="grid gap-2 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+          <div className="space-y-1 sm:space-y-2">
+            <div className="flex items-center text-xs sm:text-sm">
+              <Wrench className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-muted-foreground" />
               <span className="font-medium mr-1">Service Type:</span>
               {formatServiceType(record.service_type)}
             </div>
             
-            <div className="flex items-center text-sm">
-              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+            <div className="flex items-center text-xs sm:text-sm">
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-muted-foreground" />
               <span className="font-medium mr-1">Service Date:</span>
               {formatDate(record.service_date)}
             </div>
             
             {record.completion_date && (
-              <div className="flex items-center text-sm">
-                <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+              <div className="flex items-center text-xs sm:text-sm">
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-muted-foreground" />
                 <span className="font-medium mr-1">Completion Date:</span>
                 {formatDate(record.completion_date)}
               </div>
             )}
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-1 sm:space-y-2">
             {record.labor_hours !== undefined && (
-              <div className="flex items-center text-sm">
-                <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+              <div className="flex items-center text-xs sm:text-sm">
+                <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-muted-foreground" />
                 <span className="font-medium mr-1">Labor Hours:</span>
                 {record.labor_hours}
               </div>
             )}
             
             {record.parts_used && record.parts_used.length > 0 && (
-              <div className="flex items-center text-sm">
+              <div className="flex items-center text-xs sm:text-sm">
                 <span className="font-medium mr-1">Parts Used:</span>
                 {record.parts_used.length} items (${totalPartsCost.toFixed(2)})
               </div>
@@ -100,21 +100,21 @@ const ServiceRecordCard: React.FC<ServiceRecordCardProps> = ({ record }) => {
         </div>
         
         {record.technician_notes && (
-          <div className="mt-4">
-            <h4 className="text-sm font-medium mb-1">Technician Notes:</h4>
-            <p className="text-sm text-muted-foreground">{record.technician_notes}</p>
+          <div className="mt-3 sm:mt-4">
+            <h4 className="text-xs sm:text-sm font-medium mb-1">Technician Notes:</h4>
+            <p className="text-xs sm:text-sm text-muted-foreground">{record.technician_notes}</p>
           </div>
         )}
       </CardContent>
       
       {record.parts_used && record.parts_used.length > 0 && (
-        <CardFooter className="pt-2 flex-col items-start">
+        <CardFooter className="pt-2 px-3 sm:px-6 pb-3 sm:pb-6 flex-col items-start">
           <Button 
             variant="ghost" 
-            className="px-0 text-sm font-medium flex items-center"
+            className="px-0 text-xs sm:text-sm font-medium flex items-center"
             onClick={() => setShowPartsDetails(!showPartsDetails)}
           >
-            {showPartsDetails ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}
+            {showPartsDetails ? <ChevronUp className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronDown className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />}
             {showPartsDetails ? "Hide Parts Details" : "Show Parts Details"}
           </Button>
           
