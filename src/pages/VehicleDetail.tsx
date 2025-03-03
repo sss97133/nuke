@@ -12,6 +12,7 @@ import VehicleHistory from '@/components/vehicles/detail/VehicleHistory';
 import VehicleMarketData from '@/components/vehicles/detail/VehicleMarketData';
 import VehicleGallery from '@/components/vehicles/detail/VehicleGallery';
 import { ArrowLeft } from 'lucide-react';
+import { mockVehicles } from '@/hooks/vehicles/mockVehicleData';
 
 const VehicleDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,87 +21,29 @@ const VehicleDetail = () => {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // In a real app, this would fetch from your API
+  // Fetch vehicle data directly from mockVehicles
   useEffect(() => {
-    // Simulating API fetch for now
     const fetchVehicle = async () => {
       try {
         setLoading(true);
         
-        // Mock data - in a real app, this would be an API call
-        // This is just to simulate fetching a specific vehicle by ID
-        const mockVehicles = [
-          {
-            id: 1,
-            make: "Toyota",
-            model: "Supra",
-            year: 1998,
-            price: 62500,
-            market_value: 65000,
-            price_trend: "up",
-            mileage: 42000,
-            image: "/placeholder.png",
-            location: "Los Angeles, CA",
-            added: "2 days ago",
-            tags: ["Rare", "Sports Car"],
-            condition_rating: 8,
-            vehicle_type: "sports car",
-            body_type: "Coupe",
-            transmission: "Manual",
-            drivetrain: "RWD",
-            rarity_score: 7
-          },
-          {
-            id: 2,
-            make: "Ford",
-            model: "Mustang",
-            year: 1967,
-            price: 78900,
-            market_value: 80000,
-            price_trend: "stable",
-            mileage: 89000,
-            image: "/placeholder.png",
-            location: "Chicago, IL",
-            added: "5 days ago",
-            tags: ["Classic", "American"],
-            condition_rating: 7,
-            vehicle_type: "muscle car",
-            body_type: "Coupe",
-            transmission: "Manual",
-            drivetrain: "RWD",
-            era: "Classic",
-            rarity_score: 6
-          },
-          {
-            id: 3,
-            make: "Honda",
-            model: "Civic Type R",
-            year: 2021,
-            price: 42000,
-            market_value: 40000,
-            price_trend: "down",
-            mileage: 12000,
-            image: "/placeholder.png",
-            location: "Seattle, WA",
-            added: "1 week ago",
-            tags: ["Hot Hatch", "Modified"],
-            condition_rating: 9,
-            vehicle_type: "hatchback",
-            body_type: "Hatchback",
-            transmission: "Manual",
-            drivetrain: "FWD",
-            restoration_status: "modified"
-          },
-        ];
+        if (!id) {
+          throw new Error("Vehicle ID is missing");
+        }
         
-        const foundVehicle = mockVehicles.find(v => v.id === parseInt(id || '0'));
+        // Parse the ID to a number (our mock data uses number IDs)
+        const vehicleId = parseInt(id);
+        
+        // Find the vehicle in the mock data
+        const foundVehicle = mockVehicles.find(v => v.id === vehicleId);
         
         if (foundVehicle) {
-          setVehicle(foundVehicle as Vehicle);
+          setVehicle(foundVehicle);
         } else {
+          console.error(`Vehicle with ID ${vehicleId} not found in mock data`);
           toast({
             title: "Vehicle not found",
-            description: "The requested vehicle could not be found.",
+            description: `The vehicle with ID ${vehicleId} could not be found.`,
             variant: "destructive",
           });
           navigate("/discovered-vehicles");
@@ -117,9 +60,7 @@ const VehicleDetail = () => {
       }
     };
 
-    if (id) {
-      fetchVehicle();
-    }
+    fetchVehicle();
   }, [id, navigate, toast]);
 
   if (loading) {

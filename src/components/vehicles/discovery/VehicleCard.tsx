@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +28,7 @@ const VehicleCard = ({ vehicle, onVerify, onEdit, onRemove }: VehicleCardProps) 
   };
 
   const handleCardClick = () => {
+    console.log(`Navigating to vehicle detail for ID: ${vehicle.id}`);
     navigate(`/vehicle/${vehicle.id}`);
   };
 

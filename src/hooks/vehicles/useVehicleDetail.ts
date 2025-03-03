@@ -32,10 +32,11 @@ export function useVehicleDetail(id: number | string) {
         if (foundVehicle) {
           setVehicle(foundVehicle);
         } else {
+          console.error(`Vehicle with ID ${vehicleId} not found in mockVehicles array`);
           setError('Vehicle not found');
           toast({
             title: "Vehicle not found",
-            description: "The requested vehicle could not be found.",
+            description: `The vehicle with ID ${vehicleId} could not be found.`,
             variant: "destructive",
           });
         }
