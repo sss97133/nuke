@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import {
   Upload, FileText, Database, Globe, Image, RefreshCcw,
   Check, AlertCircle, FileSpreadsheet, UploadCloud
@@ -15,10 +17,41 @@ import {
 const ImportPage = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const { toast } = useToast();
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      
+      // Validate file type
+      const validFileTypes = ['csv', 'xlsx', 'json', 'xml'];
+      if (!fileExtension || !validFileTypes.includes(fileExtension)) {
+        toast({
+          title: "Invalid file type",
+          description: `Please select a CSV, XLSX, JSON, or XML file. You selected: ${fileExtension?.toUpperCase() || 'Unknown'}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        toast({
+          title: "File too large",
+          description: `Maximum file size is 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setSelectedFile(file);
+      toast({
+        title: "File selected",
+        description: `${file.name} (${(file.size / 1024).toFixed(2)} KB)`,
+        variant: "default",
+      });
     }
   };
   
@@ -26,9 +59,31 @@ const ImportPage = () => {
     if (selectedFile) {
       setImportStatus('processing');
       
+      // Show processing toast
+      toast({
+        title: "Processing import",
+        description: "Please wait while we process your file...",
+      });
+      
       // Simulate processing
       setTimeout(() => {
-        setImportStatus(Math.random() > 0.2 ? 'success' : 'error');
+        const success = Math.random() > 0.2;
+        setImportStatus(success ? 'success' : 'error');
+        
+        // Show result toast
+        if (success) {
+          toast({
+            title: "Import successful",
+            description: `Successfully imported data from ${selectedFile.name}`,
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "Import failed",
+            description: "There was an error processing your import. Please try again.",
+            variant: "destructive",
+          });
+        }
       }, 2000);
     }
   };
@@ -87,6 +142,9 @@ const ImportPage = () => {
                                   Browse Files
                                 </Button>
                               </Label>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Supported formats: CSV, XLSX, JSON, XML (Max 10MB)
+                              </p>
                             </>
                           ) : (
                             <div className="space-y-2">
@@ -95,9 +153,14 @@ const ImportPage = () => {
                               <p className="text-sm text-muted-foreground">
                                 {(selectedFile.size / 1024).toFixed(2)} KB
                               </p>
-                              <Button variant="outline" size="sm" onClick={resetImport}>
-                                Choose Different File
-                              </Button>
+                              <div className="flex gap-2 justify-center mt-2">
+                                <Button variant="outline" size="sm" onClick={resetImport}>
+                                  Choose Different File
+                                </Button>
+                                <Button size="sm" onClick={handleImport}>
+                                  Import Now
+                                </Button>
+                              </div>
                             </div>
                           )}
                         </div>
