@@ -31,7 +31,7 @@ const VehicleTabContent = ({
 }: VehicleTabContentProps) => {
   return (
     <>
-      <VehicleStats vehicles={vehicles} filteredCount={filteredVehicles.length} />
+      <VehicleStats vehicles={filteredVehicles} filteredCount={filteredVehicles.length} />
       
       {viewMode === "grid" && (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

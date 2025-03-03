@@ -9,13 +9,15 @@ interface VehicleStatsProps {
 }
 
 const VehicleStats = ({ vehicles, filteredCount }: VehicleStatsProps) => {
-  // Calculate total market value
-  const totalMarketValue = vehicles.reduce((sum, vehicle) => sum + vehicle.price, 0);
+  // Calculate total market value - now using filteredCount which represents the tab's filtered vehicles
+  const totalMarketValue = vehicles.reduce((sum, vehicle) => sum + (vehicle.market_value || vehicle.price || 0), 0);
   
   // Count unique categories/tags
   const uniqueTags = new Set<string>();
   vehicles.forEach(vehicle => {
-    vehicle.tags.forEach(tag => uniqueTags.add(tag));
+    if (vehicle.tags) {
+      vehicle.tags.forEach(tag => uniqueTags.add(tag));
+    }
   });
   
   return (
@@ -26,7 +28,7 @@ const VehicleStats = ({ vehicles, filteredCount }: VehicleStatsProps) => {
       <div className="flex gap-4 text-sm">
         <div className="flex items-center gap-1">
           <Car className="h-4 w-4 text-primary" />
-          <span>{vehicles.length} vehicles</span>
+          <span>{filteredCount} vehicles</span>
         </div>
         <div className="flex items-center gap-1">
           <BarChart className="h-4 w-4 text-primary" />
