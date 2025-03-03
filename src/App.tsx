@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -26,11 +25,12 @@ import Diagnostics from "./pages/Diagnostics"
 import Analytics from "./pages/Analytics"
 import Schedule from "./pages/Schedule"
 import Service from "./pages/Service"
+import Maintenance from "./pages/Maintenance"
 import Studio from "./pages/Studio"
 import Explore from "./pages/Explore"
 import ExploreContentManagement from './pages/ExploreContentManagement'
 import VehicleDetail from './pages/VehicleDetail'
-import TeamMembers from './pages/TeamMembers' // Add the import for TeamMembers page
+import TeamMembers from './pages/TeamMembers'
 
 const queryClient = new QueryClient();
 
@@ -61,7 +61,6 @@ function AppContent() {
   const isAuthPath = ['/login', '/register'].includes(location.pathname);
   const isRootPath = location.pathname === '/';
 
-  // Handle root path explicitly
   if (isRootPath) {
     return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
   }
@@ -96,7 +95,7 @@ function AppContent() {
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/achievements" element={<Achievements />} />
-          <Route path="/maintenance" element={<Dashboard />} />
+          <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/service" element={<Service />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/analytics" element={<Analytics />} />
