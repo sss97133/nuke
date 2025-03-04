@@ -9,7 +9,7 @@ import { ContentCardFooter } from './components/ContentCardFooter';
 import { getContentCardBackground } from './utils/contentCardUtils';
 
 // Fix the export type error - using export type instead of export
-export { ContentCardItem } from './types/ContentCardTypes';
+export type { ContentCardItem } from './types/ContentCardTypes';
 export type { ContentCardProps } from './types/ContentCardTypes';
 
 export const ContentCard: React.FC<ContentCardProps> = ({ 
