@@ -20,7 +20,7 @@ import DiscoveredVehicles from "./pages/DiscoveredVehicles"
 import TokenStaking from "./pages/TokenStaking"
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { NavSidebar } from './components/layout/NavSidebar'
-import TokensPage from "./pages/Tokens"  // Make sure it's imported as default export
+import TokensPage from "./pages/Tokens"
 import ServiceHistory from "./pages/ServiceHistory"
 import Parts from "./pages/Parts"
 import FuelTracking from "./pages/FuelTracking"
@@ -81,21 +81,34 @@ function AppContent() {
 
   const isAuthenticated = !!session;
   const isAuthPath = location.pathname === '/login' || location.pathname === '/register';
+  const isAuthCallbackPath = location.pathname.startsWith('/auth/callback');
   const isRootPath = location.pathname === '/';
 
-  // Handle root path redirect
+  // Handle auth callback path separately
+  if (isAuthCallbackPath) {
+    console.log("Handling auth callback");
+    return (
+      <div className="min-h-screen bg-background">
+        <Routes>
+          <Route path="/auth/callback" element={<div className="flex items-center justify-center h-screen">Completing login...</div>} />
+        </Routes>
+      </div>
+    );
+  }
+
+  // For root path, redirect based on auth status
   if (isRootPath) {
     console.log("On root path, redirecting to", isAuthenticated ? "/dashboard" : "/login");
     return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
   }
 
-  // Redirect authenticated users away from auth pages
+  // If authenticated but on auth path, redirect to dashboard
   if (isAuthenticated && isAuthPath) {
     console.log("Authenticated and on auth path, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
-  // For unauthenticated users on auth paths, just render the auth page without redirecting
+  // For unauthenticated users on auth paths, render the auth page
   if (!isAuthenticated && isAuthPath) {
     console.log("Unauthenticated and on auth path, rendering auth page");
     return (
@@ -109,21 +122,9 @@ function AppContent() {
   }
 
   // Redirect unauthenticated users to login for non-auth paths
-  if (!isAuthenticated && !location.pathname.startsWith('/auth/callback')) {
+  if (!isAuthenticated) {
     console.log("Not authenticated and not on auth path, redirecting to login");
     return <Navigate to="/login" replace />;
-  }
-
-  // Handle auth callbacks
-  if (location.pathname.startsWith('/auth/callback')) {
-    console.log("Handling auth callback");
-    return (
-      <div className="min-h-screen bg-background">
-        <Routes>
-          <Route path="/auth/callback" element={<div className="flex items-center justify-center h-screen">Completing login...</div>} />
-        </Routes>
-      </div>
-    );
   }
 
   // Main app layout with authenticated routes

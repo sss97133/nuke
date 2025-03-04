@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => {
   const [email, setEmail] = useState("");
@@ -9,6 +9,7 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
   const [rememberMe, setRememberMe] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
   const { handleEmailLogin, handleForgotPassword } = useAuth();
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,26 +26,21 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
         return;
       }
 
-      // Changed here - don't test the result for truthiness since handleEmailLogin may return void
       await handleEmailLogin(email, password, isSignUp, avatarUrl);
-      
-      // Moved the toast notification outside of the conditional
-      toast({
-        title: isSignUp ? "Account Created" : "Welcome Back!",
-        description: isSignUp ? "Your account has been created successfully." : "Successfully logged in"
-      });
       
     } catch (error: any) {
       console.error("[useEmailForm] Auth error:", error);
       
       let errorMessage = "An unexpected error occurred. Please try again.";
       
-      if (error.message.includes("Email not confirmed")) {
-        errorMessage = "Please check your email to confirm your account.";
-      } else if (error.message.includes("Invalid login credentials")) {
-        errorMessage = "Invalid email or password.";
-      } else if (error.message.includes("User already registered")) {
-        errorMessage = "This email is already registered. Please try logging in instead.";
+      if (error.message && typeof error.message === 'string') {
+        if (error.message.includes("Email not confirmed")) {
+          errorMessage = "Please check your email to confirm your account.";
+        } else if (error.message.includes("Invalid login credentials")) {
+          errorMessage = "Invalid email or password.";
+        } else if (error.message.includes("User already registered")) {
+          errorMessage = "This email is already registered. Please try logging in instead.";
+        }
       }
       
       toast({
@@ -52,8 +48,6 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
         title: "Authentication Error",
         description: errorMessage
       });
-      
-      throw error; // Re-throw to let the form component handle it
     }
   };
 

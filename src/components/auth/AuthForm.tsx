@@ -12,7 +12,7 @@ import { PasswordResetForm } from "./password-reset/PasswordResetForm";
 import { EmailLoginForm } from "./email-form/EmailLoginForm";
 
 export const AuthForm = () => {
-  const { isLoading, handlePhoneLogin, verifyOtp, handleSocialLogin } = useAuth();
+  const { isLoading, handlePhoneLogin, verifyOtp, handleSocialLogin, session } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -24,6 +24,13 @@ export const AuthForm = () => {
 
   // Debug logging to verify the component is rendering
   console.log("Rendering AuthForm component");
+
+  // If the user is already logged in, redirect to dashboard
+  useEffect(() => {
+    if (session) {
+      navigate('/dashboard');
+    }
+  }, [session, navigate]);
 
   useEffect(() => {
     const isReset = searchParams.get('reset') === 'true';
