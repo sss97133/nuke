@@ -1,34 +1,39 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
   title: string;
-  value: string | number;
+  value: string;
   description: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   onClick?: () => void;
+  isError?: boolean;
 }
 
-export const StatCard = ({ title, value, description, icon: Icon, onClick }: StatCardProps) => {
-  // Add console log to verify when card is clicked
-  const handleClick = () => {
-    console.log(`StatCard clicked: ${title}`);
-    if (onClick) onClick();
-  };
-  
+const StatCard = ({ title, value, description, icon: Icon, onClick, isError = false }: StatCardProps) => {
   return (
     <Card 
-      className={`${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-      onClick={handleClick}
+      className={`transition-all duration-200 ${onClick ? 'cursor-pointer hover:shadow-md' : ''} ${isError ? 'border-red-200' : ''}`}
+      onClick={onClick}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-medium">{title}</h3>
+          <div className={`p-2 rounded-full ${isError ? 'bg-red-50' : 'bg-primary/10'}`}>
+            <Icon className={`h-5 w-5 ${isError ? 'text-red-400' : 'text-primary'}`} />
+          </div>
+        </div>
+        <div>
+          <div className={`text-2xl font-bold ${isError ? 'text-muted-foreground' : ''}`}>
+            {isError ? "Unavailable" : value}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">{description}</p>
+          {isError && (
+            <p className="text-xs text-red-500 mt-1">Error loading data</p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

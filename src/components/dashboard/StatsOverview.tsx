@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Car, Wrench, Users, TrendingUp } from "lucide-react";
 import StatCard from './StatCard';
@@ -15,11 +16,13 @@ const StatsOverview = () => {
     marketValue: '$0'
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
         setIsLoading(true);
+        setFetchError(false);
         
         // Get current user
         const { data: { user } } = await supabase.auth.getUser();
@@ -33,31 +36,37 @@ const StatsOverview = () => {
           return;
         }
         
-        // Fetch total vehicles
-        const { data: vehicles, error: vehiclesError } = await supabase
-          .from('vehicles')
-          .select('id, market_value')
-          .eq('user_id', user.id)
-          .eq('status', 'owned');
-          
-        if (vehiclesError) throw vehiclesError;
+        // Use Promise.allSettled to handle potential failures in individual queries
+        const [vehiclesResult, servicesResult, membersResult] = await Promise.allSettled([
+          // Fetch total vehicles
+          supabase
+            .from('vehicles')
+            .select('id, market_value')
+            .eq('user_id', user.id)
+            .eq('status', 'owned'),
+            
+          // Fetch active services  
+          supabase
+            .from('service_tickets')
+            .select('id')
+            .eq('user_id', user.id)
+            .in('status', ['pending', 'in_progress']),
+            
+          // Fetch team members
+          supabase
+            .from('team_members')
+            .select('id')
+            .eq('status', 'active')
+        ]);
         
-        // Fetch active services
-        const { data: services, error: servicesError } = await supabase
-          .from('service_tickets')
-          .select('id')
-          .eq('user_id', user.id)
-          .in('status', ['pending', 'in_progress']);
-          
-        if (servicesError) throw servicesError;
+        // Extract data from results handling potential failures
+        const vehicles = vehiclesResult.status === 'fulfilled' ? vehiclesResult.value.data : null;
+        const services = servicesResult.status === 'fulfilled' ? servicesResult.value.data : null;
+        const members = membersResult.status === 'fulfilled' ? membersResult.value.data : null;
         
-        // Fetch team members
-        const { data: members, error: membersError } = await supabase
-          .from('team_members')
-          .select('id')
-          .eq('status', 'active');
-          
-        if (membersError) throw membersError;
+        if (vehiclesResult.status === 'rejected' || servicesResult.status === 'rejected' || membersResult.status === 'rejected') {
+          console.warn('Some dashboard queries failed to complete', { vehiclesResult, servicesResult, membersResult });
+        }
         
         // Calculate total market value
         const totalMarketValue = vehicles
@@ -72,9 +81,10 @@ const StatsOverview = () => {
         });
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);
+        setFetchError(true);
         toast({
           title: "Failed to load dashboard data",
-          description: "Please try again later",
+          description: "We're experiencing some technical difficulties. Stats may be unavailable temporarily.",
           variant: "destructive",
         });
       } finally {
@@ -98,6 +108,7 @@ const StatsOverview = () => {
         description={isLoading ? "" : parseInt(statsData.totalVehicles) > 0 ? "Click to view your vehicles" : "No vehicles added yet"}
         icon={Car}
         onClick={() => handleNavigate('/discovered-vehicles')}
+        isError={fetchError}
       />
       <StatCard
         title="Active Services"
@@ -105,6 +116,7 @@ const StatsOverview = () => {
         description={isLoading ? "" : parseInt(statsData.activeServices) > 0 ? "Click to view pending services" : "No active services"}
         icon={Wrench}
         onClick={() => handleNavigate('/service')}
+        isError={fetchError}
       />
       <StatCard
         title="Team Members"
@@ -112,6 +124,7 @@ const StatsOverview = () => {
         description={isLoading ? "" : parseInt(statsData.teamMembers) > 0 ? "Click to manage your team" : "No team members yet"}
         icon={Users}
         onClick={() => handleNavigate('/team-members')}
+        isError={fetchError}
       />
       <StatCard
         title="Market Value"
@@ -119,6 +132,7 @@ const StatsOverview = () => {
         description={isLoading ? "" : statsData.marketValue !== "$0" ? "Based on verified owned vehicles" : "No vehicle valuations yet"}
         icon={TrendingUp}
         onClick={() => handleNavigate('/market-analysis')}
+        isError={fetchError}
       />
     </div>
   );
