@@ -70,6 +70,7 @@ export class TwitchApi {
       
       // Then get current stream info
       const streamData = await this.makeRequest(`/streams?user_id=${userId}`, token);
+      console.log("Current broadcast data:", streamData);
       return streamData.data[0] || null;
     } catch (error) {
       console.error('Error fetching current broadcast:', error);
@@ -116,6 +117,7 @@ export class TwitchApi {
   public async getCurrentUser(token: string): Promise<any> {
     try {
       const data = await this.makeRequest('/users', token);
+      console.log("Twitch user data:", data);
       return data.data[0] || null;
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -126,6 +128,7 @@ export class TwitchApi {
   public async checkStreamStatus(token: string): Promise<boolean> {
     try {
       const broadcast = await this.getCurrentBroadcast(token);
+      console.log("Stream status check result:", broadcast ? "LIVE" : "OFFLINE");
       return !!broadcast;
     } catch (error) {
       console.error('Error checking stream status:', error);
