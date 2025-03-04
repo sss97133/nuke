@@ -1,12 +1,11 @@
 import * as React from "react"
-
-import type {
+import {
   ToastActionElement,
-  ToastProps,
+  ToastProps
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 3
-const TOAST_REMOVE_DELAY = 10000 // Reducing this to 10 seconds from 1000000
+const TOAST_LIMIT = 5
+const TOAST_REMOVE_DELAY = 1000000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -42,11 +41,11 @@ type Action =
     }
   | {
       type: ActionType["DISMISS_TOAST"]
-      toastId?: ToasterToast["id"]
+      toastId?: string
     }
   | {
       type: ActionType["REMOVE_TOAST"]
-      toastId?: ToasterToast["id"]
+      toastId?: string
     }
 
 interface State {
@@ -54,10 +53,6 @@ interface State {
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
-
-// Keep track of recent error messages to prevent duplicates
-const recentErrorMessages = new Set<string>()
-const ERROR_MESSAGE_DEBOUNCE_TIME = 5000 // 5 seconds
 
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
@@ -130,7 +125,7 @@ export const reducer = (state: State, action: Action): State => {
   }
 }
 
-const listeners: Array<(state: State) => void> = []
+const listeners: ((state: State) => void)[] = []
 
 let memoryState: State = { toasts: [] }
 
@@ -141,31 +136,9 @@ function dispatch(action: Action) {
   })
 }
 
-type Toast = Omit<ToasterToast, "id">
+interface Toast extends Omit<ToasterToast, "id"> {}
 
 function toast({ ...props }: Toast) {
-  // For error toasts, check if we've shown this recently
-  if (props.variant === 'destructive' && props.description) {
-    const errorMessage = String(props.description)
-    
-    // If this exact error was shown recently, don't show it again
-    if (recentErrorMessages.has(errorMessage)) {
-      return {
-        id: '',
-        dismiss: () => {},
-        update: () => {},
-      }
-    }
-    
-    // Add this error to recent messages
-    recentErrorMessages.add(errorMessage)
-    
-    // Remove from recent messages after debounce time
-    setTimeout(() => {
-      recentErrorMessages.delete(errorMessage)
-    }, ERROR_MESSAGE_DEBOUNCE_TIME)
-  }
-
   const id = genId()
 
   const update = (props: ToasterToast) =>
