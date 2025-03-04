@@ -7,6 +7,8 @@ import { StreamSettings } from './settings/StreamSettings';
 
 export const StreamerView = () => {
   const [isLive, setIsLive] = useState(false);
+  // Generate a unique stream ID when the component mounts
+  const [streamId] = useState(`stream-${Math.random().toString(36).substring(2, 9)}`);
 
   return (
     <Card className="bg-card">
