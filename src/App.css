@@ -37,7 +37,7 @@
 
 .card {
   padding: 2em;
-  @apply bg-background border border-border shadow-classic p-6;
+  @apply classic-window;
 }
 
 .read-the-docs {
