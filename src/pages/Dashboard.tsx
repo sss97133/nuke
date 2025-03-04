@@ -5,6 +5,7 @@ import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import DashboardLayout from '@/components/dashboard/layout/DashboardLayout';
+import { GeoFencedDiscovery } from '@/components/discovery/GeoFencedDiscovery';
 
 const Dashboard = () => {
   // Enhanced console logs for debugging
@@ -34,7 +35,7 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            {/* GeoFencedDiscovery will be rendered here */}
+            <GeoFencedDiscovery contentType="all" />
           </div>
         </CardContent>
       </Card>

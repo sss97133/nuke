@@ -8,7 +8,14 @@ interface NearbyFeedProps {
 }
 
 export const NearbyFeed = ({ filter }: NearbyFeedProps) => {
+  // Convert filter to a valid contentType
+  const contentType = filter === 'all' ? 'all' : 
+                      filter === 'vehicles' ? 'vehicles' :
+                      filter === 'garages' ? 'garages' :
+                      filter === 'auctions' ? 'auctions' :
+                      filter === 'events' ? 'events' : 'all';
+  
   return (
-    <GeoFencedDiscovery contentType={filter === 'all' ? 'all' : filter as any} />
+    <GeoFencedDiscovery contentType={contentType as 'all' | 'vehicles' | 'garages' | 'auctions' | 'events'} />
   );
 };
