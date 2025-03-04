@@ -1,5 +1,7 @@
-
 import React from 'react';
+import { Navigate } from 'react-router-dom';
+
+// Page imports
 import Dashboard from "@/pages/Dashboard";
 import Onboarding from "@/pages/Onboarding";
 import Skills from "@/pages/Skills";
@@ -29,78 +31,95 @@ import Marketplace from '@/pages/Marketplace';
 import MarketplaceListingDetail from '@/pages/MarketplaceListingDetail';
 import { AuthForm } from '@/components/auth/AuthForm';
 import Streaming from '@/pages/Streaming';
-import { Navigate } from 'react-router-dom';
+
+// Route type definitions
+export enum RouteType {
+  PUBLIC = 'public',
+  PROTECTED = 'protected',
+  AUTH = 'auth'
+}
 
 export interface RouteConfig {
   path: string;
   element: React.ReactNode;
-  public?: boolean;
+  type: RouteType;
+  redirectTo?: string;
 }
-
-// Define public routes that don't require authentication
-export const PUBLIC_ROUTES: string[] = [
-  '/explore',
-  '/discover', // Add discover to public routes
-  '/marketplace',
-  '/marketplace/listing',
-  '/glossary',
-  '/documentation',
-  '/sitemap'
-];
-
-// Helper function to check if a path is public
-export const isPublicPath = (path: string): boolean => {
-  return PUBLIC_ROUTES.some(route => path.startsWith(route));
-};
 
 // Auth routes
 export const authRoutes: RouteConfig[] = [
-  { path: '/login', element: <AuthForm />, public: true },
-  { path: '/register', element: <AuthForm />, public: true },
+  { path: '/login', element: <AuthForm />, type: RouteType.AUTH },
+  { path: '/register', element: <AuthForm />, type: RouteType.AUTH },
 ];
 
 // Public routes configuration
 export const publicRoutes: RouteConfig[] = [
-  { path: '/explore', element: <Explore />, public: true },
-  // Add a redirect from /discover to /explore
-  { path: '/discover', element: <Navigate to="/explore" replace />, public: true },
-  { path: '/marketplace', element: <Marketplace />, public: true },
-  { path: '/marketplace/listing/:id', element: <MarketplaceListingDetail />, public: true },
-  { path: '/glossary', element: <Glossary />, public: true },
-  { path: '/documentation', element: <Documentation />, public: true },
-  { path: '/sitemap', element: <Sitemap />, public: true },
+  { path: '/explore', element: <Explore />, type: RouteType.PUBLIC },
+  { path: '/discover', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC },
+  { path: '/marketplace', element: <Marketplace />, type: RouteType.PUBLIC },
+  { path: '/marketplace/listing/:id', element: <MarketplaceListingDetail />, type: RouteType.PUBLIC },
+  { path: '/glossary', element: <Glossary />, type: RouteType.PUBLIC },
+  { path: '/documentation', element: <Documentation />, type: RouteType.PUBLIC },
+  { path: '/sitemap', element: <Sitemap />, type: RouteType.PUBLIC },
+  { path: '/crypto', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC },
 ];
 
 // Protected routes configuration
 export const protectedRoutes: RouteConfig[] = [
-  { path: '/dashboard', element: <Dashboard /> },
-  { path: '/onboarding', element: <Onboarding /> },
-  { path: '/skills', element: <Skills /> },
-  { path: '/achievements', element: <Achievements /> },
-  { path: '/maintenance', element: <Maintenance /> },
-  { path: '/service', element: <Service /> },
-  { path: '/schedule', element: <Schedule /> },
-  { path: '/analytics', element: <Analytics /> },
-  { path: '/fuel', element: <FuelTracking /> },
-  { path: '/diagnostics', element: <Diagnostics /> },
-  { path: '/parts', element: <Parts /> },
-  { path: '/service-history', element: <ServiceHistory /> },
-  { path: '/token-staking', element: <TokenStaking /> },
-  { path: '/tokens', element: <TokensPage /> },
-  { path: '/import', element: <Import /> },
-  { path: '/discovered-vehicles', element: <DiscoveredVehicles /> },
-  { path: '/vehicle/:id', element: <VehicleDetail /> },
-  { path: '/profile', element: <Profile /> },
-  { path: '/team-members', element: <TeamMembers /> },
-  { path: '/professional-dashboard', element: <Profile /> },
-  { path: '/studio', element: <Studio /> },
-  { path: '/explore/manage', element: <ExploreContentManagement /> },
-  { path: '/streaming', element: <Streaming /> },
+  { path: '/dashboard', element: <Dashboard />, type: RouteType.PROTECTED },
+  { path: '/onboarding', element: <Onboarding />, type: RouteType.PROTECTED },
+  { path: '/skills', element: <Skills />, type: RouteType.PROTECTED },
+  { path: '/achievements', element: <Achievements />, type: RouteType.PROTECTED },
+  { path: '/maintenance', element: <Maintenance />, type: RouteType.PROTECTED },
+  { path: '/service', element: <Service />, type: RouteType.PROTECTED },
+  { path: '/schedule', element: <Schedule />, type: RouteType.PROTECTED },
+  { path: '/analytics', element: <Analytics />, type: RouteType.PROTECTED },
+  { path: '/fuel', element: <FuelTracking />, type: RouteType.PROTECTED },
+  { path: '/diagnostics', element: <Diagnostics />, type: RouteType.PROTECTED },
+  { path: '/parts', element: <Parts />, type: RouteType.PROTECTED },
+  { path: '/service-history', element: <ServiceHistory />, type: RouteType.PROTECTED },
+  { path: '/token-staking', element: <TokenStaking />, type: RouteType.PROTECTED },
+  { path: '/tokens', element: <TokensPage />, type: RouteType.PROTECTED },
+  { path: '/import', element: <Import />, type: RouteType.PROTECTED },
+  { path: '/discovered-vehicles', element: <DiscoveredVehicles />, type: RouteType.PROTECTED },
+  { path: '/vehicle/:id', element: <VehicleDetail />, type: RouteType.PROTECTED },
+  { path: '/profile', element: <Profile />, type: RouteType.PROTECTED },
+  { path: '/team-members', element: <TeamMembers />, type: RouteType.PROTECTED },
+  { path: '/professional-dashboard', element: <Profile />, type: RouteType.PROTECTED },
+  { path: '/studio', element: <Studio />, type: RouteType.PROTECTED },
+  { path: '/explore/manage', element: <ExploreContentManagement />, type: RouteType.PROTECTED },
+  { path: '/streaming', element: <Streaming />, type: RouteType.PROTECTED },
 ];
 
-// All routes combined
+// Special routes
+export const specialRoutes: RouteConfig[] = [
+  { path: '/', element: null, type: RouteType.PUBLIC, redirectTo: '/explore' },
+  { path: '*', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC },
+];
+
+// Utility functions
+export const isPublicPath = (path: string): boolean => {
+  if (publicRoutes.some(route => route.path === path)) {
+    return true;
+  }
+  
+  return publicRoutes.some(route => {
+    const routeSegments = route.path.split('/');
+    const pathSegments = path.split('/');
+    
+    if (routeSegments.length !== pathSegments.length) return false;
+    
+    return routeSegments.every((segment, i) => {
+      if (segment.startsWith(':')) return true;
+      return segment === pathSegments[i];
+    });
+  });
+};
+
+// Create a unified routes collection
 export const allRoutes: RouteConfig[] = [
-  ...authRoutes,
-  ...publicRoutes,
-  ...protectedRoutes
+  ...authRoutes, 
+  ...publicRoutes, 
+  ...protectedRoutes,
+  ...specialRoutes
 ];

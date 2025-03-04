@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -32,6 +33,7 @@ import {
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useAuthState } from '@/hooks/auth/use-auth-state';
 import { NavItem } from './types';
+import { isPublicPath } from '@/routes/routeConfig';
 
 export const useNavItems = () => {
   const navigate = useNavigate();
@@ -54,6 +56,7 @@ export const useNavItems = () => {
     const isAuthenticated = !!session;
     const items: NavItem[] = [];
     
+    // Always include these public items
     items.push(
       { to: "/", icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Home" },
       { to: "/explore", icon: <Atom className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Explore" },
@@ -63,6 +66,7 @@ export const useNavItems = () => {
       { to: "/sitemap", icon: <Map className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Sitemap" }
     );
     
+    // Add login/register for unauthenticated users
     if (!isAuthenticated && !authLoading) {
       return [
         ...items,
@@ -81,7 +85,8 @@ export const useNavItems = () => {
       ];
     }
     
-    if (!onboardingLoading && isCompleted === false) {
+    // Add onboarding for authenticated users who haven't completed it
+    if (isAuthenticated && !onboardingLoading && isCompleted === false) {
       items.push({ 
         to: "/onboarding", 
         icon: <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5" />, 
@@ -89,6 +94,7 @@ export const useNavItems = () => {
       });
     }
     
+    // Add all authenticated items
     if (isAuthenticated) {
       return [
         ...items,
