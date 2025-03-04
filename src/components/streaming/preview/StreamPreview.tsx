@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { twitchService } from '../services/TwitchService';
+import twitchService from '../services/TwitchService';
 import { AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 

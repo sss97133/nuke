@@ -1,6 +1,12 @@
 
 // Add these missing exports to fix the Twitch service errors
 
+export const fetchTwitchStreams = async () => {
+  // This would normally call the Twitch API
+  // For now, return mock data
+  return [];
+};
+
 export const fetchLiveStreams = async () => {
   // This would normally call the Twitch API
   // For now, return mock data

@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Video, VideoOff, Mic, MicOff, Settings } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { twitchService } from '../services/TwitchService';
+import twitchService from '../services/TwitchService';
 
 export const StreamControls = () => {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -16,16 +15,13 @@ export const StreamControls = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if Twitch Client ID is missing
     setHasClientIdError(!import.meta.env.VITE_TWITCH_CLIENT_ID);
     
-    // Check if we're already authenticated with Twitch
     const checkTwitchConnection = async () => {
       const isAuthenticated = twitchService.isAuthenticated();
       setIsConnectedToTwitch(isAuthenticated);
       
       if (isAuthenticated) {
-        // Check if we're currently streaming
         try {
           const streaming = await twitchService.isCurrentlyStreaming();
           setIsStreaming(streaming);
@@ -43,27 +39,24 @@ export const StreamControls = () => {
     
     checkTwitchConnection();
     
-    // Listen for authentication state changes
     const handleAuthChange = () => {
       setIsConnectedToTwitch(twitchService.isAuthenticated());
     };
     
     window.addEventListener('twitch_auth_changed', handleAuthChange);
     
-    // Clean up the event listener on unmount
     return () => {
       window.removeEventListener('twitch_auth_changed', handleAuthChange);
     };
   }, [toast]);
 
   const toggleStream = async () => {
-    if (isLoading) return; // Prevent multiple clicks during processing
+    if (isLoading) return;
     
     setIsLoading(true);
     
     try {
       if (isStreaming) {
-        // Stop streaming
         if (isConnectedToTwitch) {
           await twitchService.stopStream();
         }
@@ -73,7 +66,6 @@ export const StreamControls = () => {
           description: "Your stream has ended. Note: You need to also stop your broadcasting software.",
         });
       } else {
-        // Start streaming
         if (hasClientIdError) {
           toast({
             title: "Twitch Configuration Error",

@@ -44,6 +44,25 @@ class TwitchService {
     console.log('Stopping stream...');
     return true;
   }
+  
+  // Mock methods used in components
+  isAuthenticated() {
+    return true; // Mock implementation
+  }
+  
+  getUserData() {
+    return {
+      displayName: 'Mock User'
+    };
+  }
+  
+  getLiveStreams(searchTerm = '') {
+    console.log('Getting live streams with search term:', searchTerm);
+    return []; // Mock implementation
+  }
 }
 
-export default new TwitchService();
+// Export the instance as default and as named export to support both import styles
+const twitchService = new TwitchService();
+export { twitchService };
+export default twitchService;

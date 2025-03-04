@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { StreamControls } from './controls/StreamControls';
 import { StreamPreview } from './preview/StreamPreview';
 import { StreamSettings } from './settings/StreamSettings';
-import { twitchService } from './services/TwitchService';
+import twitchService from './services/TwitchService';
 import { useToast } from "@/components/ui/use-toast";
 
 export const StreamerView = () => {

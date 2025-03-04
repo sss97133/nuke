@@ -1,4 +1,3 @@
-
 export interface TwitchAuthData {
   accessToken: string;
   refreshToken?: string;
@@ -27,6 +26,18 @@ export interface TwitchStreamData {
   started_at: string;
   language: string;
   thumbnail_url: string;
+  tags?: string[];
+}
+
+export interface StreamMetadata {
+  id: string;
+  title: string;
+  user_name: string;
+  user_login: string;
+  game_name: string;
+  viewer_count: number;
+  thumbnail_url: string;
+  started_at: string;
   tags?: string[];
 }
 

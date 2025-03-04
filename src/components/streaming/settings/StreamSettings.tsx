@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Check, Twitch } from 'lucide-react';
-import { twitchService } from '../services/TwitchService';
+import twitchService from '../services/TwitchService';
 import { Switch } from '@/components/ui/switch';
 
 export const StreamSettings = () => {

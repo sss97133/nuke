@@ -1,6 +1,6 @@
 
 import { TwitchStreamData } from "@/components/streaming/services/types";
-import { twitchService } from "@/components/streaming/services/TwitchService";
+import twitchService from "@/components/streaming/services/TwitchService";
 import { ContentItem } from "./types";
 
 export async function fetchLiveTwitchStreams(searchTerm = ''): Promise<ContentItem[]> {

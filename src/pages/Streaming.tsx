@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { StreamerView } from '@/components/streaming/StreamerView';
 import { StreamChat } from '@/components/streaming/StreamChat';
 import { StreamProvider } from '@/components/streaming/StreamProvider';
-import { twitchService } from '@/components/streaming/services/TwitchService';
+import twitchService from '@/components/streaming/services/TwitchService';
 
 const Streaming = () => {
   const [streamId, setStreamId] = useState<string | undefined>(undefined);
