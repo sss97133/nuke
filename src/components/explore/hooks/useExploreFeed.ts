@@ -4,7 +4,7 @@ import { useContentInteractions } from './feed/useContentInteractions';
 import { fetchFeedContent } from './feed/contentFetcher';
 import { ContentItem, FeedOptions, UseExploreFeedReturnType } from './feed/types';
 
-export { ContentItem } from './feed/types';
+export type { ContentItem } from './feed/types';
 
 export function useExploreFeed(options: FeedOptions = {}): UseExploreFeedReturnType {
   const { filter = 'all', limit = 10, includeStreams = false, searchTerm = '' } = options;
