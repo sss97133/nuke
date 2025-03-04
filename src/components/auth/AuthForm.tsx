@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ClassicWindow } from "./ClassicWindow";
 import { PhoneInput } from "./PhoneInput";
 import { OtpInput } from "./OtpInput";
 import { Separator } from "@/components/ui/separator";
-import { SocialLoginButtons } from "./SocialLoginButtons";
+import { SocialLoginButtons } from "./social-login/SocialLoginButtons";
 import { AuthFooter } from "./AuthFooter";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PasswordResetForm } from "./password-reset/PasswordResetForm";
