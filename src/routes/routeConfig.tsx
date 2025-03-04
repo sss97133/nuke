@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Dashboard from "@/pages/Dashboard";
 import Onboarding from "@/pages/Onboarding";
@@ -28,6 +29,7 @@ import Marketplace from '@/pages/Marketplace';
 import MarketplaceListingDetail from '@/pages/MarketplaceListingDetail';
 import { AuthForm } from '@/components/auth/AuthForm';
 import Streaming from '@/pages/Streaming';
+import { Navigate } from 'react-router-dom';
 
 export interface RouteConfig {
   path: string;
@@ -38,6 +40,7 @@ export interface RouteConfig {
 // Define public routes that don't require authentication
 export const PUBLIC_ROUTES: string[] = [
   '/explore',
+  '/discover', // Add discover to public routes
   '/marketplace',
   '/marketplace/listing',
   '/glossary',
@@ -59,6 +62,8 @@ export const authRoutes: RouteConfig[] = [
 // Public routes configuration
 export const publicRoutes: RouteConfig[] = [
   { path: '/explore', element: <Explore />, public: true },
+  // Add a redirect from /discover to /explore
+  { path: '/discover', element: <Navigate to="/explore" replace />, public: true },
   { path: '/marketplace', element: <Marketplace />, public: true },
   { path: '/marketplace/listing/:id', element: <MarketplaceListingDetail />, public: true },
   { path: '/glossary', element: <Glossary />, public: true },
