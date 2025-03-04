@@ -1,6 +1,7 @@
 
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface OtpInputProps {
   otp: string;
@@ -51,7 +52,12 @@ export const OtpInput = ({ otp, setOtp, onSubmit, isLoading }: OtpInputProps) =>
         className="classic-button w-full font-system bg-secondary hover:bg-accent hover:text-accent-foreground"
         disabled={isLoading || otp.length !== 6}
       >
-        {isLoading ? "Verifying..." : "Sign In"}
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Verifying...
+          </>
+        ) : "Sign In"}
       </Button>
     </form>
   );

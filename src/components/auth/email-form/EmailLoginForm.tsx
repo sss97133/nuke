@@ -12,6 +12,7 @@ interface EmailLoginFormProps {
   isSignUp: boolean;
   setIsSignUp: (isSignup: boolean) => void;
   onContinueWithoutLogin: () => void;
+  onError?: (error: string) => void;
 }
 
 export const EmailLoginForm = ({
@@ -20,7 +21,8 @@ export const EmailLoginForm = ({
   setShowForgotPassword,
   isSignUp,
   setIsSignUp,
-  onContinueWithoutLogin
+  onContinueWithoutLogin,
+  onError
 }: EmailLoginFormProps) => {
   const {
     email,
@@ -32,7 +34,7 @@ export const EmailLoginForm = ({
     avatarUrl,
     setAvatarUrl,
     handleSubmit
-  } = useEmailForm(showForgotPassword, isSignUp);
+  } = useEmailForm(showForgotPassword, isSignUp, onError);
 
   // Debug logging
   console.log("Rendering EmailLoginForm, showForgotPassword:", showForgotPassword, "isSignUp:", isSignUp);
@@ -48,6 +50,7 @@ export const EmailLoginForm = ({
           onChange={(e) => setEmail(e.target.value)}
           required
           className="classic-input"
+          disabled={isLoading}
         />
       </div>
       {!showForgotPassword && (
@@ -60,6 +63,7 @@ export const EmailLoginForm = ({
             onChange={(e) => setPassword(e.target.value)}
             required
             className="classic-input"
+            disabled={isLoading}
           />
         </div>
       )}
@@ -72,6 +76,7 @@ export const EmailLoginForm = ({
             value={avatarUrl}
             onChange={(e) => setAvatarUrl(e.target.value)}
             className="classic-input"
+            disabled={isLoading}
           />
         </div>
       )}
@@ -82,6 +87,7 @@ export const EmailLoginForm = ({
               id="remember"
               checked={rememberMe}
               onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              disabled={isLoading}
             />
             <Label htmlFor="remember" className="text-sm">Remember me</Label>
           </div>
@@ -100,6 +106,7 @@ export const EmailLoginForm = ({
         variant="outline" 
         className="classic-button w-full border border-border bg-transparent hover:bg-accent/50" 
         onClick={onContinueWithoutLogin}
+        disabled={isLoading}
       >
         Continue without logging in
       </Button>
@@ -110,6 +117,7 @@ export const EmailLoginForm = ({
             type="button"
             onClick={() => setShowForgotPassword(false)}
             className="text-primary hover:underline font-system"
+            disabled={isLoading}
           >
             Back to login
           </button>
@@ -120,6 +128,7 @@ export const EmailLoginForm = ({
             type="button"
             onClick={() => setShowForgotPassword(true)}
             className="text-primary hover:underline font-system px-2"
+            disabled={isLoading}
           >
             Forgot password?
           </button>
@@ -127,6 +136,7 @@ export const EmailLoginForm = ({
             type="button"
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-primary hover:underline font-system px-2"
+            disabled={isLoading}
           >
             {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
           </button>

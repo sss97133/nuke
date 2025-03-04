@@ -1,6 +1,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface PhoneInputProps {
   phoneNumber: string;
@@ -44,7 +45,12 @@ export const PhoneInput = ({
         className="classic-button w-full font-system bg-secondary hover:bg-accent hover:text-accent-foreground"
         disabled={isLoading || !phoneNumber.trim()}
       >
-        {isLoading ? "Sending..." : "Continue"}
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Sending...
+          </>
+        ) : "Continue"}
       </Button>
     </form>
   );

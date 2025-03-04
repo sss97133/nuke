@@ -6,15 +6,27 @@ import { Provider } from "@supabase/supabase-js";
 interface SocialLoginButtonsProps {
   onSocialLogin: (provider: Provider) => void;
   isLoading: boolean;
+  onError?: (error: any) => void;
 }
 
-export const SocialLoginButtons = ({ onSocialLogin, isLoading }: SocialLoginButtonsProps) => {
+export const SocialLoginButtons = ({ onSocialLogin, isLoading, onError }: SocialLoginButtonsProps) => {
+  const handleSocialLogin = async (provider: Provider) => {
+    try {
+      await onSocialLogin(provider);
+    } catch (error) {
+      console.error(`Error logging in with ${provider}:`, error);
+      if (onError) {
+        onError(error);
+      }
+    }
+  };
+
   return (
     <>
       <div className="grid grid-cols-2 gap-4">
         <Button
           variant="outline"
-          onClick={() => onSocialLogin('github')}
+          onClick={() => handleSocialLogin('github')}
           disabled={isLoading}
           className="classic-button w-full bg-transparent border border-border hover:bg-accent/50"
         >
@@ -23,7 +35,7 @@ export const SocialLoginButtons = ({ onSocialLogin, isLoading }: SocialLoginButt
         </Button>
         <Button
           variant="outline"
-          onClick={() => onSocialLogin('google')}
+          onClick={() => handleSocialLogin('google')}
           disabled={isLoading}
           className="classic-button w-full bg-transparent border border-border hover:bg-accent/50"
         >
@@ -51,7 +63,7 @@ export const SocialLoginButtons = ({ onSocialLogin, isLoading }: SocialLoginButt
 
       <Button
         variant="outline"
-        onClick={() => onSocialLogin('facebook')}
+        onClick={() => handleSocialLogin('facebook')}
         disabled={isLoading}
         className="classic-button w-full mt-4 bg-transparent border border-border hover:bg-accent/50"
       >

@@ -37,6 +37,7 @@ import TeamMembers from './pages/TeamMembers'
 import { Helmet } from 'react-helmet'
 import Marketplace from './pages/Marketplace'
 import MarketplaceListingDetail from './pages/MarketplaceListingDetail'
+import { Loader2 } from 'lucide-react'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,83 +53,81 @@ const queryClient = new QueryClient({
 function AppContent() {
   const { loading, session } = useAuthState();
   const location = useLocation();
-  const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-    console.log("App mounted, session:", session);
-    return () => setIsMounted(false);
-  }, [session]);
-
-  // Add debugging to help troubleshoot rendering issues
-  console.log("Current path:", location.pathname);
-  console.log("Is authenticated:", !!session);
-  console.log("Is loading:", loading);
-
-  if (!isMounted) {
-    console.log("App not mounted yet");
-    return null;
-  }
-
-  if (loading) {
-    console.log("Auth state loading...");
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
+  // Debug information
   const isAuthenticated = !!session;
   const isAuthPath = location.pathname === '/login' || location.pathname === '/register';
   const isAuthCallbackPath = location.pathname.startsWith('/auth/callback');
   const isRootPath = location.pathname === '/';
 
-  // Handle auth callback path separately
+  console.log("Auth state:", { 
+    path: location.pathname, 
+    isAuthenticated, 
+    loading, 
+    isAuthPath, 
+    isAuthCallbackPath 
+  });
+
+  // Show loading state while auth is being determined
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <p className="mt-4 text-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If this is the auth callback path, show a loading screen
   if (isAuthCallbackPath) {
-    console.log("Handling auth callback");
     return (
       <div className="min-h-screen bg-background">
         <Routes>
-          <Route path="/auth/callback" element={<div className="flex items-center justify-center h-screen">Completing login...</div>} />
+          <Route path="/auth/callback" element={
+            <div className="flex items-center justify-center h-screen">
+              <div className="flex flex-col items-center">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                <p className="mt-4 text-foreground">Completing authentication...</p>
+              </div>
+            </div>
+          } />
         </Routes>
       </div>
     );
   }
 
-  // For root path, redirect based on auth status
+  // Simple redirect rules
+  // If at root, redirect based on auth
   if (isRootPath) {
-    console.log("On root path, redirecting to", isAuthenticated ? "/dashboard" : "/login");
     return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
   }
 
-  // If authenticated but on auth path, redirect to dashboard
+  // If trying to access auth pages while logged in, redirect to dashboard
   if (isAuthenticated && isAuthPath) {
-    console.log("Authenticated and on auth path, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
-  // For unauthenticated users on auth paths, render the auth page
-  if (!isAuthenticated && isAuthPath) {
-    console.log("Unauthenticated and on auth path, rendering auth page");
-    return (
-      <div className="min-h-screen bg-background">
-        <Routes>
-          <Route path="/login" element={<AuthForm />} />
-          <Route path="/register" element={<AuthForm />} />
-        </Routes>
-      </div>
-    );
-  }
-
-  // Redirect unauthenticated users to login for non-auth paths
+  // For non-auth paths, handle authentication requirement
   if (!isAuthenticated) {
-    console.log("Not authenticated and not on auth path, redirecting to login");
+    // Allow access to auth pages without redirection
+    if (isAuthPath) {
+      return (
+        <div className="min-h-screen bg-background">
+          <Routes>
+            <Route path="/login" element={<AuthForm />} />
+            <Route path="/register" element={<AuthForm />} />
+          </Routes>
+        </div>
+      );
+    }
+    
+    // Redirect to login for protected routes
     return <Navigate to="/login" replace />;
   }
 
   // Main app layout with authenticated routes
-  console.log("Rendering main app");
   return (
     <div className="flex min-h-screen bg-background">
       <NavSidebar />
