@@ -29,6 +29,8 @@ export const EmailLoginForm = ({
     setPassword,
     rememberMe,
     setRememberMe,
+    avatarUrl,
+    setAvatarUrl,
     handleSubmit
   } = useEmailForm(showForgotPassword, isSignUp);
 
@@ -53,6 +55,17 @@ export const EmailLoginForm = ({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+          />
+        </div>
+      )}
+      {isSignUp && (
+        <div className="space-y-2">
+          <Input
+            id="avatarUrl"
+            type="url"
+            placeholder="Avatar URL (optional)"
+            value={avatarUrl}
+            onChange={(e) => setAvatarUrl(e.target.value)}
           />
         </div>
       )}

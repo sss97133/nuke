@@ -25,15 +25,15 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
         return;
       }
 
-      const result = await handleEmailLogin(email, password, isSignUp, avatarUrl);
-      console.log("[useEmailForm] Auth result:", result);
+      // Changed here - don't test the result for truthiness since handleEmailLogin may return void
+      await handleEmailLogin(email, password, isSignUp, avatarUrl);
       
-      if (result) {
-        toast({
-          title: isSignUp ? "Account Created" : "Welcome Back!",
-          description: isSignUp ? "Your account has been created successfully." : "Successfully logged in"
-        });
-      }
+      // Moved the toast notification outside of the conditional
+      toast({
+        title: isSignUp ? "Account Created" : "Welcome Back!",
+        description: isSignUp ? "Your account has been created successfully." : "Successfully logged in"
+      });
+      
     } catch (error: any) {
       console.error("[useEmailForm] Auth error:", error);
       
@@ -48,9 +48,9 @@ export const useEmailForm = (showForgotPassword: boolean, isSignUp: boolean) => 
       }
       
       toast({
+        variant: "destructive",
         title: "Authentication Error",
-        description: errorMessage,
-        variant: "destructive"
+        description: errorMessage
       });
       
       throw error; // Re-throw to let the form component handle it
