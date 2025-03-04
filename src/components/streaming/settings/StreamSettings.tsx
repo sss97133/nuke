@@ -18,7 +18,26 @@ export const StreamSettings = () => {
   useEffect(() => {
     // Check if we're already authenticated with Twitch
     setIsTwitchConnected(twitchService.isAuthenticated());
-  }, []);
+    
+    // Listen for authentication state changes
+    const handleAuthChange = () => {
+      setIsTwitchConnected(twitchService.isAuthenticated());
+      
+      if (twitchService.isAuthenticated()) {
+        toast({
+          title: "Connected to Twitch",
+          description: "Successfully connected to your Twitch account",
+        });
+      }
+    };
+    
+    window.addEventListener('twitch_auth_changed', handleAuthChange);
+    
+    // Clean up the event listener on unmount
+    return () => {
+      window.removeEventListener('twitch_auth_changed', handleAuthChange);
+    };
+  }, [toast]);
 
   const handleTwitchLogin = () => {
     try {

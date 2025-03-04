@@ -15,6 +15,18 @@ export const StreamControls = () => {
   useEffect(() => {
     // Check if we're already authenticated with Twitch
     setIsConnectedToTwitch(twitchService.isAuthenticated());
+    
+    // Listen for authentication state changes
+    const handleAuthChange = () => {
+      setIsConnectedToTwitch(twitchService.isAuthenticated());
+    };
+    
+    window.addEventListener('twitch_auth_changed', handleAuthChange);
+    
+    // Clean up the event listener on unmount
+    return () => {
+      window.removeEventListener('twitch_auth_changed', handleAuthChange);
+    };
   }, []);
 
   const toggleStream = async () => {

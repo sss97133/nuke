@@ -12,6 +12,8 @@ export class TwitchService {
   private static API_BASE = 'https://api.twitch.tv/helix';
   
   private accessToken: string | null = null;
+  private authWindow: Window | null = null;
+  private authCheckInterval: number | null = null;
   
   constructor() {
     // Check if we have a token in localStorage
@@ -27,6 +29,30 @@ export class TwitchService {
       localStorage.setItem('twitch_access_token', token);
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // If we're in a popup, signal the parent window
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'TWITCH_AUTH_SUCCESS', token }, window.location.origin);
+        window.close();
+      }
+    }
+    
+    // Listen for messages from popup window
+    window.addEventListener('message', this.handleAuthMessage);
+  }
+
+  private handleAuthMessage = (event: MessageEvent) => {
+    // Make sure message is from our origin
+    if (event.origin !== window.location.origin) return;
+    
+    // Check if it's a Twitch auth success message
+    if (event.data && event.data.type === 'TWITCH_AUTH_SUCCESS') {
+      console.log('Received auth success message from popup');
+      this.accessToken = event.data.token;
+      localStorage.setItem('twitch_access_token', event.data.token);
+      
+      // Notify any listeners that auth state changed
+      window.dispatchEvent(new Event('twitch_auth_changed'));
     }
   }
 
@@ -41,33 +67,58 @@ export class TwitchService {
   }
 
   public login(): void {
+    // Close any existing auth window
+    if (this.authWindow && !this.authWindow.closed) {
+      this.authWindow.close();
+    }
+    
+    // Clear any existing check interval
+    if (this.authCheckInterval) {
+      clearInterval(this.authCheckInterval);
+      this.authCheckInterval = null;
+    }
+    
     const width = 600;
     const height = 700;
     const left = (window.innerWidth - width) / 2;
     const top = (window.innerHeight - height) / 2;
     
-    const authWindow = window.open(
+    this.authWindow = window.open(
       this.getLoginUrl(),
       'Twitch Login',
       `width=${width},height=${height},left=${left},top=${top}`
     );
     
+    if (!this.authWindow) {
+      throw new Error('Failed to open login popup. Please check if popups are blocked by your browser.');
+    }
+    
     // Add a listener to detect when the popup is closed
-    const checkClosed = setInterval(() => {
-      if (authWindow?.closed) {
-        clearInterval(checkClosed);
+    this.authCheckInterval = window.setInterval(() => {
+      if (this.authWindow?.closed) {
+        this.clearAuthCheck();
+        
         // Check if we got a token after the popup was closed
         if (this.isAuthenticated()) {
-          // Reload the page to refresh the state
-          window.location.reload();
+          // Notify any listeners that authentication state has changed
+          window.dispatchEvent(new Event('twitch_auth_changed'));
         }
       }
     }, 500);
+  }
+  
+  private clearAuthCheck(): void {
+    if (this.authCheckInterval) {
+      clearInterval(this.authCheckInterval);
+      this.authCheckInterval = null;
+    }
   }
 
   public logout(): void {
     this.accessToken = null;
     localStorage.removeItem('twitch_access_token');
+    // Dispatch event to notify components
+    window.dispatchEvent(new Event('twitch_auth_changed'));
   }
 
   public async getStreamKey(): Promise<string> {
