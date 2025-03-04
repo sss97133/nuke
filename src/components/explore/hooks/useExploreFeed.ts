@@ -1,8 +1,8 @@
-
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCallback } from 'react';
 import { toast } from '@/components/ui/use-toast';
+import { twitchService } from '@/components/streaming/services/TwitchService';
 
 export interface ContentItem {
   id: string;
@@ -24,14 +24,17 @@ export interface ContentItem {
   save_count?: number;
   is_liked?: boolean;
   is_saved?: boolean;
+  stream_url?: string;
 }
 
 interface FeedOptions {
   filter?: string;
   limit?: number;
+  includeStreams?: boolean;
+  searchTerm?: string;
 }
 
-export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {}) {
+export function useExploreFeed({ filter = 'all', limit = 10, includeStreams = false, searchTerm = '' }: FeedOptions = {}) {
   const queryClient = useQueryClient();
 
   // Fetch content with infinite pagination
@@ -44,9 +47,10 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
     isError,
     error
   } = useInfiniteQuery({
-    queryKey: ['explore-feed', filter],
+    // Add searchTerm to query key to refresh on search
+    queryKey: ['explore-feed', filter, includeStreams, searchTerm],
     queryFn: async ({ pageParam = 0 }) => {
-      console.log('Fetching explore feed:', { filter, pageParam, limit });
+      console.log('Fetching explore feed:', { filter, pageParam, limit, includeStreams, searchTerm });
       
       try {
         // Each content type has its own table, so we need to fetch from multiple sources
@@ -58,7 +62,7 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
         const userId = userData?.user?.id;
         
         // Determine which tables to query based on filter
-        const contentSources = filter === 'all' ? 
+        let contentSources = filter === 'all' ? 
           ['explore_content', 'vehicles', 'auctions', 'live_streams'] : 
           filter === 'vehicle' ? ['vehicles'] :
           filter === 'auction' ? ['auctions'] :
@@ -67,13 +71,19 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
           filter === 'article' ? ['explore_content'] : 
           ['explore_content']; // Default to posts
           
+        // If including streams specifically, ensure live_streams is in the sources
+        if (includeStreams && !contentSources.includes('live_streams')) {
+          contentSources.push('live_streams');
+        }
+          
         // Query each content source
         for (const source of contentSources) {
           const { data: sourceData, error: sourceError } = await fetchContentByType(
             source,
             pageParam,
             limit,
-            userId
+            userId,
+            searchTerm
           );
           
           if (sourceError) {
@@ -83,6 +93,19 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
           
           if (sourceData && sourceData.length > 0) {
             allContent = [...allContent, ...sourceData];
+          }
+        }
+        
+        // If including streams is enabled, fetch live Twitch streams
+        if (includeStreams) {
+          try {
+            const twitchStreams = await fetchLiveTwitchStreams(searchTerm);
+            if (twitchStreams && twitchStreams.length > 0) {
+              allContent = [...allContent, ...twitchStreams];
+            }
+          } catch (err) {
+            console.error('Error fetching Twitch streams:', err);
+            // Continue with other content even if Twitch fails
           }
         }
         
@@ -110,20 +133,74 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
     initialPageParam: 0,
   });
 
+  // New function to fetch live Twitch streams
+  const fetchLiveTwitchStreams = async (searchTerm = '') => {
+    try {
+      // If not authenticated with Twitch, we can't fetch streams
+      if (!twitchService.isAuthenticated()) {
+        console.log('Not authenticated with Twitch, skipping stream fetch');
+        return [];
+      }
+      
+      // Get live streams from Twitch API
+      const streams = await twitchService.getLiveStreams(searchTerm);
+      
+      if (!streams || streams.length === 0) {
+        return [];
+      }
+      
+      // Transform Twitch streams to ContentItem format
+      return streams.map(stream => ({
+        id: stream.id,
+        type: 'stream',
+        title: stream.title || 'Live Stream',
+        subtitle: `${stream.user_name} - ${stream.viewer_count} viewers`,
+        image_url: stream.thumbnail_url?.replace('{width}', '440').replace('{height}', '248') || 
+                 'https://via.placeholder.com/440x248?text=Live+Stream',
+        tags: ['Live', 'Stream', stream.game_name || 'Gaming'].filter(Boolean),
+        reason: 'Live now',
+        location: 'Twitch',
+        relevance_score: 95, // High relevance for live content
+        created_at: stream.started_at || new Date().toISOString(),
+        creator_id: stream.user_id,
+        creator_name: stream.user_name,
+        creator_avatar: '', // Twitch API doesn't provide this directly
+        view_count: stream.viewer_count,
+        like_count: 0,
+        share_count: 0,
+        save_count: 0,
+        stream_url: `https://twitch.tv/${stream.user_login}`
+      }));
+    } catch (error) {
+      console.error('Error fetching Twitch streams:', error);
+      return [];
+    }
+  };
+
   // Helper function to fetch content by type
   const fetchContentByType = async (
     contentType: string, 
     pageParam: number, 
     limit: number,
-    userId?: string
+    userId?: string,
+    searchTerm: string = ''
   ) => {
     const from = pageParam * limit;
     const to = from + limit - 1;
     
+    // For search functionality
+    const searchFilter = searchTerm ? 
+      contentType === 'explore_content' ? `title.ilike.%${searchTerm}%,subtitle.ilike.%${searchTerm}%` : 
+      contentType === 'vehicles' ? `make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%` :
+      contentType === 'auctions' ? `title.ilike.%${searchTerm}%` :
+      contentType === 'live_streams' ? `title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%` :
+      contentType === 'garages' ? `name.ilike.%${searchTerm}%` : 
+      '' : '';
+    
     // Different queries for different content types
     switch (contentType) {
       case 'explore_content':
-        return await supabase
+        let query = supabase
           .from('explore_content')
           .select(`
             id,
@@ -137,11 +214,17 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
             user_id,
             profiles(full_name, avatar_url)
           `)
-          .order('created_at', { ascending: false })
-          .range(from, to);
+          .order('created_at', { ascending: false });
+          
+        // Apply search if provided
+        if (searchTerm) {
+          query = query.or(searchFilter);
+        }
+        
+        return await query.range(from, to);
           
       case 'vehicles':
-        return await supabase
+        let vehiclesQuery = supabase
           .from('vehicles')
           .select(`
             id,
@@ -154,11 +237,17 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
             user_id,
             profiles(full_name, avatar_url)
           `)
-          .order('created_at', { ascending: false })
-          .range(from, to);
+          .order('created_at', { ascending: false });
+          
+        // Apply search if provided
+        if (searchTerm) {
+          vehiclesQuery = vehiclesQuery.or(searchFilter);
+        }
+        
+        return await vehiclesQuery.range(from, to);
           
       case 'auctions':
-        return await supabase
+        let auctionsQuery = supabase
           .from('auctions')
           .select(`
             id,
@@ -172,28 +261,41 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
             vehicles!vehicle_id(make, model, year, vin_image_url)
           `)
           .eq('status', 'active')
-          .order('end_time', { ascending: true })
-          .range(from, to);
+          .order('end_time', { ascending: true });
+          
+        // Apply search if provided
+        if (searchTerm) {
+          auctionsQuery = auctionsQuery.or(searchFilter);
+        }
+        
+        return await auctionsQuery.range(from, to);
           
       case 'live_streams':
-        return await supabase
+        let streamsQuery = supabase
           .from('live_streams')
           .select(`
             id,
             title,
             description,
             stream_url,
+            thumbnail_url,
             viewer_count,
             created_at,
             user_id,
             profiles(full_name, avatar_url)
           `)
           .eq('status', 'live')
-          .order('viewer_count', { ascending: false })
-          .range(from, to);
+          .order('viewer_count', { ascending: false });
+          
+        // Apply search if provided
+        if (searchTerm) {
+          streamsQuery = streamsQuery.or(searchFilter);
+        }
+        
+        return await streamsQuery.range(from, to);
           
       case 'garages':
-        return await supabase
+        let garagesQuery = supabase
           .from('garages')
           .select(`
             id,
@@ -203,8 +305,14 @@ export function useExploreFeed({ filter = 'all', limit = 10 }: FeedOptions = {})
             rating,
             created_at
           `)
-          .order('rating', { ascending: false })
-          .range(from, to);
+          .order('rating', { ascending: false });
+          
+        // Apply search if provided
+        if (searchTerm) {
+          garagesQuery = garagesQuery.or(searchFilter);
+        }
+        
+        return await garagesQuery.range(from, to);
           
       // Add more content types as needed
           

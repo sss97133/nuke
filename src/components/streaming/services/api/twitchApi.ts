@@ -1,138 +1,197 @@
 
-import { TwitchServiceConfig, TwitchError } from "../types";
+import { TwitchUserData, TwitchStreamData } from '../types';
 
-export class TwitchApi {
-  private config: TwitchServiceConfig;
-  
-  constructor(config: TwitchServiceConfig) {
-    this.config = config;
-  }
-  
-  private async makeRequest(endpoint: string, token: string, options: RequestInit = {}): Promise<any> {
-    if (!token) {
-      throw new Error('Not authenticated with Twitch');
-    }
-    
-    if (!this.config.clientId) {
-      throw new Error('Twitch CLIENT_ID is missing');
-    }
+const TWITCH_API_BASE = 'https://api.twitch.tv/helix';
 
-    const url = `${this.config.apiBase}${endpoint}`;
-    
+class TwitchApi {
+  async getCurrentUser(accessToken: string): Promise<TwitchUserData | null> {
     try {
-      const headers = {
-        'Client-ID': this.config.clientId,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...options.headers
-      };
-      
-      console.log(`Making request to Twitch API: ${endpoint}`);
-      
-      const response = await fetch(url, {
-        ...options,
-        headers
+      console.log("TwitchApi: Fetching current user data");
+      const response = await fetch(`${TWITCH_API_BASE}/users`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Client-Id': import.meta.env.VITE_TWITCH_CLIENT_ID || ''
+        }
       });
-
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const error: TwitchError = {
-          status: response.status,
-          message: errorData.message || `Error ${response.status}: ${response.statusText}`
-        };
-        
-        console.error('Twitch API error:', error);
-        throw error;
+        const errorText = await response.text();
+        console.error("TwitchApi: Error fetching user data", response.status, errorText);
+        return null;
       }
-
-      return await response.json();
+      
+      const data = await response.json();
+      console.log("TwitchApi: User data response", data);
+      
+      if (data.data && data.data.length > 0) {
+        return {
+          id: data.data[0].id,
+          login: data.data[0].login,
+          displayName: data.data[0].display_name,
+          profileImageUrl: data.data[0].profile_image_url,
+          email: data.data[0].email
+        };
+      }
+      
+      console.log("TwitchApi: No user data found in response");
+      return null;
     } catch (error) {
-      console.error(`Error in Twitch API call to ${endpoint}:`, error);
-      throw error;
+      console.error("TwitchApi: Error in getCurrentUser", error);
+      return null;
     }
   }
   
-  public async getStreamKey(token: string): Promise<string> {
+  async isUserLive(username: string, accessToken: string): Promise<boolean> {
     try {
-      const data = await this.makeRequest('/streams/key', token);
-      return data.data[0]?.stream_key || '';
-    } catch (error) {
-      console.error('Error fetching stream key:', error);
-      throw error;
-    }
-  }
-
-  public async getCurrentBroadcast(token: string): Promise<any> {
-    try {
-      // Get user ID first
-      const userData = await this.getCurrentUser(token);
-      const userId = userData.id;
-      
-      // Then get current stream info
-      const streamData = await this.makeRequest(`/streams?user_id=${userId}`, token);
-      console.log("Current broadcast data:", streamData);
-      return streamData.data[0] || null;
-    } catch (error) {
-      console.error('Error fetching current broadcast:', error);
-      throw error;
-    }
-  }
-
-  public async startStream(token: string, title: string): Promise<void> {
-    try {
-      // Get user ID first
-      const userData = await this.getCurrentUser(token);
-      const userId = userData.id;
-      
-      console.log('Starting stream for user:', userId);
-      
-      // Patch the channel information to update the title
-      await this.makeRequest(`/channels?broadcaster_id=${userId}`, token, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          title,
-          game_id: '0', // Default game ID
-        })
+      console.log(`TwitchApi: Checking if ${username} is live`);
+      const response = await fetch(`${TWITCH_API_BASE}/streams?user_login=${username}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Client-Id': import.meta.env.VITE_TWITCH_CLIENT_ID || ''
+        }
       });
       
-      console.log('Stream title updated successfully');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`TwitchApi: Error checking stream status for ${username}`, response.status, errorText);
+        return false;
+      }
+      
+      const data = await response.json();
+      console.log(`TwitchApi: Stream status for ${username}`, data);
+      
+      // If the data array contains any streams, the user is live
+      const isLive = data.data && data.data.length > 0;
+      console.log(`TwitchApi: ${username} is live:`, isLive);
+      return isLive;
     } catch (error) {
-      console.error('Error starting stream:', error);
-      throw error;
-    }
-  }
-
-  public async stopStream(token: string): Promise<void> {
-    try {
-      // In Twitch's API, there isn't a direct "stop stream" endpoint
-      // The stream is stopped from the broadcaster's streaming software
-      // We can notify the user about this
-      console.log('To stop streaming, please end the stream in your broadcasting software');
-    } catch (error) {
-      console.error('Error in stop stream operation:', error);
-      throw error;
-    }
-  }
-  
-  public async getCurrentUser(token: string): Promise<any> {
-    try {
-      const data = await this.makeRequest('/users', token);
-      console.log("Twitch user data:", data);
-      return data.data[0] || null;
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      throw error;
-    }
-  }
-
-  public async checkStreamStatus(token: string): Promise<boolean> {
-    try {
-      const broadcast = await this.getCurrentBroadcast(token);
-      console.log("Stream status check result:", broadcast ? "LIVE" : "OFFLINE");
-      return !!broadcast;
-    } catch (error) {
-      console.error('Error checking stream status:', error);
+      console.error(`TwitchApi: Error checking if ${username} is live`, error);
       return false;
     }
   }
+  
+  async getLiveStreams(accessToken: string, query = ''): Promise<TwitchStreamData[]> {
+    try {
+      let endpoint = `${TWITCH_API_BASE}/streams?first=20`;
+      
+      // Add search query if provided
+      if (query) {
+        // Try to search by game name or streamer name
+        endpoint += `&game_name=${encodeURIComponent(query)}`;
+      }
+      
+      console.log(`TwitchApi: Fetching live streams with endpoint: ${endpoint}`);
+      
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Client-Id': import.meta.env.VITE_TWITCH_CLIENT_ID || ''
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("TwitchApi: Error fetching live streams", response.status, errorText);
+        return [];
+      }
+      
+      const data = await response.json();
+      console.log("TwitchApi: Live streams response", data);
+      
+      if (!data.data || data.data.length === 0) {
+        return [];
+      }
+      
+      // If we have a query but didn't find results by game, try by streamer name
+      if (query && data.data.length === 0) {
+        return this.searchStreamsByUser(accessToken, query);
+      }
+      
+      // Map the response to our TwitchStreamData interface
+      return data.data.map((stream: any) => ({
+        id: stream.id,
+        user_id: stream.user_id,
+        user_login: stream.user_login,
+        user_name: stream.user_name,
+        game_id: stream.game_id,
+        game_name: stream.game_name,
+        type: stream.type,
+        title: stream.title,
+        viewer_count: stream.viewer_count,
+        started_at: stream.started_at,
+        language: stream.language,
+        thumbnail_url: stream.thumbnail_url,
+        tags: stream.tags
+      }));
+    } catch (error) {
+      console.error("TwitchApi: Error in getLiveStreams", error);
+      return [];
+    }
+  }
+  
+  async searchStreamsByUser(accessToken: string, username: string): Promise<TwitchStreamData[]> {
+    try {
+      const endpoint = `${TWITCH_API_BASE}/streams?user_login=${encodeURIComponent(username)}`;
+      
+      console.log(`TwitchApi: Searching streams by username: ${username}`);
+      
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Client-Id': import.meta.env.VITE_TWITCH_CLIENT_ID || ''
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("TwitchApi: Error searching streams by user", response.status, errorText);
+        return [];
+      }
+      
+      const data = await response.json();
+      console.log(`TwitchApi: Streams for user ${username}`, data);
+      
+      if (!data.data || data.data.length === 0) {
+        return [];
+      }
+      
+      // Map the response to our TwitchStreamData interface
+      return data.data.map((stream: any) => ({
+        id: stream.id,
+        user_id: stream.user_id,
+        user_login: stream.user_login,
+        user_name: stream.user_name,
+        game_id: stream.game_id,
+        game_name: stream.game_name,
+        type: stream.type,
+        title: stream.title,
+        viewer_count: stream.viewer_count,
+        started_at: stream.started_at,
+        language: stream.language,
+        thumbnail_url: stream.thumbnail_url,
+        tags: stream.tags
+      }));
+    } catch (error) {
+      console.error(`TwitchApi: Error searching streams for user ${username}`, error);
+      return [];
+    }
+  }
+  
+  async getStreamInfo(username: string, accessToken: string): Promise<TwitchStreamData | null> {
+    try {
+      console.log(`TwitchApi: Getting stream info for ${username}`);
+      const streams = await this.searchStreamsByUser(accessToken, username);
+      
+      if (streams.length > 0) {
+        return streams[0];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`TwitchApi: Error getting stream info for ${username}`, error);
+      return null;
+    }
+  }
 }
+
+export const twitchApi = new TwitchApi();
