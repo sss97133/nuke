@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAvatarUpload } from './hooks/useAvatarUpload';
 import { useBioUpdate } from './hooks/useBioUpdate';
 
-interface UserProfileHeaderProps {
+export interface UserProfileHeaderProps {
   userId: string;
   fullName: string | null;
   username: string | null;

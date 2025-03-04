@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ProfileContent } from './components/ProfileContent';
 import { ProfileLoadingState } from './components/ProfileLoadingState';
@@ -122,18 +121,14 @@ export const UserProfile = () => {
 
   return (
     <ProfileContent
-      profile={profile}
-      achievements={achievements || []}
-      socialLinks={socialLinks}
-      streamingLinks={streamingLinks}
-      analysisResult={analysisResult}
-      isAnalysisLoading={analysisLoading}
+      userId={profile.id}
+      isOwnProfile={true}
+      isLoading={false}
+      error={undefined}
+      profileData={profile}
+      analysisData={analysisResult}
       analysisError={analysisError ? String(analysisError) : undefined}
-      onSocialLinksChange={handleSocialLinksChange}
-      onSocialLinksSubmit={handleSocialLinksSubmit}
-      onStreamingLinksChange={handleStreamingLinksChange}
-      onStreamingLinksSubmit={handleStreamingLinksSubmit}
-      onRefreshAnalysis={refreshAnalysis}
+      onRefresh={refetch}
     />
   );
 };

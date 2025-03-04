@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SocialLinks, StreamingLinks, Achievement } from '../types';
 import { AnalysisResult } from '../hooks/useProfileAnalysis';
 
-interface ProfileTabsProps {
+export interface ProfileTabsProps {
   userId: string;
   socialLinks: SocialLinks;
   streamingLinks: StreamingLinks;
