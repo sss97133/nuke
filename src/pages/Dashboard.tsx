@@ -1,10 +1,10 @@
 
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import DashboardContent from '@/components/dashboard/DashboardContent';
+import DashboardLayout from '@/components/dashboard/layout/DashboardLayout';
 
 const Dashboard = () => {
   // Enhanced console logs for debugging
@@ -23,28 +23,24 @@ const Dashboard = () => {
   }, []);
   
   return (
-    <div className="min-h-screen bg-background dashboard-container">
-      <ScrollArea className="h-[calc(100vh-4rem)]">
-        <div className="container max-w-7xl mx-auto p-6 space-y-6">
-          <DashboardHeader />
-          <StatsOverview />
+    <DashboardLayout>
+      <DashboardHeader />
+      <StatsOverview />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Discover Nearby</CardTitle>
-              <CardDescription>Find vehicles, garages, auctions and events in your area</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                {/* GeoFencedDiscovery will be rendered here */}
-              </div>
-            </CardContent>
-          </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Discover Nearby</CardTitle>
+          <CardDescription>Find vehicles, garages, auctions and events in your area</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            {/* GeoFencedDiscovery will be rendered here */}
+          </div>
+        </CardContent>
+      </Card>
 
-          <DashboardContent />
-        </div>
-      </ScrollArea>
-    </div>
+      <DashboardContent />
+    </DashboardLayout>
   );
 };
 
