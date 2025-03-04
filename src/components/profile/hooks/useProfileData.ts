@@ -8,7 +8,7 @@ export const useProfileData = () => {
   const [profile, setProfile] = useState(null);
   const [achievements, setAchievements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<Error | string | null>(null);
 
   const fetchProfileData = async () => {
     setIsLoading(true);
@@ -45,7 +45,7 @@ export const useProfileData = () => {
       setAchievements(achievementsData || []);
     } catch (err) {
       console.error('Error fetching profile data:', err);
-      setError(err);
+      setError(err instanceof Error ? err : String(err));
     } finally {
       setIsLoading(false);
     }

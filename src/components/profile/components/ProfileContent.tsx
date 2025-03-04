@@ -31,8 +31,8 @@ interface ProfileContentProps {
   socialLinks: SocialLinks;
   streamingLinks: StreamingLinks;
   analysisResult: AnalysisResult;
-  analysisLoading: boolean;
-  analysisError: Error | null;
+  isAnalysisLoading: boolean;
+  analysisError: string | undefined;
   onRefreshAnalysis: () => void;
   onSocialLinksChange: (links: SocialLinks) => void;
   onStreamingLinksChange: (links: StreamingLinks) => void;
@@ -46,7 +46,7 @@ export const ProfileContent = ({
   socialLinks,
   streamingLinks,
   analysisResult,
-  analysisLoading,
+  isAnalysisLoading,
   analysisError,
   onRefreshAnalysis,
   onSocialLinksChange,
@@ -96,7 +96,7 @@ export const ProfileContent = ({
       <div className="mt-6">
         <ProfileInsights 
           analysis={analysisResult}
-          isLoading={analysisLoading}
+          isLoading={isAnalysisLoading}
           error={analysisError}
           onRefresh={onRefreshAnalysis}
         />
@@ -114,4 +114,4 @@ export const ProfileContent = ({
       />
     </>
   );
-};
+}
