@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
@@ -55,13 +56,14 @@ export const authRoutes: RouteConfig[] = [
 // Public routes configuration
 export const publicRoutes: RouteConfig[] = [
   { path: '/explore', element: <Explore />, type: RouteType.PUBLIC },
-  { path: '/discover', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC },
+  { path: '/discover', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC, redirectTo: '/explore' },
   { path: '/marketplace', element: <Marketplace />, type: RouteType.PUBLIC },
   { path: '/marketplace/listing/:id', element: <MarketplaceListingDetail />, type: RouteType.PUBLIC },
   { path: '/glossary', element: <Glossary />, type: RouteType.PUBLIC },
   { path: '/documentation', element: <Documentation />, type: RouteType.PUBLIC },
   { path: '/sitemap', element: <Sitemap />, type: RouteType.PUBLIC },
-  { path: '/crypto', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC },
+  // Ensure the crypto route has proper redirectTo property
+  { path: '/crypto', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC, redirectTo: '/explore' },
 ];
 
 // Protected routes configuration

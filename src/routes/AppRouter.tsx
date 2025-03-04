@@ -28,8 +28,10 @@ export const AppRouter: React.FC = () => {
     });
   }, [currentPath, isAuthenticated, loading, isAuthCallbackPath]);
 
-  // Handle route not found
+  // Handle route not found - but only after auth is determined
   useEffect(() => {
+    if (loading) return; // Don't check routes while still loading auth
+
     const matchingRoute = allRoutes.find(route => {
       // Exact match
       if (route.path === currentPath) return true;
@@ -46,7 +48,18 @@ export const AppRouter: React.FC = () => {
       });
     });
     
-    if (!matchingRoute && !loading && currentPath !== '/') {
+    // Handle redirect routes directly - don't toast or navigate
+    const redirectRoute = allRoutes.find(route => 
+      route.path === currentPath && route.redirectTo
+    );
+    
+    if (redirectRoute) {
+      console.log(`Route ${currentPath} has redirect defined to ${redirectRoute.redirectTo}`);
+      // The actual redirect will be handled by the Routes/Route components
+      return;
+    }
+    
+    if (!matchingRoute && currentPath !== '/') {
       console.warn(`Route not found: ${currentPath}, redirecting to home`);
       toast({
         title: "Route Not Found",
@@ -75,6 +88,31 @@ export const AppRouter: React.FC = () => {
     );
   }
 
+  // Process redirect routes first to avoid blinking
+  const getRouteElement = (route: typeof allRoutes[0]) => {
+    // Handle redirects immediately
+    if (route.redirectTo) {
+      return <Navigate to={route.redirectTo} replace />;
+    }
+
+    // Handle auth routes
+    if (route.type === RouteType.AUTH) {
+      return isAuthenticated 
+        ? <Navigate to="/dashboard" replace />
+        : <AuthLayout>{route.element}</AuthLayout>;
+    }
+
+    // Handle protected routes
+    if (route.type === RouteType.PROTECTED) {
+      return isAuthenticated
+        ? <MainLayout>{route.element}</MainLayout>
+        : <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    // Handle public routes (default case)
+    return <MainLayout>{route.element}</MainLayout>;
+  };
+
   // Render all routes with appropriate wrappers based on authentication status
   return (
     <Routes>
@@ -88,48 +126,14 @@ export const AppRouter: React.FC = () => {
         } 
       />
 
-      {/* Auth routes - when authenticated, redirect to dashboard */}
+      {/* Map all routes except the root and catch-all */}
       {allRoutes
-        .filter(route => route.type === RouteType.AUTH)
+        .filter(route => route.path !== '/' && route.path !== '*')
         .map(route => (
           <Route
             key={route.path}
             path={route.path}
-            element={
-              isAuthenticated
-                ? <Navigate to="/dashboard" replace />
-                : <AuthLayout>{route.element}</AuthLayout>
-            }
-          />
-        ))}
-
-      {/* Public routes - accessible to everyone */}
-      {allRoutes
-        .filter(route => route.type === RouteType.PUBLIC && route.path !== '/' && route.path !== '*')
-        .map(route => (
-          <Route
-            key={route.path}
-            path={route.path}
-            element={
-              route.redirectTo
-                ? <Navigate to={route.redirectTo} replace />
-                : <MainLayout>{route.element}</MainLayout>
-            }
-          />
-        ))}
-
-      {/* Protected routes - redirect to login if not authenticated */}
-      {allRoutes
-        .filter(route => route.type === RouteType.PROTECTED)
-        .map(route => (
-          <Route
-            key={route.path}
-            path={route.path}
-            element={
-              isAuthenticated
-                ? <MainLayout>{route.element}</MainLayout>
-                : <Navigate to="/login" state={{ from: location }} replace />
-            }
+            element={getRouteElement(route)}
           />
         ))}
 
