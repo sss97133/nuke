@@ -1,3 +1,4 @@
+
 # Getting Started Guide
 
 ## Prerequisites
@@ -23,9 +24,15 @@ Create a `.env` file with:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_TWITCH_CLIENT_ID=your_twitch_client_id
 ```
 
-4. Start development:
+4. Twitch Integration Setup:
+   - Create a Twitch Developer Application at https://dev.twitch.tv/console/apps
+   - Set the redirect URI to match your application URL (e.g. http://localhost:8080/streaming)
+   - Add your Twitch Client ID to the `.env` file
+
+5. Start development:
 ```bash
 npm run dev
 ```

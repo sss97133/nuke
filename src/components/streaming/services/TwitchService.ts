@@ -6,7 +6,6 @@ import { TwitchServiceConfig } from "./types";
 export class TwitchService {
   // Use a fallback empty string but log an error if the env var is missing
   private static CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || '';
-  private static REDIRECT_URI = `${window.location.origin}/streaming`;
   private static API_BASE = 'https://api.twitch.tv/helix';
   
   private auth: TwitchAuth;
@@ -19,9 +18,13 @@ export class TwitchService {
       console.error('Twitch CLIENT_ID is missing! Please set VITE_TWITCH_CLIENT_ID in your environment variables.');
     }
     
+    // Use the current window location to dynamically set the redirect URI
+    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+    console.log('Setting Twitch redirect URI to:', redirectUri);
+    
     this.config = {
       clientId: TwitchService.CLIENT_ID,
-      redirectUri: TwitchService.REDIRECT_URI,
+      redirectUri: redirectUri,
       apiBase: TwitchService.API_BASE
     };
     
@@ -70,6 +73,15 @@ export class TwitchService {
     }
     
     return this.api.stopStream(token);
+  }
+  
+  public async getCurrentUser(): Promise<any> {
+    const token = this.auth.getToken();
+    if (!token) {
+      throw new Error('Not authenticated with Twitch');
+    }
+    
+    return this.api.getCurrentUser(token);
   }
 }
 

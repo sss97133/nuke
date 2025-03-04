@@ -23,6 +23,16 @@ export class TwitchAuth {
   private checkForRedirectToken(): void {
     const urlParams = new URLSearchParams(window.location.hash.substring(1));
     const token = urlParams.get('access_token');
+    const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
+    
+    if (error) {
+      console.error(`Twitch auth error: ${error} - ${errorDescription}`);
+      localStorage.removeItem('twitch_access_token');
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
     
     if (token) {
       console.log('Twitch auth token received');

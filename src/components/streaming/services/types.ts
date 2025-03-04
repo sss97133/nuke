@@ -11,3 +11,8 @@ export interface TwitchServiceConfig {
   redirectUri: string;
   apiBase: string;
 }
+
+export interface TwitchError {
+  status: number;
+  message: string;
+}
