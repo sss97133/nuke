@@ -23,8 +23,11 @@ export const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) =>
       return; // Still loading or on an exempt page
     }
     
-    // If the user is authenticated but hasn't completed onboarding
-    if (session && !isCompleted && location.pathname !== '/onboarding') {
+    // Only redirect brand new users who haven't seen onboarding yet
+    // Don't redirect users who have started but not finished onboarding
+    if (session && isCompleted === false && location.pathname !== '/onboarding' && 
+        localStorage.getItem('onboarding-shown') !== 'true') {
+      localStorage.setItem('onboarding-shown', 'true');
       navigate('/onboarding');
     }
   }, [isCompleted, isLoading, authLoading, session, navigate, location.pathname]);
