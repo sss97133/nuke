@@ -5,7 +5,7 @@ export interface NavItemProps {
   label: string;
   isActive: boolean;
   isCollapsed: boolean;
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent) => void;
 }
 
 export interface NavItem {
