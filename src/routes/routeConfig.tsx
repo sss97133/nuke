@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Dashboard from "@/pages/Dashboard";
 import Onboarding from "@/pages/Onboarding";
@@ -28,6 +27,7 @@ import Profile from '@/pages/Profile';
 import Marketplace from '@/pages/Marketplace';
 import MarketplaceListingDetail from '@/pages/MarketplaceListingDetail';
 import { AuthForm } from '@/components/auth/AuthForm';
+import Streaming from '@/pages/Streaming';
 
 export interface RouteConfig {
   path: string;
@@ -90,6 +90,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/professional-dashboard', element: <Profile /> },
   { path: '/studio', element: <Studio /> },
   { path: '/explore/manage', element: <ExploreContentManagement /> },
+  { path: '/streaming', element: <Streaming /> },
 ];
 
 // All routes combined

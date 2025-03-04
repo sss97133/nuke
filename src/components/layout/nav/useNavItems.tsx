@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -39,14 +38,12 @@ export const useNavItems = () => {
   const { isCompleted, isLoading: onboardingLoading } = useOnboarding();
   const { session, loading: authLoading } = useAuthState();
   
-  // Handle direct navigation to login
   const handleLoginClick = (e: React.MouseEvent) => {
     e.preventDefault();
     console.log("Login clicked, navigating to /login");
     navigate('/login');
   };
   
-  // Handle direct navigation to register
   const handleRegisterClick = (e: React.MouseEvent) => {
     e.preventDefault();
     console.log("Register clicked, navigating to /register");
@@ -57,7 +54,6 @@ export const useNavItems = () => {
     const isAuthenticated = !!session;
     const items: NavItem[] = [];
     
-    // Always show these items regardless of auth state
     items.push(
       { to: "/", icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Home" },
       { to: "/explore", icon: <Atom className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Explore" },
@@ -67,19 +63,17 @@ export const useNavItems = () => {
       { to: "/sitemap", icon: <Map className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Sitemap" }
     );
     
-    // Add auth items if not authenticated
     if (!isAuthenticated && !authLoading) {
-      // Using special items for login/register that will use the handleLoginClick/handleRegisterClick functions
       return [
         ...items,
         { 
-          to: "#", // Use # to prevent default navigation
+          to: "#", 
           icon: <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />, 
           label: "Login",
           onClick: handleLoginClick
         },
         { 
-          to: "#", // Use # to prevent default navigation
+          to: "#", 
           icon: <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" />, 
           label: "Sign Up",
           onClick: handleRegisterClick
@@ -87,7 +81,6 @@ export const useNavItems = () => {
       ];
     }
     
-    // Add the rest of the items for authenticated users
     if (!onboardingLoading && isCompleted === false) {
       items.push({ 
         to: "/onboarding", 
@@ -96,7 +89,6 @@ export const useNavItems = () => {
       });
     }
     
-    // Only add these items if authenticated
     if (isAuthenticated) {
       return [
         ...items,
@@ -117,6 +109,7 @@ export const useNavItems = () => {
         { to: "/discovered-vehicles", icon: <Car className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Vehicles" },
         { to: "/team-members", icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Team Members" },
         { to: "/profile", icon: <User className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Profile" },
+        { to: "/streaming", icon: <Video className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Streaming" }
       ];
     }
     
