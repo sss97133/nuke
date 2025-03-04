@@ -12,29 +12,29 @@ export const RecentUpdates: React.FC = () => {
         <div className="space-y-4">
           {[
             {
-              version: "v3.0.0",
-              date: "June 2, 2024",
-              description: "Major documentation update: comprehensive coverage of all system features"
+              version: "v1.1.0",
+              date: "March 15, 2025",
+              description: "Added image-based modification value assessment system"
             },
             {
-              version: "v2.3.1",
-              date: "May 15, 2024",
-              description: "Added support for multi-camera studio recording"
+              version: "v1.0.5",
+              date: "February 28, 2025",
+              description: "Enhanced marketplace listings with multi-camera documentation"
             },
             {
-              version: "v2.2.0",
-              date: "April 22, 2024",
-              description: "Enhanced inventory management system with AI suggestions"
+              version: "v1.0.4",
+              date: "February 10, 2025",
+              description: "Comprehensive documentation update with improved navigation"
             },
             {
-              version: "v2.1.5",
-              date: "March 10, 2024",
-              description: "Bug fixes and performance improvements"
+              version: "v1.0.3",
+              date: "January 25, 2025",
+              description: "Added real-time auction tracking from multiple platforms"
             },
             {
-              version: "v2.1.0",
-              date: "February 28, 2024",
-              description: "Mobile optimization for all main application pages"
+              version: "v1.0.0",
+              date: "January 10, 2025",
+              description: "Initial release with core vehicle management features"
             }
           ].map((update, index) => (
             <div key={index} className="border-l-2 border-primary pl-4">
