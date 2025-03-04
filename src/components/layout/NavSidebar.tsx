@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Compass, 
@@ -28,13 +29,15 @@ import {
   Users,
   Menu,
   ShoppingCart,
-  GraduationCap
+  GraduationCap,
+  LogIn
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useOnboarding } from '@/hooks/useOnboarding';
+import { useAuthState } from '@/hooks/auth/use-auth-state';
 
 interface NavItemProps {
   to: string;
@@ -69,7 +72,9 @@ export const NavSidebar = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const { isCompleted, isLoading } = useOnboarding();
+  const navigate = useNavigate();
+  const { isCompleted, isLoading: onboardingLoading } = useOnboarding();
+  const { session, loading: authLoading } = useAuthState();
   
   useEffect(() => {
     const checkMobile = () => {
@@ -86,13 +91,25 @@ export const NavSidebar = () => {
   }, []);
   
   const getNavItems = () => {
-    const items = [
-      { to: "/dashboard", icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Dashboard" },
-      { to: "/explore", icon: <Atom className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Explore" },
-      { to: "/marketplace", icon: <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Marketplace" },
-    ];
+    const isAuthenticated = !!session;
+    const items = [];
     
-    if (!isLoading && isCompleted === false) {
+    // Always show home
+    items.push({ to: "/", icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Home" });
+    
+    // Add auth items if not authenticated
+    if (!isAuthenticated && !authLoading) {
+      items.push({ to: "/login", icon: <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Login" });
+      return items;
+    }
+    
+    // Add the rest of the items for authenticated users
+    items.push(
+      { to: "/explore", icon: <Atom className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Explore" },
+      { to: "/marketplace", icon: <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Marketplace" }
+    );
+    
+    if (!onboardingLoading && isCompleted === false) {
       items.push({ 
         to: "/onboarding", 
         icon: <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5" />, 
