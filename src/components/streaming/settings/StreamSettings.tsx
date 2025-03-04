@@ -6,16 +6,21 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Twitch } from "lucide-react";
+import { Twitch, AlertTriangle } from "lucide-react";
 import { twitchService } from '../services/TwitchService';
 import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const StreamSettings = () => {
   const [streamTitle, setStreamTitle] = useState('My Stream');
   const [isTwitchConnected, setIsTwitchConnected] = useState(false);
+  const [hasClientIdError, setHasClientIdError] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Check if Twitch Client ID is missing
+    setHasClientIdError(!import.meta.env.VITE_TWITCH_CLIENT_ID);
+    
     // Check if we're already authenticated with Twitch
     setIsTwitchConnected(twitchService.isAuthenticated());
     
@@ -41,6 +46,15 @@ export const StreamSettings = () => {
 
   const handleTwitchLogin = () => {
     try {
+      if (hasClientIdError) {
+        toast({
+          title: "Twitch Configuration Error",
+          description: "Twitch Client ID is missing. Please set VITE_TWITCH_CLIENT_ID in your environment variables.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       twitchService.login();
       
       // Show toast about opening the login popup
@@ -52,7 +66,7 @@ export const StreamSettings = () => {
       console.error('Error during Twitch login:', error);
       toast({
         title: "Twitch Login Error",
-        description: "There was an error connecting to Twitch. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error connecting to Twitch. Please try again.",
         variant: "destructive",
       });
     }
@@ -73,6 +87,15 @@ export const StreamSettings = () => {
         <CardTitle className="text-sm font-medium">Stream Settings</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {hasClientIdError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Twitch Client ID is missing. Please set VITE_TWITCH_CLIENT_ID in your environment variables.
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <div className="space-y-2">
           <Label htmlFor="title">Stream Title</Label>
           <Input 
@@ -145,6 +168,7 @@ export const StreamSettings = () => {
             <Button 
               onClick={handleTwitchLogin}
               className="bg-[#9146FF] hover:bg-[#7d3bdd] text-white"
+              disabled={hasClientIdError}
             >
               <Twitch className="mr-2 h-4 w-4" />
               Connect with Twitch

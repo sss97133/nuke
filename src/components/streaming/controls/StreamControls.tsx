@@ -10,9 +10,13 @@ export const StreamControls = () => {
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isConnectedToTwitch, setIsConnectedToTwitch] = useState(false);
+  const [hasClientIdError, setHasClientIdError] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Check if Twitch Client ID is missing
+    setHasClientIdError(!import.meta.env.VITE_TWITCH_CLIENT_ID);
+    
     // Check if we're already authenticated with Twitch
     setIsConnectedToTwitch(twitchService.isAuthenticated());
     
@@ -52,6 +56,15 @@ export const StreamControls = () => {
     } else {
       // Start streaming
       try {
+        if (hasClientIdError) {
+          toast({
+            title: "Twitch Configuration Error",
+            description: "Twitch Client ID is missing. Please set VITE_TWITCH_CLIENT_ID in your environment variables.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         if (isConnectedToTwitch) {
           await twitchService.startStream("My Stream");
         }
@@ -71,7 +84,7 @@ export const StreamControls = () => {
         } else {
           toast({
             title: "Error starting stream",
-            description: "An error occurred while starting the stream",
+            description: error instanceof Error ? error.message : "An error occurred while starting the stream",
             variant: "destructive",
           });
         }
@@ -100,6 +113,7 @@ export const StreamControls = () => {
       <Button 
         variant={isStreaming ? "destructive" : "default"}
         onClick={toggleStream}
+        disabled={hasClientIdError && !isStreaming}
       >
         {isStreaming ? "End Stream" : "Start Stream"}
       </Button>

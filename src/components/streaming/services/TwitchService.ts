@@ -7,6 +7,7 @@ interface TwitchAuthResponse {
 }
 
 export class TwitchService {
+  // Use a fallback empty string but log an error if the env var is missing
   private static CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || '';
   private static REDIRECT_URI = `${window.location.origin}/streaming`;
   private static API_BASE = 'https://api.twitch.tv/helix';
@@ -16,6 +17,11 @@ export class TwitchService {
   private authCheckInterval: number | null = null;
   
   constructor() {
+    // Check if the client ID is missing and log an error
+    if (!TwitchService.CLIENT_ID) {
+      console.error('Twitch CLIENT_ID is missing! Please set VITE_TWITCH_CLIENT_ID in your environment variables.');
+    }
+    
     // Check if we have a token in localStorage
     this.accessToken = localStorage.getItem('twitch_access_token');
     
@@ -61,12 +67,24 @@ export class TwitchService {
   }
 
   public getLoginUrl(): string {
+    // Log warning if client ID is missing
+    if (!TwitchService.CLIENT_ID) {
+      console.error('Cannot generate login URL: Twitch CLIENT_ID is missing!');
+      return '#';
+    }
+    
     const scopes = ['channel:read:stream_key', 'channel:manage:broadcast'];
     
     return `https://id.twitch.tv/oauth2/authorize?client_id=${TwitchService.CLIENT_ID}&redirect_uri=${encodeURIComponent(TwitchService.REDIRECT_URI)}&response_type=token&scope=${scopes.join(' ')}`;
   }
 
   public login(): void {
+    // Validate client ID is present
+    if (!TwitchService.CLIENT_ID) {
+      console.error('Twitch login failed: CLIENT_ID is missing!');
+      throw new Error('Twitch CLIENT_ID is missing. Please set VITE_TWITCH_CLIENT_ID in your environment variables.');
+    }
+    
     // Close any existing auth window
     if (this.authWindow && !this.authWindow.closed) {
       this.authWindow.close();
@@ -125,6 +143,10 @@ export class TwitchService {
     if (!this.isAuthenticated()) {
       throw new Error('Not authenticated with Twitch');
     }
+    
+    if (!TwitchService.CLIENT_ID) {
+      throw new Error('Twitch CLIENT_ID is missing');
+    }
 
     try {
       const response = await fetch(`${TwitchService.API_BASE}/streams/key`, {
@@ -150,6 +172,10 @@ export class TwitchService {
     if (!this.isAuthenticated()) {
       throw new Error('Not authenticated with Twitch');
     }
+    
+    if (!TwitchService.CLIENT_ID) {
+      throw new Error('Twitch CLIENT_ID is missing');
+    }
 
     // This would be the implementation to start a stream
     // In reality, the user would need to use OBS or similar software
@@ -160,6 +186,10 @@ export class TwitchService {
   public async stopStream(): Promise<void> {
     if (!this.isAuthenticated()) {
       throw new Error('Not authenticated with Twitch');
+    }
+    
+    if (!TwitchService.CLIENT_ID) {
+      throw new Error('Twitch CLIENT_ID is missing');
     }
 
     // This would be the implementation to stop a stream
