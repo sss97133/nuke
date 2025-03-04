@@ -1,12 +1,32 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { StreamerView } from '@/components/streaming/StreamerView';
 import { StreamChat } from '@/components/streaming/StreamChat';
 import { StreamProvider } from '@/components/streaming/StreamProvider';
+import { twitchService } from '@/components/streaming/services/TwitchService';
 
 const Streaming = () => {
+  const [streamId, setStreamId] = useState<string | undefined>(undefined);
+  
+  useEffect(() => {
+    const fetchStreamId = async () => {
+      if (twitchService.isAuthenticated()) {
+        try {
+          const userData = await twitchService.getCurrentUser();
+          if (userData) {
+            setStreamId(userData.login);
+          }
+        } catch (error) {
+          console.error("Failed to fetch stream ID:", error);
+        }
+      }
+    };
+    
+    fetchStreamId();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <ScrollArea className="h-[calc(100vh-4rem)]">
@@ -24,7 +44,7 @@ const Streaming = () => {
                   </StreamProvider>
                 </div>
                 <div className="space-y-4">
-                  <StreamChat />
+                  <StreamChat streamId={streamId} />
                 </div>
               </div>
             </CardContent>
