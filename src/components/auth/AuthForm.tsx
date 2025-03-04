@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ClassicWindow } from "./ClassicWindow";
@@ -58,10 +59,10 @@ export const AuthForm = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden">
       <div className="w-full max-w-[400px]">
         <ClassicWindow title="Welcome">
-          <div className="space-y-6">
+          <div className="space-y-6 max-h-[calc(100vh-8rem)] overflow-y-auto px-1 py-2">
             <EmailLoginForm
               isLoading={isLoading}
               showForgotPassword={showForgotPassword}
