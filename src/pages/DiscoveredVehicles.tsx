@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import VehicleFilters from '../components/vehicles/discovery/VehicleFilters';
 import BulkActions from '../components/vehicles/discovery/BulkActions';
 import VehicleTabs from '../components/vehicles/discovery/VehicleTabs';
-import { useVehiclesData } from '../hooks/useVehiclesData';
+import { useVehiclesData } from '../hooks/vehicles/useVehiclesData';
 
 const DiscoveredVehicles = () => {
   const {

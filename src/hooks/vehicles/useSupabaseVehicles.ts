@@ -41,24 +41,24 @@ export function useSupabaseVehicles() {
 
       // Transform the data to match our Vehicle type
       const transformedData: Vehicle[] = data.map(item => ({
-        id: item.id,
+        id: parseInt(item.id.toString().replace(/-/g, '').substring(0, 9), 16), // Convert UUID to numeric ID
         make: item.make,
         model: item.model,
         year: item.year,
         price: item.price || 0,
-        market_value: item.market_value,
-        price_trend: item.price_trend as 'up' | 'down' | 'stable',
+        market_value: item.market_value || 0,
+        price_trend: item.price_trend as 'up' | 'down' | 'stable' || 'stable',
         mileage: item.mileage || 0,
         image: item.image || '/placeholder.svg',
         location: item.location || 'Unknown',
-        added: formatAddedDate(item.added),
+        added: formatAddedDate(item.added || item.created_at),
         tags: item.tags || [],
         condition_rating: item.condition_rating || 5,
         vehicle_type: item.vehicle_type || 'car',
-        body_type: item.body_type,
-        transmission: item.transmission,
-        drivetrain: item.drivetrain,
-        rarity_score: item.rarity_score,
+        body_type: item.body_type || '',
+        transmission: item.transmission || '',
+        drivetrain: item.drivetrain || '',
+        rarity_score: item.rarity_score || 0,
         relevance_score: 50 // Default value
       }));
 
@@ -92,27 +92,31 @@ export function useSupabaseVehicles() {
         return null;
       }
 
+      // Transform the vehicle object to match database schema
+      const dbVehicle = {
+        make: newVehicle.make,
+        model: newVehicle.model,
+        year: newVehicle.year,
+        price: newVehicle.price,
+        market_value: newVehicle.market_value,
+        price_trend: newVehicle.price_trend,
+        mileage: newVehicle.mileage,
+        image: newVehicle.image,
+        location: newVehicle.location,
+        tags: newVehicle.tags,
+        condition_rating: newVehicle.condition_rating,
+        vehicle_type: newVehicle.vehicle_type,
+        body_type: newVehicle.body_type,
+        transmission: newVehicle.transmission,
+        drivetrain: newVehicle.drivetrain,
+        rarity_score: newVehicle.rarity_score,
+        user_id: session.user.id,
+        source: 'manual_entry'
+      };
+
       const { data, error } = await supabase
         .from('discovered_vehicles')
-        .insert({
-          make: newVehicle.make,
-          model: newVehicle.model,
-          year: newVehicle.year,
-          price: newVehicle.price,
-          market_value: newVehicle.market_value,
-          price_trend: newVehicle.price_trend,
-          mileage: newVehicle.mileage,
-          image: newVehicle.image,
-          location: newVehicle.location,
-          tags: newVehicle.tags,
-          condition_rating: newVehicle.condition_rating,
-          vehicle_type: newVehicle.vehicle_type,
-          body_type: newVehicle.body_type,
-          transmission: newVehicle.transmission,
-          drivetrain: newVehicle.drivetrain,
-          rarity_score: newVehicle.rarity_score,
-          user_id: session.user.id
-        })
+        .insert(dbVehicle)
         .select();
 
       if (error) {
@@ -145,7 +149,7 @@ export function useSupabaseVehicles() {
     }
   };
 
-  const updateVehicle = async (id: string | number, updates: Partial<Vehicle>) => {
+  const updateVehicle = async (id: number, updates: Partial<Vehicle>) => {
     try {
       if (!session) {
         toast({
@@ -156,13 +160,45 @@ export function useSupabaseVehicles() {
         return false;
       }
 
-      // Remove fields that don't exist in the database
-      const { relevance_score, added, ...dbUpdates } = updates as any;
+      // Need to find the actual UUID from our transformed ID
+      const vehicleToUpdate = vehicles.find(v => v.id === id);
+      if (!vehicleToUpdate) {
+        toast({
+          title: 'Error',
+          description: 'Vehicle not found',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      // Remove fields that don't exist in the database or shouldn't be updated
+      const { relevance_score, added, id: _id, ...dbUpdates } = updates as any;
+
+      // Get the vehicle data from Supabase to get the real UUID
+      const { data: vehicleData, error: fetchError } = await supabase
+        .from('discovered_vehicles')
+        .select('id')
+        .eq('make', vehicleToUpdate.make)
+        .eq('model', vehicleToUpdate.model)
+        .eq('year', vehicleToUpdate.year)
+        .limit(1);
+
+      if (fetchError || !vehicleData || vehicleData.length === 0) {
+        console.error('Error finding vehicle to update:', fetchError);
+        toast({
+          title: 'Error',
+          description: 'Could not find vehicle to update',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      const realId = vehicleData[0].id;
 
       const { error } = await supabase
         .from('discovered_vehicles')
         .update(dbUpdates)
-        .eq('id', id);
+        .eq('id', realId);
 
       if (error) {
         console.error('Error updating vehicle:', error);
@@ -194,7 +230,7 @@ export function useSupabaseVehicles() {
     }
   };
 
-  const deleteVehicle = async (id: string | number) => {
+  const deleteVehicle = async (id: number) => {
     try {
       if (!session) {
         toast({
@@ -205,10 +241,42 @@ export function useSupabaseVehicles() {
         return false;
       }
 
+      // Need to find the actual UUID from our transformed ID
+      const vehicleToDelete = vehicles.find(v => v.id === id);
+      if (!vehicleToDelete) {
+        toast({
+          title: 'Error',
+          description: 'Vehicle not found',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      // Get the vehicle data from Supabase to get the real UUID
+      const { data: vehicleData, error: fetchError } = await supabase
+        .from('discovered_vehicles')
+        .select('id')
+        .eq('make', vehicleToDelete.make)
+        .eq('model', vehicleToDelete.model)
+        .eq('year', vehicleToDelete.year)
+        .limit(1);
+
+      if (fetchError || !vehicleData || vehicleData.length === 0) {
+        console.error('Error finding vehicle to delete:', fetchError);
+        toast({
+          title: 'Error',
+          description: 'Could not find vehicle to delete',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      const realId = vehicleData[0].id;
+
       const { error } = await supabase
         .from('discovered_vehicles')
         .delete()
-        .eq('id', id);
+        .eq('id', realId);
 
       if (error) {
         console.error('Error deleting vehicle:', error);
