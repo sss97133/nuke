@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from 'lucide-react';
 
 export const AuthCallback = () => {
   const navigate = useNavigate();
@@ -12,21 +13,35 @@ export const AuthCallback = () => {
     const handleCallback = async () => {
       try {
         console.log("[AuthCallback] Starting callback processing");
+        
+        // Get the session after OAuth redirect
         const { data: { session }, error } = await supabase.auth.getSession();
         
-        console.log("[AuthCallback] Processing callback", { session, error });
+        console.log("[AuthCallback] Processing callback", { session: session?.user?.email, error });
         
         if (error) {
           console.error("[AuthCallback] Session error:", error);
-          throw error;
+          toast({
+            variant: "destructive",
+            title: "Authentication Error",
+            description: error.message || "Failed to authenticate"
+          });
+          navigate('/login');
+          return;
         }
 
         if (!session) {
           console.error("[AuthCallback] No session found");
-          throw new Error('No session found');
+          toast({
+            variant: "destructive",
+            title: "Authentication Error",
+            description: "No session found"
+          });
+          navigate('/login');
+          return;
         }
 
-        console.log("[AuthCallback] Session established:", session);
+        console.log("[AuthCallback] Session established for:", session.user.email);
         
         // Check if user has a profile
         const { data: profile, error: profileError } = await supabase
@@ -35,7 +50,7 @@ export const AuthCallback = () => {
           .eq('id', session.user.id)
           .single();
 
-        if (profileError) {
+        if (profileError && profileError.code !== 'PGRST116') {
           console.error("[AuthCallback] Profile error:", profileError);
         }
 
@@ -61,7 +76,7 @@ export const AuthCallback = () => {
         }
 
         // Redirect based on profile status
-        if (!profile?.username || !profile?.onboarding_completed) {
+        if (profile?.onboarding_completed === false) {
           navigate('/onboarding');
         } else {
           navigate('/dashboard');
@@ -85,7 +100,7 @@ export const AuthCallback = () => {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+        <Loader2 className="animate-spin h-8 w-8 text-primary mx-auto mb-4" />
         <p className="text-muted-foreground">Completing sign in...</p>
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom'
 import { ThemeProvider } from "@/components/ui/theme-provider"
@@ -39,6 +38,7 @@ import Marketplace from './pages/Marketplace'
 import MarketplaceListingDetail from './pages/MarketplaceListingDetail'
 import { Loader2 } from 'lucide-react'
 import { AuthRequiredModal } from './components/auth/AuthRequiredModal'
+import { AuthCallback } from './components/auth/AuthCallback'
 
 // Define public routes that don't require authentication
 const PUBLIC_ROUTES = [
@@ -98,19 +98,12 @@ function AppContent() {
     );
   }
 
-  // If this is the auth callback path, show a loading screen
+  // If this is the auth callback path, show the callback component
   if (isAuthCallbackPath) {
     return (
       <div className="min-h-screen bg-background">
         <Routes>
-          <Route path="/auth/callback" element={
-            <div className="flex items-center justify-center h-screen">
-              <div className="flex flex-col items-center">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                <p className="mt-4 text-foreground">Completing authentication...</p>
-              </div>
-            </div>
-          } />
+          <Route path="/auth/callback" element={<AuthCallback />} />
         </Routes>
       </div>
     );
