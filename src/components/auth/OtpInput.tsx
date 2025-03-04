@@ -48,7 +48,7 @@ export const OtpInput = ({ otp, setOtp, onSubmit, isLoading }: OtpInputProps) =>
       
       <Button
         type="submit"
-        className="classic-button w-full"
+        className="classic-button w-full font-system bg-secondary hover:bg-accent hover:text-accent-foreground"
         disabled={isLoading || otp.length !== 6}
       >
         {isLoading ? "Verifying..." : "Sign In"}

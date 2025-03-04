@@ -16,7 +16,7 @@ export const SocialLoginButtons = ({ onSocialLogin, isLoading }: SocialLoginButt
           variant="outline"
           onClick={() => onSocialLogin('github')}
           disabled={isLoading}
-          className="w-full"
+          className="classic-button w-full bg-transparent border border-border hover:bg-accent/50"
         >
           <Github className="mr-2 h-4 w-4" />
           GitHub
@@ -25,7 +25,7 @@ export const SocialLoginButtons = ({ onSocialLogin, isLoading }: SocialLoginButt
           variant="outline"
           onClick={() => onSocialLogin('google')}
           disabled={isLoading}
-          className="w-full"
+          className="classic-button w-full bg-transparent border border-border hover:bg-accent/50"
         >
           <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
             <path
@@ -53,7 +53,7 @@ export const SocialLoginButtons = ({ onSocialLogin, isLoading }: SocialLoginButt
         variant="outline"
         onClick={() => onSocialLogin('facebook')}
         disabled={isLoading}
-        className="w-full mt-4"
+        className="classic-button w-full mt-4 bg-transparent border border-border hover:bg-accent/50"
       >
         <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
           <path

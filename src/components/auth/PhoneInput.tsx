@@ -41,7 +41,7 @@ export const PhoneInput = ({
       
       <Button
         type="submit"
-        className="classic-button w-full"
+        className="classic-button w-full font-system bg-secondary hover:bg-accent hover:text-accent-foreground"
         disabled={isLoading || !phoneNumber.trim()}
       >
         {isLoading ? "Sending..." : "Continue"}

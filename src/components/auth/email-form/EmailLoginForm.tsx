@@ -44,6 +44,7 @@ export const EmailLoginForm = ({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          className="classic-input"
         />
       </div>
       {!showForgotPassword && (
@@ -55,6 +56,7 @@ export const EmailLoginForm = ({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            className="classic-input"
           />
         </div>
       )}
@@ -66,6 +68,7 @@ export const EmailLoginForm = ({
             placeholder="Avatar URL (optional)"
             value={avatarUrl}
             onChange={(e) => setAvatarUrl(e.target.value)}
+            className="classic-input"
           />
         </div>
       )}
@@ -81,14 +84,18 @@ export const EmailLoginForm = ({
           </div>
         </div>
       )}
-      <Button type="submit" className="w-full" disabled={isLoading}>
+      <Button 
+        type="submit" 
+        className="classic-button w-full font-system bg-secondary hover:bg-accent hover:text-accent-foreground" 
+        disabled={isLoading}
+      >
         {showForgotPassword ? 'Send Reset Link' : (isSignUp ? 'Sign Up' : 'Login')}
       </Button>
       
       <Button 
         type="button" 
         variant="outline" 
-        className="w-full" 
+        className="classic-button w-full border border-border bg-transparent hover:bg-accent/50" 
         onClick={onContinueWithoutLogin}
       >
         Continue without logging in
@@ -99,7 +106,7 @@ export const EmailLoginForm = ({
           <button
             type="button"
             onClick={() => setShowForgotPassword(false)}
-            className="text-blue-500 hover:underline"
+            className="text-primary hover:underline font-system"
           >
             Back to login
           </button>
@@ -109,14 +116,14 @@ export const EmailLoginForm = ({
           <button
             type="button"
             onClick={() => setShowForgotPassword(true)}
-            className="text-blue-500 hover:underline px-2"
+            className="text-primary hover:underline font-system px-2"
           >
             Forgot password?
           </button>
           <button
             type="button"
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-blue-500 hover:underline px-2"
+            className="text-primary hover:underline font-system px-2"
           >
             {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
           </button>
