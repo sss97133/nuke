@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Users, Trophy, GitCommit, Car, BarChart2, Coins, Zap } from 'lucide-react';
+import { UserRound, Users, Trophy, GitCommit, Car, BarChart2, Coins, Zap, Shield } from 'lucide-react';
 import { SocialLinksForm } from '../SocialLinksForm';
 import { StreamingLinksForm } from '../StreamingLinksForm';
 import { TeamSection } from '../TeamSection';
@@ -10,15 +10,18 @@ import { UserDiscoveredVehicles } from '../UserDiscoveredVehicles';
 import { UserDevelopmentSpectrum } from '../UserDevelopmentSpectrum';
 import { UserActivityAnalytics } from '../UserActivityAnalytics';
 import { UserInvestmentAnalytics } from '../UserInvestmentAnalytics';
+import { PrivacySettings } from './PrivacySettings';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { SocialLinks, StreamingLinks, Achievement } from '../types';
+import { AnalysisResult } from '../hooks/useProfileAnalysis';
 
 interface ProfileTabsProps {
   userId: string;
   socialLinks: SocialLinks;
   streamingLinks: StreamingLinks;
   achievements: Achievement[] | null;
+  analysisResult?: AnalysisResult;
   onSocialLinksChange: (links: SocialLinks) => void;
   onStreamingLinksChange: (links: StreamingLinks) => void;
   onSocialLinksSubmit: () => void;
@@ -30,11 +33,14 @@ export const ProfileTabs = ({
   socialLinks,
   streamingLinks,
   achievements,
+  analysisResult,
   onSocialLinksChange,
   onStreamingLinksChange,
   onSocialLinksSubmit,
   onStreamingLinksSubmit
 }: ProfileTabsProps) => {
+  console.log('Rendering ProfileTabs', { userId, hasAnalysisResult: !!analysisResult });
+  
   const { toast } = useToast();
   const [refreshingAnalytics, setRefreshingAnalytics] = useState(false);
 
@@ -82,6 +88,9 @@ export const ProfileTabs = ({
   const totalInvested = investmentData.reduce((sum, item) => sum + item.value, 0);
   const averageROI = parseFloat((investmentData.reduce((sum, item) => sum + (item.value * item.roi), 0) / totalInvested).toFixed(1));
 
+  // Determine recommended privacy setting from analysis if available
+  const recommendedPrivacy = analysisResult?.privacyRecommendation || 'limited';
+
   return (
     <Tabs defaultValue="profile" className="w-full mt-6">
       <TabsList className="flex overflow-x-auto pb-px">
@@ -112,6 +121,10 @@ export const ProfileTabs = ({
         <TabsTrigger value="discoveries" className="flex items-center gap-2">
           <Car className="w-4 h-4" />
           Discoveries
+        </TabsTrigger>
+        <TabsTrigger value="privacy" className="flex items-center gap-2">
+          <Shield className="w-4 h-4" />
+          Privacy
         </TabsTrigger>
       </TabsList>
 
@@ -276,6 +289,13 @@ export const ProfileTabs = ({
             <UserDiscoveredVehicles userId={userId} />
           </div>
         )}
+      </TabsContent>
+      
+      <TabsContent value="privacy" className="mt-4">
+        <PrivacySettings 
+          userId={userId} 
+          recommendedPrivacy={recommendedPrivacy}
+        />
       </TabsContent>
     </Tabs>
   );

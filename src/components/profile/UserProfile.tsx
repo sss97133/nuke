@@ -5,9 +5,12 @@ import { ProfileLoadingState } from './components/ProfileLoadingState';
 import { ProfileErrorState } from './components/ProfileErrorState';
 import { SocialLinks, StreamingLinks } from './types';
 import { useProfileData } from './hooks/useProfileData';
+import { useProfileAnalysis } from './hooks/useProfileAnalysis';
 import { useToast } from '@/hooks/use-toast';
 
 export const UserProfile = () => {
+  console.log('Rendering UserProfile component');
+  
   const { toast } = useToast();
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({
     twitter: '',
@@ -21,16 +24,40 @@ export const UserProfile = () => {
     tiktok: ''
   });
   
-  const { profile, achievements, isLoading, error, refetch } = useProfileData();
+  const { 
+    profile, 
+    achievements, 
+    isLoading: profileLoading, 
+    error: profileError, 
+    refetch 
+  } = useProfileData();
 
-  console.log('Profile render:', { profile, achievements, isLoading, error });
+  console.log('Profile data loaded:', { profile, achievements, profileLoading, profileError });
+
+  // Initialize profile analysis
+  const {
+    analysisResult,
+    isLoading: analysisLoading,
+    error: analysisError,
+    refreshAnalysis
+  } = useProfileAnalysis(
+    profile?.id,
+    profile,
+    achievements,
+    socialLinks,
+    streamingLinks
+  );
+
+  console.log('Profile analysis:', { analysisResult, analysisLoading, analysisError });
 
   // Create wrapper functions that match the expected prop types
   const handleSocialLinksChange = (links: SocialLinks) => {
+    console.log('Social links changed:', links);
     setSocialLinks(links);
   };
 
   const handleStreamingLinksChange = (links: StreamingLinks) => {
+    console.log('Streaming links changed:', links);
     setStreamingLinks(links);
   };
 
@@ -62,6 +89,7 @@ export const UserProfile = () => {
           linkedin: (profile.social_links as any).linkedin || '',
           github: (profile.social_links as any).github || ''
         });
+        console.log('Social links loaded from profile:', profile.social_links);
       }
     }
     if (profile?.streaming_links) {
@@ -72,16 +100,19 @@ export const UserProfile = () => {
           youtube: (profile.streaming_links as any).youtube || '',
           tiktok: (profile.streaming_links as any).tiktok || ''
         });
+        console.log('Streaming links loaded from profile:', profile.streaming_links);
       }
     }
   }, [profile]);
 
-  if (isLoading) {
+  if (profileLoading) {
+    console.log('Profile is loading');
     return <ProfileLoadingState />;
   }
 
-  if (error) {
-    return <ProfileErrorState error={error} onRetry={refetch} />;
+  if (profileError) {
+    console.error('Profile error:', profileError);
+    return <ProfileErrorState error={profileError} onRetry={refetch} />;
   }
 
   // Add additional mock data for the development spectrum visualization
@@ -89,10 +120,10 @@ export const UserProfile = () => {
   const enrichedProfile = profile ? {
     ...profile,
     achievements_count: achievements?.length || 0,
-    viewer_percentile: 15,
-    owner_percentile: 22,
-    technician_percentile: 8,
-    investor_percentile: 30,
+    viewer_percentile: analysisResult.developerSpectrum.viewer || 15,
+    owner_percentile: analysisResult.developerSpectrum.owner || 22,
+    technician_percentile: analysisResult.developerSpectrum.technician || 8,
+    investor_percentile: analysisResult.developerSpectrum.investor || 30,
     discovery_count: 12
   } : null;
 
@@ -104,6 +135,10 @@ export const UserProfile = () => {
           achievements={achievements}
           socialLinks={socialLinks}
           streamingLinks={streamingLinks}
+          analysisResult={analysisResult}
+          analysisLoading={analysisLoading}
+          analysisError={analysisError}
+          onRefreshAnalysis={refreshAnalysis}
           onSocialLinksChange={handleSocialLinksChange}
           onStreamingLinksChange={handleStreamingLinksChange}
           onSocialLinksSubmit={handleSocialLinksSubmit}
