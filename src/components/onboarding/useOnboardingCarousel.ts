@@ -30,7 +30,8 @@ export const useOnboardingCarousel = () => {
       
       // Small delay to ensure stable rendering on mobile
       setTimeout(() => {
-        api.scrollTo(Math.min(currentStep, 5 - 1), { immediate: true });  // 5 is total steps count
+        // Fix: Remove the options object and just use the index
+        api.scrollTo(Math.min(currentStep, 5 - 1));  // 5 is total steps count
       }, 50);
     }
     
