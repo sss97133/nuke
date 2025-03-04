@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { SortDirection, SortField } from '../../components/vehicles/discovery/types';
-import { useSupabaseVehicles } from './useSupabaseVehicles';
+import { mockVehicles } from './mockVehicleData';
 import { 
   handleVerify, 
   handleEdit, 
@@ -20,16 +20,8 @@ export function useVehiclesData() {
   const [sortField, setSortField] = useState<SortField>("added");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   
-  // Use the Supabase hook to get real vehicle data
-  const { 
-    vehicles, 
-    loading, 
-    error, 
-    fetchVehicles, 
-    addVehicle, 
-    updateVehicle, 
-    deleteVehicle 
-  } = useSupabaseVehicles();
+  // Get vehicles data from the mock data
+  const vehicles = mockVehicles;
   
   // Wrapper for toggle selection that includes the current state
   const toggleSelection = (id: number) => {
@@ -55,16 +47,8 @@ export function useVehiclesData() {
     setBulkActionOpen(false);
   };
 
-  // Wrap remove function to use deleteVehicle from Supabase
-  const removeVehicle = (id: number) => {
-    handleRemove(id);
-    deleteVehicle(id);
-  };
-
   return {
     vehicles,
-    loading,
-    error,
     searchTerm,
     setSearchTerm,
     selectedVehicles,
@@ -79,13 +63,10 @@ export function useVehiclesData() {
     setSortDirection,
     handleVerify,
     handleEdit,
-    handleRemove: removeVehicle,
+    handleRemove,
     toggleVehicleSelection: toggleSelection,
     handleBulkVerify: bulkVerify,
     handleBulkAddToGarage: bulkAddToGarage,
-    handleBulkRemove: bulkRemove,
-    refreshVehicles: fetchVehicles,
-    addVehicle,
-    updateVehicle
+    handleBulkRemove: bulkRemove
   };
 }
