@@ -1,28 +1,22 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
+import { StreamControls } from './controls/StreamControls';
+import { StreamPreview } from './preview/StreamPreview';
+import { StreamSettings } from './settings/StreamSettings';
 
 export const StreamerView = () => {
+  const [isLive, setIsLive] = useState(false);
+
   return (
     <Card className="bg-card">
-      <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-        <p className="text-muted-foreground">Stream preview will appear here</p>
-      </div>
+      <StreamPreview isLive={isLive} />
       <div className="p-4 space-y-4">
         <div className="flex gap-2 justify-end">
           <StreamControls />
         </div>
+        <StreamSettings />
       </div>
     </Card>
-  );
-};
-
-const StreamControls = () => {
-  return (
-    <div className="flex gap-2">
-      <button className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">
-        Start Streaming
-      </button>
-    </div>
   );
 };
