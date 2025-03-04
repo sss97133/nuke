@@ -23,7 +23,7 @@ import Schedule from "@/pages/Schedule";
 import Service from "@/pages/Service";
 import Maintenance from "@/pages/Maintenance";
 import Studio from "@/pages/Studio";
-import Explore from "@/pages/Explore";
+import Explore from '@/pages/Explore';
 import ExploreContentManagement from '@/pages/ExploreContentManagement';
 import VehicleDetail from '@/pages/VehicleDetail';
 import TeamMembers from '@/pages/TeamMembers';

@@ -22,25 +22,25 @@ export const ContentCard: React.FC<ContentCardProps> = ({
 }) => {
   const { 
     id, 
-    title, 
-    subtitle, 
-    image, 
-    tags, 
-    location, 
-    reason, 
-    type, 
+    title = 'Untitled Content', 
+    subtitle = '', 
+    image = '', 
+    tags = [], 
+    location = 'Unknown location', 
+    reason = '', 
+    type = 'post', 
     trending,
-    created_at,
+    created_at = new Date().toISOString(),
     creator_id,
-    creator_name,
+    creator_name = 'Unknown creator',
     creator_avatar,
-    view_count,
-    like_count,
-    share_count,
-    save_count,
-    is_liked,
-    is_saved
-  } = item;
+    view_count = 0,
+    like_count = 0,
+    share_count = 0,
+    save_count = 0,
+    is_liked = false,
+    is_saved = false
+  } = item || {};
   
   // Track view when card is rendered
   useEffect(() => {
@@ -48,6 +48,11 @@ export const ContentCard: React.FC<ContentCardProps> = ({
       onView(id, type);
     }
   }, [id, type, onView]);
+  
+  // Safeguard against null/undefined item
+  if (!item || !id) {
+    return null;
+  }
   
   return (
     <Card className={`overflow-hidden ${getContentCardBackground(type)} border-0 shadow-md`}>
