@@ -23,8 +23,11 @@ export class TwitchApi {
       const headers = {
         'Client-ID': this.config.clientId,
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
         ...options.headers
       };
+      
+      console.log(`Making request to Twitch API: ${endpoint}`);
       
       const response = await fetch(url, {
         ...options,
@@ -59,24 +62,55 @@ export class TwitchApi {
     }
   }
 
+  public async getCurrentBroadcast(token: string): Promise<any> {
+    try {
+      // Get user ID first
+      const userData = await this.getCurrentUser(token);
+      const userId = userData.id;
+      
+      // Then get current stream info
+      const streamData = await this.makeRequest(`/streams?user_id=${userId}`, token);
+      return streamData.data[0] || null;
+    } catch (error) {
+      console.error('Error fetching current broadcast:', error);
+      throw error;
+    }
+  }
+
   public async startStream(token: string, title: string): Promise<void> {
-    // This would typically call the Twitch API to update stream information
-    console.log('Starting Twitch stream with title:', title);
-    
-    // Simulate API call - in a real implementation, we would call the Twitch API
-    // For example:
-    // await this.makeRequest('/channels', token, {
-    //   method: 'PATCH',
-    //   body: JSON.stringify({ title }),
-    //   headers: { 'Content-Type': 'application/json' }
-    // });
+    try {
+      // Get user ID first
+      const userData = await this.getCurrentUser(token);
+      const userId = userData.id;
+      
+      console.log('Starting stream for user:', userId);
+      
+      // Patch the channel information to update the title
+      await this.makeRequest(`/channels?broadcaster_id=${userId}`, token, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          title,
+          game_id: '0', // Default game ID
+        })
+      });
+      
+      console.log('Stream title updated successfully');
+    } catch (error) {
+      console.error('Error starting stream:', error);
+      throw error;
+    }
   }
 
   public async stopStream(token: string): Promise<void> {
-    // This would typically call the Twitch API to end a stream
-    console.log('Stopping Twitch stream');
-    
-    // Simulate API call - in a real implementation, we would call the Twitch API
+    try {
+      // In Twitch's API, there isn't a direct "stop stream" endpoint
+      // The stream is stopped from the broadcaster's streaming software
+      // We can notify the user about this
+      console.log('To stop streaming, please end the stream in your broadcasting software');
+    } catch (error) {
+      console.error('Error in stop stream operation:', error);
+      throw error;
+    }
   }
   
   public async getCurrentUser(token: string): Promise<any> {
@@ -86,6 +120,16 @@ export class TwitchApi {
     } catch (error) {
       console.error('Error fetching user data:', error);
       throw error;
+    }
+  }
+
+  public async checkStreamStatus(token: string): Promise<boolean> {
+    try {
+      const broadcast = await this.getCurrentBroadcast(token);
+      return !!broadcast;
+    } catch (error) {
+      console.error('Error checking stream status:', error);
+      return false;
     }
   }
 }

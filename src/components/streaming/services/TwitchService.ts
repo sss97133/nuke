@@ -83,6 +83,15 @@ export class TwitchService {
     
     return this.api.getCurrentUser(token);
   }
+  
+  public async isCurrentlyStreaming(): Promise<boolean> {
+    const token = this.auth.getToken();
+    if (!token) {
+      return false;
+    }
+    
+    return this.api.checkStreamStatus(token);
+  }
 }
 
 export const twitchService = new TwitchService();

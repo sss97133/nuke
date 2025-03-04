@@ -7,6 +7,8 @@ import { twitchService } from '../services/TwitchService';
 
 export const StreamControls = () => {
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [streamTitle, setStreamTitle] = useState("My Stream");
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isConnectedToTwitch, setIsConnectedToTwitch] = useState(false);
@@ -18,7 +20,28 @@ export const StreamControls = () => {
     setHasClientIdError(!import.meta.env.VITE_TWITCH_CLIENT_ID);
     
     // Check if we're already authenticated with Twitch
-    setIsConnectedToTwitch(twitchService.isAuthenticated());
+    const checkTwitchConnection = async () => {
+      const isAuthenticated = twitchService.isAuthenticated();
+      setIsConnectedToTwitch(isAuthenticated);
+      
+      if (isAuthenticated) {
+        // Check if we're currently streaming
+        try {
+          const streaming = await twitchService.isCurrentlyStreaming();
+          setIsStreaming(streaming);
+          if (streaming) {
+            toast({
+              title: "Stream status detected",
+              description: "You are currently live on Twitch",
+            });
+          }
+        } catch (error) {
+          console.error("Error checking stream status:", error);
+        }
+      }
+    };
+    
+    checkTwitchConnection();
     
     // Listen for authentication state changes
     const handleAuthChange = () => {
@@ -31,64 +54,62 @@ export const StreamControls = () => {
     return () => {
       window.removeEventListener('twitch_auth_changed', handleAuthChange);
     };
-  }, []);
+  }, [toast]);
 
   const toggleStream = async () => {
-    if (isStreaming) {
-      // Stop streaming
-      try {
+    if (isLoading) return; // Prevent multiple clicks during processing
+    
+    setIsLoading(true);
+    
+    try {
+      if (isStreaming) {
+        // Stop streaming
         if (isConnectedToTwitch) {
           await twitchService.stopStream();
         }
         setIsStreaming(false);
         toast({
           title: "Stream ended",
-          description: "Your stream has ended",
+          description: "Your stream has ended. Note: You need to also stop your broadcasting software.",
         });
-      } catch (error) {
-        console.error('Error stopping stream:', error);
-        toast({
-          title: "Error stopping stream",
-          description: "An error occurred while stopping the stream",
-          variant: "destructive",
-        });
-      }
-    } else {
-      // Start streaming
-      try {
+      } else {
+        // Start streaming
         if (hasClientIdError) {
           toast({
             title: "Twitch Configuration Error",
             description: "Twitch Client ID is missing. Please set VITE_TWITCH_CLIENT_ID in your environment variables.",
             variant: "destructive",
           });
+          setIsLoading(false);
           return;
         }
         
-        if (isConnectedToTwitch) {
-          await twitchService.startStream("My Stream");
-        }
-        setIsStreaming(true);
-        toast({
-          title: "Stream started",
-          description: "You are now live!",
-        });
-      } catch (error) {
-        console.error('Error starting stream:', error);
         if (!isConnectedToTwitch) {
           toast({
             title: "Not connected to Twitch",
             description: "Please connect to Twitch in the settings below",
             variant: "destructive",
           });
-        } else {
-          toast({
-            title: "Error starting stream",
-            description: error instanceof Error ? error.message : "An error occurred while starting the stream",
-            variant: "destructive",
-          });
+          setIsLoading(false);
+          return;
         }
+        
+        await twitchService.startStream(streamTitle);
+        setIsStreaming(true);
+        toast({
+          title: "Stream started",
+          description: "Your stream information has been updated. Start your broadcasting software to go live.",
+        });
       }
+    } catch (error) {
+      console.error('Error toggling stream:', error);
+      toast({
+        title: "Error with stream",
+        description: error instanceof Error ? error.message : "An error occurred while managing your stream",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -113,9 +134,9 @@ export const StreamControls = () => {
       <Button 
         variant={isStreaming ? "destructive" : "default"}
         onClick={toggleStream}
-        disabled={hasClientIdError && !isStreaming}
+        disabled={hasClientIdError || isLoading || (!isConnectedToTwitch && !isStreaming)}
       >
-        {isStreaming ? "End Stream" : "Start Stream"}
+        {isLoading ? "Processing..." : isStreaming ? "End Stream" : "Start Stream"}
       </Button>
       
       <Button 
