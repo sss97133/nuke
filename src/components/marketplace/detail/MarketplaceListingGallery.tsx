@@ -6,6 +6,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi
 } from "@/components/ui/carousel";
 import { Card, CardContent } from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
@@ -22,6 +23,7 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
   onImageSelect
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [api, setApi] = useState<CarouselApi>();
   
   useEffect(() => {
     console.log("MarketplaceListingGallery mounted with ID:", listingId);
@@ -46,6 +48,16 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
       onImageSelect(selectedIndex);
     }
   }, [selectedIndex, onImageSelect]);
+
+  useEffect(() => {
+    if (!api) {
+      return;
+    }
+
+    api.on("select", () => {
+      setSelectedIndex(api.selectedScrollSnap());
+    });
+  }, [api]);
 
   if (!images || images.length === 0) {
     console.log("No images provided for gallery");
@@ -72,10 +84,7 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
             loop: true,
           }}
           className="w-full"
-          onSelect={(api) => {
-            const currentIndex = api.selectedScrollSnap();
-            setSelectedIndex(currentIndex);
-          }}
+          setApi={setApi}
         >
           <CarouselContent>
             {images.map((image, index) => (
@@ -105,7 +114,12 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
                   ? 'ring-2 ring-primary ring-offset-2' 
                   : 'opacity-70 hover:opacity-100'
               }`}
-              onClick={() => setSelectedIndex(index)}
+              onClick={() => {
+                if (api) {
+                  api.scrollTo(index);
+                }
+                setSelectedIndex(index);
+              }}
             >
               <AspectRatio ratio={16/9} className="w-20">
                 <img
