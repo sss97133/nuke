@@ -8,6 +8,9 @@ interface ClassicWindowProps {
 
 export const ClassicWindow = ({ title, children }: ClassicWindowProps) => {
   const [angle, setAngle] = useState(0);
+  
+  // Debug log to verify component rendering
+  console.log("Rendering ClassicWindow with title:", title);
 
   useEffect(() => {
     const interval = setInterval(() => {

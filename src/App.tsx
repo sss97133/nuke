@@ -60,11 +60,18 @@ function AppContent() {
     return () => setIsMounted(false);
   }, [session]);
 
+  // Add debugging to help troubleshoot rendering issues
+  console.log("Current path:", location.pathname);
+  console.log("Is authenticated:", !!session);
+  console.log("Is loading:", loading);
+
   if (!isMounted) {
+    console.log("App not mounted yet");
     return null;
   }
 
   if (loading) {
+    console.log("Auth state loading...");
     return (
       <div className="flex items-center justify-center h-screen">
         <p>Loading...</p>
@@ -77,18 +84,22 @@ function AppContent() {
   const isRootPath = location.pathname === '/';
 
   if (isRootPath) {
+    console.log("On root path, redirecting to", isAuthenticated ? "/dashboard" : "/login");
     return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
   }
 
   if (isAuthenticated && isAuthPath) {
+    console.log("Authenticated and on auth path, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
   if (!isAuthenticated && !isAuthPath && !location.pathname.startsWith('/auth/callback')) {
+    console.log("Not authenticated and not on auth path, redirecting to login");
     return <Navigate to="/login" replace />;
   }
 
   if (isAuthPath || location.pathname.startsWith('/auth/callback')) {
+    console.log("Rendering auth page");
     return (
       <div className="min-h-screen bg-background">
         <Routes>
@@ -101,6 +112,7 @@ function AppContent() {
     );
   }
 
+  console.log("Rendering main app");
   return (
     <div className="flex min-h-screen bg-background">
       <NavSidebar />
@@ -142,6 +154,7 @@ function AppContent() {
 }
 
 function App() {
+  console.log("App component initializing");
   return (
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>

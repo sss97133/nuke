@@ -22,6 +22,9 @@ export const AuthForm = () => {
   const [searchParams] = useSearchParams();
   const [isResetFlow, setIsResetFlow] = useState(false);
 
+  // Debug logging to verify the component is rendering
+  console.log("Rendering AuthForm component");
+
   useEffect(() => {
     const isReset = searchParams.get('reset') === 'true';
     setIsResetFlow(isReset);
@@ -59,7 +62,7 @@ export const AuthForm = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden bg-background">
       <div className="w-full max-w-[400px]">
         <ClassicWindow title="Welcome">
           <div className="space-y-6 max-h-[calc(100vh-8rem)] overflow-y-auto px-1 py-2">

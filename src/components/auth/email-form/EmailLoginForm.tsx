@@ -34,6 +34,9 @@ export const EmailLoginForm = ({
     handleSubmit
   } = useEmailForm(showForgotPassword, isSignUp);
 
+  // Debug logging
+  console.log("Rendering EmailLoginForm, showForgotPassword:", showForgotPassword, "isSignUp:", isSignUp);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">

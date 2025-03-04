@@ -136,3 +136,24 @@
          focus:shadow-classic-pressed focus:outline-none
          px-3 py-1.5 text-sm font-system text-foreground;
 }
+
+/* Add shadow-classic utility classes that were possibly missing */
+.shadow-classic {
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+}
+
+.shadow-classic-pressed {
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
+}
+
+.dark .shadow-classic {
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.4);
+}
+
+.dark .shadow-classic-pressed {
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.4);
+}
+
+.dark .shadow-classic-dark {
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.4);
+}
