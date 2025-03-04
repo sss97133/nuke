@@ -1,27 +1,39 @@
 
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
-import { DesktopNavSidebar } from './nav/DesktopNavSidebar';
+import React, { useState, useEffect } from 'react';
 import { MobileNavSidebar } from './nav/MobileNavSidebar';
-import { RouteDebug } from '../../debug/RouteDebug';
+import { DesktopNavSidebar } from './nav/DesktopNavSidebar';
 
 export const NavSidebar = () => {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        setIsCollapsed(true);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  if (isMobile) {
+    return <MobileNavSidebar isOpen={isOpen} setIsOpen={setIsOpen} />;
+  }
+
   return (
-    <div className="flex h-screen">
-      <RouteDebug />
-      <DesktopNavSidebar isCollapsed={isCollapsed} toggleCollapse={toggleCollapse} />
-      <MobileNavSidebar isOpen={isMobileOpen} setIsOpen={setIsMobileOpen} />
-      
-      <div className="flex-1 overflow-y-auto">
-        <Outlet />
-      </div>
-    </div>
+    <DesktopNavSidebar 
+      isCollapsed={isCollapsed} 
+      toggleCollapse={toggleCollapse} 
+    />
   );
-};
+}

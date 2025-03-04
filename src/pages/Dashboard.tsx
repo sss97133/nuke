@@ -1,49 +1,50 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from 'react-router-dom';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import StatsOverview from '@/components/dashboard/StatsOverview';
+import DashboardContent from '@/components/dashboard/DashboardContent';
 
 const Dashboard = () => {
-  const navigate = useNavigate();
+  // Enhanced console logs for debugging
+  console.log("Dashboard component initial render");
+  
+  useEffect(() => {
+    console.log("Dashboard component mounted");
+    
+    // Check for DOM elements to see if they're rendering
+    const container = document.querySelector('.dashboard-container');
+    console.log("Dashboard container found:", !!container);
+    
+    return () => {
+      console.log("Dashboard component unmounted");
+    };
+  }, []);
   
   return (
-    <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="container px-4 md:px-6 py-4 md:py-6 space-y-6 max-w-screen-xl mx-auto">
-        <div className="space-y-2">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Welcome to your vehicle management dashboard
-          </p>
-        </div>
+    <div className="min-h-screen bg-background dashboard-container">
+      <ScrollArea className="h-[calc(100vh-4rem)]">
+        <div className="container max-w-7xl mx-auto p-6 space-y-6">
+          <DashboardHeader />
+          <StatsOverview />
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <div className="p-6 border rounded-lg shadow-sm bg-card">
-            <h3 className="text-xl font-semibold mb-2">Vehicles</h3>
-            <p className="text-muted-foreground mb-4">Manage your discovered vehicles</p>
-            <Button onClick={() => navigate('/dashboard/discovered-vehicles')}>
-              Go to Vehicles
-            </Button>
-          </div>
-          
-          <div className="p-6 border rounded-lg shadow-sm bg-card">
-            <h3 className="text-xl font-semibold mb-2">Profile</h3>
-            <p className="text-muted-foreground mb-4">Manage your account information</p>
-            <Button onClick={() => navigate('/profile')}>
-              View Profile
-            </Button>
-          </div>
-          
-          <div className="p-6 border rounded-lg shadow-sm bg-card">
-            <h3 className="text-xl font-semibold mb-2">Analytics</h3>
-            <p className="text-muted-foreground mb-4">View insights about your vehicles</p>
-            <Button onClick={() => navigate('/analytics')}>
-              View Analytics
-            </Button>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Discover Nearby</CardTitle>
+              <CardDescription>Find vehicles, garages, auctions and events in your area</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                {/* GeoFencedDiscovery will be rendered here */}
+              </div>
+            </CardContent>
+          </Card>
+
+          <DashboardContent />
         </div>
-      </div>
-    </ScrollArea>
+      </ScrollArea>
+    </div>
   );
 };
 

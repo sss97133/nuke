@@ -12,7 +12,6 @@ export const useAuthActions = () => {
     try {
       console.log("[useAuthActions] Starting social login with provider:", provider);
       const redirectTo = `${window.location.origin}/auth/callback`;
-      console.log("[useAuthActions] Using redirect URL:", redirectTo);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,

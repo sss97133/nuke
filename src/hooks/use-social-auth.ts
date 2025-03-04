@@ -13,14 +13,10 @@ export const useSocialAuth = () => {
       setIsLoading(true);
       console.log("[useSocialAuth] Starting OAuth flow with provider:", provider);
       
-      // Make sure to use the full application URL for the redirect
-      const redirectUrl = `${window.location.origin}/auth/callback`;
-      console.log("[useSocialAuth] Using redirect URL:", redirectUrl);
-      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: redirectUrl,
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
