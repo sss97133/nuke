@@ -1,18 +1,20 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import DiscoveredVehicles from './pages/DiscoveredVehicles';
 import { AuthCallback } from './components/auth/AuthCallback';
 import { AuthProvider } from './hooks/auth/use-auth-provider';
 import { AuthRequiredLayout } from './components/layout/AuthRequiredLayout';
 import { NavSidebar } from './components/layout/NavSidebar';
+import { Toaster } from 'sonner';
 import './App.css';
 
-// Import other components and providers as needed
+import DiscoveredVehicles from './pages/DiscoveredVehicles';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <Toaster position="top-right" />
         <Routes>
           {/* Auth routes */}
           <Route path="/auth/callback" element={<AuthCallback />} />
@@ -20,10 +22,13 @@ function App() {
           {/* Protected routes */}
           <Route element={<AuthRequiredLayout />}>
             <Route path="/dashboard" element={<NavSidebar />}>
-              {/* Dashboard child routes */}
-              <Route path="discovered-vehicles" element={<DiscoveredVehicles />} />
+              {/* Dashboard as the main page */}
+              <Route index element={<Dashboard />} />
+              
               {/* Other dashboard routes */}
+              <Route path="discovered-vehicles" element={<DiscoveredVehicles />} />
             </Route>
+            
             <Route path="/discovered-vehicles" element={<Navigate to="/dashboard/discovered-vehicles" replace />} />
           </Route>
           
