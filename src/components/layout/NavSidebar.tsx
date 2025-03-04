@@ -90,6 +90,16 @@ export const NavSidebar = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
+  // Handle direct navigation to login
+  const handleLoginClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    console.log("Login clicked, navigating to /login");
+    navigate('/login');
+    if (isMobile) {
+      closeMenu();
+    }
+  };
+  
   const getNavItems = () => {
     const isAuthenticated = !!session;
     const items = [];
@@ -99,8 +109,16 @@ export const NavSidebar = () => {
     
     // Add auth items if not authenticated
     if (!isAuthenticated && !authLoading) {
-      items.push({ to: "/login", icon: <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Login" });
-      return items;
+      // Using a special item for login that will use the handleLoginClick function
+      return [
+        ...items,
+        { 
+          to: "#", // Use # to prevent default navigation
+          icon: <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />, 
+          label: "Login",
+          onClick: handleLoginClick
+        }
+      ];
     }
     
     // Add the rest of the items for authenticated users
@@ -150,6 +168,8 @@ export const NavSidebar = () => {
     setIsOpen(false);
   };
 
+  const navItems = getNavItems();
+
   if (isMobile) {
     return (
       <>
@@ -166,7 +186,7 @@ export const NavSidebar = () => {
               </div>
               <ScrollArea className="h-[calc(100vh-57px)]">
                 <div className="p-2 space-y-1">
-                  {getNavItems().map((item) => (
+                  {navItems.map((item) => (
                     <NavItem
                       key={item.to}
                       to={item.to}
@@ -174,7 +194,7 @@ export const NavSidebar = () => {
                       label={item.label}
                       isActive={location.pathname === item.to}
                       isCollapsed={false}
-                      onClick={closeMenu}
+                      onClick={item.onClick || closeMenu}
                     />
                   ))}
                 </div>
@@ -207,7 +227,7 @@ export const NavSidebar = () => {
       
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
-          {getNavItems().map((item) => (
+          {navItems.map((item) => (
             <NavItem
               key={item.to}
               to={item.to}
@@ -215,6 +235,7 @@ export const NavSidebar = () => {
               label={item.label}
               isActive={location.pathname === item.to}
               isCollapsed={isCollapsed}
+              onClick={item.onClick}
             />
           ))}
         </div>

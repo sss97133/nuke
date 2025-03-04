@@ -95,20 +95,31 @@ function AppContent() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Redirect unauthenticated users to login (except for auth paths and callbacks)
-  if (!isAuthenticated && !isAuthPath && !location.pathname.startsWith('/auth/callback')) {
-    console.log("Not authenticated and not on auth path, redirecting to login");
-    return <Navigate to="/login" replace />;
-  }
-
-  // Render auth pages for unauthenticated users
-  if (isAuthPath || location.pathname.startsWith('/auth/callback')) {
-    console.log("Rendering auth page");
+  // For unauthenticated users on auth paths, just render the auth page without redirecting
+  if (!isAuthenticated && isAuthPath) {
+    console.log("Unauthenticated and on auth path, rendering auth page");
     return (
       <div className="min-h-screen bg-background">
         <Routes>
           <Route path="/login" element={<AuthForm />} />
           <Route path="/register" element={<AuthForm />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  // Redirect unauthenticated users to login for non-auth paths
+  if (!isAuthenticated && !location.pathname.startsWith('/auth/callback')) {
+    console.log("Not authenticated and not on auth path, redirecting to login");
+    return <Navigate to="/login" replace />;
+  }
+
+  // Handle auth callbacks
+  if (location.pathname.startsWith('/auth/callback')) {
+    console.log("Handling auth callback");
+    return (
+      <div className="min-h-screen bg-background">
+        <Routes>
           <Route path="/auth/callback" element={<div className="flex items-center justify-center h-screen">Completing login...</div>} />
         </Routes>
       </div>
