@@ -43,10 +43,15 @@ export const AuthCallback = () => {
 
         console.log("[AuthCallback] Session established for:", session.user.email);
         
+        // Extract avatar URL and other metadata from user metadata
+        const metadata = session.user.user_metadata;
+        console.log("[AuthCallback] User metadata:", metadata);
+        const avatarUrl = metadata?.avatar_url || '';
+        
         // Check if user has a profile
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('username, onboarding_completed')
+          .select('username, onboarding_completed, avatar_url')
           .eq('id', session.user.id)
           .single();
 
@@ -54,16 +59,25 @@ export const AuthCallback = () => {
           console.error("[AuthCallback] Profile error:", profileError);
         }
 
-        // Extract GitHub profile data from user metadata
-        const metadata = session.user.user_metadata;
-        console.log("[AuthCallback] User metadata:", metadata);
+        // Update avatar URL if it's from social login and different from current
+        if (avatarUrl && (!profile?.avatar_url || profile.avatar_url !== avatarUrl)) {
+          console.log("[AuthCallback] Updating profile with social avatar URL:", avatarUrl);
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ avatar_url: avatarUrl })
+            .eq('id', session.user.id);
+            
+          if (updateError) {
+            console.error("[AuthCallback] Error updating avatar URL:", updateError);
+          }
+        }
 
         // Store GitHub data in localStorage for onboarding
         if (metadata) {
           localStorage.setItem('onboarding_data', JSON.stringify({
             firstName: metadata.name ? metadata.name.split(' ')[0] : '',
             lastName: metadata.name ? metadata.name.split(' ').slice(1).join(' ') : '',
-            avatarUrl: metadata.avatar_url || '',
+            avatarUrl: avatarUrl,
             email: session.user.email || '',
             username: metadata.user_name || metadata.preferred_username || '',
             socialLinks: {
