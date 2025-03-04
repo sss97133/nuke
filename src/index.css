@@ -76,6 +76,13 @@
   }
 }
 
+/* Add classic-window component styling in component layer */
+@layer components {
+  .classic-window {
+    @apply bg-background border border-border shadow-classic p-6;
+  }
+}
+
 /* Classic MacOS scrollbar styling */
 ::-webkit-scrollbar {
   @apply w-4;
