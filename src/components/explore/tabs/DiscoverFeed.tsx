@@ -6,11 +6,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MessageCircle, Video } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-interface DiscoverFeedProps {
+export interface DiscoverFeedProps {
   filter: string;
+  searchTerm?: string;
 }
 
-export const DiscoverFeed: React.FC<DiscoverFeedProps> = ({ filter }) => {
+export const DiscoverFeed: React.FC<DiscoverFeedProps> = ({ filter, searchTerm = '' }) => {
   const { 
     feedItems, 
     fetchNextPage, 
@@ -26,7 +27,8 @@ export const DiscoverFeed: React.FC<DiscoverFeedProps> = ({ filter }) => {
   } = useExploreFeed({ 
     filter,
     // Add a specific flag to include streaming content
-    includeStreams: true 
+    includeStreams: true,
+    searchTerm
   });
 
   // Handle loading state

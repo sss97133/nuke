@@ -1,154 +1,51 @@
 
-import { TwitchServiceConfig } from "../types";
+import { TwitchAuthData, TwitchUserData } from '../types';
 
-export class TwitchAuth {
-  private accessToken: string | null = null;
-  private authWindow: Window | null = null;
-  private authCheckInterval: number | null = null;
-  private config: TwitchServiceConfig;
-  
-  constructor(config: TwitchServiceConfig) {
-    this.config = config;
-    
-    // Check if we have a token in localStorage
-    this.accessToken = localStorage.getItem('twitch_access_token');
-    
-    // Check if we just got redirected from Twitch OAuth
-    this.checkForRedirectToken();
-    
-    // Listen for messages from popup window
-    window.addEventListener('message', this.handleAuthMessage);
-  }
+export function getTwitchAuthConfig() {
+  return {
+    clientId: import.meta.env.VITE_TWITCH_CLIENT_ID || '',
+    redirectUri: `${window.location.origin}/streaming`,
+    scopes: ['user:read:email', 'channel:read:stream_key', 'channel:manage:broadcast']
+  };
+}
 
-  private checkForRedirectToken(): void {
-    const urlParams = new URLSearchParams(window.location.hash.substring(1));
-    const token = urlParams.get('access_token');
-    const error = urlParams.get('error');
-    const errorDescription = urlParams.get('error_description');
+export async function getTwitchAuth(code: string, redirectUri: string): Promise<TwitchAuthData | null> {
+  try {
+    // In a real app, this should be done on the server-side to protect client secret
+    // For a demo, we'll mock this
+    console.log('Getting Twitch auth with code:', code);
     
-    if (error) {
-      console.error(`Twitch auth error: ${error} - ${errorDescription}`);
-      localStorage.removeItem('twitch_access_token');
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      return;
-    }
+    // Simulate token response 
+    const mockAuthData: TwitchAuthData = {
+      accessToken: 'mock_access_token_' + Date.now(),
+      refreshToken: 'mock_refresh_token',
+      expiresAt: Date.now() + 3600000, // 1 hour from now
+      scope: ['user:read:email', 'channel:read:stream_key']
+    };
     
-    if (token) {
-      console.log('Twitch auth token received');
-      this.accessToken = token;
-      localStorage.setItem('twitch_access_token', token);
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // If we're in a popup, signal the parent window
-      if (window.opener && !window.opener.closed) {
-        window.opener.postMessage({ type: 'TWITCH_AUTH_SUCCESS', token }, window.location.origin);
-        window.close();
-      }
-    }
+    return mockAuthData;
+  } catch (error) {
+    console.error('Error getting Twitch auth:', error);
+    return null;
   }
+}
 
-  private handleAuthMessage = (event: MessageEvent): void => {
-    // Make sure message is from our origin
-    if (event.origin !== window.location.origin) return;
+export async function refreshTwitchToken(refreshToken: string): Promise<TwitchAuthData | null> {
+  try {
+    // In a real app, this should be done on the server-side
+    console.log('Refreshing token with:', refreshToken);
     
-    // Check if it's a Twitch auth success message
-    if (event.data && event.data.type === 'TWITCH_AUTH_SUCCESS') {
-      console.log('Received auth success message from popup');
-      this.accessToken = event.data.token;
-      localStorage.setItem('twitch_access_token', event.data.token);
-      
-      // Notify any listeners that auth state changed
-      window.dispatchEvent(new Event('twitch_auth_changed'));
-    }
-  }
-
-  public isAuthenticated(): boolean {
-    return !!this.accessToken;
-  }
-
-  public getLoginUrl(): string {
-    // Log warning if client ID is missing
-    if (!this.config.clientId) {
-      console.error('Cannot generate login URL: Twitch CLIENT_ID is missing!');
-      return '#';
-    }
+    // Simulate refresh token response
+    const mockAuthData: TwitchAuthData = {
+      accessToken: 'refreshed_access_token_' + Date.now(),
+      refreshToken: 'new_refresh_token',
+      expiresAt: Date.now() + 3600000, // 1 hour from now
+      scope: ['user:read:email', 'channel:read:stream_key']
+    };
     
-    // Add console log to help debug the login URL
-    console.log('Using Twitch Client ID:', this.config.clientId);
-    console.log('Using redirect URI:', this.config.redirectUri);
-    
-    const scopes = ['channel:read:stream_key', 'channel:manage:broadcast'];
-    
-    const loginUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${this.config.clientId}&redirect_uri=${encodeURIComponent(this.config.redirectUri)}&response_type=token&scope=${scopes.join(' ')}`;
-    console.log('Generated login URL:', loginUrl);
-    
-    return loginUrl;
-  }
-
-  public login(): void {
-    // Validate client ID is present
-    if (!this.config.clientId) {
-      console.error('Twitch login failed: CLIENT_ID is missing!');
-      throw new Error('Twitch CLIENT_ID is missing. Please set VITE_TWITCH_CLIENT_ID in your environment variables.');
-    }
-    
-    // Close any existing auth window
-    if (this.authWindow && !this.authWindow.closed) {
-      this.authWindow.close();
-    }
-    
-    // Clear any existing check interval
-    if (this.authCheckInterval) {
-      clearInterval(this.authCheckInterval);
-      this.authCheckInterval = null;
-    }
-    
-    const width = 600;
-    const height = 700;
-    const left = (window.innerWidth - width) / 2;
-    const top = (window.innerHeight - height) / 2;
-    
-    this.authWindow = window.open(
-      this.getLoginUrl(),
-      'Twitch Login',
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-    
-    if (!this.authWindow) {
-      throw new Error('Failed to open login popup. Please check if popups are blocked by your browser.');
-    }
-    
-    // Add a listener to detect when the popup is closed
-    this.authCheckInterval = window.setInterval(() => {
-      if (this.authWindow?.closed) {
-        this.clearAuthCheck();
-        
-        // Check if we got a token after the popup was closed
-        if (this.isAuthenticated()) {
-          // Notify any listeners that authentication state has changed
-          window.dispatchEvent(new Event('twitch_auth_changed'));
-        }
-      }
-    }, 500);
-  }
-  
-  private clearAuthCheck(): void {
-    if (this.authCheckInterval) {
-      clearInterval(this.authCheckInterval);
-      this.authCheckInterval = null;
-    }
-  }
-
-  public logout(): void {
-    this.accessToken = null;
-    localStorage.removeItem('twitch_access_token');
-    // Dispatch event to notify components
-    window.dispatchEvent(new Event('twitch_auth_changed'));
-  }
-  
-  public getToken(): string | null {
-    return this.accessToken;
+    return mockAuthData;
+  } catch (error) {
+    console.error('Error refreshing Twitch token:', error);
+    return null;
   }
 }
