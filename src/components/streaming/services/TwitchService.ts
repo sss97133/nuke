@@ -13,7 +13,6 @@ class TwitchService {
     }
   }
   
-  // Add missing methods to fix the build errors
   async getCurrentUser() {
     try {
       return await getUserInfo();
@@ -33,6 +32,7 @@ class TwitchService {
     }
   }
   
+  // Modified to not take any parameters
   async startStream() {
     // This would call the Twitch API to start streaming
     console.log('Starting stream...');

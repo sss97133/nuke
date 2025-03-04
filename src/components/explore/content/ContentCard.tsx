@@ -8,7 +8,7 @@ import { ContentCardContent } from './components/ContentCardContent';
 import { ContentCardFooter } from './components/ContentCardFooter';
 import { getContentCardBackground } from './utils/contentCardUtils';
 
-// Fix the export type error
+// Fix the export type error - using export type instead of export
 export { ContentCardItem } from './types/ContentCardTypes';
 export type { ContentCardProps } from './types/ContentCardTypes';
 

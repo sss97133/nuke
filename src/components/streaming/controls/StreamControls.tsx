@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Video, VideoOff, Mic, MicOff, Settings } from "lucide-react";
@@ -86,7 +87,8 @@ export const StreamControls = () => {
           return;
         }
         
-        await twitchService.startStream(streamTitle);
+        // Fix: Remove streamTitle argument since startStream doesn't accept parameters
+        await twitchService.startStream();
         setIsStreaming(true);
         toast({
           title: "Stream started",
