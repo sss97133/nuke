@@ -2,9 +2,9 @@
 import { Vehicle } from '@/components/vehicles/discovery/types';
 
 /**
- * Formats the added date relative to now (e.g., "5 days ago")
+ * Formats the created date relative to now (e.g., "5 days ago")
  */
-export const formatAddedDate = (dateString: string): string => {
+export const formatCreatedDate = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
   const diffTime = Math.abs(now.getTime() - date.getTime());
@@ -36,7 +36,7 @@ export const transformVehicleData = (data: any[]): Vehicle[] => {
     mileage: item.mileage || 0,
     image: item.image || '/placeholder.svg',
     location: item.location || 'Unknown',
-    added: formatAddedDate(item.added || item.created_at),
+    added: formatCreatedDate(item.created_at || new Date().toISOString()), // Use created_at instead of added
     tags: item.tags || [],
     condition_rating: item.condition_rating || 5,
     vehicle_type: item.vehicle_type || 'car',

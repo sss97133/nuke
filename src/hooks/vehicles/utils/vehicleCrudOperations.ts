@@ -17,7 +17,7 @@ export const fetchVehicles = async (session: any, toast: ReturnType<typeof useTo
     const { data, error } = await supabase
       .from('discovered_vehicles')
       .select('*')
-      .order('added', { ascending: false });
+      .order('created_at', { ascending: false });  // Use created_at instead of added
 
     if (error) {
       console.error('Error fetching vehicles:', error);
@@ -61,25 +61,19 @@ export const addVehicle = async (
     }
 
     // Transform the vehicle object to match database schema
+    // Include only the fields that actually exist in the database
     const dbVehicle = {
       make: newVehicle.make,
       model: newVehicle.model,
       year: newVehicle.year,
       price: newVehicle.price.toString(), // Convert to string for database
-      market_value: newVehicle.market_value,
-      price_trend: newVehicle.price_trend,
-      mileage: newVehicle.mileage,
-      image: newVehicle.image,
       location: newVehicle.location,
-      tags: newVehicle.tags,
-      condition_rating: newVehicle.condition_rating,
-      vehicle_type: newVehicle.vehicle_type,
-      body_type: newVehicle.body_type,
-      transmission: newVehicle.transmission,
-      drivetrain: newVehicle.drivetrain,
-      rarity_score: newVehicle.rarity_score,
+      image: newVehicle.image,
+      mileage: newVehicle.mileage,
       user_id: session.user.id,
-      source: 'manual_entry'
+      source: 'manual_entry',
+      // Exclude fields that don't exist in the database:
+      // body_type, transmission, drivetrain, vehicle_type, rarity_score
     };
 
     const { data, error } = await supabase
@@ -181,8 +175,20 @@ export const updateVehicle = async (
     const realId = await findVehicleRealId(vehicleToUpdate, toast);
     if (!realId) return false;
 
-    // Remove fields that don't exist in the database or shouldn't be updated
-    const { relevance_score, added, id: _id, ...dbUpdates } = updates as any;
+    // Clean up updates to include only fields that exist in the database
+    const { 
+      relevance_score, 
+      added, 
+      id: _id, 
+      body_type,
+      transmission,
+      drivetrain,
+      vehicle_type,
+      rarity_score,
+      condition_rating,
+      tags,
+      ...dbUpdates 
+    } = updates as any;
 
     // Convert price to string if it exists in updates
     if (dbUpdates.price !== undefined) {
