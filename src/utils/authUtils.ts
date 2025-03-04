@@ -1,6 +1,6 @@
 
 import { useLocation } from 'react-router-dom';
-import { PUBLIC_ROUTES } from '@/routes/routeConfig';
+import { publicRoutes } from '@/routes/routeConfig';
 
 export const isAuthPath = (pathname: string): boolean => {
   return pathname === '/login' || pathname === '/register';
@@ -15,7 +15,7 @@ export const isRootPath = (pathname: string): boolean => {
 };
 
 export const isPublicPath = (pathname: string): boolean => {
-  return PUBLIC_ROUTES.some(route => pathname.startsWith(route));
+  return publicRoutes.some(route => pathname.startsWith(route.path));
 };
 
 export const useAuthPaths = () => {
