@@ -1,17 +1,54 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Twitch } from "lucide-react";
+import { twitchService } from '../services/TwitchService';
+import { useToast } from "@/components/ui/use-toast";
 
 export const StreamSettings = () => {
+  const [streamTitle, setStreamTitle] = useState('My Stream');
+  const [isTwitchConnected, setIsTwitchConnected] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Check if we're already authenticated with Twitch
+    setIsTwitchConnected(twitchService.isAuthenticated());
+  }, []);
+
+  const handleTwitchLogin = () => {
+    window.location.href = twitchService.getLoginUrl();
+  };
+
+  const handleTwitchLogout = () => {
+    twitchService.logout();
+    setIsTwitchConnected(false);
+    toast({
+      title: "Disconnected from Twitch",
+      description: "Your Twitch account has been disconnected",
+    });
+  };
+
   return (
     <Card className="mt-4">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium">Stream Settings</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="title">Stream Title</Label>
+          <Input 
+            id="title" 
+            value={streamTitle} 
+            onChange={(e) => setStreamTitle(e.target.value)} 
+            placeholder="Enter your stream title"
+          />
+        </div>
+        
         <div className="space-y-2">
           <Label htmlFor="quality">Quality</Label>
           <Select defaultValue="720p">
@@ -47,11 +84,38 @@ export const StreamSettings = () => {
               <SelectValue placeholder="Select platform" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="platform1">Platform 1</SelectItem>
-              <SelectItem value="platform2">Platform 2</SelectItem>
-              <SelectItem value="platform3">Platform 3</SelectItem>
+              <SelectItem value="twitch">Twitch</SelectItem>
+              <SelectItem value="youtube">YouTube</SelectItem>
+              <SelectItem value="facebook">Facebook</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        
+        <div className="pt-2">
+          <Label className="mb-2 block">Twitch Integration</Label>
+          {isTwitchConnected ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-sm text-green-500">
+                <Twitch className="h-4 w-4" />
+                <span>Connected to Twitch</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleTwitchLogout}
+              >
+                Disconnect from Twitch
+              </Button>
+            </div>
+          ) : (
+            <Button 
+              onClick={handleTwitchLogin}
+              className="bg-[#9146FF] hover:bg-[#7d3bdd] text-white"
+            >
+              <Twitch className="mr-2 h-4 w-4" />
+              Connect with Twitch
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

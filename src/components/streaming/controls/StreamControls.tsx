@@ -1,21 +1,70 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Video, VideoOff, Mic, MicOff, Settings } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { twitchService } from '../services/TwitchService';
 
 export const StreamControls = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isConnectedToTwitch, setIsConnectedToTwitch] = useState(false);
   const { toast } = useToast();
 
-  const toggleStream = () => {
-    setIsStreaming(!isStreaming);
-    toast({
-      title: isStreaming ? "Stream ended" : "Stream started",
-      description: isStreaming ? "Your stream has ended" : "You are now live!",
-    });
+  useEffect(() => {
+    // Check if we're already authenticated with Twitch
+    setIsConnectedToTwitch(twitchService.isAuthenticated());
+  }, []);
+
+  const toggleStream = async () => {
+    if (isStreaming) {
+      // Stop streaming
+      try {
+        if (isConnectedToTwitch) {
+          await twitchService.stopStream();
+        }
+        setIsStreaming(false);
+        toast({
+          title: "Stream ended",
+          description: "Your stream has ended",
+        });
+      } catch (error) {
+        console.error('Error stopping stream:', error);
+        toast({
+          title: "Error stopping stream",
+          description: "An error occurred while stopping the stream",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Start streaming
+      try {
+        if (isConnectedToTwitch) {
+          await twitchService.startStream("My Stream");
+        }
+        setIsStreaming(true);
+        toast({
+          title: "Stream started",
+          description: "You are now live!",
+        });
+      } catch (error) {
+        console.error('Error starting stream:', error);
+        if (!isConnectedToTwitch) {
+          toast({
+            title: "Not connected to Twitch",
+            description: "Please connect to Twitch in the settings below",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error starting stream",
+            description: "An error occurred while starting the stream",
+            variant: "destructive",
+          });
+        }
+      }
+    }
   };
 
   const toggleMic = () => {
