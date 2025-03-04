@@ -9,6 +9,7 @@ import { NetworkStatus } from './components/ui/network-status'
 import Profile from "./pages/Profile"
 import Dashboard from "./pages/Dashboard"
 import Onboarding from "./pages/Onboarding"
+import OnboardingCheck from "./components/onboarding/OnboardingCheck"
 import Skills from "./pages/Skills"
 import Achievements from "./pages/Achievements"
 import Glossary from "./pages/Glossary"
@@ -154,7 +155,9 @@ function App() {
           <div className="App">
             <Toaster />
             <NetworkStatus />
-            <AppContent />
+            <OnboardingCheck>
+              <AppContent />
+            </OnboardingCheck>
           </div>
         </ThemeProvider>
       </QueryClientProvider>

@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Check, ChevronRight, User, Building, Car, Wrench, Target } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const OnboardingStep = ({ 
   icon: Icon, 
@@ -42,8 +45,11 @@ const OnboardingStep = ({
 );
 
 const Onboarding = () => {
+  const [loading, setLoading] = useState(true);
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const { toast } = useToast();
+  const navigate = useNavigate();
   
   const steps = [
     {
@@ -72,22 +78,160 @@ const Onboarding = () => {
       description: "Define your skills and achievements targets"
     }
   ];
+
+  useEffect(() => {
+    const fetchOnboardingStatus = async () => {
+      try {
+        setLoading(true);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          toast({
+            title: "Not signed in",
+            description: "Please sign in to continue with onboarding",
+            variant: "destructive",
+          });
+          navigate('/login');
+          return;
+        }
+        
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('onboarding_step, onboarding_completed')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching profile:", error);
+          toast({
+            title: "Error",
+            description: "Could not fetch your profile information",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (profile) {
+          if (profile.onboarding_completed) {
+            toast({
+              title: "Onboarding complete",
+              description: "You've already completed the onboarding process",
+            });
+            navigate('/dashboard');
+            return;
+          }
+          
+          const savedStep = profile.onboarding_step || 0;
+          setActiveStep(savedStep);
+          
+          const completed: number[] = [];
+          for (let i = 0; i < savedStep; i++) {
+            completed.push(i);
+          }
+          setCompletedSteps(completed);
+        }
+      } catch (error) {
+        console.error("Unexpected error:", error);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchOnboardingStatus();
+  }, [navigate, toast]);
   
   const handleStepClick = (index: number) => {
-    setActiveStep(index);
+    if (completedSteps.includes(index) || index === activeStep) {
+      setActiveStep(index);
+    }
   };
   
-  const handleComplete = () => {
-    if (!completedSteps.includes(activeStep)) {
-      setCompletedSteps([...completedSteps, activeStep]);
-    }
-    
-    if (activeStep < steps.length - 1) {
-      setActiveStep(activeStep + 1);
+  const handleComplete = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Not signed in",
+          description: "Please sign in to save your progress",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!completedSteps.includes(activeStep)) {
+        setCompletedSteps([...completedSteps, activeStep]);
+      }
+      
+      const nextStep = activeStep < steps.length - 1 ? activeStep + 1 : activeStep;
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          onboarding_step: nextStep,
+          ...(nextStep === steps.length - 1 && activeStep === steps.length - 1 
+            ? { onboarding_completed: true } 
+            : {}),
+        })
+        .eq('id', user.id);
+        
+      if (error) {
+        console.error("Error updating onboarding progress:", error);
+        toast({
+          title: "Error",
+          description: "Could not save your progress",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (nextStep === steps.length - 1 && activeStep === steps.length - 1) {
+        toast({
+          title: "Onboarding complete!",
+          description: "You've successfully completed all onboarding steps.",
+        });
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
+      } else {
+        setActiveStep(nextStep);
+        
+        toast({
+          title: "Step completed",
+          description: `Progress saved: ${nextStep}/${steps.length}`,
+        });
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
     }
   };
   
   const progress = (completedSteps.length / steps.length) * 100;
+  
+  if (loading) {
+    return (
+      <div className="container max-w-4xl p-6 space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Onboarding</h1>
+          <p className="text-muted-foreground">Loading your onboarding progress...</p>
+        </div>
+        <div className="flex items-center justify-center p-12">
+          <div className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="container max-w-4xl p-6 space-y-6">
@@ -124,13 +268,17 @@ const Onboarding = () => {
         <CardFooter className="flex justify-between">
           <Button
             variant="outline"
-            onClick={() => activeStep > 0 && setActiveStep(activeStep - 1)}
+            onClick={() => {
+              if (activeStep > 0) {
+                setActiveStep(activeStep - 1);
+              }
+            }}
             disabled={activeStep === 0}
           >
             Previous
           </Button>
           <Button onClick={handleComplete}>
-            {completedSteps.includes(activeStep) ? "Completed" : "Complete Step"}
+            {completedSteps.includes(activeStep) ? "Continue" : "Complete Step"}
           </Button>
         </CardFooter>
       </Card>
