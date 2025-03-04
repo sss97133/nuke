@@ -39,6 +39,8 @@ export const ProfileContent = ({
   onSocialLinksSubmit,
   onStreamingLinksSubmit
 }: ProfileContentProps) => {
+  console.log("ProfileContent rendering with profile:", profile);
+  
   if (!profile) {
     return (
       <div className="text-center py-8">
