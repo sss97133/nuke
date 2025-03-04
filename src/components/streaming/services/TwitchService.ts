@@ -1,4 +1,3 @@
-
 interface TwitchAuthResponse {
   access_token: string;
   expires_in: number;
@@ -73,9 +72,16 @@ export class TwitchService {
       return '#';
     }
     
+    // Add console log to help debug the login URL
+    console.log('Using Twitch Client ID:', TwitchService.CLIENT_ID);
+    console.log('Using redirect URI:', TwitchService.REDIRECT_URI);
+    
     const scopes = ['channel:read:stream_key', 'channel:manage:broadcast'];
     
-    return `https://id.twitch.tv/oauth2/authorize?client_id=${TwitchService.CLIENT_ID}&redirect_uri=${encodeURIComponent(TwitchService.REDIRECT_URI)}&response_type=token&scope=${scopes.join(' ')}`;
+    const loginUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${TwitchService.CLIENT_ID}&redirect_uri=${encodeURIComponent(TwitchService.REDIRECT_URI)}&response_type=token&scope=${scopes.join(' ')}`;
+    console.log('Generated login URL:', loginUrl);
+    
+    return loginUrl;
   }
 
   public login(): void {
@@ -177,9 +183,6 @@ export class TwitchService {
       throw new Error('Twitch CLIENT_ID is missing');
     }
 
-    // This would be the implementation to start a stream
-    // In reality, the user would need to use OBS or similar software
-    // to send the stream to Twitch using their stream key
     console.log('Starting Twitch stream with title:', title);
   }
 
@@ -192,8 +195,6 @@ export class TwitchService {
       throw new Error('Twitch CLIENT_ID is missing');
     }
 
-    // This would be the implementation to stop a stream
-    // In reality, the user would need to stop broadcasting from their software
     console.log('Stopping Twitch stream');
   }
 }
