@@ -21,7 +21,22 @@ export const StreamSettings = () => {
   }, []);
 
   const handleTwitchLogin = () => {
-    window.location.href = twitchService.getLoginUrl();
+    try {
+      twitchService.login();
+      
+      // Show toast about opening the login popup
+      toast({
+        title: "Twitch Login",
+        description: "Opening Twitch login in a popup window. Please complete the authorization.",
+      });
+    } catch (error) {
+      console.error('Error during Twitch login:', error);
+      toast({
+        title: "Twitch Login Error",
+        description: "There was an error connecting to Twitch. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleTwitchLogout = () => {

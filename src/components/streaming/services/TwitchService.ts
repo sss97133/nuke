@@ -22,6 +22,7 @@ export class TwitchService {
     const token = urlParams.get('access_token');
     
     if (token) {
+      console.log('Twitch auth token received');
       this.accessToken = token;
       localStorage.setItem('twitch_access_token', token);
       // Clean up URL
@@ -37,6 +38,31 @@ export class TwitchService {
     const scopes = ['channel:read:stream_key', 'channel:manage:broadcast'];
     
     return `https://id.twitch.tv/oauth2/authorize?client_id=${TwitchService.CLIENT_ID}&redirect_uri=${encodeURIComponent(TwitchService.REDIRECT_URI)}&response_type=token&scope=${scopes.join(' ')}`;
+  }
+
+  public login(): void {
+    const width = 600;
+    const height = 700;
+    const left = (window.innerWidth - width) / 2;
+    const top = (window.innerHeight - height) / 2;
+    
+    const authWindow = window.open(
+      this.getLoginUrl(),
+      'Twitch Login',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+    
+    // Add a listener to detect when the popup is closed
+    const checkClosed = setInterval(() => {
+      if (authWindow?.closed) {
+        clearInterval(checkClosed);
+        // Check if we got a token after the popup was closed
+        if (this.isAuthenticated()) {
+          // Reload the page to refresh the state
+          window.location.reload();
+        }
+      }
+    }, 500);
   }
 
   public logout(): void {
