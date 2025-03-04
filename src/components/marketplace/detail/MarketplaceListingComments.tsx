@@ -1,13 +1,15 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, ThumbsUp, Flag, Reply } from 'lucide-react';
+import { MessageSquare, ThumbsUp, Flag, Reply, Lock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { useAtom } from 'jotai';
+import { authRequiredModalAtom } from '@/components/auth/AuthRequiredModal';
 
 interface Comment {
   id: string;
@@ -24,11 +26,6 @@ interface Comment {
   replies: Comment[];
 }
 
-interface MarketplaceListingCommentsProps {
-  listingId: string;
-}
-
-// Mock comments data
 const mockComments: Comment[] = [
   {
     id: '1',
@@ -108,7 +105,25 @@ const CommentItem: React.FC<{
   comment: Comment; 
   onReply: (commentId: string) => void;
   onLike: (commentId: string) => void;
-}> = ({ comment, onReply, onLike }) => {
+  isAuthenticated: boolean;
+  onAuthRequired: (action: string) => void;
+}> = ({ comment, onReply, onLike, isAuthenticated, onAuthRequired }) => {
+  const handleReply = () => {
+    if (!isAuthenticated) {
+      onAuthRequired('comment');
+      return;
+    }
+    onReply(comment.id);
+  };
+  
+  const handleLike = () => {
+    if (!isAuthenticated) {
+      onAuthRequired('interact');
+      return;
+    }
+    onLike(comment.id);
+  };
+  
   return (
     <div className="py-4">
       <div className="flex gap-3">
@@ -135,7 +150,7 @@ const CommentItem: React.FC<{
               variant="ghost" 
               size="sm" 
               className="h-7 px-2 text-xs"
-              onClick={() => onLike(comment.id)}
+              onClick={handleLike}
             >
               <ThumbsUp 
                 className="h-3.5 w-3.5 mr-1" 
@@ -148,7 +163,7 @@ const CommentItem: React.FC<{
               variant="ghost" 
               size="sm" 
               className="h-7 px-2 text-xs"
-              onClick={() => onReply(comment.id)}
+              onClick={handleReply}
             >
               <Reply className="h-3.5 w-3.5 mr-1" />
               Reply
@@ -158,6 +173,7 @@ const CommentItem: React.FC<{
               variant="ghost" 
               size="sm" 
               className="h-7 px-2 text-xs"
+              onClick={() => isAuthenticated ? null : onAuthRequired('interact')}
             >
               <Flag className="h-3.5 w-3.5" />
             </Button>
@@ -172,6 +188,8 @@ const CommentItem: React.FC<{
                   comment={reply} 
                   onReply={onReply}
                   onLike={onLike}
+                  isAuthenticated={isAuthenticated}
+                  onAuthRequired={onAuthRequired}
                 />
               ))}
             </div>
@@ -182,6 +200,10 @@ const CommentItem: React.FC<{
   );
 };
 
+interface MarketplaceListingCommentsProps {
+  listingId: string;
+}
+
 const MarketplaceListingComments: React.FC<MarketplaceListingCommentsProps> = ({ 
   listingId 
 }) => {
@@ -189,8 +211,27 @@ const MarketplaceListingComments: React.FC<MarketplaceListingCommentsProps> = ({
   const [commentText, setCommentText] = useState('');
   const [replyToId, setReplyToId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { session } = useAuth();
+  const [, setAuthModal] = useAtom(authRequiredModalAtom);
+  
+  const isAuthenticated = !!session;
+  
+  const handleAuthRequired = (actionType: string) => {
+    setAuthModal({
+      isOpen: true,
+      message: actionType === 'comment' 
+        ? "Sign in to join the conversation and leave comments."
+        : "Sign in to interact with this content.",
+      actionType: actionType as any
+    });
+  };
   
   const handleCommentSubmit = () => {
+    if (!isAuthenticated) {
+      handleAuthRequired('comment');
+      return;
+    }
+    
     if (!commentText.trim()) return;
     
     const newComment: Comment = {
@@ -299,6 +340,8 @@ const MarketplaceListingComments: React.FC<MarketplaceListingCommentsProps> = ({
               comment={comment} 
               onReply={handleReply}
               onLike={handleLike}
+              isAuthenticated={isAuthenticated}
+              onAuthRequired={handleAuthRequired}
             />
           ))}
           
@@ -313,41 +356,56 @@ const MarketplaceListingComments: React.FC<MarketplaceListingCommentsProps> = ({
       
       <CardFooter className="flex flex-col pt-0">
         <div className="w-full">
-          <div className="mb-2">
-            {replyToId && (
-              <div className="flex justify-between items-center text-sm text-muted-foreground bg-muted p-2 rounded mb-2">
-                <span>Replying to comment</span>
+          {!isAuthenticated ? (
+            <div className="flex flex-col items-center justify-center p-4 border border-dashed rounded-md bg-muted/50">
+              <Lock className="h-8 w-8 text-muted-foreground mb-2" />
+              <h3 className="text-sm font-medium mb-1">Join the conversation</h3>
+              <p className="text-xs text-muted-foreground text-center mb-3">
+                Sign in to post comments and interact with the community
+              </p>
+              <Button onClick={() => handleAuthRequired('comment')}>
+                Sign in to comment
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="mb-2">
+                {replyToId && (
+                  <div className="flex justify-between items-center text-sm text-muted-foreground bg-muted p-2 rounded mb-2">
+                    <span>Replying to comment</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2"
+                      onClick={() => setReplyToId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+                <Textarea
+                  id="comment-textarea"
+                  placeholder="Add your comment to the public discussion..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  className="resize-none mb-2"
+                  rows={3}
+                />
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <div className="text-xs text-muted-foreground">
+                  All comments are public and visible to everyone
+                </div>
                 <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 px-2"
-                  onClick={() => setReplyToId(null)}
+                  onClick={handleCommentSubmit}
+                  disabled={!commentText.trim()}
                 >
-                  Cancel
+                  Post {replyToId ? 'Reply' : 'Comment'}
                 </Button>
               </div>
-            )}
-            <Textarea
-              id="comment-textarea"
-              placeholder="Add your comment to the public discussion..."
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              className="resize-none mb-2"
-              rows={3}
-            />
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <div className="text-xs text-muted-foreground">
-              All comments are public and visible to everyone
-            </div>
-            <Button 
-              onClick={handleCommentSubmit}
-              disabled={!commentText.trim()}
-            >
-              Post {replyToId ? 'Reply' : 'Comment'}
-            </Button>
-          </div>
+            </>
+          )}
         </div>
       </CardFooter>
     </Card>

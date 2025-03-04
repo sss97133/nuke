@@ -38,6 +38,22 @@ import { Helmet } from 'react-helmet'
 import Marketplace from './pages/Marketplace'
 import MarketplaceListingDetail from './pages/MarketplaceListingDetail'
 import { Loader2 } from 'lucide-react'
+import { AuthRequiredModal } from './components/auth/AuthRequiredModal'
+
+// Define public routes that don't require authentication
+const PUBLIC_ROUTES = [
+  '/explore',
+  '/marketplace',
+  '/marketplace/listing',
+  '/glossary',
+  '/documentation',
+  '/sitemap'
+];
+
+// Helper function to check if a path is public
+const isPublicPath = (path: string) => {
+  return PUBLIC_ROUTES.some(route => path.startsWith(route));
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,13 +75,15 @@ function AppContent() {
   const isAuthPath = location.pathname === '/login' || location.pathname === '/register';
   const isAuthCallbackPath = location.pathname.startsWith('/auth/callback');
   const isRootPath = location.pathname === '/';
+  const isPublicRoute = isPublicPath(location.pathname);
 
   console.log("Auth state:", { 
     path: location.pathname, 
     isAuthenticated, 
     loading, 
     isAuthPath, 
-    isAuthCallbackPath 
+    isAuthCallbackPath,
+    isPublicRoute
   });
 
   // Show loading state while auth is being determined
@@ -101,7 +119,7 @@ function AppContent() {
   // Simple redirect rules
   // If at root, redirect based on auth
   if (isRootPath) {
-    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/explore" replace />;
   }
 
   // If trying to access auth pages while logged in, redirect to dashboard
@@ -109,7 +127,27 @@ function AppContent() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // For non-auth paths, handle authentication requirement
+  // For public routes, allow access regardless of authentication
+  if (isPublicRoute) {
+    return (
+      <div className="flex min-h-screen bg-background">
+        <NavSidebar />
+        <div className="flex-1 pt-14 md:pt-0">
+          <AuthRequiredModal />
+          <Routes>
+            <Route path="/explore" element={<Explore />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/marketplace/listing/:id" element={<MarketplaceListingDetail />} />
+            <Route path="/glossary" element={<Glossary />} />
+            <Route path="/documentation" element={<Documentation />} />
+            <Route path="/sitemap" element={<Sitemap />} />
+          </Routes>
+        </div>
+      </div>
+    );
+  }
+
+  // Auth pages handling
   if (!isAuthenticated) {
     // Allow access to auth pages without redirection
     if (isAuthPath) {
@@ -147,9 +185,6 @@ function AppContent() {
           <Route path="/service-history" element={<ServiceHistory />} />
           <Route path="/token-staking" element={<TokenStaking />} />
           <Route path="/tokens" element={<TokensPage />} />
-          <Route path="/glossary" element={<Glossary />} />
-          <Route path="/sitemap" element={<Sitemap />} />
-          <Route path="/documentation" element={<Documentation />} />
           <Route path="/import" element={<Import />} />
           <Route path="/discovered-vehicles" element={<DiscoveredVehicles />} />
           <Route path="/vehicle/:id" element={<VehicleDetail />} />
@@ -157,11 +192,7 @@ function AppContent() {
           <Route path="/team-members" element={<TeamMembers />} />
           <Route path="/professional-dashboard" element={<Profile />} />
           <Route path="/studio" element={<Studio />} />
-          <Route path="/explore" element={<Explore />} />
           <Route path="/explore/manage" element={<ExploreContentManagement />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/marketplace/listing/:id" element={<MarketplaceListingDetail />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </div>
     </div>

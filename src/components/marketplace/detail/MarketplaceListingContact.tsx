@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,9 @@ import { Mail, Phone, Calendar, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { MarketplaceListing } from '../hooks/useMarketplaceListing';
+import { useAuth } from '@/hooks/use-auth';
+import { useAtom } from 'jotai';
+import { authRequiredModalAtom } from '@/components/auth/AuthRequiredModal';
 
 interface MarketplaceListingContactProps {
   listing: MarketplaceListing;
@@ -22,6 +24,8 @@ const MarketplaceListingContact: React.FC<MarketplaceListingContactProps> = ({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [showContactForm, setShowContactForm] = useState(false);
   const { toast } = useToast();
+  const { session } = useAuth();
+  const [, setAuthModal] = useAtom(authRequiredModalAtom);
   
   const handleSendMessage = () => {
     if (!messageText.trim()) return;
@@ -35,6 +39,21 @@ const MarketplaceListingContact: React.FC<MarketplaceListingContactProps> = ({
     setMessageText('');
     setPhoneNumber('');
     setShowContactForm(false);
+  };
+  
+  const handleContactSeller = () => {
+    if (!session) {
+      // If not authenticated, show the auth modal
+      setAuthModal({
+        isOpen: true,
+        message: "Sign in to contact the seller and send messages.",
+        actionType: "contact"
+      });
+      return;
+    }
+    
+    // Otherwise show the contact form
+    setShowContactForm(true);
   };
   
   return (
@@ -69,7 +88,7 @@ const MarketplaceListingContact: React.FC<MarketplaceListingContactProps> = ({
           
           <Button 
             className="w-full"
-            onClick={() => setShowContactForm(true)}
+            onClick={handleContactSeller}
           >
             Contact Seller
           </Button>
