@@ -72,7 +72,10 @@ const MarketplaceListingGallery: React.FC<MarketplaceListingGalleryProps> = ({
             loop: true,
           }}
           className="w-full"
-          onSelect={(index) => setSelectedIndex(index)}
+          onSelect={(api) => {
+            const currentIndex = api.selectedScrollSnap();
+            setSelectedIndex(currentIndex);
+          }}
         >
           <CarouselContent>
             {images.map((image, index) => (
