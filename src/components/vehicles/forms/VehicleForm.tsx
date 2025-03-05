@@ -55,20 +55,23 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
   isSubmitting,
   initialValues = {}
 }) => {
+  // Ensure the required fields have default values
+  const defaultValues = {
+    make: initialValues.make || '',
+    model: initialValues.model || '',
+    year: initialValues.year || new Date().getFullYear(),
+    color: initialValues.color || '',
+    vin: initialValues.vin || '',
+    mileage: initialValues.mileage,
+    trim: initialValues.trim || '',
+    image: initialValues.image || '',
+    tags: initialValues.tags || '',
+    notes: initialValues.notes || '',
+  };
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      make: initialValues.make || '',
-      model: initialValues.model || '',
-      year: initialValues.year || new Date().getFullYear(),
-      color: initialValues.color || '',
-      vin: initialValues.vin || '',
-      mileage: initialValues.mileage || undefined,
-      trim: initialValues.trim || '',
-      image: initialValues.image || '',
-      tags: initialValues.tags || '',
-      notes: initialValues.notes || '',
-    },
+    defaultValues,
   });
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
