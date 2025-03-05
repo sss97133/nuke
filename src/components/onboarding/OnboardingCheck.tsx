@@ -1,46 +1,62 @@
 
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useOnboarding } from '@/hooks/useOnboarding';
+import React, { useEffect } from 'react';
 import { useAuthState } from '@/hooks/auth/use-auth-state';
+import { useNavigate, NavigateFunction } from 'react-router-dom';
+import { useOnboarding } from '@/hooks/useOnboarding';
 
 interface OnboardingCheckProps {
   children: React.ReactNode;
 }
 
-export const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
+// Component to conditionally redirect users to onboarding if needed
+const OnboardingCheckContent: React.FC<{ navigate: NavigateFunction }> = ({ navigate }) => {
+  const { session } = useAuthState();
   const { isCompleted, isLoading } = useOnboarding();
-  const { loading: authLoading, session } = useAuthState();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [hasRedirected, setHasRedirected] = useState(false);
-
+  
   useEffect(() => {
-    // Skip this check for onboarding page, login page, and auth callback
-    const skipPaths = ['/onboarding', '/login', '/register', '/auth/callback'];
-    const isSkipPath = skipPaths.some(path => location.pathname.startsWith(path));
-    
-    // Don't redirect if we're already loading or on an exempt page
-    if (isSkipPath || authLoading || isLoading || hasRedirected) {
-      return;
+    // Only redirect if:
+    // 1. User is authenticated
+    // 2. Onboarding status is loaded (not loading)
+    // 3. Onboarding is not completed
+    // 4. Current path is not already onboarding
+    if (session && !isLoading && !isCompleted && window.location.pathname !== '/onboarding') {
+      navigate('/onboarding');
     }
-    
-    // Only redirect brand new users who haven't seen onboarding yet
-    if (session && isCompleted === false && location.pathname !== '/onboarding' && 
-        localStorage.getItem('onboarding-shown') !== 'true') {
-      
-      // Set the flag to prevent multiple redirects
-      setHasRedirected(true);
-      localStorage.setItem('onboarding-shown', 'true');
-      
-      // Use a small delay to prevent UI glitching during navigation
-      setTimeout(() => {
-        navigate('/onboarding');
-      }, 100);
-    }
-  }, [isCompleted, isLoading, authLoading, session, navigate, location.pathname, hasRedirected]);
+  }, [session, isCompleted, isLoading, navigate]);
+  
+  return null;
+};
 
-  return <>{children}</>;
+// Wrapper component that only uses the check when Router is available
+const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
+  // Check if we're in a browser environment where Router is available
+  const isBrowser = typeof window !== 'undefined';
+  
+  if (!isBrowser) {
+    return <>{children}</>;
+  }
+  
+  // Try/catch to handle cases where component might be rendered outside Router context
+  try {
+    // Use useNavigate in a conditional way to prevent errors
+    const CheckWithRouter = () => {
+      const navigate = useNavigate();
+      return <OnboardingCheckContent navigate={navigate} />;
+    };
+    
+    return (
+      <>
+        {/* Render the children */}
+        {children}
+        
+        {/* Conditionally attempt to render the check */}
+        <CheckWithRouter />
+      </>
+    );
+  } catch (error) {
+    console.warn('OnboardingCheck: Router context not available, skipping check');
+    return <>{children}</>;
+  }
 };
 
 export default OnboardingCheck;

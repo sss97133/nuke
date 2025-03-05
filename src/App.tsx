@@ -21,9 +21,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <OnboardingCheck>
-          <AppRouter />
-        </OnboardingCheck>
+        {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
+        <AppRouter />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
