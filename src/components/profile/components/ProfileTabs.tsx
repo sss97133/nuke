@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserRound, Users, Trophy, GitCommit, Car, BarChart2, Coins, Zap, Shield } from 'lucide-react';
+import { UserRound, Users, Trophy, GitCommit, Car, BarChart2, Coins, Zap, Shield, Link } from 'lucide-react';
 import { SocialLinksForm } from '../SocialLinksForm';
 import { StreamingLinksForm } from '../StreamingLinksForm';
 import { TeamSection } from '../TeamSection';
@@ -15,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { SocialLinks, StreamingLinks, Achievement } from '../types';
 import { AnalysisResult } from '../hooks/useProfileAnalysis';
+import { VehicleRelationshipsSection } from '../VehicleRelationshipsSection';
 
 export interface ProfileTabsProps {
   userId: string;
@@ -92,11 +92,11 @@ export const ProfileTabs = ({
   const recommendedPrivacy = analysisResult?.privacyRecommendation || 'limited';
 
   return (
-    <Tabs defaultValue="profile" className="w-full mt-6">
+    <Tabs defaultValue="vehicles" className="w-full mt-6">
       <TabsList className="flex overflow-x-auto pb-px">
-        <TabsTrigger value="profile" className="flex items-center gap-2">
-          <UserRound className="w-4 h-4" />
-          Profile
+        <TabsTrigger value="vehicles" className="flex items-center gap-2">
+          <Car className="w-4 h-4" />
+          Vehicles
         </TabsTrigger>
         <TabsTrigger value="development" className="flex items-center gap-2">
           <Zap className="w-4 h-4" />
@@ -118,9 +118,9 @@ export const ProfileTabs = ({
           <Trophy className="w-4 h-4" />
           Achievements
         </TabsTrigger>
-        <TabsTrigger value="discoveries" className="flex items-center gap-2">
-          <Car className="w-4 h-4" />
-          Discoveries
+        <TabsTrigger value="links" className="flex items-center gap-2">
+          <Link className="w-4 h-4" />
+          Links
         </TabsTrigger>
         <TabsTrigger value="privacy" className="flex items-center gap-2">
           <Shield className="w-4 h-4" />
@@ -128,18 +128,8 @@ export const ProfileTabs = ({
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="profile" className="space-y-4 mt-4">
-        <SocialLinksForm 
-          socialLinks={socialLinks}
-          onSocialLinksChange={onSocialLinksChange}
-          onSubmit={onSocialLinksSubmit}
-        />
-        
-        <StreamingLinksForm 
-          streamingLinks={streamingLinks}
-          onStreamingLinksChange={onStreamingLinksChange}
-          onSubmit={onStreamingLinksSubmit}
-        />
+      <TabsContent value="vehicles" className="mt-4">
+        <VehicleRelationshipsSection userId={userId} />
       </TabsContent>
 
       <TabsContent value="development" className="mt-4">
@@ -280,15 +270,32 @@ export const ProfileTabs = ({
         )}
       </TabsContent>
       
-      <TabsContent value="discoveries" className="mt-4">
-        {userId && (
-          <div className="grid gap-4">
-            <p className="text-muted-foreground mb-2">
-              All vehicles you have discovered across the web and added to our database.
+      <TabsContent value="links" className="space-y-4 mt-4">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Social Media Links</h2>
+            <p className="text-muted-foreground">
+              Connect your social media accounts to share your automotive journey.
             </p>
-            <UserDiscoveredVehicles userId={userId} />
+            <SocialLinksForm 
+              socialLinks={socialLinks}
+              onSocialLinksChange={onSocialLinksChange}
+              onSubmit={onSocialLinksSubmit}
+            />
           </div>
-        )}
+          
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Streaming Platform Links</h2>
+            <p className="text-muted-foreground">
+              Link your streaming channels to showcase your automotive content.
+            </p>
+            <StreamingLinksForm 
+              streamingLinks={streamingLinks}
+              onStreamingLinksChange={onStreamingLinksChange}
+              onSubmit={onStreamingLinksSubmit}
+            />
+          </div>
+        </div>
       </TabsContent>
       
       <TabsContent value="privacy" className="mt-4">
