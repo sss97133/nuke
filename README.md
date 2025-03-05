@@ -31,6 +31,28 @@ This system provides comprehensive tools for:
 
 For detailed setup instructions, see our [Getting Started Guide](./docs/GETTING_STARTED.md).
 
+## Deployment
+
+This project is configured for deployment on Vercel:
+
+1. Push your changes to the repository
+2. Connect your repository to Vercel
+3. The application will automatically deploy from the main branch
+
+To deploy manually:
+```
+npm run build
+vercel --prod
+```
+
+## Branch Strategy
+
+We follow a simplified branch strategy:
+- `main`: Production-ready code
+- `feature/*`: New feature development
+- `fix/*`: Bug fixes
+- `release/*`: Release preparation
+
 ## Support
 
 For support, please open an issue in the repository or contact the development team.
