@@ -1,8 +1,7 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { XCircle } from 'lucide-react';
+import { XCircle, Upload } from 'lucide-react';
 import { ImagePreview } from './ImagePreview';
 
 interface FileUploaderProps {
@@ -21,102 +20,80 @@ export function FileUploader({
   setSelectedFiles
 }: FileUploaderProps) {
   const [rejectedFiles, setRejectedFiles] = useState<File[]>([]);
-  const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
 
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const files = Array.from(e.target.files);
+    processFiles(files);
+  };
+  
+  const processFiles = (files: File[]) => {
+    // Filter out invalid file types
+    const validFiles = files.filter(file => {
+      const isValidType = acceptedFileTypes.some(type => {
+        if (type.endsWith('/*')) {
+          const category = type.split('/')[0];
+          return file.type.startsWith(`${category}/`);
+        }
+        return file.type === type;
+      });
+      
+      if (!isValidType) {
+        setRejectedFiles(prev => [...prev, file]);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    // Filter out duplicate files
+    const uniqueFiles = validFiles.filter(
+      file => !selectedFiles.some(f => f.name === file.name && f.size === file.size)
+    );
+    
+    // Check if adding new files would exceed the max limit
+    if (selectedFiles.length + uniqueFiles.length > maxFiles) {
+      alert(`You can only upload a maximum of ${maxFiles} files.`);
+      return;
+    }
+    
+    if (uniqueFiles.length > 0) {
+      const newFiles = [...selectedFiles, ...uniqueFiles];
+      setSelectedFiles(newFiles);
+      onFilesSelected(newFiles);
+    }
+  };
+  
+  const removeFile = (fileToRemove: File) => {
+    const updatedFiles = selectedFiles.filter(file => file !== fileToRemove);
+    setSelectedFiles(updatedFiles);
+    onFilesSelected(updatedFiles);
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(true);
   };
-
+  
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
   };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragActive) {
-      setIsDragActive(true);
-    }
-  };
-
+  
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files);
+      const files = Array.from(e.dataTransfer.files);
+      processFiles(files);
     }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFiles(e.target.files);
-    }
-  };
-
-  const handleFiles = (files: FileList) => {
-    // Filter out duplicate files
-    const uniqueFilesArray = Array.from(files).filter(
-      file => !selectedFiles.some(f => f.name === file.name && f.size === file.size)
-    );
-
-    // Check if adding new files would exceed the max limit
-    if (selectedFiles.length + uniqueFilesArray.length > maxFiles) {
-      alert(`You can only upload a maximum of ${maxFiles} files.`);
-      return;
-    }
-
-    // Filter by file type
-    const accepted: File[] = [];
-    const rejected: File[] = [];
-
-    uniqueFilesArray.forEach(file => {
-      const isAccepted = acceptedFileTypes.some(type => {
-        if (type.endsWith('/*')) {
-          // Handle wildcard file types like 'image/*'
-          const category = type.replace('/*', '');
-          return file.type.startsWith(category);
-        }
-        return file.type === type;
-      });
-
-      if (isAccepted) {
-        accepted.push(file);
-      } else {
-        rejected.push(file);
-      }
-    });
-
-    if (accepted.length > 0) {
-      const newFiles = [...selectedFiles, ...accepted];
-      setSelectedFiles(newFiles);
-      onFilesSelected(newFiles);
-    }
-
-    if (rejected.length > 0) {
-      setRejectedFiles(prevRejected => [...prevRejected, ...rejected]);
-    }
-  };
-
-  const removeFile = (fileToRemove: File) => {
-    const updatedFiles = selectedFiles.filter(file => file !== fileToRemove);
-    setSelectedFiles(updatedFiles);
-    onFilesSelected(updatedFiles);
-  };
-
-  const handleClick = () => {
-    if (selectedFiles.length >= maxFiles) {
-      alert(`You've reached the maximum limit of ${maxFiles} files.`);
-      return;
-    }
-    
-    fileInputRef.current?.click();
   };
 
   return (
@@ -127,19 +104,18 @@ export function FileUploader({
             ? 'border-primary bg-primary/10'
             : 'border-gray-300 dark:border-gray-700 hover:border-primary'
         } ${selectedFiles.length >= maxFiles ? 'opacity-50 cursor-not-allowed' : ''}`}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={handleClick}
+        onClick={() => fileInputRef.current?.click()}
       >
         <input
-          ref={fileInputRef}
           type="file"
-          multiple
-          accept={acceptedFileTypes.join(',')}
+          ref={fileInputRef}
           className="hidden"
-          onChange={handleFileInputChange}
+          onChange={handleFileChange}
+          accept={acceptedFileTypes.join(',')}
+          multiple={maxFiles > 1}
           disabled={selectedFiles.length >= maxFiles}
         />
         <div className="flex flex-col items-center justify-center space-y-2">
