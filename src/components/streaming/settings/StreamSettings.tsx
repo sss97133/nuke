@@ -16,6 +16,7 @@ export const StreamSettings = () => {
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [userData, setUserData] = useState<any>(null);
   
   useEffect(() => {
     // Check if Twitch client ID is configured
@@ -24,10 +25,31 @@ export const StreamSettings = () => {
     } else {
       setConfigError(null);
     }
+    
+    const fetchUserData = async () => {
+      if (twitchService.isAuthenticated()) {
+        try {
+          const data = await twitchService.getCurrentUser();
+          setUserData(data);
+        } catch (err) {
+          console.error("Failed to fetch user data:", err);
+        }
+      }
+    };
+    
+    fetchUserData();
+    
+    // Listen for auth changes
+    const handleAuthChange = () => {
+      fetchUserData();
+    };
+    
+    window.addEventListener('twitch_auth_changed', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('twitch_auth_changed', handleAuthChange);
+    };
   }, []);
-  
-  const userData = twitchService.getUserData();
-  const isAuthenticated = twitchService.isAuthenticated();
   
   const handleSaveSettings = async () => {
     try {
@@ -52,6 +74,19 @@ export const StreamSettings = () => {
     } catch (err) {
       setError('Failed to save stream settings: ' + (err instanceof Error ? err.message : String(err)));
     }
+  };
+  
+  const handleConnectTwitch = () => {
+    try {
+      twitchService.login();
+    } catch (err) {
+      setError('Failed to initiate Twitch login: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+  
+  const handleDisconnect = () => {
+    twitchService.logout();
+    setUserData(null);
   };
   
   // If there's a configuration error, show a different UI
@@ -85,6 +120,8 @@ export const StreamSettings = () => {
     );
   }
   
+  const isAuthenticated = twitchService.isAuthenticated();
+  
   if (!isAuthenticated) {
     return (
       <Card className="w-full">
@@ -96,7 +133,7 @@ export const StreamSettings = () => {
         </CardHeader>
         <CardContent>
           <div className="flex justify-center p-4">
-            <Button className="bg-purple-700 hover:bg-purple-800">
+            <Button className="bg-purple-700 hover:bg-purple-800" onClick={handleConnectTwitch}>
               <Twitch className="mr-2 h-4 w-4" />
               Connect Twitch Account
             </Button>
@@ -119,7 +156,15 @@ export const StreamSettings = () => {
           <div className="flex items-center gap-2 mb-4 text-sm">
             <Twitch className="h-4 w-4 text-purple-600" />
             <span>Connected as:</span>
-            <span className="font-medium">{userData.displayName}</span>
+            <span className="font-medium">{userData.display_name}</span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-auto"
+              onClick={handleDisconnect}
+            >
+              Disconnect
+            </Button>
           </div>
         )}
         
