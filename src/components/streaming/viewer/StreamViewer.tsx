@@ -9,7 +9,8 @@ import { StreamChat } from '../StreamChat';
 import { StreamViewParams } from '../services/types';
 
 export const StreamViewer: React.FC = () => {
-  const { username } = useParams<StreamViewParams>();
+  const params = useParams<StreamViewParams>();
+  const username = params.username;
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [embedSrc, setEmbedSrc] = useState<string>('');

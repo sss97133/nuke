@@ -68,7 +68,7 @@ export async function fetchFeedContent(
             id: stream.id,
             type: 'stream',
             title: stream.title,
-            subtitle: stream.description || `Playing ${stream.game_name || 'a game'}`,
+            subtitle: stream.description || '',
             image_url: stream.image || '',
             tags: stream.tags || [],
             reason: 'Live now',

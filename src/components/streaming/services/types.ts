@@ -33,6 +33,7 @@ export interface TwitchAuthData {
 
 // Interface for in-app stream viewing
 export interface StreamViewParams {
+  [key: string]: string | undefined;
   username: string;
   streamId?: string;
 }
