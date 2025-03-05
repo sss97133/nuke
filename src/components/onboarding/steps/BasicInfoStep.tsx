@@ -17,7 +17,9 @@ export const BasicInfoStep = ({ firstName, lastName, username, email, avatarUrl,
   useEffect(() => {
     // Generate username when first or last name changes
     if (firstName || lastName) {
-      const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const array = new Uint32Array(1);
+      window.crypto.getRandomValues(array);
+      const randomSuffix = (array[0] % 10000).toString().padStart(4, '0');
       const baseUsername = `${firstName.toLowerCase()}${lastName.toLowerCase()}${randomSuffix}`;
       const generatedUsername = baseUsername.replace(/[^a-z0-9]/g, '');
       onUpdate('username', generatedUsername);
