@@ -38,13 +38,17 @@ const AddVehicle = () => {
       const processedData = {
         ...data,
         // Convert comma-separated tags to array
-        tags: data.tags ? data.tags.split(',').map(tag => tag.trim()) : [],
+        tags: data.tags 
+          ? data.tags.split(',')
+              .map(tag => tag.trim())
+              .filter(tag => tag.length > 0)
+          : [],
         // Add current timestamp
         added: new Date().toISOString(),
         // Add user ID from session
         user_id: session.user.id,
         // Generate placeholder image if not provided
-        image: '/placeholder-vehicle.jpg',
+        image: data.image || import.meta.env.VITE_PLACEHOLDER_VEHICLE_IMAGE || '/placeholder-vehicle.jpg',
       };
       
       // Create the vehicle
