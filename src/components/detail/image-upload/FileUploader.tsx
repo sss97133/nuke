@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { XCircle } from 'lucide-react';
@@ -21,32 +21,88 @@ export function FileUploader({
   setSelectedFiles
 }: FileUploaderProps) {
   const [rejectedFiles, setRejectedFiles] = useState<File[]>([]);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const onDrop = useCallback(
-    (acceptedFiles: File[], rejected: any) => {
-      // Filter out duplicate files
-      const uniqueFiles = acceptedFiles.filter(
-        file => !selectedFiles.some(f => f.name === file.name && f.size === file.size)
-      );
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(true);
+  };
 
-      // Check if adding new files would exceed the max limit
-      if (selectedFiles.length + uniqueFiles.length > maxFiles) {
-        alert(`You can only upload a maximum of ${maxFiles} files.`);
-        return;
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragActive) {
+      setIsDragActive(true);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files);
+    }
+  };
+
+  const handleFiles = (files: FileList) => {
+    // Filter out duplicate files
+    const uniqueFilesArray = Array.from(files).filter(
+      file => !selectedFiles.some(f => f.name === file.name && f.size === file.size)
+    );
+
+    // Check if adding new files would exceed the max limit
+    if (selectedFiles.length + uniqueFilesArray.length > maxFiles) {
+      alert(`You can only upload a maximum of ${maxFiles} files.`);
+      return;
+    }
+
+    // Filter by file type
+    const accepted: File[] = [];
+    const rejected: File[] = [];
+
+    uniqueFilesArray.forEach(file => {
+      const isAccepted = acceptedFileTypes.some(type => {
+        if (type.endsWith('/*')) {
+          // Handle wildcard file types like 'image/*'
+          const category = type.replace('/*', '');
+          return file.type.startsWith(category);
+        }
+        return file.type === type;
+      });
+
+      if (isAccepted) {
+        accepted.push(file);
+      } else {
+        rejected.push(file);
       }
+    });
 
-      if (uniqueFiles.length > 0) {
-        const newFiles = [...selectedFiles, ...uniqueFiles];
-        setSelectedFiles(newFiles);
-        onFilesSelected(newFiles);
-      }
+    if (accepted.length > 0) {
+      const newFiles = [...selectedFiles, ...accepted];
+      setSelectedFiles(newFiles);
+      onFilesSelected(newFiles);
+    }
 
-      if (rejected.length > 0) {
-        setRejectedFiles(prevRejected => [...prevRejected, ...rejected]);
-      }
-    },
-    [selectedFiles, maxFiles, onFilesSelected, setSelectedFiles]
-  );
+    if (rejected.length > 0) {
+      setRejectedFiles(prevRejected => [...prevRejected, ...rejected]);
+    }
+  };
 
   const removeFile = (fileToRemove: File) => {
     const updatedFiles = selectedFiles.filter(file => file !== fileToRemove);
@@ -54,27 +110,38 @@ export function FileUploader({
     onFilesSelected(updatedFiles);
   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: acceptedFileTypes.reduce((acc, type) => {
-      acc[type] = [];
-      return acc;
-    }, {} as Record<string, string[]>),
-    maxFiles: maxFiles - selectedFiles.length,
-    disabled: selectedFiles.length >= maxFiles
-  });
+  const handleClick = () => {
+    if (selectedFiles.length >= maxFiles) {
+      alert(`You've reached the maximum limit of ${maxFiles} files.`);
+      return;
+    }
+    
+    fileInputRef.current?.click();
+  };
 
   return (
     <div className="w-full space-y-4">
       <div
-        {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
           isDragActive
             ? 'border-primary bg-primary/10'
             : 'border-gray-300 dark:border-gray-700 hover:border-primary'
         } ${selectedFiles.length >= maxFiles ? 'opacity-50 cursor-not-allowed' : ''}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={handleClick}
       >
-        <input {...getInputProps()} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={acceptedFileTypes.join(',')}
+          className="hidden"
+          onChange={handleFileInputChange}
+          disabled={selectedFiles.length >= maxFiles}
+        />
         <div className="flex flex-col items-center justify-center space-y-2">
           <div className="text-4xl">📁</div>
           <div className="font-medium">
