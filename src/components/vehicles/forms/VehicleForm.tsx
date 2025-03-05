@@ -38,7 +38,7 @@ export interface VehicleFormValues {
   drivetrain?: string;
   rarity_score?: number;
   era?: string;
-  restoration_status?: string;
+  restoration_status?: "original" | "restored" | "modified" | "project";
   special_edition?: boolean;
 }
 
@@ -70,7 +70,7 @@ const formSchema = z.object({
   drivetrain: z.string().optional(),
   rarity_score: z.coerce.number().optional(),
   era: z.string().optional(),
-  restoration_status: z.string().optional(),
+  restoration_status: z.enum(["original", "restored", "modified", "project"]).optional(),
   special_edition: z.boolean().optional(),
 });
 

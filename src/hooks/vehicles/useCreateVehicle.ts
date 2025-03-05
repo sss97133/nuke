@@ -44,7 +44,8 @@ export const useCreateVehicle = () => {
         drivetrain: data.drivetrain || '',
         rarity_score: data.rarity_score !== undefined ? data.rarity_score : 0,
         era: data.era || '',
-        restoration_status: data.restoration_status || 'original',
+        // Ensure restoration_status is one of the valid enum values
+        restoration_status: (data.restoration_status as "original" | "restored" | "modified" | "project") || 'original',
         special_edition: data.special_edition !== undefined ? data.special_edition : false
       };
       
