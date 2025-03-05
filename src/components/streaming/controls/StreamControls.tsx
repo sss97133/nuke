@@ -62,7 +62,9 @@ export const StreamControls = () => {
     
     try {
       if (isStreaming) {
+        // If currently streaming, stop the stream
         if (isConnectedToTwitch) {
+          console.log("Attempting to stop stream via twitchService");
           await twitchService.stopStream();
         }
         setIsStreaming(false);
@@ -71,6 +73,7 @@ export const StreamControls = () => {
           description: "Your stream has ended. Note: You need to also stop your broadcasting software.",
         });
       } else {
+        // If not streaming, check requirements and start stream
         if (hasClientIdError) {
           toast({
             title: "Twitch Configuration Error",
@@ -91,12 +94,18 @@ export const StreamControls = () => {
           return;
         }
         
-        await twitchService.startStream();
-        setIsStreaming(true);
-        toast({
-          title: "Stream started",
-          description: "Your stream information has been updated. Start your broadcasting software to go live.",
-        });
+        // Start the stream via Twitch service
+        console.log("Attempting to start stream via twitchService");
+        const success = await twitchService.startStream();
+        if (success) {
+          setIsStreaming(true);
+          toast({
+            title: "Stream started",
+            description: "Your stream information has been updated. Start your broadcasting software to go live.",
+          });
+        } else {
+          throw new Error("Failed to start stream");
+        }
       }
     } catch (error) {
       console.error('Error toggling stream:', error);

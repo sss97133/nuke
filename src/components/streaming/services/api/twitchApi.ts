@@ -119,9 +119,17 @@ export const startStream = async (title: string, gameId: string) => {
     const userData = await getUserInfo();
     if (!userData) throw new Error('Could not retrieve user data');
     
+    console.log('Starting stream with title:', title, 'and game ID:', gameId);
+    console.log('User ID:', userData.id);
+
     // In a real implementation, this would call the appropriate Twitch API endpoint
     // to update stream information and authorize broadcasting
-    console.log('Stream started with title:', title, 'and game ID:', gameId);
+    // For example:
+    // POST https://api.twitch.tv/helix/channels?broadcaster_id={broadcaster_id}
+    // with title and game_id in the body
+    
+    // Since we can't actually start a stream through the API,
+    // we're simulating a successful call
     return true;
   } catch (error) {
     console.error('Error starting Twitch stream:', error);
@@ -134,9 +142,11 @@ export const stopStream = async () => {
   if (!authToken) throw new Error('Not authenticated with Twitch');
   
   try {
+    console.log('Stopping stream...');
     // In a real implementation, this would call the appropriate Twitch API endpoint
-    // to end the stream
-    console.log('Stream stopped');
+    // to end the stream, but Twitch doesn't provide a direct API to stop streams
+    // The API can only update stream information
+    
     return true;
   } catch (error) {
     console.error('Error stopping Twitch stream:', error);

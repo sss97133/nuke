@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, AlertTriangle, Check, Twitch } from 'lucide-react';
 import twitchService from '../services/TwitchService';
 import { Switch } from '@/components/ui/switch';
+import { TwitchUserData } from '../services/types';
 
 export const StreamSettings = () => {
   const [streamTitle, setStreamTitle] = useState('');
@@ -16,7 +17,7 @@ export const StreamSettings = () => {
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<TwitchUserData | null>(null);
   
   useEffect(() => {
     // Check if Twitch client ID is configured
@@ -156,7 +157,7 @@ export const StreamSettings = () => {
           <div className="flex items-center gap-2 mb-4 text-sm">
             <Twitch className="h-4 w-4 text-purple-600" />
             <span>Connected as:</span>
-            <span className="font-medium">{userData.display_name}</span>
+            <span className="font-medium">{userData.displayName}</span>
             <Button 
               variant="outline" 
               size="sm" 

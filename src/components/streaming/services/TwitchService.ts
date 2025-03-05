@@ -114,10 +114,36 @@ class TwitchService {
         console.error('Twitch client ID is not configured or not authenticated');
         return null;
       }
-      return await getUserInfo();
+      
+      const userData = await getUserInfo();
+      if (!userData) return null;
+      
+      // Format to match TwitchUserData interface
+      return {
+        id: userData.id,
+        login: userData.login,
+        displayName: userData.display_name,
+        profileImageUrl: userData.profile_image_url
+      };
     } catch (error) {
       console.error('Error fetching current user:', error);
       return null;
+    }
+  }
+  
+  /**
+   * Get user's live streams
+   */
+  async getLiveStreams(): Promise<any[]> {
+    try {
+      if (!this.isConfigured() || !this.isAuthenticated()) {
+        console.error('Twitch not configured or not authenticated');
+        return [];
+      }
+      return await fetchLiveStreams();
+    } catch (error) {
+      console.error('Error fetching live streams:', error);
+      return [];
     }
   }
   
@@ -145,6 +171,8 @@ class TwitchService {
     if (!this.isConfigured() || !this.isAuthenticated()) {
       throw new Error('Twitch not configured or not authenticated');
     }
+    
+    console.log('Starting stream with title:', title, 'and game ID:', gameId);
     return await apiStartStream(title || 'Live Stream', gameId || '');
   }
   
