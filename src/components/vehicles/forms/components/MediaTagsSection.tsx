@@ -21,8 +21,9 @@ export const MediaTagsSection: React.FC<MediaTagsSectionProps> = ({ form }) => {
           <ImageUpload
             form={form}
             name="image"
-            label="Vehicle Image"
-            description="Upload or provide a URL for the vehicle's main image"
+            label="Vehicle Images"
+            description="Upload or drag and drop images of your vehicle (max 5MB per image)"
+            multiple={true}
           />
           
           <FormField

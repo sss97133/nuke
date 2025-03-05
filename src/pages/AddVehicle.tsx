@@ -48,8 +48,14 @@ const AddVehicle = () => {
         added: new Date().toISOString(),
         // Add user ID from session
         user_id: session.user.id,
-        // Generate placeholder image if not provided
-        image: data.image || import.meta.env.VITE_PLACEHOLDER_VEHICLE_IMAGE || '/placeholder-vehicle.jpg',
+        // Handle image(s) - use the first image as the main image if it's an array
+        image: Array.isArray(data.image) 
+          ? (data.image.length > 0 ? data.image[0] : import.meta.env.VITE_PLACEHOLDER_VEHICLE_IMAGE || '/placeholder-vehicle.jpg')
+          : (data.image || import.meta.env.VITE_PLACEHOLDER_VEHICLE_IMAGE || '/placeholder-vehicle.jpg'),
+        // Add additional images array if multiple images were uploaded
+        additional_images: Array.isArray(data.image) && data.image.length > 1 
+          ? data.image.slice(1) 
+          : [],
       };
       
       // Create the vehicle - pass as any to bypass the type check since we've processed the data
