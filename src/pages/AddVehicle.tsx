@@ -1,124 +1,294 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAuth } from '@/hooks/use-auth';
-import VehicleForm from '@/components/vehicles/forms/VehicleForm';
-import { VehicleFormValues } from '@/components/vehicles/forms/types';
-import { useCreateVehicle } from '@/hooks/vehicles/useCreateVehicle';
-import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToastContext } from '@/contexts/ToastContext';
+import { OwnershipSection } from '@/components/vehicles/forms/components/OwnershipSection';
+import { useVehicleForm } from '@/components/vehicles/forms/hooks/useVehicleForm';
 
-const AddVehicle = () => {
+export default function AddVehicle() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { session } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { createVehicle } = useCreateVehicle();
-
-  // Redirect to login if not authenticated
-  if (!session) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
-          <p className="mb-6">You need to be logged in to add a vehicle.</p>
-          <button 
-            className="px-4 py-2 bg-primary text-white rounded-md"
-            onClick={() => navigate('/login', { state: { from: '/add-vehicle' } })}
-          >
-            Log In
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const handleSubmit = async (data: VehicleFormValues) => {
-    try {
-      setIsSubmitting(true);
+  const { success, error } = useToastContext();
+  
+  const { 
+    form, 
+    handleSubmit, 
+    isSubmitting, 
+    submitError 
+  } = useVehicleForm({
+    onSubmitSuccess: (data) => {
+      // In a real app, you would save the data to your backend here
+      console.log('Vehicle data submitted:', data);
       
-      // Process form data for submission
-      const processedData = {
-        ...data,
-        // Convert comma-separated tags string to array if it exists
-        tags: data.tags 
-          ? data.tags.split(',')
-              .map(tag => tag.trim())
-              .filter(tag => tag.length > 0)
-          : [],
-        // Add current timestamp
-        added: new Date().toISOString(),
-        // Add user ID from session
-        user_id: session.user.id,
-        // Handle image(s) - use the first image as the main image if it's an array
-        image: Array.isArray(data.image) 
-          ? (data.image.length > 0 ? data.image[0] : import.meta.env.VITE_PLACEHOLDER_VEHICLE_IMAGE || '/placeholder-vehicle.jpg')
-          : (data.image || import.meta.env.VITE_PLACEHOLDER_VEHICLE_IMAGE || '/placeholder-vehicle.jpg'),
-        // Add additional images array if multiple images were uploaded
-        additional_images: Array.isArray(data.image) && data.image.length > 1 
-          ? data.image.slice(1) 
-          : [],
-      };
-      
-      // Create the vehicle - pass as any to bypass the type check since we've processed the data
-      await createVehicle(processedData as any);
-      
-      // Get appropriate message and redirect based on ownership status
-      let successMessage = '';
-      let redirectPath = '';
-      
-      switch (data.ownership_status) {
-        case 'owned':
-          successMessage = `Your ${data.make} ${data.model} has been added to your garage.`;
-          redirectPath = '/garage';
-          break;
-        case 'claimed':
-          successMessage = `Your claimed ${data.make} ${data.model} has been added. You can verify ownership later.`;
-          redirectPath = '/garage';
-          break;
-        case 'discovered':
-          successMessage = `The discovered ${data.make} ${data.model} has been added to your discoveries.`;
-          redirectPath = '/discovered-vehicles';
-          break;
-      }
-      
-      // Display success message
-      toast({
-        title: "Vehicle added successfully",
-        description: successMessage,
+      // Show success message
+      success({ 
+        title: 'Vehicle Added', 
+        description: `${data.year} ${data.make} ${data.model} has been added to your collection.`,
+        action: {
+          label: 'View All Vehicles',
+          onClick: () => navigate('/vehicles')
+        }
       });
       
-      // Redirect based on ownership status
-      navigate(redirectPath);
-    } catch (error) {
-      console.error('Error creating vehicle:', error);
-      toast({
-        title: "Error adding vehicle",
-        description: "There was a problem adding your vehicle. Please try again.",
-        variant: "destructive",
+      // Navigate back to the vehicles list
+      navigate('/vehicles');
+    },
+    onSubmitError: (errors) => {
+      // Show error message
+      error({ 
+        title: 'Failed to add vehicle', 
+        description: 'Please check the form for errors and try again.' 
       });
-    } finally {
-      setIsSubmitting(false);
+      
+      console.error('Form submission errors:', errors);
     }
-  };
+  });
 
   return (
-    <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="container mx-auto p-6 max-w-6xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Add Vehicle</h1>
-          <p className="text-muted-foreground">
-            Add a vehicle you own, claim, or have discovered. Provide as much detail as possible for accurate tracking.
-          </p>
-        </div>
-        
-        <VehicleForm 
-          onSubmit={handleSubmit} 
-          isSubmitting={isSubmitting}
-        />
+    <div className="container max-w-4xl py-10">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Add New Vehicle</h1>
+        <p className="text-muted-foreground mt-2">
+          Add a new vehicle to your collection by filling out the information below.
+        </p>
       </div>
-    </ScrollArea>
+      
+      <Form {...form}>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Basic Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="make"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Make</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Ford" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Model</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Mustang" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Year</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={1885}
+                          max={new Date().getFullYear() + 1}
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="vin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>VIN</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Vehicle Identification Number" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        17-character vehicle identification number (optional)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="license_plate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>License Plate</FormLabel>
+                      <FormControl>
+                        <Input placeholder="License plate number" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Current or last known license plate (optional)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Ownership Section */}
+          <OwnershipSection form={form} />
+          
+          {/* Additional Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Additional Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="color"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Color</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Red" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mileage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mileage</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0"
+                          placeholder="Current mileage" 
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="engine"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Engine</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. V8, 5.0L" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="transmission"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Transmission</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Automatic, 6-speed manual" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="public_notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Public Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Additional information about this vehicle" 
+                        className="min-h-[100px]"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      These notes will be visible to other users
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="private_notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Private Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Private notes about this vehicle" 
+                        className="min-h-[100px]"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      These notes will only be visible to you
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+          
+          {/* Form submission error */}
+          {submitError && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
+              {submitError}
+            </div>
+          )}
+          
+          {/* Form Actions */}
+          <div className="flex justify-end gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(-1)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Add Vehicle'}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
   );
-};
-
-export default AddVehicle;
+}
