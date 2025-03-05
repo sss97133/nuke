@@ -8,12 +8,17 @@ export function useShareContent() {
     mutationFn: async (options: { contentId: string; contentType: string }) => {
       const { contentId, contentType } = options;
       
-      // Track the share interaction
-      return await trackContentInteraction(
-        contentId,
-        'share',
-        contentType
-      );
+      try {
+        // Track the share interaction
+        return await trackContentInteraction(
+          contentId,
+          'share',
+          contentType
+        );
+      } catch (error) {
+        console.error('Share error:', error);
+        throw error; // Rethrow so the UI can handle it
+      }
     },
     onSuccess: () => {
       // Show toast notification
@@ -21,6 +26,15 @@ export function useShareContent() {
         title: 'Content shared!',
         description: 'This content has been shared',
         duration: 2000
+      });
+    },
+    onError: () => {
+      // Show error toast but don't break the app
+      toast({
+        title: 'Sharing failed',
+        description: 'Unable to share this content',
+        variant: 'destructive',
+        duration: 3000
       });
     }
   });

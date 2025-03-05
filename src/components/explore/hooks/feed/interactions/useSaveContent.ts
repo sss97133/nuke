@@ -11,27 +11,38 @@ export function useSaveContent() {
     mutationFn: async (options: { contentId: string; contentType: string }) => {
       const { contentId, contentType } = options;
       
-      // Get current user
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      
-      if (!userId) {
-        throw new Error('User not authenticated');
+      try {
+        // Get current user
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData.user?.id;
+        
+        if (!userId) {
+          toast({
+            title: 'Authentication required',
+            description: 'Please log in to save content',
+            variant: 'destructive',
+            duration: 3000
+          });
+          throw new Error('User not authenticated');
+        }
+        
+        // Check if already saved
+        const hasSaved = await checkExistingInteraction(contentId, userId, 'save');
+        
+        if (!hasSaved) {
+          console.log('Adding new save');
+        }
+        
+        // Track the save interaction
+        return await trackContentInteraction(
+          contentId,
+          'save',
+          contentType
+        );
+      } catch (error) {
+        console.error('Save error:', error);
+        throw error;
       }
-      
-      // Check if already saved
-      const hasSaved = await checkExistingInteraction(contentId, userId, 'save');
-      
-      if (!hasSaved) {
-        console.log('Adding new save');
-      }
-      
-      // Track the save interaction
-      return await trackContentInteraction(
-        contentId,
-        'save',
-        contentType
-      );
     },
     onSuccess: () => {
       // Invalidate relevant queries to update UI
@@ -40,8 +51,16 @@ export function useSaveContent() {
       // Show toast
       toast({
         title: 'Content saved!',
-        description: 'This content has been saved to your collection',
+        description: 'This content has been added to your saved items',
         duration: 2000
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Save failed',
+        description: 'Unable to save this content',
+        variant: 'destructive',
+        duration: 3000
       });
     }
   });

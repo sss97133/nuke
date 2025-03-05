@@ -11,27 +11,38 @@ export function useLikeContent() {
     mutationFn: async (options: { contentId: string; contentType: string }) => {
       const { contentId, contentType } = options;
       
-      // Get current user
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      
-      if (!userId) {
-        throw new Error('User not authenticated');
+      try {
+        // Get current user
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData.user?.id;
+        
+        if (!userId) {
+          toast({
+            title: 'Authentication required',
+            description: 'Please log in to like content',
+            variant: 'destructive',
+            duration: 3000
+          });
+          throw new Error('User not authenticated');
+        }
+        
+        // Check if already liked
+        const hasLiked = await checkExistingInteraction(contentId, userId, 'like');
+        
+        if (!hasLiked) {
+          console.log('Adding new like');
+        }
+        
+        // Track the like interaction
+        return await trackContentInteraction(
+          contentId,
+          'like',
+          contentType
+        );
+      } catch (error) {
+        console.error('Like error:', error);
+        throw error;
       }
-      
-      // Check if already liked
-      const hasLiked = await checkExistingInteraction(contentId, userId, 'like');
-      
-      if (!hasLiked) {
-        console.log('Adding new like');
-      }
-      
-      // Track the like interaction
-      return await trackContentInteraction(
-        contentId,
-        'like',
-        contentType
-      );
     },
     onSuccess: () => {
       // Invalidate relevant queries to update UI
@@ -42,6 +53,14 @@ export function useLikeContent() {
         title: 'Content liked!',
         description: 'This content has been added to your likes',
         duration: 2000
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Like failed',
+        description: 'Unable to like this content',
+        variant: 'destructive',
+        duration: 3000
       });
     }
   });

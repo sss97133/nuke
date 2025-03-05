@@ -42,10 +42,15 @@ export const ContentCard: React.FC<ContentCardProps> = ({
     is_saved = false
   } = item || {};
   
-  // Track view when card is rendered
+  // Track view when card is rendered - with error handling
   useEffect(() => {
-    if (onView) {
-      onView(id, type);
+    if (onView && id) {
+      try {
+        onView(id, type);
+      } catch (error) {
+        console.warn('Error tracking view:', error);
+        // Continue rendering even if tracking fails
+      }
     }
   }, [id, type, onView]);
   
@@ -53,6 +58,31 @@ export const ContentCard: React.FC<ContentCardProps> = ({
   if (!item || !id) {
     return null;
   }
+  
+  // Wrap interaction handlers with error handling
+  const handleLike = (id: string, type: string) => {
+    try {
+      if (onLike) onLike(id, type);
+    } catch (error) {
+      console.error('Error handling like:', error);
+    }
+  };
+  
+  const handleShare = (id: string, type: string) => {
+    try {
+      if (onShare) onShare(id, type);
+    } catch (error) {
+      console.error('Error handling share:', error);
+    }
+  };
+  
+  const handleSave = (id: string, type: string) => {
+    try {
+      if (onSave) onSave(id, type);
+    } catch (error) {
+      console.error('Error handling save:', error);
+    }
+  };
   
   return (
     <Card className={`overflow-hidden ${getContentCardBackground(type)} border-0 shadow-md`}>
@@ -92,9 +122,9 @@ export const ContentCard: React.FC<ContentCardProps> = ({
           save_count={save_count} 
           is_liked={is_liked} 
           is_saved={is_saved} 
-          onLike={onLike} 
-          onShare={onShare} 
-          onSave={onSave} 
+          onLike={handleLike} 
+          onShare={handleShare} 
+          onSave={handleSave} 
         />
       </CardFooter>
     </Card>
