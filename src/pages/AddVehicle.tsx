@@ -63,14 +63,33 @@ const AddVehicle = () => {
       // Create the vehicle - pass as any to bypass the type check since we've processed the data
       await createVehicle(processedData as any);
       
+      // Get appropriate message and redirect based on ownership status
+      let successMessage = '';
+      let redirectPath = '';
+      
+      switch (data.ownership_status) {
+        case 'owned':
+          successMessage = `Your ${data.make} ${data.model} has been added to your garage.`;
+          redirectPath = '/garage';
+          break;
+        case 'claimed':
+          successMessage = `Your claimed ${data.make} ${data.model} has been added. You can verify ownership later.`;
+          redirectPath = '/garage';
+          break;
+        case 'discovered':
+          successMessage = `The discovered ${data.make} ${data.model} has been added to your discoveries.`;
+          redirectPath = '/discovered-vehicles';
+          break;
+      }
+      
       // Display success message
       toast({
         title: "Vehicle added successfully",
-        description: `Your ${data.make} ${data.model} has been ${data.ownership_status === 'owned' ? 'added to your garage' : 'added to discovered vehicles'}.`,
+        description: successMessage,
       });
       
       // Redirect based on ownership status
-      navigate(data.ownership_status === 'owned' ? '/garage' : '/discovered-vehicles');
+      navigate(redirectPath);
     } catch (error) {
       console.error('Error creating vehicle:', error);
       toast({
@@ -89,7 +108,7 @@ const AddVehicle = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Add Vehicle</h1>
           <p className="text-muted-foreground">
-            Add a vehicle you own or one you've discovered. Provide as much detail as possible for accurate tracking.
+            Add a vehicle you own, claim, or have discovered. Provide as much detail as possible for accurate tracking.
           </p>
         </div>
         

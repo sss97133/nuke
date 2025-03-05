@@ -52,7 +52,7 @@ export interface Vehicle {
   interested_users?: number;
   
   // Status
-  status?: 'owned' | 'discovered' | 'verified' | 'unverified';
+  status?: 'owned' | 'claimed' | 'discovered' | 'verified' | 'unverified';
   
   // Discovery source information
   source?: string;

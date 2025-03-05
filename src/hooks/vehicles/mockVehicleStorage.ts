@@ -114,8 +114,9 @@ export const addVehicleRelationship = (userId: string, vehicleId: number, relati
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     verificationData: relationshipType !== 'discovered' ? {
-      titleVerified: false,
-      identityVerified: false,
+      titleVerified: relationshipType === 'verified',
+      identityVerified: relationshipType === 'verified',
+      verificationDate: relationshipType === 'verified' ? new Date().toISOString() : undefined
     } : undefined
   };
   

@@ -67,14 +67,17 @@ export function useCreateVehicle() {
         restoration_status: 'original',
         special_edition: false,
         
-        // New fields for discovered vehicles
-        status: vehicle.ownership_status === 'owned' ? 'owned' : 'discovered',
+        // Set status based on ownership type
+        status: vehicle.ownership_status,
         source: vehicle.discovery_source || '',
         source_url: vehicle.discovery_url || '',
       });
       
       // Create relationship between user and vehicle with the appropriate type
-      const relationshipType = vehicle.ownership_status === 'owned' ? 'claimed' : 'discovered';
+      const relationshipType = 
+        vehicle.ownership_status === 'owned' ? 'verified' :
+        vehicle.ownership_status === 'claimed' ? 'claimed' : 'discovered';
+      
       addVehicleRelationship(vehicle.user_id, newVehicle.id, relationshipType);
       
       return {
@@ -84,11 +87,27 @@ export function useCreateVehicle() {
     },
     onSuccess: (data, variables) => {
       const ownershipStatus = variables.ownership_status;
+      let title = '';
+      let description = '';
+      
+      switch (ownershipStatus) {
+        case 'owned':
+          title = "Vehicle added to your garage";
+          description = "Your vehicle has been successfully added to your garage.";
+          break;
+        case 'claimed':
+          title = "Vehicle claimed and added to your garage";
+          description = "Your claimed vehicle has been added to your garage. You can verify ownership later.";
+          break;
+        case 'discovered':
+          title = "Vehicle added to discoveries";
+          description = "The discovered vehicle has been added to your discoveries list.";
+          break;
+      }
+      
       toast({
-        title: ownershipStatus === 'owned' ? "Vehicle added to your garage" : "Vehicle added to discoveries",
-        description: ownershipStatus === 'owned' 
-          ? "Your vehicle has been successfully added to your garage."
-          : "The discovered vehicle has been added to your discoveries list.",
+        title,
+        description
       });
     },
     onError: (error) => {

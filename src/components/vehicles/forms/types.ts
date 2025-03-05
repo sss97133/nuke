@@ -25,7 +25,7 @@ export interface VehicleFormValues {
   image: string | string[];
   
   // Ownership information
-  ownership_status: 'owned' | 'discovered';
+  ownership_status: 'owned' | 'claimed' | 'discovered';
   
   // Discovery-specific fields
   discovery_source?: string;
