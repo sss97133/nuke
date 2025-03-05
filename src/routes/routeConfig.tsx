@@ -11,7 +11,8 @@ import Sitemap from "@/pages/Sitemap";
 import Documentation from "@/pages/Documentation";
 import Import from "@/pages/Import";
 import DiscoveredVehicles from "@/pages/DiscoveredVehicles";
-import AddVehicle from "@/pages/AddVehicle"; // Import the new AddVehicle component
+import AddVehicle from "@/pages/AddVehicle";
+import Vehicles from "@/pages/Vehicles"; // Import the Vehicles list component
 import TokenStaking from "@/pages/TokenStaking";
 import TokensPage from "@/pages/Tokens";
 import ServiceHistory from "@/pages/ServiceHistory";
@@ -85,8 +86,10 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/tokens', element: <TokensPage />, type: RouteType.PROTECTED },
   { path: '/import', element: <Import />, type: RouteType.PROTECTED },
   { path: '/discovered-vehicles', element: <DiscoveredVehicles />, type: RouteType.PROTECTED },
-  { path: '/add-vehicle', element: <AddVehicle />, type: RouteType.PROTECTED }, // Add the new route
-  { path: '/vehicle/:id', element: <VehicleDetail />, type: RouteType.PROTECTED },
+  { path: '/vehicles', element: <Vehicles />, type: RouteType.PROTECTED }, // Add the Vehicles list route
+  { path: '/add-vehicle', element: <AddVehicle />, type: RouteType.PROTECTED },
+  { path: '/vehicles/:id', element: <VehicleDetail />, type: RouteType.PROTECTED }, // Update vehicle detail route pattern
+  { path: '/vehicle/:id', element: <Navigate to="/vehicles/:id" replace />, type: RouteType.PROTECTED, redirectTo: '/vehicles/:id' }, // Redirect old pattern
   { path: '/profile', element: <Profile />, type: RouteType.PROTECTED },
   { path: '/team-members', element: <TeamMembers />, type: RouteType.PROTECTED },
   { path: '/professional-dashboard', element: <Profile />, type: RouteType.PROTECTED },
