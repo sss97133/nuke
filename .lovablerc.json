@@ -1,18 +1,9 @@
 {
   "editable_files": [
-    "src/components/detail/image-upload/FileUploader.tsx",
-    "src/components/detail/image-upload/ImagePreview.tsx",
-    "src/components/vehicles/forms/components/OwnershipSection.tsx",
-    "src/components/vehicles/forms/hooks/useDocumentUpload.ts",
-    "src/components/vehicles/forms/hooks/useVehicleForm.ts",
-    "src/components/vehicles/forms/types.ts",
-    "docs/ownership-components.md",
-    "src/components/ui/radio-group.tsx",
-    "src/pages/VehicleFormExample.tsx",
-    "src/vite-env.d.ts",
-    "src/pages/AddVehicle.tsx",
     "src/components/**/*.tsx",
+    "src/components/**/*.ts",
     "src/pages/**/*.tsx",
+    "src/pages/**/*.ts",
     "src/hooks/**/*.ts",
     "src/utils/**/*.ts",
     "src/types/**/*.ts",
@@ -28,6 +19,7 @@
   ],
   "permissions": {
     "allow_file_creation": true,
-    "allow_file_deletion": false
+    "allow_file_deletion": false,
+    "allow_file_editing": true
   }
 }
