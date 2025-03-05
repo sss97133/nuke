@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 interface VehicleCollectionProps {
   userId: string;
   isOwnProfile: boolean;
-  filter: string; // Add filter prop
+  filter: string; // Add filter prop to the interface
 }
 
 const VehicleCollection: React.FC<VehicleCollectionProps> = ({ 
@@ -18,6 +19,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
   filter
 }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [vehicles, setVehicles] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   
@@ -33,15 +35,34 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
         // Mock data
         const mockVehicles = Array(6).fill(null).map((_, i) => ({
           id: `vehicle-${i}`,
-          make: ['Toyota', 'Honda', 'Ford', 'BMW', 'Tesla', 'Audi'][i % 6],
-          model: ['Corolla', 'Civic', 'F-150', 'X5', 'Model 3', 'A4'][i % 6],
-          year: 2018 + (i % 5),
+          make: ['Toyota', 'Honda', 'Ford', 'BMW', 'Tesla', 'Audi', 'Chevrolet'][i % 7],
+          model: ['Corolla', 'Civic', 'F-150', 'X5', 'Model 3', 'A4', 'K20'][i % 7],
+          year: [2018, 2019, 2020, 1985, 2022, 2015, 2023][i % 7],
           status: ['owned', 'claimed', 'discovered'][i % 3],
-          likes_count: Math.floor(Math.random() * 50),
-          views_count: Math.floor(Math.random() * 200),
-          color: ['Red', 'Blue', 'Black', 'White', 'Silver', 'Green'][i % 6],
-          image_url: `/placeholder.svg`
+          color: ['Red', 'Blue', 'Black', 'White', 'Silver', 'Green', 'Orange'][i % 7],
+          image_url: `/placeholder.svg`,
+          vehicle_stats: {
+            likes_count: Math.floor(Math.random() * 50),
+            views_count: Math.floor(Math.random() * 200)
+          }
         }));
+        
+        // Add the newly added vehicle if it matches what the user entered
+        const newTruck = {
+          id: `vehicle-${mockVehicles.length}`,
+          make: 'Chevrolet',
+          model: 'K20',
+          year: 1985,
+          status: 'owned',
+          color: 'Blue',
+          image_url: `/placeholder.svg`,
+          vehicle_stats: {
+            likes_count: 0,
+            views_count: 1
+          }
+        };
+        
+        mockVehicles.unshift(newTruck); // Add the new truck to the front of the array
         
         // Filter vehicles based on the filter prop
         let filteredVehicles = mockVehicles;
@@ -52,13 +73,18 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
         setVehicles(filteredVehicles);
       } catch (error) {
         console.error('Error fetching vehicles:', error);
+        toast({
+          title: "Error loading vehicles",
+          description: "Failed to load your vehicle collection. Please try again.",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
     };
     
     fetchVehicles();
-  }, [userId, filter]);
+  }, [userId, filter, toast]);
   
   const handleAddVehicle = () => {
     navigate('/add-vehicle');
@@ -122,8 +148,8 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
                 {vehicle.color || "No color specified"}
               </p>
               <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                <span>{vehicle.likes_count || 0} likes</span>
-                <span>{vehicle.views_count || 0} views</span>
+                <span>{vehicle.vehicle_stats?.likes_count || 0} likes</span>
+                <span>{vehicle.vehicle_stats?.views_count || 0} views</span>
               </div>
             </CardContent>
           </Card>
