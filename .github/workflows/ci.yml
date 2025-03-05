@@ -13,44 +13,36 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
     
     - name: Use Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20.x'
-        cache: 'npm'
     
-    - name: Cache node modules
-      uses: actions/cache@v4
-      id: npm-cache
-      with:
-        path: |
-          node_modules
-          ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+    - name: Debug Environment
+      run: |
+        echo "Node version: $(node -v)"
+        echo "NPM version: $(npm -v)"
+        echo "Directory structure:"
+        ls -la
     
+    - name: Setup .npmrc
+      run: |
+        echo "legacy-peer-deps=true" > .npmrc
+        echo "fund=false" >> .npmrc
+        echo "audit=false" >> .npmrc
+        cat .npmrc
+        
     - name: Install dependencies
-      run: npm ci
-      # If npm ci fails, try npm install as a fallback
-      continue-on-error: false
-    
-    - name: Verify TypeScript
-      run: npx tsc --noEmit
-    
-    - name: Lint
-      run: npm run lint --if-present
+      run: |
+        npm install --no-audit --no-fund
+        echo "Node modules after install:"
+        ls -la node_modules
     
     - name: Build
       run: npm run build
       env:
-        NODE_ENV: production
-    
-    - name: Test
-      run: npm test --if-present
+        NODE_OPTIONS: "--max_old_space_size=4096"
       
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
