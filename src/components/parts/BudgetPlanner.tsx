@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ChartBar, DollarSign, ChartPie, Calendar } from 'lucide-react';
+import { BarChart2, DollarSign, ChartPie, Calendar } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -107,7 +107,7 @@ const BudgetPlanner = () => {
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
                 <div className="p-2 bg-green-100 rounded-full">
-                  <ChartBar className="h-6 w-6 text-green-600" />
+                  <BarChart2 className="h-6 w-6 text-green-600" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Actual Spending</p>
