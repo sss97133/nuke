@@ -19,9 +19,6 @@ export function ImagePreview({ file }: ImagePreviewProps) {
     
     // Cleanup function to prevent memory leaks
     return () => {
-      if (preview) {
-        URL.revokeObjectURL(preview);
-      }
     };
   }, [file, preview]);
 
