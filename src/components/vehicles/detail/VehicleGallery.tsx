@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 const VehicleGallery: React.FC<VehicleGalleryProps> = ({ vehicle }) => {
   const { 
     images, 
+    isLoading,
     isUploadModalOpen, 
     setIsUploadModalOpen, 
     handleImageUpload 
@@ -43,6 +44,7 @@ const VehicleGallery: React.FC<VehicleGalleryProps> = ({ vehicle }) => {
           model: vehicle.model,
           year: vehicle.year
         }}
+        isLoading={isLoading}
       />
     </div>
   );

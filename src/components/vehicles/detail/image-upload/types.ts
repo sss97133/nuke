@@ -10,6 +10,7 @@ export interface ImageUploadModalProps {
   onOpenChange: (open: boolean) => void;
   onUpload: (files: FileList | null, type: string, description: string) => void;
   vehicleInfo?: VehicleInfo;
+  isLoading?: boolean;
 }
 
 export interface ImagePreviewProps {
@@ -29,10 +30,13 @@ export interface DescriptionInputProps {
 
 export interface FileUploaderProps {
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  maxFiles?: number;
+  maxSizeInMB?: number;
 }
 
 export interface ModalFooterProps {
   handleSubmit: () => void;
   hasSelectedFiles: boolean;
   onOpenChange: (open: boolean) => void;
+  isLoading?: boolean;
 }

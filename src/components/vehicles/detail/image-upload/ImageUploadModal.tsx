@@ -14,12 +14,14 @@ import { ImagePreview } from './ImagePreview';
 import { ModalFooter } from './ModalFooter';
 import { useImageUpload } from './useImageUpload';
 import { ImageUploadModalProps } from './types';
+import { Loader2 } from 'lucide-react';
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   open,
   onOpenChange,
   onUpload,
-  vehicleInfo
+  vehicleInfo,
+  isLoading = false,
 }) => {
   const {
     selectedFiles,
@@ -69,9 +71,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           
           <div className="bg-muted p-3 rounded-md">
             <p className="text-sm">
-              <strong>Note:</strong> Uploaded images will be reviewed for quality and relevance 
-              before being fully published. Images from verified users or PTZ garages 
-              are prioritized in the verification process.
+              <strong>Note:</strong> Images will be associated with this vehicle and visible in the gallery.
+              You can add more images at any time from the vehicle detail page.
             </p>
           </div>
         </div>
@@ -80,6 +81,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           handleSubmit={handleSubmit} 
           hasSelectedFiles={selectedFiles !== null && selectedFiles.length > 0}
           onOpenChange={onOpenChange}
+          isLoading={isLoading}
         />
       </DialogContent>
     </Dialog>
