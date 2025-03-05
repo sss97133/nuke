@@ -1,0 +1,58 @@
+{
+  "project": {
+    "name": "nuke",
+    "description": "Vehicle management system with ownership tracking and file upload capabilities"
+  },
+  "files": {
+    "patterns": {
+      "allowed": [
+        "src/components/**/*",
+        "src/pages/**/*",
+        "src/hooks/**/*",
+        "src/utils/**/*",
+        "src/types/**/*",
+        "src/**/*.css",
+        "docs/**/*.md"
+      ],
+      "excluded": [
+        "node_modules/**/*",
+        "dist/**/*",
+        ".git/**/*",
+        ".github/**/*",
+        "vite.config.ts",
+        "package.json",
+        "package-lock.json",
+        "bun.lockb",
+        "tsconfig.json",
+        "tsconfig.*.json",
+        "tailwind.config.ts",
+        ".env",
+        ".env.*"
+      ]
+    },
+    "specific": {
+      "allowed": [
+        "src/components/detail/image-upload/FileUploader.tsx",
+        "src/components/detail/image-upload/ImagePreview.tsx",
+        "src/components/vehicles/forms/components/OwnershipSection.tsx",
+        "docs/ownership-components.md",
+        "src/components/ui/radio-group.tsx",
+        "src/pages/VehicleFormExample.tsx",
+        "src/vite-env.d.ts",
+        "src/pages/AddVehicle.tsx"
+      ],
+      "excluded": []
+    }
+  },
+  "permissions": {
+    "edit": true,
+    "create": true,
+    "delete": false,
+    "rename": false
+  },
+  "editor": {
+    "fileMode": true,
+    "formatOnSave": true,
+    "autoComplete": true
+  }
+}
