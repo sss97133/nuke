@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { SortDirection, SortField } from '../../components/vehicles/discovery/types';
 import { 
@@ -41,7 +42,7 @@ function adaptVehicleFromDB(dbVehicle: any): Vehicle {
     drivetrain: dbVehicle.drivetrain || '',
     rarity_score: dbVehicle.rarity_score || 0,
     era: dbVehicle.era || '',
-    restoration_status: dbVehicle.restoration_status || '',
+    restoration_status: dbVehicle.restoration_status || 'original',
     special_edition: dbVehicle.special_edition || false
   };
 }
@@ -80,6 +81,7 @@ export function useVehiclesData() {
     async function fetchVehicles() {
       try {
         setIsLoading(true);
+        console.log('Fetching vehicles...');
         
         if (USE_REAL_DATA.vehicles) {
           // Try to get authenticated user
@@ -89,7 +91,9 @@ export function useVehiclesData() {
             console.log('User not authenticated, using mock data');
             if (isMounted) {
               // Use getStoredVehicles to get both mock and newly added vehicles
-              setVehicles(getStoredVehicles());
+              const mockVehicles = getStoredVehicles();
+              console.log('Loaded mock vehicles:', mockVehicles.length);
+              setVehicles(mockVehicles);
               setIsLoading(false);
             }
             return;
@@ -125,7 +129,9 @@ export function useVehiclesData() {
           // Use mock data directly when feature flag is off
           if (isMounted) {
             // Use getStoredVehicles to get both mock and newly added vehicles
-            setVehicles(getStoredVehicles());
+            const mockVehicles = getStoredVehicles();
+            console.log('Loaded mock vehicles:', mockVehicles.length);
+            setVehicles(mockVehicles);
           }
         }
       } catch (err) {
@@ -136,7 +142,9 @@ export function useVehiclesData() {
           setError(err.message || 'Failed to fetch vehicles');
           
           // Fall back to mock data
-          setVehicles(getStoredVehicles());
+          const mockVehicles = getStoredVehicles();
+          console.log('Loaded mock vehicles (fallback):', mockVehicles.length);
+          setVehicles(mockVehicles);
         }
       } finally {
         if (isMounted) {

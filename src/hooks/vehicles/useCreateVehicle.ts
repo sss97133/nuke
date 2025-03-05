@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VehicleFormValues } from '@/components/vehicles/forms/VehicleForm';
@@ -41,7 +42,7 @@ export const useCreateVehicle = () => {
         drivetrain: '',
         rarity_score: 0,
         era: '',
-        restoration_status: '',
+        restoration_status: 'original', // Fixed: Using a valid value for the enum
         special_edition: false
       };
       
