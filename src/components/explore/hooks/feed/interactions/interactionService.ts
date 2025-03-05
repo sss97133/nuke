@@ -1,69 +1,94 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { InteractionOptions, InteractionResponse } from "./types";
+import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Tracks a content interaction in the database
+ * Track content interactions (views, likes, shares, saves)
  */
 export async function trackContentInteraction(
-  options: InteractionOptions
-): Promise<InteractionResponse> {
-  const { contentId, contentType, interactionType } = options;
-  
+  contentId: string,
+  interactionType: 'view' | 'like' | 'share' | 'save',
+  contentType: string = 'post' // Set default content type
+) {
   try {
+    console.log(`Tracking ${interactionType} for content ${contentId} (type: ${contentType})`);
+    
+    // Get current authenticated user
     const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
+    const userId = userData?.user?.id;
     
     if (!userId) {
-      console.warn('User not authenticated, skipping interaction tracking');
-      return { success: false, message: 'User not authenticated' };
+      console.log('User not authenticated, skipping interaction tracking');
+      return { success: false, error: 'User not authenticated' };
     }
     
-    // Insert interaction
-    const { error: interactionError } = await supabase
+    // Create an interaction record with explicit column selection
+    // to avoid the schema cache issue with content_type
+    const { data, error } = await supabase
       .from('content_interactions')
       .insert({
+        user_id: userId,
         content_id: contentId,
-        content_type: contentType,
         interaction_type: interactionType,
-        user_id: userId
+        // Skip content_type since it's causing errors
+        created_at: new Date().toISOString()
       });
     
-    if (interactionError) {
-      console.error('Error tracking interaction:', interactionError);
-      throw interactionError;
+    if (error) {
+      console.error(`Error tracking interaction:`, error);
+      return { success: false, error };
     }
     
-    return { success: true };
+    return { success: true, data };
   } catch (error) {
-    console.error('Error in trackContentInteraction:', error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Unknown error occurred'
-    };
+    console.error(`Error in trackContentInteraction:`, error);
+    return { success: false, error };
   }
 }
 
 /**
- * Checks if a user has already performed a specific interaction
+ * Get interactions for a specific content item
  */
-export async function checkExistingInteraction(
-  contentId: string,
-  userId: string,
-  interactionType: string
-): Promise<boolean> {
+export async function getContentInteractions(contentId: string) {
   try {
-    const { data: existingInteraction } = await supabase
+    // Get current authenticated user
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+    
+    // Create an interaction record
+    const { data, error } = await supabase
       .from('content_interactions')
-      .select('id')
-      .eq('content_id', contentId)
-      .eq('user_id', userId)
-      .eq('interaction_type', interactionType)
-      .single();
-      
-    return !!existingInteraction;
+      .select('*')
+      .eq('content_id', contentId);
+    
+    if (error) {
+      console.error(`Error getting interactions:`, error);
+      return { error };
+    }
+    
+    // Filter by user if authenticated
+    const userInteractions = userId 
+      ? data.filter(item => item.user_id === userId) 
+      : [];
+    
+    // Count total interactions by type
+    const interactionCounts = data.reduce((acc, item) => {
+      const type = item.interaction_type;
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Determine if the user has performed specific interactions
+    const hasLiked = userInteractions.some(item => item.interaction_type === 'like');
+    const hasSaved = userInteractions.some(item => item.interaction_type === 'save');
+    
+    return { 
+      counts: interactionCounts,
+      hasLiked,
+      hasSaved,
+      success: true
+    };
   } catch (error) {
-    console.error('Error checking existing interaction:', error);
-    return false;
+    console.error(`Error in getContentInteractions:`, error);
+    return { error };
   }
 }

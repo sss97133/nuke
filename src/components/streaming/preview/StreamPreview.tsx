@@ -57,10 +57,12 @@ export const StreamPreview: React.FC<StreamPreviewProps> = ({ isLive }) => {
   return (
     <div className="aspect-video bg-muted rounded-lg flex flex-col items-center justify-center relative">
       {error && (
-        // Removed the Alert component that was positioned with absolute positioning
-        <p className="text-red-500">
-          {error}
-        </p>
+        <Alert variant="destructive" className="max-w-md mx-auto my-2">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
       )}
       
       {showEmbeddedPlayer ? (

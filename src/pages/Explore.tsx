@@ -3,8 +3,11 @@ import React from 'react';
 import { ExploreFeed } from '@/components/explore/ExploreFeed';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles } from "lucide-react";
+import { useAuthState } from '@/hooks/auth/use-auth-state';
 
 const Explore = () => {
+  const { loading } = useAuthState();
+  
   return (
     <div className="container max-w-7xl p-6">
       <div className="flex items-center justify-between mb-6">
@@ -19,9 +22,15 @@ const Explore = () => {
         </div>
       </div>
       
-      <ScrollArea className="h-[calc(100vh-9rem)]">
-        <ExploreFeed />
-      </ScrollArea>
+      {loading ? (
+        <div className="h-[calc(100vh-9rem)] flex items-center justify-center">
+          <p className="text-muted-foreground">Loading content...</p>
+        </div>
+      ) : (
+        <ScrollArea className="h-[calc(100vh-9rem)]">
+          <ExploreFeed />
+        </ScrollArea>
+      )}
     </div>
   );
 };

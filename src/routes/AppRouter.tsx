@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate, BrowserRouter } from 'react-router-dom';
 import { useAuthState } from '@/hooks/auth/use-auth-state';
@@ -6,7 +7,7 @@ import { AuthLayout } from '@/components/layout/AuthLayout';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { allRoutes, RouteType, isPublicPath } from './routeConfig';
 import { toast } from '@/components/ui/use-toast';
-import { StreamViewer } from '@/components/streaming/viewer/StreamViewer';
+import { StreamViewer } from '@/pages/StreamViewer';
 
 const AppRouterContent: React.FC = () => {
   const { loading, session } = useAuthState();
