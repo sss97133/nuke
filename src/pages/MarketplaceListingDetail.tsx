@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft } from 'lucide-react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useMarketplaceListing } from '@/components/marketplace/hooks/useMarketplaceListing';
 import MarketplaceListingHeader from '@/components/marketplace/detail/MarketplaceListingHeader';
 import MarketplaceListingGallery from '@/components/marketplace/detail/MarketplaceListingGallery';
