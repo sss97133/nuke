@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { UseFormReturn } from 'react-hook-form';
 import { VehicleFormValues } from '../types';
+import { ImageUpload } from './ImageUpload';
 
 interface MediaTagsSectionProps {
   form: UseFormReturn<VehicleFormValues>;
@@ -17,21 +18,11 @@ export const MediaTagsSection: React.FC<MediaTagsSectionProps> = ({ form }) => {
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Media & Tags</h3>
           
-          <FormField
-            control={form.control}
+          <ImageUpload
+            form={form}
             name="image"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Image URL</FormLabel>
-                <FormControl>
-                  <Input placeholder="URL to vehicle image" {...field} />
-                </FormControl>
-                <FormDescription>
-                  Enter a URL for the vehicle's image or upload one later
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
+            label="Vehicle Image"
+            description="Upload or provide a URL for the vehicle's main image"
           />
           
           <FormField

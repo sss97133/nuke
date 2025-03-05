@@ -16,6 +16,10 @@ export interface VehicleGalleryProps {
     make: string;
     model: string;
     year: number | string;
+    mileage?: number;
+    image?: string;
+    location?: string;
+    added?: string;
     [key: string]: any;
   };
 }
@@ -27,11 +31,13 @@ export interface GalleryHeaderProps {
     year: number | string;
   };
   totalImages: number;
+  onOpenUploadModal?: () => void;
 }
 
 export interface GalleryImagesProps {
   images: GalleryImage[];
   isLoading?: boolean;
+  onOpenUploadModal?: () => void;
 }
 
 export interface EmptyGalleryProps {
@@ -40,4 +46,5 @@ export interface EmptyGalleryProps {
     model: string;
     year: number | string;
   };
+  onOpenUploadModal?: () => void;
 }
