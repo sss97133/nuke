@@ -38,20 +38,18 @@ export const useAuthState = () => {
           if (data?.session) {
             console.info('[useAuthState] Auth event: INITIAL_SESSION');
             console.info('[useAuthState] Auth state changed, session:', data.session.user?.email);
-            console.info('[useAuthState] Active session detected, checking navigation');
+            console.info('[useAuthState] Active session detected, user ID:', data.session.user?.id);
           } else {
             console.info('[useAuthState] No active session found');
           }
           
           setSession(data.session);
+          setLoading(false);
         }
       } catch (err) {
         console.error('[useAuthState] Unexpected error in auth state:', err);
         if (mounted) {
           setError(err instanceof Error ? err : new Error('Unknown authentication error'));
-        }
-      } finally {
-        if (mounted) {
           setLoading(false);
         }
       }
@@ -67,7 +65,7 @@ export const useAuthState = () => {
       if (mounted) {
         if (newSession) {
           console.info('[useAuthState] Auth state changed, session:', newSession.user?.email);
-          console.info('[useAuthState] Active session detected, checking navigation');
+          console.info('[useAuthState] Auth state changed, user ID:', newSession.user?.id);
         }
         
         setSession(newSession);

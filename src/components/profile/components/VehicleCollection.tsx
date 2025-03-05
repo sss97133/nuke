@@ -58,8 +58,8 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
           image_url: vehicle.image_url || undefined,
           ownership_status: (vehicle.status as 'owned' | 'discovered' | 'claimed') || 'discovered',
           vehicle_stats: {
-            likes_count: 0, // Default value
-            views_count: 0  // Default value
+            likes_count: vehicle.likes_count || 0,
+            views_count: vehicle.views_count || 0
           }
         }));
         

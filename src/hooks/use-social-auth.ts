@@ -13,10 +13,16 @@ export const useSocialAuth = () => {
       setIsLoading(true);
       console.log("[useSocialAuth] Starting OAuth flow with provider:", provider);
       
+      // Get the current URL to handle mobile devices properly
+      const currentUrl = window.location.origin;
+      const redirectUrl = `${currentUrl}/auth/callback`;
+      
+      console.log("[useSocialAuth] Using redirect URL:", redirectUrl);
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

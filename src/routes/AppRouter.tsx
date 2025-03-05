@@ -29,6 +29,14 @@ const AppRouterContent: React.FC = () => {
     });
   }, [currentPath, isAuthenticated, loading, isAuthCallbackPath]);
 
+  // Handle successful auth callback
+  useEffect(() => {
+    if (isAuthCallbackPath && !loading && isAuthenticated) {
+      console.log("Auth callback successful, redirecting to dashboard");
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthCallbackPath, loading, isAuthenticated, navigate]);
+
   useEffect(() => {
     if (loading) return;
 
@@ -57,7 +65,7 @@ const AppRouterContent: React.FC = () => {
       return;
     }
     
-    if (!matchingRoute && currentPath !== '/') {
+    if (!matchingRoute && currentPath !== '/' && !isAuthCallbackPath) {
       console.warn(`Route not found: ${currentPath}, redirecting to home`);
       toast({
         title: "Route Not Found",
@@ -66,7 +74,7 @@ const AppRouterContent: React.FC = () => {
       });
       navigate('/');
     }
-  }, [currentPath, loading, navigate]);
+  }, [currentPath, loading, navigate, isAuthCallbackPath]);
 
   if (loading) {
     console.log("Auth loading state...");
