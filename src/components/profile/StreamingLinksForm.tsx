@@ -1,8 +1,9 @@
 import React from 'react';
-import { Video } from 'lucide-react';
+import { Video, Youtube, Twitch, ArrowBigDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { StreamingLinks } from './types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface StreamingLinksFormProps {
   streamingLinks: StreamingLinks;
@@ -12,37 +13,59 @@ interface StreamingLinksFormProps {
 
 export const StreamingLinksForm = ({ streamingLinks, onStreamingLinksChange, onSubmit }: StreamingLinksFormProps) => {
   return (
-    <div className="bg-[#FFFFFF] p-2 border border-[#403E43]">
-      <div className="flex items-center gap-2 mb-2">
-        <Video className="w-3 h-3 text-[#222222]" />
-        <h3 className="text-[10px] font-mono text-[#222222]">STREAMING_PLATFORM_LINKS</h3>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        <Input
-          placeholder="TWITCH_URL"
-          value={streamingLinks.twitch}
-          onChange={(e) => onStreamingLinksChange({ ...streamingLinks, twitch: e.target.value })}
-          className="text-[10px] font-mono bg-[#C8C8C9] border-[#8A898C] h-6"
-        />
-        <Input
-          placeholder="YOUTUBE_URL"
-          value={streamingLinks.youtube}
-          onChange={(e) => onStreamingLinksChange({ ...streamingLinks, youtube: e.target.value })}
-          className="text-[10px] font-mono bg-[#C8C8C9] border-[#8A898C] h-6"
-        />
-        <Input
-          placeholder="TIKTOK_URL"
-          value={streamingLinks.tiktok}
-          onChange={(e) => onStreamingLinksChange({ ...streamingLinks, tiktok: e.target.value })}
-          className="text-[10px] font-mono bg-[#C8C8C9] border-[#8A898C] h-6"
-        />
-      </div>
-      <Button 
-        onClick={onSubmit}
-        className="mt-2 bg-[#403E43] hover:bg-[#222222] text-[#FFFFFF] text-[10px] font-mono h-6"
-      >
-        UPDATE_STREAMING_LINKS
-      </Button>
-    </div>
+    <Card className="bg-card border border-border">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Video className="w-4 h-4 text-primary" />
+          Streaming Platform Links
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 flex items-center justify-center bg-[#9146FF]/10 text-[#9146FF] rounded-full">
+              <Twitch className="w-4 h-4" />
+            </div>
+            <Input
+              placeholder="Twitch URL"
+              value={streamingLinks.twitch}
+              onChange={(e) => onStreamingLinksChange({ ...streamingLinks, twitch: e.target.value })}
+              className="flex-1"
+            />
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 flex items-center justify-center bg-[#FF0000]/10 text-[#FF0000] rounded-full">
+              <Youtube className="w-4 h-4" />
+            </div>
+            <Input
+              placeholder="YouTube URL"
+              value={streamingLinks.youtube}
+              onChange={(e) => onStreamingLinksChange({ ...streamingLinks, youtube: e.target.value })}
+              className="flex-1"
+            />
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 flex items-center justify-center bg-[#000000]/10 text-black rounded-full dark:text-white">
+              <ArrowBigDown className="w-4 h-4" />
+            </div>
+            <Input
+              placeholder="TikTok URL"
+              value={streamingLinks.tiktok}
+              onChange={(e) => onStreamingLinksChange({ ...streamingLinks, tiktok: e.target.value })}
+              className="flex-1"
+            />
+          </div>
+          
+          <Button 
+            onClick={onSubmit}
+            className="mt-2 w-full sm:w-auto sm:self-end"
+          >
+            Update Streaming Links
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };

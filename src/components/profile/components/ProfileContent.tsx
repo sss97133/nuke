@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ProfileTabs } from './ProfileTabs';
 import { UserProfileHeader } from '../UserProfileHeader';
@@ -7,6 +6,7 @@ import { ProfileErrorState } from './ProfileErrorState';
 import { useProfileData } from '../hooks/useProfileData';
 import { SocialLinks, StreamingLinks } from '../types';
 import { AnalysisResult } from '../hooks/useProfileAnalysis';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProfileContentProps {
   userId: string;
@@ -62,6 +62,7 @@ export const ProfileContent = ({
         username={profileData.username}
         avatarUrl={profileData.avatar_url}
         bio={profileData.bio}
+        isOwnProfile={isOwnProfile}
       />
       <ProfileTabs
         userId={userId}

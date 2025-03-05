@@ -1,124 +1,125 @@
+import React, { useState } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Edit, UserRound } from 'lucide-react';
+import { UserProfileEditForm } from './UserProfileEditForm';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-import React, { useRef, useState } from 'react';
-import { Pencil, Upload } from 'lucide-react';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { useAvatarUpload } from './hooks/useAvatarUpload';
-import { useBioUpdate } from './hooks/useBioUpdate';
-
-export interface UserProfileHeaderProps {
+interface UserProfileHeaderProps {
   userId: string;
-  fullName: string | null;
-  username: string | null;
-  avatarUrl?: string | null;
-  bio?: string | null;
+  fullName: string;
+  username: string;
+  avatarUrl?: string;
+  bio?: string;
+  isOwnProfile?: boolean;
 }
 
-export const UserProfileHeader = ({ userId, fullName, username, avatarUrl, bio }: UserProfileHeaderProps) => {
-  const [isEditingBio, setIsEditingBio] = useState(false);
-  const [bioText, setBioText] = useState(bio || '');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const { isUploading, uploadAvatar } = useAvatarUpload(userId, (url) => {
-    // The URL update will be handled by the profile refetch
+export const UserProfileHeader = ({
+  userId,
+  fullName,
+  username,
+  avatarUrl,
+  bio = '',
+  isOwnProfile = false
+}: UserProfileHeaderProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [profileData, setProfileData] = useState({
+    fullName,
+    username,
+    avatarUrl,
+    bio
   });
-  
-  const { isUpdating, updateBio } = useBioUpdate(userId);
+  const { toast } = useToast();
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      await uploadAvatar(file);
+  const handleProfileUpdated = async () => {
+    setIsEditing(false);
+    
+    // Refresh profile data
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, username, avatar_url, bio')
+        .eq('id', userId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
+        setProfileData({
+          fullName: data.full_name || '',
+          username: data.username || '',
+          avatarUrl: data.avatar_url || undefined,
+          bio: data.bio || ''
+        });
+        
+        toast({
+          title: "Profile updated",
+          description: "Your profile information has been updated successfully."
+        });
+      }
+    } catch (err) {
+      console.error("Error refreshing profile data:", err);
     }
   };
 
-  const handleBioSave = async () => {
-    await updateBio(bioText);
-    setIsEditingBio(false);
-  };
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-start gap-4">
-        <div className="relative">
-          <Avatar className="h-20 w-20">
-            <AvatarImage src={avatarUrl || undefined} alt={fullName || 'User avatar'} />
-            <AvatarFallback className="text-lg">
-              {fullName ? fullName.charAt(0).toUpperCase() : 'U'}
-            </AvatarFallback>
-          </Avatar>
-          
-          <Button
-            size="icon"
-            variant="outline"
-            className="absolute bottom-0 right-0 rounded-full"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-          >
-            <Upload className="h-4 w-4" />
-          </Button>
-          
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept="image/*"
-            onChange={handleFileSelect}
+    <Card className="bg-card border border-border shadow-sm">
+      <CardContent className="p-6">
+        {isEditing && isOwnProfile ? (
+          <UserProfileEditForm
+            userId={userId}
+            currentUsername={profileData.username}
+            currentFullName={profileData.fullName}
+            currentBio={profileData.bio}
+            currentAvatarUrl={profileData.avatarUrl}
+            onProfileUpdated={handleProfileUpdated}
           />
-        </div>
-
-        <div className="flex-1">
-          <h2 className="text-xl font-semibold">{fullName || 'USER_NAME_NOT_FOUND'}</h2>
-          <p className="text-sm text-muted-foreground">@{username || 'username_404'}</p>
-          
-          <div className="mt-4">
-            {isEditingBio ? (
-              <div className="space-y-2">
-                <Textarea
-                  value={bioText}
-                  onChange={(e) => setBioText(e.target.value)}
-                  placeholder="Write something about yourself..."
-                  className="min-h-[80px]"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleBioSave}
-                    disabled={isUpdating}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setBioText(bio || '');
-                      setIsEditingBio(false);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+        ) : (
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex flex-col items-center">
+              <Avatar className="h-24 w-24 border-2 border-primary/10">
+                {profileData.avatarUrl ? (
+                  <AvatarImage
+                    src={profileData.avatarUrl}
+                    alt={profileData.fullName}
+                    className="object-cover"
+                  />
+                ) : null}
+                <AvatarFallback className="text-2xl bg-primary/5">
+                  <UserRound className="h-12 w-12 text-muted-foreground" />
+                </AvatarFallback>
+              </Avatar>
+            </div>
+            
+            <div className="flex-1 space-y-2 text-center md:text-left">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold">{profileData.fullName}</h2>
+                <p className="text-muted-foreground">@{profileData.username}</p>
               </div>
-            ) : (
-              <div className="group relative">
-                <p className="text-sm text-muted-foreground">
-                  {bio || 'Add a bio to your profile'}
-                </p>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute -right-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => setIsEditingBio(true)}
+              
+              {profileData.bio && (
+                <p className="text-sm md:text-base max-w-2xl">{profileData.bio}</p>
+              )}
+              
+              {isOwnProfile && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => setIsEditing(true)}
                 >
-                  <Pencil className="h-4 w-4" />
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Profile
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
+
+export default UserProfileHeader;
