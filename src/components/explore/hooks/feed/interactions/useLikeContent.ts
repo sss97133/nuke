@@ -27,11 +27,11 @@ export function useLikeContent() {
       }
       
       // Track the like interaction
-      return await trackContentInteraction({
+      return await trackContentInteraction(
         contentId,
-        contentType,
-        interactionType: 'like'
-      });
+        'like',
+        contentType
+      );
     },
     onSuccess: () => {
       // Invalidate relevant queries to update UI

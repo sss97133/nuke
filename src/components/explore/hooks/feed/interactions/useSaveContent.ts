@@ -27,11 +27,11 @@ export function useSaveContent() {
       }
       
       // Track the save interaction
-      return await trackContentInteraction({
+      return await trackContentInteraction(
         contentId,
-        contentType,
-        interactionType: 'save'
-      });
+        'save',
+        contentType
+      );
     },
     onSuccess: () => {
       // Invalidate relevant queries to update UI

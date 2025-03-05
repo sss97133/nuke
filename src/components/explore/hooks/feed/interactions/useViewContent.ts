@@ -8,11 +8,11 @@ export function useViewContent() {
       const { contentId, contentType } = options;
       
       // Track the view interaction without any user feedback
-      return await trackContentInteraction({
+      return await trackContentInteraction(
         contentId,
-        contentType,
-        interactionType: 'view'
-      });
+        'view',
+        contentType
+      );
     }
   });
 

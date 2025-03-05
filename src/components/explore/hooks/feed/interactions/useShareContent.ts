@@ -9,11 +9,11 @@ export function useShareContent() {
       const { contentId, contentType } = options;
       
       // Track the share interaction
-      return await trackContentInteraction({
+      return await trackContentInteraction(
         contentId,
-        contentType,
-        interactionType: 'share'
-      });
+        'share',
+        contentType
+      );
     },
     onSuccess: () => {
       // Show toast notification

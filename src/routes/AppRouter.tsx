@@ -7,7 +7,8 @@ import { AuthLayout } from '@/components/layout/AuthLayout';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { allRoutes, RouteType, isPublicPath } from './routeConfig';
 import { toast } from '@/components/ui/use-toast';
-import { StreamViewer } from '@/pages/StreamViewer';
+// Fix the import to use the default export
+import StreamViewer from '@/pages/StreamViewer';
 
 const AppRouterContent: React.FC = () => {
   const { loading, session } = useAuthState();

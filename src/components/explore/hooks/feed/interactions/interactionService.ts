@@ -1,6 +1,33 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// Add the missing checkExistingInteraction function
+export async function checkExistingInteraction(
+  contentId: string, 
+  userId: string, 
+  interactionType: 'view' | 'like' | 'share' | 'save'
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('content_interactions')
+      .select('id')
+      .eq('content_id', contentId)
+      .eq('user_id', userId)
+      .eq('interaction_type', interactionType)
+      .single();
+    
+    if (error) {
+      console.log(`No existing ${interactionType} interaction found`);
+      return false;
+    }
+    
+    return !!data;
+  } catch (error) {
+    console.error(`Error checking existing interaction:`, error);
+    return false;
+  }
+}
+
 /**
  * Track content interactions (views, likes, shares, saves)
  */
