@@ -1,7 +1,6 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { VehicleFormValues } from '@/components/vehicles/forms/VehicleForm';
+import { VehicleFormValues } from '@/components/vehicles/forms/types';
 import { useToast } from '@/hooks/use-toast';
 import { Vehicle as DiscoveryVehicle } from '@/components/vehicles/discovery/types';
 import { addStoredVehicle, addVehicleRelationship } from './mockVehicleStorage';

@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from '@/hooks/use-auth';
-import VehicleForm, { VehicleFormValues } from '@/components/vehicles/forms/VehicleForm';
+import VehicleForm from '@/components/vehicles/forms/VehicleForm';
+import { VehicleFormValues } from '@/components/vehicles/forms/types';
 import { useCreateVehicle } from '@/hooks/vehicles/useCreateVehicle';
 
 const AddVehicle = () => {

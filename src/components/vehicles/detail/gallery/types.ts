@@ -1,31 +1,21 @@
 
-import { Vehicle } from '@/components/vehicles/discovery/types';
-
-export interface VehicleGalleryProps {
-  vehicle: Vehicle;
-}
-
-export interface GalleryHeaderProps {
-  onOpenUploadModal: () => void;
-}
-
-export interface GalleryImagesProps {
-  images: GalleryImage[];
-  onOpenUploadModal: () => void;
-}
-
 export interface GalleryImage {
-  id: number;
+  id: string | number;
   url: string;
   type: string;
-  user: {
-    name: string | null;
-    isVerified: boolean;
-    avatar: string | null;
+  user?: {
+    name: string;
+    avatar?: string;
   };
-  isVerified: boolean;
+  isVerified?: boolean;
 }
 
-export interface EmptyGalleryProps {
-  onOpenUploadModal: () => void;
+export interface VehicleGalleryProps {
+  vehicle: {
+    id: string | number;
+    make: string;
+    model: string;
+    year: number | string;
+    [key: string]: any;
+  };
 }
