@@ -119,7 +119,6 @@ export default function Vehicles() {
           {filteredVehicles.map((vehicle) => (
             <Card key={vehicle.id} className="overflow-hidden">
               <div className="aspect-video bg-muted flex items-center justify-center">
-                {/* Vehicle image would go here */}
                 <Car className="h-12 w-12 text-muted-foreground opacity-50" />
               </div>
               <CardHeader className="pb-2">

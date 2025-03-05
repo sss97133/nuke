@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
@@ -86,10 +87,10 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/tokens', element: <TokensPage />, type: RouteType.PROTECTED },
   { path: '/import', element: <Import />, type: RouteType.PROTECTED },
   { path: '/discovered-vehicles', element: <DiscoveredVehicles />, type: RouteType.PROTECTED },
-  { path: '/vehicles', element: <Vehicles />, type: RouteType.PROTECTED }, // Add the Vehicles list route
+  { path: '/vehicles', element: <Vehicles />, type: RouteType.PROTECTED },
   { path: '/add-vehicle', element: <AddVehicle />, type: RouteType.PROTECTED },
-  { path: '/vehicles/:id', element: <VehicleDetail />, type: RouteType.PROTECTED }, // Update vehicle detail route pattern
-  { path: '/vehicle/:id', element: <Navigate to="/vehicles/:id" replace />, type: RouteType.PROTECTED, redirectTo: '/vehicles/:id' }, // Redirect old pattern
+  { path: '/vehicles/:id', element: <VehicleDetail />, type: RouteType.PROTECTED },
+  { path: '/vehicle/:id', element: <Navigate to="/vehicles/:id" replace />, type: RouteType.PROTECTED, redirectTo: '/vehicles/:id' },
   { path: '/profile', element: <Profile />, type: RouteType.PROTECTED },
   { path: '/team-members', element: <TeamMembers />, type: RouteType.PROTECTED },
   { path: '/professional-dashboard', element: <Profile />, type: RouteType.PROTECTED },

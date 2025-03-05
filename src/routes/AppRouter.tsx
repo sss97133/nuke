@@ -33,8 +33,10 @@ const AppRouterContent: React.FC = () => {
     if (loading) return;
 
     const matchingRoute = allRoutes.find(route => {
+      // Exact match
       if (route.path === currentPath) return true;
       
+      // Parameter match (for routes with dynamic segments like :id)
       const routeParts = route.path.split('/');
       const pathParts = currentPath.split('/');
       
