@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Video, VideoOff, Mic, MicOff, Settings } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import twitchService from '../services/TwitchService';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 
 export const StreamControls = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [streamTitle, setStreamTitle] = useState("My Stream");
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isConnectedToTwitch, setIsConnectedToTwitch] = useState(false);
@@ -16,7 +17,8 @@ export const StreamControls = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    setHasClientIdError(!import.meta.env.VITE_TWITCH_CLIENT_ID);
+    // Check if client ID is configured
+    setHasClientIdError(!twitchService.isConfigured());
     
     const checkTwitchConnection = async () => {
       const isAuthenticated = twitchService.isAuthenticated();
@@ -38,7 +40,9 @@ export const StreamControls = () => {
       }
     };
     
-    checkTwitchConnection();
+    if (!hasClientIdError) {
+      checkTwitchConnection();
+    }
     
     const handleAuthChange = () => {
       setIsConnectedToTwitch(twitchService.isAuthenticated());
@@ -49,7 +53,7 @@ export const StreamControls = () => {
     return () => {
       window.removeEventListener('twitch_auth_changed', handleAuthChange);
     };
-  }, [toast]);
+  }, [toast, hasClientIdError]);
 
   const toggleStream = async () => {
     if (isLoading) return;
@@ -87,7 +91,6 @@ export const StreamControls = () => {
           return;
         }
         
-        // Fix: Remove streamTitle argument since startStream doesn't accept parameters
         await twitchService.startStream();
         setIsStreaming(true);
         toast({
@@ -124,37 +127,48 @@ export const StreamControls = () => {
   };
 
   return (
-    <div className="flex gap-2">
-      <Button 
-        variant={isStreaming ? "destructive" : "default"}
-        onClick={toggleStream}
-        disabled={hasClientIdError || isLoading || (!isConnectedToTwitch && !isStreaming)}
-      >
-        {isLoading ? "Processing..." : isStreaming ? "End Stream" : "Start Stream"}
-      </Button>
+    <div className="space-y-4">
+      {hasClientIdError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Twitch Client ID is missing. Please add VITE_TWITCH_CLIENT_ID to your environment variables.
+          </AlertDescription>
+        </Alert>
+      )}
       
-      <Button 
-        variant="outline" 
-        size="icon"
-        onClick={toggleMic}
-      >
-        {isMicEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-      </Button>
-      
-      <Button 
-        variant="outline" 
-        size="icon"
-        onClick={toggleVideo}
-      >
-        {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-      </Button>
-      
-      <Button 
-        variant="outline" 
-        size="icon"
-      >
-        <Settings className="h-4 w-4" />
-      </Button>
+      <div className="flex gap-2">
+        <Button 
+          variant={isStreaming ? "destructive" : "default"}
+          onClick={toggleStream}
+          disabled={isLoading || (!isConnectedToTwitch && !isStreaming)}
+        >
+          {isLoading ? "Processing..." : isStreaming ? "End Stream" : "Start Stream"}
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="icon"
+          onClick={toggleMic}
+        >
+          {isMicEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="icon"
+          onClick={toggleVideo}
+        >
+          {isVideoEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="icon"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 };

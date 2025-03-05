@@ -18,7 +18,12 @@ This module provides integration with Twitch's streaming API to allow users to b
    VITE_TWITCH_CLIENT_ID=your_client_id_here
    ```
 
-3. **Limitations**:
+3. **Troubleshooting**:
+   - If you see "invalid client" errors, make sure your Client ID is correct
+   - Ensure the domain you're accessing from matches the domains in your Twitch app settings
+   - Check that your redirect URI exactly matches what's configured in the Twitch Developer Console
+
+4. **Limitations**:
    - This integration provides authentication and API integration with Twitch
    - To actually broadcast video, users will need to use OBS Studio or similar software with the stream key provided
    - The connection status and stream controls in this UI will help manage the stream settings

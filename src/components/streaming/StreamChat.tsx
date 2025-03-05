@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,6 +17,13 @@ export const StreamChat: React.FC<StreamChatProps> = ({ streamId }) => {
   const [embedSrc, setEmbedSrc] = useState<string>('');
 
   useEffect(() => {
+    // Check if Twitch is properly configured
+    if (!twitchService.isConfigured()) {
+      setError("Twitch Client ID is not configured");
+      setIsLoading(false);
+      return;
+    }
+    
     // Get the current user's Twitch username when authenticated
     const fetchUserData = async () => {
       if (twitchService.isAuthenticated()) {

@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Check, Twitch } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, Twitch } from 'lucide-react';
 import twitchService from '../services/TwitchService';
 import { Switch } from '@/components/ui/switch';
 
@@ -14,7 +14,17 @@ export const StreamSettings = () => {
   const [category, setCategory] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  useEffect(() => {
+    // Check if Twitch client ID is configured
+    if (!twitchService.isConfigured()) {
+      setConfigError(`Twitch Client ID is missing. Please set VITE_TWITCH_CLIENT_ID in your environment variables.`);
+    } else {
+      setConfigError(null);
+    }
+  }, []);
   
   const userData = twitchService.getUserData();
   const isAuthenticated = twitchService.isAuthenticated();
@@ -22,6 +32,11 @@ export const StreamSettings = () => {
   const handleSaveSettings = async () => {
     try {
       setError(null);
+      
+      if (!twitchService.isConfigured()) {
+        setError('Twitch Client ID is not configured');
+        return;
+      }
       
       if (!streamTitle) {
         setError('Stream title is required');
@@ -38,6 +53,37 @@ export const StreamSettings = () => {
       setError('Failed to save stream settings: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
+  
+  // If there's a configuration error, show a different UI
+  if (configError) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Stream Settings</CardTitle>
+          <CardDescription>
+            Twitch integration configuration
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{configError}</AlertDescription>
+          </Alert>
+          
+          <div className="mt-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              To use the streaming feature, you need to:
+            </p>
+            <ol className="list-decimal pl-5 space-y-2 text-sm text-muted-foreground mb-4">
+              <li>Create a <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noopener noreferrer" className="text-primary underline">Twitch Developer Application</a></li>
+              <li>Get your Client ID from the Developer Console</li>
+              <li>Add it to your environment variables as VITE_TWITCH_CLIENT_ID</li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   if (!isAuthenticated) {
     return (
