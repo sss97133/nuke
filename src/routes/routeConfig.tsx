@@ -11,6 +11,7 @@ import Sitemap from "@/pages/Sitemap";
 import Documentation from "@/pages/Documentation";
 import Import from "@/pages/Import";
 import DiscoveredVehicles from "@/pages/DiscoveredVehicles";
+import AddVehicle from "@/pages/AddVehicle"; // Import the new AddVehicle component
 import TokenStaking from "@/pages/TokenStaking";
 import TokensPage from "@/pages/Tokens";
 import ServiceHistory from "@/pages/ServiceHistory";
@@ -84,6 +85,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/tokens', element: <TokensPage />, type: RouteType.PROTECTED },
   { path: '/import', element: <Import />, type: RouteType.PROTECTED },
   { path: '/discovered-vehicles', element: <DiscoveredVehicles />, type: RouteType.PROTECTED },
+  { path: '/add-vehicle', element: <AddVehicle />, type: RouteType.PROTECTED }, // Add the new route
   { path: '/vehicle/:id', element: <VehicleDetail />, type: RouteType.PROTECTED },
   { path: '/profile', element: <Profile />, type: RouteType.PROTECTED },
   { path: '/team-members', element: <TeamMembers />, type: RouteType.PROTECTED },
