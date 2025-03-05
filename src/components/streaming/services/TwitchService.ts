@@ -3,90 +3,40 @@ import {
   fetchTwitchStreams, 
   fetchLiveStreams, 
   getUserInfo, 
-  setAuthToken, 
-  getAuthToken, 
-  clearAuthToken,
   startStream as apiStartStream,
   stopStream as apiStopStream
 } from './api/twitchApi';
+import { 
+  login as twitchLogin, 
+  logout as twitchLogout, 
+  isAuthenticated,
+  checkAuthResponse
+} from './auth/twitchAuth';
+import { 
+  getClientId, 
+  getRedirectUri, 
+  isConfigured 
+} from './config/twitchConfig';
 import { StreamMetadata, TwitchUserData } from './types';
 
 class TwitchService {
-  private clientId: string | null;
-  private redirectUri: string;
-
   constructor() {
-    // Get the client ID from environment variables
-    this.clientId = import.meta.env.VITE_TWITCH_CLIENT_ID || null;
-    
-    // Set the redirect URI for OAuth
-    this.redirectUri = `${window.location.origin}/streaming`;
-    
-    if (!this.clientId) {
-      console.warn('Twitch client ID is not configured. Some streaming features may not work.');
-    }
-    
     // Check URL for OAuth response
-    this.checkAuthResponse();
-  }
-
-  /**
-   * Check URL for OAuth response and handle the authentication flow
-   */
-  private checkAuthResponse() {
-    const hash = window.location.hash;
-    if (hash.includes('access_token')) {
-      // Parse the access token from URL fragment
-      const accessToken = hash.split('&')[0].split('=')[1];
-      if (accessToken) {
-        // Store the token
-        setAuthToken(accessToken);
-        
-        // Clear the URL fragment to avoid exposing the token
-        window.history.replaceState(
-          {}, 
-          document.title, 
-          window.location.pathname + window.location.search
-        );
-        
-        console.log('Successfully authenticated with Twitch');
-      }
-    }
+    checkAuthResponse();
   }
 
   /**
    * Initiate Twitch OAuth login flow
    */
   login() {
-    if (!this.isConfigured()) {
-      throw new Error('Twitch client ID is not configured');
-    }
-    
-    // Define required scopes for streaming
-    const scopes = [
-      'user:read:email',
-      'channel:read:stream_key',
-      'channel:manage:broadcast',
-      'channel:read:subscriptions'
-    ];
-    
-    // Build Twitch OAuth URL
-    const authUrl = new URL('https://id.twitch.tv/oauth2/authorize');
-    authUrl.searchParams.append('client_id', this.clientId as string);
-    authUrl.searchParams.append('redirect_uri', this.redirectUri);
-    authUrl.searchParams.append('response_type', 'token');
-    authUrl.searchParams.append('scope', scopes.join(' '));
-    
-    // Redirect to Twitch login
-    window.location.href = authUrl.toString();
+    twitchLogin();
   }
 
   /**
    * Logout from Twitch
    */
   logout() {
-    clearAuthToken();
-    console.log('Logged out from Twitch');
+    twitchLogout();
   }
 
   /**
@@ -190,28 +140,28 @@ class TwitchService {
    * Check if the user is authenticated with Twitch
    */
   isAuthenticated(): boolean {
-    return !!getAuthToken();
+    return isAuthenticated();
   }
   
   /**
    * Check if Twitch client ID is configured
    */
   isConfigured(): boolean {
-    return !!this.clientId;
+    return isConfigured();
   }
   
   /**
    * Get the client ID
    */
   getClientId(): string | null {
-    return this.clientId;
+    return getClientId();
   }
   
   /**
    * Get the redirect URI
    */
   getRedirectUri(): string {
-    return this.redirectUri;
+    return getRedirectUri();
   }
 }
 

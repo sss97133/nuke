@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ContentItem, FeedOptions } from './types';
 import { fetchContentByType } from './contentTypeFetcher';

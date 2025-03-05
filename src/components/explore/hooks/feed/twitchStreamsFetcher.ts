@@ -17,7 +17,7 @@ export const fetchTwitchStreams = async (searchTerm?: string) => {
       ? streams.filter(stream => 
           stream.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           stream.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          stream.game_name.toLowerCase().includes(searchTerm.toLowerCase())
+          (stream.game_name && stream.game_name.toLowerCase().includes(searchTerm.toLowerCase()))
         )
       : streams;
     
@@ -25,7 +25,7 @@ export const fetchTwitchStreams = async (searchTerm?: string) => {
     return filteredStreams.map(stream => ({
       id: stream.id,
       title: stream.title,
-      description: `Playing ${stream.game_name} with ${stream.viewer_count} viewers`,
+      description: `Playing ${stream.game_name || 'a game'} with ${stream.viewer_count} viewers`,
       image: stream.thumbnail_url.replace('{width}', '440').replace('{height}', '248'),
       url: `/streaming/watch/${stream.user_login}`,  // Link to in-app watch page instead of Twitch
       author: {
