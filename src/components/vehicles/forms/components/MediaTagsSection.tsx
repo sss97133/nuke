@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { UseFormReturn } from 'react-hook-form';
 import { VehicleFormValues } from '../types';
-import { ImageUpload } from './ImageUpload';
+import { ImageUpload } from './image-upload/ImageUpload';
 import { Info } from 'lucide-react';
 
 interface MediaTagsSectionProps {

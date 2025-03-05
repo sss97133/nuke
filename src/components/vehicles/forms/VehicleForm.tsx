@@ -21,15 +21,11 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
   isSubmitting,
   initialValues = {}
 }) => {
-  const form = useVehicleForm(initialValues);
-
-  const handleSubmit = async (values: VehicleFormValues) => {
-    await onSubmit(values);
-  };
+  const { form, handleSubmit } = useVehicleForm(onSubmit);
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Basic Information */}
           <BasicInformationSection form={form} />

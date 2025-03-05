@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { VehicleFormValues } from '../types';
 
-export const useVehicleForm = (onSubmit: (data: VehicleFormValues) => Promise<void>) => {
+export const useVehicleForm = (onSubmit: (data: VehicleFormValues) => Promise<void>, initialValues?: Partial<VehicleFormValues>) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Set up form with react-hook-form
@@ -16,11 +16,12 @@ export const useVehicleForm = (onSubmit: (data: VehicleFormValues) => Promise<vo
       mileage: '',
       image: [],
       tags: '',
+      ...initialValues
     }
   });
   
   // Process form submission
-  const handleSubmit = async (data: VehicleFormValues) => {
+  const processSubmit = async (data: VehicleFormValues) => {
     setIsSubmitting(true);
     
     try {
@@ -37,6 +38,6 @@ export const useVehicleForm = (onSubmit: (data: VehicleFormValues) => Promise<vo
   return {
     form,
     isSubmitting,
-    handleSubmit: form.handleSubmit(handleSubmit),
+    handleSubmit: form.handleSubmit(processSubmit),
   };
 };
