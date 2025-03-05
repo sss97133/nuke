@@ -1,6 +1,6 @@
 # Ownership and File Upload Components
 
-This documentation covers the newly added components for handling ownership information and file uploads.
+This documentation covers the components for handling ownership information and file uploads in the vehicle management system.
 
 ## Components Overview
 
@@ -17,7 +17,7 @@ The `FileUploader` component provides a user-friendly interface for uploading an
 - Maximum file limit enforcement
 
 ```tsx
-import { FileUploader } from '../components/FileUploader';
+import { FileUploader } from '../../../detail/image-upload/FileUploader';
 
 // Usage example
 const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -45,7 +45,24 @@ function handleFilesSelected(files: File[]) {
 | `acceptedFileTypes` | `string[]` | `['image/*', 'application/pdf']` | Array of MIME types to accept |
 | `maxFiles` | `number` | `5` | Maximum number of files allowed |
 
-### 2. OwnershipSection Component
+### 2. ImagePreview Component
+
+The `ImagePreview` component handles the display of uploaded files, showing image previews for images and type indicators for other file types.
+
+```tsx
+import { ImagePreview } from '../../../detail/image-upload/ImagePreview';
+
+// Usage example
+<ImagePreview file={myFile} />
+```
+
+#### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `file` | `File` | The file to preview |
+
+### 3. OwnershipSection Component
 
 The `OwnershipSection` component provides a complete interface for capturing ownership information for vehicles or other assets, featuring:
 
@@ -55,52 +72,70 @@ The `OwnershipSection` component provides a complete interface for capturing own
 - Context-specific help text for each ownership type
 
 ```tsx
-import { OwnershipSection, OwnershipData } from '../components/OwnershipSection';
+import { OwnershipSection } from '../components/vehicles/forms/components/OwnershipSection';
 
-// Usage example
-const [ownershipData, setOwnershipData] = useState<OwnershipData>({
-  status: 'owned',
-  documents: [],
-});
+// Usage example with a form library
+const form = {
+  getValues: () => ({ ownershipStatus: 'owned', documents: [] }),
+  setValue: (name, value) => console.log(`Setting ${name} to:`, value),
+  watch: (name) => form.getValues()[name]
+};
 
-function handleOwnershipChange(data: OwnershipData) {
-  setOwnershipData(data);
-  console.log('Ownership data updated:', data);
-}
-
-<OwnershipSection
-  value={ownershipData}
-  onChange={handleOwnershipChange}
-/>
+<OwnershipSection form={form} />
 ```
 
 #### Props
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `value` | `OwnershipData` | Current ownership data |
-| `onChange` | `(data: OwnershipData) => void` | Callback when ownership data changes |
+| `form` | Form object | Object with getValues, setValue, and watch methods (compatible with React Hook Form) |
 
-#### OwnershipData Interface
+## File Structure
 
-```tsx
-export type OwnershipStatus = 'owned' | 'claimed' | 'discovered';
+The components are organized in the following structure:
 
-export interface OwnershipData {
-  status: OwnershipStatus;
-  documents: File[];
-  purchaseDate?: string;
-  purchasePrice?: string;
-  purchaseLocation?: string;
-  discoveryDate?: string;
-  discoveryLocation?: string;
-  discoveryNotes?: string;
-}
+```
+src/
+├── components/
+│   ├── detail/
+│   │   └── image-upload/
+│   │       ├── FileUploader.tsx   # File upload component
+│   │       └── ImagePreview.tsx   # File preview component
+│   ├── ui/                        # UI components (buttons, inputs, etc.)
+│   └── vehicles/
+│       └── forms/
+│           └── components/
+│               └── OwnershipSection.tsx  # Vehicle ownership form section
 ```
 
 ## Implementation Example
 
-See the `VehicleFormExample.tsx` file in the `src/pages` directory for a complete implementation example.
+To use these components in a form:
+
+```tsx
+import { OwnershipSection } from '@/components/vehicles/forms/components/OwnershipSection';
+import { useForm } from 'react-hook-form';
+
+export default function VehicleForm() {
+  const form = useForm({
+    defaultValues: {
+      ownershipStatus: 'owned',
+      documents: [],
+    }
+  });
+
+  const onSubmit = form.handleSubmit((data) => {
+    console.log('Form submitted with data:', data);
+  });
+
+  return (
+    <form onSubmit={onSubmit}>
+      <OwnershipSection form={form} />
+      <button type="submit">Save Vehicle</button>
+    </form>
+  );
+}
+```
 
 ## Best Practices
 
@@ -111,7 +146,7 @@ See the `VehicleFormExample.tsx` file in the `src/pages` directory for a complet
 
 2. **Form Submission**:
    - Use FormData to handle file uploads with other form data
-   - Consider using React Hook Form for more complex form state management
+   - Consider using React Hook Form for complex form state management
    - Add proper validation before submission
 
 3. **Accessibility**:
