@@ -1,12 +1,11 @@
-
 import { useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
-import { useToast } from '@/hooks/use-toast';
-import { useFileValidation } from './useFileValidation';
-import { usePreviewManagement } from './usePreviewManagement';
 import { VehicleFormValues } from '../../../types';
+import { usePreviewManagement } from './usePreviewManagement';
+import { useFileValidation } from './useFileValidation';
+import { useToast } from '@/hooks/use-toast';
 
-interface UseFileUploadOptions {
+interface UseFileUploadProps {
   form: UseFormReturn<VehicleFormValues>;
   name: keyof VehicleFormValues;
   multiple?: boolean;
@@ -20,79 +19,129 @@ export const useFileUpload = ({
   multiple = false,
   maxSize = 5 * 1024 * 1024, // 5MB
   maxFiles = 10
-}: UseFileUploadOptions) => {
+}: UseFileUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
+  
+  // Utilize the preview management hook
+  const {
+    previewUrls,
+    createPreviews,
+    removePreview,
+    clearPreviews
+  } = usePreviewManagement();
+  
+  // Utilize the file validation hook
   const { validateFiles } = useFileValidation();
-  const { previewUrls, createPreviews, removePreview, clearPreviews } = usePreviewManagement();
-
-  // Process files for upload
-  const processFiles = (files: FileList) => {
-    const isValid = validateFiles(files, {
-      maxSize,
-      allowedTypes: ['image/'],
-      maxFiles: multiple ? maxFiles : 1
-    });
-    
-    if (!isValid) return;
-    
-    // Create preview URLs
-    const newPreviewUrls = createPreviews(files, multiple);
-    
-    // Simulate upload process
-    simulateUpload(newPreviewUrls);
-  };
   
-  // Simulate the upload process (in a real app, this would be an actual upload)
-  const simulateUpload = (previewUrls: string[]) => {
-    setIsUploading(true);
+  // Handle file selection from input
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
     
-    // In a real implementation, you would upload the files to your storage here
-    // For now, we'll simulate the upload with a timeout
-    setTimeout(() => {
-      // After "upload", set the URLs in the form
-      const imageValue = multiple 
-        ? previewUrls 
-        : previewUrls[0] || '';
-      
-      form.setValue(name as any, imageValue);
-      setIsUploading(false);
-      
-      toast({
-        title: 'Images uploaded',
-        description: `${previewUrls.length} image(s) have been uploaded successfully`,
-      });
-    }, 1500);
-  };
-  
-  // Handler for file input change events
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0) {
+      return;
+    }
     
     processFiles(files);
   };
   
-  // Clear a specific image
+  // Process files, validate them, create previews, and update form values
+  const processFiles = (files: FileList) => {
+    // Validate the files
+    const isValid = validateFiles(files, {
+      maxSize,
+      maxFiles: multiple ? maxFiles : 1,
+      allowedTypes: ['image/']
+    });
+    
+    if (!isValid) {
+      return;
+    }
+    
+    setIsUploading(true);
+    
+    try {
+      // Create preview URLs for the files
+      const newPreviews = createPreviews(files, multiple);
+      
+      // Convert files to data URLs for form values
+      const promises = Array.from(files).map(file => 
+        new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        })
+      );
+      
+      // Process all files and update form value
+      Promise.all(promises)
+        .then(dataUrls => {
+          // Update form value based on whether multiple is allowed
+          const currentValues = form.getValues(name as any);
+          
+          if (multiple) {
+            // If form value is already an array, append to it
+            if (Array.isArray(currentValues)) {
+              form.setValue(name as any, [...currentValues, ...dataUrls]);
+            } else {
+              // Otherwise, create a new array
+              form.setValue(name as any, dataUrls);
+            }
+          } else {
+            // For single file uploads, just set the first data URL
+            form.setValue(name as any, dataUrls[0]);
+          }
+          
+          toast({
+            title: multiple ? 'Images uploaded' : 'Image uploaded',
+            description: multiple ? `${dataUrls.length} files have been uploaded.` : 'Image has been uploaded.',
+            variant: 'default',
+          });
+        })
+        .catch(error => {
+          console.error('Error processing files:', error);
+          toast({
+            title: 'Upload failed',
+            description: 'There was an error processing the files.',
+            variant: 'destructive',
+          });
+        })
+        .finally(() => {
+          setIsUploading(false);
+        });
+    } catch (error) {
+      console.error('Error in file processing:', error);
+      setIsUploading(false);
+      toast({
+        title: 'Upload error',
+        description: 'An unexpected error occurred while processing the files.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Clear a specific image by index
   const clearImage = (index: number) => {
     removePreview(index);
     
-    if (multiple) {
-      const currentValue = form.watch(name as any) as string[];
-      const newValue = [...currentValue];
-      newValue.splice(index, 1);
-      form.setValue(name as any, newValue as any);
+    // Also update the form value
+    const currentValues = form.getValues(name as any);
+    if (Array.isArray(currentValues)) {
+      const newValues = [...currentValues];
+      newValues.splice(index, 1);
+      form.setValue(name as any, newValues);
     } else if (index === 0) {
-      form.setValue(name as any, '' as any);
+      // If it's the only image (index 0) and not an array
+      form.setValue(name as any, '');
     }
   };
   
   // Clear all images
   const clearAllImages = () => {
     clearPreviews();
-    form.setValue(name as any, multiple ? [] as any : '' as any);
+    form.setValue(name as any, multiple ? [] : '');
   };
-
+  
   return {
     isUploading,
     previewUrls,

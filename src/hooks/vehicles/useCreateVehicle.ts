@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { VehicleFormValues } from '@/components/vehicles/forms/types';
+import { addStoredVehicle, addVehicleRelationship } from './mockVehicleStorage';
 
 export function useCreateVehicle() {
   const { toast } = useToast();
@@ -35,14 +36,41 @@ export function useCreateVehicle() {
           : [],
       };
 
-      // For now, we're mocking the database insert
       console.log('Creating vehicle with data:', processedVehicle);
       
       // In a real app, we would send to Supabase
       // const { data, error } = await supabase.from('vehicles').insert([processedVehicle]).select();
       // if (error) throw error;
       
-      // Return mocked data
+      // For now, use our mock storage system
+      const newVehicle = addStoredVehicle({
+        id: Date.now(), // Use timestamp as ID
+        make: processedVehicle.make,
+        model: processedVehicle.model,
+        year: processedVehicle.year || new Date().getFullYear(),
+        trim: processedVehicle.trim || '',
+        price: processedVehicle.purchase_price ? Number(processedVehicle.purchase_price) : undefined,
+        market_value: processedVehicle.market_value ? Number(processedVehicle.market_value) : undefined,
+        price_trend: 'stable',
+        mileage: processedVehicle.mileage ? Number(processedVehicle.mileage) : 0,
+        image: processedVehicle.image || '/placeholder-vehicle.jpg',
+        location: processedVehicle.location || 'Unknown',
+        added: 'just now',
+        tags: vehicle.tags ? vehicle.tags.split(',').map(tag => tag.trim()) : [],
+        condition_rating: 7,
+        vehicle_type: processedVehicle.body_style || 'car',
+        body_type: processedVehicle.body_style || '',
+        transmission: processedVehicle.transmission || '',
+        drivetrain: processedVehicle.drivetrain || '',
+        rarity_score: 5,
+        era: getEraFromYear(processedVehicle.year),
+        restoration_status: 'original',
+        special_edition: false
+      });
+      
+      // Create relationship between user and vehicle
+      addVehicleRelationship(vehicle.user_id, newVehicle.id, 'discovered');
+      
       return {
         id: `vehicle_${Date.now()}`,
         ...processedVehicle
@@ -69,4 +97,17 @@ export function useCreateVehicle() {
     isCreating: mutation.isPending,
     error: mutation.error,
   };
+}
+
+// Helper function to determine era from year
+function getEraFromYear(year: number | null): string {
+  if (!year) return '';
+  
+  if (year < 1950) return 'Vintage';
+  if (year < 1970) return '60s';
+  if (year < 1980) return '70s';
+  if (year < 1990) return '80s';
+  if (year < 2000) return '90s';
+  if (year < 2010) return '2000s';
+  return 'Modern';
 }

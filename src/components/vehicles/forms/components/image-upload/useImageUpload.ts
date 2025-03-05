@@ -35,6 +35,8 @@ export const useImageUpload = ({
 
   // Convert the form value to preview URLs if necessary
   const formValue = form.watch(name as any);
+  
+  // Process the display URLs based on available data
   const displayUrls = previewUrls.length > 0 ? previewUrls : (
     Array.isArray(formValue) ? formValue : (formValue ? [formValue] : [])
   );
