@@ -128,7 +128,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                       <p className="text-sm text-muted-foreground">
                         {isUploading ? 'Uploading...' : 'Click to upload an image'}
                       </p>
-                      <Button type="button" variant="outline" size="sm" className="mt-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => document.getElementById(`${name}-upload`)?.click()}
+                      >
                         <Upload className="h-4 w-4 mr-2" />
                         Select Image
                       </Button>
