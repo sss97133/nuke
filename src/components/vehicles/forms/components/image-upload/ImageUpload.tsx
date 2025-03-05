@@ -14,6 +14,8 @@ interface ImageUploadProps {
   label: string;
   description?: string;
   multiple?: boolean;
+  maxSize?: number;
+  maxFiles?: number;
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -21,7 +23,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   name,
   label,
   description,
-  multiple = false
+  multiple = false,
+  maxSize,
+  maxFiles
 }) => {
   const {
     displayUrls,
@@ -30,7 +34,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     processFiles,
     clearAllImages,
     clearImage
-  } = useImageUpload({ form, name, multiple });
+  } = useImageUpload({ 
+    form, 
+    name, 
+    multiple,
+    maxSize,
+    maxFiles
+  });
   
   return (
     <FormField
