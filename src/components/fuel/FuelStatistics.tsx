@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,21 +6,19 @@ import { useFuelData } from "@/hooks/fuel/useFuelData";
 
 interface FuelStatisticsProps {
   vehicleId?: string;
+  refreshTrigger?: number;
 }
 
-export const FuelStatistics = ({ vehicleId }: FuelStatisticsProps) => {
-  const { statistics, isLoading } = useFuelData(vehicleId);
+export const FuelStatistics = ({ vehicleId, refreshTrigger }: FuelStatisticsProps) => {
+  const { statistics, isLoading } = useFuelData(vehicleId, refreshTrigger);
   const [timeRange, setTimeRange] = useState("month");
   
-  // Function to get trend icon based on trend value
   const getTrendIcon = (trend?: 'up' | 'down' | 'stable') => {
     if (trend === 'up') return <TrendingUp className="h-4 w-4 text-green-500" />;
     if (trend === 'down') return <TrendingDown className="h-4 w-4 text-red-500" />;
     return <Minus className="h-4 w-4 text-gray-400" />;
   };
 
-  // Apply multipliers for different time ranges
-  // This is a simplification - in a real app you would filter data by date
   const getMultiplier = () => {
     switch (timeRange) {
       case 'month': return 1;
@@ -31,7 +28,6 @@ export const FuelStatistics = ({ vehicleId }: FuelStatisticsProps) => {
     }
   };
 
-  // Get adjusted statistics based on time range
   const getAdjustedStats = () => {
     if (!statistics) return null;
     
@@ -50,7 +46,6 @@ export const FuelStatistics = ({ vehicleId }: FuelStatisticsProps) => {
     };
   };
 
-  // If loading, show a loading state
   if (isLoading) {
     return (
       <Card>
@@ -67,7 +62,6 @@ export const FuelStatistics = ({ vehicleId }: FuelStatisticsProps) => {
     );
   }
 
-  // If no statistics available, show placeholder
   if (!statistics) {
     return (
       <Card>

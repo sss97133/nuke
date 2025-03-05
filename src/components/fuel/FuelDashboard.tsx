@@ -59,7 +59,11 @@ export const FuelDashboard = () => {
   );
 };
 
-const FuelConsumptionChart = ({ refreshTrigger }: { refreshTrigger: number }) => {
+interface FuelConsumptionChartProps {
+  refreshTrigger: number;
+}
+
+const FuelConsumptionChart = ({ refreshTrigger }: FuelConsumptionChartProps) => {
   // This would normally fetch data based on the refreshTrigger
   
   return (

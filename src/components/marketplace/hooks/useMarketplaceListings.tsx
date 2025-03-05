@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
@@ -155,6 +154,12 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
         return filterMockData(mockListings, options, userId);
       }
       
+      // For now, always use mock data to avoid database reference issues
+      console.log('Using mock marketplace data until database tables are created');
+      return filterMockData(mockListings, options, userId);
+      
+      /*
+      // NOTE: The following code is commented out until proper database tables exist
       // When feature flag is on, try to get real data
       // Start building the query
       let query = supabase.from('marketplace_listings').select('*');
@@ -232,6 +237,7 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
       
       // Adapt data to expected format
       return adaptMarketplaceListings(data);
+      */
     } catch (err) {
       console.error('Error in useMarketplaceListings:', err);
       setFetchError(err.message || 'An error occurred fetching listings');

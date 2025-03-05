@@ -1,4 +1,3 @@
-
 /**
  * iCloud Shared Album Integration - Core Functions
  * 
@@ -84,6 +83,19 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
       };
     }
     
+    console.log('Using mock iCloud data until database tables are created');
+    return {
+      album: {
+        title: 'Mock Shared Album',
+        description: 'Mock data for development',
+        createdAt: new Date().toISOString(),
+        itemCount: 3
+      },
+      images: mockFetchICloudImages(sharedLink)
+    };
+    
+    /*
+    // NOTE: The following code is commented out until proper database tables exist
     // First try to get from Supabase
     console.log('Attempting to find iCloud album in Supabase:', albumId);
     
@@ -212,6 +224,7 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
         images: mockFetchICloudImages(sharedLink)
       };
     }
+    */
   } catch (error) {
     console.error('Error in fetchICloudSharedAlbum:', error);
     

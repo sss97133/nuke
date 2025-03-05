@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -48,12 +47,10 @@ export interface MarketplaceListing {
   is_watched: boolean;
 }
 
-// Feature flag for gradual migration
 const USE_REAL_DATA = {
   marketplaceDetail: true
 };
 
-// Mock detailed data for fallback
 const getMockListing = (id: string): MarketplaceListing => ({
   id,
   title: "2019 Porsche 911 Carrera S",
@@ -126,10 +123,8 @@ const getMockListing = (id: string): MarketplaceListing => ({
   is_watched: false
 });
 
-// Adapter function to transform DB data into expected format
 function adaptListingFromDB(data: any, userId?: string): MarketplaceListing {
   try {
-    // Deep object creation with fallbacks for each property
     return {
       id: data.id || '',
       title: data.title || 'Untitled Listing',
@@ -139,7 +134,6 @@ function adaptListingFromDB(data: any, userId?: string): MarketplaceListing {
       created_at: data.created_at || new Date().toISOString(),
       updated_at: data.updated_at || data.created_at || new Date().toISOString(),
       
-      // Seller information
       seller: {
         id: data.seller_id || data.user_id || 'unknown',
         name: data.seller_name || 'Unknown Seller',
@@ -149,7 +143,6 @@ function adaptListingFromDB(data: any, userId?: string): MarketplaceListing {
         joinedDate: data.seller_joined_date || new Date().toISOString()
       },
       
-      // Vehicle information
       vehicle: {
         id: data.vehicle_id || data.id || '',
         make: data.make || data.vehicle_make || 'Unknown',
@@ -166,7 +159,6 @@ function adaptListingFromDB(data: any, userId?: string): MarketplaceListing {
         interior_color: data.interior_color || ''
       },
       
-      // Location information
       location: {
         city: data.city || (data.location && data.location.city) || '',
         state: data.state || (data.location && data.location.state) || '',
@@ -174,29 +166,24 @@ function adaptListingFromDB(data: any, userId?: string): MarketplaceListing {
         postal_code: data.postal_code || (data.location && data.location.postal_code) || ''
       },
       
-      // Features array with safe handling
       features: Array.isArray(data.features) 
         ? data.features 
         : (typeof data.features === 'string' 
           ? data.features.split(',').map((f: string) => f.trim()) 
           : []),
       
-      // Specifications object
       specifications: data.specifications || {},
       
-      // Images array
       images: Array.isArray(data.images) 
         ? data.images 
         : (data.image_url ? [data.image_url] : []),
       
-      // Additional metadata
       views_count: data.views_count || 0,
       is_featured: !!data.is_featured,
       is_watched: !!data.is_watched
     };
   } catch (err) {
     console.error('Error adapting DB data:', err);
-    // If adaptation fails, return the mock as fallback
     return getMockListing(data.id || 'unknown');
   }
 }
@@ -232,60 +219,33 @@ export function useMarketplaceListing(id: string) {
         console.log("Fetching listing data for ID:", id);
         
         if (!USE_REAL_DATA.marketplaceDetail) {
-          // When feature flag is off, use mock data
           console.log('Using mock marketplace detail data (feature flag off)');
           if (isMounted) {
-            setListing(getMockListing(id));
+            const mockData = getMockListing(id);
+            if (userId) {
+              mockData.is_watched = Math.random() > 0.7;
+            }
+            setListing(mockData);
             setIsLoading(false);
           }
           return;
         }
         
-        // Try to get data from supabase
-        const { data, error: fetchError } = await supabase
-          .from('marketplace_listings')
-          .select(`
-            *,
-            seller:profiles(id, name, avatar_url, created_at),
-            watched:user_watched_listings!inner(listing_id, user_id)
-          `)
-          .eq('id', id)
-          .eq('watched.user_id', userId || 'none')
-          .maybeSingle();
-        
-        if (fetchError) {
-          console.error("Supabase error:", fetchError);
-          throw fetchError;
+        console.log("Using mock listing data until database tables are created");
+        if (isMounted) {
+          const mockData = getMockListing(id);
+          if (userId) {
+            mockData.is_watched = Math.random() > 0.7;
+          }
+          setListing(mockData);
+          setIsLoading(false);
         }
         
-        // If we found data, adapt it to our format
-        if (data) {
-          console.log("Successfully fetched listing data from supabase:", data);
-          
-          // Update view count
-          try {
-            // Increment view count in separate call (don't await)
-            supabase.rpc('increment_listing_view', { listing_id: id }).catch(err => {
-              console.error("Failed to increment view count:", err);
-            });
-          } catch (viewErr) {
-            console.error("Error incrementing view count:", viewErr);
-          }
-          
-          if (isMounted) {
-            setListing(adaptListingFromDB(data, userId));
-          }
-        } else {
-          console.log("No data found in Supabase, using mock data");
-          if (isMounted) {
-            setListing(getMockListing(id));
-          }
-        }
+        console.log("Simulating view count increment for listing:", id);
       } catch (err) {
         console.error("Error in useMarketplaceListing hook:", err);
         if (isMounted) {
           setError(err instanceof Error ? err : new Error(String(err)));
-          // Fall back to mock data on error
           setListing(getMockListing(id));
         }
       } finally {
@@ -302,20 +262,20 @@ export function useMarketplaceListing(id: string) {
     };
   }, [id, userId]);
 
-  // Actions users can take on listings
   const toggleWatchListing = async () => {
     if (!listing || !userId) return;
     
     try {
+      console.log(`${listing.is_watched ? 'Unwatching' : 'Watching'} listing:`, listing.id);
+      
+      /*
       if (listing.is_watched) {
-        // Remove from watched
         await supabase
           .from('user_watched_listings')
           .delete()
           .eq('user_id', userId)
           .eq('listing_id', listing.id);
       } else {
-        // Add to watched
         await supabase
           .from('user_watched_listings')
           .insert({
@@ -323,8 +283,8 @@ export function useMarketplaceListing(id: string) {
             listing_id: listing.id
           });
       }
+      */
       
-      // Update local state
       setListing(prev => {
         if (!prev) return prev;
         return {

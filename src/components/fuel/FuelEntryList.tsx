@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,11 +19,12 @@ import {
 interface FuelEntryListProps {
   vehicleId?: string;
   onEdit?: (id: string) => void;
+  refreshTrigger?: number;
 }
 
-export const FuelEntryList = ({ vehicleId, onEdit }: FuelEntryListProps) => {
+export const FuelEntryList = ({ vehicleId, onEdit, refreshTrigger }: FuelEntryListProps) => {
   const { toast } = useToast();
-  const { entries, isLoading, error, deleteFuelEntry } = useFuelData(vehicleId);
+  const { entries, isLoading, error, deleteFuelEntry } = useFuelData(vehicleId, refreshTrigger);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
 
@@ -187,7 +187,6 @@ export const FuelEntryList = ({ vehicleId, onEdit }: FuelEntryListProps) => {
         </Table>
       </div>
       
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={closeDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
