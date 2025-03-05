@@ -1,132 +1,68 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export type VehicleRelationshipType = 'discovered' | 'claimed' | 'verified';
-
-export interface VehicleRelationship {
+// Types for vehicle relationships
+interface VehicleRelationship {
   id: string;
-  userId: string;
-  vehicleId: string;
-  relationshipType: VehicleRelationshipType;
-  createdAt: string;
-  updatedAt: string;
+  vehicle_id: string;
+  user_id: string;
+  relationship_type: 'owned' | 'discovered' | 'claimed';
+  created_at: string;
 }
 
-export interface Vehicle {
+interface RelatedVehicle {
   id: string;
   make: string;
   model: string;
   year: number;
-  image_url?: string;
-  status?: string;
-  relationship?: VehicleRelationshipType;
+  relationship_type: 'owned' | 'discovered' | 'claimed';
 }
 
-export const useVehicleRelationships = (userId?: string) => {
-  const [vehicles, setVehicles] = useState<{
-    discovered: Vehicle[];
-    claimed: Vehicle[];
-    verified: Vehicle[];
-    all: Vehicle[];
-  }>({
-    discovered: [],
-    claimed: [],
-    verified: [],
-    all: []
-  });
+export function useVehicleRelationships(userId: string) {
+  const [relationships, setRelationships] = useState<RelatedVehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchVehicleRelationships = async () => {
-      if (!userId) {
-        setIsLoading(false);
-        return;
-      }
-
+    const fetchRelationships = async () => {
       setIsLoading(true);
       setError(null);
-
+      
       try {
-        // Get all relationships for this user
-        const { data: relationships, error: relationshipsError } = await supabase
-          .from('vehicle_relationships')
-          .select('*')
+        // For now, we'll just fetch vehicles and simulate relationships
+        // Until the actual vehicle_relationships table is created
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('id, make, model, year, status')
           .eq('user_id', userId);
-
-        if (relationshipsError) throw relationshipsError;
-
-        if (relationships && relationships.length > 0) {
-          // Get all the vehicle ids
-          const vehicleIds = relationships.map(rel => rel.vehicle_id);
-          
-          // Fetch the vehicles
-          const { data: vehiclesData, error: vehiclesError } = await supabase
-            .from('vehicles')
-            .select('*')
-            .in('id', vehicleIds);
-            
-          if (vehiclesError) throw vehiclesError;
-          
-          // Map vehicles to their relationship types
-          const vehicleMap = new Map<string, Vehicle & { relationship: VehicleRelationshipType }>();
-          
-          if (vehiclesData) {
-            vehiclesData.forEach(vehicle => {
-              const relationship = relationships.find(rel => rel.vehicle_id === vehicle.id);
-              if (relationship) {
-                vehicleMap.set(vehicle.id, {
-                  ...vehicle,
-                  relationship: relationship.relationship_type as VehicleRelationshipType
-                });
-              }
-            });
-          }
-          
-          // Organize by relationship type
-          const discovered: Vehicle[] = [];
-          const claimed: Vehicle[] = [];
-          const verified: Vehicle[] = [];
-          const all: Vehicle[] = [];
-          
-          vehicleMap.forEach(vehicle => {
-            all.push(vehicle);
-            
-            if (vehicle.relationship === 'discovered') {
-              discovered.push(vehicle);
-            } else if (vehicle.relationship === 'claimed') {
-              claimed.push(vehicle);
-            } else if (vehicle.relationship === 'verified') {
-              verified.push(vehicle);
-            }
-          });
-          
-          setVehicles({
-            discovered,
-            claimed,
-            verified,
-            all
-          });
-        }
+        
+        if (error) throw error;
+        
+        // Transform vehicles into relationships
+        const vehicleRelationships: RelatedVehicle[] = data.map(vehicle => ({
+          id: vehicle.id,
+          make: vehicle.make,
+          model: vehicle.model,
+          year: vehicle.year,
+          relationship_type: (vehicle.status as 'owned' | 'discovered' | 'claimed') || 'discovered'
+        }));
+        
+        setRelationships(vehicleRelationships);
       } catch (err) {
-        console.error('Error fetching vehicle relationships:', err);
-        setError(err instanceof Error ? err : new Error(String(err)));
+        console.error("Error fetching vehicle relationships:", err);
+        setError("Failed to load vehicle relationships");
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchVehicleRelationships();
+    
+    fetchRelationships();
   }, [userId]);
-
+  
   return {
-    vehicles,
+    relationships,
     isLoading,
-    error,
-    refetch: () => {
-      setIsLoading(true);
-      setError(null);
-      // Trigger re-render which will call the useEffect again
-    }
+    error
   };
-};
+}

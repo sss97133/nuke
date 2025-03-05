@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { type CarouselApi } from "@/components/ui/carousel";
@@ -13,6 +12,9 @@ export const useOnboardingCarousel = () => {
   const { isCompleted, currentStep, updateOnboardingStep, completeOnboarding, isLoading } = useOnboarding();
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Adding completedSteps array - matching the expected pattern in Onboarding.tsx
+  const completedSteps = currentStep > 0 ? Array.from({ length: currentStep }, (_, i) => i) : [];
   
   useEffect(() => {
     if (!api) return;
@@ -80,6 +82,7 @@ export const useOnboardingCarousel = () => {
     current,
     loading,
     isCompleted,
+    completedSteps,
     handleNext
   };
 };

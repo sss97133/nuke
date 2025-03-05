@@ -47,9 +47,9 @@ export const VehicleCollection = ({ userId, isOwnProfile, filter = 'all' }: Vehi
           .eq('user_id', userId);
 
         if (filter === 'owned') {
-          query = query.eq('ownership_status', 'owned');
+          query = query.eq('status', 'owned');
         } else if (filter === 'discovered') {
-          query = query.eq('ownership_status', 'discovered');
+          query = query.eq('status', 'discovered');
         } else if (filter === 'recent') {
           // No additional filter, just sort by most recent
         }
@@ -58,7 +58,21 @@ export const VehicleCollection = ({ userId, isOwnProfile, filter = 'all' }: Vehi
         const { data, error } = await query.order(orderColumn, { ascending: false });
         
         if (error) throw error;
-        setVehicles(data || []);
+        
+        const mappedVehicles: Vehicle[] = (data || []).map(vehicle => ({
+          id: vehicle.id,
+          make: vehicle.make,
+          model: vehicle.model,
+          year: vehicle.year,
+          trim: vehicle.trim,
+          color: vehicle.color,
+          image_url: vehicle.icloud_album_link || vehicle.vin_image_url,
+          vehicle_stats: vehicle.vehicle_stats,
+          ownership_status: (vehicle.status as 'owned' | 'discovered' | 'claimed') || 'discovered',
+          is_serviced: false,
+        }));
+        
+        setVehicles(mappedVehicles);
       } catch (error) {
         console.error('Error fetching vehicles:', error);
       } finally {

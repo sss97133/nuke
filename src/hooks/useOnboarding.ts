@@ -2,15 +2,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-// Define a type for the onboarding data returned from the database
-interface OnboardingData {
-  user_id: string;
-  is_completed: boolean;
-  current_step: number;
-  total_steps: number;
-  updated_at: string;
-}
-
 export function useOnboarding() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,7 +23,7 @@ export function useOnboarding() {
         
         setUserId(session.user.id);
         
-        // Check if the onboarding table exists by querying it
+        // Check if the profiles table has onboarding data
         const { data, error } = await supabase
           .from('profiles')
           .select('onboarding_completed, onboarding_step')
