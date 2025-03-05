@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Card, 
@@ -13,12 +13,17 @@ import {
   MessageSquare, 
   Clock, 
   MapPin,
-  Heart
+  Heart,
+  Lock
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from '@/hooks/use-auth';
+import { useWatchlist } from '@/hooks/useWatchlist';
+import { useAtom } from 'jotai';
+import { authRequiredModalAtom } from '@/components/auth/AuthRequiredModal';
 
 interface ListingCardProps {
   id: string;
@@ -47,16 +52,37 @@ export const ListingCard = ({
 }: ListingCardProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [isWatched, setIsWatched] = React.useState(false);
+  const { session } = useAuth();
+  const [, setAuthModal] = useAtom(authRequiredModalAtom);
+  const { isWatched, toggleWatchlist } = useWatchlist();
+  
+  const isAuthenticated = !!session;
+  const isItemWatched = isWatched(id, 'listing');
   
   const handleWatchToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    setIsWatched(!isWatched);
+    // If not authenticated, show auth modal
+    if (!isAuthenticated) {
+      setAuthModal({
+        isOpen: true,
+        message: "Sign in to add listings to your watchlist",
+        actionType: "watch"
+      });
+      return;
+    }
+    
+    // Toggle item in watchlist
+    const wasWatched = isItemWatched;
+    toggleWatchlist(id, 'listing');
+    
+    // Show toast notification
     toast({
-      title: isWatched ? "Removed from watchlist" : "Added to watchlist",
-      description: isWatched ? "This listing has been removed from your watchlist." : "This listing has been added to your watchlist.",
+      title: wasWatched ? "Removed from watchlist" : "Added to watchlist",
+      description: wasWatched 
+        ? "This listing has been removed from your watchlist." 
+        : "This listing has been added to your watchlist. We'll notify you of any updates.",
     });
   };
   
@@ -132,11 +158,20 @@ export const ListingCard = ({
           className="p-0 h-auto"
           onClick={handleWatchToggle}
         >
-          <Heart 
-            className="h-4 w-4 mr-1" 
-            fill={isWatched ? "currentColor" : "none"} 
-          />
-          <span className="text-xs">{isWatched ? "Watching" : "Watch"}</span>
+          {!isAuthenticated ? (
+            <>
+              <Lock className="h-4 w-4 mr-1" />
+              <span className="text-xs">Watch</span>
+            </>
+          ) : (
+            <>
+              <Heart 
+                className="h-4 w-4 mr-1" 
+                fill={isItemWatched ? "currentColor" : "none"} 
+              />
+              <span className="text-xs">{isItemWatched ? "Watching" : "Watch"}</span>
+            </>
+          )}
         </Button>
       </CardFooter>
     </Card>
