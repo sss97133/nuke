@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import UserProfileHeader from "../UserProfileHeader";
@@ -14,6 +13,17 @@ import VehicleCollectionTabs from './VehicleCollectionTabs';
 interface ProfileContentContainerProps {
   userId: string;
   isOwnProfile: boolean;
+}
+
+interface ProfileMetrics {
+  user_type: 'viewer' | 'professional';
+  reputation_score: number;
+  achievements_count: number;
+  viewer_percentile: number;
+  owner_percentile?: number;
+  technician_percentile?: number;
+  investor_percentile?: number;
+  discovery_count: number;
 }
 
 export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContentContainerProps) => {
@@ -41,7 +51,7 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
             username: data.username,
             full_name: data.full_name,
             avatar_url: data.avatar_url,
-            bio: data.bio,
+            bio: data.bio || '',
             user_type: data.user_type || 'viewer',
             reputation_score: data.reputation_score,
             created_at: data.created_at,
@@ -64,7 +74,7 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
         const { data, error } = await supabase
           .from('vehicles')
           .select('*')
-          .eq('owner_id', userId)
+          .eq('user_id', userId)
           .order('created_at', { ascending: false });
           
         if (error) throw error;
@@ -100,21 +110,8 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
     );
   }
 
-  const socialLinks = profileData.social_links || {
-    twitter: '',
-    instagram: '',
-    linkedin: '',
-    github: ''
-  };
-  
-  const streamingLinks = profileData.streaming_links || {
-    twitch: '',
-    youtube: '',
-    tiktok: ''
-  };
-
-  const profileMetrics = {
-    user_type: profileData.user_type || 'viewer',
+  const profileMetrics: ProfileMetrics = {
+    user_type: profileData.user_type,
     reputation_score: profileData.reputation_score || 0,
     achievements_count: 0, // This would come from actual data
     viewer_percentile: 50, // Sample percentile
@@ -131,7 +128,7 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
         fullName={profileData.full_name || ''}
         username={profileData.username || ''}
         avatarUrl={profileData.avatar_url || undefined}
-        bio={profileData.bio || ''}
+        bio={profileData.bio}
         isOwnProfile={isOwnProfile}
       />
       
@@ -189,7 +186,7 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
                 <CardContent className="p-6">
                   <h3 className="font-semibold mb-2">Social Links</h3>
                   <div className="space-y-2">
-                    {Object.entries(socialLinks).map(([platform, url]) => 
+                    {Object.entries(profileData.social_links || {}).map(([platform, url]) => 
                       url ? (
                         <div key={platform} className="flex items-center justify-between">
                           <span className="capitalize">{platform}</span>

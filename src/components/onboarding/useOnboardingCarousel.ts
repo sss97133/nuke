@@ -10,7 +10,7 @@ export const useOnboardingCarousel = () => {
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(true);
   const [carouselReady, setCarouselReady] = useState(false);
-  const { isCompleted, currentStep, completedSteps, updateOnboardingStep, completeOnboarding, isLoading } = useOnboarding();
+  const { isCompleted, currentStep, updateOnboardingStep, completeOnboarding, isLoading } = useOnboarding();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -79,7 +79,6 @@ export const useOnboardingCarousel = () => {
     setApi,
     current,
     loading,
-    completedSteps,
     isCompleted,
     handleNext
   };

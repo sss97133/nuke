@@ -15,16 +15,16 @@ export function useCreateVehicle() {
       const processedVehicle = {
         ...vehicle,
         // Convert numeric strings to numbers where appropriate
-        year: vehicle.year ? parseInt(vehicle.year, 10) || null : null,
-        mileage: vehicle.mileage ? parseInt(vehicle.mileage, 10) || null : null,
+        year: vehicle.year ? Number(vehicle.year) || null : null,
+        mileage: vehicle.mileage ? Number(vehicle.mileage) || null : null,
         purchase_price: vehicle.purchase_price ? parseFloat(vehicle.purchase_price) || null : null,
-        weight: vehicle.weight ? parseFloat(vehicle.weight) || null : null,
-        top_speed: vehicle.top_speed ? parseFloat(vehicle.top_speed) || null : null,
-        doors: vehicle.doors ? parseInt(vehicle.doors, 10) || null : null,
-        seats: vehicle.seats ? parseInt(vehicle.seats, 10) || null : null,
+        weight: vehicle.weight ? Number(vehicle.weight) || null : null,
+        top_speed: vehicle.top_speed ? Number(vehicle.top_speed) || null : null,
+        doors: vehicle.doors ? Number(vehicle.doors) || null : null,
+        seats: vehicle.seats ? Number(vehicle.seats) || null : null,
         
         // Add default market analysis fields - these should be calculated properly in a real app
-        market_value: vehicle.purchase_price ? parseFloat(vehicle.purchase_price) * 1.1 : null,
+        market_value: vehicle.purchase_price ? parseFloat(vehicle.purchase_price as string) * 1.1 : null,
         
         // Handle image (could be string or array)
         image: Array.isArray(vehicle.image) && vehicle.image.length > 0 ? vehicle.image[0] : 
@@ -54,7 +54,7 @@ export function useCreateVehicle() {
         price_trend: 'stable',
         mileage: processedVehicle.mileage ? Number(processedVehicle.mileage) : 0,
         image: processedVehicle.image || '/placeholder-vehicle.jpg',
-        location: processedVehicle.location || (vehicle.discovery_location || 'Unknown'),
+        location: vehicle.discovery_location || 'Unknown',
         added: 'just now',
         tags: vehicle.tags || [],
         condition_rating: 7,

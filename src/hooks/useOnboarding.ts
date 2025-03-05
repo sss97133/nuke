@@ -2,6 +2,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+// Define a type for the onboarding data returned from the database
+interface OnboardingData {
+  user_id: string;
+  is_completed: boolean;
+  current_step: number;
+  total_steps: number;
+  updated_at: string;
+}
+
 export function useOnboarding() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,23 +32,22 @@ export function useOnboarding() {
         
         setUserId(session.user.id);
         
-        // Check onboarding status
+        // Check if the onboarding table exists by querying it
         const { data, error } = await supabase
-          .from('onboarding')
-          .select('*')
-          .eq('user_id', session.user.id)
+          .from('profiles')
+          .select('onboarding_completed, onboarding_step')
+          .eq('id', session.user.id)
           .single();
           
-        if (error && error.code !== 'PGRST116') {
+        if (error) {
           console.error('Error checking onboarding status:', error);
           setIsLoading(false);
           return;
         }
         
         if (data) {
-          setIsCompleted(data.is_completed || false);
-          setCurrentStep(data.current_step || 0);
-          setTotalSteps(data.total_steps || 5);
+          setIsCompleted(data.onboarding_completed || false);
+          setCurrentStep(data.onboarding_step || 0);
         }
       } catch (error) {
         console.error('Unexpected error checking onboarding:', error);
@@ -56,14 +64,13 @@ export function useOnboarding() {
     
     try {
       const { error } = await supabase
-        .from('onboarding')
-        .upsert({
-          user_id: userId,
-          current_step: step,
-          is_completed: completed,
-          total_steps: totalSteps,
+        .from('profiles')
+        .update({
+          onboarding_step: step,
+          onboarding_completed: completed,
           updated_at: new Date().toISOString()
-        });
+        })
+        .eq('id', userId);
         
       if (error) throw error;
       

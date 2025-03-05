@@ -1,19 +1,19 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 
-export interface ProfileInsightsProps {
+interface ProfileInsightsProps {
   userId: string;
 }
 
-export const ProfileInsights: React.FC<ProfileInsightsProps> = ({ userId }) => {
+export const ProfileInsights = ({ userId }: ProfileInsightsProps) => {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Profile Insights</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p>Insights for user {userId} will be displayed here.</p>
+      <CardContent className="p-6">
+        <h3 className="font-semibold mb-4">Profile Insights</h3>
+        <p className="text-muted-foreground">
+          This section will display insights about the user's profile and activity.
+        </p>
       </CardContent>
     </Card>
   );

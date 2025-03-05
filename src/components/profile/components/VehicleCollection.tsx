@@ -8,6 +8,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+interface VehicleStats {
+  likes_count: number;
+  views_count: number;
+}
+
+interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  trim?: string;
+  color?: string;
+  image_url?: string;
+  vehicle_stats?: VehicleStats;
+  ownership_status: 'owned' | 'discovered' | 'claimed';
+  is_serviced?: boolean;
+}
+
 interface VehicleCollectionProps {
   userId: string;
   isOwnProfile: boolean;
@@ -15,7 +33,7 @@ interface VehicleCollectionProps {
 }
 
 export const VehicleCollection = ({ userId, isOwnProfile, filter = 'all' }: VehicleCollectionProps) => {
-  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -26,7 +44,7 @@ export const VehicleCollection = ({ userId, isOwnProfile, filter = 'all' }: Vehi
         let query = supabase
           .from('vehicles')
           .select('*, vehicle_stats(*)')
-          .eq('owner_id', userId);
+          .eq('user_id', userId);
 
         if (filter === 'owned') {
           query = query.eq('ownership_status', 'owned');
@@ -113,7 +131,7 @@ export const VehicleCollection = ({ userId, isOwnProfile, filter = 'all' }: Vehi
 };
 
 interface VehicleCardProps {
-  vehicle: any;
+  vehicle: Vehicle;
   isOwner: boolean;
 }
 

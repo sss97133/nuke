@@ -1,28 +1,23 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 
 export interface UserDevelopmentSpectrumProps {
   userId: string;
   categories: string[];
 }
 
-export const UserDevelopmentSpectrum: React.FC<UserDevelopmentSpectrumProps> = ({ 
-  userId, 
-  categories = ['knowledge', 'skills', 'experience'] 
-}) => {
+export const UserDevelopmentSpectrum = ({ userId, categories }: UserDevelopmentSpectrumProps) => {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Development Spectrum</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p>Development spectrum for user {userId} will be displayed here.</p>
-        <ul>
-          {categories.map(category => (
-            <li key={category}>{category}</li>
-          ))}
-        </ul>
+      <CardContent className="p-6">
+        <h3 className="font-semibold mb-4">Development Spectrum</h3>
+        <p className="text-muted-foreground">
+          This section will display the user's development spectrum across various categories.
+        </p>
+        <div className="mt-4">
+          <p>Categories: {categories.join(', ')}</p>
+        </div>
       </CardContent>
     </Card>
   );
