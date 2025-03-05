@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+
+import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Car, Search, Filter } from 'lucide-react';
+import { PlusCircle, Car, Search, Filter, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import VehicleFilterDialog, { VehicleFilters } from '@/components/vehicles/VehicleFilterDialog';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 
 // Mock data for demonstration purposes
 const MOCK_VEHICLES = [
@@ -12,8 +16,9 @@ const MOCK_VEHICLES = [
     make: 'Ford',
     model: 'Mustang',
     year: 1967,
-    color: 'Blue',
+    color: 'blue',
     ownership_status: 'owned',
+    mileage: 78500,
     image: null,
     lastUpdated: '2025-02-15T14:30:00Z'
   },
@@ -22,8 +27,9 @@ const MOCK_VEHICLES = [
     make: 'Chevrolet',
     model: 'Corvette',
     year: 1963,
-    color: 'Red',
+    color: 'red',
     ownership_status: 'claimed',
+    mileage: 120300,
     image: null,
     lastUpdated: '2025-03-01T10:15:00Z'
   },
@@ -32,8 +38,9 @@ const MOCK_VEHICLES = [
     make: 'Porsche',
     model: '911',
     year: 1973,
-    color: 'Silver',
+    color: 'silver',
     ownership_status: 'discovered',
+    mileage: 45200,
     image: null,
     lastUpdated: '2025-02-28T16:45:00Z'
   }
@@ -43,12 +50,109 @@ export default function Vehicles() {
   const [searchQuery, setSearchQuery] = useState('');
   const [vehicles] = useState(MOCK_VEHICLES);
   const navigate = useNavigate();
+  const { toast } = useToast();
   
-  // Filter vehicles based on search query
-  const filteredVehicles = vehicles.filter(vehicle => {
-    const searchString = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.color}`.toLowerCase();
-    return searchString.includes(searchQuery.toLowerCase());
-  });
+  // Filter dialog state
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<VehicleFilters | null>(null);
+  
+  // Apply filters function
+  const handleApplyFilters = (filters: VehicleFilters) => {
+    setActiveFilters(Object.keys(filters).length ? filters : null);
+    
+    // Show toast to confirm filters were applied
+    toast({
+      title: "Filters Applied",
+      description: `Applied ${Object.keys(filters).length} filters to your vehicle list.`,
+    });
+  };
+  
+  // Clear all filters
+  const handleClearFilters = () => {
+    setActiveFilters(null);
+    setSearchQuery('');
+    
+    toast({
+      title: "Filters Cleared",
+      description: "All filters have been removed.",
+    });
+  };
+  
+  // Handle edit button click
+  const handleEditVehicle = (id: string) => {
+    // In a full implementation, this would navigate to an edit page
+    // For now, we'll show a toast notification
+    toast({
+      title: "Edit Vehicle",
+      description: "Vehicle editing functionality will be implemented soon.",
+    });
+  };
+  
+  // Get filtered vehicles based on search query and active filters
+  const filteredVehicles = useMemo(() => {
+    let result = vehicles;
+    
+    // Apply text search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(vehicle => {
+        const searchString = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.color}`.toLowerCase();
+        return searchString.includes(query);
+      });
+    }
+    
+    // Apply advanced filters if any
+    if (activeFilters) {
+      // Filter by make
+      if (activeFilters.make) {
+        result = result.filter(vehicle => 
+          vehicle.make.toLowerCase() === activeFilters.make!.toLowerCase()
+        );
+      }
+      
+      // Filter by model
+      if (activeFilters.model) {
+        result = result.filter(vehicle => 
+          vehicle.model.toLowerCase().includes(activeFilters.model!.toLowerCase())
+        );
+      }
+      
+      // Filter by year range
+      if (activeFilters.yearRange) {
+        const [minYear, maxYear] = activeFilters.yearRange;
+        result = result.filter(vehicle => 
+          vehicle.year >= minYear && vehicle.year <= maxYear
+        );
+      }
+      
+      // Filter by colors
+      if (activeFilters.colors && activeFilters.colors.length > 0) {
+        result = result.filter(vehicle => 
+          activeFilters.colors!.includes(vehicle.color.toLowerCase())
+        );
+      }
+      
+      // Filter by ownership status
+      if (activeFilters.statuses && activeFilters.statuses.length > 0) {
+        result = result.filter(vehicle => 
+          activeFilters.statuses!.includes(vehicle.ownership_status)
+        );
+      }
+      
+      // Filter by mileage range
+      if (activeFilters.mileageRange) {
+        const [minMileage, maxMileage] = activeFilters.mileageRange;
+        result = result.filter(vehicle => 
+          vehicle.mileage >= minMileage && vehicle.mileage <= maxMileage
+        );
+      }
+    }
+    
+    return result;
+  }, [vehicles, searchQuery, activeFilters]);
+  
+  // Get filter count for the badge
+  const filterCount = activeFilters ? Object.keys(activeFilters).length : 0;
   
   const getOwnershipStatusBadge = (status: string) => {
     switch (status) {
@@ -91,10 +195,31 @@ export default function Vehicles() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="sm:w-auto w-full">
-          <Filter className="mr-2 h-4 w-4" />
-          Filters
-        </Button>
+        <div className="flex gap-2">
+          {filterCount > 0 && (
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={handleClearFilters}
+              title="Clear all filters"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          <Button 
+            variant="outline" 
+            className="sm:w-auto w-full"
+            onClick={() => setIsFilterOpen(true)}
+          >
+            <Filter className="mr-2 h-4 w-4" />
+            Filters
+            {filterCount > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {filterCount}
+              </Badge>
+            )}
+          </Button>
+        </div>
       </div>
       
       {filteredVehicles.length === 0 ? (
@@ -102,17 +227,26 @@ export default function Vehicles() {
           <Car className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
           <h3 className="mt-4 text-lg font-medium">No vehicles found</h3>
           <p className="mt-1 text-muted-foreground">
-            {searchQuery 
-              ? "Try adjusting your search query" 
+            {(searchQuery || activeFilters) 
+              ? "Try adjusting your search criteria or filters" 
               : "Add your first vehicle to get started"}
           </p>
-          <Button 
-            onClick={() => navigate('/add-vehicle')} 
-            className="mt-6"
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Vehicle
-          </Button>
+          <div className="flex gap-4 justify-center mt-6">
+            {(searchQuery || activeFilters) && (
+              <Button
+                variant="outline"
+                onClick={handleClearFilters}
+              >
+                Clear Filters
+              </Button>
+            )}
+            <Button 
+              onClick={() => navigate('/add-vehicle')}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Vehicle
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -132,6 +266,7 @@ export default function Vehicles() {
               <CardContent className="pb-2">
                 <div className="text-sm text-muted-foreground">
                   <p>Color: {vehicle.color}</p>
+                  <p>Mileage: {vehicle.mileage.toLocaleString()} mi</p>
                   <p className="mt-1">
                     Last updated {new Date(vehicle.lastUpdated).toLocaleDateString()}
                   </p>
@@ -141,12 +276,25 @@ export default function Vehicles() {
                 <Button variant="ghost" size="sm" asChild>
                   <Link to={`/vehicles/${vehicle.id}`}>View Details</Link>
                 </Button>
-                <Button variant="outline" size="sm">Edit</Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleEditVehicle(vehicle.id)}
+                >
+                  Edit
+                </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       )}
+      
+      {/* Filter Dialog */}
+      <VehicleFilterDialog
+        open={isFilterOpen}
+        onOpenChange={setIsFilterOpen}
+        onApplyFilters={handleApplyFilters}
+      />
     </div>
   );
 }
