@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAtom } from 'jotai';
 import { authRequiredModalAtom } from '@/components/auth/AuthRequiredModal';
 import FilterDialog from './FilterDialog';
+import CreateListingForm from './CreateListingForm';
 import { useToast } from '@/components/ui/use-toast';
 
 export const MarketplaceHeader = () => {
@@ -19,6 +20,8 @@ export const MarketplaceHeader = () => {
   
   // State for filter dialog
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  // State for create listing form
+  const [isCreateListingOpen, setIsCreateListingOpen] = useState(false);
   // State for active filters
   const [activeFilters, setActiveFilters] = useState<any>(null);
   
@@ -34,12 +37,8 @@ export const MarketplaceHeader = () => {
       return;
     }
     
-    // In a real implementation, we would navigate to a form page
-    // For now, we'll use a toast to indicate future functionality
-    toast({
-      title: "Create Listing",
-      description: "This feature will be implemented soon. You'll be able to create and publish your own listings.",
-    });
+    // Open the create listing form
+    setIsCreateListingOpen(true);
   };
   
   const handleSavedSearches = () => {
@@ -71,6 +70,14 @@ export const MarketplaceHeader = () => {
     
     // In a real implementation, we would update the search results based on filters
     console.log("Applied filters:", filters);
+  };
+  
+  const handleListingCreated = () => {
+    // Successfully created listing
+    toast({
+      title: "Listing Published",
+      description: "Your listing has been published to the marketplace.",
+    });
   };
   
   return (
@@ -144,6 +151,13 @@ export const MarketplaceHeader = () => {
         open={isFilterOpen} 
         onOpenChange={setIsFilterOpen}
         onApplyFilters={handleApplyFilters}
+      />
+      
+      {/* Create Listing Form */}
+      <CreateListingForm 
+        open={isCreateListingOpen}
+        onOpenChange={setIsCreateListingOpen}
+        onSuccess={handleListingCreated}
       />
     </div>
   );
