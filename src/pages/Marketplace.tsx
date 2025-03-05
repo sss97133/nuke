@@ -2,7 +2,7 @@
 import React from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MarketplaceContent } from '@/components/marketplace/MarketplaceContent';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 
 const Marketplace = () => {
   return (
