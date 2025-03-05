@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { UseFormReturn } from 'react-hook-form';
 import { VehicleFormValues } from '../types';
 import { ImageUpload } from './ImageUpload';
+import { Info } from 'lucide-react';
 
 interface MediaTagsSectionProps {
   form: UseFormReturn<VehicleFormValues>;
@@ -25,6 +26,15 @@ export const MediaTagsSection: React.FC<MediaTagsSectionProps> = ({ form }) => {
             description="Upload or drag and drop images of your vehicle (max 5MB per image)"
             multiple={true}
           />
+          
+          <div className="bg-muted/50 p-3 rounded-md flex items-start gap-2">
+            <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-muted-foreground">
+              <strong>Note:</strong> Due to browser security restrictions, browsing your device's folder structure 
+              is limited. Web applications can only access files you specifically select, not entire folder hierarchies. 
+              For full folder access, consider using the native app version.
+            </p>
+          </div>
           
           <FormField
             control={form.control}

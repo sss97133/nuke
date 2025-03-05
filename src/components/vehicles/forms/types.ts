@@ -25,3 +25,8 @@ export interface VehicleFormValues {
   image: string | string[];
   // Additional fields can be added here
 }
+
+// Add validation schema for the form
+export const formSchema = {
+  // This could be expanded with Zod or other validation
+};

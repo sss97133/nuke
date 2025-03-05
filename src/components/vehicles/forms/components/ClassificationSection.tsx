@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
 import { UseFormReturn } from 'react-hook-form';
 import { VehicleFormValues } from '../types';
 
@@ -39,10 +39,9 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({ fo
                       <SelectItem value="coupe">Coupe</SelectItem>
                       <SelectItem value="hatchback">Hatchback</SelectItem>
                       <SelectItem value="suv">SUV</SelectItem>
-                      <SelectItem value="crossover">Crossover</SelectItem>
+                      <SelectItem value="truck">Truck</SelectItem>
+                      <SelectItem value="wagon">Wagon</SelectItem>
                       <SelectItem value="convertible">Convertible</SelectItem>
-                      <SelectItem value="wagon">Station Wagon</SelectItem>
-                      <SelectItem value="pickup">Pickup Truck</SelectItem>
                       <SelectItem value="van">Van</SelectItem>
                       <SelectItem value="minivan">Minivan</SelectItem>
                     </SelectContent>
@@ -51,7 +50,7 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({ fo
                 </FormItem>
               )}
             />
-
+            
             <FormField
               control={form.control}
               name="fuel_type"
@@ -73,22 +72,21 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({ fo
                       <SelectItem value="electric">Electric</SelectItem>
                       <SelectItem value="hybrid">Hybrid</SelectItem>
                       <SelectItem value="plugin_hybrid">Plug-in Hybrid</SelectItem>
-                      <SelectItem value="natural_gas">Natural Gas</SelectItem>
                       <SelectItem value="hydrogen">Hydrogen</SelectItem>
-                      <SelectItem value="flex_fuel">Flex Fuel</SelectItem>
+                      <SelectItem value="natural_gas">Natural Gas</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
+            
             <FormField
               control={form.control}
               name="transmission"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Transmission Type</FormLabel>
+                  <FormLabel>Transmission</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
                     defaultValue={field.value}
@@ -99,10 +97,10 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({ fo
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="manual">Manual</SelectItem>
                       <SelectItem value="automatic">Automatic</SelectItem>
-                      <SelectItem value="cvt">CVT</SelectItem>
+                      <SelectItem value="manual">Manual</SelectItem>
                       <SelectItem value="semi_automatic">Semi-Automatic</SelectItem>
+                      <SelectItem value="cvt">CVT</SelectItem>
                       <SelectItem value="dual_clutch">Dual Clutch</SelectItem>
                     </SelectContent>
                   </Select>
@@ -110,7 +108,7 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({ fo
                 </FormItem>
               )}
             />
-
+            
             <FormField
               control={form.control}
               name="drivetrain"
@@ -137,7 +135,7 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({ fo
                 </FormItem>
               )}
             />
-
+            
             <FormField
               control={form.control}
               name="engine_type"
@@ -151,57 +149,57 @@ export const ClassificationSection: React.FC<ClassificationSectionProps> = ({ fo
                 </FormItem>
               )}
             />
-
+            
             <FormField
               control={form.control}
-              name="number_of_doors"
+              name="doors"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Number of Doors</FormLabel>
                   <FormControl>
-                    <Input type="number" min="1" max="7" {...field} />
+                    <Input type="number" placeholder="e.g. 2, 4, 5" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
+            
             <FormField
               control={form.control}
-              name="number_of_seats"
+              name="seats"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Number of Seats</FormLabel>
                   <FormControl>
-                    <Input type="number" min="1" max="12" {...field} />
+                    <Input type="number" placeholder="e.g. 2, 4, 5, 7" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
+            
             <FormField
               control={form.control}
               name="weight"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Weight (kg)</FormLabel>
+                  <FormLabel>Weight (lbs)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Vehicle weight in kg" {...field} />
+                    <Input type="number" placeholder="e.g. 3500" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
+            
             <FormField
               control={form.control}
               name="top_speed"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Top Speed (km/h)</FormLabel>
+                  <FormLabel>Top Speed (mph)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Top speed in km/h" {...field} />
+                    <Input type="number" placeholder="e.g. 155" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

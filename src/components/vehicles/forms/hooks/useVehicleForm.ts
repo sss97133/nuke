@@ -1,36 +1,42 @@
 
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { VehicleFormValues, formSchema } from '../types';
+import { VehicleFormValues } from '../types';
 
-export const useVehicleForm = (initialValues: Partial<VehicleFormValues> = {}) => {
-  // Create defaultValues with required fields guaranteed to be non-optional
-  const defaultValues: VehicleFormValues = {
-    make: initialValues.make || '',
-    model: initialValues.model || '',
-    year: initialValues.year || new Date().getFullYear(),
-    color: initialValues.color || '',
-    vin: initialValues.vin || '',
-    mileage: initialValues.mileage,
-    trim: initialValues.trim || '',
-    image: initialValues.image || '',
-    tags: initialValues.tags || '',
-    notes: initialValues.notes || '',
-    body_style: initialValues.body_style || '',
-    fuel_type: initialValues.fuel_type || '',
-    transmission: initialValues.transmission || '',
-    drivetrain: initialValues.drivetrain || '',
-    engine_type: initialValues.engine_type || '',
-    number_of_doors: initialValues.number_of_doors,
-    number_of_seats: initialValues.number_of_seats,
-    weight: initialValues.weight,
-    top_speed: initialValues.top_speed,
-  };
-
+export const useVehicleForm = (onSubmit: (data: VehicleFormValues) => Promise<void>) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Set up form with react-hook-form
   const form = useForm<VehicleFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues,
+    defaultValues: {
+      make: '',
+      model: '',
+      year: String(new Date().getFullYear()),
+      color: '',
+      mileage: '',
+      image: [],
+      tags: '',
+    }
   });
-
-  return form;
+  
+  // Process form submission
+  const handleSubmit = async (data: VehicleFormValues) => {
+    setIsSubmitting(true);
+    
+    try {
+      await onSubmit(data);
+      // Optionally reset the form after successful submission
+      // form.reset();
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return {
+    form,
+    isSubmitting,
+    handleSubmit: form.handleSubmit(handleSubmit),
+  };
 };
