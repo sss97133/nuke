@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { BookOpen, FileText, Settings, Car, Package, Wrench, Users, BarChart, Building, Video, ChartLine, Coins, LayoutPanelTop } from 'lucide-react';
+import { BookOpen, FileText, Settings, Car, Package, Wrench, Users, BarChart, Building, Video, LineChart, Coins, LayoutPanelTop } from 'lucide-react';
 import { DocSection } from '../layout/DocSection';
 import { DocLink } from '../layout/DocLink';
 
@@ -84,7 +84,7 @@ export const CoreDocumentation: React.FC<CoreDocumentationProps> = ({ onDocLinkC
         
         <Separator />
         
-        <DocSection icon={<ChartLine className="h-5 w-5 text-green-500" />} title="Market Analysis">
+        <DocSection icon={<LineChart className="h-5 w-5 text-green-500" />} title="Market Analysis">
           <div className="grid gap-3 mt-2">
             <DocLink href="/docs/market-analysis/valuation" onClick={onDocLinkClick}>
               Vehicle Valuation Tools
