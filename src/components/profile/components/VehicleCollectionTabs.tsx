@@ -55,3 +55,6 @@ export const VehicleCollectionTabs: React.FC<VehicleCollectionTabsProps> = ({
     </Tabs>
   );
 };
+
+// Add a default export in addition to the named export
+export default VehicleCollectionTabs;

@@ -1,260 +1,147 @@
 
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Car, Plus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-
-type Vehicle = {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  trim?: string;
-  color?: string;
-  image_url?: string;
-  ownership_status: 'owned' | 'discovered' | 'claimed';
-  vehicle_stats: {
-    likes_count: number;
-    views_count: number;
-  };
-};
+import React from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Plus } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 
 interface VehicleCollectionProps {
   userId: string;
   isOwnProfile: boolean;
-  filter?: string; // Add optional filter prop
+  filter: string; // Add filter prop
 }
 
-const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProfile, filter = 'all' }) => {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+const VehicleCollection: React.FC<VehicleCollectionProps> = ({ 
+  userId,
+  isOwnProfile,
+  filter
+}) => {
   const navigate = useNavigate();
-
-  useEffect(() => {
+  const [vehicles, setVehicles] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    // Simulate fetching vehicles with a delay
     const fetchVehicles = async () => {
-      setIsLoading(true);
+      setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('vehicles')
-          .select('*')
-          .eq('user_id', userId);
+        // This would be a real API call in a production app
+        // Simulating API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        if (error) {
-          console.error('Error fetching vehicles:', error);
-          return;
-        }
-        
-        // Transform the data to match the Vehicle type with proper defaults
-        const transformedVehicles: Vehicle[] = data.map(vehicle => ({
-          id: vehicle.id,
-          make: vehicle.make || 'Unknown',
-          model: vehicle.model || 'Unknown',
-          year: vehicle.year || 0,
-          trim: vehicle.trim || undefined,
-          color: vehicle.color || undefined,
-          image_url: vehicle.image_url || undefined,
-          ownership_status: (vehicle.status as 'owned' | 'discovered' | 'claimed') || 'discovered',
-          vehicle_stats: {
-            likes_count: vehicle.likes_count || 0,
-            views_count: vehicle.views_count || 0
-          }
+        // Mock data
+        const mockVehicles = Array(6).fill(null).map((_, i) => ({
+          id: `vehicle-${i}`,
+          make: ['Toyota', 'Honda', 'Ford', 'BMW', 'Tesla', 'Audi'][i % 6],
+          model: ['Corolla', 'Civic', 'F-150', 'X5', 'Model 3', 'A4'][i % 6],
+          year: 2018 + (i % 5),
+          status: ['owned', 'claimed', 'discovered'][i % 3],
+          likes_count: Math.floor(Math.random() * 50),
+          views_count: Math.floor(Math.random() * 200),
+          color: ['Red', 'Blue', 'Black', 'White', 'Silver', 'Green'][i % 6],
+          image_url: `/placeholder.svg`
         }));
         
-        setVehicles(transformedVehicles);
+        // Filter vehicles based on the filter prop
+        let filteredVehicles = mockVehicles;
+        if (filter !== 'all') {
+          filteredVehicles = mockVehicles.filter(v => v.status === filter);
+        }
+        
+        setVehicles(filteredVehicles);
       } catch (error) {
-        console.error('Error in fetch operation:', error);
+        console.error('Error fetching vehicles:', error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
     
     fetchVehicles();
-  }, [userId]);
+  }, [userId, filter]);
   
   const handleAddVehicle = () => {
     navigate('/add-vehicle');
   };
   
-  if (isLoading) {
+  if (loading) {
     return (
-      <Card className="p-8">
-        <div className="flex justify-center">
-          <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-        </div>
-      </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {Array(6).fill(null).map((_, i) => (
+          <Card key={i} className="overflow-hidden">
+            <Skeleton className="h-48 w-full" />
+            <CardContent className="p-4">
+              <Skeleton className="h-6 w-2/3 mb-2" />
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     );
   }
   
-  // Filter vehicles based on the filter prop
-  const filteredVehicles = filter === 'all' 
-    ? vehicles 
-    : filter === 'recent'
-      ? [...vehicles].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 5) // Sort by ID as proxy for recency
-      : vehicles.filter(v => v.ownership_status === filter);
-  
-  if (filteredVehicles.length === 0) {
+  if (vehicles.length === 0) {
     return (
-      <Card className="p-8">
-        <CardContent className="flex flex-col items-center justify-center pt-6">
-          <Car className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No vehicles yet</h3>
-          <p className="text-muted-foreground text-center mb-6">
-            {isOwnProfile 
-              ? filter !== 'all' 
-                ? `You haven't added any ${filter} vehicles to your collection yet.`
-                : "You haven't added any vehicles to your collection yet."
-              : filter !== 'all'
-                ? `This user hasn't added any ${filter} vehicles to their collection yet.`
-                : "This user hasn't added any vehicles to their collection yet."}
-          </p>
-          
-          {isOwnProfile && (
-            <Button onClick={handleAddVehicle}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Vehicle
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Vehicles ({filteredVehicles.length})</h3>
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-muted-foreground mb-4">
+          {filter === 'all' 
+            ? 'No vehicles in collection yet.' 
+            : `No ${filter} vehicles in collection.`}
+        </p>
         {isOwnProfile && (
-          <Button onClick={handleAddVehicle} size="sm">
-            <Plus className="mr-2 h-4 w-4" />
+          <Button onClick={handleAddVehicle}>
+            <Plus className="h-4 w-4 mr-2" />
             Add Vehicle
           </Button>
         )}
       </div>
-      
-      {!filter && (
-        <Tabs defaultValue="all">
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="owned">Owned</TabsTrigger>
-            <TabsTrigger value="claimed">Claimed</TabsTrigger>
-            <TabsTrigger value="discovered">Discovered</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="all" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {vehicles.map(vehicle => (
-                <VehicleCard key={vehicle.id} vehicle={vehicle} />
-              ))}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="owned" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {vehicles
-                .filter(v => v.ownership_status === 'owned')
-                .map(vehicle => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
-                ))
-              }
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="claimed" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {vehicles
-                .filter(v => v.ownership_status === 'claimed')
-                .map(vehicle => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
-                ))
-              }
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="discovered" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {vehicles
-                .filter(v => v.ownership_status === 'discovered')
-                .map(vehicle => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
-                ))
-              }
-            </div>
-          </TabsContent>
-        </Tabs>
-      )}
-      
-      {filter && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredVehicles.map(vehicle => (
-            <VehicleCard key={vehicle.id} vehicle={vehicle} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-interface VehicleCardProps {
-  vehicle: Vehicle;
-}
-
-const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle }) => {
+    );
+  }
+  
   return (
-    <Card className="overflow-hidden">
-      <div className="aspect-video bg-muted flex items-center justify-center">
-        {vehicle.image_url ? (
-          <img 
-            src={vehicle.image_url} 
-            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-            className="object-cover w-full h-full"
-          />
-        ) : (
-          <Car className="h-12 w-12 text-muted-foreground opacity-50" />
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {vehicles.map((vehicle) => (
+          <Card key={vehicle.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+            <div className="h-48 bg-muted relative overflow-hidden">
+              <img 
+                src={vehicle.image_url || "/placeholder.svg"} 
+                alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                className="w-full h-full object-cover" 
+              />
+              <div className="absolute top-2 right-2 bg-background/80 text-xs font-medium px-2 py-1 rounded">
+                {vehicle.status || "owned"}
+              </div>
+            </div>
+            <CardContent className="p-4">
+              <h3 className="font-medium truncate">
+                {vehicle.year} {vehicle.make} {vehicle.model}
+              </h3>
+              <p className="text-sm text-muted-foreground truncate">
+                {vehicle.color || "No color specified"}
+              </p>
+              <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                <span>{vehicle.likes_count || 0} likes</span>
+                <span>{vehicle.views_count || 0} views</span>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        
+        {isOwnProfile && (
+          <Card 
+            className="flex items-center justify-center h-[280px] border-dashed cursor-pointer hover:bg-accent/10 transition-colors"
+            onClick={handleAddVehicle}
+          >
+            <div className="flex flex-col items-center justify-center text-muted-foreground">
+              <Plus className="h-10 w-10 mb-2" />
+              <span>Add Vehicle</span>
+            </div>
+          </Card>
         )}
       </div>
-      <CardContent className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="font-semibold">
-            {vehicle.year} {vehicle.make} {vehicle.model}
-          </h3>
-          <div>
-            {vehicle.ownership_status === 'owned' && (
-              <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                Owned
-              </span>
-            )}
-            {vehicle.ownership_status === 'claimed' && (
-              <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                Claimed
-              </span>
-            )}
-            {vehicle.ownership_status === 'discovered' && (
-              <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
-                Discovered
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="text-sm text-muted-foreground mb-4">
-          {vehicle.trim && <p>Trim: {vehicle.trim}</p>}
-          {vehicle.color && <p>Color: {vehicle.color}</p>}
-          <div className="flex gap-4 mt-2">
-            <span className="flex items-center gap-1">
-              <span role="img" aria-label="likes">👍</span> {vehicle.vehicle_stats.likes_count}
-            </span>
-            <span className="flex items-center gap-1">
-              <span role="img" aria-label="views">👁️</span> {vehicle.vehicle_stats.views_count}
-            </span>
-          </div>
-        </div>
-        <Button asChild variant="outline" size="sm" className="w-full">
-          <Link to={`/vehicles/${vehicle.id}`}>View Details</Link>
-        </Button>
-      </CardContent>
-    </Card>
+    </div>
   );
 };
 

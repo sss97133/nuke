@@ -11,7 +11,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <div className="flex min-h-screen bg-background">
       <NavSidebar />
-      <div className="flex-1 pt-14 md:pt-0">
+      <div className="flex-1 pt-14 pb-20 md:pt-0 md:pb-0">
         <AuthRequiredModal />
         {children}
       </div>

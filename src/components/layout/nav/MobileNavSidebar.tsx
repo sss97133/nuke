@@ -31,11 +31,11 @@ export const MobileNavSidebar = ({ isOpen, setIsOpen }: MobileNavSidebarProps) =
             <Menu className="h-4 w-4" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64 sm:w-[270px]">
+        <SheetContent side="left" className="p-0 w-64 sm:w-[270px] pb-16">
           <div className="p-3 sm:p-4 flex items-center justify-between border-b">
             <span className="font-semibold text-sm sm:text-base">Vehicle Manager</span>
           </div>
-          <ScrollArea className="h-[calc(100vh-57px)]">
+          <ScrollArea className="h-[calc(100vh-57px-4rem)]">
             <div className="p-2 space-y-1">
               {navItems.map((item) => (
                 <NavItem
