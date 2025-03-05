@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate, BrowserRouter } from 'react-router-dom';
 import { useAuthState } from '@/hooks/auth/use-auth-state';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
 import { AuthLayout } from '@/components/layout/AuthLayout';
@@ -8,7 +8,8 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { allRoutes, RouteType, isPublicPath } from './routeConfig';
 import { toast } from '@/components/ui/use-toast';
 
-export const AppRouter: React.FC = () => {
+// Create a component with the router navigation logic
+const AppRouterContent: React.FC = () => {
   const { loading, session } = useAuthState();
   const location = useLocation();
   const navigate = useNavigate();
@@ -140,5 +141,14 @@ export const AppRouter: React.FC = () => {
       {/* Catch-all route for undefined routes */}
       <Route path="*" element={<Navigate to="/explore" replace />} />
     </Routes>
+  );
+};
+
+// Main router component that wraps the content with BrowserRouter
+export const AppRouter: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <AppRouterContent />
+    </BrowserRouter>
   );
 };

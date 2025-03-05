@@ -6,16 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AlertCircle } from 'lucide-react';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { Button } from '@/components/ui/button';
-import { BrowserRouter, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 export const Profile = () => {
   const { isCompleted, isLoading } = useOnboarding();
-  
-  const ProfileWithRouter = () => {
-    const navigate = useNavigate();
-    
-    return (
-      <>
+  const navigate = useNavigate();
+
+  return (
+    <ScrollArea className="h-[calc(100vh-4rem)]">
+      <div className="container mx-auto py-6 px-4 md:px-6 max-w-6xl">
         {!isLoading && !isCompleted && (
           <Card className="mb-6 border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
             <CardHeader className="pb-2">
@@ -40,16 +39,6 @@ export const Profile = () => {
         )}
         
         <UserProfile />
-      </>
-    );
-  };
-
-  return (
-    <ScrollArea className="h-[calc(100vh-4rem)]">
-      <div className="container mx-auto py-6 px-4 md:px-6 max-w-6xl">
-        <BrowserRouter>
-          <ProfileWithRouter />
-        </BrowserRouter>
       </div>
     </ScrollArea>
   );
