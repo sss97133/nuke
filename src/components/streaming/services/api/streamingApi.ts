@@ -1,13 +1,24 @@
 
-import { getAuthToken } from '../auth/authUtils';
-import { getClientId } from '../config/twitchConfig';
+import { getAuthToken, isDemoModeEnabled } from '../auth/authUtils';
+import { getClientId, getMockTwitchUsername } from '../config/twitchConfig';
 import { StreamMetadata, TwitchUserData } from '../types';
 import { getUserInfo } from './twitchApi';
+
+// State management for demo mode
+let demoStreamActive = false;
+let demoStreamTitle = 'Demo Stream';
+let demoStreamGame = 'Just Chatting';
 
 /**
  * Check if the user is currently streaming
  */
 export const isCurrentlyStreaming = async (): Promise<boolean> => {
+  // If in demo mode, use our local state
+  if (isDemoModeEnabled()) {
+    return demoStreamActive;
+  }
+  
+  // Standard flow for real API
   try {
     const streams = await fetchLiveStreams();
     return streams.length > 0;
@@ -21,6 +32,30 @@ export const isCurrentlyStreaming = async (): Promise<boolean> => {
  * Get user's live streams
  */
 export const fetchLiveStreams = async (): Promise<any[]> => {
+  // If in demo mode, return mock data based on our state
+  if (isDemoModeEnabled()) {
+    if (!demoStreamActive) {
+      return [];
+    }
+    
+    return [{
+      id: 'demo_stream_123',
+      user_id: 'demo_123456789',
+      user_login: getMockTwitchUsername(),
+      user_name: 'Demo Streamer',
+      game_id: '123456',
+      game_name: demoStreamGame,
+      type: 'live',
+      title: demoStreamTitle,
+      viewer_count: Math.floor(Math.random() * 100),
+      started_at: new Date().toISOString(),
+      language: 'en',
+      thumbnail_url: 'https://placehold.co/1920x1080/purple/white?text=DEMO+STREAM',
+      is_mature: false
+    }];
+  }
+  
+  // Standard API flow
   const authToken = getAuthToken();
   if (!authToken) return [];
   
@@ -51,6 +86,15 @@ export const fetchLiveStreams = async (): Promise<any[]> => {
  * Start a stream
  */
 export const startStream = async (title: string, gameId: string): Promise<boolean> => {
+  // If in demo mode, update our local state
+  if (isDemoModeEnabled()) {
+    demoStreamActive = true;
+    demoStreamTitle = title || 'Demo Stream';
+    demoStreamGame = gameId || 'Just Chatting';
+    return true;
+  }
+  
+  // Standard API flow
   const authToken = getAuthToken();
   if (!authToken) throw new Error('Not authenticated with Twitch');
   
@@ -75,6 +119,13 @@ export const startStream = async (title: string, gameId: string): Promise<boolea
  * Stop a stream
  */
 export const stopStream = async (): Promise<boolean> => {
+  // If in demo mode, update our local state
+  if (isDemoModeEnabled()) {
+    demoStreamActive = false;
+    return true;
+  }
+  
+  // Standard API flow
   const authToken = getAuthToken();
   if (!authToken) throw new Error('Not authenticated with Twitch');
   
