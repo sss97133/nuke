@@ -1,7 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 // Fallback values in case env vars are not set
 const SUPABASE_URL = "https://qkgaybvrernstplzjaam.supabase.co";
@@ -17,6 +17,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Track database errors to prevent duplicate notifications
 const recentServerErrors = new Set<string>();
 const SERVER_ERROR_DEBOUNCE_TIME = 10000; // 10 seconds
+
+// Create a simple toast function for server-side or non-hook contexts
+const showToast = (props: { title: string; description?: string; variant?: 'default' | 'destructive' | 'success' | 'warning' | 'info' }) => {
+  // If running in browser context, log to console
+  if (typeof window !== 'undefined') {
+    console.error(`${props.title}: ${props.description}`);
+  }
+};
 
 // Create supabase client with enhanced options for reliability
 export const supabase = createClient<Database>(
@@ -87,7 +95,7 @@ export const supabase = createClient<Database>(
           if (!recentServerErrors.has(errorMessage)) {
             recentServerErrors.add(errorMessage);
             
-            toast({
+            showToast({
               title: "Connection Error",
               description: "Could not connect to the database. Please try again later.",
               variant: "destructive",
@@ -125,7 +133,7 @@ export const handleSupabaseError = (error: any, defaultMessage = "An error occur
   if (!recentServerErrors.has(message)) {
     recentServerErrors.add(message);
     
-    toast({
+    showToast({
       title: "Database Error",
       description: message,
       variant: "destructive",
@@ -153,4 +161,55 @@ export const safeQuery = async <T>(
   } catch (error) {
     return handleSupabaseError(error);
   }
+};
+
+// Hook that combines supabase with toast notifications
+export const useSupabaseWithToast = () => {
+  const { toast } = useToast();
+
+  // Enhanced error handler that uses the toast hook
+  const handleError = (error: any, defaultMessage = "An error occurred") => {
+    console.error("Supabase error:", error);
+    
+    const message = error?.message || defaultMessage;
+    
+    // Only show toast if we haven't shown this error recently
+    if (!recentServerErrors.has(message)) {
+      recentServerErrors.add(message);
+      
+      toast({
+        title: "Database Error",
+        description: message,
+        variant: "destructive",
+      });
+      
+      // Remove from recent errors after debounce time
+      setTimeout(() => {
+        recentServerErrors.delete(message);
+      }, SERVER_ERROR_DEBOUNCE_TIME);
+    }
+    
+    return null;
+  };
+
+  // Enhanced safe query that uses the toast hook
+  const safeFetch = async <T>(
+    queryFn: () => Promise<{ data: T | null; error: any }>
+  ): Promise<T | null> => {
+    try {
+      const { data, error } = await queryFn();
+      if (error) {
+        return handleError(error);
+      }
+      return data;
+    } catch (error) {
+      return handleError(error);
+    }
+  };
+
+  return {
+    supabase,
+    handleError,
+    safeFetch
+  };
 };
