@@ -24,6 +24,14 @@ export interface VehicleFormValues {
   era?: string;
   restoration_status?: "original" | "restored" | "modified" | "project";
   special_edition?: boolean;
+  // New classification fields
+  body_style?: string;
+  fuel_type?: string;
+  engine_type?: string;
+  number_of_doors?: number;
+  number_of_seats?: number;
+  weight?: number;
+  top_speed?: number;
 }
 
 // Form validation schema
@@ -50,4 +58,13 @@ export const formSchema = z.object({
   era: z.string().optional(),
   restoration_status: z.enum(["original", "restored", "modified", "project"]).optional(),
   special_edition: z.boolean().optional(),
+  // New classification fields validation
+  body_style: z.string().optional(),
+  fuel_type: z.string().optional(),
+  engine_type: z.string().optional(),
+  number_of_doors: z.coerce.number().optional(),
+  number_of_seats: z.coerce.number().optional(),
+  weight: z.coerce.number().optional(),
+  top_speed: z.coerce.number().optional(),
 });
+

@@ -8,6 +8,7 @@ import { BasicInformationSection } from './components/BasicInformationSection';
 import { AdditionalDetailsSection } from './components/AdditionalDetailsSection';
 import { MediaTagsSection } from './components/MediaTagsSection';
 import { NotesSection } from './components/NotesSection';
+import { ClassificationSection } from './components/ClassificationSection';
 
 interface VehicleFormProps {
   onSubmit: (data: VehicleFormValues) => Promise<void>;
@@ -36,6 +37,9 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
           {/* Additional Details */}
           <AdditionalDetailsSection form={form} />
         </div>
+        
+        {/* Classification Section */}
+        <ClassificationSection form={form} />
         
         {/* Media and Tags */}
         <MediaTagsSection form={form} />

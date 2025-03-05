@@ -19,3 +19,25 @@ export interface VehicleGalleryProps {
     [key: string]: any;
   };
 }
+
+export interface GalleryHeaderProps {
+  vehicle: {
+    make: string;
+    model: string;
+    year: number | string;
+  };
+  totalImages: number;
+}
+
+export interface GalleryImagesProps {
+  images: GalleryImage[];
+  isLoading?: boolean;
+}
+
+export interface EmptyGalleryProps {
+  vehicle: {
+    make: string;
+    model: string;
+    year: number | string;
+  };
+}

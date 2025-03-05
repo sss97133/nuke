@@ -16,6 +16,15 @@ export const useVehicleForm = (initialValues: Partial<VehicleFormValues> = {}) =
     image: initialValues.image || '',
     tags: initialValues.tags || '',
     notes: initialValues.notes || '',
+    body_style: initialValues.body_style || '',
+    fuel_type: initialValues.fuel_type || '',
+    transmission: initialValues.transmission || '',
+    drivetrain: initialValues.drivetrain || '',
+    engine_type: initialValues.engine_type || '',
+    number_of_doors: initialValues.number_of_doors,
+    number_of_seats: initialValues.number_of_seats,
+    weight: initialValues.weight,
+    top_speed: initialValues.top_speed,
   };
 
   const form = useForm<VehicleFormValues>({
