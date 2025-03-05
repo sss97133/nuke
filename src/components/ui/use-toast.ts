@@ -1,10 +1,6 @@
-import { useToast } from "@/hooks/use-toast";
+// This file is kept for backward compatibility
+// It re-exports everything from the new toast system
 
-// Re-export the useToast hook
-export { useToast };
+import { useToast, toast, success, error, warning, info, dismiss } from '@/components/ui/toast';
 
-// Re-export the toast function from the hook
-export const toast = (props: Parameters<ReturnType<typeof useToast>['toast']>[0]) => {
-  const { toast } = useToast();
-  return toast(props);
-};
+export { useToast, toast, success, error, warning, info, dismiss };
