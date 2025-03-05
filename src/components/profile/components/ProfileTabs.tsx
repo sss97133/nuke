@@ -1,116 +1,119 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import VehicleCollection from './VehicleCollection';
-import VehicleRelationshipsSection from './VehicleRelationshipsSection';
 
+// Update and create needed imports and interfaces
 interface ProfileTabsProps {
   userId: string;
   isOwnProfile: boolean;
 }
 
-// Sample skill data with correct type
-const skillsData = [
-  { name: "Restoration", value: 85, color: "#3498db", percentile: 92 },
-  { name: "Diagnostics", value: 70, color: "#2ecc71", percentile: 78 },
-  { name: "Modification", value: 65, color: "#f39c12", percentile: 65 },
-  { name: "Paint & Body", value: 60, color: "#9b59b6", percentile: 55 },
-  { name: "Maintenance", value: 90, color: "#1abc9c", percentile: 97 },
-];
+export const ProfileTabs = ({ userId, isOwnProfile }: ProfileTabsProps) => {
+  // Add isLoading state
+  const [isLoading, setIsLoading] = useState(false);
 
-interface ProfileInsightsProps {
-  userId: string;
-}
-
-const ProfileInsights: React.FC<ProfileInsightsProps> = ({ userId }) => {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Profile Insights</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p>Profile insights coming soon...</p>
-      </CardContent>
-    </Card>
-  );
-};
-
-interface UserDevelopmentSpectrumProps {
-  userId: string;
-  categories: string[];
-}
-
-const UserDevelopmentSpectrum: React.FC<UserDevelopmentSpectrumProps> = ({ userId, categories }) => {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Development Spectrum</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p>Development spectrum visualization coming soon...</p>
-        <ul>
-          {categories.map(category => (
-            <li key={category}>{category}</li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
-};
-
-const ProfileTabs: React.FC<ProfileTabsProps> = ({ userId, isOwnProfile }) => {
-  return (
-    <Tabs defaultValue="vehicles" className="space-y-4">
+    <Tabs defaultValue="vehicles" className="w-full">
       <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
+        <TabsTrigger value="skills">Skills</TabsTrigger>
         <TabsTrigger value="relationships">Relationships</TabsTrigger>
-        <TabsTrigger value="insights">Insights</TabsTrigger>
-        <TabsTrigger value="activity">Activity</TabsTrigger>
+        <TabsTrigger value="achievements">Achievements</TabsTrigger>
       </TabsList>
-      
+
+      {/* Vehicles tab content */}
       <TabsContent value="vehicles">
-        <VehicleCollection 
-          userId={userId} 
-          isOwnProfile={isOwnProfile} 
-        />
-      </TabsContent>
-      
-      <TabsContent value="relationships">
-        <VehicleRelationshipsSection userId={userId} />
-      </TabsContent>
-      
-      <TabsContent value="insights">
-        <div className="grid gap-4 md:grid-cols-2">
-          <ProfileInsights userId={userId} />
-          <UserDevelopmentSpectrum 
-            userId={userId} 
-            categories={["Mechanical", "Electrical", "Fabrication", "Design"]} 
-          />
-        </div>
-      </TabsContent>
-      
-      <TabsContent value="activity">
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-8">
-              {isLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">
-                  No recent activity to display
+          <CardContent className="pt-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Vehicles</h3>
+                <p className="text-sm text-muted-foreground">
+                  A list of vehicles owned by this user.
                 </p>
-              )}
-            </div>
+                {/* Placeholder for vehicle collection component */}
+                <div>Vehicle collection data would be displayed here</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Skills tab content */}
+      <TabsContent value="skills">
+        <Card>
+          <CardContent className="pt-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Skills & Expertise</h3>
+                <p className="text-sm text-muted-foreground">
+                  The skills and expertise levels for this user.
+                </p>
+                {/* Placeholder for skills component */}
+                <div>Skills data would be displayed here</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Relationships tab content */}
+      <TabsContent value="relationships">
+        <Card>
+          <CardContent className="pt-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Relationships</h3>
+                <p className="text-sm text-muted-foreground">
+                  The relationships and connections of this user.
+                </p>
+                {/* Placeholder for relationships component */}
+                <div>Relationships data would be displayed here</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      {/* Achievements tab content */}
+      <TabsContent value="achievements">
+        <Card>
+          <CardContent className="pt-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Achievements</h3>
+                <p className="text-sm text-muted-foreground">
+                  The achievements and milestones of this user.
+                </p>
+                {/* Placeholder for achievements component */}
+                <div>Achievements data would be displayed here</div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </TabsContent>

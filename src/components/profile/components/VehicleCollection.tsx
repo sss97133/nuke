@@ -65,9 +65,12 @@ export const VehicleCollection = ({ userId, isOwnProfile, filter = 'all' }: Vehi
           model: vehicle.model,
           year: vehicle.year,
           trim: vehicle.trim,
-          color: vehicle.color,
+          color: vehicle.color || 'Unknown color',
           image_url: vehicle.icloud_album_link || vehicle.vin_image_url,
-          vehicle_stats: vehicle.vehicle_stats,
+          vehicle_stats: {
+            likes_count: vehicle.vehicle_stats?.likes_count || 0,
+            views_count: vehicle.vehicle_stats?.views_count || 0
+          },
           ownership_status: (vehicle.status as 'owned' | 'discovered' | 'claimed') || 'discovered',
           is_serviced: false,
         }));
