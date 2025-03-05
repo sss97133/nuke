@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { SortDirection, SortField } from '../../components/vehicles/discovery/types';
 import { mockVehicles } from './mockVehicleData';
@@ -90,7 +89,9 @@ export function useVehiclesData() {
           if (!userId) {
             console.log('User not authenticated, using mock data');
             if (isMounted) {
-              setVehicles(mockVehicles);
+              // Import the stored vehicles instead of using mockVehicles directly
+              const { getStoredVehicles } = await import('./mockVehicleStorage');
+              setVehicles(getStoredVehicles());
               setIsLoading(false);
             }
             return;
@@ -114,13 +115,21 @@ export function useVehiclesData() {
             // Transform data to match expected schema
             const adaptedVehicles = (data || []).map(adaptVehicleFromDB);
             
-            // Fall back to mock data if no real data found
-            setVehicles(adaptedVehicles.length > 0 ? adaptedVehicles : mockVehicles);
+            // If no real data found
+            if (adaptedVehicles.length === 0) {
+              // Import the stored vehicles instead of using mockVehicles directly
+              const { getStoredVehicles } = await import('./mockVehicleStorage');
+              setVehicles(getStoredVehicles());
+            } else {
+              setVehicles(adaptedVehicles);
+            }
           }
         } else {
           // Use mock data directly when feature flag is off
           if (isMounted) {
-            setVehicles(mockVehicles);
+            // Import the stored vehicles instead of using mockVehicles directly
+            const { getStoredVehicles } = await import('./mockVehicleStorage');
+            setVehicles(getStoredVehicles());
           }
         }
       } catch (err) {
@@ -131,7 +140,8 @@ export function useVehiclesData() {
           setError(err.message || 'Failed to fetch vehicles');
           
           // Fall back to mock data
-          setVehicles(mockVehicles);
+          const { getStoredVehicles } = await import('./mockVehicleStorage');
+          setVehicles(getStoredVehicles());
         }
       } finally {
         if (isMounted) {

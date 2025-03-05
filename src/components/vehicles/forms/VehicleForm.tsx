@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -55,14 +54,14 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
   isSubmitting,
   initialValues = {}
 }) => {
-  // Ensure the required fields have default values
-  const defaultValues = {
+  // Create defaultValues with required fields guaranteed to be non-optional
+  const defaultValues: VehicleFormValues = {
     make: initialValues.make || '',
     model: initialValues.model || '',
     year: initialValues.year || new Date().getFullYear(),
     color: initialValues.color || '',
     vin: initialValues.vin || '',
-    mileage: initialValues.mileage,
+    mileage: initialValues.mileage || undefined,
     trim: initialValues.trim || '',
     image: initialValues.image || '',
     tags: initialValues.tags || '',

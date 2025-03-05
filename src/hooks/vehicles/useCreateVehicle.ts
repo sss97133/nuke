@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VehicleFormValues } from '@/components/vehicles/forms/VehicleForm';
 import { useToast } from '@/hooks/use-toast';
+import { Vehicle } from '@/components/vehicles/discovery/types';
+import { addStoredVehicle } from './mockVehicleStorage';
 
 interface Vehicle {
   id: string;
@@ -34,10 +36,30 @@ export const useCreateVehicle = () => {
         id: `vehicle_${Date.now()}`,
         ...data,
         created_at: new Date().toISOString(),
+        // Transform to match the Vehicle type from discovery/types
+        price: 0,
+        market_value: 0,
+        price_trend: 'stable',
+        image: data.image || '/placeholder-vehicle.jpg',
+        location: 'Local',
+        added: data.added,
+        tags: data.tags || [],
+        condition_rating: 5,
+        vehicle_type: 'car',
+        body_type: '',
+        transmission: '',
+        drivetrain: '',
+        rarity_score: 0,
+        era: '',
+        restoration_status: '',
+        special_edition: false
       };
       
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Add to our mock storage
+      addStoredVehicle(mockResponse as unknown as Vehicle);
       
       toast({
         title: 'Vehicle added',
