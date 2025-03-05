@@ -8,17 +8,26 @@ import twitchService from '../../../streaming/services/TwitchService';
  * Fetches currently live Twitch streams
  * @returns Promise with array of content items
  */
-export const fetchTwitchStreams = async () => {
+export const fetchTwitchStreams = async (searchTerm?: string) => {
   try {
     const streams = await twitchService.getStreams();
     
+    // Filter by search term if provided
+    const filteredStreams = searchTerm 
+      ? streams.filter(stream => 
+          stream.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          stream.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          stream.game_name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : streams;
+    
     // Transform the streams into the content format
-    return streams.map(stream => ({
+    return filteredStreams.map(stream => ({
       id: stream.id,
       title: stream.title,
       description: `Playing ${stream.game_name} with ${stream.viewer_count} viewers`,
       image: stream.thumbnail_url.replace('{width}', '440').replace('{height}', '248'),
-      url: `https://twitch.tv/${stream.user_login}`,
+      url: `/streaming/watch/${stream.user_login}`,  // Link to in-app watch page instead of Twitch
       author: {
         name: stream.user_name,
         avatar: null

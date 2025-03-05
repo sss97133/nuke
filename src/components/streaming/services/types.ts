@@ -30,3 +30,9 @@ export interface TwitchAuthData {
   scope: string[];
   token_type: string;
 }
+
+// Interface for in-app stream viewing
+export interface StreamViewParams {
+  username: string;
+  streamId?: string;
+}

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
@@ -32,6 +31,7 @@ import Marketplace from '@/pages/Marketplace';
 import MarketplaceListingDetail from '@/pages/MarketplaceListingDetail';
 import { AuthForm } from '@/components/auth/AuthForm';
 import Streaming from '@/pages/Streaming';
+import StreamViewer from '@/pages/StreamViewer';
 
 // Route type definitions
 export enum RouteType {
@@ -91,6 +91,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/studio', element: <Studio />, type: RouteType.PROTECTED },
   { path: '/explore/manage', element: <ExploreContentManagement />, type: RouteType.PROTECTED },
   { path: '/streaming', element: <Streaming />, type: RouteType.PROTECTED },
+  { path: '/streaming/watch/:username', element: <StreamViewer />, type: RouteType.PROTECTED },
 ];
 
 // Special routes

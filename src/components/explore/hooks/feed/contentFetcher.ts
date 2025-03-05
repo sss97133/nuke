@@ -61,8 +61,27 @@ export async function fetchFeedContent(
     if (includeStreams) {
       try {
         const twitchStreams = await fetchLiveTwitchStreams(searchTerm);
+        
         if (twitchStreams && twitchStreams.length > 0) {
-          allContent = [...allContent, ...twitchStreams];
+          // Convert Twitch streams to ContentItem format
+          const formattedStreams: ContentItem[] = twitchStreams.map(stream => ({
+            id: stream.id,
+            type: 'stream',
+            title: stream.title,
+            subtitle: stream.description || `Playing ${stream.game_name || 'a game'}`,
+            image_url: stream.image || '',
+            tags: stream.tags || [],
+            reason: 'Live now',
+            location: 'Online',
+            relevance_score: 100,
+            created_at: stream.published || new Date().toISOString(),
+            creator_name: stream.author?.name || '',
+            view_count: stream.views || 0,
+            url: stream.url || '',
+            stream_url: stream.url || ''
+          }));
+          
+          allContent = [...allContent, ...formattedStreams];
         }
       } catch (err) {
         console.error('Error fetching Twitch streams:', err);

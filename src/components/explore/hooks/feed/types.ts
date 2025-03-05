@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 
 export interface ContentItem {
@@ -22,6 +21,17 @@ export interface ContentItem {
   is_liked?: boolean;
   is_saved?: boolean;
   stream_url?: string;
+  description?: string;  // For stream descriptions
+  image?: string;        // Alternative to image_url for streams
+  url?: string;          // For stream URLs
+  author?: {             // Alternative to creator fields for streams
+    name: string;
+    avatar: string | null;
+  };
+  published?: string;    // Alternative to created_at for streams
+  views?: number;        // Alternative to view_count for streams
+  likes?: number;        // Alternative to like_count for streams
+  comments?: number;     // For stream comments count
 }
 
 export interface FeedOptions {

@@ -2,10 +2,12 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { ExternalLink, ThumbsUp, Share2, Bookmark } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface ContentCardFooterProps {
   id: string;
   type: string;
+  url?: string;
   like_count?: number;
   share_count?: number;
   save_count?: number;
@@ -19,6 +21,7 @@ interface ContentCardFooterProps {
 export const ContentCardFooter: React.FC<ContentCardFooterProps> = ({
   id,
   type,
+  url,
   like_count,
   share_count,
   save_count,
@@ -28,12 +31,23 @@ export const ContentCardFooter: React.FC<ContentCardFooterProps> = ({
   onShare,
   onSave
 }) => {
+  const isAppLink = url && url.startsWith('/');
+  
   return (
     <div className="pt-0 flex flex-col gap-1 sm:gap-2 p-2 sm:p-3">
-      <Button variant="secondary" size="sm" className="w-full text-xs sm:text-sm py-1 sm:py-2">
-        View Details
-        <ExternalLink className="ml-1 h-3 w-3" />
-      </Button>
+      {isAppLink ? (
+        <Button variant="secondary" size="sm" className="w-full text-xs sm:text-sm py-1 sm:py-2" asChild>
+          <Link to={url}>
+            Watch Stream
+            <ExternalLink className="ml-1 h-3 w-3" />
+          </Link>
+        </Button>
+      ) : (
+        <Button variant="secondary" size="sm" className="w-full text-xs sm:text-sm py-1 sm:py-2">
+          View Details
+          <ExternalLink className="ml-1 h-3 w-3" />
+        </Button>
+      )}
       
       <div className="flex justify-between w-full">
         <Button 
