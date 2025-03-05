@@ -9,8 +9,7 @@ import {
 import { 
   login as twitchLogin, 
   logout as twitchLogout, 
-  isAuthenticated,
-  checkAuthResponse
+  isAuthenticated
 } from './auth/twitchAuth';
 import { 
   getClientId, 
@@ -22,7 +21,34 @@ import { StreamMetadata, TwitchUserData } from './types';
 class TwitchService {
   constructor() {
     // Check URL for OAuth response
-    checkAuthResponse();
+    this.checkAuthFromUrl();
+  }
+
+  /**
+   * Check for auth response in the URL
+   */
+  private checkAuthFromUrl() {
+    // This function replaces the missing checkAuthResponse
+    // Extract token from URL if present
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get('access_token');
+      const expiresIn = params.get('expires_in');
+      
+      if (accessToken) {
+        // Save the token
+        localStorage.setItem('twitch_auth_token', accessToken);
+        
+        // Clear the URL hash
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        
+        // Dispatch event for auth change
+        window.dispatchEvent(new Event('twitch_auth_changed'));
+        
+        console.log('Authenticated with Twitch');
+      }
+    }
   }
 
   /**
