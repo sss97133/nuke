@@ -1,7 +1,5 @@
-
-import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import PartsDashboard from '@/components/parts/PartsDashboard';
 import InventoryBrowser from '@/components/parts/InventoryBrowser';
 import VehiclePartsViewer from '@/components/parts/VehiclePartsViewer';

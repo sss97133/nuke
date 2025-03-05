@@ -1,14 +1,6 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/hooks/use-auth';
 import { atom, useAtom } from 'jotai';
@@ -17,7 +9,7 @@ import { atom, useAtom } from 'jotai';
 export const authRequiredModalAtom = atom({
   isOpen: false,
   message: "Please sign in to continue",
-  actionType: "generic",
+  actionType: "generic"
 });
 
 export const AuthRequiredModal = () => {
