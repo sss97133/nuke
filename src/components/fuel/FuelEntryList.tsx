@@ -1,73 +1,89 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Pencil, Trash2, Calendar, Droplet, DollarSign, Car } from "lucide-react";
+import { Pencil, Trash2, Calendar, Droplet, DollarSign, Car, AlertCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFuelData } from "@/hooks/fuel/useFuelData";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-interface FuelEntry {
-  id: string;
-  date: string;
-  vehicleName: string;
-  amount: number;
-  price: number;
-  total: number;
-  odometer: number;
-  fuelType: string;
+interface FuelEntryListProps {
+  vehicleId?: string;
+  onEdit?: (id: string) => void;
 }
 
-export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) => {
-  const [entries, setEntries] = useState<FuelEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchEntries = async () => {
-      setLoading(true);
-      try {
-        const mockEntries: FuelEntry[] = [
-          {
-            id: "1",
-            date: "2023-09-15",
-            vehicleName: "2019 Toyota Camry",
-            amount: 12.5,
-            price: 3.49,
-            total: 43.63,
-            odometer: 45230,
-            fuelType: "regular"
-          },
-          {
-            id: "2",
-            date: "2023-09-02",
-            vehicleName: "2019 Toyota Camry",
-            amount: 11.2,
-            price: 3.59,
-            total: 40.21,
-            odometer: 44950,
-            fuelType: "regular"
-          }
-        ];
-        
-        setEntries(mockEntries);
-      } catch (error) {
-        console.error("Error fetching fuel entries:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEntries();
-  }, [refreshTrigger]);
+export const FuelEntryList = ({ vehicleId, onEdit }: FuelEntryListProps) => {
+  const { toast } = useToast();
+  const { entries, isLoading, error, deleteFuelEntry } = useFuelData(vehicleId);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
 
   const handleEdit = (id: string) => {
-    console.log(`Edit entry ${id}`);
+    if (onEdit) {
+      onEdit(id);
+    } else {
+      toast({
+        title: "Edit functionality",
+        description: "Edit functionality is not yet implemented for this view.",
+      });
+    }
   };
 
-  const handleDelete = (id: string) => {
-    console.log(`Delete entry ${id}`);
+  const openDeleteDialog = (id: string) => {
+    setDeleteId(id);
   };
 
-  if (loading) {
+  const closeDeleteDialog = () => {
+    setDeleteId(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    
+    try {
+      setDeleteInProgress(true);
+      await deleteFuelEntry(deleteId);
+      
+      toast({
+        title: "Entry deleted",
+        description: "Fuel entry has been successfully deleted.",
+      });
+    } catch (err) {
+      console.error("Error deleting entry:", err);
+      toast({
+        title: "Delete failed",
+        description: "There was an error deleting the fuel entry. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteInProgress(false);
+      closeDeleteDialog();
+    }
+  };
+
+  if (isLoading) {
     return <div className="p-3 sm:p-4 text-center">Loading entries...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-3 sm:p-4 text-center text-destructive">
+        <div className="flex justify-center mb-2">
+          <AlertCircle className="h-5 w-5" />
+        </div>
+        <p>Error loading fuel entries. Please try again later.</p>
+      </div>
+    );
   }
 
   if (entries.length === 0) {
@@ -88,7 +104,7 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(entry.id)}>
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(entry.id)}>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDeleteDialog(entry.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -117,6 +133,12 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
                 <span className="text-xs font-medium ml-1.5">{entry.odometer.toLocaleString()}</span>
               </div>
             </div>
+            
+            {entry.notes && (
+              <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                {entry.notes}
+              </div>
+            )}
           </Card>
         ))}
       </div>
@@ -137,6 +159,7 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
               <TableHead>Price</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Odometer</TableHead>
+              <TableHead>Fuel Type</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -149,11 +172,12 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
                 <TableCell>${entry.price.toFixed(2)}</TableCell>
                 <TableCell>${entry.total.toFixed(2)}</TableCell>
                 <TableCell>{entry.odometer.toLocaleString()}</TableCell>
+                <TableCell className="capitalize">{entry.fuelType}</TableCell>
                 <TableCell className="space-x-2">
                   <Button variant="ghost" size="icon" onClick={() => handleEdit(entry.id)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)}>
+                  <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(entry.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>
@@ -162,6 +186,28 @@ export const FuelEntryList = ({ refreshTrigger }: { refreshTrigger: number }) =>
           </TableBody>
         </Table>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={closeDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this fuel entry. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteInProgress}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteInProgress}
+            >
+              {deleteInProgress ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
