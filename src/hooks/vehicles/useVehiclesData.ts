@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SortDirection, SortField } from '../../components/vehicles/discovery/types';
 import { mockVehicles } from './mockVehicleData';
 import { 
@@ -11,8 +11,58 @@ import {
   handleBulkRemove,
   toggleVehicleSelection
 } from './vehicleActions';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
+import { Vehicle } from '../../components/vehicles/discovery/types';
+
+// Feature flag for gradual migration
+const USE_REAL_DATA = {
+  vehicles: true
+};
+
+// Adapter function to map database fields to component-expected schema
+function adaptVehicleFromDB(dbVehicle: any): Vehicle {
+  return {
+    id: dbVehicle.id,
+    make: dbVehicle.make || '',
+    model: dbVehicle.model || '',
+    year: dbVehicle.year || 0,
+    price: dbVehicle.price || 0,
+    market_value: dbVehicle.market_value || dbVehicle.price || 0,
+    price_trend: dbVehicle.price_trend || 'stable',
+    mileage: dbVehicle.mileage || 0,
+    image: dbVehicle.image_url || '/placeholder.png',
+    location: dbVehicle.location || '',
+    added: dbVehicle.created_at ? getRelativeTimeString(new Date(dbVehicle.created_at)) : '',
+    tags: dbVehicle.tags || [],
+    condition_rating: dbVehicle.condition_rating || 5,
+    vehicle_type: dbVehicle.vehicle_type || '',
+    body_type: dbVehicle.body_type || '',
+    transmission: dbVehicle.transmission || '',
+    drivetrain: dbVehicle.drivetrain || '',
+    // Include other fields with safe defaults
+    rarity_score: dbVehicle.rarity_score || 0,
+    era: dbVehicle.era || '',
+    restoration_status: dbVehicle.restoration_status || '',
+    special_edition: dbVehicle.special_edition || false
+  };
+}
+
+// Helper function to convert timestamp to "X days ago" format
+function getRelativeTimeString(date: Date): string {
+  const now = new Date();
+  const diffInMs = now.getTime() - date.getTime();
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+  
+  if (diffInDays === 0) return 'today';
+  if (diffInDays === 1) return 'yesterday';
+  if (diffInDays < 7) return `${diffInDays} days ago`;
+  if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
+  return `${Math.floor(diffInDays / 30)} months ago`;
+}
 
 export function useVehiclesData() {
+  const { session } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVehicles, setSelectedVehicles] = useState<number[]>([]);
   const [bulkActionOpen, setBulkActionOpen] = useState(false);
@@ -20,8 +70,83 @@ export function useVehiclesData() {
   const [sortField, setSortField] = useState<SortField>("added");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   
-  // Get vehicles data from the mock data
-  const vehicles = mockVehicles;
+  // Add state for vehicles data
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Fetch vehicles data
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function fetchVehicles() {
+      try {
+        setIsLoading(true);
+        
+        if (USE_REAL_DATA.vehicles) {
+          // Try to get authenticated user
+          const userId = session?.user?.id;
+          
+          if (!userId) {
+            console.log('User not authenticated, using mock data');
+            if (isMounted) {
+              setVehicles(mockVehicles);
+              setIsLoading(false);
+            }
+            return;
+          }
+          
+          // Build query based on sort field
+          let query = supabase
+            .from('vehicles')
+            .select('*')
+            .eq('user_id', userId);
+          
+          // Apply sorting
+          const dbSortField = sortField === 'added' ? 'created_at' : sortField;
+          query = query.order(dbSortField, { ascending: sortDirection === 'asc' });
+          
+          const { data, error: fetchError } = await query;
+          
+          if (fetchError) throw fetchError;
+          
+          if (isMounted) {
+            // Transform data to match expected schema
+            const adaptedVehicles = (data || []).map(adaptVehicleFromDB);
+            
+            // Fall back to mock data if no real data found
+            setVehicles(adaptedVehicles.length > 0 ? adaptedVehicles : mockVehicles);
+          }
+        } else {
+          // Use mock data directly when feature flag is off
+          if (isMounted) {
+            setVehicles(mockVehicles);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching vehicles:', err);
+        
+        if (isMounted) {
+          // Set error message
+          setError(err.message || 'Failed to fetch vehicles');
+          
+          // Fall back to mock data
+          setVehicles(mockVehicles);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+    
+    fetchVehicles();
+    
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [session, sortField, sortDirection]);
   
   // Wrapper for toggle selection that includes the current state
   const toggleSelection = (id: number) => {
@@ -49,6 +174,8 @@ export function useVehiclesData() {
 
   return {
     vehicles,
+    isLoading,
+    error,
     searchTerm,
     setSearchTerm,
     selectedVehicles,
