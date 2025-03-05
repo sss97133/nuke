@@ -61,19 +61,19 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
     year: initialValues.year || new Date().getFullYear(),
     color: initialValues.color || '',
     vin: initialValues.vin || '',
-    mileage: initialValues.mileage || undefined,
+    mileage: initialValues.mileage,
     trim: initialValues.trim || '',
     image: initialValues.image || '',
     tags: initialValues.tags || '',
     notes: initialValues.notes || '',
   };
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<VehicleFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues,
   });
 
-  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleSubmit = async (values: VehicleFormValues) => {
     await onSubmit(values);
   };
 

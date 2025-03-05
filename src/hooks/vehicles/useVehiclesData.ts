@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { SortDirection, SortField } from '../../components/vehicles/discovery/types';
-import { mockVehicles } from './mockVehicleData';
 import { 
   handleVerify, 
   handleEdit, 
@@ -13,6 +12,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Vehicle } from '../../components/vehicles/discovery/types';
+import { getStoredVehicles } from './mockVehicleStorage';
 
 // Feature flag for gradual migration
 const USE_REAL_DATA = {
@@ -39,7 +39,6 @@ function adaptVehicleFromDB(dbVehicle: any): Vehicle {
     body_type: dbVehicle.body_type || '',
     transmission: dbVehicle.transmission || '',
     drivetrain: dbVehicle.drivetrain || '',
-    // Include other fields with safe defaults
     rarity_score: dbVehicle.rarity_score || 0,
     era: dbVehicle.era || '',
     restoration_status: dbVehicle.restoration_status || '',
@@ -89,8 +88,7 @@ export function useVehiclesData() {
           if (!userId) {
             console.log('User not authenticated, using mock data');
             if (isMounted) {
-              // Import the stored vehicles instead of using mockVehicles directly
-              const { getStoredVehicles } = await import('./mockVehicleStorage');
+              // Use getStoredVehicles to get both mock and newly added vehicles
               setVehicles(getStoredVehicles());
               setIsLoading(false);
             }
@@ -117,8 +115,7 @@ export function useVehiclesData() {
             
             // If no real data found
             if (adaptedVehicles.length === 0) {
-              // Import the stored vehicles instead of using mockVehicles directly
-              const { getStoredVehicles } = await import('./mockVehicleStorage');
+              // Use getStoredVehicles to get both mock and newly added vehicles
               setVehicles(getStoredVehicles());
             } else {
               setVehicles(adaptedVehicles);
@@ -127,8 +124,7 @@ export function useVehiclesData() {
         } else {
           // Use mock data directly when feature flag is off
           if (isMounted) {
-            // Import the stored vehicles instead of using mockVehicles directly
-            const { getStoredVehicles } = await import('./mockVehicleStorage');
+            // Use getStoredVehicles to get both mock and newly added vehicles
             setVehicles(getStoredVehicles());
           }
         }
@@ -140,7 +136,6 @@ export function useVehiclesData() {
           setError(err.message || 'Failed to fetch vehicles');
           
           // Fall back to mock data
-          const { getStoredVehicles } = await import('./mockVehicleStorage');
           setVehicles(getStoredVehicles());
         }
       } finally {

@@ -1,21 +1,9 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VehicleFormValues } from '@/components/vehicles/forms/VehicleForm';
 import { useToast } from '@/hooks/use-toast';
-import { Vehicle } from '@/components/vehicles/discovery/types';
+import { Vehicle as DiscoveryVehicle } from '@/components/vehicles/discovery/types';
 import { addStoredVehicle } from './mockVehicleStorage';
-
-interface Vehicle {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  mileage?: number;
-  image: string;
-  added: string;
-  [key: string]: any;
-}
 
 export const useCreateVehicle = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -32,14 +20,16 @@ export const useCreateVehicle = () => {
       console.log('Creating vehicle with data:', data);
       
       // For now, return a mock response
-      const mockResponse = {
-        id: `vehicle_${Date.now()}`,
-        ...data,
-        created_at: new Date().toISOString(),
-        // Transform to match the Vehicle type from discovery/types
+      const mockResponse: DiscoveryVehicle = {
+        id: Date.now(), // Use timestamp as numeric ID
+        make: data.make,
+        model: data.model,
+        year: data.year,
+        trim: data.trim,
         price: 0,
         market_value: 0,
         price_trend: 'stable',
+        mileage: data.mileage || 0,
         image: data.image || '/placeholder-vehicle.jpg',
         location: 'Local',
         added: data.added,
@@ -59,14 +49,14 @@ export const useCreateVehicle = () => {
       await new Promise(resolve => setTimeout(resolve, 800));
       
       // Add to our mock storage
-      addStoredVehicle(mockResponse as unknown as Vehicle);
+      addStoredVehicle(mockResponse);
       
       toast({
         title: 'Vehicle added',
         description: `Successfully added ${data.year} ${data.make} ${data.model}`,
       });
       
-      return mockResponse as unknown as Vehicle;
+      return mockResponse;
       
       /*
       // NOTE: Commented out until we have proper database tables
