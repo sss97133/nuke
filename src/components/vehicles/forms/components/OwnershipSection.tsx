@@ -3,22 +3,103 @@ import { UseFormReturn } from 'react-hook-form';
 import { VehicleFormValues } from '../types';
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { FileUploader } from '@/components/detail/image-upload/FileUploader';
 import { useDocumentUpload } from '../hooks/useDocumentUpload';
+import { useToastContext } from '@/contexts/ToastContext';
+import { FileText, Car, AlertCircle } from 'lucide-react';
 
 export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValues> }) => {
   const ownershipStatus = form.watch('ownership_status');
+  const { toast } = useToastContext();
   const { documents, setDocuments, handleDocumentsSelected } = useDocumentUpload({
     form,
-    field: 'ownership_documents'
+    field: 'ownership_documents',
+    onValidationError: (message) => {
+      toast({
+        title: 'Document Error',
+        description: message,
+        variant: 'destructive'
+      });
+    },
+    onSuccess: (count) => {
+      toast({
+        title: 'Documents Added',
+        description: `${count} document${count !== 1 ? 's' : ''} successfully uploaded.`,
+        variant: 'success'
+      });
+    }
   });
+
+  const renderOwnershipTypeIcon = () => {
+    switch (ownershipStatus) {
+      case 'owned':
+        return <Car className="h-5 w-5 text-primary" />;
+      case 'claimed':
+        return <FileText className="h-5 w-5 text-yellow-500" />;
+      case 'discovered':
+        return <AlertCircle className="h-5 w-5 text-blue-500" />;
+      default:
+        return <Car className="h-5 w-5 text-primary" />;
+    }
+  };
+
+  const getDocumentInstructions = () => {
+    switch (ownershipStatus) {
+      case 'owned':
+        return 'Upload title, bill of sale, registration, or other proof of ownership.';
+      case 'claimed':
+        return 'Upload documentation supporting your claim to this vehicle.';
+      case 'discovered':
+        return 'Upload photos or documents from when you discovered this vehicle.';
+      default:
+        return 'Upload relevant documentation for this vehicle.';
+    }
+  };
+
+  const getDocumentLabel = () => {
+    switch (ownershipStatus) {
+      case 'owned':
+        return 'Ownership Documents';
+      case 'claimed':
+        return 'Claim Evidence';
+      case 'discovered':
+        return 'Discovery Documentation';
+      default:
+        return 'Vehicle Documents';
+    }
+  };
+
+  const handleStatusChange = (newStatus: string) => {
+    // If there are already documents uploaded and user is changing status,
+    // confirm with user that this will clear their documents
+    if (documents.length > 0 && newStatus !== ownershipStatus) {
+      if (window.confirm(
+        'Changing ownership status will clear your uploaded documents. Do you want to continue?'
+      )) {
+        // Clear documents and set new status
+        setDocuments([]);
+        form.setValue('ownership_documents', []);
+        form.setValue('ownership_status', newStatus as 'owned' | 'claimed' | 'discovered');
+      }
+    } else {
+      // Just update the status
+      form.setValue('ownership_status', newStatus as 'owned' | 'claimed' | 'discovered');
+    }
+  };
 
   return (
     <Card className="w-full">
-      <CardContent className="pt-6">
+      <CardHeader className="flex flex-row items-center">
+        <div className="mr-2">
+          {renderOwnershipTypeIcon()}
+        </div>
+        <CardTitle>Ownership Information</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
         <div className="space-y-6">
           <FormField
             control={form.control}
@@ -28,31 +109,44 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                 <FormLabel>Ownership Status</FormLabel>
                 <FormControl>
                   <RadioGroup
-                    onValueChange={field.onChange}
+                    onValueChange={handleStatusChange}
                     defaultValue={field.value}
                     className="flex flex-col space-y-1"
+                    value={field.value}
                   >
                     <FormItem className="flex items-center space-x-3 space-y-0">
                       <FormControl>
-                        <RadioGroupItem value="owned" />
+                        <RadioGroupItem value="owned" id="owned" />
                       </FormControl>
-                      <FormLabel className="font-normal">
+                      <FormLabel 
+                        htmlFor="owned" 
+                        className="font-normal cursor-pointer"
+                        onClick={() => handleStatusChange('owned')}
+                      >
                         I own this vehicle
                       </FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-3 space-y-0">
                       <FormControl>
-                        <RadioGroupItem value="claimed" />
+                        <RadioGroupItem value="claimed" id="claimed" />
                       </FormControl>
-                      <FormLabel className="font-normal">
+                      <FormLabel 
+                        htmlFor="claimed" 
+                        className="font-normal cursor-pointer"
+                        onClick={() => handleStatusChange('claimed')}
+                      >
                         I'm claiming this vehicle
                       </FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-3 space-y-0">
                       <FormControl>
-                        <RadioGroupItem value="discovered" />
+                        <RadioGroupItem value="discovered" id="discovered" />
                       </FormControl>
-                      <FormLabel className="font-normal">
+                      <FormLabel 
+                        htmlFor="discovered" 
+                        className="font-normal cursor-pointer"
+                        onClick={() => handleStatusChange('discovered')}
+                      >
                         I discovered this vehicle
                       </FormLabel>
                     </FormItem>
@@ -64,7 +158,7 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
           />
 
           {ownershipStatus === 'owned' && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-fadeIn">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -73,7 +167,15 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                     <FormItem>
                       <FormLabel>Purchase Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input 
+                          type="date" 
+                          {...field} 
+                          value={field.value || ''}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            // Add validation here if needed
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -86,7 +188,18 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                     <FormItem>
                       <FormLabel>Purchase Price</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. $25,000" {...field} />
+                        <Input 
+                          placeholder="e.g. $25,000" 
+                          {...field} 
+                          value={field.value || ''}
+                          onChange={(e) => {
+                            // Allow only numbers, commas, periods, and dollar sign
+                            const value = e.target.value;
+                            if (/^[$]?[0-9,]*\.?[0-9]*$/.test(value) || value === '') {
+                              field.onChange(value);
+                            }
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -100,31 +213,21 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                   <FormItem>
                     <FormLabel>Purchase Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. Dealer name, private sale" {...field} />
+                      <Input 
+                        placeholder="e.g. Dealer name, private sale" 
+                        {...field} 
+                        value={field.value || ''}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
-              <div className="space-y-2">
-                <FormLabel>Ownership Documents</FormLabel>
-                <FileUploader
-                  selectedFiles={documents}
-                  setSelectedFiles={setDocuments}
-                  onFilesSelected={handleDocumentsSelected}
-                  acceptedFileTypes={['image/*', 'application/pdf']}
-                  maxFiles={5}
-                />
-                <FormDescription>
-                  Upload title, bill of sale, registration, or other proof of ownership.
-                </FormDescription>
-              </div>
             </div>
           )}
 
           {ownershipStatus === 'claimed' && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-fadeIn">
               <FormField
                 control={form.control}
                 name="claim_justification"
@@ -136,31 +239,18 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                         placeholder="Explain why you're claiming this vehicle"
                         className="min-h-[100px]"
                         {...field}
+                        value={field.value || ''}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
-              <div className="space-y-2">
-                <FormLabel>Claim Evidence</FormLabel>
-                <FileUploader
-                  selectedFiles={documents}
-                  setSelectedFiles={setDocuments}
-                  onFilesSelected={handleDocumentsSelected}
-                  acceptedFileTypes={['image/*', 'application/pdf']}
-                  maxFiles={5}
-                />
-                <FormDescription>
-                  Upload documentation supporting your claim to this vehicle.
-                </FormDescription>
-              </div>
             </div>
           )}
 
           {ownershipStatus === 'discovered' && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-fadeIn">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -169,7 +259,11 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                     <FormItem>
                       <FormLabel>Discovery Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input 
+                          type="date" 
+                          {...field} 
+                          value={field.value || ''}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -182,7 +276,11 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                     <FormItem>
                       <FormLabel>Discovery Location</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Barn, storage facility" {...field} />
+                        <Input 
+                          placeholder="e.g. Barn, storage facility" 
+                          {...field} 
+                          value={field.value || ''}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -200,28 +298,31 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                         placeholder="Describe how you discovered this vehicle"
                         className="min-h-[100px]"
                         {...field}
+                        value={field.value || ''}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
-              <div className="space-y-2">
-                <FormLabel>Discovery Documentation</FormLabel>
-                <FileUploader
-                  selectedFiles={documents}
-                  setSelectedFiles={setDocuments}
-                  onFilesSelected={handleDocumentsSelected}
-                  acceptedFileTypes={['image/*', 'application/pdf']}
-                  maxFiles={5}
-                />
-                <FormDescription>
-                  Upload photos or documents from when you discovered this vehicle.
-                </FormDescription>
-              </div>
             </div>
           )}
+          
+          <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-800">
+            <FormLabel>{getDocumentLabel()}</FormLabel>
+            <FileUploader
+              selectedFiles={documents}
+              setSelectedFiles={setDocuments}
+              onFilesSelected={handleDocumentsSelected}
+              acceptedFileTypes={['image/*', 'application/pdf']}
+              maxFiles={5}
+              maxFileSize={10 * 1024 * 1024} // 10MB
+              ariaLabel={`Upload ${getDocumentLabel()}`}
+            />
+            <FormDescription>
+              {getDocumentInstructions()}
+            </FormDescription>
+          </div>
         </div>
       </CardContent>
     </Card>
