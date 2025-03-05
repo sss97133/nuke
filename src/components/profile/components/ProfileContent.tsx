@@ -5,6 +5,8 @@ import { UserProfileHeader } from '../UserProfileHeader';
 import { ProfileLoadingState } from './ProfileLoadingState';
 import { ProfileErrorState } from './ProfileErrorState';
 import { useProfileData } from '../hooks/useProfileData';
+import { SocialLinks, StreamingLinks } from '../types';
+import { AnalysisResult } from '../hooks/useProfileAnalysis';
 
 interface ProfileContentProps {
   userId: string;
@@ -12,7 +14,7 @@ interface ProfileContentProps {
   isLoading: boolean;
   error: string | undefined;
   profileData: any | null;
-  analysisData: any | null;
+  analysisData: AnalysisResult | null;
   analysisError: string | undefined;
   onRefresh: () => void;
 }
@@ -39,18 +41,38 @@ export const ProfileContent = ({
     return <ProfileErrorState error="Profile data not found" onRetry={onRefresh} />;
   }
 
+  const socialLinks: SocialLinks = profileData.social_links || {
+    twitter: '',
+    instagram: '',
+    linkedin: '',
+    github: ''
+  };
+  
+  const streamingLinks: StreamingLinks = profileData.streaming_links || {
+    twitch: '',
+    youtube: '',
+    tiktok: ''
+  };
+
   return (
     <div className="space-y-6">
       <UserProfileHeader
-        profileData={profileData}
-        isOwnProfile={isOwnProfile}
+        userId={userId}
+        fullName={profileData.full_name}
+        username={profileData.username}
+        avatarUrl={profileData.avatar_url}
+        bio={profileData.bio}
       />
       <ProfileTabs
         userId={userId}
-        profileData={profileData}
-        analysisData={analysisData}
-        isOwnProfile={isOwnProfile}
-        analysisError={analysisError}
+        socialLinks={socialLinks}
+        streamingLinks={streamingLinks}
+        achievements={profileData.achievements || []}
+        analysisResult={analysisData}
+        onSocialLinksChange={() => {}}
+        onStreamingLinksChange={() => {}}
+        onSocialLinksSubmit={() => {}}
+        onStreamingLinksSubmit={() => {}}
       />
     </div>
   );
@@ -58,24 +80,25 @@ export const ProfileContent = ({
 
 export const ProfileContentContainer = ({ userId, isOwnProfile }: { userId: string, isOwnProfile: boolean }) => {
   const {
-    isLoading,
-    error,
-    profileData,
-    analysisData,
-    analysisError,
-    refreshData
-  } = useProfileData(userId);
+    profile,
+    achievements, 
+    isLoading, 
+    error, 
+    refetch
+  } = useProfileData();
+
+  const errorMessage = error ? (error instanceof Error ? error.message : String(error)) : undefined;
 
   return (
     <ProfileContent
       userId={userId}
       isOwnProfile={isOwnProfile}
       isLoading={isLoading}
-      error={error}
-      profileData={profileData}
-      analysisData={analysisData}
-      analysisError={analysisError}
-      onRefresh={refreshData}
+      error={errorMessage}
+      profileData={profile}
+      analysisData={null}
+      analysisError={undefined}
+      onRefresh={refetch}
     />
   );
 };

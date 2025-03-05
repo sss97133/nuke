@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ProfileContent } from './components/ProfileContent';
 import { ProfileLoadingState } from './components/ProfileLoadingState';
@@ -119,6 +120,8 @@ export const UserProfile = () => {
     );
   }
 
+  const errorMessage = analysisError ? (analysisError instanceof Error ? analysisError.message : String(analysisError)) : undefined;
+
   return (
     <ProfileContent
       userId={profile.id}
@@ -127,7 +130,7 @@ export const UserProfile = () => {
       error={undefined}
       profileData={profile}
       analysisData={analysisResult}
-      analysisError={analysisError ? String(analysisError) : undefined}
+      analysisError={errorMessage}
       onRefresh={refetch}
     />
   );
