@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,11 +8,19 @@ import { useAuth } from '@/hooks/use-auth';
 import { useNavigate } from 'react-router-dom';
 import { useAtom } from 'jotai';
 import { authRequiredModalAtom } from '@/components/auth/AuthRequiredModal';
+import FilterDialog from './FilterDialog';
+import { useToast } from '@/components/ui/use-toast';
 
 export const MarketplaceHeader = () => {
   const { session } = useAuth();
   const navigate = useNavigate();
   const [, setAuthModal] = useAtom(authRequiredModalAtom);
+  const { toast } = useToast();
+  
+  // State for filter dialog
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  // State for active filters
+  const [activeFilters, setActiveFilters] = useState<any>(null);
   
   const isAuthenticated = !!session;
   
@@ -26,9 +34,12 @@ export const MarketplaceHeader = () => {
       return;
     }
     
-    // Navigate to create listing page (would be implemented in a real app)
-    // navigate('/marketplace/create');
-    alert('Create listing functionality would be implemented here');
+    // In a real implementation, we would navigate to a form page
+    // For now, we'll use a toast to indicate future functionality
+    toast({
+      title: "Create Listing",
+      description: "This feature will be implemented soon. You'll be able to create and publish your own listings.",
+    });
   };
   
   const handleSavedSearches = () => {
@@ -41,9 +52,25 @@ export const MarketplaceHeader = () => {
       return;
     }
     
-    // Navigate to saved searches page (would be implemented in a real app)
-    // navigate('/marketplace/saved-searches');
-    alert('Saved searches functionality would be implemented here');
+    // In a real implementation, we would navigate to a saved searches page
+    // For now, we'll use a toast to indicate future functionality
+    toast({
+      title: "Saved Searches & Alerts",
+      description: "This feature will be implemented soon. You'll be able to view and manage your saved searches and alerts.",
+    });
+  };
+  
+  const handleApplyFilters = (filters: any) => {
+    setActiveFilters(filters);
+    
+    // Show toast to indicate filters were applied
+    toast({
+      title: "Filters Applied",
+      description: `Applied ${Object.values(filters).flat().filter(Boolean).length} filters to your search.`,
+    });
+    
+    // In a real implementation, we would update the search results based on filters
+    console.log("Applied filters:", filters);
   };
   
   return (
@@ -59,9 +86,18 @@ export const MarketplaceHeader = () => {
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button 
+            variant="outline"
+            onClick={() => setIsFilterOpen(true)}
+            className={activeFilters ? "bg-primary/10" : ""}
+          >
             <Filter className="h-4 w-4 mr-2" />
             Filters
+            {activeFilters && (
+              <span className="ml-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                {Object.values(activeFilters).flat().filter(Boolean).length}
+              </span>
+            )}
           </Button>
           
           <Button
@@ -102,6 +138,13 @@ export const MarketplaceHeader = () => {
           )}
         </div>
       </div>
+      
+      {/* Filter Dialog */}
+      <FilterDialog 
+        open={isFilterOpen} 
+        onOpenChange={setIsFilterOpen}
+        onApplyFilters={handleApplyFilters}
+      />
     </div>
   );
 };
