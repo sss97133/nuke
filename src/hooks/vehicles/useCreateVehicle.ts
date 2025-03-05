@@ -19,7 +19,11 @@ export const useCreateVehicle = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const createVehicle = async (data: VehicleFormValues & { user_id: string }) => {
+  const createVehicle = async (data: VehicleFormValues & { 
+    user_id: string;
+    added: string;
+    tags: string[];
+  }) => {
     setIsLoading(true);
     
     try {
