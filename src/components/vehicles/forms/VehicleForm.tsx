@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -27,6 +28,18 @@ export interface VehicleFormValues {
   image?: string;
   tags?: string; // Keep as string for form input, will be processed to array later
   notes?: string;
+  price?: number;
+  market_value?: number;
+  location?: string;
+  condition_rating?: number;
+  vehicle_type?: string;
+  body_type?: string;
+  transmission?: string;
+  drivetrain?: string;
+  rarity_score?: number;
+  era?: string;
+  restoration_status?: string;
+  special_edition?: boolean;
 }
 
 interface VehicleFormProps {
@@ -47,6 +60,18 @@ const formSchema = z.object({
   image: z.string().optional(),
   tags: z.string().optional(),
   notes: z.string().optional(),
+  price: z.coerce.number().optional(),
+  market_value: z.coerce.number().optional(),
+  location: z.string().optional(),
+  condition_rating: z.coerce.number().optional(),
+  vehicle_type: z.string().optional(),
+  body_type: z.string().optional(),
+  transmission: z.string().optional(),
+  drivetrain: z.string().optional(),
+  rarity_score: z.coerce.number().optional(),
+  era: z.string().optional(),
+  restoration_status: z.string().optional(),
+  special_edition: z.boolean().optional(),
 });
 
 const VehicleForm: React.FC<VehicleFormProps> = ({ 

@@ -28,24 +28,24 @@ export const useCreateVehicle = () => {
         make: data.make,
         model: data.model,
         year: data.year,
-        trim: data.trim,
-        price: data.price || 0,
-        market_value: data.market_value || data.price || 0,
+        trim: data.trim || '',
+        price: data.price !== undefined ? data.price : 0,
+        market_value: data.market_value !== undefined ? data.market_value : (data.price !== undefined ? data.price : 0),
         price_trend: 'stable',
         mileage: data.mileage || 0,
         image: data.image || '/placeholder-vehicle.jpg',
         location: data.location || 'Local',
         added: data.added,
         tags: data.tags || [],
-        condition_rating: data.condition_rating || 5,
+        condition_rating: data.condition_rating !== undefined ? data.condition_rating : 5,
         vehicle_type: data.vehicle_type || 'car',
         body_type: data.body_type || '',
         transmission: data.transmission || '',
         drivetrain: data.drivetrain || '',
-        rarity_score: data.rarity_score || 0,
+        rarity_score: data.rarity_score !== undefined ? data.rarity_score : 0,
         era: data.era || '',
         restoration_status: data.restoration_status || 'original',
-        special_edition: data.special_edition || false
+        special_edition: data.special_edition !== undefined ? data.special_edition : false
       };
       
       // Simulate API delay
