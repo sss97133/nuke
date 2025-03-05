@@ -1,11 +1,49 @@
-import React from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { XCircle, CheckCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { ToastProps, ToastVariant } from '@/hooks/use-toast';
 
 interface ToastComponentProps extends ToastProps {
   id: string;
   visible: boolean;
-  onDismiss: (id: string) => void;
+  onDismiss?: (id: string) => void;
+  children?: ReactNode;
+}
+
+// Create context for toast provider
+type ToastContextType = {
+  toasts: ToastComponentProps[];
+};
+
+const ToastContext = createContext<ToastContextType>({ toasts: [] });
+
+// Add the missing components that are imported in toaster.tsx
+export function ToastProvider({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+
+export function ToastViewport() {
+  return null;
+}
+
+export function ToastTitle({ children }: { children: ReactNode }) {
+  return <h3 className="text-sm font-medium">{children}</h3>;
+}
+
+export function ToastDescription({ children }: { children: ReactNode }) {
+  return <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">{children}</div>;
+}
+
+export function ToastClose({ onClick }: { onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ml-2 inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
+      aria-label="Close"
+    >
+      <X className="h-5 w-5" />
+    </button>
+  );
 }
 
 export function Toast({
@@ -15,7 +53,8 @@ export function Toast({
   variant = 'default',
   visible,
   onDismiss,
-  action
+  action,
+  children
 }: ToastComponentProps) {
   const getVariantStyles = () => {
     switch (variant) {
@@ -95,9 +134,11 @@ export function Toast({
           {getIcon()}
         </div>
         <div className="ml-3 flex-1">
-          <h3 className={`text-sm font-medium ${getTitleColor()}`}>
-            {title}
-          </h3>
+          {title && (
+            <h3 className={`text-sm font-medium ${getTitleColor()}`}>
+              {title}
+            </h3>
+          )}
           {description && (
             <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               {description}
@@ -126,15 +167,18 @@ export function Toast({
               </button>
             </div>
           )}
+          {children}
         </div>
-        <button
-          type="button"
-          className="ml-2 inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
-          onClick={() => onDismiss(id)}
-          aria-label="Close"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        {onDismiss && (
+          <button
+            type="button"
+            className="ml-2 inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary"
+            onClick={() => onDismiss(id)}
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
     </div>
   );
