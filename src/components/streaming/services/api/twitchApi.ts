@@ -1,11 +1,23 @@
 
-import { getAuthToken } from '../auth/authUtils';
-import { getClientId } from '../config/twitchConfig';
+import { getAuthToken, isDemoModeEnabled } from '../auth/authUtils';
+import { getClientId, getMockTwitchUsername } from '../config/twitchConfig';
 
 /**
  * Fetch user's information
  */
 export const getUserInfo = async () => {
+  // Check if we're in demo mode
+  if (isDemoModeEnabled()) {
+    // Return mock user data for demo
+    return {
+      id: 'demo_123456789',
+      login: getMockTwitchUsername(),
+      display_name: 'Demo Streamer',
+      profile_image_url: 'https://placehold.co/100x100/purple/white?text=DS'
+    };
+  }
+  
+  // Normal API flow for real Twitch integration
   const authToken = getAuthToken();
   if (!authToken) return null;
   
@@ -39,6 +51,12 @@ export const getUserInfo = async () => {
 };
 
 // Re-export auth functions from the API layer file
-export { getAuthToken, setAuthToken, clearAuthToken } from '../auth/authUtils';
+export { 
+  getAuthToken, 
+  setAuthToken, 
+  clearAuthToken,
+  isDemoModeEnabled
+} from '../auth/authUtils';
+
 export { fetchTwitchStreams } from './contentApi';
 export { fetchLiveStreams, startStream, stopStream } from './streamingApi';
