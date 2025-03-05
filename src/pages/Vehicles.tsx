@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { PlusCircle, Car, Search, Filter, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import VehicleFilterDialog, { VehicleFilters } from '@/components/vehicles/VehicleFilterDialog';
+import EditVehicleForm from '@/components/vehicles/EditVehicleForm';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -48,7 +49,7 @@ const MOCK_VEHICLES = [
 
 export default function Vehicles() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [vehicles] = useState(MOCK_VEHICLES);
+  const [vehicles, setVehicles] = useState(MOCK_VEHICLES);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -56,15 +57,22 @@ export default function Vehicles() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<VehicleFilters | null>(null);
   
+  // Edit vehicle form state
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  
   // Apply filters function
   const handleApplyFilters = (filters: VehicleFilters) => {
     setActiveFilters(Object.keys(filters).length ? filters : null);
     
-    // Show toast to confirm filters were applied
-    toast({
-      title: "Filters Applied",
-      description: `Applied ${Object.keys(filters).length} filters to your vehicle list.`,
-    });
+    // Show toast notification about filters
+    const filterCount = Object.keys(filters).length;
+    if (filterCount > 0) {
+      toast({
+        title: "Filters Applied",
+        description: `Applied ${filterCount} filter${filterCount === 1 ? '' : 's'} to your vehicles.`,
+      });
+    }
   };
   
   // Clear all filters
@@ -80,11 +88,25 @@ export default function Vehicles() {
   
   // Handle edit button click
   const handleEditVehicle = (id: string) => {
-    // In a full implementation, this would navigate to an edit page
-    // For now, we'll show a toast notification
+    setSelectedVehicleId(id);
+    setIsEditOpen(true);
+  };
+  
+  // Handle successful edit
+  const handleEditSuccess = () => {
+    // In a real app, you would refresh the vehicle data
+    // For demo purposes, we'll just update the lastUpdated timestamp
+    setVehicles(prev => 
+      prev.map(vehicle => 
+        vehicle.id === selectedVehicleId
+          ? { ...vehicle, lastUpdated: new Date().toISOString() }
+          : vehicle
+      )
+    );
+    
     toast({
-      title: "Edit Vehicle",
-      description: "Vehicle editing functionality will be implemented soon.",
+      title: "Vehicle Updated",
+      description: "Your vehicle information has been successfully updated.",
     });
   };
   
@@ -295,6 +317,16 @@ export default function Vehicles() {
         onOpenChange={setIsFilterOpen}
         onApplyFilters={handleApplyFilters}
       />
+      
+      {/* Edit Vehicle Form */}
+      {selectedVehicleId && (
+        <EditVehicleForm
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          vehicleId={selectedVehicleId}
+          onSuccess={handleEditSuccess}
+        />
+      )}
     </div>
   );
 }
