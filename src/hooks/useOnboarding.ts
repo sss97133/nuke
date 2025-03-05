@@ -1,146 +1,96 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { supabase } from '@/integrations/supabase/client';
 
-export interface OnboardingState {
-  currentStep: number;
-  completedSteps: number[];
-  isCompleted: boolean;
-  isLoading: boolean;
-}
-
-export const useOnboarding = () => {
-  const [state, setState] = useState<OnboardingState>({
-    currentStep: 0,
-    completedSteps: [],
-    isCompleted: false,
-    isLoading: true,
-  });
-  const { toast } = useToast();
+export function useOnboarding() {
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [totalSteps, setTotalSteps] = useState(5); // Default total steps
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchOnboardingStatus();
+    const checkOnboardingStatus = async () => {
+      setIsLoading(true);
+      
+      try {
+        // Get current user
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          setIsLoading(false);
+          return;
+        }
+        
+        setUserId(session.user.id);
+        
+        // Check onboarding status
+        const { data, error } = await supabase
+          .from('onboarding')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+          
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error checking onboarding status:', error);
+          setIsLoading(false);
+          return;
+        }
+        
+        if (data) {
+          setIsCompleted(data.is_completed || false);
+          setCurrentStep(data.current_step || 0);
+          setTotalSteps(data.total_steps || 5);
+        }
+      } catch (error) {
+        console.error('Unexpected error checking onboarding:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkOnboardingStatus();
   }, []);
-
-  const fetchOnboardingStatus = async () => {
+  
+  const updateOnboardingStep = async (step: number, completed = false) => {
+    if (!userId) return false;
+    
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
-      
-      // Get current user 
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        setState(prev => ({ ...prev, isLoading: false }));
-        return;
-      }
-      
-      // Fetch the user's profile including onboarding information
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('onboarding_step, onboarding_completed')
-        .eq('id', user.id)
-        .single();
-        
-      if (error) {
-        console.error("Error fetching profile:", error);
-        setState(prev => ({ ...prev, isLoading: false }));
-        return;
-      }
-      
-      if (profile) {
-        const step = profile.onboarding_step || 0;
-        const completed = profile.onboarding_completed || false;
-        
-        // Setup completed steps
-        const completedSteps: number[] = [];
-        for (let i = 0; i < step; i++) {
-          completedSteps.push(i);
-        }
-        
-        setState({
-          currentStep: step,
-          completedSteps,
-          isCompleted: completed,
-          isLoading: false,
-        });
-      } else {
-        setState(prev => ({ ...prev, isLoading: false }));
-      }
-    } catch (error) {
-      console.error("Error in onboarding hook:", error);
-      setState(prev => ({ ...prev, isLoading: false }));
-    }
-  };
-
-  const updateOnboardingStep = async (step: number, completed: boolean = false) => {
-    try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast({
-          title: "Not signed in",
-          description: "Please sign in to save your progress",
-          variant: "destructive",
-        });
-        return false;
-      }
-      
-      // Update the onboarding step in the database
       const { error } = await supabase
-        .from('profiles')
-        .update({
-          onboarding_step: step,
-          onboarding_completed: completed,
-        })
-        .eq('id', user.id);
-        
-      if (error) {
-        console.error("Error updating onboarding progress:", error);
-        toast({
-          title: "Error",
-          description: "Could not save your progress",
-          variant: "destructive",
+        .from('onboarding')
+        .upsert({
+          user_id: userId,
+          current_step: step,
+          is_completed: completed,
+          total_steps: totalSteps,
+          updated_at: new Date().toISOString()
         });
-        return false;
-      }
-      
-      // Update local state
-      setState(prev => {
-        const completedSteps = [...prev.completedSteps];
-        if (!completedSteps.includes(step - 1) && step > 0) {
-          completedSteps.push(step - 1);
-        }
         
-        return {
-          currentStep: step,
-          completedSteps,
-          isCompleted: completed,
-          isLoading: false,
-        };
-      });
+      if (error) throw error;
       
+      setCurrentStep(step);
+      setIsCompleted(completed);
       return true;
     } catch (error) {
-      console.error("Error updating onboarding:", error);
+      console.error('Error updating onboarding step:', error);
       return false;
     }
   };
-
+  
   const completeOnboarding = async () => {
-    return await updateOnboardingStep(state.currentStep, true);
+    return updateOnboardingStep(totalSteps, true);
   };
-
+  
   const resetOnboarding = async () => {
-    return await updateOnboardingStep(0, false);
+    return updateOnboardingStep(0, false);
   };
 
   return {
-    ...state,
+    isCompleted,
+    isLoading,
+    currentStep,
+    totalSteps,
     updateOnboardingStep,
     completeOnboarding,
-    resetOnboarding,
-    refreshStatus: fetchOnboardingStatus,
+    resetOnboarding
   };
-};
+}

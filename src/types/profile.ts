@@ -1,3 +1,4 @@
+
 import { Json } from '@/integrations/supabase/types';
 
 export interface Profile {
@@ -5,6 +6,7 @@ export interface Profile {
   username: string | null;
   full_name: string | null;
   avatar_url: string | null;
+  bio?: string;
   user_type: 'viewer' | 'professional';
   reputation_score: number | null;
   created_at: string;

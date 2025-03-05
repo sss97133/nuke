@@ -14,7 +14,7 @@ import { Helmet } from 'react-helmet';
 
 export const Profile = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { isCompleted, isLoading, step, totalSteps } = useOnboarding();
+  const { isCompleted, isLoading, currentStep, totalSteps } = useOnboarding();
   const navigate = useNavigate();
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
   const [loadingUsername, setLoadingUsername] = useState(true);
@@ -44,7 +44,8 @@ export const Profile = () => {
     fetchUsername();
   }, [userId]);
 
-  const completionPercentage = Math.round((step / totalSteps) * 100);
+  // Default to 0 if currentStep is undefined
+  const completionPercentage = Math.round(((currentStep || 0) / (totalSteps || 1)) * 100);
 
   // Dynamic page title based on whether viewing own or other's profile
   const pageTitle = profileUsername 

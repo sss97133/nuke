@@ -1,3 +1,4 @@
+
 export interface VehicleFormValues {
   // Basic Information
   make: string;
@@ -22,6 +23,8 @@ export interface VehicleFormValues {
   discovery_date?: string;
   discovery_location?: string;
   discovery_notes?: string;
+  discovery_source?: string;
+  discovery_url?: string;
   
   // Additional Details
   color?: string;
@@ -31,6 +34,13 @@ export interface VehicleFormValues {
   engine?: string;
   fuel_type?: string;
   mileage?: number | string;
+  drivetrain?: string;
+  engine_type?: string;
+  doors?: number | string;
+  seats?: number | string;
+  weight?: number | string;
+  top_speed?: number | string;
+  notes?: string;
   
   // Classification
   condition?: string;

@@ -5,8 +5,6 @@ import UserProfileHeader from "../UserProfileHeader";
 import { UserMetrics } from "../UserMetrics";
 import { Separator } from "@/components/ui/separator";
 import { Car, Settings, Users, Award, Clock, BarChart3 } from 'lucide-react';
-import { ProfileInsights } from '../ProfileInsights';
-import { UserDevelopmentSpectrum } from '../UserDevelopmentSpectrum';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,7 +34,23 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
           
         if (error) throw error;
         
-        setProfileData(data as Profile);
+        // Convert database response to Profile type
+        if (data) {
+          const profile: Profile = {
+            id: data.id,
+            username: data.username,
+            full_name: data.full_name,
+            avatar_url: data.avatar_url,
+            bio: data.bio,
+            user_type: data.user_type || 'viewer',
+            reputation_score: data.reputation_score,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            social_links: toSocialLinks(data.social_links),
+            streaming_links: toStreamingLinks(data.streaming_links)
+          };
+          setProfileData(profile);
+        }
       } catch (error) {
         console.error('Error fetching profile data:', error);
       } finally {
@@ -86,8 +100,18 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
     );
   }
 
-  const socialLinks = toSocialLinks(profileData.social_links);
-  const streamingLinks = toStreamingLinks(profileData.streaming_links);
+  const socialLinks = profileData.social_links || {
+    twitter: '',
+    instagram: '',
+    linkedin: '',
+    github: ''
+  };
+  
+  const streamingLinks = profileData.streaming_links || {
+    twitch: '',
+    youtube: '',
+    tiktok: ''
+  };
 
   const profileMetrics = {
     user_type: profileData.user_type || 'viewer',
@@ -213,8 +237,15 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
         
         <TabsContent value="insights">
           <div className="space-y-6">
+            {/* Temporarily disabled until we fix the ProfileInsights component 
             <ProfileInsights userId={userId} />
-            <UserDevelopmentSpectrum />
+            <UserDevelopmentSpectrum /> */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-4">Profile Insights</h3>
+                <p className="text-muted-foreground">User insights will be displayed here.</p>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
         
