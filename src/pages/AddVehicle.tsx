@@ -6,9 +6,11 @@ import { useAuth } from '@/hooks/use-auth';
 import VehicleForm from '@/components/vehicles/forms/VehicleForm';
 import { VehicleFormValues } from '@/components/vehicles/forms/types';
 import { useCreateVehicle } from '@/hooks/vehicles/useCreateVehicle';
+import { useToast } from '@/hooks/use-toast';
 
 const AddVehicle = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { session } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { createVehicle } = useCreateVehicle();
@@ -61,11 +63,21 @@ const AddVehicle = () => {
       // Create the vehicle - pass as any to bypass the type check since we've processed the data
       await createVehicle(processedData as any);
       
-      // Redirect to discovered vehicles page
-      navigate('/discovered-vehicles');
+      // Display success message
+      toast({
+        title: "Vehicle added successfully",
+        description: `Your ${data.make} ${data.model} has been ${data.ownership_status === 'owned' ? 'added to your garage' : 'added to discovered vehicles'}.`,
+      });
+      
+      // Redirect based on ownership status
+      navigate(data.ownership_status === 'owned' ? '/garage' : '/discovered-vehicles');
     } catch (error) {
       console.error('Error creating vehicle:', error);
-      throw error;
+      toast({
+        title: "Error adding vehicle",
+        description: "There was a problem adding your vehicle. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -75,10 +87,9 @@ const AddVehicle = () => {
     <ScrollArea className="h-[calc(100vh-4rem)]">
       <div className="container mx-auto p-6 max-w-6xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Add New Vehicle</h1>
+          <h1 className="text-3xl font-bold mb-2">Add Vehicle</h1>
           <p className="text-muted-foreground">
-            Fill out the form below to add a new vehicle to your collection. 
-            The more detailed information you provide, the better.
+            Add a vehicle you own or one you've discovered. Provide as much detail as possible for accurate tracking.
           </p>
         </div>
         

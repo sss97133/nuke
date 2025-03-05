@@ -16,6 +16,12 @@ export const useVehicleForm = (onSubmit: (data: VehicleFormValues) => Promise<vo
       mileage: '',
       image: [],
       tags: '',
+      notes: '',
+      ownership_status: 'owned', // Default to owned
+      discovery_source: '',
+      discovery_url: '',
+      discovery_date: '',
+      discovery_location: '',
       ...initialValues
     }
   });

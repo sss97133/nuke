@@ -8,6 +8,7 @@ import AddVehicleButton from '../components/vehicles/discovery/AddVehicleButton'
 import { useVehiclesData } from '../hooks/useVehiclesData';
 
 const DiscoveredVehicles = () => {
+  // Use the hook with 'discovered' status to get only discovered vehicles
   const {
     vehicles,
     searchTerm,
@@ -31,16 +32,16 @@ const DiscoveredVehicles = () => {
     handleBulkRemove,
     isLoading,
     error
-  } = useVehiclesData();
+  } = useVehiclesData('discovered');
   
   return (
     <ScrollArea className="h-[calc(100vh-4rem)]">
       <div className="container px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-6 max-w-screen-xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Vehicles</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Discovered Vehicles</h1>
             <p className="text-sm md:text-base text-muted-foreground">
-              Organize and manage vehicles discovered by our system and community
+              Vehicles you've discovered but don't own. Track interesting cars you find online or in person.
             </p>
           </div>
           

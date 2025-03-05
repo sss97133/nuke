@@ -23,7 +23,15 @@ export interface VehicleFormValues {
   tags?: string;
   notes?: string;
   image: string | string[];
-  // Additional fields can be added here
+  
+  // Ownership information
+  ownership_status: 'owned' | 'discovered';
+  
+  // Discovery-specific fields
+  discovery_source?: string;
+  discovery_url?: string;
+  discovery_date?: string;
+  discovery_location?: string;
 }
 
 // Add validation schema for the form

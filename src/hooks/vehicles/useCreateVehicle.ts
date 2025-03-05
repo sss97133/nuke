@@ -54,9 +54,9 @@ export function useCreateVehicle() {
         price_trend: 'stable',
         mileage: processedVehicle.mileage ? Number(processedVehicle.mileage) : 0,
         image: processedVehicle.image || '/placeholder-vehicle.jpg',
-        location: processedVehicle.location || 'Unknown',
+        location: processedVehicle.location || (vehicle.discovery_location || 'Unknown'),
         added: 'just now',
-        tags: vehicle.tags ? vehicle.tags.split(',').map(tag => tag.trim()) : [],
+        tags: vehicle.tags || [],
         condition_rating: 7,
         vehicle_type: processedVehicle.body_style || 'car',
         body_type: processedVehicle.body_style || '',
@@ -65,21 +65,30 @@ export function useCreateVehicle() {
         rarity_score: 5,
         era: getEraFromYear(processedVehicle.year),
         restoration_status: 'original',
-        special_edition: false
+        special_edition: false,
+        
+        // New fields for discovered vehicles
+        status: vehicle.ownership_status === 'owned' ? 'owned' : 'discovered',
+        source: vehicle.discovery_source || '',
+        source_url: vehicle.discovery_url || '',
       });
       
-      // Create relationship between user and vehicle
-      addVehicleRelationship(vehicle.user_id, newVehicle.id, 'discovered');
+      // Create relationship between user and vehicle with the appropriate type
+      const relationshipType = vehicle.ownership_status === 'owned' ? 'claimed' : 'discovered';
+      addVehicleRelationship(vehicle.user_id, newVehicle.id, relationshipType);
       
       return {
         id: `vehicle_${Date.now()}`,
         ...processedVehicle
       };
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      const ownershipStatus = variables.ownership_status;
       toast({
-        title: "Vehicle created",
-        description: "Your vehicle has been successfully added.",
+        title: ownershipStatus === 'owned' ? "Vehicle added to your garage" : "Vehicle added to discoveries",
+        description: ownershipStatus === 'owned' 
+          ? "Your vehicle has been successfully added to your garage."
+          : "The discovered vehicle has been added to your discoveries list.",
       });
     },
     onError: (error) => {

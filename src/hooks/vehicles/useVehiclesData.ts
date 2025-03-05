@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { SortDirection, SortField } from '../../components/vehicles/discovery/types';
 import { 
@@ -42,7 +43,10 @@ function adaptVehicleFromDB(dbVehicle: any): Vehicle {
     rarity_score: dbVehicle.rarity_score || 0,
     era: dbVehicle.era || '',
     restoration_status: dbVehicle.restoration_status || 'original',
-    special_edition: dbVehicle.special_edition || false
+    special_edition: dbVehicle.special_edition || false,
+    status: dbVehicle.status || 'discovered',
+    source: dbVehicle.source || '',
+    source_url: dbVehicle.source_url || '',
   };
 }
 
@@ -59,7 +63,7 @@ function getRelativeTimeString(date: Date): string {
   return `${Math.floor(diffInDays / 30)} months ago`;
 }
 
-export function useVehiclesData() {
+export function useVehiclesData(vehicleStatus: 'discovered' | 'owned' = 'discovered') {
   const { session } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVehicles, setSelectedVehicles] = useState<number[]>([]);
@@ -80,7 +84,7 @@ export function useVehiclesData() {
     async function fetchVehicles() {
       try {
         setIsLoading(true);
-        console.log('Fetching vehicles...');
+        console.log(`Fetching ${vehicleStatus} vehicles...`);
         
         if (USE_REAL_DATA.vehicles) {
           // Try to get authenticated user
@@ -89,9 +93,9 @@ export function useVehiclesData() {
           if (!userId) {
             console.log('User not authenticated, using mock data');
             if (isMounted) {
-              // Use getStoredVehicles to get mock vehicles
-              const mockVehicles = getStoredVehicles();
-              console.log('Loaded mock vehicles:', mockVehicles.length);
+              // Use getStoredVehicles to get mock vehicles based on status
+              const mockVehicles = getStoredVehicles().filter(v => v.status === vehicleStatus);
+              console.log(`Loaded mock ${vehicleStatus} vehicles:`, mockVehicles.length);
               setVehicles(mockVehicles);
               setIsLoading(false);
             }
@@ -107,7 +111,7 @@ export function useVehiclesData() {
               .from('vehicle_relationships')
               .select('vehicle_id')
               .eq('user_id', userId)
-              .eq('relationship_type', 'discovered');
+              .eq('relationship_type', vehicleStatus === 'owned' ? 'claimed' : 'discovered');
               
             if (relError) throw relError;
             
@@ -133,18 +137,20 @@ export function useVehiclesData() {
             */
             
             // Mock implementation using our in-memory storage
-            const discoveredVehicles = getVehiclesByRelationship(userId, 'discovered');
+            const relationshipType = vehicleStatus === 'owned' ? 'claimed' : 'discovered';
+            const filteredVehicles = getVehiclesByRelationship(userId, relationshipType);
             if (isMounted) {
-              setVehicles(discoveredVehicles);
+              setVehicles(filteredVehicles);
             }
           } catch (err) {
-            console.error('Error fetching relationships:', err);
+            console.error(`Error fetching ${vehicleStatus} relationships:`, err);
             if (isMounted) {
-              setError('Failed to fetch vehicle relationships');
+              setError(`Failed to fetch ${vehicleStatus} vehicle relationships`);
               
               // Fall back to mock data
-              const mockVehicles = getVehiclesByRelationship('mock-user-1', 'discovered');
-              console.log('Loaded mock vehicles (fallback):', mockVehicles.length);
+              const relationshipType = vehicleStatus === 'owned' ? 'claimed' : 'discovered';
+              const mockVehicles = getVehiclesByRelationship('mock-user-1', relationshipType);
+              console.log(`Loaded mock ${vehicleStatus} vehicles (fallback):`, mockVehicles.length);
               setVehicles(mockVehicles);
             }
           }
@@ -152,21 +158,23 @@ export function useVehiclesData() {
           // Use mock data directly when feature flag is off
           if (isMounted) {
             // Use mock data with relationship filter
-            const mockVehicles = getVehiclesByRelationship('mock-user-1', 'discovered');
-            console.log('Loaded mock vehicles:', mockVehicles.length);
+            const relationshipType = vehicleStatus === 'owned' ? 'claimed' : 'discovered';
+            const mockVehicles = getVehiclesByRelationship('mock-user-1', relationshipType);
+            console.log(`Loaded mock ${vehicleStatus} vehicles:`, mockVehicles.length);
             setVehicles(mockVehicles);
           }
         }
       } catch (err) {
-        console.error('Error fetching vehicles:', err);
+        console.error(`Error fetching ${vehicleStatus} vehicles:`, err);
         
         if (isMounted) {
           // Set error message
-          setError(err.message || 'Failed to fetch vehicles');
+          setError(err.message || `Failed to fetch ${vehicleStatus} vehicles`);
           
           // Fall back to mock data
-          const mockVehicles = getVehiclesByRelationship('mock-user-1', 'discovered');
-          console.log('Loaded mock vehicles (fallback):', mockVehicles.length);
+          const relationshipType = vehicleStatus === 'owned' ? 'claimed' : 'discovered';
+          const mockVehicles = getVehiclesByRelationship('mock-user-1', relationshipType);
+          console.log(`Loaded mock ${vehicleStatus} vehicles (fallback):`, mockVehicles.length);
           setVehicles(mockVehicles);
         }
       } finally {
@@ -182,7 +190,7 @@ export function useVehiclesData() {
     return () => {
       isMounted = false;
     };
-  }, [session, sortField, sortDirection]);
+  }, [session, sortField, sortDirection, vehicleStatus]);
   
   // Wrapper for toggle selection that includes the current state
   const toggleSelection = (id: number) => {
@@ -230,6 +238,7 @@ export function useVehiclesData() {
     toggleVehicleSelection: toggleSelection,
     handleBulkVerify: bulkVerify,
     handleBulkAddToGarage: bulkAddToGarage,
-    handleBulkRemove: bulkRemove
+    handleBulkRemove: bulkRemove,
+    vehicleStatus
   };
 }

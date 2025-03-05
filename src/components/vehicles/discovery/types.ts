@@ -50,6 +50,13 @@ export interface Vehicle {
   views_count?: number;
   saves_count?: number;
   interested_users?: number;
+  
+  // Status
+  status?: 'owned' | 'discovered' | 'verified' | 'unverified';
+  
+  // Discovery source information
+  source?: string;
+  source_url?: string;
 }
 
 export interface VehicleActionHandlers {
