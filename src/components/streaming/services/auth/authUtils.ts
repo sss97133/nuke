@@ -1,11 +1,15 @@
 
 // Authentication utilities for Twitch
 
+// Constants
+const TWITCH_AUTH_TOKEN_KEY = 'twitch_auth_token';
+const DEMO_MODE_ENABLED_KEY = 'twitch_demo_mode';
+
 /**
  * Store the auth token in localStorage
  */
 export const setAuthToken = (token: string) => {
-  localStorage.setItem('twitch_auth_token', token);
+  localStorage.setItem(TWITCH_AUTH_TOKEN_KEY, token);
   // Dispatch event for components to know authentication changed
   window.dispatchEvent(new CustomEvent('twitch_auth_changed'));
 };
@@ -14,14 +18,15 @@ export const setAuthToken = (token: string) => {
  * Get the stored auth token
  */
 export const getAuthToken = (): string | null => {
-  return localStorage.getItem('twitch_auth_token');
+  return localStorage.getItem(TWITCH_AUTH_TOKEN_KEY);
 };
 
 /**
  * Clear the stored auth token
  */
 export const clearAuthToken = () => {
-  localStorage.removeItem('twitch_auth_token');
+  localStorage.removeItem(TWITCH_AUTH_TOKEN_KEY);
+  localStorage.removeItem(DEMO_MODE_ENABLED_KEY);
   window.dispatchEvent(new CustomEvent('twitch_auth_changed'));
 };
 
@@ -29,7 +34,7 @@ export const clearAuthToken = () => {
  * Check if user is authenticated
  */
 export const isAuthenticated = (): boolean => {
-  return !!getAuthToken();
+  return !!getAuthToken() || isDemoModeEnabled();
 };
 
 /**
@@ -56,4 +61,21 @@ export const checkAuthResponse = () => {
     }
   }
   return false;
+};
+
+/**
+ * Enable demo mode (for when real OAuth isn't available)
+ */
+export const enableDemoMode = () => {
+  localStorage.setItem(DEMO_MODE_ENABLED_KEY, 'true');
+  // Set a fake token to ensure other code works
+  setAuthToken('demo_token_12345');
+  window.dispatchEvent(new CustomEvent('twitch_auth_changed'));
+};
+
+/**
+ * Check if demo mode is enabled
+ */
+export const isDemoModeEnabled = (): boolean => {
+  return localStorage.getItem(DEMO_MODE_ENABLED_KEY) === 'true';
 };
