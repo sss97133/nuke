@@ -30,6 +30,16 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
+  // Function to validate object URLs
+  const isValidObjectURL = (url: string) => {
+    try {
+      const objUrl = new URL(url);
+      return objUrl.protocol === 'blob:';
+    } catch (e) {
+      return false;
+    }
+  };
+  
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -80,7 +90,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       ? [...previewUrls, ...newPreviewUrls]
       : newPreviewUrls;
     
-    setPreviewUrls(updatedPreviewUrls);
+    // Validate the URLs before setting them
+    const validatedUrls = updatedPreviewUrls.filter(url => isValidObjectURL(url));
+    setPreviewUrls(validatedUrls);
     
     // Simulate uploading
     setIsUploading(true);
