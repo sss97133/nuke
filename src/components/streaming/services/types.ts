@@ -19,3 +19,5 @@ export interface StreamMetadata {
   started_at: string;
   tags: string[];
 }
+
+export type ContentType = 'stream' | 'post' | 'video' | 'article';
