@@ -23,7 +23,7 @@ export function FileUploader({
   const [rejectedFiles, setRejectedFiles] = useState<File[]>([]);
 
   const onDrop = useCallback(
-    (acceptedFiles: File[], rejected: any) => {
+    (acceptedFiles: File[], rejected: FileRejection[]) => {
       // Filter out duplicate files
       const uniqueFiles = acceptedFiles.filter(
         file => !selectedFiles.some(f => f.name === file.name && f.size === file.size)
