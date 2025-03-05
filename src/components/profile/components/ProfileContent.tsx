@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import UserProfileHeader from "../UserProfileHeader";
@@ -10,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Profile, toSocialLinks, toStreamingLinks } from '@/types/profile';
+import VehicleCollectionTabs from './VehicleCollectionTabs';
 
 interface ProfileContentContainerProps {
   userId: string;
@@ -144,28 +146,7 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
         </TabsList>
         
         <TabsContent value="vehicles">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {vehiclesLoading ? (
-              Array(3).fill(0).map((_, i) => (
-                <Skeleton key={i} className="h-[200px]" />
-              ))
-            ) : userVehicles.length > 0 ? (
-              userVehicles.map(vehicle => (
-                <VehicleCard 
-                  key={vehicle.id} 
-                  vehicle={vehicle} 
-                  isOwner={isOwnProfile} 
-                />
-              ))
-            ) : (
-              <div className="col-span-full text-center py-8 text-muted-foreground">
-                <p>No vehicles found.</p>
-                {isOwnProfile && (
-                  <p className="mt-2">Start building your collection by adding your first vehicle!</p>
-                )}
-              </div>
-            )}
-          </div>
+          <VehicleCollectionTabs userId={userId} isOwnProfile={isOwnProfile} />
         </TabsContent>
         
         <TabsContent value="community">
@@ -251,34 +232,5 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
         )}
       </Tabs>
     </div>
-  );
-};
-
-interface VehicleCardProps {
-  vehicle: any;
-  isOwner: boolean;
-}
-
-const VehicleCard = ({ vehicle, isOwner }: VehicleCardProps) => {
-  return (
-    <Card className="overflow-hidden">
-      <div className="aspect-[16/9] bg-muted relative">
-        {vehicle.image_url ? (
-          <img 
-            src={vehicle.image_url} 
-            alt={`${vehicle.make} ${vehicle.model}`} 
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-muted">
-            <Car className="h-16 w-16 text-muted-foreground/40" />
-          </div>
-        )}
-      </div>
-      <CardContent className="p-4">
-        <h3 className="font-semibold truncate">{vehicle.year} {vehicle.make} {vehicle.model}</h3>
-        <p className="text-sm text-muted-foreground truncate">{vehicle.trim || 'Standard'}</p>
-      </CardContent>
-    </Card>
   );
 };

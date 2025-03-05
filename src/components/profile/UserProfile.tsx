@@ -1,8 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { useParams } from 'react-router-dom';
 import { ProfileContentContainer } from './components/ProfileContent';
 import { supabase } from '@/integrations/supabase/client';
+import VehicleCollection from './components/VehicleCollection';
+import { Separator } from '@/components/ui/separator';
 
 const UserProfile = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -41,7 +44,16 @@ const UserProfile = () => {
     );
   }
 
-  return <ProfileContentContainer userId={profileUserId} isOwnProfile={isOwnProfile} />;
+  return (
+    <div className="space-y-8">
+      <ProfileContentContainer userId={profileUserId} isOwnProfile={isOwnProfile} />
+      <Separator className="my-8" />
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">Vehicle Collection</h2>
+        <VehicleCollection userId={profileUserId} isOwnProfile={isOwnProfile} />
+      </div>
+    </div>
+  );
 };
 
 export default UserProfile;

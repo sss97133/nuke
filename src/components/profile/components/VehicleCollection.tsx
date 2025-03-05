@@ -11,12 +11,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface VehicleCollectionProps {
   userId: string;
   isOwnProfile: boolean;
+  filter?: string; // 'all', 'owned', 'discovered', 'recent'
 }
 
-export const VehicleCollection = ({ userId, isOwnProfile }: VehicleCollectionProps) => {
+export const VehicleCollection = ({ userId, isOwnProfile, filter = 'all' }: VehicleCollectionProps) => {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<string>('all'); // 'all', 'owned', 'discovered', etc.
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,11 +28,16 @@ export const VehicleCollection = ({ userId, isOwnProfile }: VehicleCollectionPro
           .select('*, vehicle_stats(*)')
           .eq('owner_id', userId);
 
-        if (filter !== 'all') {
-          query = query.eq('ownership_status', filter);
+        if (filter === 'owned') {
+          query = query.eq('ownership_status', 'owned');
+        } else if (filter === 'discovered') {
+          query = query.eq('ownership_status', 'discovered');
+        } else if (filter === 'recent') {
+          // No additional filter, just sort by most recent
         }
 
-        const { data, error } = await query.order('created_at', { ascending: false });
+        let orderColumn = filter === 'recent' ? 'created_at' : 'created_at';
+        const { data, error } = await query.order(orderColumn, { ascending: false });
         
         if (error) throw error;
         setVehicles(data || []);
@@ -82,43 +87,7 @@ export const VehicleCollection = ({ userId, isOwnProfile }: VehicleCollectionPro
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 items-center justify-between">
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            variant={filter === 'all' ? "default" : "outline"} 
-            size="sm" 
-            onClick={() => setFilter('all')}
-          >
-            All ({vehicles.length})
-          </Button>
-          <Button 
-            variant={filter === 'owned' ? "default" : "outline"} 
-            size="sm" 
-            onClick={() => setFilter('owned')}
-          >
-            Owned
-          </Button>
-          <Button 
-            variant={filter === 'discovered' ? "default" : "outline"} 
-            size="sm" 
-            onClick={() => setFilter('discovered')}
-          >
-            Discovered
-          </Button>
-        </div>
-        
-        {isOwnProfile && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => navigate('/vehicles/add')}
-          >
-            Add Vehicle
-          </Button>
-        )}
-      </div>
-      
+    <div className="space-y-6">      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {vehicles.map(vehicle => (
           <VehicleCard 
@@ -128,6 +97,17 @@ export const VehicleCollection = ({ userId, isOwnProfile }: VehicleCollectionPro
           />
         ))}
       </div>
+      
+      {vehicles.length > 0 && isOwnProfile && (
+        <div className="flex justify-center mt-6">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/vehicles/add')}
+          >
+            Add Another Vehicle
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
