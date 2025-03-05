@@ -25,9 +25,10 @@ type Vehicle = {
 interface VehicleCollectionProps {
   userId: string;
   isOwnProfile: boolean;
+  filter?: string; // Add optional filter prop
 }
 
-const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProfile }) => {
+const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProfile, filter = 'all' }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
           return;
         }
         
-        // Transform the data to match the Vehicle type
+        // Transform the data to match the Vehicle type with proper defaults
         const transformedVehicles: Vehicle[] = data.map(vehicle => ({
           id: vehicle.id,
           make: vehicle.make || 'Unknown',
@@ -55,14 +56,10 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
           trim: vehicle.trim || undefined,
           color: vehicle.color || undefined,
           image_url: vehicle.image_url || undefined,
-          ownership_status: (vehicle.ownership_status as 'owned' | 'discovered' | 'claimed') || 'discovered',
+          ownership_status: (vehicle.status as 'owned' | 'discovered' | 'claimed') || 'discovered',
           vehicle_stats: {
-            likes_count: vehicle.vehicle_stats && typeof vehicle.vehicle_stats === 'object' && 'likes_count' in vehicle.vehicle_stats 
-              ? vehicle.vehicle_stats.likes_count 
-              : 0,
-            views_count: vehicle.vehicle_stats && typeof vehicle.vehicle_stats === 'object' && 'views_count' in vehicle.vehicle_stats 
-              ? vehicle.vehicle_stats.views_count 
-              : 0
+            likes_count: 0, // Default value
+            views_count: 0  // Default value
           }
         }));
         
@@ -78,7 +75,6 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
   }, [userId]);
   
   const handleAddVehicle = () => {
-    // Ensure we navigate to the correct route as defined in routeConfig.tsx
     navigate('/add-vehicle');
   };
   
@@ -92,7 +88,14 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
     );
   }
   
-  if (vehicles.length === 0) {
+  // Filter vehicles based on the filter prop
+  const filteredVehicles = filter === 'all' 
+    ? vehicles 
+    : filter === 'recent'
+      ? [...vehicles].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 5) // Sort by ID as proxy for recency
+      : vehicles.filter(v => v.ownership_status === filter);
+  
+  if (filteredVehicles.length === 0) {
     return (
       <Card className="p-8">
         <CardContent className="flex flex-col items-center justify-center pt-6">
@@ -100,8 +103,12 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
           <h3 className="text-lg font-semibold mb-2">No vehicles yet</h3>
           <p className="text-muted-foreground text-center mb-6">
             {isOwnProfile 
-              ? "You haven't added any vehicles to your collection yet." 
-              : "This user hasn't added any vehicles to their collection yet."}
+              ? filter !== 'all' 
+                ? `You haven't added any ${filter} vehicles to your collection yet.`
+                : "You haven't added any vehicles to your collection yet."
+              : filter !== 'all'
+                ? `This user hasn't added any ${filter} vehicles to their collection yet.`
+                : "This user hasn't added any vehicles to their collection yet."}
           </p>
           
           {isOwnProfile && (
@@ -118,7 +125,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Vehicles ({vehicles.length})</h3>
+        <h3 className="text-lg font-semibold">Vehicles ({filteredVehicles.length})</h3>
         {isOwnProfile && (
           <Button onClick={handleAddVehicle} size="sm">
             <Plus className="mr-2 h-4 w-4" />
@@ -127,55 +134,65 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
         )}
       </div>
       
-      <Tabs defaultValue="all">
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="owned">Owned</TabsTrigger>
-          <TabsTrigger value="claimed">Claimed</TabsTrigger>
-          <TabsTrigger value="discovered">Discovered</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="all" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {vehicles.map(vehicle => (
-              <VehicleCard key={vehicle.id} vehicle={vehicle} />
-            ))}
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="owned" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {vehicles
-              .filter(v => v.ownership_status === 'owned')
-              .map(vehicle => (
+      {!filter && (
+        <Tabs defaultValue="all">
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="owned">Owned</TabsTrigger>
+            <TabsTrigger value="claimed">Claimed</TabsTrigger>
+            <TabsTrigger value="discovered">Discovered</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="all" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {vehicles.map(vehicle => (
                 <VehicleCard key={vehicle.id} vehicle={vehicle} />
-              ))
-            }
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="claimed" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {vehicles
-              .filter(v => v.ownership_status === 'claimed')
-              .map(vehicle => (
-                <VehicleCard key={vehicle.id} vehicle={vehicle} />
-              ))
-            }
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="discovered" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {vehicles
-              .filter(v => v.ownership_status === 'discovered')
-              .map(vehicle => (
-                <VehicleCard key={vehicle.id} vehicle={vehicle} />
-              ))
-            }
-          </div>
-        </TabsContent>
-      </Tabs>
+              ))}
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="owned" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {vehicles
+                .filter(v => v.ownership_status === 'owned')
+                .map(vehicle => (
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                ))
+              }
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="claimed" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {vehicles
+                .filter(v => v.ownership_status === 'claimed')
+                .map(vehicle => (
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                ))
+              }
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="discovered" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {vehicles
+                .filter(v => v.ownership_status === 'discovered')
+                .map(vehicle => (
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                ))
+              }
+            </div>
+          </TabsContent>
+        </Tabs>
+      )}
+      
+      {filter && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredVehicles.map(vehicle => (
+            <VehicleCard key={vehicle.id} vehicle={vehicle} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
