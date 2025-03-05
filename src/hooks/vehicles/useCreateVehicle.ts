@@ -4,11 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { VehicleFormValues } from '@/components/vehicles/forms/VehicleForm';
 import { useToast } from '@/hooks/use-toast';
 import { Vehicle as DiscoveryVehicle } from '@/components/vehicles/discovery/types';
-import { addStoredVehicle } from './mockVehicleStorage';
+import { addStoredVehicle, addVehicleRelationship } from './mockVehicleStorage';
+import { useAuth } from '@/hooks/use-auth';
 
 export const useCreateVehicle = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { session } = useAuth();
 
   const createVehicle = async (data: VehicleFormValues & { 
     user_id: string;
@@ -27,40 +29,45 @@ export const useCreateVehicle = () => {
         model: data.model,
         year: data.year,
         trim: data.trim,
-        price: 0,
-        market_value: 0,
+        price: data.price || 0,
+        market_value: data.market_value || data.price || 0,
         price_trend: 'stable',
         mileage: data.mileage || 0,
         image: data.image || '/placeholder-vehicle.jpg',
-        location: 'Local',
+        location: data.location || 'Local',
         added: data.added,
         tags: data.tags || [],
-        condition_rating: 5,
-        vehicle_type: 'car',
-        body_type: '',
-        transmission: '',
-        drivetrain: '',
-        rarity_score: 0,
-        era: '',
-        restoration_status: 'original', // Fixed: Using a valid value for the enum
-        special_edition: false
+        condition_rating: data.condition_rating || 5,
+        vehicle_type: data.vehicle_type || 'car',
+        body_type: data.body_type || '',
+        transmission: data.transmission || '',
+        drivetrain: data.drivetrain || '',
+        rarity_score: data.rarity_score || 0,
+        era: data.era || '',
+        restoration_status: data.restoration_status || 'original',
+        special_edition: data.special_edition || false
       };
       
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 800));
       
       // Add to our mock storage
-      addStoredVehicle(mockResponse);
+      const addedVehicle = addStoredVehicle(mockResponse);
+      
+      // Create the user-vehicle relationship (always starts as "discovered")
+      const userId = session?.user?.id || 'mock-user-1';
+      addVehicleRelationship(userId, addedVehicle.id, 'discovered');
       
       toast({
         title: 'Vehicle added',
-        description: `Successfully added ${data.year} ${data.make} ${data.model}`,
+        description: `Successfully added ${data.year} ${data.make} ${data.model} to your discovered vehicles`,
       });
       
       return mockResponse;
       
       /*
       // NOTE: Commented out until we have proper database tables
+      // This would be updated to handle the relationship model in the database
       const { data: vehicle, error } = await supabase
         .from('vehicles')
         .insert({
@@ -74,7 +81,7 @@ export const useCreateVehicle = () => {
           notes: data.notes || null,
           image: data.image || null,
           user_id: data.user_id,
-          status: 'owned',
+          status: 'discovered', // Changed from 'owned' to better reflect the relationship
           added: new Date().toISOString()
         })
         .select()
@@ -82,6 +89,21 @@ export const useCreateVehicle = () => {
 
       if (error) {
         throw error;
+      }
+
+      // Create the relationship record
+      const { error: relationshipError } = await supabase
+        .from('vehicle_relationships')
+        .insert({
+          user_id: data.user_id,
+          vehicle_id: vehicle.id,
+          relationship_type: 'discovered',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (relationshipError) {
+        console.error('Error creating vehicle relationship:', relationshipError);
       }
 
       // If tags were provided, save them

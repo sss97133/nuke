@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { SortDirection, SortField } from '../../components/vehicles/discovery/types';
 import { 
@@ -13,7 +12,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Vehicle } from '../../components/vehicles/discovery/types';
-import { getStoredVehicles } from './mockVehicleStorage';
+import { getStoredVehicles, getVehiclesByRelationship } from './mockVehicleStorage';
 
 // Feature flag for gradual migration
 const USE_REAL_DATA = {
@@ -90,7 +89,7 @@ export function useVehiclesData() {
           if (!userId) {
             console.log('User not authenticated, using mock data');
             if (isMounted) {
-              // Use getStoredVehicles to get both mock and newly added vehicles
+              // Use getStoredVehicles to get mock vehicles
               const mockVehicles = getStoredVehicles();
               console.log('Loaded mock vehicles:', mockVehicles.length);
               setVehicles(mockVehicles);
@@ -99,37 +98,61 @@ export function useVehiclesData() {
             return;
           }
           
-          // Build query based on sort field
-          let query = supabase
-            .from('vehicles')
-            .select('*')
-            .eq('user_id', userId);
-          
-          // Apply sorting
-          const dbSortField = sortField === 'added' ? 'created_at' : sortField;
-          query = query.order(dbSortField, { ascending: sortDirection === 'asc' });
-          
-          const { data, error: fetchError } = await query;
-          
-          if (fetchError) throw fetchError;
-          
-          if (isMounted) {
-            // Transform data to match expected schema
-            const adaptedVehicles = (data || []).map(adaptVehicleFromDB);
+          // Real implementation would fetch from database with relationship filter
+          // This would fetch vehicles from the database based on user-vehicle relationships
+          try {
+            /*
+            // This would be the real implementation with the database
+            const { data: relationships, error: relError } = await supabase
+              .from('vehicle_relationships')
+              .select('vehicle_id')
+              .eq('user_id', userId)
+              .eq('relationship_type', 'discovered');
+              
+            if (relError) throw relError;
             
-            // If no real data found
-            if (adaptedVehicles.length === 0) {
-              // Use getStoredVehicles to get both mock and newly added vehicles
-              setVehicles(getStoredVehicles());
+            const vehicleIds = relationships.map(rel => rel.vehicle_id);
+            
+            if (vehicleIds.length > 0) {
+              const { data: vehiclesData, error: vehicleError } = await supabase
+                .from('vehicles')
+                .select('*')
+                .in('id', vehicleIds);
+                
+              if (vehicleError) throw vehicleError;
+              
+              if (isMounted) {
+                const adaptedVehicles = vehiclesData.map(adaptVehicleFromDB);
+                setVehicles(adaptedVehicles);
+              }
             } else {
-              setVehicles(adaptedVehicles);
+              if (isMounted) {
+                setVehicles([]);
+              }
+            }
+            */
+            
+            // Mock implementation using our in-memory storage
+            const discoveredVehicles = getVehiclesByRelationship(userId, 'discovered');
+            if (isMounted) {
+              setVehicles(discoveredVehicles);
+            }
+          } catch (err) {
+            console.error('Error fetching relationships:', err);
+            if (isMounted) {
+              setError('Failed to fetch vehicle relationships');
+              
+              // Fall back to mock data
+              const mockVehicles = getVehiclesByRelationship('mock-user-1', 'discovered');
+              console.log('Loaded mock vehicles (fallback):', mockVehicles.length);
+              setVehicles(mockVehicles);
             }
           }
         } else {
           // Use mock data directly when feature flag is off
           if (isMounted) {
-            // Use getStoredVehicles to get both mock and newly added vehicles
-            const mockVehicles = getStoredVehicles();
+            // Use mock data with relationship filter
+            const mockVehicles = getVehiclesByRelationship('mock-user-1', 'discovered');
             console.log('Loaded mock vehicles:', mockVehicles.length);
             setVehicles(mockVehicles);
           }
@@ -142,7 +165,7 @@ export function useVehiclesData() {
           setError(err.message || 'Failed to fetch vehicles');
           
           // Fall back to mock data
-          const mockVehicles = getStoredVehicles();
+          const mockVehicles = getVehiclesByRelationship('mock-user-1', 'discovered');
           console.log('Loaded mock vehicles (fallback):', mockVehicles.length);
           setVehicles(mockVehicles);
         }
