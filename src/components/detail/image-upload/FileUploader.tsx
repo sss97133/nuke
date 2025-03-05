@@ -1,7 +1,9 @@
+
 import React, { useState, useRef } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { XCircle, Upload } from 'lucide-react';
+import { XCircle } from 'lucide-react';
 import { ImagePreview } from './ImagePreview';
 
 interface FileUploaderProps {
@@ -21,36 +23,10 @@ export function FileUploader({
 }: FileUploaderProps) {
   const [rejectedFiles, setRejectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragActive, setIsDragActive] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    const files = Array.from(e.target.files);
-    processFiles(files);
-  };
-  
-  const processFiles = (files: File[]) => {
-    // Filter out invalid file types
-    const validFiles = files.filter(file => {
-      const isValidType = acceptedFileTypes.some(type => {
-        if (type.endsWith('/*')) {
-          const category = type.split('/')[0];
-          return file.type.startsWith(`${category}/`);
-        }
-        return file.type === type;
-      });
-      
-      if (!isValidType) {
-        setRejectedFiles(prev => [...prev, file]);
-        return false;
-      }
-      
-      return true;
-    });
-    
+  const onDrop = (acceptedFiles: File[], rejected: any[]) => {
     // Filter out duplicate files
-    const uniqueFiles = validFiles.filter(
+    const uniqueFiles = acceptedFiles.filter(
       file => !selectedFiles.some(f => f.name === file.name && f.size === file.size)
     );
     
@@ -65,59 +41,42 @@ export function FileUploader({
       setSelectedFiles(newFiles);
       onFilesSelected(newFiles);
     }
+    
+    if (rejected.length > 0) {
+      setRejectedFiles((prevRejected) => [
+        ...prevRejected,
+        ...rejected.map(r => r.file)
+      ]);
+    }
   };
-  
+
   const removeFile = (fileToRemove: File) => {
     const updatedFiles = selectedFiles.filter(file => file !== fileToRemove);
     setSelectedFiles(updatedFiles);
     onFilesSelected(updatedFiles);
   };
-  
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(true);
-  };
-  
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(false);
-  };
-  
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const files = Array.from(e.dataTransfer.files);
-      processFiles(files);
-    }
-  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: acceptedFileTypes.reduce((acc: Record<string, string[]>, type) => {
+      acc[type] = [];
+      return acc;
+    }, {}),
+    maxFiles: maxFiles - selectedFiles.length,
+    disabled: selectedFiles.length >= maxFiles
+  });
 
   return (
     <div className="w-full space-y-4">
       <div
+        {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
           isDragActive
             ? 'border-primary bg-primary/10'
             : 'border-gray-300 dark:border-gray-700 hover:border-primary'
         } ${selectedFiles.length >= maxFiles ? 'opacity-50 cursor-not-allowed' : ''}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
       >
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          onChange={handleFileChange}
-          accept={acceptedFileTypes.join(',')}
-          multiple={maxFiles > 1}
-          disabled={selectedFiles.length >= maxFiles}
-        />
+        <input {...getInputProps()} />
         <div className="flex flex-col items-center justify-center space-y-2">
           <div className="text-4xl">📁</div>
           <div className="font-medium">
