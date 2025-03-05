@@ -21,3 +21,12 @@ export interface StreamMetadata {
 }
 
 export type ContentType = 'stream' | 'post' | 'video' | 'article';
+
+// Auth data returned from Twitch OAuth
+export interface TwitchAuthData {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  scope: string[];
+  token_type: string;
+}

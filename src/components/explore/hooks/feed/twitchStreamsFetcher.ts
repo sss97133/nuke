@@ -35,3 +35,6 @@ export const fetchTwitchStreams = async () => {
     return [];
   }
 };
+
+// Alias for backward compatibility
+export const fetchLiveTwitchStreams = fetchTwitchStreams;
