@@ -2,12 +2,24 @@ import js from "@eslint/js";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
-import tseslint from "typescript-eslint";
+import { FlatCompat } from "@eslint/eslintrc";
+import path from "path";
+import { fileURLToPath } from "url";
 
-export default tseslint.config(
-  { ignores: ["dist"] },
+// Manually set __dirname since it's not available in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Create a compatibility instance
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+});
+
+export default [
+  { ignores: ["dist/**", "node_modules/**"] },
+  js.configs.recommended,
+  ...compat.extends("plugin:@typescript-eslint/recommended"),
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
@@ -26,4 +38,4 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   }
-);
+];
