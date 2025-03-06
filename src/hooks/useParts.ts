@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, useSupabaseWithToast } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export interface Part {
@@ -20,6 +20,7 @@ export const useParts = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { safeFetch } = useSupabaseWithToast();
 
   const fetchParts = async () => {
     try {
@@ -27,20 +28,20 @@ export const useParts = () => {
       setError(null);
       
       // In production, we would fetch from Supabase
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('*');
+      const data = await safeFetch(() => 
+        supabase
+          .from('inventory')
+          .select('*')
+      );
       
-      if (error) throw error;
-      
-      if (data) {
+      if (data && Array.isArray(data)) {
         setParts(data as Part[]);
       } else {
         // Fallback to mock data if no data returned
         const mockParts: Part[] = [
           { id: '1', name: 'Oil Filter', category: 'Filters', compatibleVehicles: 'Toyota, Honda', quantity: 15, price: 12.99, supplier: 'AutoZone' },
           { id: '2', name: 'Brake Pads (Front)', category: 'Brakes', compatibleVehicles: 'Ford, Chevrolet', quantity: 8, price: 45.99, supplier: 'NAPA Auto Parts' },
-          { id: '3', name: 'Air Filter', category: 'Filters', compatibleVehicles: 'Honda, Nissan', quantity: 3, price: 18.50, supplier: 'O\'Reilly Auto Parts' },
+          { id: '3', name: 'Air Filter', category: 'Filters', compatibleVehicles: 'Honda, Nissan', quantity: 3, price: 18.50, supplier: "O'Reilly Auto Parts" },
           { id: '4', name: 'Spark Plugs', category: 'Ignition', compatibleVehicles: 'All', quantity: 24, price: 8.99, supplier: 'AutoZone' },
           { id: '5', name: 'Wiper Blades', category: 'Exterior', compatibleVehicles: 'All', quantity: 10, price: 15.99, supplier: 'Advance Auto Parts' },
         ];
@@ -64,19 +65,18 @@ export const useParts = () => {
       setLoading(true);
       
       // In production, we would insert to Supabase
-      const { data, error } = await supabase
-        .from('inventory')
-        .insert([newPart])
-        .select();
+      const data = await safeFetch(() => 
+        supabase
+          .from('inventory')
+          .insert([newPart])
+          .select()
+      );
       
-      if (error) throw error;
-      
-      if (data) {
+      if (data && Array.isArray(data) && data.length > 0) {
         setParts(prevParts => [...prevParts, data[0] as Part]);
         toast({
           title: "Success",
           description: "Part added successfully",
-          variant: "default"
         });
         return data[0] as Part;
       } else {
@@ -89,7 +89,6 @@ export const useParts = () => {
         toast({
           title: "Success",
           description: "Part added successfully",
-          variant: "default"
         });
         return mockNewPart;
       }
@@ -111,22 +110,21 @@ export const useParts = () => {
       setLoading(true);
       
       // In production, we would update in Supabase
-      const { data, error } = await supabase
-        .from('inventory')
-        .update(updates)
-        .eq('id', id)
-        .select();
+      const data = await safeFetch(() => 
+        supabase
+          .from('inventory')
+          .update(updates)
+          .eq('id', id)
+          .select()
+      );
       
-      if (error) throw error;
-      
-      if (data) {
+      if (data && Array.isArray(data) && data.length > 0) {
         setParts(prevParts => 
           prevParts.map(part => part.id === id ? { ...part, ...data[0] } : part)
         );
         toast({
           title: "Success",
           description: "Part updated successfully",
-          variant: "default"
         });
       } else {
         // Mock implementation for demo
@@ -136,7 +134,6 @@ export const useParts = () => {
         toast({
           title: "Success",
           description: "Part updated successfully",
-          variant: "default"
         });
       }
       return true;
@@ -169,7 +166,6 @@ export const useParts = () => {
       toast({
         title: "Success",
         description: "Part deleted successfully",
-        variant: "default"
       });
       return true;
     } catch (err) {
