@@ -66,3 +66,16 @@ stats.html
 playwright-report
 test-results
 .turbo
+
+# Sensitive files
+src/scripts/create-test-users.js
+src/scripts/importChevroletTrucks.ts
+src/scripts/setupStorage.ts
+.env
+.env.local
+.env.*.local
+
+# Backup files
+*.bak
+*.backup
+*_backup

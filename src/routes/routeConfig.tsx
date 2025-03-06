@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
@@ -35,6 +34,8 @@ import MarketplaceListingDetail from '@/pages/MarketplaceListingDetail';
 import { AuthForm } from '@/components/auth/AuthForm';
 import Streaming from '@/pages/Streaming';
 import StreamViewer from '@/pages/StreamViewer';
+import VehicleImport from "@/pages/VehicleImport"; // Import the new VehicleImport page
+import AdminPanel from '@/pages/AdminPanel'; // Import the AdminPanel component
 
 // Route type definitions
 export enum RouteType {
@@ -89,6 +90,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/discovered-vehicles', element: <DiscoveredVehicles />, type: RouteType.PROTECTED },
   { path: '/vehicles', element: <Vehicles />, type: RouteType.PROTECTED },
   { path: '/add-vehicle', element: <AddVehicle />, type: RouteType.PROTECTED },
+  { path: '/import-vehicles', element: <VehicleImport />, type: RouteType.PROTECTED },
   { path: '/vehicles/:id', element: <VehicleDetail />, type: RouteType.PROTECTED },
   { path: '/vehicle/:id', element: <Navigate to="/vehicles/:id" replace />, type: RouteType.PROTECTED, redirectTo: '/vehicles/:id' },
   { path: '/profile', element: <Profile />, type: RouteType.PROTECTED },
@@ -98,6 +100,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/explore/manage', element: <ExploreContentManagement />, type: RouteType.PROTECTED },
   { path: '/streaming', element: <Streaming />, type: RouteType.PROTECTED },
   { path: '/streaming/watch/:username', element: <StreamViewer />, type: RouteType.PROTECTED },
+  { path: '/admin', element: <AdminPanel />, type: RouteType.PROTECTED },
 ];
 
 // Special routes

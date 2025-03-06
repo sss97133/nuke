@@ -1,15 +1,15 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Car, Search, Filter, X } from 'lucide-react';
+import { PlusCircle, Car, Search, Filter, X, ChevronDown, Check, UploadCloud, Circle, Gauge, Calendar } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import VehicleFilterDialog, { VehicleFilters } from '@/components/vehicles/VehicleFilterDialog';
 import EditVehicleForm from '@/components/vehicles/EditVehicleForm';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/toast/toast-context';
+import { supabase, safeSelect } from '@/integrations/supabase/client';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Vehicle {
   id: string;
@@ -23,97 +23,137 @@ interface Vehicle {
   image?: string | null;
   updated_at?: string;
   lastUpdated?: string;
+  bulk_upload_batch_id?: string | null;
+  user_id?: string;
+  created_at?: string;
+  body_type?: string | null;
+  condition_description?: string | null;
+  condition_rating?: number | null;
+  drivetrain?: string | null;
 }
 
-// Mock data for fallback if no real data exists
-const MOCK_VEHICLES = [
-  {
-    id: '1',
-    make: 'Ford',
-    model: 'Mustang',
-    year: 1967,
-    color: 'blue',
-    ownership_status: 'owned',
-    mileage: 78500,
-    image: null,
-    lastUpdated: '2025-02-15T14:30:00Z'
-  },
-  {
-    id: '2',
-    make: 'Chevrolet',
-    model: 'Corvette',
-    year: 1963,
-    color: 'red',
-    ownership_status: 'claimed',
-    mileage: 120300,
-    image: null,
-    lastUpdated: '2025-03-01T10:15:00Z'
-  },
-  {
-    id: '3',
-    make: 'Porsche',
-    model: '911',
-    year: 1973,
-    color: 'silver',
-    ownership_status: 'discovered',
-    mileage: 45200,
-    image: null,
-    lastUpdated: '2025-02-28T16:45:00Z'
+// Helper function to format date
+const formatDate = (dateString?: string): string => {
+  if (!dateString) return 'Unknown';
+  
+  try {
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) return 'Unknown';
+    
+    // Get time difference in milliseconds
+    const diff = Date.now() - date.getTime();
+    
+    // Less than 24 hours ago
+    if (diff < 24 * 60 * 60 * 1000) {
+      return 'Today';
+    }
+    
+    // Less than 48 hours ago
+    if (diff < 48 * 60 * 60 * 1000) {
+      return 'Yesterday';
+    }
+    
+    // Format date
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch (error) {
+    return 'Unknown';
   }
-];
+};
 
 export default function Vehicles() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   
-  // Filter dialog state
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  // State declarations
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showFilters, setShowFilters] = useState<boolean>(false);
   const [activeFilters, setActiveFilters] = useState<VehicleFilters | null>(null);
-  
-  // Edit vehicle form state
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [justImported, setJustImported] = useState<string | null>(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  
+  // Use this effect to check if we just added a vehicle and show a message
+  useEffect(() => {
+    if (location.state?.fromAdd) {
+      toast({
+        title: 'Vehicle Added',
+        description: 'Your vehicle has been successfully added.',
+        variant: 'success',
+      });
+      // Clear the state to avoid showing the toast multiple times
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, toast, navigate]);
+  
+  // Check for query params for just imported vehicles
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const batchId = params.get('batch');
+    if (batchId) {
+      setJustImported(batchId);
+      // Clear it from URL without refreshing
+      navigate('/vehicles', { replace: true });
+    }
+  }, [location, navigate]);
 
   // Fetch vehicles from Supabase
   useEffect(() => {
     const fetchVehicles = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('vehicles')
-          .select('*')
-          .order('updated_at', { ascending: false });
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          toast({
+            title: "Authentication required",
+            description: "You must be logged in to view vehicles",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        
+        const { data, error } = await safeSelect(
+          supabase.from('vehicles'),
+          '*'
+        )
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
         
         if (error) {
-          throw error;
-        }
-        
-        // Map the data to match our Vehicle interface
-        const formattedVehicles = data.map(vehicle => ({
-          ...vehicle,
-          image: vehicle.image_url, // Handle the image field
-          lastUpdated: vehicle.updated_at, // Handle the lastUpdated field
-        }));
-        
-        // If we have real data, use it. Otherwise, use mock data.
-        if (formattedVehicles.length > 0) {
-          console.log('Using real vehicle data:', formattedVehicles);
-          setVehicles(formattedVehicles);
+          console.error('Error fetching vehicles:', error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch vehicles. Please try again.",
+            variant: "destructive",
+          });
         } else {
-          console.log('No real vehicle data found, using mock data');
-          setVehicles(MOCK_VEHICLES);
+          // Process the vehicles data
+          const processedVehicles = data.map((vehicle: any) => ({
+            ...vehicle,
+            lastUpdated: formatDate(vehicle.updated_at),
+            // Add image_url if it exists in your data structure
+          })) as Vehicle[];
+          
+          setVehicles(processedVehicles);
         }
       } catch (error) {
-        console.error('Error fetching vehicles:', error);
+        console.error('Error:', error);
         toast({
-          title: 'Error',
-          description: 'Failed to load vehicles. Using mock data instead.',
-          variant: 'destructive'
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
         });
-        setVehicles(MOCK_VEHICLES);
       } finally {
         setLoading(false);
       }
@@ -122,85 +162,13 @@ export default function Vehicles() {
     fetchVehicles();
   }, [toast]);
   
-  // Apply filters function
-  const handleApplyFilters = (filters: VehicleFilters) => {
-    setActiveFilters(Object.keys(filters).length ? filters : null);
-    
-    // Show toast notification about filters
-    const filterCount = Object.keys(filters).length;
-    if (filterCount > 0) {
-      toast({
-        title: "Filters Applied",
-        description: `Applied ${filterCount} filter${filterCount === 1 ? '' : 's'} to your vehicles.`,
-      });
-    }
-  };
-  
-  // Clear all filters
-  const handleClearFilters = () => {
-    setActiveFilters(null);
-    setSearchQuery('');
-    
-    toast({
-      title: "Filters Cleared",
-      description: "All filters have been removed.",
-    });
-  };
-  
-  // Handle edit button click
-  const handleEditVehicle = (id: string) => {
-    setSelectedVehicleId(id);
-    setIsEditOpen(true);
-  };
-  
-  // Handle successful edit
-  const handleEditSuccess = async () => {
-    // Refresh the vehicles data after an edit
-    setLoading(true);
-    
-    try {
-      // For real implementation, refetch from the database
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('*')
-        .order('updated_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      // Map the data to match our Vehicle interface
-      const formattedVehicles = data.map(vehicle => ({
-        ...vehicle,
-        image: vehicle.image_url,
-        lastUpdated: vehicle.updated_at,
-      }));
-      
-      if (formattedVehicles.length > 0) {
-        setVehicles(formattedVehicles);
-      }
-      
-      toast({
-        title: "Vehicle Updated",
-        description: "Your vehicle information has been successfully updated.",
-      });
-    } catch (error) {
-      console.error('Error refreshing vehicles:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to refresh vehicles data.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Get filtered vehicles based on search query and active filters
+  // Use useMemo to compute filtered vehicles
   const filteredVehicles = useMemo(() => {
-    let result = vehicles;
+    let result = [...vehicles];
     
     // Apply text search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (searchTerm) {
+      const query = searchTerm.toLowerCase();
       result = result.filter(vehicle => {
         const searchString = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.color}`.toLowerCase();
         return searchString.includes(query);
@@ -255,7 +223,86 @@ export default function Vehicles() {
     }
     
     return result;
-  }, [vehicles, searchQuery, activeFilters]);
+  }, [vehicles, searchTerm, activeFilters]);
+  
+  // Apply filters function
+  const handleApplyFilters = (filters: VehicleFilters) => {
+    setActiveFilters(filters);
+    setIsFilterOpen(false);
+  };
+  
+  // Clear all filters
+  const handleClearFilters = () => {
+    setActiveFilters(null);
+    setSearchTerm('');
+    setIsFilterOpen(false);
+    
+    toast({
+      title: "Filters Cleared",
+      description: "All filters have been removed.",
+    });
+  };
+  
+  // Handle edit button click
+  const handleEditVehicle = (id: string) => {
+    setEditingVehicleId(id);
+    setIsEditOpen(true);
+  };
+  
+  // Handle successful edit
+  const handleEditSuccess = async () => {
+    // Refresh the vehicles data after an edit
+    setLoading(true);
+    
+    try {
+      // For real implementation, refetch from the database
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Authentication required",
+          description: "You must be logged in to view vehicles",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+      
+      const { data, error } = await safeSelect(
+        supabase.from('vehicles'),
+        '*'
+      )
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Map the data to match our Vehicle interface
+      const formattedVehicles = data.map((vehicle: any) => ({
+        ...vehicle,
+        image: vehicle.image_url,
+        lastUpdated: formatDate(vehicle.updated_at),
+      })) as Vehicle[];
+      
+      if (formattedVehicles.length > 0) {
+        setVehicles(formattedVehicles);
+      }
+      
+      toast({
+        title: "Vehicle Updated",
+        description: "Your vehicle information has been successfully updated.",
+      });
+    } catch (error) {
+      console.error('Error refreshing vehicles:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh vehicles data.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Get filter count for the badge
   const filterCount = activeFilters ? Object.keys(activeFilters).length : 0;
@@ -273,156 +320,244 @@ export default function Vehicles() {
     }
   };
 
-  return (
-    <div className="container py-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Vehicles</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage and view all your vehicles
-          </p>
-        </div>
-        <Button 
-          onClick={() => navigate('/add-vehicle')}
-          className="whitespace-nowrap"
-        >
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Vehicle
-        </Button>
-      </div>
-      
-      <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search vehicles..."
-            className="pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2">
-          {filterCount > 0 && (
-            <Button 
-              variant="outline" 
-              size="icon"
-              onClick={handleClearFilters}
-              title="Clear all filters"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+  const renderVehicleCard = (vehicle: Vehicle) => {
+    // Check if this is a recently imported vehicle
+    const isRecentlyImported = !!vehicle.bulk_upload_batch_id;
+    
+    return (
+      <Card key={vehicle.id} className={`overflow-hidden ${isRecentlyImported ? 'border-green-500 border-2 shadow-md' : ''}`}>
+        <CardContent className="p-0">
+          <div className="relative aspect-[16/9] bg-muted">
+            {vehicle.image_url ? (
+              <img
+                src={vehicle.image_url}
+                alt={`${vehicle.make} ${vehicle.model}`}
+                className="object-cover w-full h-full"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <Car className="h-10 w-10 text-muted-foreground" />
+                <span className="sr-only">No image available</span>
+              </div>
+            )}
+            
+            {isRecentlyImported && (
+              <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                New Import
+              </div>
+            )}
+          </div>
+          
+          <div className="p-4">
+            <h3 className="text-lg font-semibold">{vehicle.year} {vehicle.make} {vehicle.model}</h3>
+            <div className="mt-2 space-y-1">
+              {vehicle.color && (
+                <p className="text-sm flex items-center gap-2">
+                  <Circle className="h-3 w-3" style={{ fill: vehicle.color, stroke: vehicle.color }} />
+                  <span>{vehicle.color}</span>
+                </p>
+              )}
+              {vehicle.mileage && (
+                <p className="text-sm flex items-center gap-2">
+                  <Gauge className="h-3 w-3" />
+                  <span>{vehicle.mileage.toLocaleString()} miles</span>
+                </p>
+              )}
+              <p className="text-sm flex items-center gap-2">
+                <Calendar className="h-3 w-3" />
+                <span>Updated {vehicle.lastUpdated}</span>
+              </p>
+              <div className="mt-2">
+                {getOwnershipStatusBadge(vehicle.ownership_status)}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="border-t p-4">
           <Button 
             variant="outline" 
-            className="sm:w-auto w-full"
-            onClick={() => setIsFilterOpen(true)}
+            size="sm" 
+            className="w-full" 
+            onClick={() => handleEditVehicle(vehicle.id)}
           >
-            <Filter className="mr-2 h-4 w-4" />
-            Filters
-            {filterCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {filterCount}
-              </Badge>
-            )}
+            View Details
           </Button>
-        </div>
-      </div>
-      
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      ) : filteredVehicles.length === 0 ? (
-        <div className="text-center py-12">
-          <Car className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-          <h3 className="mt-4 text-lg font-medium">No vehicles found</h3>
-          <p className="mt-1 text-muted-foreground">
-            {(searchQuery || activeFilters) 
-              ? "Try adjusting your search criteria or filters" 
-              : "Add your first vehicle to get started"}
-          </p>
-          <div className="flex gap-4 justify-center mt-6">
-            {(searchQuery || activeFilters) && (
-              <Button
-                variant="outline"
-                onClick={handleClearFilters}
-              >
-                Clear Filters
-              </Button>
-            )}
-            <Button 
-              onClick={() => navigate('/add-vehicle')}
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Vehicle
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  return (
+    <ScrollArea className="h-[calc(100vh-4rem)]">
+      <div className="container max-w-7xl p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">My Vehicles</h1>
+            <p className="text-muted-foreground">
+              View and manage all your vehicles
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button asChild>
+              <Link to="/import-vehicles" className="flex items-center gap-2">
+                <UploadCloud className="h-4 w-4" /> Import
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/add-vehicle" className="flex items-center gap-2">
+                <PlusCircle className="h-4 w-4" /> Add Vehicle
+              </Link>
             </Button>
           </div>
         </div>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredVehicles.map((vehicle) => (
-            <Card key={vehicle.id} className="overflow-hidden">
-              <div className="aspect-video bg-muted flex items-center justify-center">
-                {vehicle.image || vehicle.image_url ? (
-                  <img 
-                    src={vehicle.image || vehicle.image_url || ''} 
-                    alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                    className="object-cover w-full h-full"
-                  />
-                ) : (
-                  <Car className="h-12 w-12 text-muted-foreground opacity-50" />
-                )}
-              </div>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-xl">
-                    {vehicle.year} {vehicle.make} {vehicle.model}
-                  </CardTitle>
-                  {getOwnershipStatusBadge(vehicle.ownership_status)}
-                </div>
-              </CardHeader>
-              <CardContent className="pb-2">
-                <div className="text-sm text-muted-foreground">
-                  <p>Color: {vehicle.color}</p>
-                  <p>Mileage: {vehicle.mileage.toLocaleString()} mi</p>
-                  <p className="mt-1">
-                    Last updated {new Date(vehicle.lastUpdated || vehicle.updated_at || '').toLocaleDateString()}
-                  </p>
-                </div>
-              </CardContent>
-              <CardFooter className="pt-0 flex justify-between">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to={`/vehicles/${vehicle.id}`}>View Details</Link>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleEditVehicle(vehicle.id)}
-                >
-                  Edit
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+
+        <div className="flex gap-3 flex-col sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search vehicles..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            className="flex gap-2 items-center"
+            onClick={() => setIsFilterOpen(true)}
+          >
+            <Filter className="h-4 w-4" />
+            Filters
+            {activeFilters && (
+              <Badge variant="secondary" className="ml-1">
+                Active
+              </Badge>
+            )}
+          </Button>
+          {activeFilters && (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="hidden sm:flex"
+              onClick={handleClearFilters}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Clear filters</span>
+            </Button>
+          )}
         </div>
-      )}
-      
-      {/* Filter Dialog */}
-      <VehicleFilterDialog
-        open={isFilterOpen}
-        onOpenChange={setIsFilterOpen}
-        onApplyFilters={handleApplyFilters}
-      />
-      
-      {/* Edit Vehicle Form */}
-      {selectedVehicleId && (
-        <EditVehicleForm
-          open={isEditOpen}
-          onOpenChange={setIsEditOpen}
-          vehicleId={selectedVehicleId}
-          onSuccess={handleEditSuccess}
+
+        {activeFilters && (
+          <div className="flex gap-2 flex-wrap text-sm">
+            <div className="text-muted-foreground">Active filters:</div>
+            {activeFilters.statuses && activeFilters.statuses.length > 0 && (
+              <Badge variant="secondary" className="flex gap-1 items-center">
+                Status: {activeFilters.statuses.join(', ')}
+                <button
+                  className="ml-1 rounded-full"
+                  onClick={() => {
+                    setActiveFilters({
+                      ...activeFilters,
+                      statuses: undefined
+                    });
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                  <span className="sr-only">Remove status filter</span>
+                </button>
+              </Badge>
+            )}
+            {(activeFilters.make || activeFilters.model) && (
+              <Badge variant="secondary" className="flex gap-1 items-center">
+                Make/Model: {activeFilters.make} {activeFilters.model}
+                <button
+                  className="ml-1 rounded-full"
+                  onClick={() => {
+                    setActiveFilters({
+                      ...activeFilters,
+                      make: undefined,
+                      model: undefined
+                    });
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                  <span className="sr-only">Remove make/model filter</span>
+                </button>
+              </Badge>
+            )}
+            {activeFilters.yearRange && (
+              <Badge variant="secondary" className="flex gap-1 items-center">
+                Year: {activeFilters.yearRange[0]} - {activeFilters.yearRange[1]}
+                <button
+                  className="ml-1 rounded-full"
+                  onClick={() => {
+                    setActiveFilters({
+                      ...activeFilters,
+                      yearRange: undefined
+                    });
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                  <span className="sr-only">Remove year filter</span>
+                </button>
+              </Badge>
+            )}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 px-2 sm:hidden"
+              onClick={handleClearFilters}
+            >
+              Clear all
+            </Button>
+          </div>
+        )}
+
+        <VehicleFilterDialog
+          open={isFilterOpen}
+          onOpenChange={setIsFilterOpen}
+          onApplyFilters={handleApplyFilters}
+          initialFilters={activeFilters}
+          onClear={handleClearFilters}
         />
-      )}
-    </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="text-muted-foreground">Loading your vehicles...</p>
+            </div>
+          </div>
+        ) : filteredVehicles.length === 0 ? (
+          <div className="border rounded-lg p-12 flex flex-col items-center justify-center text-center">
+            <Car className="h-12 w-12 mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">No vehicles found</h2>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              {searchTerm || activeFilters
+                ? "No vehicles match your search criteria. Try adjusting your filters."
+                : "You haven't added any vehicles yet. Get started by adding your first vehicle."}
+            </p>
+            <div className="flex gap-4">
+              {(searchTerm || activeFilters) && (
+                <Button variant="outline" onClick={handleClearFilters}>
+                  Clear Filters
+                </Button>
+              )}
+              <Button asChild>
+                <Link to="/add-vehicle" className="flex items-center gap-2">
+                  <PlusCircle className="h-4 w-4" />
+                  Add Vehicle
+                </Link>
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredVehicles.map(renderVehicleCard)}
+          </div>
+        )}
+      </div>
+    </ScrollArea>
   );
-}
+} 

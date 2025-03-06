@@ -9,12 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { FileUploader } from '@/components/detail/image-upload/FileUploader';
 import { useDocumentUpload } from '../hooks/useDocumentUpload';
-import { useToastContext } from '@/contexts/ToastContext';
+import { useToast } from '@/components/ui/toast/toast-context';
 import { FileText, Car, AlertCircle } from 'lucide-react';
 
 export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValues> }) => {
   const ownershipStatus = form.watch('ownership_status');
-  const { toast } = useToastContext();
+  const { toast } = useToast();
   const { documents, setDocuments, handleDocumentsSelected } = useDocumentUpload({
     form,
     field: 'ownership_documents',

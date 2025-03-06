@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate, BrowserRouter } from 'react-router-dom';
 import { useAuthState } from '@/hooks/auth/use-auth-state';
@@ -123,15 +122,13 @@ const AppRouterContent: React.FC = () => {
         } 
       />
 
-      {allRoutes
-        .filter(route => route.path !== '/' && route.path !== '*')
-        .map(route => (
-          <Route
-            key={route.path}
-            path={route.path}
-            element={getRouteElement(route)}
-          />
-        ))}
+      {allRoutes.map(route => (
+        <Route
+          key={route.path}
+          path={route.path}
+          element={getRouteElement(route)}
+        />
+      ))}
 
       <Route path="*" element={<Navigate to="/explore" replace />} />
     </Routes>

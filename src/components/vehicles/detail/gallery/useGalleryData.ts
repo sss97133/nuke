@@ -84,6 +84,12 @@ export const useGalleryData = (vehicle: any) => {
     const uploadedImages: GalleryImage[] = [];
     
     try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileExt = file.name.split('.').pop();
@@ -118,7 +124,8 @@ export const useGalleryData = (vehicle: any) => {
             is_primary: false,
             public_url: publicUrl,
             source: 'user_upload',
-            uploaded_at: new Date().toISOString()
+            uploaded_at: new Date().toISOString(),
+            user_id: user.id
           }])
           .select()
           .single();
@@ -134,7 +141,7 @@ export const useGalleryData = (vehicle: any) => {
           url: publicUrl,
           type: type,
           user: {
-            name: 'Current User'
+            name: user.user_metadata?.full_name || 'Current User'
           },
           isVerified: false,
           caption: description
@@ -161,7 +168,6 @@ export const useGalleryData = (vehicle: any) => {
       });
     } finally {
       setIsLoading(false);
-      setIsUploadModalOpen(false);
     }
   };
 

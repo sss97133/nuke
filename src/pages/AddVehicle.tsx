@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/toast/toast-context';
 import { OwnershipSection } from '@/components/vehicles/forms/components/OwnershipSection';
 import { useVehicleForm } from '@/components/vehicles/forms/hooks/useVehicleForm';
 
@@ -25,16 +25,16 @@ export default function AddVehicle() {
       
       // Show success message
       toast({
-        title: 'Vehicle Added',
+        title: 'Vehicle Added Successfully',
         description: `${data.year} ${data.make} ${data.model} has been added to your collection.`,
-        action: {
-          label: 'View All Vehicles',
-          onClick: () => navigate('/vehicles')
-        }
+        variant: 'success',
       });
       
-      // Navigate back to the vehicles list
-      navigate('/vehicles');
+      // Set a timeout to allow the user to see the toast before navigation
+      setTimeout(() => {
+        // Navigate back to the vehicles list with state
+        navigate('/vehicles', { state: { fromAdd: true, vehicleData: data } });
+      }, 1500);
     },
     onSubmitError: (errors) => {
       // Show error message

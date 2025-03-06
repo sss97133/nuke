@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,11 +5,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VehicleCollectionProps {
   userId: string;
   isOwnProfile: boolean;
-  filter: string; // Add filter prop to the interface
+  filter: string;
 }
 
 const VehicleCollection: React.FC<VehicleCollectionProps> = ({ 
@@ -24,53 +24,29 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
   const [loading, setLoading] = React.useState(true);
   
   React.useEffect(() => {
-    // Simulate fetching vehicles with a delay
     const fetchVehicles = async () => {
       setLoading(true);
       try {
-        // This would be a real API call in a production app
-        // Simulating API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data
-        const mockVehicles = Array(6).fill(null).map((_, i) => ({
-          id: `vehicle-${i}`,
-          make: ['Toyota', 'Honda', 'Ford', 'BMW', 'Tesla', 'Audi', 'Chevrolet'][i % 7],
-          model: ['Corolla', 'Civic', 'F-150', 'X5', 'Model 3', 'A4', 'K20'][i % 7],
-          year: [2018, 2019, 2020, 1985, 2022, 2015, 2023][i % 7],
-          status: ['owned', 'claimed', 'discovered'][i % 3],
-          color: ['Red', 'Blue', 'Black', 'White', 'Silver', 'Green', 'Orange'][i % 7],
-          image_url: `/placeholder.svg`,
-          vehicle_stats: {
-            likes_count: Math.floor(Math.random() * 50),
-            views_count: Math.floor(Math.random() * 200)
-          }
-        }));
-        
-        // Add the newly added vehicle if it matches what the user entered
-        const newTruck = {
-          id: `vehicle-${mockVehicles.length}`,
-          make: 'Chevrolet',
-          model: 'K20',
-          year: 1985,
-          status: 'owned',
-          color: 'Blue',
-          image_url: `/placeholder.svg`,
-          vehicle_stats: {
-            likes_count: 0,
-            views_count: 1
-          }
-        };
-        
-        mockVehicles.unshift(newTruck); // Add the new truck to the front of the array
-        
-        // Filter vehicles based on the filter prop
-        let filteredVehicles = mockVehicles;
-        if (filter !== 'all') {
-          filteredVehicles = mockVehicles.filter(v => v.status === filter);
+        let query = supabase
+          .from('vehicles')
+          .select('*');
+
+        // Apply filters based on the filter prop
+        if (filter === 'owned') {
+          query = query.eq('owner_id', userId);
+        } else if (filter === 'claimed') {
+          query = query.eq('claimer_id', userId);
+        } else if (filter === 'discovered') {
+          query = query.eq('discoverer_id', userId);
         }
-        
-        setVehicles(filteredVehicles);
+
+        const { data, error } = await query;
+
+        if (error) {
+          throw error;
+        }
+
+        setVehicles(data || []);
       } catch (error) {
         console.error('Error fetching vehicles:', error);
         toast({
@@ -88,6 +64,23 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
   
   const handleAddVehicle = () => {
     navigate('/add-vehicle');
+  };
+  
+  const handleVehicleClick = (vehicleId: string) => {
+    console.log('Vehicle card clicked:', {
+      vehicleId,
+      currentPath: window.location.pathname,
+      timestamp: new Date().toISOString()
+    });
+    
+    try {
+      const targetPath = `/vehicles/${vehicleId}`;
+      console.log('Attempting navigation to:', targetPath);
+      navigate(targetPath);
+      console.log('Navigation completed');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
   };
   
   if (loading) {
@@ -129,7 +122,18 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {vehicles.map((vehicle) => (
-          <Card key={vehicle.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+          <Card 
+            key={vehicle.id} 
+            className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+            onClick={(e) => {
+              console.log('Card clicked:', {
+                vehicleId: vehicle.id,
+                event: e,
+                timestamp: new Date().toISOString()
+              });
+              handleVehicleClick(vehicle.id);
+            }}
+          >
             <div className="h-48 bg-muted relative overflow-hidden">
               <img 
                 src={vehicle.image_url || "/placeholder.svg"} 
@@ -148,8 +152,8 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
                 {vehicle.color || "No color specified"}
               </p>
               <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                <span>{vehicle.vehicle_stats?.likes_count || 0} likes</span>
-                <span>{vehicle.vehicle_stats?.views_count || 0} views</span>
+                <span>{vehicle.likes_count || 0} likes</span>
+                <span>{vehicle.views_count || 0} views</span>
               </div>
             </CardContent>
           </Card>

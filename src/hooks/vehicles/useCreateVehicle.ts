@@ -1,16 +1,23 @@
-
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { VehicleFormValues } from '@/components/vehicles/forms/types';
-import { addStoredVehicle, addVehicleRelationship } from './mockVehicleStorage';
 
 export function useCreateVehicle() {
   const { toast } = useToast();
 
   // Define the mutation for creating a vehicle
   const mutation = useMutation({
-    mutationFn: async (vehicle: VehicleFormValues & { user_id: string, added: string, tags: string[] }) => {
+    mutationFn: async (vehicle: VehicleFormValues & { user_id?: string }) => {
+      // Get current user if user_id not provided
+      if (!vehicle.user_id) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+        vehicle.user_id = user.id;
+      }
+
       // Convert string values to the appropriate types
       const processedVehicle = {
         ...vehicle,
@@ -23,67 +30,76 @@ export function useCreateVehicle() {
         doors: vehicle.doors ? Number(vehicle.doors) || null : null,
         seats: vehicle.seats ? Number(vehicle.seats) || null : null,
         
-        // Add default market analysis fields - these should be calculated properly in a real app
-        market_value: vehicle.purchase_price ? parseFloat(vehicle.purchase_price as string) * 1.1 : null,
+        // Add timestamp for creation
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         
-        // Handle image (could be string or array)
-        image: Array.isArray(vehicle.image) && vehicle.image.length > 0 ? vehicle.image[0] : 
-              (typeof vehicle.image === 'string' ? vehicle.image : null),
-        
-        // Handle additional images if we have an array
-        additional_images: Array.isArray(vehicle.image) && vehicle.image.length > 1 
-          ? vehicle.image.slice(1) 
-          : [],
+        // Handle tags if it's a string (convert to array)
+        tags: typeof vehicle.tags === 'string' ? 
+          vehicle.tags.split(',').map(tag => tag.trim()) : 
+          vehicle.tags || [],
       };
 
       console.log('Creating vehicle with data:', processedVehicle);
       
-      // In a real app, we would send to Supabase
-      // const { data, error } = await supabase.from('vehicles').insert([processedVehicle]).select();
-      // if (error) throw error;
+      // Insert the vehicle into Supabase
+      const { data, error } = await supabase
+        .from('vehicles')
+        .insert([processedVehicle])
+        .select();
       
-      // For now, use our mock storage system
-      const newVehicle = addStoredVehicle({
-        id: Date.now(), // Use timestamp as ID
-        make: processedVehicle.make,
-        model: processedVehicle.model,
-        year: processedVehicle.year || new Date().getFullYear(),
-        trim: processedVehicle.trim || '',
-        price: processedVehicle.purchase_price ? Number(processedVehicle.purchase_price) : undefined,
-        market_value: processedVehicle.market_value ? Number(processedVehicle.market_value) : undefined,
-        price_trend: 'stable',
-        mileage: processedVehicle.mileage ? Number(processedVehicle.mileage) : 0,
-        image: processedVehicle.image || '/placeholder-vehicle.jpg',
-        location: vehicle.discovery_location || 'Unknown',
-        added: 'just now',
-        tags: vehicle.tags || [],
-        condition_rating: 7,
-        vehicle_type: processedVehicle.body_style || 'car',
-        body_type: processedVehicle.body_style || '',
-        transmission: processedVehicle.transmission || '',
-        drivetrain: processedVehicle.drivetrain || '',
-        rarity_score: 5,
-        era: getEraFromYear(processedVehicle.year),
-        restoration_status: 'original',
-        special_edition: false,
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        throw new Error('Failed to create vehicle');
+      }
+      
+      // If there are any images, save them
+      if (Array.isArray(vehicle.image) && vehicle.image.length > 0) {
+        const vehicleId = data[0].id;
         
-        // Set status based on ownership type
-        status: vehicle.ownership_status,
-        source: vehicle.discovery_source || '',
-        source_url: vehicle.discovery_url || '',
-      });
+        // Save each image to storage
+        for (let i = 0; i < vehicle.image.length; i++) {
+          const imageFile = vehicle.image[i];
+          
+          if (typeof imageFile === 'string' && imageFile.startsWith('data:')) {
+            // It's a data URL, need to convert to file
+            try {
+              const res = await fetch(imageFile);
+              const blob = await res.blob();
+              const file = new File([blob], `vehicle-${vehicleId}-${i}.jpg`, { type: 'image/jpeg' });
+              
+              // Upload to Supabase storage
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('vehicle-images')
+                .upload(`${vehicleId}/${file.name}`, file);
+              
+              if (uploadError) {
+                console.error('Error uploading image:', uploadError);
+                continue;
+              }
+              
+              // Create record in vehicle_images table
+              const { error: imageInsertError } = await supabase
+                .from('vehicle_images')
+                .insert([{
+                  vehicle_id: vehicleId,
+                  file_path: uploadData?.path,
+                  is_primary: i === 0, // First image is primary
+                  user_id: vehicle.user_id
+                }]);
+              
+              if (imageInsertError) {
+                console.error('Error creating image record:', imageInsertError);
+              }
+            } catch (err) {
+              console.error('Error processing image:', err);
+            }
+          }
+        }
+      }
       
-      // Create relationship between user and vehicle with the appropriate type
-      const relationshipType = 
-        vehicle.ownership_status === 'owned' ? 'verified' :
-        vehicle.ownership_status === 'claimed' ? 'claimed' : 'discovered';
-      
-      addVehicleRelationship(vehicle.user_id, newVehicle.id, relationshipType);
-      
-      return {
-        id: `vehicle_${Date.now()}`,
-        ...processedVehicle
-      };
+      return data[0];
     },
     onSuccess: (data, variables) => {
       const ownershipStatus = variables.ownership_status;

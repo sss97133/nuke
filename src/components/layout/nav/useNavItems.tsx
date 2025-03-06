@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -28,7 +27,8 @@ import {
   ShoppingCart,
   GraduationCap,
   LogIn,
-  UserPlus
+  UserPlus,
+  UploadCloud
 } from 'lucide-react';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useAuthState } from '@/hooks/auth/use-auth-state';
@@ -113,6 +113,7 @@ export const useNavItems = () => {
         { to: "/token-staking", icon: <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Token Staking" },
         { to: "/import", icon: <FileInput className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Import" },
         { to: "/discovered-vehicles", icon: <Car className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Vehicles" },
+        { to: "/import-vehicles", icon: <UploadCloud className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Import Vehicles" },
         { to: "/team-members", icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Team Members" },
         { to: "/profile", icon: <User className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Profile" },
         { to: "/streaming", icon: <Video className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Streaming" }

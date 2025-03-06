@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Dialog,
@@ -25,6 +24,8 @@ interface VehicleFilterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onApplyFilters: (filters: VehicleFilters) => void;
+  initialFilters?: VehicleFilters | null;
+  onClear?: () => void;
 }
 
 export interface VehicleFilters {
@@ -39,17 +40,39 @@ export interface VehicleFilters {
 const VehicleFilterDialog: React.FC<VehicleFilterDialogProps> = ({
   open,
   onOpenChange,
-  onApplyFilters
+  onApplyFilters,
+  initialFilters,
+  onClear
 }) => {
   const currentYear = new Date().getFullYear();
   
   // Initialize filter states
-  const [make, setMake] = React.useState<string>("");
-  const [model, setModel] = React.useState<string>("");
-  const [yearRange, setYearRange] = React.useState<[number, number]>([1950, currentYear]);
-  const [colors, setColors] = React.useState<string[]>([]);
-  const [statuses, setStatuses] = React.useState<string[]>([]);
-  const [mileageRange, setMileageRange] = React.useState<[number, number]>([0, 200000]);
+  const [make, setMake] = React.useState<string>(initialFilters?.make || "");
+  const [model, setModel] = React.useState<string>(initialFilters?.model || "");
+  const [yearRange, setYearRange] = React.useState<[number, number]>(
+    initialFilters?.yearRange || [1950, currentYear]
+  );
+  const [colors, setColors] = React.useState<string[]>(
+    initialFilters?.colors || []
+  );
+  const [statuses, setStatuses] = React.useState<string[]>(
+    initialFilters?.statuses || []
+  );
+  const [mileageRange, setMileageRange] = React.useState<[number, number]>(
+    initialFilters?.mileageRange || [0, 200000]
+  );
+  
+  // Update state when initialFilters changes
+  React.useEffect(() => {
+    if (initialFilters) {
+      setMake(initialFilters.make || "");
+      setModel(initialFilters.model || "");
+      setYearRange(initialFilters.yearRange || [1950, currentYear]);
+      setColors(initialFilters.colors || []);
+      setStatuses(initialFilters.statuses || []);
+      setMileageRange(initialFilters.mileageRange || [0, 200000]);
+    }
+  }, [initialFilters, currentYear]);
   
   // Color options
   const colorOptions = [
@@ -115,6 +138,11 @@ const VehicleFilterDialog: React.FC<VehicleFilterDialogProps> = ({
     setColors([]);
     setStatuses([]);
     setMileageRange([0, 200000]);
+    
+    // Call the onClear prop if provided
+    if (onClear) {
+      onClear();
+    }
   };
   
   // List of popular makes for the dropdown
@@ -178,7 +206,7 @@ const VehicleFilterDialog: React.FC<VehicleFilterDialogProps> = ({
               min={1950}
               max={currentYear}
               step={1}
-              onValueChange={setYearRange}
+              onValueChange={(value) => setYearRange(value as [number, number])}
               className="mt-2"
             />
           </div>
@@ -243,7 +271,7 @@ const VehicleFilterDialog: React.FC<VehicleFilterDialogProps> = ({
               min={0}
               max={200000}
               step={5000}
-              onValueChange={setMileageRange}
+              onValueChange={(value) => setMileageRange(value as [number, number])}
               className="mt-2"
             />
           </div>

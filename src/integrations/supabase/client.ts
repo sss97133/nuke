@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -9,6 +8,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
@@ -38,8 +38,20 @@ export const supabase = createClient<Database>(
     },
     global: {
       fetch: async (url, options) => {
-        // Implement custom fetch with retry logic
-        const MAX_RETRIES = 2; // Reduced from 3 to 2
+        // If this is an admin operation and we have a service role key, use it
+        if (url.includes('/auth/v1/admin') && supabaseServiceRoleKey) {
+          const adminOptions = {
+            ...options,
+            headers: {
+              ...options?.headers,
+              'Authorization': `Bearer ${supabaseServiceRoleKey}`
+            }
+          };
+          return fetch(url, adminOptions);
+        }
+        
+        // Otherwise use the default fetch with retry logic
+        const MAX_RETRIES = 2;
         let retries = 0;
         let error;
         
@@ -212,4 +224,23 @@ export const useSupabaseWithToast = () => {
     handleError,
     safeFetch
   };
+};
+
+/**
+ * Utility function to safely create a select query with proper column formatting.
+ * This prevents issues with malformed URL parameters like 'columns=id:1'
+ */
+export const safeSelect = <T>(
+  query: any,
+  columns: string | string[] = '*'
+) => {
+  // Create a base query from the table
+  if (typeof columns === 'string') {
+    // If columns is already a string, just use it directly
+    return query.select(columns);
+  }
+  
+  // If columns is an array, join it properly with commas
+  // Make sure there are no spaces after the commas to prevent URL encoding issues
+  return query.select(columns.join(','));
 };
