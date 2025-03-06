@@ -2,8 +2,16 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { OwnershipSection, OwnershipData } from '../components/OwnershipSection';
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from 'lucide-react';
+
+interface VehicleFormData {
+  ownership: OwnershipData;
+}
 
 export default function VehicleFormExample() {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
   const [ownershipData, setOwnershipData] = useState<OwnershipData>({
     status: 'owned',
     documents: [],
@@ -11,18 +19,73 @@ export default function VehicleFormExample() {
 
   const handleOwnershipChange = (data: OwnershipData) => {
     setOwnershipData(data);
-    console.log('Updated ownership data:', data);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real application, you would submit the form data to your backend
-    console.log('Form submitted with data:', {
-      ownership: ownershipData,
-    });
+  const validateForm = (data: VehicleFormData): string | null => {
+    if (!data.ownership.status) {
+      return 'Vehicle ownership status is required';
+    }
+    if (data.ownership.status === 'owned' && data.ownership.documents.length === 0) {
+      return 'Please upload at least one ownership document';
+    }
+    return null;
+  };
 
-    // Show success message or redirect user
-    alert('Vehicle information saved successfully!');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const formData: VehicleFormData = {
+        ownership: ownershipData,
+      };
+
+      const validationError = validateForm(formData);
+      if (validationError) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: validationError,
+        });
+        return;
+      }
+
+      // In a real application, this would be an API call to your backend
+      const response = await mockSaveVehicle(formData);
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Vehicle information saved successfully!",
+        });
+        handleCancel();
+      } else {
+        throw new Error('Failed to save vehicle');
+      }
+    } catch (error) {
+      console.error('Error saving vehicle:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save vehicle information. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Mock API function
+  const mockSaveVehicle = async (data: VehicleFormData) => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return { success: true, data };
+  };
+
+  const handleCancel = () => {
+    setOwnershipData({
+      status: 'owned',
+      documents: [],
+    });
   };
 
   return (
@@ -41,10 +104,27 @@ export default function VehicleFormExample() {
 
             {/* Form Actions */}
             <div className="flex justify-end gap-4">
-              <Button type="button" variant="outline">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleCancel}
+                disabled={isLoading}
+              >
                 Cancel
               </Button>
-              <Button type="submit">Save Vehicle</Button>
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Vehicle'
+                )}
+              </Button>
             </div>
           </form>
         </CardContent>
