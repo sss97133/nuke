@@ -1,62 +1,48 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
-import { Brain } from 'lucide-react';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
+const models = [
+  {
+    name: 'Predictive Maintenance Model',
+    description: 'Predicts when parts will need replacement based on vehicle usage patterns',
+    accuracy: 94,
+    lastUpdate: '2 days ago'
+  },
+  {
+    name: 'Cost Optimization Model',
+    description: 'Identifies cost-saving opportunities across your parts inventory',
+    accuracy: 88,
+    lastUpdate: '3 days ago'
+  },
+  {
+    name: 'Parts Compatibility Analysis',
+    description: 'Analyzes optimal parts matches across your vehicle fleet',
+    accuracy: 92,
+    lastUpdate: '1 day ago'
+  }
+];
 
-interface AnalysisModel {
-  name: string;
-  description: string;
-  accuracy: number;
-  colorClass: string;
-}
-
-export const AIAnalysisModels = () => {
-  const analysisModels: AnalysisModel[] = [
-    {
-      name: 'Maintenance Prediction',
-      description: 'Analyzes vehicle history, manufacturer recommendations, and usage patterns to predict maintenance needs.',
-      accuracy: 95,
-      colorClass: 'bg-blue-600'
-    },
-    {
-      name: 'Budget Optimization',
-      description: 'Identifies cost-saving opportunities and optimal purchase timing based on market trends and service schedules.',
-      accuracy: 87,
-      colorClass: 'bg-green-600'
-    },
-    {
-      name: 'Parts Compatibility',
-      description: 'Cross-references your vehicles with our parts database to ensure perfect compatibility and optimal performance.',
-      accuracy: 99,
-      colorClass: 'bg-purple-600'
-    }
-  ];
-
+export function AIAnalysisModels() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>AI Analysis Models</CardTitle>
-            <CardDescription>The systems powering your insights</CardDescription>
-          </div>
-          <div className="p-2 bg-purple-100 rounded-full">
-            <Brain className="h-5 w-5 text-purple-700" />
-          </div>
-        </div>
+        <CardTitle>AI Models</CardTitle>
+        <CardDescription>
+          These machine learning models power your parts insights
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {analysisModels.map((model, index) => (
-            <div key={index} className="border rounded-md p-4">
-              <h4 className="font-medium mb-1">{model.name}</h4>
-              <p className="text-sm text-muted-foreground mb-2">
-                {model.description}
-              </p>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className={`${model.colorClass} h-2 rounded-full`} style={{ width: `${model.accuracy}%` }}></div>
+        <div className="space-y-5">
+          {models.map((model) => (
+            <div key={model.name} className="space-y-1">
+              <div className="flex justify-between">
+                <h4 className="font-medium">{model.name}</h4>
+                <span className="text-sm text-muted-foreground">Updated {model.lastUpdate}</span>
               </div>
-              <div className="flex justify-end mt-1">
-                <span className="text-xs text-muted-foreground">{model.accuracy}% accuracy</span>
+              <p className="text-sm text-muted-foreground">{model.description}</p>
+              <div className="flex items-center gap-2">
+                <Progress value={model.accuracy} className="h-2" />
+                <span className="text-sm font-medium">{model.accuracy}%</span>
               </div>
             </div>
           ))}
@@ -64,4 +50,4 @@ export const AIAnalysisModels = () => {
       </CardContent>
     </Card>
   );
-};
+}
