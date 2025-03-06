@@ -1,17 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Bot } from 'lucide-react';
 import { InsightsList } from './insights/InsightsList';
 import { AIAnalysisModels } from './insights/AIAnalysisModels';
-import { AIInsight } from './insights/InsightCard';
+
+export interface AIInsight {
+  id: string;
+  title: string;
+  description: string;
+  category: 'recommendation' | 'prediction' | 'analysis';
+  relatedVehicle?: string;
+  confidence: number;
+}
 
 const AIInsightsPanel = () => {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchAIInsights = async () => {
+  const fetchAIInsights = useCallback(async () => {
     try {
       setLoading(true);
       // In a real implementation, this would fetch from your API
@@ -58,8 +66,7 @@ const AIInsightsPanel = () => {
       setInsights(mockInsights);
       toast({
         title: "Insights refreshed",
-        description: "New AI insights have been generated",
-        variant: "default"
+        description: "New AI insights have been generated"
       });
     } catch (error) {
       console.error('Error fetching AI insights:', error);
@@ -71,11 +78,11 @@ const AIInsightsPanel = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchAIInsights();
-  }, []);
+  }, [fetchAIInsights]);
 
   return (
     <div className="space-y-6">
