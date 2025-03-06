@@ -1,62 +1,141 @@
+# Nuke Project
 
-# Nucleus of digital autonomy
+A modern React application built with TypeScript, Vite, and shadcn/ui components that provides a robust foundation for your web application.
 
-A modern web application for managing vehicle fleets, inventory, and service operations with an integrated professional development system.
+## 🚀 Features
 
-## Quick Links
+- **Modern React Framework** - Built with React 18 and TypeScript
+- **Fast Development Experience** - Powered by Vite for rapid development
+- **Beautiful UI Components** - Utilizes shadcn/ui for consistent, accessible components
+- **Robust State Management** - Integration with Jotai for simple and flexible state
+- **Powerful Routing** - React Router DOM for comprehensive routing
+- **Data Fetching & Caching** - TanStack Query for efficient API interactions
+- **Dark Mode Support** - Out-of-the-box light/dark theming
+- **Responsive Design** - Mobile-first approach with Tailwind CSS
+- **Toast Notifications** - Comprehensive toast notification system
 
-- [Features Documentation](./docs/FEATURES.md)
-- [Technical Documentation](./docs/TECHNICAL.md)
-- [Getting Started Guide](./docs/GETTING_STARTED.md)
-- [Contributing Guidelines](./docs/CONTRIBUTING.md)
-- [Market Analysis](./docs/MARKET_ANALYSIS.md)
+## 🛠️ Project Structure
 
-## Overview
+```
+nuke/
+├── public/               # Static assets
+├── src/
+│   ├── components/       # Reusable UI components
+│   │   ├── ui/           # Base UI components from shadcn
+│   │   └── ...           # Custom components
+│   ├── contexts/         # React contexts
+│   ├── hooks/            # Custom React hooks
+│   ├── routes/           # Application routes
+│   ├── utils/            # Utility functions
+│   ├── App.tsx           # Main App component
+│   ├── main.tsx          # Entry point
+│   └── index.css         # Global styles
+├── .gitignore
+├── eslint.config.js      # ESLint configuration
+├── package.json          # Dependencies and scripts
+├── tsconfig.json         # TypeScript configuration
+└── vite.config.ts        # Vite configuration
+```
 
-This system provides comprehensive tools for:
-- Vehicle fleet management
-- Inventory control
-- Service operations
-- Professional development tracking
-- Business operations
-- Media production
-- Market analysis
+## 🔧 Toast Notification System
 
-## Getting Started
+The toast notification system in this project follows a modular architecture:
+
+- **Core Components**: Located in `/src/components/ui/toast/`
+- **Global Provider**: Integrated in `App.tsx` for app-wide notifications
+- **Helper Hooks**: Use `useToast()` hook to trigger notifications from anywhere
+- **Global Functions**: Call `toast()`, `success()`, `error()` etc. from non-React contexts
+
+### Usage Examples
+
+```tsx
+// Inside a React component
+import { useToast } from '@/hooks/use-toast';
+
+function MyComponent() {
+  const { success, error } = useToast();
+  
+  const handleSubmit = async () => {
+    try {
+      // Your logic here
+      success({ title: 'Success!', description: 'Your action completed successfully.' });
+    } catch (err) {
+      error({ title: 'Error!', description: 'Something went wrong.' });
+    }
+  };
+}
+
+// Outside React components (e.g., in a utility function)
+import { toast, success, error } from '@/hooks/use-toast';
+
+function apiService() {
+  // Your API logic
+  success({ title: 'API call successful!' });
+}
+```
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18.x or higher
+- npm or yarn
+
+### Installation
 
 1. Clone the repository
-2. Install dependencies: `npm install`
-3. Set up environment variables
-4. Start development server: `npm run dev`
+   ```bash
+   git clone https://github.com/sss97133/nuke.git
+   cd nuke
+   ```
 
-For detailed setup instructions, see our [Getting Started Guide](./docs/GETTING_STARTED.md).
+2. Install dependencies
+   ```bash
+   npm install
+   # or
+   yarn
+   ```
 
-## Deployment
+3. Start the development server
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
 
-This project is configured for deployment on Vercel:
+4. Build for production
+   ```bash
+   npm run build
+   # or
+   yarn build
+   ```
 
-1. Push your changes to the repository
-2. Connect your repository to Vercel
-3. The application will automatically deploy from the main branch
+## 🧪 Recommended Development Tools
 
-To deploy manually:
-```
-npm run build
-vercel --prod
-```
+- [React Developer Tools](https://chrome.google.com/webstore/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi)
+- [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss)
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
+- [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
 
-## Branch Strategy
+## 📚 Key Dependencies
 
-We follow a simplified branch strategy:
-- `main`: Production-ready code
-- `feature/*`: New feature development
-- `fix/*`: Bug fixes
-- `release/*`: Release preparation
+- **React & React DOM** - Core UI library
+- **TypeScript** - Type safety and enhanced developer experience
+- **Vite** - Fast build tool and development server
+- **React Router DOM** - Routing and navigation
+- **TanStack Query** - Data fetching and cache management
+- **shadcn/ui** - Component library (built on Radix UI)
+- **Tailwind CSS** - Utility-first CSS framework
+- **Jotai** - Atomic state management
+- **Zod** - Schema validation
+- **date-fns** - Date utilities
+- **Recharts** - Data visualization
+- **Lucide React** - Icon library
 
-## Support
+## 🤝 Contributing
 
-For support, please open an issue in the repository or contact the development team.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
+## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
