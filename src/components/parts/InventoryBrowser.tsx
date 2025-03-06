@@ -22,6 +22,7 @@ const InventoryBrowser = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
 
+  // Filter parts based on search query and category
   const filteredParts = parts.filter(part => {
     // Filter by search query
     const matchesSearch = part.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -34,6 +35,7 @@ const InventoryBrowser = () => {
     return matchesSearch && matchesCategory;
   });
 
+  // Get unique categories for filter dropdown
   const categories = ['all', ...new Set(parts.map(part => part.category))];
 
   const handleEditClick = (part: Part) => {
