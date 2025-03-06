@@ -1,0 +1,80 @@
+name: Sync and Safety Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 */6 * * *'  # Run every 6 hours
+
+jobs:
+  check:
+    name: Check Repository Health
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for all branches and tags
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Check for sensitive data
+      run: |
+        echo "🔍 Checking for sensitive data patterns..."
+        if git diff --cached | grep -E "(password|secret|key|token|api_key|auth)" > /dev/null; then
+          echo "❌ WARNING: Possible sensitive data detected!"
+          exit 1
+        fi
+
+    - name: Type check
+      run: npm run type-check
+
+    - name: Lint
+      run: npm run lint
+
+    - name: Test
+      run: npm test
+
+    - name: Check for large files
+      run: |
+        echo "🔍 Checking for large files..."
+        find . -type f -size +10M -not -path "./node_modules/*" -not -path "./dist/*" | while read file; do
+          echo "⚠️ Warning: Large file detected: $file"
+        done
+
+    - name: Check for outdated dependencies
+      run: |
+        echo "🔍 Checking for outdated dependencies..."
+        npm outdated || true
+
+    - name: Check for sync issues
+      run: |
+        echo "🔍 Checking for sync issues..."
+        git fetch --prune
+        if git branch -a | grep -q "remotes/origin/"; then
+          echo "✅ Remote branches are in sync"
+        else
+          echo "⚠️ Warning: Some remote branches might be out of sync"
+        fi
+
+    - name: Check for uncommitted changes
+      run: |
+        echo "🔍 Checking for uncommitted changes..."
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "⚠️ Warning: Repository has uncommitted changes"
+        else
+          echo "✅ Repository is clean"
+        fi 
