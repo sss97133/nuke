@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,12 +14,16 @@ interface SetBudgetDialogProps {
 export function SetBudgetDialog({ open, onClose, onSetBudget, currentBudget = 0 }: SetBudgetDialogProps) {
   const [amount, setAmount] = useState(currentBudget.toString());
   const [submitting, setSubmitting] = useState(false);
+  
+  useEffect(() => {
+    setAmount(currentBudget.toString());
+  }, [currentBudget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     
-    await onSetBudget(parseFloat(amount));
+    await onSetBudget(parseFloat(amount) || 0);
     
     setSubmitting(false);
     onClose();
