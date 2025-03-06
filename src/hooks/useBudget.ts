@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 export interface BudgetData {
@@ -14,7 +14,7 @@ export const useBudget = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchBudgetData = async () => {
+  const fetchBudgetData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -57,7 +57,7 @@ export const useBudget = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const setBudget = async (amount: number) => {
     try {
@@ -78,7 +78,6 @@ export const useBudget = () => {
         toast({
           title: "Success",
           description: "Budget updated successfully",
-          variant: "default"
         });
       }
     } catch (error) {
@@ -95,7 +94,7 @@ export const useBudget = () => {
 
   useEffect(() => {
     fetchBudgetData();
-  }, [toast]);
+  }, [fetchBudgetData]);
 
   return {
     budgetData,
