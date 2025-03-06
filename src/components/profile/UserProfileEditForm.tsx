@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { UserRound, Camera, Loader2, Check, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAvatarUpload } from './hooks/useAvatarUpload';
 
 interface UserProfileFormValues {
   username: string;
@@ -36,9 +37,13 @@ export const UserProfileEditForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(currentAvatarUrl || null);
-  const [isUploading, setIsUploading] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState(true);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  
+  // Use the dedicated avatar upload hook
+  const { isUploading, uploadAvatar } = useAvatarUpload(userId, (url) => {
+    setAvatarPreview(url);
+  });
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<UserProfileFormValues>({
     defaultValues: {
@@ -98,47 +103,6 @@ export const UserProfileEditForm = ({
     }
   };
 
-  const uploadAvatar = async (): Promise<string | null> => {
-    if (!avatarFile) return currentAvatarUrl || null;
-
-    setIsUploading(true);
-    try {
-      // Generate a unique file name
-      const fileExt = avatarFile.name.split('.').pop();
-      const fileName = `${userId}-${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      // Upload the file to Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
-        .from('profiles')
-        .upload(filePath, avatarFile, {
-          upsert: true,
-          contentType: avatarFile.type
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get the public URL
-      const { data: urlData } = supabase.storage
-        .from('profiles')
-        .getPublicUrl(filePath);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading avatar:', error);
-      toast({
-        title: 'Avatar upload failed',
-        description: 'There was an error uploading your avatar. Please try again.',
-        variant: 'destructive'
-      });
-      return currentAvatarUrl || null;
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const onSubmit = async (data: UserProfileFormValues) => {
     if (!usernameAvailable) {
       toast({
@@ -152,8 +116,18 @@ export const UserProfileEditForm = ({
     setIsSubmitting(true);
 
     try {
-      // Upload avatar if changed
-      const avatarUrl = await uploadAvatar();
+      // Handle avatar upload if there's a new file
+      let avatarUrl = currentAvatarUrl;
+      if (avatarFile) {
+        try {
+          // Use the dedicated avatar upload hook
+          await uploadAvatar(avatarFile);
+          // The URL will be set via the callback in the hook initialization
+        } catch (error) {
+          console.error('Error uploading avatar:', error);
+          // Continue with profile update even if avatar upload fails
+        }
+      }
 
       // Update profile data in Supabase
       const { error } = await supabase
@@ -162,7 +136,6 @@ export const UserProfileEditForm = ({
           username: data.username,
           full_name: data.fullName,
           bio: data.bio,
-          ...(avatarUrl && { avatar_url: avatarUrl })
         })
         .eq('id', userId);
 
