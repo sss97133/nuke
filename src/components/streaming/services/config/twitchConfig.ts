@@ -17,9 +17,17 @@ export const getClientId = (): string | null => {
 
 /**
  * Gets the redirect URI for OAuth
+ * Uses a hardcoded URL for deployed environments to avoid lovable.ai redirect issues
  */
 export const getRedirectUri = (): string => {
-  return `${window.location.origin}/streaming`;
+  // For local development
+  if (window.location.hostname === 'localhost') {
+    return `${window.location.origin}/streaming`;
+  }
+  
+  // For production, use a hardcoded URL to nuke-kohl.vercel.app
+  // This ensures the auth callback always goes to the right place
+  return 'https://nuke-kohl.vercel.app/streaming';
 };
 
 /**
