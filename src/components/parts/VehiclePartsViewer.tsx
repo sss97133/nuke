@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
 import { Car, Wrench, List, ShoppingCart } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useVehicles, Vehicle } from '@/hooks/useVehicles';
+import { useToast } from '@/hooks/use-toast';
 
 // Define part compatibility type
 interface PartCompatibility {
@@ -25,47 +24,46 @@ const VehiclePartsViewer = () => {
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchCompatibleParts = async () => {
-      try {
-        if (vehiclesLoading) return;
+  const fetchCompatibleParts = useCallback(async () => {
+    try {
+      if (vehiclesLoading) return;
+      
+      setLoading(true);
+      
+      if (vehicles.length > 0) {
+        setSelectedVehicle(vehicles[0].id);
         
-        setLoading(true);
+        // In a real implementation, this would fetch compatible parts from your database
+        // For now, using mock data
+        const mockParts: Record<string, PartCompatibility[]> = {};
         
-        if (vehicles.length > 0) {
-          setSelectedVehicle(vehicles[0].id);
-          
-          // In a real implementation, this would fetch compatible parts from your database
-          // For now, using mock data
-          const mockParts: Record<string, PartCompatibility[]> = {};
-          
-          // Generate mock parts for each vehicle
-          vehicles.forEach(vehicle => {
-            const vehicleParts = getPartsForVehicle(vehicle);
-            mockParts[vehicle.id] = vehicleParts;
-          });
-          
-          setCompatibleParts(mockParts);
-        }
-      } catch (err) {
-        console.error('Error fetching compatible parts:', err);
-        toast({
-          title: "Error",
-          description: "Could not load compatible parts data",
-          variant: "destructive"
+        // Generate mock parts for each vehicle
+        vehicles.forEach(vehicle => {
+          const vehicleParts = getPartsForVehicle(vehicle);
+          mockParts[vehicle.id] = vehicleParts;
         });
-      } finally {
-        setLoading(false);
+        
+        setCompatibleParts(mockParts);
       }
-    };
-
-    fetchCompatibleParts();
+    } catch (err) {
+      console.error('Error fetching compatible parts:', err);
+      toast({
+        title: "Error",
+        description: "Could not load compatible parts data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [vehicles, vehiclesLoading, toast]);
+
+  useEffect(() => {
+    fetchCompatibleParts();
+  }, [fetchCompatibleParts]);
 
   // Helper function to generate mock parts for a vehicle
   const getPartsForVehicle = (vehicle: Vehicle): PartCompatibility[] => {
     const { make, model, year } = vehicle;
-    const vehicleString = `${make} ${model} ${year}`;
     
     // Basic parts all vehicles need
     const basicParts = [
@@ -128,7 +126,7 @@ const VehiclePartsViewer = () => {
     return vehicles.find(v => v.id === id);
   };
 
-  const handleAddVehicleClick = () => {
+  const handleAddVehicleClick = async () => {
     // In a real app, this would open a modal to add a vehicle
     // For demo, we'll just add a mock vehicle
     const newVehicle = {
@@ -137,19 +135,17 @@ const VehiclePartsViewer = () => {
       year: 2021,
     };
     
-    addVehicle(newVehicle);
+    await addVehicle(newVehicle);
     toast({
       title: "Vehicle Added",
-      description: "New vehicle has been added to your garage",
-      variant: "default"
+      description: "New vehicle has been added to your garage"
     });
   };
 
   const handleAddToCartClick = (part: PartCompatibility) => {
     toast({
       title: "Added to Cart",
-      description: `${part.name} has been added to your cart`,
-      variant: "default"
+      description: `${part.name} has been added to your cart`
     });
   };
 
