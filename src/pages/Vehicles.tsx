@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,8 +9,23 @@ import VehicleFilterDialog, { VehicleFilters } from '@/components/vehicles/Vehic
 import EditVehicleForm from '@/components/vehicles/EditVehicleForm';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-// Mock data for demonstration purposes
+interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  color: string;
+  ownership_status: string;
+  mileage: number;
+  image_url?: string | null;
+  image?: string | null;
+  updated_at?: string;
+  lastUpdated?: string;
+}
+
+// Mock data for fallback if no real data exists
 const MOCK_VEHICLES = [
   {
     id: '1',
@@ -49,7 +64,8 @@ const MOCK_VEHICLES = [
 
 export default function Vehicles() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [vehicles, setVehicles] = useState(MOCK_VEHICLES);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -60,6 +76,51 @@ export default function Vehicles() {
   // Edit vehicle form state
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+
+  // Fetch vehicles from Supabase
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('*')
+          .order('updated_at', { ascending: false });
+        
+        if (error) {
+          throw error;
+        }
+        
+        // Map the data to match our Vehicle interface
+        const formattedVehicles = data.map(vehicle => ({
+          ...vehicle,
+          image: vehicle.image_url, // Handle the image field
+          lastUpdated: vehicle.updated_at, // Handle the lastUpdated field
+        }));
+        
+        // If we have real data, use it. Otherwise, use mock data.
+        if (formattedVehicles.length > 0) {
+          console.log('Using real vehicle data:', formattedVehicles);
+          setVehicles(formattedVehicles);
+        } else {
+          console.log('No real vehicle data found, using mock data');
+          setVehicles(MOCK_VEHICLES);
+        }
+      } catch (error) {
+        console.error('Error fetching vehicles:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load vehicles. Using mock data instead.',
+          variant: 'destructive'
+        });
+        setVehicles(MOCK_VEHICLES);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchVehicles();
+  }, [toast]);
   
   // Apply filters function
   const handleApplyFilters = (filters: VehicleFilters) => {
@@ -93,21 +154,44 @@ export default function Vehicles() {
   };
   
   // Handle successful edit
-  const handleEditSuccess = () => {
-    // In a real app, you would refresh the vehicle data
-    // For demo purposes, we'll just update the lastUpdated timestamp
-    setVehicles(prev => 
-      prev.map(vehicle => 
-        vehicle.id === selectedVehicleId
-          ? { ...vehicle, lastUpdated: new Date().toISOString() }
-          : vehicle
-      )
-    );
+  const handleEditSuccess = async () => {
+    // Refresh the vehicles data after an edit
+    setLoading(true);
     
-    toast({
-      title: "Vehicle Updated",
-      description: "Your vehicle information has been successfully updated.",
-    });
+    try {
+      // For real implementation, refetch from the database
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Map the data to match our Vehicle interface
+      const formattedVehicles = data.map(vehicle => ({
+        ...vehicle,
+        image: vehicle.image_url,
+        lastUpdated: vehicle.updated_at,
+      }));
+      
+      if (formattedVehicles.length > 0) {
+        setVehicles(formattedVehicles);
+      }
+      
+      toast({
+        title: "Vehicle Updated",
+        description: "Your vehicle information has been successfully updated.",
+      });
+    } catch (error) {
+      console.error('Error refreshing vehicles:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh vehicles data.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   
   // Get filtered vehicles based on search query and active filters
@@ -244,7 +328,11 @@ export default function Vehicles() {
         </div>
       </div>
       
-      {filteredVehicles.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : filteredVehicles.length === 0 ? (
         <div className="text-center py-12">
           <Car className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
           <h3 className="mt-4 text-lg font-medium">No vehicles found</h3>
@@ -275,7 +363,15 @@ export default function Vehicles() {
           {filteredVehicles.map((vehicle) => (
             <Card key={vehicle.id} className="overflow-hidden">
               <div className="aspect-video bg-muted flex items-center justify-center">
-                <Car className="h-12 w-12 text-muted-foreground opacity-50" />
+                {vehicle.image || vehicle.image_url ? (
+                  <img 
+                    src={vehicle.image || vehicle.image_url || ''} 
+                    alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <Car className="h-12 w-12 text-muted-foreground opacity-50" />
+                )}
               </div>
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
@@ -290,7 +386,7 @@ export default function Vehicles() {
                   <p>Color: {vehicle.color}</p>
                   <p>Mileage: {vehicle.mileage.toLocaleString()} mi</p>
                   <p className="mt-1">
-                    Last updated {new Date(vehicle.lastUpdated).toLocaleDateString()}
+                    Last updated {new Date(vehicle.lastUpdated || vehicle.updated_at || '').toLocaleDateString()}
                   </p>
                 </div>
               </CardContent>
