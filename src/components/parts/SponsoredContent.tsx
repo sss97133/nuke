@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -96,6 +95,24 @@ const SponsoredContent = () => {
     return (price * (1 - discount / 100)).toFixed(2);
   };
 
+  const handleBuyClick = (item: SponsoredItem) => {
+    // In a real implementation, this would add the item to cart or redirect to purchase page
+    toast({
+      title: "Added to cart",
+      description: `${item.title} has been added to your cart`,
+      variant: "default"
+    });
+  };
+
+  const handleViewOffer = (title: string) => {
+    // In a real implementation, this would open the offer details
+    toast({
+      title: "Viewing offer",
+      description: `Opening details for ${title}`,
+      variant: "default"
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -153,7 +170,11 @@ const SponsoredContent = () => {
                     )}
                     <p className="text-xs text-muted-foreground">From {item.retailer}</p>
                   </div>
-                  <Button size="sm" className="flex items-center gap-1">
+                  <Button 
+                    size="sm" 
+                    className="flex items-center gap-1"
+                    onClick={() => handleBuyClick(item)}
+                  >
                     <ShoppingCart className="h-3 w-3" />
                     <span>Buy</span>
                   </Button>
@@ -182,7 +203,11 @@ const SponsoredContent = () => {
                   <h4 className="font-medium">Summer Service Special</h4>
                   <p className="text-sm text-muted-foreground">Complete A/C service kit - 30% off with code SUMMER30</p>
                 </div>
-                <Button variant="outline" className="flex items-center gap-1">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-1"
+                  onClick={() => handleViewOffer('Summer Service Special')}
+                >
                   <ExternalLink className="h-3 w-3" />
                   <span>View</span>
                 </Button>
@@ -193,7 +218,11 @@ const SponsoredContent = () => {
                   <h4 className="font-medium">Brake System Bundle</h4>
                   <p className="text-sm text-muted-foreground">Complete front and rear brake kit - Buy front, get rear 50% off</p>
                 </div>
-                <Button variant="outline" className="flex items-center gap-1">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-1"
+                  onClick={() => handleViewOffer('Brake System Bundle')}
+                >
                   <ExternalLink className="h-3 w-3" />
                   <span>View</span>
                 </Button>
