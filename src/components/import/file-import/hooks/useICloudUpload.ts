@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { parseICloudSharedLink } from '@/utils/icloud';
 import { supabase } from '@/integrations/supabase/client';
@@ -81,7 +80,7 @@ export const useICloudUpload = ({ vehicleId, vehicleInfo, onConnect }: UseICloud
         const filePath = `${folderPath}/${fileName}`;
         
         const { error } = await supabase.storage
-          .from('car-images')
+          .from('vehicle-images')
           .upload(filePath, file);
         
         if (error) throw error;
