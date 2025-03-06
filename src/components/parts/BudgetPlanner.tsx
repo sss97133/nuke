@@ -1,81 +1,27 @@
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { BarChart2, DollarSign, ChartPie, Calendar } from 'lucide-react';
+import { DollarSign, BarChart2, Calendar } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-
-interface BudgetData {
-  planned: number;
-  actual: number;
-  difference: number;
-  monthlySpending: { name: string; planned: number; actual: number; }[];
-  categorySpending: { name: string; value: number; }[];
-}
+import { useBudget } from '@/hooks/useBudget';
+import { SetBudgetDialog } from './dialogs/SetBudgetDialog';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 const BudgetPlanner = () => {
-  const [budgetData, setBudgetData] = useState<BudgetData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchBudgetData = async () => {
-      try {
-        setLoading(true);
-        // In a real implementation, this would fetch from your database
-        // For demo purposes, we're using mock data
-        
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data
-        const mockData: BudgetData = {
-          planned: 2500,
-          actual: 2150,
-          difference: 350,
-          monthlySpending: [
-            { name: 'Jan', planned: 200, actual: 180 },
-            { name: 'Feb', planned: 300, actual: 250 },
-            { name: 'Mar', planned: 400, actual: 420 },
-            { name: 'Apr', planned: 200, actual: 180 },
-            { name: 'May', planned: 300, actual: 380 },
-            { name: 'Jun', planned: 400, actual: 340 },
-          ],
-          categorySpending: [
-            { name: 'Filters', value: 420 },
-            { name: 'Brakes', value: 680 },
-            { name: 'Fluids', value: 350 },
-            { name: 'Electrical', value: 230 },
-            { name: 'Engine', value: 470 },
-          ],
-        };
-        
-        setBudgetData(mockData);
-      } catch (error) {
-        console.error('Error fetching budget data:', error);
-        toast({
-          title: "Error",
-          description: "Could not load budget data",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBudgetData();
-  }, [toast]);
+  const { budgetData, loading, setBudget } = useBudget();
+  const [isSetBudgetDialogOpen, setIsSetBudgetDialogOpen] = useState(false);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-bold">Parts Budget Planner</h2>
-        <Button className="flex items-center gap-2">
+        <Button 
+          className="flex items-center gap-2"
+          onClick={() => setIsSetBudgetDialogOpen(true)}
+        >
           <Calendar size={16} />
           Set Budget
         </Button>
@@ -248,6 +194,14 @@ const BudgetPlanner = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Budget Dialog */}
+      <SetBudgetDialog 
+        open={isSetBudgetDialogOpen}
+        onClose={() => setIsSetBudgetDialogOpen(false)}
+        onSetBudget={setBudget}
+        currentBudget={budgetData?.planned}
+      />
     </div>
   );
 };
