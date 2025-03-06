@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useToast, ToastProps } from '@/hooks/use-toast';
-import { ToastContainer } from '@/components/ui/toast';
+import { Toaster } from '@/components/ui/toast/index';
 
 // Create a context for the toast functions
 interface ToastContextType {
@@ -32,7 +32,7 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
  * ```
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const { toast, dismiss, toasts, success, error, warning, info } = useToast();
+  const { toast, dismiss, success, error, warning, info } = useToast();
 
   // The value that will be given to the context
   const contextValue: ToastContextType = {
@@ -47,7 +47,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      <ToastContainer toasts={toasts} onDismiss={dismiss} />
+      <Toaster />
     </ToastContext.Provider>
   );
 }
