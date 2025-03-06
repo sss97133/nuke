@@ -30,8 +30,8 @@ export function EditPartDialog({ open, onClose, onUpdatePart, part }: EditPartDi
     if (part) {
       setName(part.name || '');
       setCategory(part.category || '');
-      setQuantity(part.quantity.toString() || '0');
-      setPrice(part.price.toString() || '0');
+      setQuantity(part.quantity?.toString() || '0');
+      setPrice(part.price?.toString() || '0');
       setSupplier(part.supplier || '');
       setCompatibleVehicles(part.compatibleVehicles || '');
       setMinQuantity(part.min_quantity?.toString() || '0');
@@ -49,11 +49,11 @@ export function EditPartDialog({ open, onClose, onUpdatePart, part }: EditPartDi
     const updates: Partial<Part> = {
       name,
       category,
-      quantity: parseInt(quantity),
-      price: parseFloat(price),
+      quantity: parseInt(quantity) || 0,
+      price: parseFloat(price) || 0,
       supplier,
       compatibleVehicles,
-      min_quantity: parseInt(minQuantity),
+      min_quantity: parseInt(minQuantity) || 0,
       location,
       notes
     };
