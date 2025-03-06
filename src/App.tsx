@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { AppRouter } from './routes/AppRouter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster, ToastProvider, useToast, setToastFunctions } from '@/components/ui/toast';
+import { Toaster, ToastProvider, useToast, setToastFunctions } from '@/components/ui/toast/index';
 import { TooltipProvider } from '@/components/ui/TooltipProvider';
 import OnboardingCheck from '@/components/onboarding/OnboardingCheck';
 
