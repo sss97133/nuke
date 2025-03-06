@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, useSupabaseWithToast } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export interface Vehicle {
@@ -18,6 +18,7 @@ export const useVehicles = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { safeFetch } = useSupabaseWithToast();
 
   const fetchVehicles = async () => {
     try {
@@ -25,14 +26,14 @@ export const useVehicles = () => {
       setError(null);
       
       // In production, we would fetch from Supabase
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('id, make, model, year, vin, notes, status, mileage')
-        .order('year', { ascending: false });
+      const data = await safeFetch(() => 
+        supabase
+          .from('vehicles')
+          .select('id, make, model, year, vin, notes, status, mileage')
+          .order('year', { ascending: false })
+      );
       
-      if (error) throw error;
-      
-      if (data && data.length > 0) {
+      if (data && Array.isArray(data) && data.length > 0) {
         setVehicles(data as Vehicle[]);
       } else {
         // Fallback to mock data if no data returned
@@ -69,19 +70,18 @@ export const useVehicles = () => {
       setLoading(true);
       
       // In production, we would insert to Supabase
-      const { data, error } = await supabase
-        .from('vehicles')
-        .insert([newVehicle])
-        .select();
+      const data = await safeFetch(() => 
+        supabase
+          .from('vehicles')
+          .insert([newVehicle])
+          .select()
+      );
       
-      if (error) throw error;
-      
-      if (data) {
+      if (data && Array.isArray(data) && data.length > 0) {
         setVehicles(prev => [...prev, data[0] as Vehicle]);
         toast({
           title: "Success",
           description: "Vehicle added successfully",
-          variant: "default"
         });
         return data[0] as Vehicle;
       } else {
@@ -94,7 +94,6 @@ export const useVehicles = () => {
         toast({
           title: "Success",
           description: "Vehicle added successfully",
-          variant: "default"
         });
         return mockNewVehicle;
       }
