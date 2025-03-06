@@ -1,5 +1,6 @@
 # Nuke Project
 
+enhancement/project-improvements
 A modern React application built with TypeScript, Vite, and shadcn/ui components that provides a robust foundation for your web application.
 
 ## 🚀 Features
@@ -139,3 +140,20 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+=======
+Modern React application with TypeScript and shadcn/ui components.
+
+## Toast System
+
+The toast notification system in this project has been refactored into a modular structure:
+
+- Core toast components in `/components/ui/toast/`
+- Re-export wrappers for backward compatibility
+- Global toast provider in App.tsx
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Run development server: `npm run dev`
+main
