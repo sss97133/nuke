@@ -5,13 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useToastContext } from '@/contexts/ToastContext';
+import { useToast } from '@/components/ui/use-toast';
 import { OwnershipSection } from '@/components/vehicles/forms/components/OwnershipSection';
 import { useVehicleForm } from '@/components/vehicles/forms/hooks/useVehicleForm';
 
 export default function AddVehicle() {
   const navigate = useNavigate();
-  const { success, error } = useToastContext();
+  const { toast } = useToast();
   
   const { 
     form, 
@@ -24,8 +24,8 @@ export default function AddVehicle() {
       console.log('Vehicle data submitted:', data);
       
       // Show success message
-      success({ 
-        title: 'Vehicle Added', 
+      toast({
+        title: 'Vehicle Added',
         description: `${data.year} ${data.make} ${data.model} has been added to your collection.`,
         action: {
           label: 'View All Vehicles',
@@ -38,9 +38,10 @@ export default function AddVehicle() {
     },
     onSubmitError: (errors) => {
       // Show error message
-      error({ 
-        title: 'Failed to add vehicle', 
-        description: 'Please check the form for errors and try again.' 
+      toast({
+        title: 'Failed to add vehicle',
+        description: 'Please check the form for errors and try again.',
+        variant: 'destructive'
       });
       
       console.error('Form submission errors:', errors);
