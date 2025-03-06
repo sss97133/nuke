@@ -1,5 +1,5 @@
 import { defineConfig, loadEnv } from "vite";
-import react from "@vitejs/plugin-react-swc";
+import react from "@vitejs/plugin-react";
 import path from "path";
 
 // https://vitejs.dev/config/
@@ -16,10 +16,7 @@ export default defineConfig(({ mode }) => {
       cors: true,
     },
     plugins: [
-      react({
-        // Enable SWC's React Refresh for development
-        plugins: [['@swc/plugin-react-refresh', {}]],
-      }),
+      react(),
     ],
     resolve: {
       alias: {
