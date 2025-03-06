@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,75 +21,75 @@ const SponsoredContent = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchSponsoredItems = async () => {
-      try {
-        setLoading(true);
-        // In a real implementation, this would fetch from your API
-        // For demo purposes, we're using mock data
-        
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data
-        const mockItems: SponsoredItem[] = [
-          {
-            id: '1',
-            title: 'Premium Oil Filter Set',
-            description: 'High-performance oil filters for all Japanese vehicles.',
-            price: 24.99,
-            discount: 15,
-            imageUrl: 'https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7',
-            retailer: 'AutoZone',
-            url: '#'
-          },
-          {
-            id: '2',
-            title: 'Ceramic Brake Pad Kit',
-            description: 'Low dust, noise-free braking for luxury vehicles.',
-            price: 89.99,
-            discount: 20,
-            imageUrl: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d',
-            retailer: 'NAPA Auto Parts',
-            url: '#'
-          },
-          {
-            id: '3',
-            title: 'Complete Tune-Up Kit',
-            description: 'All the parts you need for a comprehensive engine tune-up.',
-            price: 65.99,
-            discount: 10,
-            imageUrl: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b',
-            retailer: "O'Reilly Auto Parts",
-            url: '#'
-          },
-          {
-            id: '4',
-            title: 'Synthetic Oil Change Bundle',
-            description: 'Full synthetic oil with filter and disposal kit.',
-            price: 42.99,
-            discount: 25,
-            imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475',
-            retailer: 'Advance Auto Parts',
-            url: '#'
-          },
-        ];
-        
-        setItems(mockItems);
-      } catch (error) {
-        console.error('Error fetching sponsored items:', error);
-        toast({
-          title: "Error",
-          description: "Could not load sponsored content",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSponsoredItems();
+  const fetchSponsoredItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      // In a real implementation, this would fetch from your API
+      // For demo purposes, we're using mock data
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock data
+      const mockItems: SponsoredItem[] = [
+        {
+          id: '1',
+          title: 'Premium Oil Filter Set',
+          description: 'High-performance oil filters for all Japanese vehicles.',
+          price: 24.99,
+          discount: 15,
+          imageUrl: 'https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7',
+          retailer: 'AutoZone',
+          url: '#'
+        },
+        {
+          id: '2',
+          title: 'Ceramic Brake Pad Kit',
+          description: 'Low dust, noise-free braking for luxury vehicles.',
+          price: 89.99,
+          discount: 20,
+          imageUrl: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d',
+          retailer: 'NAPA Auto Parts',
+          url: '#'
+        },
+        {
+          id: '3',
+          title: 'Complete Tune-Up Kit',
+          description: 'All the parts you need for a comprehensive engine tune-up.',
+          price: 65.99,
+          discount: 10,
+          imageUrl: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b',
+          retailer: "O'Reilly Auto Parts",
+          url: '#'
+        },
+        {
+          id: '4',
+          title: 'Synthetic Oil Change Bundle',
+          description: 'Full synthetic oil with filter and disposal kit.',
+          price: 42.99,
+          discount: 25,
+          imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475',
+          retailer: 'Advance Auto Parts',
+          url: '#'
+        },
+      ];
+      
+      setItems(mockItems);
+    } catch (error) {
+      console.error('Error fetching sponsored items:', error);
+      toast({
+        title: "Error",
+        description: "Could not load sponsored content",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [toast]);
+
+  useEffect(() => {
+    fetchSponsoredItems();
+  }, [fetchSponsoredItems]);
 
   const getSalePrice = (price: number, discount: number) => {
     return (price * (1 - discount / 100)).toFixed(2);
@@ -99,8 +99,7 @@ const SponsoredContent = () => {
     // In a real implementation, this would add the item to cart or redirect to purchase page
     toast({
       title: "Added to cart",
-      description: `${item.title} has been added to your cart`,
-      variant: "default"
+      description: `${item.title} has been added to your cart`
     });
   };
 
@@ -108,8 +107,7 @@ const SponsoredContent = () => {
     // In a real implementation, this would open the offer details
     toast({
       title: "Viewing offer",
-      description: `Opening details for ${title}`,
-      variant: "default"
+      description: `Opening details for ${title}`
     });
   };
 
