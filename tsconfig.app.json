@@ -14,13 +14,18 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
-    "strict": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noImplicitAny": false,
-    "noFallthroughCasesInSwitch": false,
-
+    /* Enhanced Linting - opt-in approach to gradually improve type safety */
+    "strict": true,
+    "noUnusedLocals": false, /* Set to true once project is more stable */
+    "noUnusedParameters": false, /* Set to true once project is more stable */
+    /* Below settings are enabled for better type safety */
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    /* With existing codebase, we allow implicit any but will gradually phase out */
+    "noImplicitAny": false, /* Target to set true in future */
+    
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
