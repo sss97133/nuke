@@ -1,5 +1,6 @@
+import React from 'react';
 import { Progress } from "@/components/ui/progress";
-import { LoaderCircle, Check, Search, Database } from "lucide-react";
+import { Loader2, Check, Search, Database } from "lucide-react";
 
 interface ProcessingStatusProps {
   processingStep: string;
@@ -11,7 +12,7 @@ export const ProcessingStatus = ({ processingStep, progress }: ProcessingStatusP
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <LoaderCircle className="animate-spin h-4 w-4" />
+          <Loader2 className="animate-spin h-4 w-4" />
           <span className="font-mono text-sm">{processingStep}</span>
         </div>
         <span className="font-mono text-sm">{progress}%</span>
@@ -34,7 +35,7 @@ export const ProcessingStatus = ({ processingStep, progress }: ProcessingStatusP
         <div className="flex items-center space-x-2">
           {progress >= 100 ? 
             <Check className="h-4 w-4 text-green-500" /> : 
-            (progress >= 80 ? <LoaderCircle className="animate-spin h-4 w-4" /> : null)
+            (progress >= 80 ? <Loader2 className="animate-spin h-4 w-4" /> : null)
           }
           <span>Verify</span>
         </div>

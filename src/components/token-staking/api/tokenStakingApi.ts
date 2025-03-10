@@ -13,7 +13,17 @@ export const fetchTokens = async (): Promise<Token[]> => {
       .order('name');
     
     if (error) throw error;
-    return data || [];
+    
+    // Convert nullable fields to required types
+    const tokens = data?.map(token => ({
+      ...token,
+      contract_address: token.contract_address || '',
+      description: token.description || '',
+      owner_id: token.owner_id || '',
+      status: token.status || 'active',
+    })) || [];
+    
+    return tokens;
   } catch (error) {
     console.error('Error fetching tokens:', error);
     throw error;
@@ -31,7 +41,16 @@ export const fetchVehicles = async (): Promise<Vehicle[]> => {
       .order('make');
     
     if (error) throw error;
-    return data || [];
+    
+    // Convert the data to conform to our Vehicle type
+    const vehicles = data?.map(vehicle => ({
+      ...vehicle,
+      vin: vehicle.vin || undefined,
+      description: vehicle.description || undefined,
+      image_url: vehicle.image_url || undefined,
+    })) || [];
+    
+    return vehicles;
   } catch (error) {
     console.error('Error fetching vehicles:', error);
     throw error;

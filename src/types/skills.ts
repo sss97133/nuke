@@ -1,3 +1,4 @@
+
 export type SkillCategory = 'mechanical' | 'electrical' | 'bodywork' | 'diagnostics' | 'restoration' | 'customization' | 'technical' | 'maintenance' | 'soft_skills' | 'safety';
 export type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 export type ContributionType = 'repair' | 'maintenance' | 'modification' | 'restoration' | 'documentation';
@@ -11,6 +12,7 @@ export interface Skill {
   level?: SkillLevel;
   created_at: string;
   updated_at: string;
+  prerequisites?: string[] | null;
 }
 
 export interface SkillStatus {

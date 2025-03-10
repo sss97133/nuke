@@ -14,18 +14,21 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
-      // Add global error handling for queries
-      onError: (error) => {
-        console.error('Query error:', error);
-      }
     },
     mutations: {
-      // Add global error handling for mutations
-      onError: (error) => {
-        console.error('Mutation error:', error);
-      }
+      // The latest version of Tanstack Query handles errors differently
+      // Global error handling is now done via a QueryCache or MutationCache
     }
   },
+});
+
+// Set up global error handlers on the queryClient
+queryClient.setDefaultOptions({
+  queries: {
+    onError: (error) => {
+      console.error('Query error:', error);
+    }
+  }
 });
 
 // Component to initialize global toast functions

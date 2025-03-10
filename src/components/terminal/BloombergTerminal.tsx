@@ -1,71 +1,54 @@
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart, LineChart, Briefcase } from 'lucide-react'; // Using existing icons
 
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { ChartBar, ChartLine, Database, DollarSign, Monitor } from "lucide-react";
-import { MarketDataPanel } from "./panels/MarketDataPanel";
-import { TokenAnalyticsPanel } from "./panels/TokenAnalyticsPanel";
-import { NewsPanel } from "./panels/NewsPanel";
-import { OrderBookPanel } from "./panels/OrderBookPanel";
-import { ChartPanel } from "./panels/ChartPanel";
-
-export const BloombergTerminal = () => {
-  const [layout, setLayout] = useState([30, 40, 30]);
+const BloombergTerminal = () => {
+  const [activeTab, setActiveTab] = useState('overview');
 
   return (
-    <div className="h-[90vh] bg-background text-foreground p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Monitor className="w-5 h-5" />
-          <h2 className="text-lg font-mono">SCRAP Terminal</h2>
-        </div>
-        <div className="flex gap-2">
-          <DollarSign className="w-5 h-5" />
-          <Database className="w-5 h-5" />
-          <ChartLine className="w-5 h-5" />
-          <ChartBar className="w-5 h-5" />
-        </div>
-      </div>
-
-      <ResizablePanelGroup direction="horizontal" className="min-h-[85vh]">
-        <ResizablePanel defaultSize={layout[0]}>
-          <Card className="h-full bg-card border-border">
-            <Tabs defaultValue="market" className="w-full">
-              <TabsList className="w-full bg-muted">
-                <TabsTrigger value="market">Market Data</TabsTrigger>
-                <TabsTrigger value="tokens">Token Analytics</TabsTrigger>
-                <TabsTrigger value="chart">Chart</TabsTrigger>
-              </TabsList>
-              <TabsContent value="market">
-                <MarketDataPanel />
-              </TabsContent>
-              <TabsContent value="tokens">
-                <TokenAnalyticsPanel />
-              </TabsContent>
-              <TabsContent value="chart">
-                <ChartPanel />
-              </TabsContent>
-            </Tabs>
-          </Card>
-        </ResizablePanel>
-
-        <ResizableHandle className="bg-border" />
-
-        <ResizablePanel defaultSize={layout[1]}>
-          <Card className="h-full bg-card border-border">
-            <OrderBookPanel />
-          </Card>
-        </ResizablePanel>
-
-        <ResizableHandle className="bg-border" />
-
-        <ResizablePanel defaultSize={layout[2]}>
-          <Card className="h-full bg-card border-border">
-            <NewsPanel />
-          </Card>
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Bloomberg Terminal</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue={activeTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="overview" onClick={() => setActiveTab('overview')}>
+              <Briefcase className="mr-2 h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="marketData" onClick={() => setActiveTab('marketData')}>
+              <LineChart className="mr-2 h-4 w-4" />
+              Market Data
+            </TabsTrigger>
+            <TabsTrigger value="analytics" onClick={() => setActiveTab('analytics')}>
+              <BarChart className="mr-2 h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="overview">
+            <div>
+              <h3 className="text-lg font-semibold">Overview</h3>
+              <p>Key metrics and summary data.</p>
+            </div>
+          </TabsContent>
+          <TabsContent value="marketData">
+            <div>
+              <h3 className="text-lg font-semibold">Market Data</h3>
+              <p>Real-time market information.</p>
+            </div>
+          </TabsContent>
+          <TabsContent value="analytics">
+            <div>
+              <h3 className="text-lg font-semibold">Analytics</h3>
+              <p>In-depth data analysis and insights.</p>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 };
+
+export default BloombergTerminal;

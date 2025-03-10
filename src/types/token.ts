@@ -37,6 +37,11 @@ export interface Vehicle {
   vin?: string;
   description?: string;
   image_url?: string;
+  tags?: string[];
+  price?: number;
+  rarity_score?: number;
+  status?: string;
+  user_id?: string;
 }
 
 export interface TokenStake {
