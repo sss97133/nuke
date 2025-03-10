@@ -1,119 +1,266 @@
 
-import { useParams, useNavigate } from 'react-router-dom';
-import { useToast } from "@/components/ui/use-toast";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import VehicleDetailHeader from '@/components/vehicles/detail/VehicleDetailHeader';
-import VehicleSpecifications from '@/components/vehicles/detail/VehicleSpecifications';
-import VehicleHistory from '@/components/vehicles/detail/VehicleHistory';
-import VehicleMarketData from '@/components/vehicles/detail/VehicleMarketData';
-import VehicleGallery from '@/components/vehicles/detail/VehicleGallery';
-import VehicleComments from '@/components/vehicles/detail/VehicleComments';
-import { ArrowLeft } from 'lucide-react';
-import { useVehicleDetail } from '@/hooks/vehicles/useVehicleDetail';
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Check, Clock, AlertTriangle, Car, FileText, Image, History, ArrowLeft } from 'lucide-react';
+import VehicleImageGallery from '@/components/vehicle-images/VehicleImageGallery';
+import { Link } from 'react-router-dom';
+
+interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin: string;
+  notes: string;
+  status: string;
+  user_id: string;
+  historical_data?: any;
+  // Add other fields as needed
+}
 
 const VehicleDetail = () => {
-  const { id } = useParams<{ id: string; }>();
-  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { vehicle, loading, error } = useVehicleDetail(id || '');
-
-  // Improved loading UI
+  
+  useEffect(() => {
+    const fetchVehicle = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        console.info('Vehicle ID:', id);
+        
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data) {
+          console.info('Vehicle found in Supabase:', data);
+          setVehicle(data);
+        } else {
+          setError('Vehicle not found');
+        }
+      } catch (err) {
+        console.error('Error fetching vehicle:', err);
+        setError('Failed to load vehicle details');
+        toast({
+          title: "Error",
+          description: "Failed to load vehicle details. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchVehicle();
+  }, [id, toast]);
+  
+  // Function to format VIN with proper spacing
+  const formatVin = (vin: string) => {
+    return vin ? vin.replace(/(.{3})/g, '$1 ').trim() : 'N/A';
+  };
+  
+  // Function to capitalize first letter of each word
+  const capitalize = (str: string) => {
+    return str ? str.split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ') : '';
+  };
+  
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-        <p className="text-muted-foreground">Loading vehicle details...</p>
+      <div className="container max-w-5xl py-6 space-y-6">
+        <Skeleton className="h-10 w-1/3" />
+        <Skeleton className="h-[20rem] w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+        </div>
       </div>
     );
   }
-
-  // Improved error handling
+  
   if (error || !vehicle) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen gap-4 p-4">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 max-w-md w-full text-center">
-          <h1 className="text-2xl font-bold text-red-700 dark:text-red-400 mb-2">Vehicle Not Found</h1>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            {error || "The vehicle you are looking for could not be found."}
-          </p>
-          <div className="flex justify-center">
-            <Button onClick={() => navigate("/vehicles")}>
-              Return to Vehicles
+      <div className="container max-w-5xl py-6">
+        <Card className="border-destructive">
+          <CardHeader>
+            <div className="flex items-center text-destructive">
+              <AlertTriangle className="mr-2 h-5 w-5" />
+              <CardTitle>Error Loading Vehicle</CardTitle>
+            </div>
+            <CardDescription>
+              We couldn't load the vehicle details. Please try again later.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>{error || 'Unknown error occurred'}</p>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" asChild>
+              <Link to="/vehicles">Back to Vehicles</Link>
             </Button>
-          </div>
-        </div>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
-
+  
   return (
-    <ScrollArea className="h-screen">
-      <div className="container max-w-7xl p-4 space-y-6">
-        <Button variant="ghost" onClick={() => navigate("/vehicles")} className="mb-4">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Vehicles
+    <div className="container max-w-5xl py-6 space-y-6">
+      {/* Navigation */}
+      <div className="flex justify-between items-center">
+        <Button variant="ghost" asChild>
+          <Link to="/vehicles" className="flex items-center">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Vehicles
+          </Link>
         </Button>
         
-        <VehicleDetailHeader vehicle={vehicle} />
-        
-        {/* Main content area with editorial layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main content column */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Tabs for vehicle details, history, market data */}
-            <Tabs defaultValue="editorial" className="w-full">
-              <TabsList className="grid grid-cols-3 w-full lg:w-auto">
-                <TabsTrigger value="editorial">Editorial</TabsTrigger>
-                <TabsTrigger value="history">History</TabsTrigger>
-                <TabsTrigger value="market">Market</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="editorial" className="mt-4 prose max-w-none">
-                <h2 className="text-xl font-semibold mb-3">About this {vehicle.make} {vehicle.model}</h2>
-                
-                {/* If we have a description from the database, use it, otherwise generate one */}
-                {vehicle.description ? (
-                  <div dangerouslySetInnerHTML={{ __html: vehicle.description }} />
-                ) : (
-                  <>
-                    <p>This {vehicle.year} {vehicle.make} {vehicle.model} represents one of the finest examples of automotive craftsmanship from its era. With its distinctive {vehicle.body_type || 'classic'} styling and powerful {vehicle.engine_type || 'standard'} engine, this vehicle combines performance and aesthetics in a package that continues to captivate enthusiasts today.</p>
-                    
-                    <p>Maintained in excellent condition with a rating of {vehicle.condition_rating || '?'}/10, this vehicle showcases the enduring appeal of {vehicle.era || "classic"} automotive design. The {vehicle.transmission || 'standard'} transmission paired with its {vehicle.drivetrain || 'standard'} drivetrain delivers a driving experience that remains engaging and responsive.</p>
-                    
-                    <p>With {(vehicle.mileage || 0).toLocaleString()} miles on the odometer, this vehicle has been well-used but carefully maintained throughout its life. Its current market value of ${(vehicle.market_value || 0).toLocaleString()} reflects both its inherent quality and the growing collector interest in vehicles of this type.</p>
-                  </>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="history" className="mt-4">
-                <VehicleHistory vehicle={vehicle} />
-              </TabsContent>
-              
-              <TabsContent value="market" className="mt-4">
-                <VehicleMarketData vehicle={vehicle} />
-              </TabsContent>
-            </Tabs>
-            
-            {/* Gallery Section - Always visible, without redundant headers */}
-            <div className="space-y-4">
-              <VehicleGallery vehicle={vehicle} />
-            </div>
-            
-            {/* Comments Section - Always follows the gallery */}
-            <div className="space-y-4">
-              <VehicleComments vehicle={vehicle} />
-            </div>
-          </div>
-          
-          {/* Sidebar with specifications */}
-          <div className="lg:col-span-1">
-            <VehicleSpecifications vehicle={vehicle} />
-          </div>
+        <div className="flex space-x-2">
+          <Button variant="outline">Edit</Button>
+          <Button variant="outline">Service History</Button>
         </div>
       </div>
-    </ScrollArea>
+      
+      {/* Vehicle Header */}
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">
+          {vehicle.year} {capitalize(vehicle.make)} {capitalize(vehicle.model)}
+        </h1>
+        <div className="flex items-center text-muted-foreground">
+          <span className="flex items-center mr-4">
+            <Car className="mr-1 h-4 w-4" />
+            VIN: {formatVin(vehicle.vin)}
+          </span>
+          <span className="flex items-center">
+            <Clock className="mr-1 h-4 w-4" />
+            Status: {capitalize(vehicle.status)}
+          </span>
+        </div>
+      </div>
+      
+      {/* Tabs */}
+      <Tabs defaultValue="gallery" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="gallery">
+            <Image className="mr-2 h-4 w-4" />
+            Gallery
+          </TabsTrigger>
+          <TabsTrigger value="details">
+            <FileText className="mr-2 h-4 w-4" />
+            Details
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <History className="mr-2 h-4 w-4" />
+            History
+          </TabsTrigger>
+        </TabsList>
+        
+        {/* Gallery Tab */}
+        <TabsContent value="gallery" className="space-y-6">
+          <VehicleImageGallery vehicleId={id as string} />
+        </TabsContent>
+        
+        {/* Details Tab */}
+        <TabsContent value="details" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Vehicle Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Make</p>
+                    <p>{capitalize(vehicle.make)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Model</p>
+                    <p>{capitalize(vehicle.model)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Year</p>
+                    <p>{vehicle.year}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">VIN</p>
+                    <p className="font-mono">{formatVin(vehicle.vin)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {vehicle.notes ? (
+                  <p className="text-sm leading-relaxed">{vehicle.notes}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No notes available</p>
+                )}
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" size="sm">Edit Notes</Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        {/* History Tab */}
+        <TabsContent value="history" className="space-y-6">
+          {vehicle.historical_data ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Vehicle History</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm space-y-3">
+                  {vehicle.historical_data.rawResponse && (
+                    <pre className="bg-muted p-4 rounded-md overflow-auto max-h-96 text-xs whitespace-pre-wrap">
+                      {vehicle.historical_data.rawResponse}
+                    </pre>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Vehicle History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">No historical data available for this vehicle.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
 
