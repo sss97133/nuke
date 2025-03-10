@@ -30,9 +30,12 @@ export const setToastFunctions = (toast: ReturnType<typeof useToastHook>) => {
   dismissToast = toast.dismiss;
 };
 
-// Toast provider for component
+// Toast provider component - simply importing from react
+import React from 'react';
+
+// We are using a simpler implementation for the provider since we can't use JSX in .ts files
 export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
-  return <>{children}</>;
+  return children;
 };
 
 // Expose global toast functions

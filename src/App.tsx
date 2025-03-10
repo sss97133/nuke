@@ -15,10 +15,7 @@ const queryClient = new QueryClient({
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
     },
-    mutations: {
-      // The latest version of Tanstack Query handles errors differently
-      // Global error handling is now done via a QueryCache or MutationCache
-    }
+    // Remove the onError property as it's no longer supported in this format
   },
 });
 
