@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ImageIcon, LinkIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { isURL } from 'validator';
 
 function AddVehicle() {
   const navigate = useNavigate();
@@ -139,9 +140,17 @@ function AddVehicle() {
   // Handle URL input
   const handleUrlInput = (event: React.ChangeEvent<HTMLInputElement>) => {
     const url = event.target.value;
-    setImagePreview(url);
-    form.setValue('image', url);
-    setIsFormModified(true);
+    if (isURL(url)) {
+      setImagePreview(url);
+      form.setValue('image', url);
+      setIsFormModified(true);
+    } else {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid image URL.",
+        status: "error",
+      });
+    }
   };
 
   // Detect form changes
