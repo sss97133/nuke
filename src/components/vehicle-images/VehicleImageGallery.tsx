@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
@@ -30,6 +29,7 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({ vehicleId }) 
       
       try {
         setLoading(true);
+        console.log('Fetching images for vehicle:', vehicleId);
         const { data, error } = await supabase
           .from('vehicle_images')
           .select('*')
@@ -38,6 +38,7 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({ vehicleId }) 
         
         if (error) throw error;
         
+        console.log('Fetched vehicle images:', data);
         setImages(data || []);
         if (data && data.length > 0) {
           setSelectedImage(data[0].image_url);
@@ -54,14 +55,21 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({ vehicleId }) 
   }, [vehicleId]);
 
   const handleNewImage = (imageUrl: string) => {
+    console.log('New image uploaded:', imageUrl);
     // Refetch images to ensure we have the latest data
     supabase
       .from('vehicle_images')
       .select('*')
       .eq('car_id', vehicleId)
       .order('uploaded_at', { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error refreshing images:', error);
+          return;
+        }
+        
         if (data) {
+          console.log('Refreshed image list:', data);
           setImages(data);
           setSelectedImage(imageUrl);
         }

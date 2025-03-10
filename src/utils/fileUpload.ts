@@ -35,7 +35,7 @@ export const validateImageFile = (
   if (allowedTypes.length > 0 && !allowedTypes.includes(file.type)) {
     return {
       valid: false,
-      error: `Unsupported image type. Please upload one of: ${allowedTypes.join(', ')}`
+      error: `Unsupported image type. Please upload one of: ${allowedTypes.map(type => type.replace('image/', '')).join(', ')}`
     };
   }
 

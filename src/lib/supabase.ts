@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // Get environment variables
@@ -56,6 +55,9 @@ export const uploadVehicleImage = async (
         car_id: vehicleId,
         image_url: publicUrl,
         uploaded_at: new Date().toISOString(),
+        file_name: file.name,
+        file_path: filePath,
+        is_primary: false // By default, not primary
       });
 
     if (dbError) {

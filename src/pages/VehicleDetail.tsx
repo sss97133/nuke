@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -181,7 +180,10 @@ const VehicleDetail = () => {
         
         {/* Gallery Tab */}
         <TabsContent value="gallery" className="space-y-6">
-          <VehicleImageGallery vehicleId={id as string} />
+          <VehicleImageGallery 
+            vehicleId={id as string} 
+            key={id} // Add a key to force re-render when vehicle ID changes
+          />
         </TabsContent>
         
         {/* Details Tab */}

@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/toast';
 import { Upload, XCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { uploadVehicleImage } from '@/lib/supabase';
+import { validateImageFile } from '@/utils/fileUpload';
 
 interface ImageUploaderProps {
   vehicleId: string;
@@ -30,16 +32,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     
     if (!file) return;
     
-    // Check file size
-    if (file.size > MAX_FILE_SIZE) {
-      setError(`File is too large. Maximum size is ${maxSizeMB}MB.`);
-      setSelectedFile(null);
-      return;
-    }
+    // Validate file using the utility function
+    const validation = validateImageFile(file, { maxSizeInMB: maxSizeMB });
     
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      setError('Only image files are allowed.');
+    if (!validation.valid) {
+      setError(validation.error || 'Invalid file');
       setSelectedFile(null);
       return;
     }
@@ -55,10 +52,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       setUploadProgress(0);
       setError(null);
       
-      const simulateProgress = setInterval(() => {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
-            clearInterval(simulateProgress);
+            clearInterval(progressInterval);
             return prev;
           }
           return prev + 10;
@@ -66,17 +64,18 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       }, 300);
       
       // Use the uploadVehicleImage helper function
-      const publicUrl = await uploadVehicleImage(vehicleId, selectedFile, maxSizeMB);
+      const publicUrl = await uploadVehicleImage(vehicleId, selectedFile);
       
-      clearInterval(simulateProgress);
+      clearInterval(progressInterval);
       setUploadProgress(100);
       
       toast({
         title: "Image uploaded successfully",
         description: "Your image has been added to the vehicle gallery.",
-        variant: "default",
+        variant: "success", // Changed from default to success for clarity
       });
       
+      // Call the success callback with the new image URL
       if (onSuccess) onSuccess(publicUrl);
       setSelectedFile(null);
       
