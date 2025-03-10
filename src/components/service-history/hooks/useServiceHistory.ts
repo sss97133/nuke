@@ -39,10 +39,12 @@ export const useServiceHistory = () => {
       const formattedRecords: ServiceRecord[] = data.map(record => ({
         id: record.id,
         description: record.description,
-        service_date: record.service_date,
+        // Ensure service_date is never null - use creation date as fallback
+        service_date: record.service_date || record.created_at || new Date().toISOString(),
         completion_date: record.completion_date || undefined,
         service_type: record.service_type || undefined,
-        status: record.status,
+        // Ensure status is never null - use 'pending' as default
+        status: record.status || 'pending',
         technician_notes: record.technician_notes || undefined,
         labor_hours: record.labor_hours || undefined,
         parts_used: parsePartsUsed(record.parts_used),

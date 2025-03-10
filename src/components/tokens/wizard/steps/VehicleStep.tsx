@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { nullToUndefined } from "@/utils/vehicle/types";
 
 interface VehicleStepProps {
   selectedVehicleId: string | undefined;
@@ -28,7 +29,7 @@ const mapToVehicle = (dbVehicle: DBVehicle): Vehicle => ({
   make: dbVehicle.make,
   model: dbVehicle.model,
   year: dbVehicle.year,
-  vin: dbVehicle.vin || undefined
+  vin: nullToUndefined(dbVehicle.vin)
 });
 
 const VehicleStep = ({

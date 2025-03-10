@@ -33,17 +33,51 @@ export interface CarImageData {
 
 export type SupabaseClient = typeof supabase;
 
-// Added additional types to better support vehicle type handling
+// Updated type definitions to better support null/undefined handling
 export interface VehicleBase {
   make: string;
   model: string;
   year: number;
   vin?: string; // Optional string, not nullable
   notes?: string;
+  description?: string;
+  image_url?: string;
+  rarity_score?: number;
 }
 
 export interface VehicleWithId extends VehicleBase {
   id: string;
   status?: 'active' | 'inactive' | 'maintenance' | 'sold';
   mileage?: number;
+}
+
+// Type guard to check if a database object has a valid VIN
+export function hasValidVin(obj: any): obj is { vin: string } {
+  return obj && typeof obj.vin === 'string' && obj.vin.length > 0;
+}
+
+// Helper function to convert nullable fields to undefined
+export function nullToUndefined<T>(value: T | null): T | undefined {
+  return value === null ? undefined : value;
+}
+
+// Helper to transform database vehicle to our internal type
+export function mapDbToVehicle(dbVehicle: any): VehicleWithId {
+  if (!dbVehicle) {
+    throw new Error("Cannot adapt undefined or null vehicle data");
+  }
+  
+  return {
+    id: dbVehicle.id,
+    make: dbVehicle.make || '',
+    model: dbVehicle.model || '',
+    year: dbVehicle.year || 0,
+    vin: nullToUndefined(dbVehicle.vin),
+    notes: nullToUndefined(dbVehicle.notes),
+    description: nullToUndefined(dbVehicle.description || dbVehicle.condition_description),
+    status: nullToUndefined(dbVehicle.status) as VehicleWithId['status'],
+    mileage: typeof dbVehicle.mileage === 'number' ? dbVehicle.mileage : undefined,
+    image_url: nullToUndefined(dbVehicle.image_url),
+    rarity_score: typeof dbVehicle.rarity_score === 'number' ? dbVehicle.rarity_score : undefined
+  };
 }

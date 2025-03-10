@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { NewToken, Vehicle } from "@/types/token";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { mapDbToVehicle } from "@/utils/vehicle/types";
 
 interface ReviewStepProps {
   token: NewToken;
@@ -14,7 +15,7 @@ const mapToVehicle = (dbVehicle: any): Vehicle => ({
   make: dbVehicle.make,
   model: dbVehicle.model,
   year: dbVehicle.year,
-  vin: dbVehicle.vin || undefined
+  vin: dbVehicle.vin || undefined // Convert null to undefined
 });
 
 const ReviewStep = ({ token }: ReviewStepProps) => {
@@ -36,6 +37,7 @@ const ReviewStep = ({ token }: ReviewStepProps) => {
         
       if (error) throw error;
       if (data) {
+        // Use the mapToVehicle function to handle null values
         setVehicle(mapToVehicle(data));
       }
     } catch (error) {

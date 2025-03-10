@@ -62,21 +62,33 @@ export const usePhoneAuth = () => {
         });
         return false;
       } else {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', data.user?.id)
-          .single();
+        // Safely access user data
+        const userId = data.user?.id;
+        
+        if (userId) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', userId)
+            .single();
 
-        toast({
-          title: "Welcome",
-          description: "Successfully logged in",
-        });
+          toast({
+            title: "Welcome",
+            description: "Successfully logged in",
+          });
 
-        if (!profile?.username) {
-          navigate('/onboarding');
+          if (!profile?.username) {
+            navigate('/onboarding');
+          } else {
+            navigate('/dashboard');
+          }
         } else {
-          navigate('/dashboard');
+          // Handle missing user ID
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to retrieve user information",
+          });
         }
         return true;
       }

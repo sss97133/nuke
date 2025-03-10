@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, useSupabaseWithToast } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { VehicleWithId } from '@/utils/vehicle/types';
+import { VehicleWithId, nullToUndefined } from '@/utils/vehicle/types';
 
 export type Vehicle = VehicleWithId;
 
@@ -19,12 +19,12 @@ export const useVehicles = () => {
       setError(null);
       
       // In production, we would fetch from Supabase
-      const data = await safeFetch(() => 
-        supabase
-          .from('vehicles')
-          .select('id, make, model, year, vin, notes, status, mileage')
-          .order('year', { ascending: false })
-      );
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('id, make, model, year, vin, notes, status, mileage')
+        .order('year', { ascending: false });
+        
+      if (error) throw error;
       
       if (data && Array.isArray(data) && data.length > 0) {
         // Map data to ensure type safety
@@ -33,10 +33,10 @@ export const useVehicles = () => {
           make: item.make || '',
           model: item.model || '',
           year: item.year || 0,
-          vin: item.vin || undefined,
-          notes: item.notes || undefined,
-          status: item.status as Vehicle['status'] || 'active',
-          mileage: item.mileage || undefined
+          vin: nullToUndefined(item.vin),
+          notes: nullToUndefined(item.notes),
+          status: (item.status as Vehicle['status']) || 'active',
+          mileage: typeof item.mileage === 'number' ? item.mileage : undefined
         }));
         setVehicles(typedVehicles);
       } else {
@@ -73,13 +73,24 @@ export const useVehicles = () => {
     try {
       setLoading(true);
       
+      // Prepare vehicle data for Supabase
+      const vehicleData = {
+        ...newVehicle,
+        // Make sure all nulls are converted to undefined for TypeScript
+        vin: newVehicle.vin || null,
+        notes: newVehicle.notes || null,
+        status: newVehicle.status || 'active',
+        mileage: newVehicle.mileage || null,
+        created_at: new Date().toISOString()
+      };
+      
       // In production, we would insert to Supabase
-      const data = await safeFetch(() => 
-        supabase
-          .from('vehicles')
-          .insert([newVehicle])
-          .select()
-      );
+      const { data, error } = await supabase
+        .from('vehicles')
+        .insert([vehicleData])
+        .select();
+      
+      if (error) throw error;
       
       if (data && Array.isArray(data) && data.length > 0) {
         const typedVehicle: Vehicle = {
@@ -87,10 +98,10 @@ export const useVehicles = () => {
           make: data[0].make || '',
           model: data[0].model || '',
           year: data[0].year || 0,
-          vin: data[0].vin || undefined,
-          notes: data[0].notes || undefined,
+          vin: nullToUndefined(data[0].vin),
+          notes: nullToUndefined(data[0].notes),
           status: data[0].status as Vehicle['status'] || 'active',
-          mileage: data[0].mileage || undefined
+          mileage: typeof data[0].mileage === 'number' ? data[0].mileage : undefined
         };
         setVehicles(prev => [...prev, typedVehicle]);
         toast({

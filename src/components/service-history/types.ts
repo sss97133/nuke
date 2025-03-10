@@ -4,7 +4,7 @@ import { Json } from "@/integrations/supabase/types";
 export interface ServiceRecord {
   id: string;
   description: string;
-  status: string;
+  status: 'completed' | 'in-progress' | 'pending';
   service_date: string;
   completion_date?: string;
   service_type?: string;
@@ -41,3 +41,13 @@ export const parsePartsUsed = (partsJson: Json | null): {name: string; quantity:
     return [];
   }
 };
+
+// Helper to normalize null to undefined
+export function nullToUndefined<T>(value: T | null): T | undefined {
+  return value === null ? undefined : value;
+}
+
+// Helper to provide default values for missing fields
+export function withDefault<T>(value: T | null | undefined, defaultValue: T): T {
+  return (value === null || value === undefined) ? defaultValue : value;
+}

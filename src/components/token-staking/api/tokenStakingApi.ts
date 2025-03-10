@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Token, Vehicle, TokenStake, TokenStakeStats } from "@/types/token";
+import { nullToUndefined } from "@/utils/vehicle/types";
 
 /**
  * Fetches available tokens for staking
@@ -44,11 +45,20 @@ export const fetchVehicles = async (): Promise<Vehicle[]> => {
     
     // Convert the data to conform to our Vehicle type
     const vehicles = data?.map(vehicle => ({
-      ...vehicle,
-      vin: vehicle.vin || undefined,
-      description: vehicle.description || undefined,
-      image_url: vehicle.image_url || undefined,
-    })) || [];
+      id: vehicle.id,
+      make: vehicle.make || '',
+      model: vehicle.model || '',
+      year: vehicle.year || 0,
+      // Convert null values to undefined for optional fields
+      vin: nullToUndefined(vehicle.vin),
+      // Use condition_description as fallback for description
+      description: nullToUndefined(vehicle.description || vehicle.condition_description),
+      // Handle missing fields
+      image_url: nullToUndefined(vehicle.image_url),
+      // Ensure proper type handling
+      rarity_score: typeof vehicle.rarity_score === 'number' ? vehicle.rarity_score : undefined,
+      mileage: typeof vehicle.mileage === 'number' ? vehicle.mileage : undefined
+    })) as Vehicle[];
     
     return vehicles;
   } catch (error) {
