@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 // Get environment variables
@@ -25,11 +26,15 @@ export const uploadVehicleImage = async (
   }
 
   try {
+    console.log(`Starting upload for vehicle ${vehicleId}, file: ${file.name}`);
+    
     // Create a unique file name
     const fileExt = file.name.split('.').pop();
     const fileName = `${vehicleId}/${Date.now()}.${fileExt}`;
     const filePath = `vehicle-images/${fileName}`;
 
+    console.log(`Generated file path: ${filePath}`);
+    
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
       .from('vehicles')
@@ -42,11 +47,15 @@ export const uploadVehicleImage = async (
       console.error('Storage upload error:', error);
       throw error;
     }
+    
+    console.log('File uploaded successfully');
 
     // Get the public URL
     const { data: { publicUrl } } = supabase.storage
       .from('vehicles')
       .getPublicUrl(filePath);
+      
+    console.log('Generated public URL:', publicUrl);
 
     // Add to vehicle_images table
     const { error: dbError } = await supabase
@@ -64,6 +73,8 @@ export const uploadVehicleImage = async (
       console.error('Database insert error:', dbError);
       throw dbError;
     }
+    
+    console.log('Database record created successfully');
 
     // Return the public URL
     return publicUrl;

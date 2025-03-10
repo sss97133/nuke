@@ -63,20 +63,28 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         });
       }, 300);
       
+      console.log('Starting upload for vehicle:', vehicleId);
+      
       // Use the uploadVehicleImage helper function
-      const publicUrl = await uploadVehicleImage(vehicleId, selectedFile);
+      const publicUrl = await uploadVehicleImage(vehicleId, selectedFile, maxSizeMB);
       
       clearInterval(progressInterval);
       setUploadProgress(100);
       
+      console.log('Upload successful, URL:', publicUrl);
+      
       toast({
         title: "Image uploaded successfully",
         description: "Your image has been added to the vehicle gallery.",
-        variant: "success", // Changed from default to success for clarity
+        variant: "success",
       });
       
       // Call the success callback with the new image URL
-      if (onSuccess) onSuccess(publicUrl);
+      if (onSuccess) {
+        console.log('Calling onSuccess callback with URL:', publicUrl);
+        onSuccess(publicUrl);
+      }
+      
       setSelectedFile(null);
       
       // Reset progress after a delay
