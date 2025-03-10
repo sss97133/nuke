@@ -36,6 +36,14 @@ interface ListingCardProps {
   viewCount: number;
   commentCount: number;
   isFeatured?: boolean;
+  // NFT-specific properties
+  tokenId?: string;
+  contractAddress?: string;
+  vin?: string;
+  verifiedHistory?: boolean;
+  ownerAddress?: string;
+  lastTransferDate?: string;
+  documentationScore?: number; // 0-100 score based on available documentation
 }
 
 export const ListingCard = ({
@@ -48,7 +56,11 @@ export const ListingCard = ({
   condition,
   viewCount,
   commentCount,
-  isFeatured = false
+  isFeatured = false,
+  tokenId,
+  vin,
+  verifiedHistory = false,
+  documentationScore
 }: ListingCardProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -105,11 +117,21 @@ export const ListingCard = ({
           className="h-48 bg-cover bg-center w-full"
           style={{ backgroundImage: `url(${imageUrl})` }}
         />
-        {isFeatured && (
-          <Badge className="absolute top-2 right-2" variant="secondary">
-            Featured
-          </Badge>
-        )}
+        <div className="absolute top-2 right-2 flex gap-2">
+          {isFeatured && (
+            <Badge variant="secondary">Featured</Badge>
+          )}
+          {verifiedHistory && (
+            <Badge variant="secondary" className="bg-green-600 text-white">
+              Verified History
+            </Badge>
+          )}
+          {tokenId && (
+            <Badge variant="outline" className="bg-purple-600 text-white">
+              NFT #{tokenId.slice(0, 6)}
+            </Badge>
+          )}
+        </div>
       </Link>
       
       <CardHeader className="pb-2">
@@ -129,15 +151,40 @@ export const ListingCard = ({
       </CardHeader>
       
       <CardContent className="pb-0 flex-grow">
+        {/* Location and Date */}
         <div className="flex items-center text-muted-foreground text-sm mb-2">
           <MapPin className="h-3.5 w-3.5 mr-1" />
           <span className="truncate">{location}</span>
         </div>
         
-        <div className="flex items-center text-muted-foreground text-sm">
+        <div className="flex items-center text-muted-foreground text-sm mb-2">
           <Clock className="h-3.5 w-3.5 mr-1" />
           <span>{formattedDate}</span>
         </div>
+
+        {/* Vehicle Specific Info */}
+        {vin && (
+          <div className="flex items-center text-muted-foreground text-sm mb-2">
+            <span className="font-semibold mr-2">VIN:</span>
+            <span className="font-mono">{vin}</span>
+          </div>
+        )}
+
+        {/* Documentation Score */}
+        {documentationScore !== undefined && (
+          <div className="mt-2">
+            <div className="flex justify-between text-sm mb-1">
+              <span>Documentation Score</span>
+              <span className="font-semibold">{documentationScore}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-blue-600 rounded-full" 
+                style={{ width: `${documentationScore}%` }}
+              />
+            </div>
+          </div>
+        )}
       </CardContent>
       
       <CardFooter className="pt-4 flex justify-between">

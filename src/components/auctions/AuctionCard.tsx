@@ -7,6 +7,7 @@ import { AuctionGallery } from "./AuctionGallery";
 import { AuctionDetails } from "./AuctionDetails";
 import { Clock, MessageSquare } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useWallet } from "../wallet/WalletContext";
 
 interface AuctionCardProps {
   auction: {
@@ -25,6 +26,17 @@ interface AuctionCardProps {
       make: string;
       model: string;
       year: number;
+      vin: string;
+      tokenId?: string;
+      contractAddress?: string;
+      documentationScore?: number;
+      verifiedHistory: boolean;
+    };
+    smartContract?: {
+      auctionAddress: string;
+      minimumBidIncrement: number;
+      escrowRequired: boolean;
+      autoTransfer: boolean;
     };
   };
   onBidSubmit: (auctionId: string, amount: number) => Promise<void>;
@@ -38,6 +50,7 @@ export const AuctionCard = ({
   onToggleDetails,
   selectedAuction 
 }: AuctionCardProps) => {
+  const { address: userWalletAddress } = useWallet();
   const isEnded = new Date(auction.end_time) < new Date();
   const timeRemaining = formatDistanceToNow(new Date(auction.end_time), { addSuffix: true });
   const bidCount = auction._count?.auction_bids || 0;
@@ -55,10 +68,28 @@ export const AuctionCard = ({
           year={auction.vehicle.year}
         />
         
-        <div className="absolute top-4 right-4 bg-black/80 text-white px-3 py-1 rounded-full flex items-center">
-          <Clock className="w-4 h-4 mr-2" />
-          {timeRemaining}
+        <div className="absolute top-4 right-4 flex gap-2">
+          <div className="bg-black/80 text-white px-3 py-1 rounded-full flex items-center">
+            <Clock className="w-4 h-4 mr-2" />
+            {timeRemaining}
+          </div>
+          {auction.vehicle.tokenId && (
+            <div className="bg-purple-600 text-white px-3 py-1 rounded-full flex items-center text-sm">
+              NFT #{auction.vehicle.tokenId.slice(0, 6)}
+            </div>
+          )}
+          {auction.vehicle.verifiedHistory && (
+            <div className="bg-green-600 text-white px-3 py-1 rounded-full flex items-center text-sm">
+              Verified
+            </div>
+          )}
         </div>
+
+        {auction.smartContract && (
+          <div className="absolute bottom-4 left-4 bg-blue-600/90 text-white px-3 py-1 rounded-full text-sm">
+            Smart Contract Auction
+          </div>
+        )}
       </div>
       
       <div className="p-4 space-y-4">
@@ -73,6 +104,25 @@ export const AuctionCard = ({
             </span>
             <span>{bidCount} bids</span>
           </div>
+          {auction.vehicle.vin && (
+            <div className="mt-2 text-sm font-mono text-muted-foreground">
+              VIN: {auction.vehicle.vin}
+            </div>
+          )}
+          {auction.vehicle.documentationScore !== undefined && (
+            <div className="mt-2">
+              <div className="flex justify-between text-sm mb-1">
+                <span>Documentation Score</span>
+                <span className="font-semibold">{auction.vehicle.documentationScore}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 rounded-full" 
+                  style={{ width: `${auction.vehicle.documentationScore}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <AuctionDetails
@@ -87,6 +137,9 @@ export const AuctionCard = ({
             auctionId={auction.id}
             currentPrice={auction.current_price || auction.starting_price}
             onSubmit={onBidSubmit}
+            smartContract={auction.smartContract}
+            vehicleInfo={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model} - ${auction.vehicle.vin}`}
+            userWalletAddress={userWalletAddress || undefined}
           />
         )}
 
