@@ -1,5 +1,7 @@
 
 import React, { useState } from "react";
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BookOpen, FileText, Settings, Terminal, HelpCircle } from "lucide-react";
@@ -68,26 +70,60 @@ export const DocumentationDialog = ({ open, onOpenChange }: DocumentationDialogP
     loadDocumentation();
   }, [activeTab, open]);
 
-  // Simple markdown parsing function
+  // Safe markdown parsing function with sanitization
   const renderMarkdown = (markdown: string) => {
-    // Convert headers
-    let html = markdown.replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mb-4">$1</h1>');
-    html = html.replace(/^## (.*$)/gm, '<h2 class="text-xl font-semibold mb-3 mt-6">$1</h2>');
-    html = html.replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mb-2 mt-4">$1</h3>');
-    
-    // Convert lists
-    html = html.replace(/^\- (.*$)/gm, '<li class="ml-4">$1</li>');
-    
-    // Convert code blocks
-    html = html.replace(/```(.+?)```/gs, '<pre class="bg-muted p-4 rounded-md overflow-x-auto my-4"><code>$1</code></pre>');
-    
-    // Convert inline code
-    html = html.replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-sm">$1</code>');
-    
-    // Convert paragraphs (needs to be after the other conversions)
-    html = html.replace(/^(?!<[h|l|p])(.*$)/gm, '<p class="mb-4">$1</p>');
-    
-    return html;
+    // Configure marked options
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+      headerIds: false,
+      mangle: false
+    });
+
+    // Add custom renderer for styling
+    const renderer = new marked.Renderer();
+    renderer.heading = (text, level) => {
+      const sizes = {
+        1: 'text-2xl font-bold mb-4',
+        2: 'text-xl font-semibold mb-3 mt-6',
+        3: 'text-lg font-semibold mb-2 mt-4'
+      };
+      const className = sizes[level as keyof typeof sizes] || 'text-base font-semibold mb-2';
+      return `<h${level} class="${className}">${text}</h${level}>`;
+    };
+
+    renderer.code = (code, language) => {
+      return `<pre class="bg-muted p-4 rounded-md overflow-x-auto my-4"><code class="language-${language}">${code}</code></pre>`;
+    };
+
+    renderer.codespan = (code) => {
+      return `<code class="bg-muted px-1.5 py-0.5 rounded text-sm">${code}</code>`;
+    };
+
+    renderer.list = (body, ordered) => {
+      const type = ordered ? 'ol' : 'ul';
+      return `<${type} class="list-inside ${ordered ? 'list-decimal' : 'list-disc'} mb-4 space-y-2">${body}</${type}>`;
+    };
+
+    renderer.listitem = (text) => {
+      return `<li class="ml-4">${text}</li>`;
+    };
+
+    renderer.paragraph = (text) => {
+      return `<p class="mb-4">${text}</p>`;
+    };
+
+    marked.use({ renderer });
+
+    // Convert markdown to HTML and sanitize
+    const rawHtml = marked(markdown);
+    const sanitizedHtml = DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'strong', 'em', 'blockquote'],
+      ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],
+      ALLOW_DATA_ATTR: false
+    });
+
+    return sanitizedHtml;
   };
 
   const getTabIcon = (tab: string) => {
