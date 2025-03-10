@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Upload, XCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/lib/supabase';
+import { uploadVehicleImage } from '@/lib/supabase';
 
 interface ImageUploaderProps {
   vehicleId: string;
@@ -56,38 +55,22 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       setUploadProgress(0);
       setError(null);
       
-      // Create a unique file name
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${vehicleId}/${Date.now()}.${fileExt}`;
-      const filePath = `vehicle-images/${fileName}`;
-      
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('vehicles')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false,
+      const simulateProgress = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(simulateProgress);
+            return prev;
+          }
+          return prev + 10;
         });
+      }, 300);
       
-      if (error) throw error;
+      // Use the uploadVehicleImage helper function
+      const publicUrl = await uploadVehicleImage(vehicleId, selectedFile, maxSizeMB);
       
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('vehicles')
-        .getPublicUrl(filePath);
+      clearInterval(simulateProgress);
+      setUploadProgress(100);
       
-      // Save to database
-      const { error: dbError } = await supabase
-        .from('vehicle_images')
-        .insert({
-          car_id: vehicleId,
-          image_url: publicUrl,
-          uploaded_at: new Date().toISOString(),
-        });
-      
-      if (dbError) throw dbError;
-      
-      // Success
       toast({
         title: "Image uploaded successfully",
         description: "Your image has been added to the vehicle gallery.",
@@ -97,29 +80,24 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       if (onSuccess) onSuccess(publicUrl);
       setSelectedFile(null);
       
-    } catch (err) {
+      // Reset progress after a delay
+      setTimeout(() => {
+        setUploadProgress(0);
+        setIsUploading(false);
+      }, 1000);
+      
+    } catch (err: any) {
       console.error('Error uploading image:', err);
-      setError(err instanceof Error ? err.message : 'Failed to upload image');
+      setError(err.message || 'Failed to upload image');
       toast({
         title: "Upload failed",
-        description: err instanceof Error ? err.message : 'Failed to upload image',
+        description: err.message || 'Failed to upload image',
         variant: "destructive",
       });
-    } finally {
       setIsUploading(false);
       setUploadProgress(0);
     }
   };
-
-  // Simulating upload progress
-  React.useEffect(() => {
-    if (isUploading && uploadProgress < 95) {
-      const timer = setTimeout(() => {
-        setUploadProgress(prev => Math.min(prev + 5, 95));
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isUploading, uploadProgress]);
 
   return (
     <div className="border border-border rounded-lg p-4 space-y-4">

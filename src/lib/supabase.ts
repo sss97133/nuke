@@ -25,26 +25,48 @@ export const uploadVehicleImage = async (
     throw new Error('Only image files are allowed');
   }
 
-  // Create a unique file name
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${vehicleId}/${Date.now()}.${fileExt}`;
-  const filePath = `vehicle-images/${fileName}`;
+  try {
+    // Create a unique file name
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${vehicleId}/${Date.now()}.${fileExt}`;
+    const filePath = `vehicle-images/${fileName}`;
 
-  // Upload to Supabase Storage
-  const { data, error } = await supabase.storage
-    .from('vehicles')
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false,
-    });
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('vehicles')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
 
-  if (error) throw error;
+    if (error) {
+      console.error('Storage upload error:', error);
+      throw error;
+    }
 
-  // Get the public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from('vehicles')
-    .getPublicUrl(filePath);
+    // Get the public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('vehicles')
+      .getPublicUrl(filePath);
 
-  // Return the public URL
-  return publicUrl;
+    // Add to vehicle_images table
+    const { error: dbError } = await supabase
+      .from('vehicle_images')
+      .insert({
+        car_id: vehicleId,
+        image_url: publicUrl,
+        uploaded_at: new Date().toISOString(),
+      });
+
+    if (dbError) {
+      console.error('Database insert error:', dbError);
+      throw dbError;
+    }
+
+    // Return the public URL
+    return publicUrl;
+  } catch (error) {
+    console.error('Error in uploadVehicleImage:', error);
+    throw error;
+  }
 };
