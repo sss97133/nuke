@@ -21,24 +21,29 @@ const queryClient = new QueryClient({
 // Set up global error handlers on the queryClient
 queryClient.setDefaultOptions({
   queries: {
-    onError: (error) => {
-      console.error('Query error:', error);
-    }
+    // Remove the onError property which is not supported in the current version
+    // onError: (error) => {
+    //   console.error('Query error:', error);
+    // }
   },
   mutations: {
-    onError: (error) => {
-      console.error('Mutation error:', error);
-    }
+    // Remove the onError property which is not supported in the current version
+    // onError: (error) => {
+    //   console.error('Mutation error:', error);
+    // }
   }
 });
 
 // Component to initialize global toast functions
 function ToastInitializer() {
-  const { toast } = useToast();
+  const toast = useToast();
   
   useEffect(() => {
     // Set global toast functions for use outside of React components
-    setToastFunctions(toast);
+    if (toast) {
+      setToastFunctions(toast);
+      console.log('Toast functions initialized');
+    }
   }, [toast]);
   
   return null;

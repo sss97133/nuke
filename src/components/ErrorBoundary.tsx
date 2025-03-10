@@ -1,6 +1,6 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { toast } from '@/components/ui/toast/index';
+import { useToast } from '@/components/ui/toast/index';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 interface ErrorBoundaryProps {
@@ -45,8 +45,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       this.props.onError(error, errorInfo);
     }
     
-    // Show a toast notification about the error
-    toast({
+    // Instead of directly using toast, we just log the error
+    // The toast would be shown by the ErrorBoundary's parent
+    console.error('An error occurred in the application', {
       title: 'An error occurred',
       description: 'We encountered a problem. Please try again or contact support if the issue persists.',
       variant: 'destructive',
