@@ -13,7 +13,7 @@ export interface CarImportData {
   mileage?: number | string;
   condition?: string;
   location?: string;
-  vin?: string;
+  vin?: string; // Changed to optional string (not nullable)
   license_plate?: string;
   insurance_policy?: string;
   notes?: string;
@@ -32,3 +32,18 @@ export interface CarImageData {
 }
 
 export type SupabaseClient = typeof supabase;
+
+// Added additional types to better support vehicle type handling
+export interface VehicleBase {
+  make: string;
+  model: string;
+  year: number;
+  vin?: string; // Optional string, not nullable
+  notes?: string;
+}
+
+export interface VehicleWithId extends VehicleBase {
+  id: string;
+  status?: 'active' | 'inactive' | 'maintenance' | 'sold';
+  mileage?: number;
+}

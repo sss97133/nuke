@@ -14,8 +14,12 @@ export function getRelativeTimeString(date: Date): string {
   return `${Math.floor(diffInDays / 30)} months ago`;
 }
 
-// Adapter function to map database fields to component-expected schema
+// Adapter function to map database fields to component-expected schema with null safety
 export function adaptVehicleFromDB(dbVehicle: any): Vehicle {
+  if (!dbVehicle) {
+    throw new Error("Cannot adapt undefined or null vehicle data");
+  }
+  
   return {
     id: dbVehicle.id,
     make: dbVehicle.make || '',
@@ -28,16 +32,16 @@ export function adaptVehicleFromDB(dbVehicle: any): Vehicle {
     image: dbVehicle.image_url || '/placeholder.png',
     location: dbVehicle.location || '',
     added: dbVehicle.created_at ? getRelativeTimeString(new Date(dbVehicle.created_at)) : '',
-    tags: dbVehicle.tags || [],
-    condition_rating: dbVehicle.condition_rating || 5,
+    tags: Array.isArray(dbVehicle.tags) ? dbVehicle.tags : [],
+    condition_rating: typeof dbVehicle.condition_rating === 'number' ? dbVehicle.condition_rating : 5,
     vehicle_type: dbVehicle.vehicle_type || '',
     body_type: dbVehicle.body_type || '',
     transmission: dbVehicle.transmission || '',
     drivetrain: dbVehicle.drivetrain || '',
-    rarity_score: dbVehicle.rarity_score || 0,
+    rarity_score: typeof dbVehicle.rarity_score === 'number' ? dbVehicle.rarity_score : 0,
     era: dbVehicle.era || '',
     restoration_status: dbVehicle.restoration_status || 'original',
-    special_edition: dbVehicle.special_edition || false,
+    special_edition: Boolean(dbVehicle.special_edition),
     status: dbVehicle.status || 'discovered',
     source: dbVehicle.source || '',
     source_url: dbVehicle.source_url || '',

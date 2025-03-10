@@ -16,10 +16,10 @@ import { UseVehiclesDataResult } from './types';
 
 export function useVehiclesData(vehicleStatus: 'discovered' | 'owned' = 'discovered'): UseVehiclesDataResult {
   const { session } = useAuth();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedVehicles, setSelectedVehicles] = useState<number[]>([]);
-  const [bulkActionOpen, setBulkActionOpen] = useState(false);
-  const [viewMode, setViewMode] = useState("grid");
+  const [bulkActionOpen, setBulkActionOpen] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<string>("grid");
   const [sortField, setSortField] = useState<SortField>("added");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   

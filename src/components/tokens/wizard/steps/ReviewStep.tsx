@@ -8,6 +8,15 @@ interface ReviewStepProps {
   token: NewToken;
 }
 
+// Create a mapper function to convert database vehicle to our Vehicle type
+const mapToVehicle = (dbVehicle: any): Vehicle => ({
+  id: dbVehicle.id,
+  make: dbVehicle.make,
+  model: dbVehicle.model,
+  year: dbVehicle.year,
+  vin: dbVehicle.vin || undefined
+});
+
 const ReviewStep = ({ token }: ReviewStepProps) => {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   
@@ -26,7 +35,9 @@ const ReviewStep = ({ token }: ReviewStepProps) => {
         .single();
         
       if (error) throw error;
-      setVehicle(data);
+      if (data) {
+        setVehicle(mapToVehicle(data));
+      }
     } catch (error) {
       console.error('Error fetching vehicle details:', error);
     }

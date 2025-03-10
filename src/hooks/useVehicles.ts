@@ -1,17 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { supabase, useSupabaseWithToast } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { VehicleWithId } from '@/utils/vehicle/types';
 
-export interface Vehicle {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  vin?: string;
-  notes?: string;
-  status?: 'active' | 'inactive' | 'maintenance' | 'sold';
-  mileage?: number;
-}
+export type Vehicle = VehicleWithId;
 
 export const useVehicles = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -34,7 +27,18 @@ export const useVehicles = () => {
       );
       
       if (data && Array.isArray(data) && data.length > 0) {
-        setVehicles(data as Vehicle[]);
+        // Map data to ensure type safety
+        const typedVehicles: Vehicle[] = data.map(item => ({
+          id: item.id,
+          make: item.make || '',
+          model: item.model || '',
+          year: item.year || 0,
+          vin: item.vin || undefined,
+          notes: item.notes || undefined,
+          status: item.status as Vehicle['status'] || 'active',
+          mileage: item.mileage || undefined
+        }));
+        setVehicles(typedVehicles);
       } else {
         // Fallback to mock data if no data returned
         const mockVehicles: Vehicle[] = [
@@ -65,7 +69,7 @@ export const useVehicles = () => {
     }
   };
 
-  const addVehicle = async (newVehicle: Omit<Vehicle, 'id'>) => {
+  const addVehicle = async (newVehicle: Omit<Vehicle, 'id'>): Promise<Vehicle | null> => {
     try {
       setLoading(true);
       
@@ -78,12 +82,22 @@ export const useVehicles = () => {
       );
       
       if (data && Array.isArray(data) && data.length > 0) {
-        setVehicles(prev => [...prev, data[0] as Vehicle]);
+        const typedVehicle: Vehicle = {
+          id: data[0].id,
+          make: data[0].make || '',
+          model: data[0].model || '',
+          year: data[0].year || 0,
+          vin: data[0].vin || undefined,
+          notes: data[0].notes || undefined,
+          status: data[0].status as Vehicle['status'] || 'active',
+          mileage: data[0].mileage || undefined
+        };
+        setVehicles(prev => [...prev, typedVehicle]);
         toast({
           title: "Success",
           description: "Vehicle added successfully",
         });
-        return data[0] as Vehicle;
+        return typedVehicle;
       } else {
         // Mock implementation for demo
         const mockNewVehicle: Vehicle = {

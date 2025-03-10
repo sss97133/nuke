@@ -14,6 +14,23 @@ interface VehicleStepProps {
   onVehicleSelect: (vehicleId: string | undefined) => void;
 }
 
+interface DBVehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin: string | null;
+}
+
+// Create a mapper function to convert database vehicle to our Vehicle type
+const mapToVehicle = (dbVehicle: DBVehicle): Vehicle => ({
+  id: dbVehicle.id,
+  make: dbVehicle.make,
+  model: dbVehicle.model,
+  year: dbVehicle.year,
+  vin: dbVehicle.vin || undefined
+});
+
 const VehicleStep = ({
   selectedVehicleId,
   onVehicleSelect,
@@ -66,7 +83,10 @@ const VehicleStep = ({
       
       if (error) throw error;
       
-      setGarageVehicles(data || []);
+      if (data) {
+        const typedVehicles = data.map(mapToVehicle);
+        setGarageVehicles(typedVehicles);
+      }
     } catch (error) {
       console.error('Error fetching garage vehicles:', error);
     } finally {
@@ -85,7 +105,7 @@ const VehicleStep = ({
       
       if (error) throw error;
       if (data) {
-        setSelectedVehicle(data);
+        setSelectedVehicle(mapToVehicle(data));
       }
     } catch (error) {
       console.error('Error fetching vehicle:', error);
@@ -112,9 +132,12 @@ const VehicleStep = ({
       
       if (error) throw error;
       
-      setVehicles(data || []);
-      if (data?.length === 0) {
-        setError("No vehicles found with that VIN");
+      if (data) {
+        const typedVehicles = data.map(mapToVehicle);
+        setVehicles(typedVehicles);
+        if (typedVehicles.length === 0) {
+          setError("No vehicles found with that VIN");
+        }
       }
     } catch (error) {
       console.error('Error searching vehicles:', error);
