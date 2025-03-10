@@ -1,71 +1,159 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
+import { useVehicleForm } from '@/components/vehicles/forms/hooks/useVehicleForm';
+import { useNavigationProtection } from '@/hooks/useNavigationProtection';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/toast/toast-context';
-import { OwnershipSection } from '@/components/vehicles/forms/components/OwnershipSection';
-import { useVehicleForm } from '@/components/vehicles/forms/hooks/useVehicleForm';
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ImageIcon, LinkIcon } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
-export default function AddVehicle() {
+function AddVehicle() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const { 
-    form, 
-    handleSubmit, 
-    isSubmitting, 
-    submitError 
+  const [isFormModified, setIsFormModified] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const {
+    form,
+    handleSubmit,
+    isSubmitting,
+    submitError,
   } = useVehicleForm({
-    onSubmitSuccess: (data) => {
-      // In a real app, you would save the data to your backend here
-      console.log('Vehicle data submitted:', data);
-      
-      // Show success message
-      toast({
-        title: 'Vehicle Added Successfully',
-        description: `${data.year} ${data.make} ${data.model} has been added to your collection.`,
-        variant: 'success',
-      });
-      
-      // Set a timeout to allow the user to see the toast before navigation
-      setTimeout(() => {
-        // Navigate back to the vehicles list with state
-        navigate('/vehicles', { state: { fromAdd: true, vehicleData: data } });
-      }, 1500);
+    onSubmitSuccess: async (data) => {
+      try {
+        // Insert the vehicle data into the database
+        const { data: vehicle, error } = await supabase
+          .from('vehicles')
+          .insert([{
+            make: data.make,
+            model: data.model,
+            year: data.year,
+            vin: data.vin,
+            license_plate: data.license_plate,
+            ownership_status: data.ownership_status,
+            purchase_date: data.purchase_date,
+            purchase_price: data.purchase_price,
+            purchase_location: data.purchase_location,
+            claim_justification: data.claim_justification,
+            discovery_date: data.discovery_date,
+            discovery_location: data.discovery_location,
+            discovery_notes: data.discovery_notes,
+            color: data.color,
+            trim: data.trim,
+            body_style: data.body_style,
+            transmission: data.transmission,
+            engine: data.engine,
+            fuel_type: data.fuel_type,
+            mileage: data.mileage,
+            condition: data.condition,
+            category: data.category,
+            rarity: data.rarity,
+            significance: data.significance,
+            public_notes: data.public_notes,
+            private_notes: data.private_notes,
+            image: data.image,
+            tags: data.tags,
+          }])
+          .select()
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        console.log('Vehicle submitted:', vehicle);
+        toast({
+          title: 'Success',
+          description: 'Vehicle added successfully',
+        });
+
+        // Navigate back to vehicles list after a short delay
+        setTimeout(() => {
+          navigate(-1);
+        }, 1000);
+      } catch (error) {
+        console.error('Error submitting vehicle:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to add vehicle. Please try again.',
+          variant: 'destructive',
+        });
+      }
     },
-    onSubmitError: (errors) => {
-      // Show error message
+    onSubmitError: (error) => {
+      console.error('Error submitting vehicle:', error);
       toast({
-        title: 'Failed to add vehicle',
-        description: 'Please check the form for errors and try again.',
-        variant: 'destructive'
+        title: 'Error',
+        description: 'Failed to add vehicle. Please try again.',
+        variant: 'destructive',
       });
-      
-      console.error('Form submission errors:', errors);
-    }
+    },
   });
 
+  const {
+    showExitDialog,
+    handleNavigation,
+    confirmNavigation,
+    cancelNavigation,
+    saveAndNavigate,
+  } = useNavigationProtection({
+    shouldPreventNavigation: isFormModified,
+    onSave: () => {
+      // If the form is valid, submit it before navigating
+      if (form.formState.isValid) {
+        handleSubmit();
+      }
+    },
+  });
+
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        form.setValue('image', reader.result as string);
+        setIsFormModified(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle URL input
+  const handleUrlInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const url = event.target.value;
+    setImagePreview(url);
+    form.setValue('image', url);
+    setIsFormModified(true);
+  };
+
+  // Detect form changes
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      setIsFormModified(true);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   return (
-    <div className="container max-w-4xl py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Add New Vehicle</h1>
-        <p className="text-muted-foreground mt-2">
-          Add a new vehicle to your collection by filling out the information below.
-        </p>
-      </div>
-      
-      <Form {...form}>
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-3">
+    <div className="container mx-auto py-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Add New Vehicle</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Basic Information</h3>
                 <FormField
                   control={form.control}
                   name="make"
@@ -73,7 +161,7 @@ export default function AddVehicle() {
                     <FormItem>
                       <FormLabel>Make</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Ford" {...field} />
+                        <Input placeholder="e.g., Toyota" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -86,7 +174,7 @@ export default function AddVehicle() {
                     <FormItem>
                       <FormLabel>Model</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Mustang" {...field} />
+                        <Input placeholder="e.g., Camry" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -99,21 +187,12 @@ export default function AddVehicle() {
                     <FormItem>
                       <FormLabel>Year</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          min={1885}
-                          max={new Date().getFullYear() + 1}
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.value)}
-                        />
+                        <Input type="number" placeholder="e.g., 2020" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-              
-              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="vin"
@@ -123,9 +202,6 @@ export default function AddVehicle() {
                       <FormControl>
                         <Input placeholder="Vehicle Identification Number" {...field} />
                       </FormControl>
-                      <FormDescription>
-                        17-character vehicle identification number (optional)
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -137,159 +213,238 @@ export default function AddVehicle() {
                     <FormItem>
                       <FormLabel>License Plate</FormLabel>
                       <FormControl>
-                        <Input placeholder="License plate number" {...field} />
+                        <Input placeholder="e.g., ABC123" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Vehicle Image */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Vehicle Image</h3>
+                <Tabs defaultValue="upload" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="upload" className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Upload Image
+                    </TabsTrigger>
+                    <TabsTrigger value="url" className="flex items-center gap-2">
+                      <LinkIcon className="h-4 w-4" />
+                      Image URL
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="upload">
+                    <FormItem>
+                      <FormLabel>Upload Image</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                        />
                       </FormControl>
                       <FormDescription>
-                        Current or last known license plate (optional)
+                        Upload an image of your vehicle (JPG, PNG, GIF)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  </TabsContent>
+                  <TabsContent value="url">
+                    <FormItem>
+                      <FormLabel>Image URL</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="url"
+                          placeholder="https://example.com/image.jpg"
+                          onChange={handleUrlInput}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter a URL to an image of your vehicle
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  </TabsContent>
+                </Tabs>
+                {imagePreview && (
+                  <div className="mt-4">
+                    <img
+                      src={imagePreview}
+                      alt="Vehicle preview"
+                      className="max-w-full h-auto rounded-lg shadow-md"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Ownership Details */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Ownership Details</h3>
+                <FormField
+                  control={form.control}
+                  name="ownership_status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ownership Status</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                        >
+                          <option value="owned">Owned</option>
+                          <option value="claimed">Claimed</option>
+                          <option value="discovered">Discovered</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="purchase_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="purchase_price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Price</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="claim_justification"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Claim Justification</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Please provide a detailed justification for your claim..."
+                          className="min-h-[100px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Required if ownership status is "Claimed"
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-            </CardContent>
-          </Card>
-          
-          {/* Ownership Section */}
-          <OwnershipSection form={form} />
-          
-          {/* Additional Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Additional Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+
+              {/* Additional Notes */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Additional Notes</h3>
                 <FormField
                   control={form.control}
-                  name="color"
+                  name="public_notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Color</FormLabel>
+                      <FormLabel>Notes</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Red" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="mileage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Mileage</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0"
-                          placeholder="Current mileage" 
+                        <Textarea
+                          placeholder="Add any additional notes about the vehicle..."
+                          className="min-h-[100px]"
                           {...field}
-                          onChange={(e) => field.onChange(e.target.value)}
                         />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="engine"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Engine</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. V8, 5.0L" {...field} />
-                      </FormControl>
+                      <FormDescription>
+                        These notes will be visible to anyone who can view this vehicle.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
                   control={form.control}
-                  name="transmission"
+                  name="private_notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Transmission</FormLabel>
+                      <FormLabel>Private Notes</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Automatic, 6-speed manual" {...field} />
+                        <Textarea
+                          placeholder="Add any private notes about the vehicle..."
+                          className="min-h-[100px]"
+                          {...field}
+                        />
                       </FormControl>
+                      <FormDescription>
+                        These notes will only be visible to you.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-              
-              <FormField
-                control={form.control}
-                name="public_notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Public Notes</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Additional information about this vehicle" 
-                        className="min-h-[100px]"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      These notes will be visible to other users
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="private_notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Private Notes</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Private notes about this vehicle" 
-                        className="min-h-[100px]"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      These notes will only be visible to you
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-          
-          {/* Form submission error */}
-          {submitError && (
-            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
-              {submitError}
-            </div>
-          )}
-          
-          {/* Form Actions */}
-          <div className="flex justify-end gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate(-1)}
-              disabled={isSubmitting}
-            >
+
+              {submitError && (
+                <div className="text-red-500 text-sm">
+                  {submitError}
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleNavigation(-1)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Adding...' : 'Add Vehicle'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={showExitDialog} onOpenChange={(open) => {
+        if (!open) {
+          cancelNavigation();
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Would you like to save them before leaving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelNavigation}>
               Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Add Vehicle'}
-            </Button>
-          </div>
-        </form>
-      </Form>
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={saveAndNavigate}>
+              Save and Leave
+            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmNavigation} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Leave Without Saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+export default AddVehicle;

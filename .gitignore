@@ -1,11 +1,10 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
 
 # Dependencies
 node_modules
@@ -14,36 +13,47 @@ node_modules
 
 # Testing
 coverage
-.nyc_output
 
-# Build outputs
+# Production
 dist
-dist-ssr
-*.local
 build
-out
-.next
 
-# Environment variables
-.env
+# Misc
+.DS_Store
+*.pem
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-!.vscode/launch.json
 .idea
-.DS_Store
+.vscode
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-*.sublime-workspace
+
+# Supabase
+**/supabase/.temp
+
+# Logs
+logs
+*.log
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist-ssr
+*.local
+out
+.next
 
 # Temporary files
 .tmp
@@ -54,7 +64,6 @@ out
 tsconfig.tsbuildinfo
 
 # Package manager specific
-yarn.lock
 package-lock.json
 pnpm-lock.yaml
 !yarn.lock  # Include if you prefer yarn and want to commit the lockfile
@@ -71,9 +80,6 @@ test-results
 src/scripts/create-test-users.js
 src/scripts/importChevroletTrucks.ts
 src/scripts/setupStorage.ts
-.env
-.env.local
-.env.*.local
 
 # Backup files
 *.bak

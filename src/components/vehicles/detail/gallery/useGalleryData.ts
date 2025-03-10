@@ -85,21 +85,61 @@ export const useGalleryData = (vehicle: any) => {
     
     try {
       // Get current user
+      console.log('Checking authentication state...');
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('Auth state:', { user, error: userError });
+      
       if (userError || !user) {
+        console.error('Authentication error:', userError);
         throw new Error('User not authenticated');
       }
 
+      // Log vehicle ID
+      console.log('Vehicle ID:', vehicle.id);
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        console.log('Processing file:', {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          lastModified: file.lastModified
+        });
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          console.error(`File ${i} is not an image:`, file.type);
+          continue;
+        }
+
+        // Validate file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+          console.error(`File ${i} is too large:`, file.size);
+          continue;
+        }
+
         const fileExt = file.name.split('.').pop();
-        const fileName = `${vehicle.id}_${Date.now()}_${i}.${fileExt}`;
+        const fileName = `${Date.now()}_${i}.${fileExt}`;
         const filePath = `vehicles/${vehicle.id}/${fileName}`;
+        
+        console.log('Attempting upload with path:', filePath);
         
         // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('vehicle-images')
-          .upload(filePath, file);
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        
+        console.log('Upload result:', { 
+          data: uploadData, 
+          error: uploadError,
+          path: filePath,
+          fileType: file.type,
+          fileSize: file.size,
+          bucket: 'vehicle-images'
+        });
         
         if (uploadError) {
           console.error(`Error uploading file ${i}:`, uploadError);
@@ -111,9 +151,11 @@ export const useGalleryData = (vehicle: any) => {
           .from('vehicle-images')
           .getPublicUrl(filePath);
           
+        console.log('Generated public URL:', urlData);
         const publicUrl = urlData.publicUrl;
         
         // Create record in vehicle_images table
+        console.log('Creating database record...');
         const { data: imageRecord, error: dbError } = await supabase
           .from('vehicle_images')
           .insert([{
@@ -129,6 +171,8 @@ export const useGalleryData = (vehicle: any) => {
           }])
           .select()
           .single();
+        
+        console.log('Database record result:', { record: imageRecord, error: dbError });
         
         if (dbError) {
           console.error(`Error saving image ${i} to database:`, dbError);
