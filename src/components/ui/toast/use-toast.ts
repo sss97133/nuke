@@ -1,5 +1,5 @@
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect } from "react";
 import { ToastActionElement, ToastProps } from "./toast";
 
 // Unique ID for toasts
@@ -42,21 +42,15 @@ export const useToast = (options?: UseToastOptions) => {
     };
   }, [toasts, options?.duration]);
 
-  const toast = ({ 
-    title, 
-    description, 
-    action, 
-    variant = "default", 
-    duration = 5000 
-  }: ToastProps) => {
+  const toast = (props: ToastProps) => {
     const id = generateId();
     const newToast: Toast = {
       id,
-      title,
-      description,
-      action,
-      variant,
-      duration
+      title: props.title,
+      description: props.description,
+      action: props.action as ToastActionElement,
+      variant: props.variant,
+      duration: props.duration || 5000
     };
 
     setToasts(prev => [...prev, newToast]);
@@ -71,11 +65,26 @@ export const useToast = (options?: UseToastOptions) => {
     }
   };
 
-  toast.dismiss = dismiss;
+  // Create specialized toast variants
+  const success = (props: Omit<ToastProps, 'variant'>) => 
+    toast({ ...props, variant: "success" });
+    
+  const error = (props: Omit<ToastProps, 'variant'>) => 
+    toast({ ...props, variant: "destructive" });
+    
+  const warning = (props: Omit<ToastProps, 'variant'>) => 
+    toast({ ...props, variant: "warning" });
+    
+  const info = (props: Omit<ToastProps, 'variant'>) => 
+    toast({ ...props, variant: "info" });
 
   return {
-    ...toast,
-    toasts,
+    toast,
+    success,
+    error,
+    warning,
+    info,
     dismiss,
+    toasts
   };
 };

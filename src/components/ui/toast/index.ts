@@ -1,4 +1,3 @@
-
 import { Toast, ToastActionElement, ToastProps } from "@/components/ui/toast/toast";
 import { Toaster } from "@/components/ui/toast/toaster";
 import { useToast as useToastHook } from "@/components/ui/toast/use-toast";
@@ -6,51 +5,76 @@ import { useToast as useToastHook } from "@/components/ui/toast/use-toast";
 // Re-export the main components
 export { Toast, Toaster };
 
-// Create a wrapper for the useToast hook for consistency
+// Global toast handler for use outside of components
+let globalToastHandler: ReturnType<typeof useToastHook> | null = null;
+
+// Export the useToast hook with enhanced functionality
 export const useToast = () => {
-  const toast = useToastHook();
+  const hookResult = useToastHook();
   
-  // Return the toast function and all of its properties
-  return {
-    ...toast,
-    toast,
-    success: (props: ToastProps) => toast({ ...props, variant: "success" }),
-    error: (props: ToastProps) => toast({ ...props, variant: "destructive" }),
-    warning: (props: ToastProps) => toast({ ...props, variant: "warning" }),
-    info: (props: ToastProps) => toast({ ...props, variant: "info" }),
-    default: (props: ToastProps) => toast(props),
-  };
+  // When this hook is used within a component, it provides an opportunity
+  // to capture a reference to the toast functions for global use
+  if (globalToastHandler === null) {
+    globalToastHandler = hookResult;
+  }
+  
+  return hookResult;
 };
 
-// Global toast functions that use a default implementation
-// We're not reassigning these functions, which fixes the readonly property error
+// Global toast functions for non-component use
+// These functions will use the captured hook reference if available,
+// otherwise provide a fallback that warns the user
 export const toast = (props: ToastProps) => {
-  console.warn('Toast was called outside of a component. For best results, use the useToast hook inside your component.');
+  if (globalToastHandler) {
+    return globalToastHandler.toast(props);
+  }
+  console.warn('Toast was called before it was initialized. For best results, use the useToast hook inside your component.');
   return '';
 };
 
-export const success = (props: ToastProps) => toast({ ...props, variant: "success" });
-export const error = (props: ToastProps) => toast({ ...props, variant: "destructive" });
-export const warning = (props: ToastProps) => toast({ ...props, variant: "warning" });
-export const info = (props: ToastProps) => toast({ ...props, variant: "info" });
-export const dismiss = (toastId?: string) => {
-  console.warn('Toast dismiss was called outside of a component. For best results, use the useToast hook inside your component.');
+export const success = (props: Omit<ToastProps, 'variant'>) => {
+  if (globalToastHandler) {
+    return globalToastHandler.success(props);
+  }
+  console.warn('Toast success was called before it was initialized.');
+  return '';
 };
 
-// Instead of reassigning functions, we create a new object that will be used within the app
-// to properly handle toasts outside of React components
-let globalToastHandler: any = null;
+export const error = (props: Omit<ToastProps, 'variant'>) => {
+  if (globalToastHandler) {
+    return globalToastHandler.error(props);
+  }
+  console.warn('Toast error was called before it was initialized.');
+  return '';
+};
+
+export const warning = (props: Omit<ToastProps, 'variant'>) => {
+  if (globalToastHandler) {
+    return globalToastHandler.warning(props);
+  }
+  console.warn('Toast warning was called before it was initialized.');
+  return '';
+};
+
+export const info = (props: Omit<ToastProps, 'variant'>) => {
+  if (globalToastHandler) {
+    return globalToastHandler.info(props);
+  }
+  console.warn('Toast info was called before it was initialized.');
+  return '';
+};
+
+export const dismiss = (toastId?: string) => {
+  if (globalToastHandler) {
+    globalToastHandler.dismiss(toastId);
+  } else {
+    console.warn('Toast dismiss was called before it was initialized.');
+  }
+};
 
 // Set up the toast initialization function - now it stores the reference without reassigning functions
 export const setToastFunctions = (toastHook: ReturnType<typeof useToastHook>) => {
   globalToastHandler = toastHook;
-  
-  // Override the default console.warn implementation with a real implementation
-  // by using the function wrapper pattern instead of direct reassignment
-  Object.defineProperty(window, '__toastHandler', {
-    value: globalToastHandler,
-    writable: true
-  });
 };
 
 // Re-export types
