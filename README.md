@@ -1,15 +1,15 @@
-# Nuke - Blockchain-Powered Vehicle Management Platform
+# Nuke - Vehicle Management Platform with blockchain integration 
 
-Nuke is revolutionizing classic and collectible car ownership through blockchain technology. Our platform provides authenticated vehicle history, secure ownership transfers, and a trusted marketplace for automotive enthusiasts.
+Nuke is revolutionizing classic and collectible car ownership, selling, tracking and speculation with blockchain technology. Our platform provides authenticated vehicle history, secure ownership transfers, and a trusted marketplace for automotive enthusiasts.
 
 ## 🚀 Core Features
 
 - **Blockchain Vehicle History** - Immutable record of ownership, maintenance, and modifications
-- **NFT-Based Ownership** - Secure, transferable digital titles for vehicles
-- **Verified Documentation** - Store and authenticate maintenance records, photos, and restoration documentation
-- **Smart Contract Auctions** - Transparent, secure bidding process for vehicle sales
-- **Expert Network** - Connect with verified mechanics, restorers, and appraisers
-- **Mobile-First Design** - Update records and photos directly from your garage
+- **LLM database record analysis** - Secure, transferable digital databases for vehicles
+- ** percentage Verification Documentation** - Store and authenticate maintenance records, photos, and restoration documentation among multiple owners with verification by authenticated appraisal owners submit documentation to public scrutiny 
+- **Smart Contract Auctions** - Transparent, secure bidding process for vehicle sales with deposits made upon bid placement 
+- **defining Expert Network** - user actions define skill development my proof of method and live streaming Connect with verified mechanics, restorers, and appraisersuse livestreaming to fast track verification. 
+- **Mobile-First Design** - Update records and photos directly from your garage. livestream integration 
 - **Multi-Vehicle Portfolio** - Manage your entire collection in one place
 - **Market Analytics** - Track market trends and vehicle valuations
 - **Secure Messaging** - Built-in communication for buyers, sellers, and service providers
