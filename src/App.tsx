@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { AppRouter } from './routes/AppRouter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster, ToastProvider, useToast, setToastFunctions } from '@/components/ui/toast/index';
+import { Toaster, useToast, setToastFunctions } from '@/components/ui/toast/index';
 import { TooltipProvider } from '@/components/ui/TooltipProvider';
 import OnboardingCheck from '@/components/onboarding/OnboardingCheck';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -15,7 +15,6 @@ const queryClient = new QueryClient({
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
     },
-    // Remove the onError property as it's no longer supported in this format
   },
 });
 
@@ -25,12 +24,17 @@ queryClient.setDefaultOptions({
     onError: (error) => {
       console.error('Query error:', error);
     }
+  },
+  mutations: {
+    onError: (error) => {
+      console.error('Mutation error:', error);
+    }
   }
 });
 
 // Component to initialize global toast functions
 function ToastInitializer() {
-  const toast = useToast();
+  const { toast } = useToast();
   
   useEffect(() => {
     // Set global toast functions for use outside of React components
@@ -44,16 +48,14 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <TooltipProvider>
-            {/* Initialize global toast functions */}
-            <ToastInitializer />
-            
-            {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
-            <AppRouter />
-            <Toaster />
-          </TooltipProvider>
-        </ToastProvider>
+        <TooltipProvider>
+          {/* Initialize global toast functions */}
+          <ToastInitializer />
+          
+          {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
+          <AppRouter />
+          <Toaster />
+        </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

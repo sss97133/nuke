@@ -1,5 +1,6 @@
+
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/toast/index';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 interface ErrorBoundaryProps {
