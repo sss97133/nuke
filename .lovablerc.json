@@ -1,0 +1,19 @@
+
+{
+  "version": "1.0.0",
+  "features": {
+    "badges": true,
+    "customKnowledge": true,
+    "debugging": true,
+    "deployment": true,
+    "hooks": true
+  },
+  "ui": {
+    "showBadge": true,
+    "theme": "auto"
+  },
+  "build": {
+    "outputDir": "dist",
+    "entry": "src/main.tsx"
+  }
+}

@@ -1,3 +1,4 @@
+
 import { Toast, ToastActionElement, ToastProps } from "@/components/ui/toast/toast";
 import { Toaster } from "@/components/ui/toast/toaster";
 import { useToast as useToastHook } from "@/components/ui/toast/use-toast";
@@ -22,8 +23,6 @@ export const useToast = () => {
 };
 
 // Global toast functions for non-component use
-// These functions will use the captured hook reference if available,
-// otherwise provide a fallback that warns the user
 export const toast = (props: ToastProps) => {
   if (globalToastHandler) {
     return globalToastHandler.toast(props);
@@ -72,7 +71,7 @@ export const dismiss = (toastId?: string) => {
   }
 };
 
-// Set up the toast initialization function - now it stores the reference without reassigning functions
+// Set up the toast initialization function
 export const setToastFunctions = (toastHook: ReturnType<typeof useToastHook>) => {
   globalToastHandler = toastHook;
 };
