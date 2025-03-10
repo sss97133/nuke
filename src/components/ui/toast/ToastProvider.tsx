@@ -1,12 +1,7 @@
 
-import React from 'react';
+import React from "react";
 
-interface ToastProviderProps {
-  children: React.ReactNode;
-}
-
-export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
+// Create a proper ToastProvider JSX component in a .tsx file
+export const ToastProviderJSX = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
-
-export default ToastProvider;
