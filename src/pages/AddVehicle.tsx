@@ -27,10 +27,16 @@ function AddVehicle() {
   } = useVehicleForm({
     onSubmitSuccess: async (data) => {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
         // Insert the vehicle data into the database
         const { data: vehicle, error } = await supabase
           .from('vehicles')
           .insert([{
+            user_id: user.id,
             make: data.make,
             model: data.model,
             year: data.year,
@@ -59,6 +65,8 @@ function AddVehicle() {
             private_notes: data.private_notes,
             image: data.image,
             tags: data.tags,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           }])
           .select()
           .single();
@@ -69,14 +77,16 @@ function AddVehicle() {
 
         console.log('Vehicle submitted:', vehicle);
         toast({
-          title: 'Success',
-          description: 'Vehicle added successfully',
+          title: 'Vehicle Added Successfully! 🚗',
+          description: `Your ${data.year} ${data.make} ${data.model} has been added to your collection. Redirecting to vehicle details...`,
+          variant: 'default',
+          duration: 3000,
         });
 
-        // Navigate back to vehicles list after a short delay
+        // Navigate to the new vehicle's detail page after showing the success message
         setTimeout(() => {
-          navigate(-1);
-        }, 1000);
+          navigate(`/vehicles/${vehicle.id}`, { replace: true });
+        }, 2000);
       } catch (error) {
         console.error('Error submitting vehicle:', error);
         toast({
@@ -147,10 +157,24 @@ function AddVehicle() {
       <Card>
         <CardHeader>
           <CardTitle>Add New Vehicle</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Fill out the details below to add a new vehicle to your collection.
+            You'll be redirected to the vehicle's page once it's added.
+          </p>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+              {/* Loading overlay */}
+              {isSubmitting && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                  <div className="bg-white p-6 rounded-lg shadow-xl text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-lg font-medium">Adding your vehicle...</p>
+                    <p className="text-sm text-muted-foreground">This may take a moment</p>
+                  </div>
+                </div>
+              )}
               {/* Basic Information */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Basic Information</h3>
@@ -401,16 +425,29 @@ function AddVehicle() {
                 </div>
               )}
 
-              <div className="flex justify-end space-x-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:justify-end sm:gap-4 mt-8">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => handleNavigation(-1)}
+                  className="w-full sm:w-auto"
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Adding...' : 'Add Vehicle'}
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto min-w-[150px] relative"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent" />
+                      <span>Adding...</span>
+                    </>
+                  ) : (
+                    'Add Vehicle'
+                  )}
                 </Button>
               </div>
             </form>
