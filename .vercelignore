@@ -1,0 +1,28 @@
+# Tests
+**/*.test.*
+**/*.spec.*
+tests/
+coverage/
+
+# Development files
+.github/
+.husky/
+.vscode/
+scripts/
+e2e/
+cypress/
+storybook/
+*.log
+.eslintrc
+.prettierrc
+.editorconfig
+README.md
+CHANGELOG.md
+LICENSE
+
+# Source control
+.git/
+.gitignore
+
+# Node modules already installed by Vercel
+node_modules/
