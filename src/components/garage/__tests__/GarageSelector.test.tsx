@@ -1,11 +1,12 @@
 
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { GarageSelector } from "../GarageSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import "@testing-library/jest-dom/vitest";
+import { renderWithProviders } from "@/test/test-utils";
 
 // Mock dependencies
 vi.mock("@/integrations/supabase/client", () => ({
@@ -60,7 +61,7 @@ describe("GarageSelector", () => {
   });
 
   it("should render loading state initially", () => {
-    render(<GarageSelector />);
+    renderWithProviders(<GarageSelector />);
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
@@ -74,7 +75,7 @@ describe("GarageSelector", () => {
       })
     }));
 
-    render(<GarageSelector />);
+    renderWithProviders(<GarageSelector />);
 
     await waitFor(() => {
       expect(screen.getByText("Test Garage 1")).toBeInTheDocument();
@@ -95,7 +96,7 @@ describe("GarageSelector", () => {
       })
     }));
 
-    render(<GarageSelector />);
+    renderWithProviders(<GarageSelector />);
 
     await waitFor(() => {
       const selectButton = screen.getAllByText("Select Garage")[0];
@@ -121,7 +122,7 @@ describe("GarageSelector", () => {
       })
     }));
 
-    render(<GarageSelector />);
+    renderWithProviders(<GarageSelector />);
 
     await waitFor(() => {
       expect(screen.getByText("No Garages Found")).toBeInTheDocument();

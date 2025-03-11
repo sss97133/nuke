@@ -1,5 +1,8 @@
 
 import React, { useState, useEffect } from "react";
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+import { toast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -12,7 +15,27 @@ export const Documentation = () => {
   const [activeTab, setActiveTab] = useState("getting-started");
   const [docContent, setDocContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
+
+  // Configure marked options
+  marked.setOptions({
+    gfm: true,
+    breaks: true
+  });
+
+  // Create a custom renderer for styling
+  const renderer = new marked.Renderer();
+  renderer.heading = ({ tokens, depth }) => {
+    const text = tokens.map(t => t.text).join('');
+    const sizes = {
+      1: 'text-2xl font-bold mb-4',
+      2: 'text-xl font-semibold mb-3 mt-6',
+      3: 'text-lg font-semibold mb-2 mt-4'
+    };
+    const className = sizes[depth as keyof typeof sizes] || 'text-base font-semibold mb-2';
+    return `<h${depth} class="${className}">${text}</h${depth}>`;
+  };
+
+  marked.use({ renderer });
 
   useEffect(() => {
     const loadDocumentation = async () => {
@@ -144,7 +167,11 @@ export const Documentation = () => {
                 <ScrollArea className="h-[500px]">
                   <div 
                     className="documentation-content"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(docContent) }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(docContent || ''), {
+                      ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'strong', 'em', 'blockquote'],
+                      ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],
+                      ALLOW_DATA_ATTR: false
+                    }) }}
                   />
                 </ScrollArea>
               )}

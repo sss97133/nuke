@@ -75,48 +75,73 @@ export const DocumentationDialog = ({ open, onOpenChange }: DocumentationDialogP
     // Configure marked options
     marked.setOptions({
       gfm: true,
-      breaks: true,
-      headerIds: false,
-      mangle: false
+      breaks: true
     });
 
     // Add custom renderer for styling
     const renderer = new marked.Renderer();
-    renderer.heading = (text, level) => {
+    
+    // Type-safe heading renderer
+    const originalHeading = renderer.heading.bind(renderer);
+    renderer.heading = ({ tokens, depth }) => {
+      const text = tokens.map(token => {
+        if ('text' in token) return token.text;
+        return '';
+      }).join('');
       const sizes = {
         1: 'text-2xl font-bold mb-4',
         2: 'text-xl font-semibold mb-3 mt-6',
         3: 'text-lg font-semibold mb-2 mt-4'
       };
-      const className = sizes[level as keyof typeof sizes] || 'text-base font-semibold mb-2';
-      return `<h${level} class="${className}">${text}</h${level}>`;
+      const className = sizes[depth as keyof typeof sizes] || 'text-base font-semibold mb-2';
+      return `<h${depth} class="${className}">${text}</h${depth}>`;
     };
 
-    renderer.code = (code, language) => {
-      return `<pre class="bg-muted p-4 rounded-md overflow-x-auto my-4"><code class="language-${language}">${code}</code></pre>`;
+    // Type-safe code block renderer
+    renderer.code = ({ text, lang }) => {
+      return `<pre class="bg-muted p-4 rounded-md overflow-x-auto my-4"><code class="language-${lang || ''}">${text}</code></pre>`;
     };
 
-    renderer.codespan = (code) => {
-      return `<code class="bg-muted px-1.5 py-0.5 rounded text-sm">${code}</code>`;
+    // Type-safe inline code renderer
+    renderer.codespan = ({ text }) => {
+      return `<code class="bg-muted px-1.5 py-0.5 rounded text-sm">${text}</code>`;
     };
 
-    renderer.list = (body, ordered) => {
+    // Type-safe list renderer
+    renderer.list = (token) => {
+      const ordered = token.ordered;
       const type = ordered ? 'ol' : 'ul';
-      return `<${type} class="list-inside ${ordered ? 'list-decimal' : 'list-disc'} mb-4 space-y-2">${body}</${type}>`;
+      const items = token.items.map(item => {
+        const text = item.tokens
+          .map(token => {
+            if ('text' in token) return token.text;
+            if ('raw' in token) return token.raw;
+            return '';
+          })
+          .join('');
+        return `<li class="ml-4">${text}</li>`;
+      }).join('');
+      return `<${type} class="list-inside ${ordered ? 'list-decimal' : 'list-disc'} mb-4 space-y-2">${items}</${type}>`;
     };
 
-    renderer.listitem = (text) => {
-      return `<li class="ml-4">${text}</li>`;
-    };
 
-    renderer.paragraph = (text) => {
+
+    // Type-safe paragraph renderer
+    renderer.paragraph = ({ tokens }) => {
+      const text = tokens
+        .map(token => {
+          if ('text' in token) return token.text;
+          if ('raw' in token) return token.raw;
+          return '';
+        })
+        .join('');
       return `<p class="mb-4">${text}</p>`;
     };
 
     marked.use({ renderer });
 
     // Convert markdown to HTML and sanitize
-    const rawHtml = marked(markdown);
+    const rawHtml = marked.parse(markdown || '');
     const sanitizedHtml = DOMPurify.sanitize(rawHtml, {
       ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'strong', 'em', 'blockquote'],
       ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],

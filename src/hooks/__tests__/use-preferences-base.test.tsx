@@ -11,11 +11,30 @@ vi.mock('@/integrations/supabase/client', () => ({
       getUser: vi.fn()
     },
     from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      single: vi.fn(),
-      insert: vi.fn()
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+        }))
+      })),
+      insert: vi.fn(() => ({
+        select: vi.fn(() => Promise.resolve({ data: null, error: null }))
+      })),
+      update: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({ data: null, error: null }))
+      })),
+      delete: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({ data: null, error: null }))
+      }))
     }))
   }
+}));
+
+// Mock toast hook
+vi.mock('@/hooks/use-toast', () => ({
+  useToast: () => ({
+    toast: vi.fn()
+  })
 }));
 
 describe('usePreferencesBase', () => {
@@ -39,7 +58,7 @@ describe('usePreferencesBase', () => {
     };
 
     (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
-    (supabase.from as any)().select().single.mockResolvedValue({ data: mockPreferences });
+    (supabase.from as any)().select().eq('user_id', mockUser.id).maybeSingle.mockResolvedValue({ data: mockPreferences });
 
     const { result } = renderHook(() => usePreferencesBase());
 
@@ -52,12 +71,18 @@ describe('usePreferencesBase', () => {
       notificationsEnabled: true,
       autoSaveEnabled: true,
       compactViewEnabled: false,
+      theme: 'system',
       distanceUnit: 'miles',
       currency: 'USD',
       defaultGarageView: 'list',
       serviceRemindersEnabled: true,
       inventoryAlertsEnabled: true,
-      priceAlertsEnabled: true
+      priceAlertsEnabled: true,
+      primaryColor: '#9b87f5',
+      secondaryColor: '#7E69AB',
+      accentColor: '#8B5CF6',
+      fontFamily: 'Inter',
+      fontSize: 'medium'
     });
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
