@@ -50,19 +50,21 @@ export const uploadVehicleImage = async (
     
     console.log('File uploaded successfully');
 
-    // Get the public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('vehicles')
-      .getPublicUrl(filePath);
-      
-    console.log('Generated public URL:', publicUrl);
+    // Get the public URL with the correct domain
+    const storageUrl = supabase.storage.from('vehicles').getPublicUrl(filePath).data.publicUrl;
+    const publicUrl = new URL(storageUrl);
+    
+    // Ensure we're using the correct Supabase project URL
+    publicUrl.host = new URL(supabaseUrl).host;
+    
+    console.log('Generated public URL:', publicUrl.toString());
 
     // Add to vehicle_images table
     const { error: dbError } = await supabase
       .from('vehicle_images')
       .insert({
         car_id: vehicleId,
-        image_url: publicUrl,
+        image_url: publicUrl.toString(),
         uploaded_at: new Date().toISOString(),
         file_name: file.name,
         file_path: filePath,
