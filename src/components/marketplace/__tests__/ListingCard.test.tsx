@@ -17,7 +17,7 @@ vi.mock('@/hooks/useWatchlist', () => ({
 
 // Mock navigate function
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', async () => ({
   ...vi.importActual('react-router-dom'),
   useNavigate: () => mockNavigate
 }));
@@ -107,8 +107,8 @@ describe('ListingCard', () => {
   });
 
   it('requires authentication to add to watchlist', () => {
-    const mockSetAuthModal = jest.fn();
-    (useAuth as jest.Mock).mockReturnValue({
+    const mockSetAuthModal = vi.fn();
+    (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
       session: null
     });
 
@@ -130,11 +130,11 @@ describe('ListingCard', () => {
   });
 
   it('toggles watchlist when authenticated', () => {
-    const mockToggleWatchlist = jest.fn();
-    (useAuth as jest.Mock).mockReturnValue({
+    const mockToggleWatchlist = vi.fn();
+    (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
       session: { user: { id: '123' } }
     });
-    (useWatchlist as jest.Mock).mockReturnValue({
+    (useWatchlist as ReturnType<typeof vi.fn>).mockReturnValue({
       isWatched: () => false,
       toggleWatchlist: mockToggleWatchlist
     });

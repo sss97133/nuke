@@ -10,15 +10,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ImageIcon, LinkIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { isURL } from 'validator';
+import ImageUploader from '@/components/vehicle-images/ImageUploader';
 
 function AddVehicle() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isFormModified, setIsFormModified] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [primaryImageUrl, setPrimaryImageUrl] = useState<string | null>(null);
 
   const {
     form,
@@ -64,13 +63,40 @@ function AddVehicle() {
             significance: data.significance,
             public_notes: data.public_notes,
             private_notes: data.private_notes,
-            image: data.image,
+            image: primaryImageUrl, // Use the uploaded image URL
             tags: data.tags,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
           .select()
           .single();
+
+        // If we have a temporary image, update its vehicle ID
+        if (primaryImageUrl && vehicle) {
+          const oldPath = primaryImageUrl.split('/').pop(); // Get the filename
+          const newPath = `${vehicle.id}/${oldPath}`;
+          
+          // Move the file to the correct vehicle folder
+          const { error: moveError } = await supabase.storage
+            .from('vehicles')
+            .move(`${user.id}/${oldPath}`, newPath);
+
+          if (moveError) {
+            console.error('Error moving image:', moveError);
+            // Don't throw here, we still want to create the vehicle
+          }
+
+          // Update the vehicle_images table
+          const { error: imageError } = await supabase
+            .from('vehicle_images')
+            .update({ car_id: vehicle.id })
+            .eq('image_url', primaryImageUrl);
+
+          if (imageError) {
+            console.error('Error updating image record:', imageError);
+            // Don't throw here, we still want to create the vehicle
+          }
+        }
 
         if (error) {
           throw error;
@@ -123,34 +149,10 @@ function AddVehicle() {
     },
   });
 
-  // Handle file upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-        form.setValue('image', reader.result as string);
-        setIsFormModified(true);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Handle URL input
-  const handleUrlInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const url = event.target.value;
-    if (isURL(url)) {
-      setImagePreview(url);
-      form.setValue('image', url);
-      setIsFormModified(true);
-    } else {
-      toast({
-        title: "Invalid URL",
-        description: "Please enter a valid image URL.",
-        status: "error",
-      });
-    }
+  const handleImageUpload = (imageUrl: string) => {
+    setPrimaryImageUrl(imageUrl);
+    form.setValue('image', imageUrl);
+    setIsFormModified(true);
   };
 
   // Detect form changes
@@ -257,59 +259,20 @@ function AddVehicle() {
               {/* Vehicle Image */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Vehicle Image</h3>
-                <Tabs defaultValue="upload" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="upload" className="flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" />
-                      Upload Image
-                    </TabsTrigger>
-                    <TabsTrigger value="url" className="flex items-center gap-2">
-                      <LinkIcon className="h-4 w-4" />
-                      Image URL
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="upload">
-                    <FormItem>
-                      <FormLabel>Upload Image</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileUpload}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Upload an image of your vehicle (JPG, PNG, GIF)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  </TabsContent>
-                  <TabsContent value="url">
-                    <FormItem>
-                      <FormLabel>Image URL</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="url"
-                          placeholder="https://example.com/image.jpg"
-                          onChange={handleUrlInput}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Enter a URL to an image of your vehicle
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  </TabsContent>
-                </Tabs>
-                {imagePreview && (
-                  <div className="mt-4">
-                    <img
-                      src={imagePreview}
-                      alt="Vehicle preview"
-                      className="max-w-full h-auto rounded-lg shadow-md"
+                <FormItem>
+                  <FormLabel>Upload Image</FormLabel>
+                  <FormControl>
+                    <ImageUploader
+                      vehicleId="temp" // Will be replaced with actual ID after vehicle creation
+                      onSuccess={handleImageUpload}
+                      maxSizeMB={5}
                     />
-                  </div>
-                )}
+                  </FormControl>
+                  <FormDescription>
+                    Upload a primary image for your vehicle. You can add more images after creating the vehicle.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
               </div>
 
               {/* Ownership Details */}
