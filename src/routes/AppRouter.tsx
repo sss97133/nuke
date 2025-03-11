@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, memo } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate, BrowserRouter } from 'react-router-dom';
 import { useAuthState } from '@/hooks/auth/use-auth-state';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
@@ -6,10 +6,9 @@ import { AuthLayout } from '@/components/layout/AuthLayout';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { allRoutes, RouteType, isPublicPath } from './routeConfig';
 import { toast } from '@/components/ui/use-toast';
-// Fix the import to use the default export
-import StreamViewer from '@/pages/StreamViewer';
 
-const AppRouterContent: React.FC = () => {
+// Memoize the AppRouterContent component to prevent unnecessary rerenders
+const AppRouterContent = memo(() => {
   const { loading, session } = useAuthState();
   const location = useLocation();
   const navigate = useNavigate();
@@ -17,27 +16,30 @@ const AppRouterContent: React.FC = () => {
   const isAuthCallbackPath = location.pathname.startsWith('/auth/callback');
   const currentPath = location.pathname;
 
+  // Only log in development mode
   useEffect(() => {
-    console.log("Router state:", { 
-      currentPath, 
-      isAuthenticated, 
-      loading, 
-      isAuthCallbackPath,
-      isPublicRoute: isPublicPath(currentPath),
-      availableRoutes: allRoutes.map(r => r.path)
-    });
-  }, [currentPath, isAuthenticated, loading, isAuthCallbackPath]);
+    if (import.meta.env.DEV) {
+      console.log("Router state:", { 
+        currentPath, 
+        isAuthenticated, 
+        loading
+      });
+    }
+  }, [currentPath, isAuthenticated, loading]);
 
-  // Handle successful auth callback
+  // Handle successful auth callback with reduced complexity
   useEffect(() => {
     if (isAuthCallbackPath && !loading && isAuthenticated) {
-      console.log("Auth callback successful, redirecting to dashboard");
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthCallbackPath, loading, isAuthenticated, navigate]);
 
+  // Route validation and redirection logic
   useEffect(() => {
     if (loading) return;
+
+    // Skip validation for known system routes
+    if (isAuthCallbackPath || currentPath === '/') return;
 
     const matchingRoute = allRoutes.find(route => {
       // Exact match
@@ -55,33 +57,22 @@ const AppRouterContent: React.FC = () => {
       });
     });
     
-    const redirectRoute = allRoutes.find(route => 
-      route.path === currentPath && route.redirectTo
-    );
-    
-    if (redirectRoute) {
-      console.log(`Route ${currentPath} has redirect defined to ${redirectRoute.redirectTo}`);
-      return;
-    }
-    
-    if (!matchingRoute && currentPath !== '/' && !isAuthCallbackPath) {
-      console.warn(`Route not found: ${currentPath}, redirecting to home`);
+    if (!matchingRoute) {
       toast({
-        title: "Route Not Found",
-        description: `The page at ${currentPath} does not exist. Redirecting to home.`,
+        title: "Page Not Found",
+        description: "Redirecting to home page",
         variant: "destructive"
       });
-      navigate('/');
+      navigate('/', { replace: true });
     }
   }, [currentPath, loading, navigate, isAuthCallbackPath]);
 
   if (loading) {
-    console.log("Auth loading state...");
     return <LoadingScreen />;
   }
 
+  // Simplified auth callback handling
   if (isAuthCallbackPath) {
-    console.log("Auth callback path detected");
     return (
       <Routes>
         <Route path="/auth/callback" element={
@@ -91,28 +82,34 @@ const AppRouterContent: React.FC = () => {
     );
   }
 
+  // Efficient route element generation
   const getRouteElement = (route: typeof allRoutes[0]) => {
+    // Handle redirects
     if (route.redirectTo) {
       return <Navigate to={route.redirectTo} replace />;
     }
 
+    // Handle auth routes
     if (route.type === RouteType.AUTH) {
       return isAuthenticated 
         ? <Navigate to="/dashboard" replace />
         : <AuthLayout>{route.element}</AuthLayout>;
     }
 
+    // Handle protected routes
     if (route.type === RouteType.PROTECTED) {
       return isAuthenticated
         ? <MainLayout>{route.element}</MainLayout>
         : <Navigate to="/login" state={{ from: location }} replace />;
     }
 
+    // Handle public routes
     return <MainLayout>{route.element}</MainLayout>;
   };
 
   return (
     <Routes>
+      {/* Root path handling */}
       <Route 
         path="/" 
         element={
@@ -122,6 +119,7 @@ const AppRouterContent: React.FC = () => {
         } 
       />
 
+      {/* Dynamically generated routes */}
       {allRoutes.map(route => (
         <Route
           key={route.path}
@@ -130,12 +128,14 @@ const AppRouterContent: React.FC = () => {
         />
       ))}
 
+      {/* Catch-all route for 404s */}
       <Route path="*" element={<Navigate to="/explore" replace />} />
     </Routes>
   );
-};
+});
 
-export const AppRouter: React.FC = () => {
+// Export the wrapped router
+export const AppRouter = () => {
   return (
     <BrowserRouter>
       <AppRouterContent />
