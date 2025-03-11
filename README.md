@@ -131,17 +131,15 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-# Vehicle Management System
-
-## Environment Setup
+# Environment Setup
 
 This project uses different environment configurations for development, testing, and production. Follow these steps to set up your environment:
 
-### Development Setup
+## Development Setup
 
 1. Copy the development environment template:
    ```bash
-   cp .env.development.example .env.development
+   cp .env.example .env.development
    ```
 
 2. Update the `.env.development` file with your development Supabase credentials:
@@ -162,11 +160,11 @@ This project uses different environment configurations for development, testing,
    npm run dev
    ```
 
-### Test Setup
+## Test Setup
 
 1. Copy the test environment template:
    ```bash
-   cp .env.test.example .env.test
+   cp .env.example .env.test
    ```
 
 2. Update the `.env.test` file with your test Supabase credentials:
@@ -182,11 +180,11 @@ This project uses different environment configurations for development, testing,
    npm run test
    ```
 
-### Production Setup
+## Production Setup
 
 1. Copy the production environment template:
    ```bash
-   cp .env.production.example .env.production
+   cp .env.example .env.production
    ```
 
 2. Update the `.env.production` file with your production Supabase credentials:
@@ -206,6 +204,52 @@ This project uses different environment configurations for development, testing,
    ```bash
    npm run preview
    ```
+
+## Vercel Deployment
+
+This project is configured for seamless deployment on Vercel. Follow these steps for optimal deployment:
+
+### Automated Deployment
+
+1. Connect your GitHub repository to Vercel
+2. Vercel will automatically detect the project as a Vite application
+3. Set the following build configuration:
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+   - Install Command: `npm install`
+
+### Environment Variables
+
+Add the following environment variables in your Vercel project settings:
+
+```
+VITE_SUPABASE_URL=your_production_supabase_url
+VITE_SUPABASE_ANON_KEY=your_production_anon_key
+VITE_APP_NAME=Nuke
+VITE_APP_DESCRIPTION=Vehicle Management Platform
+VITE_ENABLE_ANALYTICS=true
+```
+
+### Troubleshooting Deployments
+
+If you encounter issues with your Vercel deployment:
+
+1. Check build logs for errors
+2. Ensure all environment variables are correctly set
+3. Verify the Node.js version (Vercel supports Node.js 18.x and newer)
+4. Check that the `vercel.json` configuration is correct:
+   ```bash
+   {
+     "version": 2,
+     "buildCommand": "npm run build",
+     "outputDirectory": "dist",
+     "framework": "vite",
+     "rewrites": [
+       { "source": "/(.*)", "destination": "/index.html" }
+     ]
+   }
+   ```
+5. If CSP issues occur, adjust the content security policy in your HTML or Vercel configuration
 
 ## Database Setup
 
