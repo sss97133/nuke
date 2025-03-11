@@ -35,13 +35,13 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 // Mock react-router-dom
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-  return {
-    ...actual,
-    BrowserRouter: ({ children }) => children
-  };
-});
+vi.mock('react-router-dom', () => ({
+  BrowserRouter: ({ children }: { children: React.ReactNode }) => children,
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/' }),
+  useParams: () => ({}),
+  Link: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 // Mock Three.js
 vi.mock('three', () => ({
@@ -55,8 +55,26 @@ vi.mock('three', () => ({
     }
   })),
   Scene: vi.fn(),
-  PerspectiveCamera: vi.fn(),
-  Vector3: vi.fn(),
+  PerspectiveCamera: vi.fn(() => ({
+    position: { set: vi.fn() },
+    lookAt: vi.fn(),
+    up: { set: vi.fn() },
+  })),
+  Vector3: vi.fn(() => ({
+    set: vi.fn(),
+  })),
+  Quaternion: vi.fn(() => ({
+    setFromUnitVectors: vi.fn(),
+    clone: vi.fn(() => ({
+      invert: vi.fn(),
+    })),
+  })),
+  LineBasicMaterial: vi.fn(() => ({
+    color: 0x444444,
+    linewidth: 1,
+  })),
+  BufferGeometry: vi.fn(),
+  Line: vi.fn(),
   Box3: vi.fn(),
   Color: vi.fn(),
   Mesh: vi.fn(),
@@ -68,6 +86,26 @@ vi.mock('three', () => ({
   Clock: vi.fn(() => ({
     getElapsedTime: () => 0
   }))
+}));
+
+// Mock OrbitControls
+vi.mock('three/examples/jsm/controls/OrbitControls', () => ({
+  OrbitControls: vi.fn(() => ({
+    enableDamping: true,
+    update: vi.fn(),
+    dispose: vi.fn(),
+  })),
+}));
+
+// Mock window URL methods
+window.URL.createObjectURL = vi.fn(() => 'mock-url');
+window.URL.revokeObjectURL = vi.fn();
+
+// Mock ResizeObserver
+window.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
 }));
 
 beforeAll(() => {

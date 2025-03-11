@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 import { AuthContext } from '../contexts/auth-context';
 import { ToastContext } from '../contexts/toast-context';
 import { mockThree } from './three-mock';
+import { Toaster } from '@/components/ui/toaster';
 
 // Mock Three.js
 vi.mock('three', () => mockThree);
@@ -63,7 +64,18 @@ export const mockSupabaseClient = {
         }
       },
       error: null
-    })
+    }),
+    onAuthStateChange: (callback: (event: string, session: any) => void) => {
+      // Simulate initial auth state
+      callback('SIGNED_IN', {
+        user: {
+          id: 'mock-user-id',
+          email: 'mock-user@test.local',
+          role: 'authenticated'
+        }
+      });
+      return { data: { subscription: { unsubscribe: () => {} } } };
+    }
   }
 };
 
@@ -72,9 +84,8 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: false,
-      gcTime: 0
-    }
-  }
+    },
+  },
 });
 
 // Mock auth context
@@ -116,12 +127,17 @@ export function TestWrapper({ children, withoutAuth = false }: WrapperProps) {
 }
 
 // Custom render function that includes providers
-export function renderWithProviders(ui: React.ReactElement, { withoutAuth = false } = {}) {
-  return render(ui, {
-    wrapper: ({ children }) => (
-      <TestWrapper withoutAuth={withoutAuth}>{children}</TestWrapper>
-    )
-  });
+export function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <AuthContext.Provider value={mockAuthContext}>
+          {ui}
+          <Toaster />
+        </AuthContext.Provider>
+      </QueryClientProvider>
+    </BrowserRouter>
+  );
 }
 
 // Setup WebGL mock
@@ -143,4 +159,6 @@ export function setupWebGLMock() {
     () => mockWebGLContext
   );
 }
+
+export * from '@testing-library/react';
 
