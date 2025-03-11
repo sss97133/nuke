@@ -1,12 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings, ArrowLeft, Search, Copy, Check } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import Prism from 'prismjs';
+import 'prismjs/themes/prism-tomorrow.css';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-jsx';
+import 'prismjs/components/prism-tsx';
 
-// Import technical documentation as a string
+// Types
+interface TableOfContentsItem {
+  title: string;
+  level: number;
+  id: string;
+}
+
+// Constants
 const TECHNICAL_DOC = `# Technical Documentation
 
 ## Tech Stack
@@ -49,21 +59,27 @@ src/
 - Market value analysis
 `;
 
-interface TableOfContentsItem {
-  title: string;
-  level: number;
-  id: string;
-}
-
-export const TechTab = () => {
+export const TechTab: React.FC = () => {
   const [showTechDocs, setShowTechDocs] = useState(false);
-  const [showIntegrationDocs, setShowIntegrationDocs] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
+  // Highlight code blocks when content changes
+  useEffect(() => {
+    if (showTechDocs) {
+      Prism.highlightAll();
+    }
+  }, [showTechDocs, searchQuery]);
+
+  const handleCopyCode = useCallback((code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2000);
+  }, []);
+
   const tableOfContents = useMemo(() => {
     const items: TableOfContentsItem[] = [];
-    TECHNICAL_DOC.split('\n').forEach((line, index) => {
+    TECHNICAL_DOC.split('\n').forEach((line: string, index: number) => {
       if (line.startsWith('# ')) {
         items.push({
           title: line.replace('# ', ''),
@@ -87,17 +103,56 @@ export const TechTab = () => {
     return items;
   }, []);
 
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
+  const renderContent = useCallback((content: string): JSX.Element[] => {
+    return content.split('\n').map((line: string, index: number) => {
+      if (line.startsWith('# ')) {
+        return (
+          <h1 key={`h1-${index}`} id={`section-${index}`} className="text-2xl font-bold mt-6 mb-4 scroll-mt-16">
+            {line.replace('# ', '')}
+          </h1>
+        );
+      }
+      if (line.startsWith('## ')) {
+        return (
+          <h2 key={`h2-${index}`} id={`section-${index}`} className="text-xl font-bold mt-5 mb-3 scroll-mt-16">
+            {line.replace('## ', '')}
+          </h2>
+        );
+      }
+      if (line.startsWith('### ')) {
+        return (
+          <h3 key={`h3-${index}`} id={`section-${index}`} className="text-lg font-bold mt-4 mb-2 scroll-mt-16">
+            {line.replace('### ', '')}
+          </h3>
+        );
+      }
+      if (line.startsWith('```')) {
+        const code = line.replace(/^```(\w+)?\s*|```$/g, '').trim();
+        return (
+          <div key={`code-${index}`} className="relative group my-4">
+            <pre className="rounded-lg overflow-x-auto bg-gray-900">
+              <code className="language-typescript block p-4">{code}</code>
+            </pre>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => handleCopyCode(code)}
+            >
+              {copiedCode === code ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+        );
+      }
+      return line ? <p key={`p-${index}`} className="my-2">{line}</p> : null;
+    });
+  }, [copiedCode, handleCopyCode]);
 
-  const filteredContent = useMemo(() => {
+  const filteredContent = useMemo((): string => {
     if (!searchQuery) return TECHNICAL_DOC;
     const lines = TECHNICAL_DOC.split('\n');
     return lines
-      .filter(line => 
+      .filter((line: string) => 
         line.toLowerCase().includes(searchQuery.toLowerCase())
       )
       .join('\n');
@@ -126,7 +181,7 @@ export const TechTab = () => {
               <Input
                 placeholder="Search documentation..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -194,15 +249,14 @@ export const TechTab = () => {
                   if (paragraph.startsWith('```')) {
                     const code = paragraph.replace('```', '').trim();
                     return (
-                      <div key={index} className="relative group">
+                      <><div key={index} className="relative group">
                         <SyntaxHighlighter
                           language="typescript"
                           style={vscDarkPlus}
                           className="rounded-lg"
                         >
                           {code}
-                        </SyntaxHighlighter>
-                        <Button
+                        </code></pre><Button
                           variant="ghost"
                           size="icon"
                           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -213,7 +267,7 @@ export const TechTab = () => {
                           ) : (
                             <Copy className="h-4 w-4" />
                           )}
-                        </Button>
+                        </Button></>
                       </div>
                     );
                   }
