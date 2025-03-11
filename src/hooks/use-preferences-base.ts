@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { UserPreferences, DbUserPreferences } from "@/types/preferences";
 import { useToast } from "@/hooks/use-toast";
@@ -26,107 +25,64 @@ export const usePreferencesBase = () => {
     fontSize: 'medium'
   });
 
-  useEffect(() => {
-    loadUserPreferences();
-  }, []);
-
-  const loadUserPreferences = async () => {
+  const loadUserPreferences = useCallback(async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      setLoading(true);
+      setError(null);
       
-      if (userError) {
-        setError('Authentication error. Please sign in again.');
-        setLoading(false);
-        return;
-      }
+      const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        setError('No user found. Please sign in again.');
+        console.log('No user found, using default preferences');
         setLoading(false);
         return;
       }
-
-      const { data: preferencesData, error: preferencesError } = await supabase
+      
+      const { data, error: fetchError } = await supabase
         .from('user_preferences')
         .select('*')
         .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (preferencesError) {
-        console.error('Error loading preferences:', preferencesError);
-        setError('Failed to load preferences');
-        setLoading(false);
-        return;
+        .single();
+      
+      if (fetchError) {
+        throw fetchError;
       }
-
-      if (preferencesData) {
-        // Map the snake_case database fields to camelCase for the UI
+      
+      if (data) {
         setPreferences({
-          notificationsEnabled: preferencesData.notifications_enabled,
-          autoSaveEnabled: preferencesData.auto_save_enabled,
-          compactViewEnabled: preferencesData.compact_view_enabled,
-          theme: preferencesData.theme || 'system',
-          distanceUnit: preferencesData.distance_unit,
-          currency: preferencesData.currency,
-          defaultGarageView: preferencesData.default_garage_view,
-          serviceRemindersEnabled: preferencesData.service_reminders_enabled,
-          inventoryAlertsEnabled: preferencesData.inventory_alerts_enabled,
-          priceAlertsEnabled: preferencesData.price_alerts_enabled,
-          primaryColor: preferencesData.primary_color || '#9b87f5',
-          secondaryColor: preferencesData.secondary_color || '#7E69AB',
-          accentColor: preferencesData.accent_color || '#8B5CF6',
-          fontFamily: preferencesData.font_family || 'Inter',
-          fontSize: preferencesData.font_size || 'medium'
+          notificationsEnabled: data.notifications_enabled ?? true,
+          autoSaveEnabled: data.auto_save_enabled ?? true,
+          compactViewEnabled: data.compact_view_enabled ?? false,
+          theme: data.theme ?? 'system',
+          distanceUnit: data.distance_unit ?? 'miles',
+          currency: data.currency ?? 'USD',
+          defaultGarageView: data.default_garage_view ?? 'list',
+          serviceRemindersEnabled: data.service_reminders_enabled ?? true,
+          inventoryAlertsEnabled: data.inventory_alerts_enabled ?? true,
+          priceAlertsEnabled: data.price_alerts_enabled ?? true,
+          primaryColor: data.primary_color ?? '#9b87f5',
+          secondaryColor: data.secondary_color ?? '#7E69AB',
+          accentColor: data.accent_color ?? '#8B5CF6',
+          fontFamily: data.font_family ?? 'Inter',
+          fontSize: data.font_size ?? 'medium'
         });
-      } else {
-        // Create default preferences if none exist
-        const defaultPreferences: DbUserPreferences = {
-          notifications_enabled: true,
-          auto_save_enabled: true,
-          compact_view_enabled: false,
-          theme: 'system',
-          distance_unit: 'miles',
-          currency: 'USD',
-          default_garage_view: 'list',
-          service_reminders_enabled: true,
-          inventory_alerts_enabled: true,
-          price_alerts_enabled: true,
-          primary_color: '#9b87f5',
-          secondary_color: '#7E69AB',
-          accent_color: '#8B5CF6',
-          font_family: 'Inter',
-          font_size: 'medium'
-        };
-
-        const { error: insertError } = await supabase
-          .from('user_preferences')
-          .insert({
-            user_id: user.id,
-            ...defaultPreferences
-          });
-
-        if (insertError) {
-          console.error('Error inserting default preferences:', insertError);
-          setError('Failed to create default preferences');
-          setLoading(false);
-          return;
-        }
       }
-      
-      setLoading(false);
-      setError(null);
-      
-    } catch (error) {
-      console.error('Unexpected error loading preferences:', error);
-      setError('An unexpected error occurred. Please try again.');
-      setLoading(false);
+    } catch (err) {
+      console.error('Error loading preferences:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load preferences');
       toast({
         title: "Error",
-        description: "Failed to load preferences. Please refresh the page.",
+        description: "Failed to load preferences. Using defaults.",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadUserPreferences();
+  }, [loadUserPreferences]);
 
   return {
     preferences,

@@ -1,4 +1,3 @@
-
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
@@ -10,6 +9,7 @@ export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current directory.
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '');
+  const isProd = mode === 'production';
 
   return {
     test: {
@@ -36,7 +36,13 @@ export default defineConfig(({ mode }) => {
       cors: true,
     },
     plugins: [
-      react(),
+      react({
+        babel: {
+          plugins: isProd ? [
+            ['transform-remove-console', { exclude: ['error', 'warn'] }]
+          ] : []
+        }
+      }),
       mode === 'development' && componentTagger(),
     ].filter(Boolean),
     resolve: {
@@ -45,12 +51,22 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      sourcemap: mode !== 'production', // Only generate sourcemaps for non-prod builds
-      // Use Terser for production builds, but disable in CI for faster builds
-      minify: mode === 'production' ? 'terser' : false,
-      // Improved chunk splitting strategy
+      sourcemap: !isProd,
+      minify: isProd ? 'terser' : false,
+      outDir: 'dist',
+      target: 'es2020',
+      assetsInlineLimit: 4096,
+      cssCodeSplit: true,
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          background: path.resolve(__dirname, 'src/background.ts'),
+        },
         output: {
+          entryFileNames: isProd ? 'assets/[name].[hash].js' : 'assets/[name].js',
+          chunkFileNames: isProd ? 'assets/[name].[hash].js' : 'assets/[name].js',
+          assetFileNames: isProd ? 'assets/[name].[hash].[ext]' : 'assets/[name].[ext]',
           manualChunks: {
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
             'vendor-ui': [
@@ -65,19 +81,18 @@ export default defineConfig(({ mode }) => {
             ],
             'vendor-utils': ['date-fns', 'zod', 'jotai'],
             'vendor-charts': ['recharts'],
+            'vendor-three': ['three'],
+            'vendor-form': ['react-hook-form', '@hookform/resolvers'],
+            'vendor-animation': ['framer-motion'],
           },
-          // Optimize chunk size
-          chunkFileNames: 'assets/[name]-[hash].js',
-          entryFileNames: 'assets/[name]-[hash].js',
-          assetFileNames: 'assets/[name]-[hash].[ext]',
         },
       },
-      // Set target to ensure wider browser compatibility
-      target: 'es2020',
-      // Ensure proper handling of dynamic imports
-      dynamicImportVarsOptions: {
-        warnOnError: true,
-      },
+      terserOptions: isProd ? {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      } : undefined,
     },
     // Optimize dependency pre-bundling
     optimizeDeps: {
@@ -96,15 +111,17 @@ export default defineConfig(({ mode }) => {
     },
     // Adjust CSS handling for better performance
     css: {
-      devSourcemap: true,
-      preprocessorOptions: {
-        // Add preprocessor options if using SASS/LESS
+      devSourcemap: !isProd,
+      modules: {
+        generateScopedName: isProd ? '[hash:base64:8]' : '[local]_[hash:base64:5]',
       },
     },
     // Add custom environment variables if needed
     define: {
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
-      __DEV_MODE__: mode !== 'production',
+      __DEV_MODE__: !isProd,
+      __PROD_MODE__: isProd,
     },
   };
 });
+

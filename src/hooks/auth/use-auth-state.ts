@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase, handleSupabaseError } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -10,51 +9,45 @@ export const useAuthState = () => {
   const [error, setError] = useState<Error | null>(null);
   const { toast } = useToast();
 
+  const fetchSession = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('[useAuthState] Error fetching session:', error);
+        setError(error);
+        toast({
+          title: "Authentication Error",
+          description: "We're having trouble verifying your login. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (data?.session) {
+        console.info('[useAuthState] Auth event: INITIAL_SESSION');
+        console.info('[useAuthState] Auth state changed, session:', data.session.user?.email);
+        console.info('[useAuthState] Active session detected, user ID:', data.session.user?.id);
+      } else {
+        console.info('[useAuthState] No active session found');
+      }
+      
+      setSession(data.session);
+      setLoading(false);
+    } catch (err) {
+      console.error('[useAuthState] Unexpected error in auth state:', err);
+      setError(err instanceof Error ? err : new Error('Unknown authentication error'));
+      setLoading(false);
+    }
+  }, [toast]);
+
   useEffect(() => {
     console.info('[useAuthState] Setting up auth state management');
 
     let mounted = true;
     
-    const fetchSession = async () => {
-      try {
-        setLoading(true);
-        
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('[useAuthState] Error fetching session:', error);
-          if (mounted) {
-            setError(error);
-            toast({
-              title: "Authentication Error",
-              description: "We're having trouble verifying your login. Please try again.",
-              variant: "destructive",
-            });
-          }
-          return;
-        }
-        
-        if (mounted) {
-          if (data?.session) {
-            console.info('[useAuthState] Auth event: INITIAL_SESSION');
-            console.info('[useAuthState] Auth state changed, session:', data.session.user?.email);
-            console.info('[useAuthState] Active session detected, user ID:', data.session.user?.id);
-          } else {
-            console.info('[useAuthState] No active session found');
-          }
-          
-          setSession(data.session);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('[useAuthState] Unexpected error in auth state:', err);
-        if (mounted) {
-          setError(err instanceof Error ? err : new Error('Unknown authentication error'));
-          setLoading(false);
-        }
-      }
-    };
-
     // Initialize by fetching the session
     fetchSession();
 
@@ -79,7 +72,7 @@ export const useAuthState = () => {
       mounted = false;
       if (authListener) authListener.subscription.unsubscribe();
     };
-  }, [toast]);
+  }, [fetchSession]);
 
   // Return the session and loading state
   return { session, loading, error };

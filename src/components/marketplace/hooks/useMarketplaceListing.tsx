@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -196,6 +196,40 @@ export function useMarketplaceListing(id: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  const fetchListing = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log("Fetching listing data for ID:", id);
+      
+      if (!USE_REAL_DATA.marketplaceDetail) {
+        console.log('Using mock marketplace detail data (feature flag off)');
+        const mockData = getMockListing(id);
+        if (userId) {
+          mockData.is_watched = Math.random() > 0.7;
+        }
+        setListing(mockData);
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log("Using mock listing data until database tables are created");
+      const mockData = getMockListing(id);
+      if (userId) {
+        mockData.is_watched = Math.random() > 0.7;
+      }
+      setListing(mockData);
+      setIsLoading(false);
+      
+      console.log("Simulating view count increment for listing:", id);
+    } catch (err) {
+      console.error("Error in useMarketplaceListing hook:", err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+      setListing(getMockListing(id));
+    }
+  }, [id, userId]);
+
   useEffect(() => {
     let isMounted = true;
     
@@ -209,58 +243,12 @@ export function useMarketplaceListing(id: string) {
       return;
     }
 
-    const fetchListing = async () => {
-      try {
-        if (isMounted) {
-          setIsLoading(true);
-          setError(null);
-        }
-        
-        console.log("Fetching listing data for ID:", id);
-        
-        if (!USE_REAL_DATA.marketplaceDetail) {
-          console.log('Using mock marketplace detail data (feature flag off)');
-          if (isMounted) {
-            const mockData = getMockListing(id);
-            if (userId) {
-              mockData.is_watched = Math.random() > 0.7;
-            }
-            setListing(mockData);
-            setIsLoading(false);
-          }
-          return;
-        }
-        
-        console.log("Using mock listing data until database tables are created");
-        if (isMounted) {
-          const mockData = getMockListing(id);
-          if (userId) {
-            mockData.is_watched = Math.random() > 0.7;
-          }
-          setListing(mockData);
-          setIsLoading(false);
-        }
-        
-        console.log("Simulating view count increment for listing:", id);
-      } catch (err) {
-        console.error("Error in useMarketplaceListing hook:", err);
-        if (isMounted) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setListing(getMockListing(id));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
     fetchListing();
-    
+
     return () => {
       isMounted = false;
     };
-  }, [id, userId]);
+  }, [id, fetchListing]);
 
   const toggleWatchListing = async () => {
     if (!listing || !userId) return;

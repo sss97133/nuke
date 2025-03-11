@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { Skill, UserSkill } from '@/types/skills';
@@ -44,7 +43,7 @@ const SkillOrbitals = ({
         (line.material as THREE.Material).dispose();
       });
     };
-  }, [scene]);
+  }, [scene, skills]);
 
   useEffect(() => {
     if (!scene || !skills.length) return;
