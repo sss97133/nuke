@@ -91,6 +91,10 @@ export default defineConfig(({ mode }) => {
         compress: {
           drop_console: true,
           drop_debugger: true,
+          pure_funcs: ['console.log'],
+        },
+        format: {
+          comments: false,
         },
       } : undefined,
     },
@@ -121,6 +125,10 @@ export default defineConfig(({ mode }) => {
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
       __DEV_MODE__: !isProd,
       __PROD_MODE__: isProd,
+      // Fix for production environment
+      'process.env': {
+        NODE_ENV: JSON.stringify(isProd ? 'production' : 'development'),
+      },
     },
   };
 });
