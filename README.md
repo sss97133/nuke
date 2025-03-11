@@ -42,10 +42,9 @@ nuke/
 Nuke leverages blockchain technology for secure and transparent vehicle management:
 
 ### Vehicle NFTs
-- Each vehicle gets a unique NFT representing ownership
 - Immutable history of ownership transfers
 - Smart contract-based authenticity verification
-- Automated royalties for original owners on resales
+- Automated royalties for token holdersvon resales or vehicle partnership collaborations
 
 ### Smart Contracts
 ```solidity
