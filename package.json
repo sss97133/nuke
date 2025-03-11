@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
@@ -19,7 +19,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
     "clean": "rimraf dist node_modules/.vite",
     "prepare": "echo 'Ready for development!'",
-    "test": "vitest run",
+    "test": "vitest",
+    "test:ci": "vitest run --coverage",
     "test:watch": "vitest watch"
   },
   "dependencies": {

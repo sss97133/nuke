@@ -1,26 +1,70 @@
+import '@testing-library/jest-dom';
+import { vi } from 'vitest';
+import { TextEncoder, TextDecoder } from 'util';
 
-import { expect, afterEach, beforeAll } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import * as matchers from '@testing-library/jest-dom/matchers';
-import '@testing-library/jest-dom/matchers';
-import { config } from './config/environment';
+// Mock browser APIs
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
 
-// Ensure all features use real data in tests
-beforeAll(() => {
-  // Use test environment configuration
-  process.env.VITE_ENV = 'test';
-  
-  // Set placeholder values for required environment variables
-  process.env.VITE_SUPABASE_URL = config.supabaseUrl;
-  process.env.VITE_SUPABASE_ANON_KEY = config.supabaseAnonKey;
-  process.env.VITE_ESCROW_CONTRACT_ADDRESS = '0x0';
-});
+// Mock Supabase
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: vi.fn(() => ({
+    auth: {
+      getSession: vi.fn(),
+      onAuthStateChange: vi.fn(),
+      signOut: vi.fn(),
+    },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn(),
+    })),
+  })),
+}));
 
-// Extend Vitest's expect method with methods from react-testing-library
-expect.extend(matchers);
+// Mock react-router-dom
+vi.mock('react-router-dom', () => ({
+  useNavigate: vi.fn(),
+  useLocation: vi.fn(),
+  Link: vi.fn(),
+  BrowserRouter: vi.fn(),
+  Routes: vi.fn(),
+  Route: vi.fn(),
+}));
 
-// Cleanup after each test case
-afterEach(() => {
-  cleanup();
+// Mock three.js
+vi.mock('three', () => ({
+  Scene: vi.fn(),
+  PerspectiveCamera: vi.fn(),
+  WebGLRenderer: vi.fn(() => ({
+    setSize: vi.fn(),
+    render: vi.fn(),
+    domElement: document.createElement('canvas'),
+  })),
+  BoxGeometry: vi.fn(),
+  MeshBasicMaterial: vi.fn(),
+  Mesh: vi.fn(),
+  LineBasicMaterial: vi.fn(),
+  BufferGeometry: vi.fn(),
+  Float32BufferAttribute: vi.fn(),
+  Line: vi.fn(),
+}));
+
+// Mock window methods
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
 });
 

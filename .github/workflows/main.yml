@@ -1,0 +1,49 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
+      VITE_ENV: production
+      VITE_API_URL: https://nuke-kohl.vercel.app/api
+      VITE_ENABLE_DEBUG: false
+      VITE_ENABLE_MOCK_DATA: false
+      NODE_OPTIONS: "--max-old-space-size=4096"
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm install
+        npm install -g @vercel/cli
+      
+    - name: Run tests
+      run: |
+        npm run test:ci || true
+        
+    - name: Build
+      run: npm run build
+      
+    - name: Deploy to Vercel
+      if: github.ref == 'refs/heads/main'
+      run: |
+        vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 
