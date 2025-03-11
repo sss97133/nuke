@@ -312,7 +312,7 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
             <FormLabel>{getDocumentLabel()}</FormLabel>
             <FileUploader
               selectedFiles={documents}
-              setSelectedFiles={setDocuments}
+              setSelectedFiles={(files) => setDocuments(files)}
               onFilesSelected={handleDocumentsSelected}
               acceptedFileTypes={['image/*', 'application/pdf']}
               maxFiles={5}

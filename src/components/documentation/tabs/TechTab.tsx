@@ -61,6 +61,7 @@ src/
 
 export const TechTab: React.FC = () => {
   const [showTechDocs, setShowTechDocs] = useState(false);
+  const [showIntegrationDocs, setShowIntegrationDocs] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -103,7 +104,7 @@ export const TechTab: React.FC = () => {
     return items;
   }, []);
 
-  const renderContent = useCallback((content: string): JSX.Element[] => {
+  const renderContent = useCallback((content: string): React.ReactElement[] => {
     return content.split('\n').map((line: string, index: number) => {
       if (line.startsWith('# ')) {
         return (
@@ -210,76 +211,71 @@ export const TechTab: React.FC = () => {
             </div>
             <div className="md:col-span-3">
               <div className="prose dark:prose-invert max-w-none">
-                {filteredContent.split('\n').map((paragraph, index) => {
+                {filteredContent.split('\n').map((line, lineNumber) => {
+                  const trimmedLine = line.trim();
+
                   // Handle headers
-                  if (paragraph.startsWith('# ')) {
+                  if (trimmedLine.startsWith('# ')) {
                     return (
-                      <h1 
-                        key={index} 
-                        id={`section-${index}`}
+                      <h1
+                        key={lineNumber}
+                        id={`section-${lineNumber}`}
                         className="text-2xl font-bold mt-6 mb-4 scroll-mt-16"
                       >
-                        {paragraph.replace('# ', '')}
+                        {trimmedLine.replace('# ', '')}
                       </h1>
                     );
                   }
-                  if (paragraph.startsWith('## ')) {
+                  if (trimmedLine.startsWith('## ')) {
                     return (
-                      <h2 
-                        key={index} 
-                        id={`section-${index}`}
+                      <h2
+                        key={lineNumber}
+                        id={`section-${lineNumber}`}
                         className="text-xl font-bold mt-5 mb-3 scroll-mt-16"
                       >
-                        {paragraph.replace('## ', '')}
+                        {trimmedLine.replace('## ', '')}
                       </h2>
                     );
                   }
-                  if (paragraph.startsWith('### ')) {
+                  if (trimmedLine.startsWith('### ')) {
                     return (
-                      <h3 
-                        key={index} 
-                        id={`section-${index}`}
+                      <h3
+                        key={lineNumber}
+                        id={`section-${lineNumber}`}
                         className="text-lg font-bold mt-4 mb-2 scroll-mt-16"
                       >
-                        {paragraph.replace('### ', '')}
+                        {trimmedLine.replace('### ', '')}
                       </h3>
                     );
                   }
                   // Handle code blocks
-                  if (paragraph.startsWith('```')) {
-                    const code = paragraph.replace('```', '').trim();
+                  if (trimmedLine.startsWith('```')) {
+                    const code = trimmedLine.replace(/^```(\w+)?\s*|```$/g, '').trim();
                     return (
-                      <><div key={index} className="relative group">
-                        <SyntaxHighlighter
-                          language="typescript"
-                          style={vscDarkPlus}
-                          className="rounded-lg"
-                        >
-                          {code}
-                        </code></pre><Button
+                      <div key={`code-${lineNumber}`} className="relative group my-4">
+                        <pre className="rounded-lg overflow-x-auto bg-gray-900">
+                          <code className="language-typescript block p-4">{code}</code>
+                        </pre>
+                        <Button
                           variant="ghost"
                           size="icon"
                           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => handleCopyCode(code)}
                         >
-                          {copiedCode === code ? (
-                            <Check className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button></>
+                          {copiedCode === code ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
                       </div>
                     );
                   }
                   // Handle lists
-                  if (paragraph.startsWith('- ')) {
-                    return <li key={index} className="ml-6 mb-1">{paragraph.replace('- ', '')}</li>;
+                  if (trimmedLine.startsWith('- ')) {
+                    return <li key={`list-${lineNumber}`} className="ml-6 mb-1">{trimmedLine.replace('- ', '')}</li>;
                   }
-                  if (paragraph.trim() === '') {
-                    return <br key={index} />;
+                  if (trimmedLine === '') {
+                    return <br key={`br-${lineNumber}`} />;
                   }
                   // Regular paragraphs
-                  return <p key={index} className="mb-4">{paragraph}</p>;
+                  return <p key={`p-${lineNumber}`} className="mb-4">{trimmedLine}</p>;
                 })}
               </div>
             </div>

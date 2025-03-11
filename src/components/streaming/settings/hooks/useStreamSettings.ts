@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import twitchService from '../../services/TwitchService';
 import { TwitchUserData } from '../../services/types';
@@ -45,7 +44,7 @@ export const useStreamSettings = () => {
     return () => {
       window.removeEventListener('twitch_auth_changed', handleAuthChange);
     };
-  }, []);
+  }, [toast]);
   
   const handleSaveSettings = async () => {
     try {

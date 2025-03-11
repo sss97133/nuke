@@ -1,8 +1,14 @@
-import { supabaseAdmin } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import config from '@/config/environment';
+
+// Create a Supabase client with admin privileges
+const supabaseAdmin = createClient(
+  config.supabase.url,
+  config.supabase.serviceRoleKey
+);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
