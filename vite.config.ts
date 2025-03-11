@@ -7,7 +7,6 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '');
   const isProd = mode === 'production';
 
@@ -59,10 +58,6 @@ export default defineConfig(({ mode }) => {
       cssCodeSplit: true,
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
-        input: {
-          main: path.resolve(__dirname, 'index.html'),
-          background: path.resolve(__dirname, 'src/background.ts'),
-        },
         output: {
           entryFileNames: isProd ? 'assets/[name].[hash].js' : 'assets/[name].js',
           chunkFileNames: isProd ? 'assets/[name].[hash].js' : 'assets/[name].js',
@@ -132,4 +127,3 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
-
