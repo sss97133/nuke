@@ -2,31 +2,97 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { uploadVehicleImage } from '@/lib/supabase';
+import { uploadVehicleImages, VehicleImageCategory, ImagePosition } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, X, ImagePlus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+
+interface UploadProgress {
+  file: string;
+  progress: number;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  error?: string;
+}
 
 interface ImageUploaderProps {
   vehicleId: string;
-  onSuccess?: (imageUrl: string) => void;
+  onSuccess?: (imageUrls: string[]) => void;
   maxSizeMB?: number;
+  defaultCategory?: VehicleImageCategory;
+  defaultPosition?: ImagePosition;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
   vehicleId,
   onSuccess,
-  maxSizeMB = 2
+  maxSizeMB = 10,
+  defaultCategory = VehicleImageCategory.EXTERIOR,
+  defaultPosition = ImagePosition.FRONT_34
 }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [category, setCategory] = useState<VehicleImageCategory>(defaultCategory);
+  const [positions, setPositions] = useState<ImagePosition[]>([defaultPosition]);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, UploadProgress>>({});
   const toastMethods = useToast();
+
+  // Get available positions based on selected category
+  const getPositionsForCategory = (cat: VehicleImageCategory): ImagePosition[] => {
+    switch (cat) {
+      case VehicleImageCategory.EXTERIOR:
+        return [
+          ImagePosition.FRONT_34,
+          ImagePosition.SIDE_DRIVER,
+          ImagePosition.SIDE_PASSENGER,
+          ImagePosition.REAR_34,
+          ImagePosition.FRONT_DIRECT,
+          ImagePosition.REAR_DIRECT
+        ];
+      case VehicleImageCategory.INTERIOR:
+        return [
+          ImagePosition.DASHBOARD,
+          ImagePosition.CENTER_CONSOLE,
+          ImagePosition.FRONT_SEATS,
+          ImagePosition.REAR_SEATS,
+          ImagePosition.TRUNK
+        ];
+      case VehicleImageCategory.DOCUMENTATION:
+        return [
+          ImagePosition.VIN,
+          ImagePosition.ODOMETER,
+          ImagePosition.WINDOW_STICKER,
+          ImagePosition.TITLE
+        ];
+      case VehicleImageCategory.TECHNICAL:
+        return [
+          ImagePosition.ENGINE,
+          ImagePosition.UNDERCARRIAGE,
+          ImagePosition.WHEELS,
+          ImagePosition.FEATURES
+        ];
+      case VehicleImageCategory.PRIMARY:
+        return [ImagePosition.FRONT_34];
+      default:
+        return [];
+    }
+  };
+
+  // Update positions when category changes
+  const handleCategoryChange = (newCategory: VehicleImageCategory) => {
+    setCategory(newCategory);
+    const availablePositions = getPositionsForCategory(newCategory);
+    setPositions(selectedFiles.map(() => availablePositions[0])); // Set all files to first available position
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
-      setSelectedFile(acceptedFiles[0]);
+      setSelectedFiles(acceptedFiles);
+      // Initialize positions for each file
+      setPositions(acceptedFiles.map(() => defaultPosition));
     }
-  }, []);
+  }, [defaultPosition]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -34,67 +100,104 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       'image/*': ['.jpeg', '.jpg', '.png', '.webp']
     },
     maxSize: maxSizeMB * 1024 * 1024,
-    multiple: false
+    multiple: true
   });
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
     
     try {
       setIsUploading(true);
-      setProgress(10);
       
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          const newProgress = prev + Math.floor(Math.random() * 15);
-          return newProgress > 90 ? 90 : newProgress;
-        });
-      }, 500);
-      
-      const imageUrl = await uploadVehicleImage(
+      const imageUrls = await uploadVehicleImages(
         vehicleId,
-        selectedFile,
+        selectedFiles,
+        category,
+        positions,
+        (progress) => setUploadProgress(progress),
         maxSizeMB
       );
       
-      clearInterval(progressInterval);
-      setProgress(100);
+      toastMethods.toast({
+        title: 'Success',
+        description: `${selectedFiles.length} image(s) uploaded successfully`,
+      });
       
-      if (toastMethods) {
-        toastMethods.success({
-          title: 'Image uploaded',
-          description: 'Your image has been successfully uploaded'
-        });
-      }
-      
-      if (onSuccess) {
-        onSuccess(imageUrl);
-      }
+      onSuccess?.(imageUrls);
       
       // Reset the form
-      setSelectedFile(null);
+      setSelectedFiles([]);
+      setPositions([defaultPosition]);
+      setUploadProgress({});
     } catch (error: any) {
       console.error('Upload error:', error);
-      if (toastMethods) {
-        toastMethods.error({
-          title: 'Upload failed',
-          description: error.message || 'There was an error uploading your image'
-        });
-      }
+      toastMethods.toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to upload images',
+      });
     } finally {
       setIsUploading(false);
-      setProgress(0);
     }
   };
 
-  const cancelUpload = () => {
-    setSelectedFile(null);
+  const removeFile = (index: number) => {
+    const newFiles = [...selectedFiles];
+    const newPositions = [...positions];
+    newFiles.splice(index, 1);
+    newPositions.splice(index, 1);
+    setSelectedFiles(newFiles);
+    setPositions(newPositions);
   };
 
   return (
     <div className="w-full">
-      {!selectedFile ? (
+      <div className="space-y-4 mb-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Select 
+              value={category} 
+              onValueChange={(val: string) => handleCategoryChange(val as VehicleImageCategory)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.values(VehicleImageCategory).map((cat: string) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Default Position</Label>
+            <Select 
+              value={positions[0]} 
+              onValueChange={(val: string) => {
+                const newPosition = val as ImagePosition;
+                setPositions(selectedFiles.map(() => newPosition));
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select position" />
+              </SelectTrigger>
+              <SelectContent>
+                {getPositionsForCategory(category).map((pos: string) => (
+                  <SelectItem key={pos} value={pos}>
+                    {pos.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {selectedFiles.length === 0 ? (
         <div
           {...getRootProps()}
           className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
@@ -102,7 +205,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         >
           <input {...getInputProps()} />
           <UploadCloud className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-          <p className="text-sm font-medium mb-1">Drag and drop your image here</p>
+          <p className="text-sm font-medium mb-1">Drag and drop images here</p>
           <p className="text-xs text-muted-foreground mb-3">
             JPG, PNG, WEBP up to {maxSizeMB}MB
           </p>
@@ -112,57 +215,63 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           </Button>
         </div>
       ) : (
-        <div className="rounded-lg border border-border p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center">
-              <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
-                <ImagePlus className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="ml-3 max-w-[180px]">
-                <p className="text-sm font-medium truncate">{selectedFile.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {!isUploading && (
-                <>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={cancelUpload}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel
-                  </Button>
-                  <Button 
-                    size="sm"
-                    onClick={handleUpload}
-                  >
-                    <UploadCloud className="h-4 w-4 mr-1" />
-                    Upload
-                  </Button>
-                </>
-              )}
-              
-              {isUploading && (
-                <Button size="sm" variant="outline" disabled>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading ({progress}%)
+        <div className="space-y-4">
+          {selectedFiles.map((file, index) => (
+            <div key={file.name} className="rounded-lg border border-border p-4">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                  <ImagePlus className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(file.size / (1024 * 1024)).toFixed(2)} MB
+                  </p>
+                  {uploadProgress[file.name] && (
+                    <div className="mt-2">
+                      <Progress
+                        value={uploadProgress[file.name].progress}
+                        className="h-1"
+                      />
+                      {uploadProgress[file.name].error && (
+                        <p className="text-xs text-destructive mt-1">
+                          {uploadProgress[file.name].error}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <Select
+                  value={positions[index]}
+                  onValueChange={(val: string) => {
+                    const newPositions = [...positions];
+                    newPositions[index] = val as ImagePosition;
+                    setPositions(newPositions);
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getPositionsForCategory(category).map((pos: string) => (
+                      <SelectItem key={pos} value={pos}>
+                        {pos.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => removeFile(index)}
+                  disabled={isUploading}
+                >
+                  <X className="h-4 w-4" />
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
-          
-          {isUploading && (
-            <div className="w-full bg-muted rounded-full h-2.5 mt-2">
-              <div 
-                className="bg-primary h-2.5 rounded-full" 
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-          )}
+          ))}
         </div>
       )}
     </div>

@@ -149,9 +149,11 @@ function AddVehicle() {
     },
   });
 
-  const handleImageUpload = (imageUrl: string) => {
-    setPrimaryImageUrl(imageUrl);
-    form.setValue('image', imageUrl);
+  const handleImageUpload = (imageUrls: string[]) => {
+    // Use the first image as the primary image
+    const primaryUrl = imageUrls[0];
+    setPrimaryImageUrl(primaryUrl);
+    form.setValue('image', primaryUrl);
     setIsFormModified(true);
   };
 

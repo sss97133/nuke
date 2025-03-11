@@ -2,13 +2,207 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { useToast } from '@/hooks/use-toast';
 
-// Fallback values in case env vars are not set
-const SUPABASE_URL = "https://qkgaybvrernstplzjaam.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk";
+// Environment-specific Supabase configuration
+const ENVIRONMENTS = {
+  development: {
+    url: 'http://localhost:54321',
+    anonKey: import.meta.env.VITE_SUPABASE_LOCAL_ANON_KEY || ''
+  },
+  production: {
+    url: import.meta.env.VITE_SUPABASE_URL || '',
+    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+  },
+  test: {
+    url: 'mock',
+    anonKey: 'mock'
+  }
+};
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+// Get environment from Vite
+const ENV = import.meta.env.MODE || 'development';
+
+// Use environment variables if provided, otherwise fall back to environment config
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ENVIRONMENTS[ENV].url;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ENVIRONMENTS[ENV].anonKey;
+
+// Image categories for better organization
+export enum VehicleImageCategory {
+  PRIMARY = 'primary',
+  EXTERIOR = 'exterior',
+  INTERIOR = 'interior',
+  DOCUMENTATION = 'documentation',
+  TECHNICAL = 'technical'
+}
+
+// Position/type within each category
+export enum ImagePosition {
+  // Exterior positions
+  FRONT_34 = 'front_34',
+  SIDE_DRIVER = 'side_driver',
+  SIDE_PASSENGER = 'side_passenger',
+  REAR_34 = 'rear_34',
+  FRONT_DIRECT = 'front_direct',
+  REAR_DIRECT = 'rear_direct',
+  
+  // Interior positions
+  DASHBOARD = 'dashboard',
+  CENTER_CONSOLE = 'center_console',
+  FRONT_SEATS = 'front_seats',
+  REAR_SEATS = 'rear_seats',
+  TRUNK = 'trunk',
+  
+  // Documentation types
+  VIN = 'vin',
+  ODOMETER = 'odometer',
+  WINDOW_STICKER = 'window_sticker',
+  TITLE = 'title',
+  
+  // Technical areas
+  ENGINE = 'engine',
+  UNDERCARRIAGE = 'undercarriage',
+  WHEELS = 'wheels',
+  FEATURES = 'features'
+}
+
+interface UploadProgress {
+  file: string;
+  progress: number;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  error?: string;
+}
+
+type ProgressCallback = (progress: Record<string, UploadProgress>) => void;
+
+// Helper function to handle single or batch image uploads
+export const uploadVehicleImages = async (
+  vehicleId: string,
+  files: File[],
+  category: VehicleImageCategory,
+  positions: ImagePosition[],
+  onProgress?: ProgressCallback,
+  maxSizeMB: number = 10
+): Promise<string[]> => {
+  if (files.length !== positions.length) {
+    throw new Error('Number of files must match number of positions');
+  }
+
+  const progress: Record<string, UploadProgress> = {};
+  const results: string[] = [];
+
+  // Initialize progress tracking
+  files.forEach(file => {
+    progress[file.name] = {
+      file: file.name,
+      progress: 0,
+      status: 'pending'
+    };
+  });
+
+  const updateProgress = (fileName: string, update: Partial<UploadProgress>) => {
+    progress[fileName] = { ...progress[fileName], ...update };
+    onProgress?.(progress);
+  };
+
+  try {
+    // Process files in parallel with a concurrency limit
+    const concurrencyLimit = 3;
+    const chunks: File[][] = [];
+    for (let i = 0; i < files.length; i += concurrencyLimit) {
+      chunks.push(files.slice(i, i + concurrencyLimit));
+    }
+
+    for (const chunk of chunks) {
+      await Promise.all(chunk.map(async (file) => {
+        const position = positions[files.indexOf(file)];
+        try {
+          // Validate file size and type
+          const maxSize = maxSizeMB * 1024 * 1024;
+          if (file.size > maxSize) {
+            throw new Error(`File size exceeds ${maxSizeMB}MB limit`);
+          }
+          if (!file.type.startsWith('image/')) {
+            throw new Error('Only image files are allowed');
+          }
+
+          updateProgress(file.name, { progress: 25, status: 'uploading' });
+          
+          // Create an organized file name
+          const fileExt = file.name.split('.').pop();
+          const timestamp = Date.now();
+          const fileName = `${category}/${position}_${timestamp}.${fileExt}`;
+          const filePath = `vehicle-images/${vehicleId}/${fileName}`;
+
+          updateProgress(file.name, { progress: 50, status: 'uploading' });
+
+          // Upload to storage
+          const { error: uploadError } = await supabase.storage
+            .from('vehicles')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          if (uploadError) {
+            updateProgress(file.name, { status: 'error', error: uploadError.message });
+            throw uploadError;
+          }
+          // Get the public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('vehicles')
+            .getPublicUrl(filePath);
+
+          // Add to vehicle_images table
+          const { error: dbError } = await supabase
+            .from('vehicle_images')
+            .insert({
+              car_id: vehicleId,
+              image_url: publicUrl,
+              uploaded_at: new Date().toISOString(),
+              file_name: file.name,
+              file_path: filePath,
+              category: category,
+              position: position,
+              is_primary: category === VehicleImageCategory.PRIMARY
+            });
+
+          if (dbError) {
+            console.error(`Database insert error for ${file.name}:`, dbError);
+            updateProgress(file.name, { status: 'error', error: dbError.message });
+            throw dbError;
+          }
+          
+          console.log(`Database record created successfully for ${file.name}`);
+          updateProgress(file.name, { progress: 100, status: 'success' });
+          results.push(publicUrl);
+        } catch (error: any) {
+          console.error(`Error processing ${file.name}:`, error);
+          updateProgress(file.name, { status: 'error', error: error.message });
+          throw error;
+        }
+      }));
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Error in batch upload:', error);
+    throw error;
+  }
+};
+
+// Admin operations will use standard auth - no service role key needed
+const handleAdminOperation = async (url: string, options: any) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('Not authenticated');
+  }
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options?.headers,
+      'Authorization': `Bearer ${session.access_token}`
+    }
+  });
+};
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables');
@@ -38,17 +232,10 @@ export const supabase = createClient<Database>(
     },
     global: {
       fetch: async (url, options) => {
-        // If this is an admin operation and we have a service role key, use it
-        if (url.includes('/auth/v1/admin') && supabaseServiceRoleKey) {
-          const adminOptions = {
-            ...options,
-            headers: {
-              ...options?.headers,
-              'Authorization': `Bearer ${supabaseServiceRoleKey}`
-            }
-          };
-          return fetch(url, adminOptions);
-        }
+        // Handle admin operations with user session
+      if (url.includes('/auth/v1/admin')) {
+        return handleAdminOperation(url, options);
+      }
         
         // Otherwise use the default fetch with retry logic
         const MAX_RETRIES = 2;
