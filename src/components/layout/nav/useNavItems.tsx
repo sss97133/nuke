@@ -40,14 +40,14 @@ export const useNavItems = () => {
   const { isCompleted, isLoading: onboardingLoading } = useOnboarding();
   const { session, loading: authLoading } = useAuthState();
   
-  const handleLoginClick = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleLoginClick = (e?: React.MouseEvent<Element, MouseEvent>) => {
+    e?.preventDefault();
     console.log("Login clicked, navigating to /login");
     navigate('/login');
   };
   
-  const handleRegisterClick = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleRegisterClick = (e?: React.MouseEvent<Element, MouseEvent>) => {
+    e?.preventDefault();
     console.log("Register clicked, navigating to /register");
     navigate('/register');
   };
