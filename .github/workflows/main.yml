@@ -19,6 +19,8 @@ jobs:
       VITE_ENABLE_DEBUG: false
       VITE_ENABLE_MOCK_DATA: false
       NODE_OPTIONS: "--max-old-space-size=4096"
+      NODE_ENV: production
+      TAILWIND_MODE: build
 
     steps:
     - uses: actions/checkout@v3
@@ -29,20 +31,30 @@ jobs:
         node-version: '18.x'
         cache: 'npm'
         
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          **/node_modules
+          ~/.npm
+          ${{ github.workspace }}/.next/cache
+        key: ${{ runner.os }}-modules-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-modules-
+          
     - name: Install dependencies
       run: |
-        npm install
+        npm ci
         npm install -g @vercel/cli
       
     - name: Run tests
-      run: |
-        npm run test:ci || true
+      run: npm run test:ci
         
     - name: Build
       run: npm run build
       
     - name: Deploy to Vercel
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main' && success()
       run: |
         vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}

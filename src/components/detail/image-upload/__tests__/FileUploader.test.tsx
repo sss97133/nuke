@@ -1,7 +1,7 @@
-import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { FileUploader } from '../FileUploader';
-import { ToastProvider } from '@/contexts/ToastContext';
+import { useToast } from '@/components/ui/use-toast';
 
 // Mock file creation helper
 const createMockFile = (name: string, size: number, type: string): File => {
@@ -12,36 +12,29 @@ const createMockFile = (name: string, size: number, type: string): File => {
   return file;
 };
 
-// Mock window.URL.createObjectURL and window.URL.revokeObjectURL
-const mockCreateObjectURL = jest.fn(() => 'mock-url');
-const mockRevokeObjectURL = jest.fn();
-global.URL.createObjectURL = mockCreateObjectURL;
-global.URL.revokeObjectURL = mockRevokeObjectURL;
-
-// Mock toast context
-jest.mock('@/contexts/ToastContext', () => ({
-  ToastProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useToastContext: () => ({
-    toast: jest.fn(),
-    success: jest.fn(),
-    error: jest.fn(),
-    warning: jest.fn(),
-    info: jest.fn(),
-    dismiss: jest.fn(),
-  }),
+// Mock the toast context
+vi.mock('@/components/ui/use-toast', () => ({
+  useToast: vi.fn()
 }));
+
+// Mock URL methods
+window.URL.createObjectURL = vi.fn();
+window.URL.revokeObjectURL = vi.fn();
 
 describe('FileUploader Component', () => {
   // Common props for testing
   const mockProps = {
-    onFilesSelected: jest.fn(),
+    onFilesSelected: vi.fn(),
     selectedFiles: [],
-    setSelectedFiles: jest.fn(),
+    setSelectedFiles: vi.fn(),
+    maxFiles: 5,
+    maxSize: 5242880, // 5MB
+    accept: 'image/*'
   };
 
   beforeEach(() => {
-    // Clear mocks before each test
-    jest.clearAllMocks();
+    vi.clearAllMocks();
+    (useToast as any).mockReturnValue({ toast: vi.fn() });
   });
 
   it('renders correctly with default props', () => {
@@ -131,40 +124,24 @@ describe('FileUploader Component', () => {
     });
   });
 
-  it('limits the number of files to maxFiles', async () => {
-    const maxFiles = 2;
-    const selectedFiles = [
-      createMockFile('existing1.jpg', 1024, 'image/jpeg')
-    ];
-    
-    render(
-      <FileUploader
-        {...mockProps}
-        maxFiles={maxFiles}
-        selectedFiles={selectedFiles}
-      />
-    );
-    
-    // Create mock files to add
-    const newFile1 = createMockFile('new1.jpg', 1024, 'image/jpeg');
-    const newFile2 = createMockFile('new2.jpg', 1024, 'image/jpeg');
-    const newFile3 = createMockFile('new3.jpg', 1024, 'image/jpeg');
-    
+  it('limits the number of files to maxFiles', () => {
+    const { container } = render(<FileUploader {...mockProps} maxFiles={2} selectedFiles={[createMockFile('existing1.jpg', 1024, 'image/jpeg')]} />);
+
     // Mock file input change
-    const input = screen.getByRole('button').querySelector('input[type="file"]') as HTMLInputElement;
-    
+    const dropArea = screen.getByTestId('file-drop-area');
+    const input = dropArea.querySelector('input[type="file"]') as HTMLInputElement;
+
     Object.defineProperty(input, 'files', {
-      value: [newFile1, newFile2, newFile3],
+      value: [
+        createMockFile('test1.jpg', 1024, 'image/jpeg'),
+        createMockFile('test2.jpg', 1024, 'image/jpeg')
+      ]
     });
-    
+
     fireEvent.change(input);
-    
-    // Verify only up to the max limit was added
-    await waitFor(() => {
-      // Should only add one more file to reach the limit of 2
-      expect(mockProps.onFilesSelected).toHaveBeenCalledWith([...selectedFiles, newFile1]);
-      expect(mockProps.setSelectedFiles).toHaveBeenCalledWith([...selectedFiles, newFile1]);
-    });
+
+    expect(mockProps.onFilesSelected).not.toHaveBeenCalled();
+    expect(screen.getByText(/Maximum number of files exceeded/)).toBeInTheDocument();
   });
 
   it('shows disabled state when at max capacity', () => {
