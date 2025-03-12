@@ -4,11 +4,15 @@ FROM node:18-alpine AS build
 # Set working directory
 WORKDIR /app
 
-# Copy package files for efficient caching
-COPY package.json package-lock.json ./
+# Install necessary build tools
+RUN apk add --no-cache python3 make g++
 
-# Install dependencies
-RUN npm ci
+# Copy package files for efficient caching
+COPY package*.json ./
+COPY .npmrc ./
+
+# First try clean install, if it fails fall back to regular install
+RUN npm ci || npm install
 
 # Copy all files
 COPY . .
@@ -22,8 +26,9 @@ FROM nginx:alpine AS production
 # Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy custom nginx config if needed
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Add nginx configuration if needed
+RUN rm -rf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf || echo "No custom nginx.conf found, using default"
 
 # Expose port 80
 EXPOSE 80
