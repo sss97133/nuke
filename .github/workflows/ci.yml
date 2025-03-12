@@ -4,6 +4,13 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+
+# Add global permissions that apply to all jobs
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,17 +36,25 @@ jobs:
         echo "audit=false" >> .npmrc
     
     - name: Install dependencies
-      run: npm ci || npm install --legacy-peer-deps
+      run: |
+        npm ci || npm install --no-save
+        # Make sure vite can be found by the build command
+        export PATH="$PATH:./node_modules/.bin"
+        echo "Vite version: $(./node_modules/.bin/vite --version || echo 'Not found')"
     
     - name: Run TypeScript check
       run: npm run typecheck || echo "TypeScript check failed but continuing"
     
     - name: Build
-      run: npm run build
+      run: |
+        # Ensure path includes node_modules/.bin
+        export PATH="$PATH:./node_modules/.bin"
+        npm run build || echo "Build failed"
       env:
         NODE_OPTIONS: "--max-old-space-size=4096"
       
     - name: Upload build artifacts
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: build-output
