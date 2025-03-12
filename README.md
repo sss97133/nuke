@@ -1,8 +1,30 @@
 # Nuke
 
-Modern vehicle management platform with advanced features.
+A revolutionary vehicle management platform that serves as the digital identity for vehicles and transforms automotive ownership, investment, and data validation.
 
-## Build Status
+## Vision
+
+Nuke is not just a vehicle management system—it's a comprehensive platform that creates a digital mirror for every vehicle. We're building the ultimate repository of automotive data, where vehicles themselves become digital entities with their own histories, specifications, and economic potential.
+
+### Core Purpose
+
+Our platform serves as:
+- A digital identity for individual vehicles
+- A comprehensive vehicle history validated through multiple data sources
+- A new economic model for automotive investment and ownership
+- The ultimate data platform for all automotive recordkeeping
+
+### Target Users
+
+Our ecosystem is designed for:
+
+- **Industry Professionals**: Mechanics, detailers, car salespeople, restoration specialists
+- **Vehicle Owners**: From everyday drivers to collectors
+- **Automotive Investors**: Who want to participate in vehicle ownership without full title
+- **Automotive Enthusiasts**: DIY mechanics, car hobbyists, and collectors
+- **The Vehicles Themselves**: As digital entities with their own profiles and data histories
+
+## Current Status
 
 Our CI/CD pipeline has been fixed with comprehensive updates to all GitHub Actions workflows:
 
@@ -15,10 +37,12 @@ Our CI/CD pipeline has been fixed with comprehensive updates to all GitHub Actio
 
 ## Features
 
-- Vehicle tracking
-- Maintenance scheduling
-- Analytics dashboard
+- Vehicle digital identity profiles
+- Verified data collection from multiple sources
+- Maintenance and modification history tracking
+- Analytics dashboard and valuation tools
 - Mobile-friendly UI
+- Ownership and investment management
 
 ## Technology Stack
 
