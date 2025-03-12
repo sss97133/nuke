@@ -84,6 +84,16 @@ At its heart, Nuke treats vehicles as first-class digital entities:
 - **Token System**: Vehicle-specific tokens representing ownership stakes
 - **Marketplace**: Exchange for vehicle investment opportunities
 
+## PTZ Verification Systems
+
+The physical verification infrastructure consists of specialized facilities equipped with:
+
+- **Pan-Tilt-Zoom Camera Systems**: High-definition camera arrays that can document vehicles from all angles
+- **Video Processing Pipeline**: Software to catalog, timestamp, and index video evidence
+- **Technician Verification Tools**: Mobile applications and hardware for certified professionals
+- **Live Streaming Capability**: Real-time observation of verification processes
+- **Secure Chain-of-Custody**: Protocols to ensure tamper-proof documentation
+
 ## Security Architecture
 
 - **Multi-factor Authentication**: Enhanced security for all users
