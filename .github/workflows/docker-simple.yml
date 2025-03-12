@@ -1,0 +1,56 @@
+name: Docker Simple Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: node:18-alpine
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Show environment
+        run: |
+          echo "Running in Docker container"
+          node -v
+          npm -v
+          
+      - name: Install dependencies
+        run: |
+          # Install dependencies inside container
+          npm ci || npm install
+          
+      - name: Create minimal config
+        run: |
+          echo "Creating minimal Vite config"
+          cat > vite.config.js << 'EOL'
+          import { defineConfig } from 'vite';
+          import react from '@vitejs/plugin-react';
+          import path from 'path';
+
+          export default defineConfig({
+            plugins: [react()],
+            resolve: {
+              alias: {
+                "@": path.resolve(__dirname, "./src"),
+              },
+            },
+            build: {
+              outDir: 'dist',
+            }
+          });
+          EOL
+          
+      - name: Build in Docker
+        run: |
+          echo "Building with direct npx calls in Docker"
+          npx tsc --noEmit && npx vite build
+          
+      - name: Check build output
+        run: |
+          echo "Build output in Docker:"
+          ls -la dist/ || echo "No dist directory found"
