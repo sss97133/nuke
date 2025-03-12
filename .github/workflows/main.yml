@@ -1,11 +1,9 @@
 name: CI/CD Pipeline
-
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
@@ -28,13 +26,16 @@ jobs:
       
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18.x'
         cache: 'npm'
+        
+    - name: Create required script directories
+      run: mkdir -p scripts
         
     - name: Cache dependencies
       uses: actions/cache@v3
@@ -49,7 +50,7 @@ jobs:
           
     - name: Install dependencies
       run: |
-        npm ci
+        npm ci || npm install --legacy-peer-deps
         npm install -g vercel@latest
       
     - name: Print environment info
@@ -62,22 +63,25 @@ jobs:
       run: npm run test:ci || echo "Tests failed but continuing deployment"
       
     - name: Build project
-      run: npm run build
+      id: build
+      run: |
+        npm run build || exit 1
+        echo "Build completed successfully"
       
     - name: Deploy to Vercel (Production)
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && success()
       env:
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: |
         vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} ./dist
 
     - name: Deploy to Vercel (Preview)
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && success()
       env:
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: |
         vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 
+        vercel deploy --token=${{ secrets.VERCEL_TOKEN }} ./dist
