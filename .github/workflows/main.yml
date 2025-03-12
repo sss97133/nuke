@@ -50,7 +50,11 @@ jobs:
           
     - name: Install dependencies
       run: |
-        npm ci || npm install --legacy-peer-deps
+        # First try to install dependencies with npm ci
+        npm ci || npm install --no-save
+        # Make sure vite can be found by the build command
+        export PATH="$PATH:./node_modules/.bin"
+        # Install Vercel globally for deployment
         npm install -g vercel@latest
       
     - name: Print environment info
@@ -58,6 +62,7 @@ jobs:
         echo "Node version: $(node -v)"
         echo "NPM version: $(npm -v)"
         echo "Vercel CLI version: $(vercel --version)"
+        echo "Vite version: $(./node_modules/.bin/vite --version || echo 'Not found')"
         
     - name: Run tests (continue on error)
       run: npm run test:ci || echo "Tests failed but continuing deployment"
@@ -65,6 +70,8 @@ jobs:
     - name: Build project
       id: build
       run: |
+        # Ensure path includes node_modules/.bin
+        export PATH="$PATH:./node_modules/.bin"
         npm run build || exit 1
         echo "Build completed successfully"
       
