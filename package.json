@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:alt": "node build.js",
     "build:dev": "vite build --mode development",
     "build:prod": "tsc && vite build --mode production",
     "preview": "vite preview",
