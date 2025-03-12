@@ -14,14 +14,27 @@ ENV VITE_APP_DESCRIPTION=${VITE_APP_DESCRIPTION}
 WORKDIR /app
 
 # Install dependencies first (better caching)
-COPY package*.json ./
-RUN npm ci --prefer-offline --no-audit
+COPY package*.json bun.lockb ./
+COPY .npmrc ./
+
+# Install build dependencies and clean up in one layer
+RUN apk add --no-cache python3 make g++ \
+    && npm ci --prefer-offline --no-audit --no-optional \
+    && apk del python3 make g++
+
+# Copy necessary config files
+COPY tsconfig*.json ./
+COPY vite.config.* ./
+COPY tailwind.config.* ./
+COPY postcss.config.js ./
 
 # Copy source files
-COPY . .
+COPY src/ ./src/
+COPY public/ ./public/
 
-# Build the application
-RUN npm run build
+# Build the application using CI config
+RUN cp vite.config.ci.js vite.config.js && \
+    npm run build
 
 # Production stage
 FROM nginx:alpine
@@ -35,10 +48,15 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Create non-root user
+# Create non-root user and set permissions
 RUN adduser -D -u 1000 appuser && \
     chown -R appuser:appuser /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html
+    chmod -R 755 /usr/share/nginx/html && \
+    # Ensure nginx can bind to port 80 as non-root
+    chmod -R 755 /var/run/ && \
+    chmod -R 755 /var/cache/nginx/ && \
+    touch /var/run/nginx.pid && \
+    chown -R appuser:appuser /var/run/nginx.pid
 
 # Switch to non-root user
 USER appuser
