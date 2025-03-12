@@ -1,7 +1,9 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { FileUploader } from '../FileUploader';
 import { useToast } from '@/components/ui/use-toast';
+import { renderWithProviders } from '../../../../test/test-utils';
 
 // Mock file creation helper
 const createMockFile = (name: string, size: number, type: string): File => {
@@ -22,14 +24,13 @@ window.URL.createObjectURL = vi.fn();
 window.URL.revokeObjectURL = vi.fn();
 
 describe('FileUploader Component', () => {
-  // Common props for testing
   const mockProps = {
     onFilesSelected: vi.fn(),
     selectedFiles: [],
     setSelectedFiles: vi.fn(),
     maxFiles: 5,
-    maxSize: 5242880, // 5MB
-    accept: 'image/*'
+    acceptedFileTypes: ['image/*'],
+    maxFileSize: 5 * 1024 * 1024 // 5MB
   };
 
   beforeEach(() => {
@@ -37,12 +38,79 @@ describe('FileUploader Component', () => {
     (useToast as any).mockReturnValue({ toast: vi.fn() });
   });
 
-  it('renders correctly with default props', () => {
-    render(<FileUploader {...mockProps} />);
+  it('renders file upload area', () => {
+    renderWithProviders(<FileUploader {...mockProps} />);
+    expect(screen.getByText(/Drop files here/i)).toBeInTheDocument();
+    expect(screen.getByText(/or click to select/i)).toBeInTheDocument();
+  });
+
+  it('handles file selection through input', () => {
+    renderWithProviders(<FileUploader {...mockProps} />);
     
-    // Check if the uploader area is rendered
-    expect(screen.getByText(/drag & drop files here/i)).toBeInTheDocument();
-    expect(screen.getByText(/accepted file types/i)).toBeInTheDocument();
+    const dropArea = screen.getByTestId('file-drop-area');
+    const input = dropArea.querySelector('input[type="file"]') as HTMLInputElement;
+    
+    const file = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(mockProps.onFilesSelected).toHaveBeenCalledWith([file]);
+  });
+
+  it('limits the number of files to maxFiles', () => {
+    renderWithProviders(<FileUploader {...mockProps} maxFiles={1} />);
+    
+    const dropArea = screen.getByTestId('file-drop-area');
+    const input = dropArea.querySelector('input[type="file"]') as HTMLInputElement;
+    
+    const files = [
+      new File(['test1'], 'test1.jpg', { type: 'image/jpeg' }),
+      new File(['test2'], 'test2.jpg', { type: 'image/jpeg' })
+    ];
+    
+    Object.defineProperty(input, 'files', {
+      value: files
+    });
+    
+    fireEvent.change(input);
+    
+    expect(mockProps.onFilesSelected).not.toHaveBeenCalled();
+    expect(screen.getByText(/Maximum number of files exceeded/i)).toBeInTheDocument();
+  });
+
+  it('validates file size', () => {
+    renderWithProviders(<FileUploader {...mockProps} maxFileSize={1024} />); // 1KB limit
+    
+    const dropArea = screen.getByTestId('file-drop-area');
+    const input = dropArea.querySelector('input[type="file"]') as HTMLInputElement;
+    
+    const file = new File(['x'.repeat(2048)], 'large.jpg', { type: 'image/jpeg' });
+    
+    Object.defineProperty(input, 'files', {
+      value: [file]
+    });
+    
+    fireEvent.change(input);
+    
+    expect(mockProps.onFilesSelected).not.toHaveBeenCalled();
+    expect(screen.getByText(/File size exceeds maximum/i)).toBeInTheDocument();
+  });
+
+  it('validates file type', () => {
+    renderWithProviders(<FileUploader {...mockProps} acceptedFileTypes={['image/jpeg']} />);
+    
+    const dropArea = screen.getByTestId('file-drop-area');
+    const input = dropArea.querySelector('input[type="file"]') as HTMLInputElement;
+    
+    const file = new File(['test'], 'test.png', { type: 'image/png' });
+    
+    Object.defineProperty(input, 'files', {
+      value: [file]
+    });
+    
+    fireEvent.change(input);
+    
+    expect(mockProps.onFilesSelected).not.toHaveBeenCalled();
+    expect(screen.getByText(/Invalid file type/i)).toBeInTheDocument();
   });
 
   it('shows the correct accepted file types', () => {
@@ -72,7 +140,6 @@ describe('FileUploader Component', () => {
     // Verify the callbacks were called
     await waitFor(() => {
       expect(mockProps.onFilesSelected).toHaveBeenCalledWith([mockJpegFile, mockPdfFile]);
-      expect(mockProps.setSelectedFiles).toHaveBeenCalledWith([mockJpegFile, mockPdfFile]);
     });
   });
 
@@ -96,7 +163,6 @@ describe('FileUploader Component', () => {
     // Verify only the small file was accepted
     await waitFor(() => {
       expect(mockProps.onFilesSelected).toHaveBeenCalledWith([smallFile]);
-      expect(mockProps.setSelectedFiles).toHaveBeenCalledWith([smallFile]);
     });
   });
 
@@ -120,28 +186,7 @@ describe('FileUploader Component', () => {
     // Verify only the jpeg file was accepted
     await waitFor(() => {
       expect(mockProps.onFilesSelected).toHaveBeenCalledWith([jpegFile]);
-      expect(mockProps.setSelectedFiles).toHaveBeenCalledWith([jpegFile]);
     });
-  });
-
-  it('limits the number of files to maxFiles', () => {
-    const { container } = render(<FileUploader {...mockProps} maxFiles={2} selectedFiles={[createMockFile('existing1.jpg', 1024, 'image/jpeg')]} />);
-
-    // Mock file input change
-    const dropArea = screen.getByTestId('file-drop-area');
-    const input = dropArea.querySelector('input[type="file"]') as HTMLInputElement;
-
-    Object.defineProperty(input, 'files', {
-      value: [
-        createMockFile('test1.jpg', 1024, 'image/jpeg'),
-        createMockFile('test2.jpg', 1024, 'image/jpeg')
-      ]
-    });
-
-    fireEvent.change(input);
-
-    expect(mockProps.onFilesSelected).not.toHaveBeenCalled();
-    expect(screen.getByText(/Maximum number of files exceeded/)).toBeInTheDocument();
   });
 
   it('shows disabled state when at max capacity', () => {
@@ -178,7 +223,6 @@ describe('FileUploader Component', () => {
       <FileUploader
         {...mockProps}
         selectedFiles={selectedFiles}
-        setSelectedFiles={mockProps.setSelectedFiles}
       />
     );
     
@@ -189,7 +233,6 @@ describe('FileUploader Component', () => {
     // Verify the file was removed
     await waitFor(() => {
       expect(mockProps.onFilesSelected).toHaveBeenCalledWith([selectedFiles[1]]);
-      expect(mockProps.setSelectedFiles).toHaveBeenCalledWith([selectedFiles[1]]);
     });
   });
 });

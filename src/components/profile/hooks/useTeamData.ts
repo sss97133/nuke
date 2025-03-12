@@ -11,31 +11,50 @@ export const useTeamData = () => {
 
   const { data: teamMembers, isLoading, error, refetch } = useQuery({
     queryKey: ['team-members'],
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('team_members')
-        .select(`
-          *,
-          profile:profile_id (
-            username,
-            full_name,
-            avatar_url,
-            email,
-            phone
-          )
-        `)
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('team_members')
+          .select(`
+            id,
+            member_type,
+            department,
+            position,
+            start_date,
+            created_at,
+            updated_at,
+            profile:profiles (
+              id,
+              username,
+              full_name,
+              avatar_url,
+              email
+            )
+          `)
+          .order('created_at', { ascending: false });
 
-      if (error) {
+        if (error) {
+          console.error('Supabase error:', error);
+          toast({
+            title: 'Error fetching team members',
+            description: error.message,
+            variant: 'destructive',
+          });
+          throw error;
+        }
+
+        return data || [];
+      } catch (err) {
+        console.error('Query error:', err);
         toast({
           title: 'Error fetching team members',
-          description: error.message,
+          description: 'Please try again later',
           variant: 'destructive',
         });
-        throw error;
+        throw err;
       }
-
-      return data;
     },
   });
 

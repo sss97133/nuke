@@ -108,6 +108,36 @@ window.ResizeObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }));
 
+// Set up environment variables for tests
+process.env.VITE_SUPABASE_URL = 'http://localhost:54321';
+process.env.VITE_SUPABASE_ANON_KEY = 'test-anon-key';
+process.env.VITE_SUPABASE_SERVICE_KEY = 'test-service-key';
+process.env.NODE_ENV = 'test';
+
+// Mock IntersectionObserver
+const mockIntersectionObserver = vi.fn();
+mockIntersectionObserver.mockReturnValue({
+  observe: () => null,
+  unobserve: () => null,
+  disconnect: () => null
+});
+window.IntersectionObserver = mockIntersectionObserver;
+
+// Mock window.matchMedia
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
 beforeAll(() => {
   setupWebGLMock();
 });

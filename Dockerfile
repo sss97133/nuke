@@ -1,37 +1,72 @@
-# Build Stage
-FROM node:18-alpine AS build
+FROM node:18-alpine as builder
+
+# Build arguments
+ARG NODE_ENV=production
+ARG VITE_APP_NAME="Nuke"
+ARG VITE_APP_DESCRIPTION="Vehicle Management Platform"
+
+# Set environment variables
+ENV NODE_ENV=${NODE_ENV}
+ENV VITE_APP_NAME=${VITE_APP_NAME}
+ENV VITE_APP_DESCRIPTION=${VITE_APP_DESCRIPTION}
 
 # Set working directory
 WORKDIR /app
 
-# Install necessary build tools
-RUN apk add --no-cache python3 make g++
-
-# Copy package files for efficient caching
-COPY package*.json ./
+# Install dependencies first (better caching)
+COPY package*.json bun.lockb ./
 COPY .npmrc ./
 
-# First try clean install, if it fails fall back to regular install
-RUN npm ci || npm install
+# Install build dependencies and clean up in one layer
+RUN apk add --no-cache python3 make g++ \
+    && npm ci --prefer-offline --no-audit --no-optional \
+    && apk del python3 make g++
 
-# Copy all files
-COPY . .
+# Copy necessary config files
+COPY tsconfig*.json ./
+COPY vite.config.* ./
+COPY tailwind.config.* ./
+COPY postcss.config.js ./
 
-# Build the application
-RUN npm run build
+# Copy source files
+COPY src/ ./src/
+COPY public/ ./public/
 
-# Production Stage
-FROM nginx:alpine AS production
+# Build the application using CI config
+RUN cp vite.config.ci.js vite.config.js && \
+    npm run build
 
-# Copy built assets from build stage
-COPY --from=build /app/dist /usr/share/nginx/html
+# Production stage
+FROM nginx:alpine
 
-# Add nginx configuration if needed
-RUN rm -rf /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf || echo "No custom nginx.conf found, using default"
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+# Copy built files from builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Create non-root user and set permissions
+RUN adduser -D -u 1000 appuser && \
+    chown -R appuser:appuser /usr/share/nginx/html && \
+    chmod -R 755 /usr/share/nginx/html && \
+    # Ensure nginx can bind to port 80 as non-root
+    chmod -R 755 /var/run/ && \
+    chmod -R 755 /var/cache/nginx/ && \
+    touch /var/run/nginx.pid && \
+    chown -R appuser:appuser /var/run/nginx.pid
+
+# Switch to non-root user
+USER appuser
 
 # Expose port 80
 EXPOSE 80
 
-# Start Nginx server
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:80/ || exit 1
+
+# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
