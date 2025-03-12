@@ -31,6 +31,8 @@ jobs:
       NODE_OPTIONS: "--max-old-space-size=4096"
       NODE_ENV: production
       TAILWIND_MODE: build
+      # Set PATH directly in the environment to ensure it persists between steps
+      PATH: "${{ github.workspace }}/node_modules/.bin:${{ env.PATH }}"
       
     steps:
     - name: Checkout code
@@ -60,17 +62,18 @@ jobs:
       run: |
         # First try to install dependencies with npm ci
         npm ci || npm install --no-save
-        # Make sure vite can be found by the build command
-        export PATH="$PATH:./node_modules/.bin"
         # Install Vercel globally for deployment
         npm install -g vercel@latest
+        # Create an NPM bin symlink for all steps to use
+        echo "${PWD}/node_modules/.bin" >> $GITHUB_PATH
       
     - name: Print environment info
       run: |
         echo "Node version: $(node -v)"
         echo "NPM version: $(npm -v)"
         echo "Vercel CLI version: $(vercel --version || echo 'Not found')"
-        echo "Vite version: $(./node_modules/.bin/vite --version || echo 'Not found')"
+        ls -la ./node_modules/.bin/
+        echo "Vite location: $(which vite || echo 'Not found')"
         echo "PATH: $PATH"
         
     - name: Run tests (continue on error)
@@ -79,9 +82,8 @@ jobs:
     - name: Build project
       id: build
       run: |
-        # Ensure path includes node_modules/.bin
-        export PATH="$PATH:./node_modules/.bin"
-        npm run build || exit 1
+        # Use the full path to vite instead of relying on PATH
+        npx tsc && npx vite build || exit 1
         echo "Build completed successfully"
       
     - name: Deploy to Vercel (Production)
