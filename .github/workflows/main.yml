@@ -37,11 +37,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    # Use Node.js 20 which has better ESM support
+    # Use Node.js 18 as specified in package.json
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.x'
+        node-version: '18.x'
         cache: 'npm'
         
     - name: Create required script directories
@@ -84,13 +84,13 @@ jobs:
     - name: Build project
       id: build
       run: |
-        # Use ESM build script which is working
-        echo "Building with ESM build script"
-        node build.mjs || (
-          echo "ESM script failed, trying direct npx..."
-          npx tsc && npx vite build
+        # Try multiple build approaches
+        echo "Building with simplified config and direct npx commands"
+        npx tsc && npx vite build || (
+          echo "Direct npx failed, trying ESM script..."
+          node build.mjs
         ) || (
-          echo "Direct npx failed, trying npm script..."
+          echo "ESM script failed, trying npm script..."
           npm run build:ci
         ) || exit 1
         
