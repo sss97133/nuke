@@ -190,8 +190,4 @@ We'll also likely see pushback from corporations who recognize this as a disrupt
 
 **Q: What keeps you motivated to build Nuke despite the challenges ahead?**
 
-A: My motivation is linked to my personal need for this tool. I'm not too familiar with all the potential challenges ahead, other than knowing that everything I'm dealing with is already difficult. I see this as an exchange of one type of difficulty for another.
-
-I'm much more interested in pursuing something with significant potential. I currently exist in a unique time where this type of technology doesn't exist, but after actions I take, it might possibly exist - which is extremely interesting to me.
-
-I also have multiple decades of experience that I don't want to waste, and many years ahead to continue developing this vision.
+A: My motivation is linked to my personal need for this tool. I'm not too familiar with all the potential challenges ahead, other than knowing that everything I'm dealing with is already difficult. I see this as an exchange of one type of difficulty for another. Im excited to get this done so I can enjoy the utility of it.
