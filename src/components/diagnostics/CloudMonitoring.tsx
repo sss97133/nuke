@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,12 +19,43 @@ const CloudMonitoring = () => {
   const [performanceData, setPerformanceData] = useState<{ time: string; value: number }[]>([]);
   const [connectionHistory, setConnectionHistory] = useState<{ hour: string; value: number }[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [cicdStatus, setCicdStatus] = useState<{
+    status: 'success' | 'warning' | 'error';
+    message: string;
+    lastBuild: string;
+  }>({
+    status: 'success',
+    message: 'All systems operational',
+    lastBuild: new Date().toISOString()
+  });
 
   // Generate mock data on component mount
   useEffect(() => {
     const loadData = () => {
       setIsLoading(true);
       
+      // Monitor CI/CD health
+      fetch('https://api.github.com/repos/sss97133/nuke/actions/runs')
+        .then(res => res.json())
+        .then(data => {
+          const lastRun = data.workflow_runs?.[0];
+          if (lastRun) {
+            setCicdStatus({
+              status: lastRun.conclusion === 'success' ? 'success' : 'warning',
+              message: lastRun.conclusion === 'success' ? 'All systems operational' : 'Recent build issues detected',
+              lastBuild: lastRun.updated_at
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching CI/CD status:', err);
+          setCicdStatus(prev => ({
+            ...prev,
+            status: 'error',
+            message: 'Unable to fetch build status'
+          }));
+        });
+
       // Simulate API call delay
       setTimeout(() => {
         // Generate performance data points (response times in ms)
@@ -71,6 +101,8 @@ const CloudMonitoring = () => {
     };
     
     loadData();
+    const interval = setInterval(loadData, 300000); // Check every 5 minutes
+    return () => clearInterval(interval);
   }, []);
 
   const handleRefresh = () => {
@@ -109,6 +141,9 @@ const CloudMonitoring = () => {
             Last updated: {lastUpdated.toLocaleTimeString()}
           </p>
         </div>
+        <Badge variant={cicdStatus.status === 'success' ? 'default' : 'destructive'}>
+          CI/CD: {cicdStatus.message}
+        </Badge>
         <Button 
           variant="outline" 
           size="sm" 

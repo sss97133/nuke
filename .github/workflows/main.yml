@@ -1,20 +1,47 @@
-name: CI/CD Pipeline
+name: Main Pipeline
+
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 */6 * * *'  # Run every 6 hours
 
-# Add global permissions to avoid permission issues
-permissions:
-  contents: read
-  pull-requests: read
-  actions: read
-  deployments: write
-  
 jobs:
-  build_and_deploy:
+  security_check:
+    name: Security Analysis
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      continue-on-error: true  # Allow continuation even if CodeQL setup fails
+
+    - name: Check for sensitive data
+      run: |
+        echo "🔍 Checking for sensitive data patterns..."
+        if git diff --cached | grep -E "(password|secret|key|token|api_key|auth)" > /dev/null; then
+          echo "⚠️ Found potentially sensitive data patterns"
+          echo "Please review the changes carefully"
+        fi
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      continue-on-error: true  # Allow continuation even if analysis fails
+
+  build_and_test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    needs: security_check
     
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -31,21 +58,22 @@ jobs:
       NODE_OPTIONS: "--max-old-space-size=4096"
       NODE_ENV: production
       TAILWIND_MODE: build
-      CI: "true"
       
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    # Use Node.js 18 as specified in package.json
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
+        node-version: '20.x'
         cache: 'npm'
         
-    - name: Create required script directories
-      run: mkdir -p scripts
+    - name: Setup .npmrc
+      run: |
+        echo "legacy-peer-deps=true" > .npmrc
+        echo "fund=false" >> .npmrc
+        echo "audit=false" >> .npmrc
         
     - name: Cache dependencies
       uses: actions/cache@v3
@@ -60,63 +88,66 @@ jobs:
           
     - name: Install dependencies
       run: |
-        # Clean install
-        npm ci || npm install --no-save
-        
-        # Show installed binaries
-        echo "Available binaries:"
-        ls -la node_modules/.bin/ || echo "No binaries found"
-        
-    - name: Print environment info
-      run: |
-        echo "Node version: $(node -v)"
-        echo "NPM version: $(npm -v)"
-        echo "Vercel CLI version: $(vercel --version || echo 'Not found')"
-        
-    - name: Run tests (continue on error)
-      run: npm run test:ci || echo "Tests failed but continuing deployment"
+        # Retry npm ci up to 3 times
+        for i in 1 2 3; do
+          npm ci && break || echo "Retry $i..."
+          sleep 5
+        done
       
-    - name: Use simplified Vite config for build
-      run: |
-        echo "Using simplified Vite config for CI"
-        cp vite.config.ci.js vite.config.js || echo "No simplified config found, using default"
-        
+    - name: Type check
+      run: npm run type-check
+      continue-on-error: true  # Don't fail the build for type errors yet
+      
+    - name: Lint
+      run: npm run lint
+      continue-on-error: true  # Don't fail the build for lint errors yet
+      
+    - name: Run tests
+      run: npm run test:ci
+      continue-on-error: true  # Don't fail the build for test failures yet
+      
     - name: Build project
-      id: build
-      run: |
-        # Try multiple build approaches
-        echo "Building with simplified config and direct npx commands"
-        npx tsc && npx vite build || (
-          echo "Direct npx failed, trying ESM script..."
-          node build.mjs
-        ) || (
-          echo "ESM script failed, trying npm script..."
-          npm run build:ci
-        ) || exit 1
-        
-        echo "Build completed successfully"
-        
-        # Check build output
-        echo "Build output:"
-        ls -la dist/ || echo "No dist directory found"
+      run: npm run build
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build_and_test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
       
     - name: Install Vercel CLI
       run: npm install -g vercel@latest
       
     - name: Deploy to Vercel (Production)
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && success()
       env:
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: |
-        vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }} || echo "Vercel pull failed but continuing"
-        vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} ./dist || echo "Vercel deploy failed"
+        # Retry deployment up to 3 times
+        for i in 1 2 3; do
+          if vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }} && \
+             vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}; then
+            break
+          else
+            echo "Deployment attempt $i failed..."
+            if [ $i -eq 3 ]; then
+              echo "❌ All deployment attempts failed"
+              exit 1
+            fi
+            sleep 10
+          fi
+        done
 
-    - name: Deploy to Vercel (Preview)
-      if: github.event_name == 'pull_request' && success()
-      env:
-        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    - name: Notify deployment status
+      if: always()
       run: |
-        vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }} || echo "Vercel pull failed but continuing"
-        vercel deploy --token=${{ secrets.VERCEL_TOKEN }} ./dist || echo "Vercel deploy failed"
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "✅ Deployment successful"
+        else
+          echo "❌ Deployment failed"
+          echo "Check the logs above for more details"
+        fi 

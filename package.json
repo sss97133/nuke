@@ -18,13 +18,13 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "fix-deps": "node scripts/fix-deps.js",
-    "typecheck": "tsc --noEmit",
+    "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
     "clean": "rimraf dist node_modules/.vite",
     "prepare": "echo 'Ready for development!'",
     "test": "NODE_OPTIONS='--max-old-space-size=8192' vitest",
-    "test:ci": "NODE_OPTIONS='--max-old-space-size=8192' vitest run --coverage",
+    "test:ci": "vitest run --coverage",
     "test:watch": "NODE_OPTIONS='--max-old-space-size=8192' vitest watch"
   },
   "dependencies": {
