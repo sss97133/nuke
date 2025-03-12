@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { configDefaults } from 'vitest/config';
 import { componentTagger } from "lovable-tagger";
+import autoprefixer from 'autoprefixer';
+import postcssNesting from 'postcss-nesting';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -130,8 +132,8 @@ export default defineConfig(({ mode }) => {
       },
       postcss: {
         plugins: [
-          require('autoprefixer'),
-          require('postcss-nesting'),
+          autoprefixer,
+          postcssNesting,
         ],
       },
     },
@@ -147,4 +149,3 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
-
