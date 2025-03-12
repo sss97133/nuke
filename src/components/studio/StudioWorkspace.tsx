@@ -44,10 +44,15 @@ export const StudioWorkspace: React.FC<StudioWorkspaceProps> = ({
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.shadowMap.enabled = true;
+    if (renderer.shadowMap) {
+      renderer.shadowMap.enabled = true;
+    }
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
-    
+
+    if (!scene.userData) {
+      scene.userData = {};
+    }
     scene.userData.renderer = renderer;
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -466,9 +471,10 @@ export const StudioWorkspace: React.FC<StudioWorkspaceProps> = ({
   }, [ptzTracks, selectedCameraIndex]);
 
   return (
-    <div 
-      ref={containerRef} 
-      className="w-full aspect-video bg-white rounded-md overflow-hidden"
+    <div
+      ref={containerRef}
+      className="w-full h-full min-h-[400px] bg-gray-100 dark:bg-gray-900"
+      aria-label="3D Studio Workspace"
     />
   );
 };

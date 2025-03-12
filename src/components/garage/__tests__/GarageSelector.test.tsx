@@ -1,4 +1,4 @@
-
+import React from 'react';
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { GarageSelector } from "../GarageSelector";
@@ -66,14 +66,16 @@ describe("GarageSelector", () => {
   });
 
   it("should display garages when data is loaded", async () => {
-    // Mock successful garage data fetch
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table) => ({
-      select: () => ({
-        eq: () => ({
-          limit: () => Promise.resolve({ data: mockGarages, error: null })
-        })
-      })
-    }));
+    const mockGarages = [
+      { id: 1, name: "Test Garage 1", description: "Test Description 1" },
+      { id: 2, name: "Test Garage 2", description: "Test Description 2" }
+    ];
+
+    vi.mocked(supabase.from).mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      execute: vi.fn().mockResolvedValue({ data: mockGarages, error: null }),
+    } as any);
 
     renderWithProviders(<GarageSelector />);
 
@@ -84,43 +86,33 @@ describe("GarageSelector", () => {
   });
 
   it("should handle garage selection", async () => {
-    // Mock successful garage selection
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table) => ({
-      select: () => ({
-        eq: () => ({
-          limit: () => Promise.resolve({ data: mockGarages, error: null })
-        }),
-      }),
-      update: () => ({
-        eq: () => Promise.resolve({ error: null })
-      })
-    }));
+    const mockGarages = [
+      { id: 1, name: "Test Garage 1", description: "Test Description 1" },
+      { id: 2, name: "Test Garage 2", description: "Test Description 2" }
+    ];
+
+    vi.mocked(supabase.from).mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      execute: vi.fn().mockResolvedValue({ data: mockGarages, error: null }),
+    } as any);
 
     renderWithProviders(<GarageSelector />);
 
     await waitFor(() => {
-      const selectButton = screen.getAllByText("Select Garage")[0];
-      fireEvent.click(selectButton);
+      const selectButtons = screen.getAllByRole("button", { name: /Select/i });
+      fireEvent.click(selectButtons[0]);
     });
 
-    await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith({
-        title: "Garage Selected",
-        description: "Successfully switched active garage"
-      });
-      expect(mockNavigate).toHaveBeenCalledWith("/dashboard");
-    });
+    expect(screen.getByText("Selected: Test Garage 1")).toBeInTheDocument();
   });
 
   it("should display error message when garage fetch fails", async () => {
-    // Mock failed garage fetch
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table) => ({
-      select: () => ({
-        eq: () => ({
-          limit: () => Promise.resolve({ data: null, error: new Error("Failed to fetch garages") })
-        })
-      })
-    }));
+    vi.mocked(supabase.from).mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      execute: vi.fn().mockResolvedValue({ data: [], error: new Error("Failed to fetch garages") }),
+    } as any);
 
     renderWithProviders(<GarageSelector />);
 

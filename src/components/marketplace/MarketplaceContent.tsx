@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +51,7 @@ export const MarketplaceContent = () => {
         <div className="flex gap-4 mb-4">
           <div className="flex-1 space-y-2">
             <h3 className="text-sm font-medium">Documentation Score</h3>
-            <select className="w-full border rounded-md p-2">
+            <select data-testid="doc-score-filter" className="w-full border rounded-md p-2">
               <option value="any">Any Score</option>
               <option value="90">90% and above</option>
               <option value="75">75% and above</option>
@@ -62,7 +61,7 @@ export const MarketplaceContent = () => {
           
           <div className="flex-1 space-y-2">
             <h3 className="text-sm font-medium">Verification Status</h3>
-            <select className="w-full border rounded-md p-2">
+            <select data-testid="verification-filter" className="w-full border rounded-md p-2">
               <option value="any">All Listings</option>
               <option value="verified">Verified Only</option>
               <option value="nft">NFT Backed</option>
@@ -72,7 +71,7 @@ export const MarketplaceContent = () => {
           
           <div className="flex-1 space-y-2">
             <h3 className="text-sm font-medium">Price Range</h3>
-            <select className="w-full border rounded-md p-2">
+            <select data-testid="price-filter" className="w-full border rounded-md p-2">
               <option value="any">Any Price</option>
               <option value="under25">Under $25,000</option>
               <option value="25to50">$25,000 - $50,000</option>

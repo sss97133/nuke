@@ -1,4 +1,3 @@
-
 import React from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -56,7 +55,7 @@ export const GarageSelector = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
+      <div className="flex items-center justify-center min-h-[200px]" role="status">
         <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );

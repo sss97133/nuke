@@ -9,7 +9,34 @@ import { mockThree } from './three-mock';
 import { Toaster } from '@/components/ui/toaster';
 
 // Mock Three.js
-vi.mock('three', () => mockThree);
+vi.mock('three', () => ({
+  Scene: vi.fn().mockImplementation(() => ({
+    add: vi.fn(),
+    remove: vi.fn(),
+    background: null,
+  })),
+  PerspectiveCamera: vi.fn().mockImplementation(() => ({
+    position: { set: vi.fn() },
+    lookAt: vi.fn(),
+  })),
+  WebGLRenderer: vi.fn().mockImplementation(() => ({
+    setSize: vi.fn(),
+    render: vi.fn(),
+    domElement: document.createElement('canvas'),
+    shadowMap: { enabled: false },
+  })),
+  LineBasicMaterial: vi.fn().mockImplementation(() => ({})),
+  BoxGeometry: vi.fn().mockImplementation(() => ({})),
+  EdgesGeometry: vi.fn().mockImplementation(() => ({})),
+  LineSegments: vi.fn().mockImplementation(() => ({})),
+  Vector3: vi.fn().mockImplementation(() => ({ set: vi.fn() })),
+  OrbitControls: vi.fn().mockImplementation(() => ({
+    enableDamping: false,
+    dampingFactor: 0,
+    update: vi.fn(),
+  })),
+  Color: vi.fn().mockImplementation((color) => ({ color })),
+}));
 
 // Mock data for tests
 const mockPreferences = {
@@ -159,6 +186,89 @@ export function setupWebGLMock() {
     () => mockWebGLContext
   );
 }
+
+// Mock Supabase configuration
+vi.mock("../integrations/supabase/client", () => {
+  const mockSupabase = {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
+    },
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      execute: vi.fn().mockImplementation(async () => {
+        // Mock different responses based on the table being queried
+        const table = mockSupabase.from.mock.calls[0][0];
+        if (table === 'garages') {
+          return {
+            data: [
+              { id: 1, name: 'Test Garage 1', description: 'Test Description 1' },
+              { id: 2, name: 'Test Garage 2', description: 'Test Description 2' }
+            ],
+            error: null
+          };
+        } else if (table === 'studio_configurations') {
+          return {
+            data: [{
+              id: 1,
+              name: 'Test Studio',
+              description: 'Test Studio Description',
+              room_width: 10,
+              room_height: 8,
+              room_depth: 12,
+              camera_height: 1.8,
+              ptz_enabled: true,
+              ptz_speed: 0.5,
+              ptz_sensitivity: 0.7
+            }],
+            error: null
+          };
+        }
+        return { data: [], error: null };
+      }),
+    }),
+  };
+  return { supabase: mockSupabase };
+});
+
+// Mock react-router-dom
+vi.mock("react-router-dom", () => ({
+  BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  Navigate: () => null,
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/', search: '', hash: '', state: null }),
+  useParams: () => ({}),
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+}));
+
+// Setup test environment
+beforeAll(() => {
+  // Mock window properties used by Three.js
+  Object.defineProperty(window, 'devicePixelRatio', {
+    value: 1,
+    writable: true
+  });
+
+  // Mock requestAnimationFrame
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+  global.cancelAnimationFrame = (id) => clearTimeout(id);
+
+  // Setup WebGL mock
+  setupWebGLMock();
+
+  // Reset all mocks before each test
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient.clear();
+  });
+});
 
 export * from '@testing-library/react';
 

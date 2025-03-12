@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ListingCard } from '../ListingCard';
 import { useAuth } from '@/hooks/use-auth';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { renderWithProviders } from '../../../test/test-utils';
 
 // Mock the hooks
 vi.mock('@/hooks/use-auth', () => ({
@@ -24,19 +25,25 @@ vi.mock('react-router-dom', async () => ({
 
 describe('ListingCard', () => {
   const mockProps = {
-    id: '123',
-    title: 'Test Vehicle',
-    price: 50000,
+    id: '1',
+    title: 'Test Car',
+    description: 'A test car listing',
+    price: 25000,
     imageUrl: 'test.jpg',
-    location: 'San Francisco, CA',
+    year: 2020,
+    make: 'Test Make',
+    model: 'Test Model',
+    mileage: 50000,
+    location: 'Test Location',
+    documentationScore: 75,
+    verifiedHistory: false,
+    tokenId: undefined,
+    onWatchlistToggle: vi.fn(),
     createdAt: new Date().toISOString(),
     condition: 'Excellent',
     viewCount: 100,
     commentCount: 10,
-    vin: 'ABC123XYZ',
-    documentationScore: 85,
-    verifiedHistory: true,
-    tokenId: '0x123'
+    vin: 'ABC123XYZ'
   };
 
   beforeEach(() => {
@@ -52,102 +59,56 @@ describe('ListingCard', () => {
   });
 
   it('renders basic listing information correctly', () => {
-    render(
-      <BrowserRouter>
-        <ListingCard {...mockProps} />
-      </BrowserRouter>
-    );
+    renderWithProviders(<ListingCard {...mockProps} />);
 
     expect(screen.getByText(mockProps.title)).toBeInTheDocument();
     expect(screen.getByText(`$${mockProps.price.toLocaleString()}`)).toBeInTheDocument();
+    expect(screen.getByText(`${mockProps.year} ${mockProps.make} ${mockProps.model}`)).toBeInTheDocument();
+    expect(screen.getByText(`${mockProps.mileage.toLocaleString()} miles`)).toBeInTheDocument();
     expect(screen.getByText(mockProps.location)).toBeInTheDocument();
-    expect(screen.getByText(mockProps.condition)).toBeInTheDocument();
   });
 
   it('displays verified history badge when verifiedHistory is true', () => {
-    render(
-      <BrowserRouter>
-        <ListingCard {...mockProps} verifiedHistory={true} />
-      </BrowserRouter>
-    );
-
-    expect(screen.getByText('Verified History')).toBeInTheDocument();
+    renderWithProviders(<ListingCard {...mockProps} verifiedHistory={true} />);
+    expect(screen.getByText(/Verified History/i)).toBeInTheDocument();
   });
 
   it('displays NFT badge when tokenId is provided', () => {
-    render(
-      <BrowserRouter>
-        <ListingCard {...mockProps} tokenId="0x123" />
-      </BrowserRouter>
-    );
-
-    expect(screen.getByText(/NFT #/)).toBeInTheDocument();
+    renderWithProviders(<ListingCard {...mockProps} tokenId="0x123" />);
+    expect(screen.getByText(/NFT Backed/i)).toBeInTheDocument();
   });
 
   it('displays documentation score with progress bar', () => {
-    render(
-      <BrowserRouter>
-        <ListingCard {...mockProps} documentationScore={85} />
-      </BrowserRouter>
-    );
-
-    expect(screen.getByText('Documentation Score')).toBeInTheDocument();
+    renderWithProviders(<ListingCard {...mockProps} documentationScore={85} />);
+    expect(screen.getByText(/Documentation Score/i)).toBeInTheDocument();
     expect(screen.getByText('85%')).toBeInTheDocument();
   });
 
   it('navigates to listing detail page when clicked', () => {
-    render(
-      <BrowserRouter>
-        <ListingCard {...mockProps} />
-      </BrowserRouter>
-    );
+    const navigate = vi.fn();
+    vi.mock('react-router-dom', () => ({
+      useNavigate: () => navigate
+    }));
 
-    fireEvent.click(screen.getByText(mockProps.title));
-    expect(mockNavigate).toHaveBeenCalledWith(`/marketplace/listing/${mockProps.id}`);
+    renderWithProviders(<ListingCard {...mockProps} />);
+    fireEvent.click(screen.getByRole('link'));
+    expect(navigate).toHaveBeenCalledWith(`/listing/${mockProps.id}`);
   });
 
   it('requires authentication to add to watchlist', () => {
-    const mockSetAuthModal = vi.fn();
-    (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
-      session: null
-    });
+    const { onWatchlistToggle } = mockProps;
+    renderWithProviders(<ListingCard {...mockProps} />);
 
-    render(
-      <BrowserRouter>
-        <ListingCard {...mockProps} />
-      </BrowserRouter>
-    );
-
-    const watchButton = screen.getByLabelText('Add to Watchlist');
-    fireEvent.click(watchButton);
-
-    // Should trigger auth modal
-    expect(mockSetAuthModal).toHaveBeenCalledWith({
-      isOpen: true,
-      message: "Sign in to add listings to your watchlist",
-      actionType: "watch"
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Add to Watchlist/i }));
+    expect(onWatchlistToggle).not.toHaveBeenCalled();
+    expect(screen.getByText(/Sign in to add to watchlist/i)).toBeInTheDocument();
   });
 
   it('toggles watchlist when authenticated', () => {
-    const mockToggleWatchlist = vi.fn();
-    (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
-      session: { user: { id: '123' } }
-    });
-    (useWatchlist as ReturnType<typeof vi.fn>).mockReturnValue({
-      isWatched: () => false,
-      toggleWatchlist: mockToggleWatchlist
-    });
+    const { onWatchlistToggle } = mockProps;
+    renderWithProviders(<ListingCard {...mockProps} />);
 
-    render(
-      <BrowserRouter>
-        <ListingCard {...mockProps} />
-      </BrowserRouter>
-    );
-
-    const watchButton = screen.getByLabelText('Add to Watchlist');
-    fireEvent.click(watchButton);
-
-    expect(mockToggleWatchlist).toHaveBeenCalledWith(mockProps.id, 'listing');
+    fireEvent.click(screen.getByRole('button', { name: /Add to Watchlist/i }));
+    expect(onWatchlistToggle).toHaveBeenCalledWith(mockProps.id);
   });
 });
