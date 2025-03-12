@@ -21,7 +21,7 @@ jobs:
         run: npm install -g vite typescript
       
       - name: Install project dependencies
-        run: npm install
+        run: npm ci || npm install
       
       - name: List node_modules/.bin contents
         run: |
@@ -45,3 +45,25 @@ jobs:
         run: |
           echo "Running build with npx"
           npx tsc && npx vite build || echo "Build failed with npx"
+      
+      - name: Build with Node.js script
+        run: |
+          echo "Running build with Node.js script"
+          # Fix build.js for CommonJS
+          sed -i 's/^const/var/' build.js
+          node build.js || echo "Build failed with Node.js script"
+          
+      - name: Try direct commands
+        run: |
+          # Try building with absolute paths
+          echo "Running build with absolute paths"
+          $(which tsc) || echo "Direct tsc failed"
+          $(which vite) build || echo "Direct vite failed"
+          
+          # Try verbose diagnosis of the problem
+          echo "NODE_PATH: $NODE_PATH"
+          echo "NPM_CONFIG_PREFIX: $NPM_CONFIG_PREFIX"
+          npm root -g
+          npm config get prefix
+          npm config list
+          node -e "console.log(process.env.PATH)"
