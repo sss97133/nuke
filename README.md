@@ -95,6 +95,8 @@ docker run -p 8080:80 yourdockerhubusername/nuke:latest
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md)
+- [Vision](docs/VISION.md)
+- [Strategic Roadmap](docs/ROADMAP.md)
 - [API Documentation](API.md)
 - [Docker Integration](docs/DOCKER.md)
 - [Contributing](CONTRIBUTING.md)
