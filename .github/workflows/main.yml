@@ -31,8 +31,6 @@ jobs:
       NODE_OPTIONS: "--max-old-space-size=4096"
       NODE_ENV: production
       TAILWIND_MODE: build
-      # Set PATH directly in the environment to ensure it persists between steps
-      PATH: "${{ github.workspace }}/node_modules/.bin:${{ env.PATH }}"
       
     steps:
     - name: Checkout code
@@ -62,19 +60,18 @@ jobs:
       run: |
         # First try to install dependencies with npm ci
         npm ci || npm install --no-save
-        # Install Vercel globally for deployment
-        npm install -g vercel@latest
-        # Create an NPM bin symlink for all steps to use
-        echo "${PWD}/node_modules/.bin" >> $GITHUB_PATH
+        # Install Vite globally for absolute path access
+        npm install -g vite typescript
       
     - name: Print environment info
       run: |
         echo "Node version: $(node -v)"
         echo "NPM version: $(npm -v)"
         echo "Vercel CLI version: $(vercel --version || echo 'Not found')"
-        ls -la ./node_modules/.bin/
-        echo "Vite location: $(which vite || echo 'Not found')"
-        echo "PATH: $PATH"
+        echo "Vite version global: $(vite --version || echo 'Not found')"
+        echo "Vite version local: $(npx vite --version || echo 'Not found')"
+        echo "Available binaries:"
+        ls -la node_modules/.bin/ || echo "No binaries found"
         
     - name: Run tests (continue on error)
       run: npm run test:ci || echo "Tests failed but continuing deployment"
@@ -82,8 +79,21 @@ jobs:
     - name: Build project
       id: build
       run: |
-        # Use the full path to vite instead of relying on PATH
-        npx tsc && npx vite build || exit 1
+        # Fix build.js for CommonJS if needed
+        if grep -q "const" build.js; then
+          sed -i 's/^const/var/' build.js
+        fi
+        
+        # Try multiple build approaches
+        echo "Trying build with Node.js script..."
+        node build.js || (
+          echo "Node.js script failed, trying direct npx..."
+          npx tsc && npx vite build
+        ) || (
+          echo "Direct npx failed, trying run-script..."
+          npm run build:alt
+        ) || exit 1
+        
         echo "Build completed successfully"
       
     - name: Deploy to Vercel (Production)
@@ -92,6 +102,7 @@ jobs:
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: |
+        npm install -g vercel@latest
         vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }} || echo "Vercel pull failed but continuing"
         vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} ./dist || echo "Vercel deploy failed"
 
@@ -101,5 +112,6 @@ jobs:
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: |
+        npm install -g vercel@latest
         vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }} || echo "Vercel pull failed but continuing"
         vercel deploy --token=${{ secrets.VERCEL_TOKEN }} ./dist || echo "Vercel deploy failed"
