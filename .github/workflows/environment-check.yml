@@ -1,0 +1,92 @@
+name: Environment Check
+on: 
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: System Information
+        run: |
+          echo "OS Information:"
+          uname -a
+          cat /etc/os-release
+          
+      - name: Environment Variables
+        run: |
+          echo "Environment Variables (excluding secrets):"
+          env | grep -v -E '(TOKEN|KEY|SECRET|PASSWORD)' | sort
+          
+      - name: Node and NPM Information
+        run: |
+          echo "Node version: $(node -v)"
+          echo "NPM version: $(npm -v)"
+          echo "NPM config:"
+          npm config list
+          echo "NPM global packages:"
+          npm list -g --depth=0
+          
+      - name: GitHub Runner Information
+        run: |
+          echo "GitHub Runner Information:"
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "GITHUB_PATH: $GITHUB_PATH"
+          echo "PATH: $PATH"
+          
+      - name: Secret Availability Check (without revealing values)
+        run: |
+          echo "Checking for presence of secrets (not showing values):"
+          echo "VITE_SUPABASE_URL is set: ${{ secrets.VITE_SUPABASE_URL != '' }}"
+          echo "VITE_SUPABASE_ANON_KEY is set: ${{ secrets.VITE_SUPABASE_ANON_KEY != '' }}"
+          echo "VITE_SUPABASE_SERVICE_KEY is set: ${{ secrets.VITE_SUPABASE_SERVICE_KEY != '' }}"
+          echo "VERCEL_TOKEN is set: ${{ secrets.VERCEL_TOKEN != '' }}"
+          echo "VERCEL_ORG_ID is set: ${{ secrets.VERCEL_ORG_ID != '' }}"
+          echo "VERCEL_PROJECT_ID is set: ${{ secrets.VERCEL_PROJECT_ID != '' }}"
+          
+      - name: Network Connectivity Test
+        run: |
+          echo "Testing network connectivity:"
+          ping -c 4 npmjs.org || echo "Ping failed but continuing"
+          curl -s https://registry.npmjs.org/npm | grep latest
+          
+      - name: Try newer Node.js version
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          
+      - name: Check with Node 20
+        run: |
+          echo "Node 20 version: $(node -v)"
+          echo "NPM version with Node 20: $(npm -v)"
+          
+      - name: Install minimal dependencies
+        run: |
+          npm install -g vite typescript
+          echo "Global binaries after install:"
+          which vite
+          which tsc
+          
+      - name: Test direct Vite execution
+        run: |
+          # Create minimal test files
+          echo "console.log('test');" > test.js
+          echo "export default { plugins: [] }" > vite.config.js
+          
+          # Try different ways to execute vite
+          echo "Testing vite --version:"
+          vite --version || echo "Global vite command failed"
+          
+          echo "Testing npx vite --version:"
+          npx vite --version || echo "npx vite command failed"
+          
+          echo "Testing with full path:"
+          $(npm bin -g)/vite --version || echo "Global bin path failed"
+          
+          echo "Testing local installation:"
+          npm install vite
+          $(npm bin)/vite --version || echo "Local bin path failed"
