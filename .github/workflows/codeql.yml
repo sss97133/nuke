@@ -13,7 +13,8 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
+      # Required for CodeQL
+      security-events: write  
       packages: read
       actions: read
       contents: read
@@ -35,8 +36,18 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci || npm install --legacy-peer-deps
+      run: |
+        npm ci || npm install --no-save
+        # Make sure vite and other binaries can be found
+        export PATH="$PATH:./node_modules/.bin"
       
+    - name: Print environment info
+      run: |
+        echo "Node version: $(node -v)"
+        echo "NPM version: $(npm -v)"
+        echo "PATH: $PATH"
+        echo "Vite version: $(./node_modules/.bin/vite --version || echo 'Not found')"
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
