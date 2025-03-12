@@ -6,10 +6,11 @@ Modern vehicle management platform with advanced features.
 
 Our CI/CD pipeline has been fixed with comprehensive updates to all GitHub Actions workflows:
 
-- Fixed PATH configuration to find executables
-- Added proper permissions
-- Standardized dependency installation
-- Added error handling and diagnostics
+- Fixed PATH configuration using GitHub-recommended $GITHUB_PATH approach
+- Added proper permissions configuration
+- Standardized dependency installation procedures
+- Implemented direct executable calling with npx
+- Added detailed error handling and diagnostics
 
 ## Features
 
@@ -27,3 +28,15 @@ Our CI/CD pipeline has been fixed with comprehensive updates to all GitHub Actio
 - Jotai for state management
 - Supabase for backend
 - Vercel for deployment
+
+## Development
+
+To run the project locally:
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
