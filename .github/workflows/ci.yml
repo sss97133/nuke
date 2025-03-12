@@ -38,18 +38,17 @@ jobs:
     - name: Install dependencies
       run: |
         npm ci || npm install --no-save
-        # Make sure vite can be found by the build command
-        export PATH="$PATH:./node_modules/.bin"
-        echo "Vite version: $(./node_modules/.bin/vite --version || echo 'Not found')"
+        # Add node_modules/.bin to GITHUB_PATH for all subsequent steps
+        echo "${PWD}/node_modules/.bin" >> $GITHUB_PATH
+        ls -la ./node_modules/.bin/
     
     - name: Run TypeScript check
-      run: npm run typecheck || echo "TypeScript check failed but continuing"
+      run: npx tsc --noEmit || echo "TypeScript check failed but continuing"
     
     - name: Build
       run: |
-        # Ensure path includes node_modules/.bin
-        export PATH="$PATH:./node_modules/.bin"
-        npm run build || echo "Build failed"
+        # Use npx to directly call the binaries
+        npx tsc && npx vite build || echo "Build failed"
       env:
         NODE_OPTIONS: "--max-old-space-size=4096"
       
