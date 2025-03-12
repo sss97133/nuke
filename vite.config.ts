@@ -57,7 +57,7 @@ export default defineConfig(({ mode }) => {
       target: 'es2020',
       assetsInlineLimit: 4096,
       cssCodeSplit: true,
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 1500,
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
@@ -84,6 +84,8 @@ export default defineConfig(({ mode }) => {
             'vendor-three': ['three'],
             'vendor-form': ['react-hook-form', '@hookform/resolvers'],
             'vendor-animation': ['framer-motion'],
+            'vendor-helmet': ['react-helmet-async'],
+            'vendor-query': ['@tanstack/react-query'],
           },
         },
       },
@@ -92,9 +94,13 @@ export default defineConfig(({ mode }) => {
           drop_console: true,
           drop_debugger: true,
           pure_funcs: ['console.log'],
+          passes: 2,
         },
         format: {
           comments: false,
+        },
+        mangle: {
+          properties: false,
         },
       } : undefined,
     },
@@ -106,11 +112,14 @@ export default defineConfig(({ mode }) => {
         'react-router-dom',
         'jotai',
         '@tanstack/react-query',
+        'react-helmet-async',
       ],
       exclude: ['fsevents'],
       force: true,
       esbuildOptions: {
         target: 'es2020',
+        treeShaking: true,
+        minify: true,
       }
     },
     // Adjust CSS handling for better performance
@@ -118,6 +127,12 @@ export default defineConfig(({ mode }) => {
       devSourcemap: !isProd,
       modules: {
         generateScopedName: isProd ? '[hash:base64:8]' : '[local]_[hash:base64:5]',
+      },
+      postcss: {
+        plugins: [
+          require('autoprefixer'),
+          require('postcss-nesting'),
+        ],
       },
     },
     // Add custom environment variables if needed
