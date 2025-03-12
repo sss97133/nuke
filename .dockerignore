@@ -1,58 +1,68 @@
-# Dependency directories
-node_modules/
+# Version control
+.git
+.gitignore
+.gitattributes
+.github
+
+# Dependencies
+node_modules
 npm-debug.log
 yarn-debug.log
 yarn-error.log
+.pnpm-debug.log
 
-# Build outputs
-dist/
-build/
-out/
-.parcel-cache/
-.cache/
-.next/
-
-# Development/Environment files
+# Environment files
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.production
+.env.*
+!.env.example
 
-# Editor directories and files
-.idea/
-.vscode/
+# Build output
+dist
+build
+coverage
+.next
+.nuxt
+.output
+
+# Development files
+*.log
+*.md
+!README.md
+.editorconfig
+.eslintrc*
+.prettierrc*
+.vscode
+.idea
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+__tests__
+__mocks__
+
+# Docker
+.docker
+docker-compose*.yml
+Dockerfile.*
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+.circleci
+
+# Temporary files
 *.swp
 *.swo
-*.swn
-*.bak
-*~
-
-# System Files
 .DS_Store
 Thumbs.db
 
-# Testing
-coverage/
-.nyc_output/
+# Debug files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Logs
-logs/
-*.log
-
-# Version control
-.git/
-.github/
-.gitignore
-
-# Docker related
-docker-compose*.yml
-*.Dockerfile
-Dockerfile.*
-
-# Misc
-README.md
-LICENSE
-.husky/
-.npmrc
+# Cache directories
+.npm
+.eslintcache
+.stylelintcache
+.parcel-cache
