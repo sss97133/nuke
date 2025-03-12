@@ -31,15 +31,17 @@ jobs:
       NODE_OPTIONS: "--max-old-space-size=4096"
       NODE_ENV: production
       TAILWIND_MODE: build
+      CI: "true"
       
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    # Use Node.js 20 which has better ESM support
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
+        node-version: '20.x'
         cache: 'npm'
         
     - name: Create required script directories
@@ -58,43 +60,48 @@ jobs:
           
     - name: Install dependencies
       run: |
-        # First try to install dependencies with npm ci
+        # Clean install
         npm ci || npm install --no-save
-        # Install Vite globally for absolute path access
-        npm install -g vite typescript
-      
+        
+        # Show installed binaries
+        echo "Available binaries:"
+        ls -la node_modules/.bin/ || echo "No binaries found"
+        
     - name: Print environment info
       run: |
         echo "Node version: $(node -v)"
         echo "NPM version: $(npm -v)"
         echo "Vercel CLI version: $(vercel --version || echo 'Not found')"
-        echo "Vite version global: $(vite --version || echo 'Not found')"
-        echo "Vite version local: $(npx vite --version || echo 'Not found')"
-        echo "Available binaries:"
-        ls -la node_modules/.bin/ || echo "No binaries found"
         
     - name: Run tests (continue on error)
       run: npm run test:ci || echo "Tests failed but continuing deployment"
       
+    - name: Use simplified Vite config for build
+      run: |
+        echo "Using simplified Vite config for CI"
+        cp vite.config.ci.js vite.config.js || echo "No simplified config found, using default"
+        
     - name: Build project
       id: build
       run: |
-        # Fix build.js for CommonJS if needed
-        if grep -q "const" build.js; then
-          sed -i 's/^const/var/' build.js
-        fi
-        
-        # Try multiple build approaches
-        echo "Trying build with Node.js script..."
-        node build.js || (
-          echo "Node.js script failed, trying direct npx..."
+        # Use ESM build script which is working
+        echo "Building with ESM build script"
+        node build.mjs || (
+          echo "ESM script failed, trying direct npx..."
           npx tsc && npx vite build
         ) || (
-          echo "Direct npx failed, trying run-script..."
-          npm run build:alt
+          echo "Direct npx failed, trying npm script..."
+          npm run build:ci
         ) || exit 1
         
         echo "Build completed successfully"
+        
+        # Check build output
+        echo "Build output:"
+        ls -la dist/ || echo "No dist directory found"
+      
+    - name: Install Vercel CLI
+      run: npm install -g vercel@latest
       
     - name: Deploy to Vercel (Production)
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && success()
@@ -102,7 +109,6 @@ jobs:
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: |
-        npm install -g vercel@latest
         vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }} || echo "Vercel pull failed but continuing"
         vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} ./dist || echo "Vercel deploy failed"
 
@@ -112,6 +118,5 @@ jobs:
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: |
-        npm install -g vercel@latest
         vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }} || echo "Vercel pull failed but continuing"
         vercel deploy --token=${{ secrets.VERCEL_TOKEN }} ./dist || echo "Vercel deploy failed"
