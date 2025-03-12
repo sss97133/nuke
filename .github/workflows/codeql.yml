@@ -11,6 +11,7 @@ on:
 jobs:
   analyze:
     name: Analyze
+    # Using Ubuntu runner directly instead of Docker container
     runs-on: ubuntu-latest
     permissions:
       # Required for CodeQL
@@ -25,29 +26,32 @@ jobs:
         language: [ 'javascript' ]
         # Learn more about CodeQL language support at https://aka.ms/codeql-docs/language-support
 
-    container:
-      image: node:18-alpine
-      
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
     - name: System Info
       run: |
-        echo "Running in Docker container with Node.js 18-alpine"
+        echo "Running in GitHub-hosted Ubuntu runner"
         node -v
         npm -v
+        java -version || echo "Java not installed yet - CodeQL will handle this"
     
     - name: Install dependencies
       run: |
-        # Install dependencies in Docker environment
         npm ci || npm install
         
         # List installed binaries
         echo "Available binaries:"
         ls -la node_modules/.bin/ || echo "No binaries found"
       
-    # Initialize CodeQL does not need builds but does need dependencies
+    # Initialize CodeQL - this will automatically install Java if needed
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
