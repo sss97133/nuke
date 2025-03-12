@@ -7,7 +7,7 @@ This document explains how Docker is integrated with the Nuke project and GitHub
 Docker is used in two primary ways in the Nuke project:
 
 1. **Local Development**: Using Docker Compose for consistent development environments
-2. **CI/CD**: Using Docker in GitHub Actions for building, testing, and deploying the application
+2. **CI/CD**: Using Docker in GitHub Actions for building, testing, and deploying the application to Docker Hub
 
 ## Docker Configuration Files
 
@@ -43,10 +43,10 @@ docker compose down
 
 1. GitHub Actions uses Docker in two ways:
    - **Container-based Actions**: Running workflows inside Docker containers
-   - **Docker Build/Push**: Building Docker images and pushing to registries
+   - **Docker Build/Push**: Building Docker images and pushing to Docker Hub
 
 2. The workflow files that use Docker:
-   - `.github/workflows/docker-deploy.yml`: Builds and optionally deploys the Docker image
+   - `.github/workflows/docker-deploy.yml`: Builds and pushes the Docker image to Docker Hub
    - `.github/workflows/docker-build.yml`: Tests building the application in a Docker container
    - `.github/workflows/docker-simple.yml`: Simplified Docker-based build for debugging
 
@@ -65,7 +65,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: node:18-alpine
+      image: node:18-alpine  # This runs the entire job in a Node.js container
     
     steps:
       # Actions run inside the specified container
@@ -76,15 +76,51 @@ jobs:
         run: npm ci && npm run build
 ```
 
-## Setting up Docker Registry Integration
+## Docker Hub Integration
 
-To push Docker images to a registry (Docker Hub or GitHub Container Registry), you need to:
+The Nuke project is set up to automatically build and push Docker images to Docker Hub.
 
-1. Set up secrets in your GitHub repository:
-   - For Docker Hub: `DOCKER_HUB_USERNAME` and `DOCKER_HUB_TOKEN`
-   - For GitHub Container Registry: Uses `GITHUB_TOKEN` automatically
+### How It Works
 
-2. Uncomment the relevant sections in `.github/workflows/docker-deploy.yml`
+1. When you push to the `main` branch, the workflow:
+   - Builds a Docker image
+   - Logs into Docker Hub using your credentials stored as GitHub Secrets
+   - Pushes the image with two tags:
+     - `latest`: Always the most recent build
+     - `<commit-sha>`: A unique tag for each build for versioning
+
+2. Images are available at: `your-dockerhub-username/nuke`
+
+### Setting up Docker Hub Secrets
+
+To connect GitHub to Docker Hub, you need to set up the following secrets in your GitHub repository:
+
+1. Go to your repository settings: `https://github.com/sss97133/nuke/settings/secrets/actions`
+2. Add these secrets:
+   - `DOCKER_HUB_USERNAME`: Your Docker Hub username
+   - `DOCKER_HUB_TOKEN`: Your Docker Hub access token (not your password)
+
+### Creating a Docker Hub Access Token
+
+For security, use access tokens instead of your password:
+
+1. Log in to Docker Hub: https://hub.docker.com
+2. Go to your account settings
+3. Click on "Security" > "New Access Token"
+4. Give the token a name (e.g., "GitHub Actions")
+5. Copy the generated token and add it to GitHub Secrets
+
+## Using the Published Docker Images
+
+Once your images are published to Docker Hub, you can use them in various environments:
+
+```bash
+# Pull the latest image
+docker pull yourusername/nuke:latest
+
+# Run the container
+docker run -p 8080:80 yourusername/nuke:latest
+```
 
 ## Troubleshooting
 
@@ -94,13 +130,13 @@ To push Docker images to a registry (Docker Hub or GitHub Container Registry), y
    - Check if the Docker image has all required dependencies
    - Ensure proper environment variables are set
 
-2. **Local Docker Compose issues**:
+2. **Docker Hub authentication failures**:
+   - Verify your Docker Hub credentials are correct in GitHub Secrets
+   - Make sure the access token has push permissions
+
+3. **Local Docker Compose issues**:
    - Make sure ports aren't already in use
    - Check volume mounts are correct
-
-3. **Docker Registry push failures**:
-   - Verify authentication credentials
-   - Check if you have permission to push to the registry
 
 ### Debugging Tips
 
