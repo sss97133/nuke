@@ -60,7 +60,12 @@ export async function fetchUserKeywords(userId: string): Promise<string[]> {
 
 export async function calculateContentRelevance(
   userId: string,
-  content: any
+  content: {
+    type?: string;
+    target_audience?: string[];
+    skills?: string[];
+    description?: string;
+  }
 ): Promise<number> {
   try {
     // Get user's profile analysis
@@ -89,12 +94,14 @@ export async function calculateContentRelevance(
     let score = 0;
 
     // Content type affinity
-    if (analysis.contentAffinities.includes(content.type)) {
+    if (content.type && analysis.contentAffinities.includes(content.type)) {
       score += 30;
     }
 
     // Audience match
-    if (analysis.audienceMatch.includes(content.target_audience)) {
+    if (content.target_audience?.some(audience => 
+      analysis.audienceMatch.includes(audience)
+    )) {
       score += 20;
     }
 

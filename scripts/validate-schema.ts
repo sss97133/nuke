@@ -317,7 +317,7 @@ class MockSchemaValidator extends SchemaValidator {
 
         // Create a mock implementation that matches the test environment
     const mockImplementation = {
-      rpc: <T = any>(fn: string, args?: { table_name?: string }) => {
+      rpc: <T = TableColumn[]>(fn: string, args?: { table_name?: string }) => {
         if (fn === "get_table_columns" && args?.table_name) {
           const tableName = args.table_name;
           if (!(tableName in this.mockSchema)) {
