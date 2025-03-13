@@ -41,21 +41,42 @@ export enum ImagePosition {
 
 // Get environment variables based on the current environment
 const getEnvValue = (key: string): string => {
+  let value = '';
+  let source = '';
+  
   // For Vite builds
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return import.meta.env[key] || '';
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+    value = import.meta.env[key];
+    source = 'import.meta.env';
   }
   
   // For production builds where import.meta might not be available
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env[key] || '';
+  if (!value && typeof process !== 'undefined' && process.env && process.env[key]) {
+    value = process.env[key];
+    source = 'process.env';
   }
   
   // For browser environments where window.__env might be set
-  if (typeof window !== 'undefined' && window.__env && window.__env[key]) {
-    return window.__env[key];
+  if (!value && typeof window !== 'undefined' && window.__env && window.__env[key]) {
+    value = window.__env[key];
+    source = 'window.__env';
   }
   
+  // Hard-coded emergency fallback values for critical production deployments
+  // Only use this approach if absolutely necessary and for non-sensitive variables
+  if (!value && key === 'VITE_SUPABASE_URL') {
+    // This approach is only for illustrative purposes and should be a last resort
+    console.warn(`Using emergency fallback value for ${key}`);
+    // Replace with actual production Supabase URL if needed
+    // value = "https://your-project.supabase.co";
+  }
+  
+  if (value) {
+    console.log(`Environment variable ${key} found in ${source}`);
+    return value;
+  }
+  
+  console.error(`Environment variable ${key} not found in any source`);
   return '';
 };
 
@@ -71,8 +92,33 @@ const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
 
 // Validate environment configuration
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(`Invalid configuration: missing URL or key for environment ${process.env.NODE_ENV || 'production'}`);
-  throw new Error(`Invalid configuration: missing URL for environment ${process.env.NODE_ENV || 'production'}`);
+  const environment = typeof process !== 'undefined' && process.env && process.env.NODE_ENV 
+    ? process.env.NODE_ENV 
+    : (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE) 
+      ? import.meta.env.MODE 
+      : 'production';
+      
+  console.error(`Invalid configuration: missing Supabase credentials for environment ${environment}`);
+  console.error('VITE_SUPABASE_URL present:', !!supabaseUrl);
+  console.error('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
+  
+  // In production, display a more user-friendly error
+  if (typeof document !== 'undefined') {
+    const rootElement = document.getElementById('app') || document.body;
+    if (rootElement) {
+      rootElement.innerHTML = `
+        <div style="padding: 20px; font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #e11d48;">Configuration Error</h2>
+          <p>The application cannot connect to its backend services due to missing configuration.</p>
+          <p>If you're the site owner, please ensure environment variables are correctly set in Vercel.</p>
+          <p><strong>Environment:</strong> ${environment}</p>
+        </div>
+      `;
+    }
+  }
+  
+  // Still throw error for non-browser environments
+  throw new Error(`Invalid Supabase configuration: missing credentials for environment ${environment}`);
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
