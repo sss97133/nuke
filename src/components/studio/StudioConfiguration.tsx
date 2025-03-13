@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -174,6 +173,7 @@ export const StudioConfiguration: React.FC<StudioConfigurationProps> = ({
                       onChange={handleDimensionChange}
                       min={5}
                       max={50}
+                      data-testid="length-input"
                     />
                   </div>
                   
@@ -188,6 +188,7 @@ export const StudioConfiguration: React.FC<StudioConfigurationProps> = ({
                       onChange={handleDimensionChange}
                       min={5}
                       max={50}
+                      data-testid="width-input"
                     />
                   </div>
                   
@@ -202,6 +203,7 @@ export const StudioConfiguration: React.FC<StudioConfigurationProps> = ({
                       onChange={handleDimensionChange}
                       min={2}
                       max={20}
+                      data-testid="height-input"
                     />
                   </div>
                 </div>
@@ -239,6 +241,7 @@ export const StudioConfiguration: React.FC<StudioConfigurationProps> = ({
                             min={-dimensions.length / 2}
                             max={dimensions.length / 2}
                             step={0.5}
+                            data-testid={`camera-x-position-input-${index}`}
                           />
                         </div>
                         
@@ -253,6 +256,7 @@ export const StudioConfiguration: React.FC<StudioConfigurationProps> = ({
                             min={0}
                             max={dimensions.height}
                             step={0.5}
+                            data-testid={`camera-y-position-input-${index}`}
                           />
                         </div>
                         
@@ -267,6 +271,7 @@ export const StudioConfiguration: React.FC<StudioConfigurationProps> = ({
                             min={-dimensions.width / 2}
                             max={dimensions.width / 2}
                             step={0.5}
+                            data-testid={`camera-z-position-input-${index}`}
                           />
                         </div>
                       </div>

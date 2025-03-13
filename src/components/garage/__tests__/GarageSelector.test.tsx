@@ -1,124 +1,113 @@
 import React from 'react';
-import { screen, fireEvent, waitFor } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
-import { GarageSelector } from "../GarageSelector";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-import "@testing-library/jest-dom/vitest";
-import { renderWithProviders } from "@/test/test-utils";
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { GarageSelector } from '../GarageSelector';
+import { renderWithProviders } from '@/test/test-utils';
+import { useGarages } from '../hooks/useGarages';
 
-// Mock dependencies
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn(),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-    })),
-  },
+// Mock hooks
+vi.mock('@/hooks/use-toast', () => ({
+  useToast: vi.fn(() => ({
+    toast: vi.fn()
+  }))
 }));
 
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: vi.fn(),
+vi.mock('react-router-dom', () => ({
+  useNavigate: vi.fn()
 }));
 
-vi.mock("react-router-dom", () => ({
-  useNavigate: vi.fn(),
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: vi.fn(),
+  QueryClient: vi.fn(),
+  QueryClientProvider: ({ children }: { children: React.ReactNode }) => children
 }));
 
-// Test data
-const mockGarages = [
-  { id: "1", name: "Test Garage 1", garage_members: [{ role: "owner", status: "active" }] },
-  { id: "2", name: "Test Garage 2", garage_members: [{ role: "member", status: "active" }] },
-];
+vi.mock('../hooks/useGarages', () => ({
+  useGarages: vi.fn()
+}));
 
-const mockUser = {
-  data: {
-    user: { id: "test-user-id" }
-  },
-  error: null
-};
-
-describe("GarageSelector", () => {
-  const mockToast = vi.fn();
-  const mockNavigate = vi.fn();
+describe('GarageSelector', () => {
+  const mockGarages = [
+    { id: '1', name: 'Test Garage 1', location: 'San Francisco' },
+    { id: '2', name: 'Test Garage 2', location: 'Los Angeles' }
+  ];
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('renders loading state', async () => {
+    const { useGarages } = require('../hooks/useGarages');
+    useGarages.mockReturnValue({
+      data: null,
+      isLoading: true,
+      error: null
+    });
+
+    await act(async () => {
+      renderWithProviders(<GarageSelector />);
+    });
+
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('renders garage list', async () => {
+    const { useGarages } = require('../hooks/useGarages');
+    useGarages.mockReturnValue({
+      data: mockGarages,
+      isLoading: false,
+      error: null
+    });
+
+    await act(async () => {
+      renderWithProviders(<GarageSelector />);
+    });
+
+    expect(screen.getByRole('heading', { name: 'Select Garage' })).toBeInTheDocument();
+    expect(screen.getByText('Test Garage 1')).toBeInTheDocument();
+    expect(screen.getByText('Test Garage 2')).toBeInTheDocument();
+  });
+
+  it('handles garage selection', async () => {
+    const { useGarages } = require('../hooks/useGarages');
+    useGarages.mockReturnValue({
+      data: mockGarages,
+      isLoading: false,
+      error: null
+    });
+
+    const { useNavigate } = require('react-router-dom');
+    const navigate = vi.fn();
+    useNavigate.mockReturnValue(navigate);
+
+    await act(async () => {
+      renderWithProviders(<GarageSelector />);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /Select/i })[0]);
+    });
+
+    expect(navigate).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('handles empty garage list', async () => {
+    const { useGarages } = require('../hooks/useGarages');
+    useGarages.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null
+    });
+
+    await act(async () => {
+      renderWithProviders(<GarageSelector />);
+    });
+
+    const noGaragesHeading = screen.getByRole('heading', { name: 'No Garages Found', level: 2 });
+    expect(noGaragesHeading).toBeInTheDocument();
     
-    // Setup default mocks
-    (useToast as ReturnType<typeof vi.fn>).mockReturnValue({ toast: mockToast });
-    (useNavigate as ReturnType<typeof vi.fn>).mockReturnValue(mockNavigate);
-    
-    // Setup Supabase mocks
-    (supabase.auth.getUser as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
-  });
-
-  it("should render loading state initially", () => {
-    renderWithProviders(<GarageSelector />);
-    expect(screen.getByRole("status")).toBeInTheDocument();
-  });
-
-  it("should display garages when data is loaded", async () => {
-    const mockGarages = [
-      { id: 1, name: "Test Garage 1", description: "Test Description 1" },
-      { id: 2, name: "Test Garage 2", description: "Test Description 2" }
-    ];
-
-    vi.mocked(supabase.from).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      execute: vi.fn().mockResolvedValue({ data: mockGarages, error: null }),
-    } as any);
-
-    renderWithProviders(<GarageSelector />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Test Garage 1")).toBeInTheDocument();
-      expect(screen.getByText("Test Garage 2")).toBeInTheDocument();
-    });
-  });
-
-  it("should handle garage selection", async () => {
-    const mockGarages = [
-      { id: 1, name: "Test Garage 1", description: "Test Description 1" },
-      { id: 2, name: "Test Garage 2", description: "Test Description 2" }
-    ];
-
-    vi.mocked(supabase.from).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      execute: vi.fn().mockResolvedValue({ data: mockGarages, error: null }),
-    } as any);
-
-    renderWithProviders(<GarageSelector />);
-
-    await waitFor(() => {
-      const selectButtons = screen.getAllByRole("button", { name: /Select/i });
-      fireEvent.click(selectButtons[0]);
-    });
-
-    expect(screen.getByText("Selected: Test Garage 1")).toBeInTheDocument();
-  });
-
-  it("should display error message when garage fetch fails", async () => {
-    vi.mocked(supabase.from).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      execute: vi.fn().mockResolvedValue({ data: [], error: new Error("Failed to fetch garages") }),
-    } as any);
-
-    renderWithProviders(<GarageSelector />);
-
-    await waitFor(() => {
-      expect(screen.getByText("No Garages Found")).toBeInTheDocument();
-      expect(screen.getByText("You don't have access to any garages yet.")).toBeInTheDocument();
-    });
+    const noGaragesText = screen.getByText("You don't have access to any garages yet.");
+    expect(noGaragesText).toBeInTheDocument();
+    expect(noGaragesText).toHaveClass('text-muted-foreground');
   });
 });

@@ -1,0 +1,80 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run ESLint
+        run: npm run lint
+        
+      - name: Run Prettier check
+        run: npm run format:check
+        
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run TypeScript check
+        run: npm run type-check
+        
+  bundle-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Check bundle size
+        run: |
+          # Get the size of the main bundle
+          MAIN_SIZE=$(stat -f%z dist/assets/main.*.js)
+          if [ $MAIN_SIZE -gt 500000 ]; then
+            echo "Warning: Main bundle size ($MAIN_SIZE bytes) exceeds 500KB"
+          fi
+          
+          # Get the size of vendor chunks
+          for file in dist/assets/vendor-*.js; do
+            if [ -f "$file" ]; then
+              SIZE=$(stat -f%z "$file")
+              if [ $SIZE -gt 200000 ]; then
+                echo "Warning: Vendor chunk $(basename $file) size ($SIZE bytes) exceeds 200KB"
+              fi
+            fi
+          done 

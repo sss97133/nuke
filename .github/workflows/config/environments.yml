@@ -1,0 +1,13 @@
+test:
+  supabase_url: http://localhost:54321
+  use_mock_data: true
+  use_mock_webgl: true
+
+development:
+  supabase_url: http://localhost:54321
+  use_mock_data: false
+  use_mock_webgl: false
+
+production:
+  use_mock_data: false
+  use_mock_webgl: false

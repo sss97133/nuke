@@ -1,62 +1,163 @@
 import React from 'react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
 import { StudioConfiguration } from '../StudioConfiguration';
-import { renderWithProviders } from '../../../test/test-utils';
+import { renderWithProviders } from '@/test/test-utils';
 
-describe('StudioConfiguration - Base functionality', () => {
-  const mockConfig = {
-    id: 1,
-    name: 'Test Studio',
-    description: 'Test Studio Description',
-    room_width: 10,
-    room_height: 8,
-    room_depth: 12,
-    camera_height: 1.8,
-    ptz_enabled: true,
-    ptz_speed: 0.5,
-    ptz_sensitivity: 0.7
-  };
+// Mock initial data
+const mockInitialDimensions = {
+  length: 20,
+  width: 20,
+  height: 10
+};
+
+const mockInitialTracks = [
+  {
+    id: '1',
+    name: 'Camera 1',
+    position: { x: 8, y: 5, z: 8 },
+    rotation: { x: 0, y: 0, z: 0 },
+    target: { x: 0, y: 5, z: 0 },
+    speed: 1,
+    zoom: 1,
+    length: 10,
+    coneAngle: 45
+  }
+];
+
+// Mock StudioWorkspace component
+vi.mock('../StudioWorkspace', () => ({
+  StudioWorkspace: vi.fn(() => <div data-testid="studio-workspace" />)
+}));
+
+describe('StudioConfiguration', () => {
+  const onConfigChange = vi.fn();
 
   beforeEach(() => {
-    vi.mock('../../../lib/supabase', () => ({
-      supabase: {
-        from: () => ({
-          select: () => ({
-            eq: () => ({
-              single: () => ({
-                execute: () => Promise.resolve({ data: mockConfig, error: null })
-              })
-            })
-          })
-        })
-      }
-    }));
+    vi.clearAllMocks();
   });
 
-  it('renders the studio configuration form', async () => {
-    renderWithProviders(<StudioConfiguration />);
+  it('renders studio configuration form with initial values', async () => {
+    await act(async () => {
+      renderWithProviders(
+        <StudioConfiguration
+          initialDimensions={mockInitialDimensions}
+          initialTracks={mockInitialTracks}
+          onConfigChange={onConfigChange}
+        />
+      );
+    });
 
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Studio Name/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Description/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Room Width/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Room Height/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Room Depth/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Camera Height/i)).toBeInTheDocument();
+    // Check for form elements
+    expect(screen.getByText('Studio Configuration')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Dimensions' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Cameras' })).toBeInTheDocument();
+    expect(screen.getByTestId('studio-workspace')).toBeInTheDocument();
+
+    // Check initial dimension values
+    const lengthInput = screen.getByTestId('length-input');
+    const widthInput = screen.getByTestId('width-input');
+    const heightInput = screen.getByTestId('height-input');
+
+    expect(lengthInput).toHaveValue(mockInitialDimensions.length);
+    expect(widthInput).toHaveValue(mockInitialDimensions.width);
+    expect(heightInput).toHaveValue(mockInitialDimensions.height);
+  });
+
+  it('handles dimension changes', async () => {
+    await act(async () => {
+      renderWithProviders(
+        <StudioConfiguration
+          initialDimensions={mockInitialDimensions}
+          initialTracks={mockInitialTracks}
+          onConfigChange={onConfigChange}
+        />
+      );
+    });
+
+    // Change dimensions
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('length-input'), {
+        target: { value: '25' }
+      });
+      fireEvent.change(screen.getByTestId('width-input'), {
+        target: { value: '30' }
+      });
+      fireEvent.change(screen.getByTestId('height-input'), {
+        target: { value: '15' }
+      });
+    });
+
+    expect(onConfigChange).toHaveBeenCalledWith({
+      dimensions: { length: 25, width: 30, height: 15 },
+      ptzTracks: mockInitialTracks
     });
   });
 
-  it('displays the correct default values', async () => {
-    renderWithProviders(<StudioConfiguration />);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Studio Name/i)).toHaveValue(mockConfig.name);
-      expect(screen.getByLabelText(/Description/i)).toHaveValue(mockConfig.description);
-      expect(screen.getByLabelText(/Room Width/i)).toHaveValue(mockConfig.room_width);
-      expect(screen.getByLabelText(/Room Height/i)).toHaveValue(mockConfig.room_height);
-      expect(screen.getByLabelText(/Room Depth/i)).toHaveValue(mockConfig.room_depth);
-      expect(screen.getByLabelText(/Camera Height/i)).toHaveValue(mockConfig.camera_height);
+  it('handles camera operations', async () => {
+    await act(async () => {
+      renderWithProviders(
+        <StudioConfiguration
+          initialDimensions={mockInitialDimensions}
+          initialTracks={mockInitialTracks}
+          onConfigChange={onConfigChange}
+        />
+      );
     });
+
+    // Switch to cameras tab
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Cameras' }));
+    });
+
+    // Add new camera
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add Camera' }));
+    });
+
+    expect(screen.getByText('Camera 2')).toBeInTheDocument();
+
+    // Update camera position
+    const xPositionInput = screen.getByTestId('camera-x-position-input-1');
+    await act(async () => {
+      fireEvent.change(xPositionInput, { target: { value: '10' } });
+    });
+
+    expect(onConfigChange).toHaveBeenCalled();
+
+    // Remove camera
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
+    });
+
+    expect(screen.queryByText('Camera 2')).not.toBeInTheDocument();
+  });
+
+  it('validates dimension inputs', async () => {
+    await act(async () => {
+      renderWithProviders(
+        <StudioConfiguration
+          initialDimensions={mockInitialDimensions}
+          initialTracks={mockInitialTracks}
+          onConfigChange={onConfigChange}
+        />
+      );
+    });
+
+    const lengthInput = screen.getByTestId('length-input');
+
+    // Test invalid input
+    await act(async () => {
+      fireEvent.change(lengthInput, { target: { value: 'invalid' } });
+    });
+
+    expect(lengthInput).toHaveValue(mockInitialDimensions.length);
+
+    // Test out of range input
+    await act(async () => {
+      fireEvent.change(lengthInput, { target: { value: '60' } });
+    });
+
+    expect(lengthInput).toHaveAttribute('max', '50');
   });
 });

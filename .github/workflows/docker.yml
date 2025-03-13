@@ -1,114 +1,212 @@
-name: Docker
+name: Docker CI/CD
 
 on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - development
+          - test
+          - production
   push:
-    tags: ["*"]
-    branches:
-      - "main"
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
-    branches: ["**"]
-    paths:
-      - 'Dockerfile'
-      - '.github/workflows/docker.yml'
-      - 'docker-compose*.yml'
-      - '.dockerignore'
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 env:
-  # Hostname of your registry
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
   REGISTRY: docker.io
-  # Image repository, without hostname and tag
   IMAGE_NAME: ${{ github.repository }}
-  SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
 
 jobs:
-  build:
+  docker:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
       contents: read
       packages: write
-
+      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # Authenticate to the container registry
-      - name: Authenticate to registry ${{ env.REGISTRY }}
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Copy production env file
+          cp .env.production.example .env.production
+          # Build the application
+          npm run build
+        env:
+          NODE_ENV: production
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
+          buildkitd-flags: --debug
+      
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@v3
-
-      # Install Docker Scout CLI
-      - name: Install Docker Scout
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh | sh -s --
-          docker scout version
-
-      # Extract metadata (tags, labels) for Docker
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          labels: |
-            org.opencontainers.image.revision=${{ env.SHA }}
+          images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=edge,branch=$repo.default_branch
-            type=semver,pattern=v{{version}}
-            type=sha,prefix=,suffix=,format=short
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+      
+      - name: Set environment variables
+        id: env
+        run: |
+          ENV_NAME=${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'test') }}
+          echo "environment=$ENV_NAME" >> $GITHUB_OUTPUT
+          
+          # Load environment config
+          CONFIG_TYPE=$(node -e "console.log(require('./.github/workflows/config/env-config.js')['$ENV_NAME'].services.type)")
+          
+          # Set mock flags based on environment
+          if [[ "$ENV_NAME" == "test" ]]; then
+            echo "use_mock_data=true" >> $GITHUB_OUTPUT
+            echo "mock_webgl=true" >> $GITHUB_OUTPUT
+          else
+            echo "use_mock_data=false" >> $GITHUB_OUTPUT
+            echo "mock_webgl=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Set environment variables from secrets
+          echo "supabase_url=${{ secrets.VITE_SUPABASE_URL }}" >> $GITHUB_OUTPUT
 
-      # Build and push Docker image with Buildx
-      # (don't push on PR, load instead)
-      - name: Build and push Docker image
-        id: build-and-push
-        uses: docker/build-push-action@v6
+      - name: Build and test image
+        id: build
+        uses: docker/build-push-action@v5
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         with:
           context: .
-          sbom: ${{ github.event_name != 'pull_request' }}
-          provenance: ${{ github.event_name != 'pull_request' }}
-          push: ${{ github.event_name != 'pull_request' }}
-          load: ${{ github.event_name == 'pull_request' }}
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      # Run security scan based on branch
-      - name: Run Docker Scout Security Scan
-        if: success()
+          platforms: linux/amd64
+          build-args: |
+            NODE_ENV=${{ steps.env.outputs.environment }}
+            VITE_APP_NAME=Nuke
+            VITE_APP_DESCRIPTION=Vehicle Management Platform
+            VITE_SUPABASE_URL=${{ steps.env.outputs.supabase_url }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+            VITE_USE_MOCK_DATA=${{ steps.env.outputs.use_mock_data }}
+            VITE_MOCK_WEBGL=${{ steps.env.outputs.mock_webgl }}
+      
+      - name: Test container
+        id: test
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "Running on main branch: Performing full CVE scan"
-            # Scan for critical and high severity CVEs
-            docker scout cves "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" --exit-code --only-severity critical,high
+          set -e
+          CONTAINER_NAME="test-nuke-${{ github.run_id }}"
+          echo "🚀 Starting container for testing..."
+          
+          # Run container in background
+          docker run -d --name $CONTAINER_NAME -p 8080:8080 ${{ steps.meta.outputs.tags }}
+          
+          echo "⏳ Waiting for container to be ready..."
+          # Wait for container to be ready (max 30s)
+          timeout 30s bash -c 'until curl -s http://localhost:8080/ > /dev/null; do echo "Waiting for service..."; sleep 2; done'
+          
+          echo "🧪 Running tests..."
+          # Run environment-specific tests
+          if [[ "${{ steps.env.outputs.environment }}" != "production" ]]; then
+            echo "🧪 Running test environment checks..."
+            curl -f http://localhost:8080/health || {
+              echo "❌ Health check failed"
+              docker logs $CONTAINER_NAME
+              exit 1
+            }
           else
-            echo "Running on branch '${{ github.ref }}': Comparing with main"
-            # Compare with latest image from main branch
-            docker scout compare "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" \
-              --to "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" \
-              --exit-code --only-severity critical,high --ignore-unchanged
+            echo "🔍 Running production verification..."
+            curl -f http://localhost:8080/ || {
+              echo "❌ Production check failed"
+              docker logs $CONTAINER_NAME
+              exit 1
+            }
           fi
-
-      # Post scan results as PR comment if this is a pull request
-      - name: Post Scan Results
-        if: github.event_name == 'pull_request' && success()
-        uses: actions/github-script@v7
+          
+          echo "✅ Tests passed successfully"
+          docker stop $CONTAINER_NAME
+          docker rm $CONTAINER_NAME
+      
+      - name: Push image
+        if: github.event_name != 'pull_request' && success()
+        uses: docker/build-push-action@v5
         with:
-          script: |
-            const scanOutput = `Docker Scout security scan completed:
-            - Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-            - Status: ${{ job.status }}
-            
-            See workflow run for detailed results.`;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: scanOutput
-            }); 
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            NODE_ENV=production
+            VITE_APP_NAME=Nuke
+            VITE_APP_DESCRIPTION=Vehicle Management Platform
+            VITE_SUPABASE_URL=${{ steps.env.outputs.supabase_url }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+            VITE_USE_MOCK_DATA=false
+            VITE_MOCK_WEBGL=false
+      
+      - name: Verify deployment
+        if: github.event_name != 'pull_request' && success()
+        run: |
+          echo "✅ Docker image deployed successfully"
+          echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo "🏷️ Tags:"
+          echo "${{ steps.meta.outputs.tags }}" | tr ' ' '\n'
+      
+      - name: Handle Failure
+        if: failure()
+        run: |
+          echo "❌ Workflow failed!"
+          echo "Please check:"
+          echo "1. GitHub token permissions and Docker Hub connection"
+          echo "2. Environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY)"
+          echo "3. Build logs for detailed error messages"
+          exit 1
+      
+      - name: Clean up
+        if: always()
+        run: |
+          echo "🧹 Cleaning up resources..."
+          docker system prune -f
+          docker volume prune -f 

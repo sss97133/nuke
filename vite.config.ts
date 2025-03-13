@@ -5,6 +5,9 @@ import { configDefaults } from 'vitest/config';
 import { componentTagger } from "lovable-tagger";
 import autoprefixer from 'autoprefixer';
 import postcssNesting from 'postcss-nesting';
+import tsconfigPaths from 'vite-tsconfig-paths';
+import { splitVendorChunkPlugin } from 'vite';
+import { compression } from 'vite-plugin-compression2';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -46,6 +49,12 @@ export default defineConfig(({ mode }) => {
         }
       }),
       mode === 'development' && componentTagger(),
+      tsconfigPaths(),
+      splitVendorChunkPlugin(),
+      compression({
+        algorithm: 'gzip',
+        exclude: [/\.(br)$/, /\.(gz)$/],
+      }),
     ].filter(Boolean),
     resolve: {
       alias: {
@@ -56,10 +65,10 @@ export default defineConfig(({ mode }) => {
       sourcemap: !isProd,
       minify: isProd ? 'terser' : false,
       outDir: 'dist',
-      target: 'es2020',
+      target: 'esnext',
       assetsInlineLimit: 4096,
       cssCodeSplit: true,
-      chunkSizeWarningLimit: 1500,
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
@@ -69,26 +78,65 @@ export default defineConfig(({ mode }) => {
           entryFileNames: isProd ? 'assets/[name].[hash].js' : 'assets/[name].js',
           chunkFileNames: isProd ? 'assets/[name].[hash].js' : 'assets/[name].js',
           assetFileNames: isProd ? 'assets/[name].[hash].[ext]' : 'assets/[name].[ext]',
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-ui': [
-              '@radix-ui/react-alert-dialog',
-              '@radix-ui/react-dialog',
-              '@radix-ui/react-dropdown-menu',
-              '@radix-ui/react-popover',
-              '@radix-ui/react-toast',
-              'class-variance-authority',
-              'clsx',
-              'tailwind-merge',
-            ],
-            'vendor-utils': ['date-fns', 'zod', 'jotai'],
-            'vendor-charts': ['recharts'],
-            'vendor-three': ['three'],
-            'vendor-form': ['react-hook-form', '@hookform/resolvers'],
-            'vendor-animation': ['framer-motion'],
-            'vendor-helmet': ['react-helmet-async'],
-            'vendor-query': ['@tanstack/react-query'],
-          },
+          manualChunks: (id) => {
+            // Core dependencies
+            if (id.includes('node_modules/react') || 
+                id.includes('node_modules/react-dom') || 
+                id.includes('node_modules/react-router-dom')) {
+              return 'vendor-react';
+            }
+            
+            // UI components
+            if (id.includes('node_modules/@radix-ui')) {
+              return 'vendor-ui';
+            }
+            
+            // Form handling
+            if (id.includes('node_modules/react-hook-form') || 
+                id.includes('node_modules/@hookform')) {
+              return 'vendor-form';
+            }
+            
+            // Data fetching
+            if (id.includes('node_modules/@tanstack')) {
+              return 'vendor-query';
+            }
+            
+            // Charts and 3D
+            if (id.includes('node_modules/recharts')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('node_modules/three')) {
+              return 'vendor-three';
+            }
+            
+            // Animation
+            if (id.includes('node_modules/framer-motion')) {
+              return 'vendor-animation';
+            }
+            
+            // Utilities
+            if (id.includes('node_modules/date-fns') || 
+                id.includes('node_modules/lodash')) {
+              return 'vendor-utils';
+            }
+            
+            // Meta
+            if (id.includes('node_modules/react-helmet-async')) {
+              return 'vendor-helmet';
+            }
+
+            // Split large vendor chunks
+            if (id.includes('node_modules/')) {
+              const match = id.match(/node_modules\/([^/]+)/);
+              if (match) {
+                const packageName = match[1];
+                if (packageName.length > 20) {
+                  return `vendor-${packageName.slice(0, 20)}`;
+                }
+              }
+            }
+          }
         },
       },
       terserOptions: isProd ? {

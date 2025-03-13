@@ -1,7 +1,11 @@
 import { renderHook, act } from '@testing-library/react';
 import { usePreferencesBase } from '../use-preferences-base';
 import { supabase } from '@/integrations/supabase/client';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
+
+// Mock console.log
+const originalConsoleLog = console.log;
+vi.spyOn(console, 'log').mockImplementation(() => {});
 
 // Mock Supabase client
 vi.mock('@/integrations/supabase/client', () => ({
@@ -29,6 +33,10 @@ vi.mock('@/hooks/use-toast', () => ({
 describe('usePreferencesBase', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterAll(() => {
+    console.log = originalConsoleLog;
   });
 
   it('should load user preferences successfully', async () => {
@@ -117,6 +125,7 @@ describe('usePreferencesBase', () => {
       fontFamily: 'Inter',
       fontSize: 'medium'
     });
+    expect(console.log).toHaveBeenCalledWith('No user found, using default preferences');
   });
 
   it('should handle error when fetching preferences fails', async () => {

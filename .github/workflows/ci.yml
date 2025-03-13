@@ -1,61 +1,83 @@
-name: CI
+name: CI/CD
+
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 
-# Add global permissions that apply to all jobs
-permissions:
-  contents: read
-  pull-requests: read
-  actions: read
+env:
+  NODE_VERSION: '20'
+  VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+  VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+  VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18.x'
-        cache: 'npm'
-    
-    - name: Debug Environment
-      run: |
-        echo "Node version: $(node -v)"
-        echo "NPM version: $(npm -v)"
-    
-    - name: Setup .npmrc
-      run: |
-        echo "legacy-peer-deps=true" > .npmrc
-        echo "fund=false" >> .npmrc
-        echo "audit=false" >> .npmrc
-    
-    - name: Install dependencies
-      run: |
-        npm ci || npm install --no-save
-        # Add node_modules/.bin to GITHUB_PATH for all subsequent steps
-        echo "${PWD}/node_modules/.bin" >> $GITHUB_PATH
-        ls -la ./node_modules/.bin/
-    
-    - name: Run TypeScript check
-      run: npx tsc --noEmit || echo "TypeScript check failed but continuing"
-    
-    - name: Build
-      run: |
-        # Use npx to directly call the binaries
-        npx tsc && npx vite build || echo "Build failed"
-      env:
-        NODE_OPTIONS: "--max-old-space-size=4096"
+      - uses: actions/checkout@v4
       
-    - name: Upload build artifacts
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-output
-        path: dist/
-        retention-days: 7
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm run test
+        
+      - name: Run type check
+        run: npm run type-check
+        
+      - name: Run lint
+        run: npm run lint
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'

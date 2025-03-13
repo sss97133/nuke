@@ -1,40 +1,47 @@
-FROM node:18-alpine as builder
-
-# Build arguments
-ARG NODE_ENV=production
-ARG VITE_APP_NAME="Nuke"
-ARG VITE_APP_DESCRIPTION="Vehicle Management Platform"
-
-# Set environment variables
-ENV NODE_ENV=${NODE_ENV}
-ENV VITE_APP_NAME=${VITE_APP_NAME}
-ENV VITE_APP_DESCRIPTION=${VITE_APP_DESCRIPTION}
+# Build stage
+FROM node:20-alpine as builder
 
 # Set working directory
 WORKDIR /app
 
-# Install dependencies first (better caching)
-COPY package*.json bun.lockb ./
+# Copy package files
+COPY package*.json ./
 COPY .npmrc ./
 
-# Install build dependencies and clean up in one layer
-RUN apk add --no-cache python3 make g++ \
-    && npm ci --prefer-offline --no-audit --no-optional \
-    && apk del python3 make g++
+# Install dependencies and build tools with retry mechanism
+RUN apk add --no-cache python3 make g++ && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 100000 && \
+    npm config set fetch-retry-maxtimeout 600000 && \
+    npm ci && \
+    npm install typescript && \
+    npm install vite @vitejs/plugin-react && \
+    ./node_modules/.bin/tsc --version
 
-# Copy necessary config files
+# Copy configuration files
 COPY tsconfig*.json ./
 COPY vite.config.* ./
 COPY tailwind.config.* ./
 COPY postcss.config.js ./
+COPY index.html ./
 
 # Copy source files
 COPY src/ ./src/
 COPY public/ ./public/
 
-# Build the application using CI config
-RUN cp vite.config.ci.js vite.config.js && \
-    npm run build
+# Build arguments for environment variables
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_API_URL
+
+# Set environment variables
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_API_URL=$VITE_API_URL
+ENV PATH=/app/node_modules/.bin:$PATH
+
+# Build the application
+RUN npm run build:prod
 
 # Production stage
 FROM nginx:alpine
@@ -42,31 +49,32 @@ FROM nginx:alpine
 # Install curl for healthcheck
 RUN apk add --no-cache curl
 
+# Create non-root user
+RUN adduser -D -u 1000 appuser
+
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Create non-root user and set permissions
-RUN adduser -D -u 1000 appuser && \
-    chown -R appuser:appuser /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html && \
-    # Ensure nginx can bind to port 80 as non-root
-    chmod -R 755 /var/run/ && \
-    chmod -R 755 /var/cache/nginx/ && \
+# Change ownership of nginx directories
+RUN chown -R appuser:appuser /var/cache/nginx && \
+    chown -R appuser:appuser /var/log/nginx && \
+    chown -R appuser:appuser /etc/nginx/conf.d && \
     touch /var/run/nginx.pid && \
-    chown -R appuser:appuser /var/run/nginx.pid
+    chown -R appuser:appuser /var/run/nginx.pid && \
+    chmod -R 755 /usr/share/nginx/html
 
 # Switch to non-root user
 USER appuser
 
-# Expose port 80
-EXPOSE 80
+# Expose port 8080 instead of 80
+EXPOSE 8080
 
-# Add healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:80/ || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD curl -f http://localhost:8080/ || exit 1
 
-# Start Nginx
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
