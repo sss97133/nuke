@@ -13,7 +13,7 @@
     "build:esm": "cross-env NODE_ENV=production node build.mjs",
     "build:ci": "cross-env CI=true NODE_ENV=production node build.mjs",
     "build:dev": "cross-env NODE_ENV=development npm run validate:all && vite build --mode development",
-    "build:prod": "cross-env NODE_ENV=production tsc && vite build --mode production && node scripts/inject-env.js",
+    "build:prod": "cross-env NODE_ENV=production tsc && vite build --mode production && node scripts/inject-env.js && node scripts/verify-env.js",
     "vercel-build": "npm ci && npm run build:prod",
     "preview": "vite preview",
     "lint": "eslint .",
