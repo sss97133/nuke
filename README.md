@@ -34,6 +34,7 @@ Our CI/CD pipeline has been fixed with comprehensive updates to all GitHub Actio
 - Implemented direct executable calling with npx
 - Added detailed error handling and diagnostics
 - Added Docker integration with automated Docker Hub publishing
+- Fixed database schema issues and added migration scripts
 
 ## Features
 
