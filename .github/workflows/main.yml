@@ -38,10 +38,51 @@ jobs:
       uses: github/codeql-action/analyze@v3
       continue-on-error: true  # Allow continuation even if analysis fails
 
+  code_quality_checks:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    needs: security_check
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Setup .npmrc
+      run: |
+        echo "legacy-peer-deps=true" > .npmrc
+        echo "fund=false" >> .npmrc
+        echo "audit=false" >> .npmrc
+    
+    - name: Install dependencies
+      run: |
+        # Retry npm ci up to 3 times
+        for i in 1 2 3; do
+          npm ci && break || echo "Retry $i..."
+          sleep 5
+        done
+    
+    - name: Validate Supabase queries
+      run: npm run lint:queries
+      
+    - name: Type check
+      run: npm run type-check
+      
+    - name: Lint
+      run: npm run lint
+        
+    - name: Format check
+      run: npm run format:check
+    
   build_and_test:
     name: Build and Test
     runs-on: ubuntu-latest
-    needs: security_check
+    needs: code_quality_checks
     
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -94,17 +135,16 @@ jobs:
           sleep 5
         done
       
-    - name: Type check
-      run: npm run type-check
-      continue-on-error: true  # Don't fail the build for type errors yet
+    - name: Install ts-node for schema validation
+      run: npm install -g ts-node
       
-    - name: Lint
-      run: npm run lint
-      continue-on-error: true  # Don't fail the build for lint errors yet
+    - name: Validate database schema (if connection details available)
+      if: ${{ env.VITE_SUPABASE_URL != '' && env.VITE_SUPABASE_SERVICE_KEY != '' }}
+      run: npm run validate:schema
+      continue-on-error: true  # Don't fail the build if no connection
       
     - name: Run tests
       run: npm run test:ci
-      continue-on-error: true  # Don't fail the build for test failures yet
       
     - name: Build project
       run: npm run build
@@ -150,4 +190,4 @@ jobs:
         else
           echo "❌ Deployment failed"
           echo "Check the logs above for more details"
-        fi 
+        fi
