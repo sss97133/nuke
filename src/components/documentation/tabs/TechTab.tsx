@@ -4,7 +4,8 @@ import { Settings, ArrowLeft, Search, Copy, Check } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+// Fix the import path to avoid ESM-specific import which causes build issues
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 // Import technical documentation as a string
 const TECHNICAL_DOC = `# Technical Documentation
