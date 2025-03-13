@@ -52,8 +52,11 @@ const StatsOverview = () => {
             .eq('user_id', user.id)
             .in('status', ['pending', 'in_progress']),
             
-          // Fetch team members - removed the status filter as it doesn't exist in the schema
-          supabase
+// Fetch active team members with status filter
+supabase
+  .from('team_members')
+  .select('id')
+  .eq('status', 'active')
             .from('team_members')
             .select('id')
         ]);
