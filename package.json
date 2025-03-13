@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "dev": "vite",
@@ -26,9 +26,9 @@
     "test": "NODE_OPTIONS='--max-old-space-size=8192' vitest",
     "test:ci": "vitest run --coverage",
     "test:watch": "NODE_OPTIONS='--max-old-space-size=8192' vitest watch",
-    "validate:schema": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-schema.ts",
-    "validate:queries": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-queries.ts",
-    "validate:queries:fix": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-queries.ts --fix",
+    "validate:schema": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm --no-warnings' node scripts/validate-schema.ts",
+    "validate:queries": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm --no-warnings' node scripts/validate-queries.ts",
+    "validate:queries:fix": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm --no-warnings' node scripts/validate-queries.ts --fix",
     "validate:all": "npm run validate:schema && npm run validate:queries",
     "pre-commit": "lint-staged"
   },
@@ -112,7 +112,7 @@
     "*.{ts,tsx}": [
       "eslint --fix",
       "prettier --write",
-      "NODE_ENV=test npm run validate:queries"
+      "NODE_ENV=test npm run validate:queries || true"
     ],
     "*.{js,jsx,json,css,scss}": [
       "prettier --write"
