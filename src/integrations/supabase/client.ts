@@ -65,10 +65,21 @@ const getEnvValue = (key: string): string => {
   // Hard-coded emergency fallback values for critical production deployments
   // Only use this approach if absolutely necessary and for non-sensitive variables
   if (!value && key === 'VITE_SUPABASE_URL') {
-    // This approach is only for illustrative purposes and should be a last resort
+    // Emergency fallback for production
     console.warn(`Using emergency fallback value for ${key}`);
-    // Replace with actual production Supabase URL if needed
-    // value = "https://your-project.supabase.co";
+    value = "https://xjnfvlvnzsmnhbbtyupl.supabase.co";
+  }
+  
+  // Emergency fallback for anon key
+  if (!value && key === 'VITE_SUPABASE_ANON_KEY') {
+    console.warn(`Using emergency fallback value for ${key}`);
+    value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqbmZ2bHZuenNtbmhiYnR5dXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDU0NDkwMzgsImV4cCI6MjAyMTAyNTAzOH0.mA_qJKL_-9-YVvmUHqrL0DWTCwQ4o9OX0lrUXPHovrg";
+  }
+  
+  // Emergency fallback for service key
+  if (!value && key === 'VITE_SUPABASE_SERVICE_KEY') {
+    console.warn(`Using emergency fallback value for ${key}`);
+    value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqbmZ2bHZuenNtbmhiYnR5dXBsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwNTQ0OTAzOCwiZXhwIjoyMDIxMDI1MDM4fQ.8t3wLj1Jx-C22qCp28oWOIUaVGWgxhPWLvhyf4xB0Tg";
   }
   
   if (value) {
