@@ -26,7 +26,8 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: javascript, typescript
-        queries: security-and-quality
+        queries: security-extended
+        config-file: ./.github/codeql/codeql-config.yml
 
     - name: Check for sensitive data
       run: |
