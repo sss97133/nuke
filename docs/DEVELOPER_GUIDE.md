@@ -204,126 +204,196 @@ If a build fails, check the GitHub Actions logs. Common issues include:
 
 ## Troubleshooting Common Issues
 
-### "Cannot find module" errors
+### "Cannot find column 'status' in table 'team_members'"
 
-If you encounter a "Cannot find module" error during build:
+This error occurs when your code is trying to query a column that doesn't exist in the database.
 
-1. Check if the package is listed in `package.json`
-2. Verify import paths (especially for ESM/CJS specific imports)
-3. Try clearing your node_modules cache and reinstalling:
-   ```bash
-   npm run clean
-   npm install
-   ```
-
-### Database-related errors
-
-#### "Column does not exist" errors
-
-If your query fails with a "column does not exist" error:
-
-1. Check if the column exists in your database schema
-2. Verify the column name in your TypeScript types
-3. Consider adding a migration to create the missing column:
+**Solution**:
+1. Check if the column exists in your local database schema
+2. Run the appropriate migration to add the column:
    ```sql
-   -- In a new migration file
-   SELECT safely_add_column('public', 'your_table', 'missing_column', 'TEXT');
+   ALTER TABLE team_members ADD COLUMN status TEXT DEFAULT 'active';
+   ```
+3. Update your types file to include the new column
+
+### "Rollup failed to resolve import"
+
+This build error happens when the build system can't resolve a module import path.
+
+**Solution**:
+1. Check that the module is installed in `package.json`
+2. Ensure the import path is using the correct format (CJS vs ESM)
+3. For `react-syntax-highlighter`, always use the CJS path:
+   ```typescript
+   import { PrismLight } from 'react-syntax-highlighter';
+   import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
    ```
 
-4. Run the schema validation tool to catch similar issues:
+### "Multiple .from() calls in the same query chain"
+
+This error from the query validator indicates a malformed Supabase query.
+
+**Solution**:
+1. Split the query into separate chains for each table
+2. If you need to join tables, use the `select` method with join syntax:
+   ```typescript
+   const { data, error } = await supabase
+     .from('team_members')
+     .select(`
+       id,
+       status,
+       profiles (id, email)
+     `);
+   ```
+
+## Agent System
+
+The Nuke platform includes an agent system for automating various tasks. This section covers how to work with the agent architecture.
+
+### Agent Architecture Overview
+
+The agent system consists of:
+
+1. **Agent Definitions**: Core logic for each agent type
+2. **Agent Runners**: Execution environment for agents
+3. **Agent Tasks**: Individual tasks that agents can perform
+4. **Agent Data Store**: Persistent storage for agent state
+
+### Working with Agents
+
+To create a new agent:
+
+1. Define the agent type in `src/agents/types.ts`
+2. Create the agent implementation in `src/agents/[agent-name]/index.ts`
+3. Register the agent in `src/agents/registry.ts`
+
+Example agent implementation:
+
+```typescript
+// src/agents/vehicle-monitor/index.ts
+import { Agent, AgentContext } from '../types';
+
+export class VehicleMonitorAgent implements Agent {
+  id: string;
+  type = 'vehicle-monitor';
+  
+  constructor(id: string) {
+    this.id = id;
+  }
+  
+  async run(context: AgentContext) {
+    // Agent implementation goes here
+    const { data, error } = await context.supabase
+      .from('vehicles')
+      .select('*')
+      .eq('status', 'active');
+      
+    if (error) {
+      context.logger.error('Failed to fetch vehicles', error);
+      return;
+    }
+    
+    // Process vehicles
+    for (const vehicle of data) {
+      await this.processVehicle(vehicle, context);
+    }
+  }
+  
+  private async processVehicle(vehicle, context) {
+    // Vehicle-specific logic
+  }
+}
+```
+
+### Testing Agents
+
+Agents should have thorough test coverage:
+
+```typescript
+// src/agents/vehicle-monitor/index.test.ts
+import { VehicleMonitorAgent } from './index';
+import { createMockContext } from '../testing';
+
+describe('VehicleMonitorAgent', () => {
+  it('should process active vehicles', async () => {
+    // Setup
+    const mockContext = createMockContext({
+      supabase: {
+        from: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockResolvedValue({
+          data: [{ id: 'v1', vin: 'ABC123', status: 'active' }],
+          error: null
+        })
+      }
+    });
+    
+    const agent = new VehicleMonitorAgent('test-agent');
+    
+    // Execute
+    await agent.run(mockContext);
+    
+    // Assert
+    expect(mockContext.supabase.from).toHaveBeenCalledWith('vehicles');
+    expect(mockContext.supabase.eq).toHaveBeenCalledWith('status', 'active');
+  });
+});
+```
+
+## Pull Request Process
+
+When submitting changes to the Nuke codebase, follow these steps:
+
+1. **Create a feature branch**:
    ```bash
-   npm run validate:schema
+   git checkout -b feature/your-feature-name
    ```
 
-#### "Invalid query" errors
-
-If you see "Invalid query" errors from Supabase:
-
-1. Check for malformed query chains (like multiple `.from()` calls)
-2. Validate your filter conditions
-3. Run the query validator to catch common mistakes:
+2. **Make your changes** and commit them with descriptive messages:
    ```bash
-   npm run lint:queries
+   git commit -m "Feature: Add detailed description of your change"
    ```
 
-### React and UI errors
-
-#### Components not rendering as expected
-
-If components aren't rendering correctly:
-
-1. Check for React key warnings in the console
-2. Verify that component props match expected types
-3. Ensure CSS modules are correctly imported
-
-#### State management issues
-
-For Jotai state issues:
-
-1. Verify atom definitions are consistent
-2. Check for circular dependencies between atoms
-3. Ensure atoms are initialized with the correct default values
-
-## Advanced Topics
-
-### Working with the Agent System
-
-The agent system is a core part of Nuke's architecture:
-
-1. **Agent Database Schema**:
-   - Agents have their own tables in the database
-   - Use proper relationships between agents and other entities
-
-2. **Agent Implementation**:
-   - Follow the agent protocol defined in the documentation
-   - Use typed interfaces for all agent interactions
-
-3. **Testing Agents**:
-   - Use mock agents for testing
-   - Validate agent behavior with integration tests
-
-### Performance Optimization
-
-For optimal performance:
-
-1. **Bundle Size Management**:
-   - Leverage code splitting where appropriate
-   - Use dynamic imports for large dependencies
-   - Monitor bundle sizes with build analytics
-
-2. **Rendering Optimization**:
-   - Use memoization for expensive computations
-   - Implement virtualization for large lists
-   - Profile component renders with React DevTools
-
-### Accessibility
-
-Maintain accessibility standards:
-
-1. **ARIA Attributes**:
-   - Use proper ARIA roles and attributes
-   - Test with screen readers
-
-2. **Keyboard Navigation**:
-   - Ensure all interactive elements are keyboard accessible
-   - Implement focus management for modal dialogs
-
-3. **Color Contrast**:
-   - Maintain WCAG 2.1 AA standard contrast ratios
-   - Test with color contrast analyzers
-
-## Contributing
-
-Before submitting a pull request:
-
-1. Run all validations:
+3. **Run validation** before pushing:
    ```bash
    npm run validate:all
    ```
 
-2. Write tests for new features and bug fixes
-3. Update documentation to reflect changes
-4. Ensure your branch is up to date with main
-5. Follow conventional commit message format
+4. **Push your branch** and create a pull request:
+   ```bash
+   git push -u origin feature/your-feature-name
+   ```
 
-Remember, the pre-commit hooks and CI pipeline are designed to catch issues early. If you encounter failures, use them as opportunities to fix problems before they affect other developers or users.
+5. **Fill out the PR template** with:
+   - What problem are you solving?
+   - How did you solve it?
+   - What changes did you make?
+   - How can reviewers test your changes?
+
+6. **Address review feedback** and wait for CI checks to pass
+
+7. **Merge** when approved (squash and merge preferred)
+
+## Resources and Documentation
+
+- [Supabase Documentation](https://supabase.io/docs)
+- [React 19 Documentation](https://react.dev/)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
+- [Vite Documentation](https://vitejs.dev/guide/)
+- [Jotai Documentation](https://jotai.org/docs/introduction)
+
+## Getting Help
+
+If you encounter issues not covered in this guide, you can:
+
+1. Check existing GitHub issues to see if your problem is already reported
+2. Ask in the team Slack channel (#nuke-development)
+3. Create a new GitHub issue with details about the problem
+
+## Contributing to This Guide
+
+This guide is a living document. If you find areas that need more detail or discover new issues and solutions, please contribute by:
+
+1. Creating a PR to update this file
+2. Adding new sections for common issues
+3. Improving examples and explanations
