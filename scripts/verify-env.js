@@ -1,9 +1,16 @@
+/* eslint-disable no-console, no-undef */
 /**
  * Verifies environment variables are properly set and accessible
  * Run this script during build to explicitly check all required variables
  */
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import * as process from 'process';
+
+// Get the directory name using ES modules approach
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // List of required environment variables
 const REQUIRED_VARS = [

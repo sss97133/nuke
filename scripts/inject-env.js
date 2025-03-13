@@ -1,10 +1,16 @@
-/* eslint-disable no-console */
+/* eslint-disable no-console, no-undef */
 /**
  * Script to inject environment variables into index.html for production builds
  * This enables environment variables in static deployed environments like Vercel
  */
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import * as process from 'process';
+
+// Get the directory name using ES modules approach
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Path to the built index.html
 const indexPath = path.resolve(__dirname, '../dist/index.html');
