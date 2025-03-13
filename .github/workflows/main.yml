@@ -142,6 +142,16 @@ jobs:
           sleep 5
         done
       
+    - name: Install ts-node for schema validation
+      run: npm install -g ts-node
+      
+    - name: Validate database schema in test environment
+      if: ${{ env.VITE_SUPABASE_URL != '' && env.VITE_SUPABASE_SERVICE_KEY != '' }}
+      env:
+        NODE_ENV: test
+      run: npm run validate:schema
+      continue-on-error: true  # Allow deployment even if validation fails
+      
     - name: Run tests
       run: npm run test:ci || echo "Tests failed but continuing to build"
       
