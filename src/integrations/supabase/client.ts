@@ -1,49 +1,49 @@
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
-import { useToast } from '@/components/ui/use-toast';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
+import { useToast } from "@/components/ui/use-toast";
 
 export enum VehicleImageCategory {
-  PRIMARY = 'primary',
-  EXTERIOR = 'exterior',
-  INTERIOR = 'interior',
-  TECHNICAL = 'technical',
-  DOCUMENTATION = 'documentation'
+  PRIMARY = "primary",
+  EXTERIOR = "exterior",
+  INTERIOR = "interior",
+  TECHNICAL = "technical",
+  DOCUMENTATION = "documentation",
 }
 
 export enum ImagePosition {
   // Exterior positions
-  FRONT_34 = 'front_34',
-  SIDE_DRIVER = 'side_driver',
-  SIDE_PASSENGER = 'side_passenger',
-  REAR_34 = 'rear_34',
-  FRONT_DIRECT = 'front_direct',
-  REAR_DIRECT = 'rear_direct',
+  FRONT_34 = "front_34",
+  SIDE_DRIVER = "side_driver",
+  SIDE_PASSENGER = "side_passenger",
+  REAR_34 = "rear_34",
+  FRONT_DIRECT = "front_direct",
+  REAR_DIRECT = "rear_direct",
 
   // Interior positions
-  DASHBOARD = 'dashboard',
-  CENTER_CONSOLE = 'center_console',
-  FRONT_SEATS = 'front_seats',
-  REAR_SEATS = 'rear_seats',
-  TRUNK = 'trunk',
+  DASHBOARD = "dashboard",
+  CENTER_CONSOLE = "center_console",
+  FRONT_SEATS = "front_seats",
+  REAR_SEATS = "rear_seats",
+  TRUNK = "trunk",
 
   // Documentation positions
-  VIN = 'vin',
-  ODOMETER = 'odometer',
-  WINDOW_STICKER = 'window_sticker',
-  TITLE = 'title',
+  VIN = "vin",
+  ODOMETER = "odometer",
+  WINDOW_STICKER = "window_sticker",
+  TITLE = "title",
 
   // Technical positions
-  ENGINE = 'engine',
-  UNDERCARRIAGE = 'undercarriage',
-  WHEELS = 'wheels',
-  FEATURES = 'features'
+  ENGINE = "engine",
+  UNDERCARRIAGE = "undercarriage",
+  WHEELS = "wheels",
+  FEATURES = "features",
 }
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+  throw new Error("Missing Supabase environment variables");
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
@@ -62,36 +62,34 @@ export const handleSupabaseError = (error: unknown): SupabaseError => {
       details: error.stack,
     };
   }
-  
+
   return {
-    message: 'An unknown error occurred',
+    message: "An unknown error occurred",
     details: String(error),
   };
 };
 
 export const isSupabaseError = (error: unknown): error is SupabaseError => {
   return (
-    typeof error === 'object' &&
+    typeof error === "object" &&
     error !== null &&
-    'message' in error &&
-    typeof (error as SupabaseError).message === 'string'
+    "message" in error &&
+    typeof (error as SupabaseError).message === "string"
   );
 };
 
 // Utility function for safe database selects
-export async function safeSelect<T>(
-  query: Promise<{ data: T | null; error: Error | null }>
-): Promise<T | null> {
+export async function safeSelect<T extends Record<string, unknown>>(
+  table: string,
+  select?: string,
+): Promise<T[] | null> {
   try {
-    const { data, error } = await query;
-    if (error) {
-      console.error('Database select error:', error);
-      throw error;
-    }
-    return data;
+    const { data, error } = await supabase.from(table).select(select || "*");
+    if (error) console.error("Database query error:", error);
+    return data as T[] | null;
   } catch (error) {
     const supaError = handleSupabaseError(error);
-    console.error('Database select error:', supaError);
+    console.error("Database select error:", supaError);
     return null;
   }
 }
@@ -100,7 +98,7 @@ export async function safeSelect<T>(
 type ProgressState = {
   file: string;
   progress: number;
-  status: 'pending' | 'uploading' | 'success' | 'error';
+  status: "pending" | "uploading" | "success" | "error";
   error?: string;
 };
 
@@ -111,16 +109,16 @@ export function useSupabaseWithToast() {
   const handleError = (error: unknown) => {
     const supaError = handleSupabaseError(error);
     toast({
-      title: 'Error',
+      title: "Error",
       description: supaError.message,
-      variant: 'destructive',
+      variant: "destructive",
     });
     return supaError;
   };
 
   const handleSuccess = (message: string) => {
     toast({
-      title: 'Success',
+      title: "Success",
       description: message,
     });
   };
@@ -137,17 +135,17 @@ export async function uploadVehicleImages(
   category: VehicleImageCategory,
   positions: ImagePosition[],
   onProgress: (progress: Record<string, ProgressState>) => void,
-  maxSizeMB: number = 10
+  maxSizeMB: number = 10,
 ): Promise<string[]> {
   const uploadProgress: Record<string, ProgressState> = {};
   const imageUrls: string[] = [];
 
   // Initialize progress for each file
-  files.forEach(file => {
+  files.forEach((file) => {
     uploadProgress[file.name] = {
       file: file.name,
       progress: 0,
-      status: 'pending'
+      status: "pending",
     };
   });
 
@@ -158,12 +156,12 @@ export async function uploadVehicleImages(
       const position = positions[i];
 
       // Check file size
-      if (file.size > maxSizeMB * 1024 * 1024) {
+      if (file.size > maxSizeMB * 10024 * 10024) {
         uploadProgress[file.name] = {
           file: file.name,
           progress: 0,
-          status: 'error',
-          error: `File size exceeds ${maxSizeMB}MB limit`
+          status: "error",
+          error: `File size exceeds ${maxSizeMB}MB limit`,
         };
         onProgress({ ...uploadProgress });
         continue;
@@ -173,45 +171,48 @@ export async function uploadVehicleImages(
       uploadProgress[file.name] = {
         file: file.name,
         progress: 0,
-        status: 'uploading'
+        status: "uploading",
       };
       onProgress({ ...uploadProgress });
 
       try {
         // Upload to storage bucket
         const fileName = `${vehicleId}/${category}/${position}/${Date.now()}-${file.name}`;
-        const { error } = await supabase.storage
-          .from('vehicle-images')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
-        if (error) throw error;
 
-        // Get public URL
+        // Upload to storage bucket
+        // Get public URL first (synchronous)
         const { data: urlData } = supabase.storage
-          .from('vehicle-images')
+          .from("vehicle-images")
           .getPublicUrl(fileName);
+
+        // Then do the upload (async)
+        const { data, error } = await supabase.storage
+          .from("vehicle-images")
+          .upload(fileName, file, { cacheControl: "3600", upsert: false });
+        if (error) console.error("Database query error:", error);
+
         if (!urlData?.publicUrl) {
-          const error = new Error('Failed to get public URL');
-          console.error('Public URL error:', error);
+          const error = new Error("Failed to get public URL");
+          console.error("Public URL error:", handleSupabaseError(error));
           throw error;
         }
 
-        imageUrls.push(urlData.publicUrl);
-
-        // Update progress
+        // Update progress and store URL
         uploadProgress[file.name] = {
           file: file.name,
           progress: 100,
-          status: 'success'
+          status: "success",
         };
+        onProgress({ ...uploadProgress });
+        imageUrls.push(urlData.publicUrl);
+
+        // Update progress is already handled in the try block above
       } catch (error) {
         uploadProgress[file.name] = {
           file: file.name,
           progress: 0,
-          status: 'error',
-          error: error instanceof Error ? error.message : 'Upload failed'
+          status: "error",
+          error: error instanceof Error ? error.message : "Upload failed",
         };
       }
 
@@ -221,17 +222,20 @@ export async function uploadVehicleImages(
     return imageUrls;
   } catch (error) {
     // Handle any unexpected errors
-    Object.keys(uploadProgress).forEach(fileName => {
-      if (uploadProgress[fileName].status === 'pending' || uploadProgress[fileName].status === 'uploading') {
+    Object.keys(uploadProgress).forEach((fileName) => {
+      if (
+        uploadProgress[fileName].status === "pending" ||
+        uploadProgress[fileName].status === "uploading"
+      ) {
         uploadProgress[fileName] = {
           file: fileName,
           progress: 0,
-          status: 'error',
-          error: error instanceof Error ? error.message : 'Upload failed'
+          status: "error",
+          error: error instanceof Error ? error.message : "Upload failed",
         };
       }
     });
     onProgress({ ...uploadProgress });
     throw error;
   }
-} 
+}

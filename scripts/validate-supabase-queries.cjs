@@ -174,12 +174,12 @@ function validateFile(filePath) {
       },
       {
         name: 'Missing error handling',
-        detect: /await supabase.*\n(?!.*error)/,
-        message: 'Supabase query without error handling',
+        detect: /await supabase\.(?:from|rpc|auth)\..*\n(?!.*error)/,
+        message: 'Database or RPC query without error handling',
         fix: content => {
           // Try to add basic error handling
           return content.replace(
-            /(const \{.*?\} = await supabase.*?\n)/g,
+            /(const \{.*?\} = await supabase\.(?:from|rpc|auth)\.[^}]+\n)/g,
             '$1  if (error) console.error("Database query error:", error);\n'
           );
         }
