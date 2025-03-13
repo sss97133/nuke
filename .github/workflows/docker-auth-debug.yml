@@ -1,0 +1,147 @@
+name: Debug Docker Authentication
+
+on:
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: 'Docker registry to authenticate with'
+        required: true
+        default: 'docker.io'
+        type: string
+
+jobs:
+  debug-docker-auth:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Debug environment
+        run: |
+          echo "Docker version:"
+          docker --version
+          
+          echo "Docker info:"
+          docker info
+          
+          echo "GitHub Actions environment:"
+          echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "GITHUB_SHA: $GITHUB_SHA"
+          
+          echo "Docker system info:"
+          docker system info || echo "Could not retrieve Docker system info"
+      
+      - name: Check Docker Hub credentials
+        id: check-creds
+        run: |
+          echo "Checking Docker Hub credentials..."
+          
+          # Check DOCKER_HUB_USERNAME
+          if [ -n "${{ secrets.DOCKER_HUB_USERNAME }}" ]; then
+            echo "✅ DOCKER_HUB_USERNAME is configured"
+            USERNAME_FIRST_CHAR="${{ secrets.DOCKER_HUB_USERNAME:0:1 }}"
+            echo "Username starts with: $USERNAME_FIRST_CHAR***"
+            echo "username_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ DOCKER_HUB_USERNAME is not configured"
+            echo "username_exists=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check DOCKER_HUB_TOKEN
+          if [ -n "${{ secrets.DOCKER_HUB_TOKEN }}" ]; then
+            echo "✅ DOCKER_HUB_TOKEN is configured"
+            TOKEN_LENGTH=${#TOKEN}
+            echo "Token length: $TOKEN_LENGTH characters"
+            echo "token_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ DOCKER_HUB_TOKEN is not configured"
+            echo "token_exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Debug GitHub context
+        run: |
+          echo "Debug GitHub context:"
+          echo "Actor: ${{ github.actor }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Event name: ${{ github.event_name }}"
+          echo "Workspace: ${{ github.workspace }}"
+      
+      - name: Verify Docker networking
+        run: |
+          echo "Testing connection to Docker Hub:"
+          curl -sL https://registry-1.docker.io/v2/ || echo "Could not connect to Docker Hub"
+          
+          echo "Testing DNS resolution:"
+          nslookup registry-1.docker.io || echo "DNS resolution failed"
+      
+      - name: Attempt Docker login
+        if: steps.check-creds.outputs.username_exists == 'true' && steps.check-creds.outputs.token_exists == 'true'
+        run: |
+          echo "Attempting manual Docker login..."
+          echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin ${{ inputs.registry }} || echo "Manual login failed"
+      
+      - name: Attempt login with Docker action
+        if: steps.check-creds.outputs.username_exists == 'true' && steps.check-creds.outputs.token_exists == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Verify login status
+        run: |
+          echo "Verifying Docker login status:"
+          docker info | grep -i username || echo "Not logged in"
+      
+      - name: Generate diagnostic report
+        run: |
+          echo "# Docker Authentication Diagnostic Report" > docker-auth-report.md
+          echo "" >> docker-auth-report.md
+          echo "## Environment" >> docker-auth-report.md
+          echo "- Registry: ${{ inputs.registry }}" >> docker-auth-report.md
+          echo "- Runner: ${{ runner.os }}" >> docker-auth-report.md
+          echo "- Docker version: $(docker --version)" >> docker-auth-report.md
+          echo "" >> docker-auth-report.md
+          
+          echo "## Credentials Status" >> docker-auth-report.md
+          if [ "${{ steps.check-creds.outputs.username_exists }}" == "true" ]; then
+            echo "- Username: ✅ Configured" >> docker-auth-report.md
+          else
+            echo "- Username: ❌ Missing" >> docker-auth-report.md
+          fi
+          
+          if [ "${{ steps.check-creds.outputs.token_exists }}" == "true" ]; then
+            echo "- Token: ✅ Configured" >> docker-auth-report.md
+          else
+            echo "- Token: ❌ Missing" >> docker-auth-report.md
+          fi
+          
+          echo "" >> docker-auth-report.md
+          echo "## Recommendations" >> docker-auth-report.md
+          
+          if [ "${{ steps.check-creds.outputs.username_exists }}" != "true" ] || [ "${{ steps.check-creds.outputs.token_exists }}" != "true" ]; then
+            echo "1. Go to Settings > Secrets > Actions" >> docker-auth-report.md
+            echo "2. Add the following secrets:" >> docker-auth-report.md
+            if [ "${{ steps.check-creds.outputs.username_exists }}" != "true" ]; then
+              echo "   - DOCKER_HUB_USERNAME: Your Docker Hub username" >> docker-auth-report.md
+            fi
+            if [ "${{ steps.check-creds.outputs.token_exists }}" != "true" ]; then
+              echo "   - DOCKER_HUB_TOKEN: A token created at https://hub.docker.com/settings/security" >> docker-auth-report.md
+            fi
+          else
+            echo "All required credentials are configured. If you're still experiencing issues:" >> docker-auth-report.md
+            echo "1. Verify the username and token are correct" >> docker-auth-report.md
+            echo "2. Check if your Docker Hub account has permission to push to the repository" >> docker-auth-report.md
+            echo "3. Ensure your Docker Hub account doesn't have 2FA requirements that prevent token authentication" >> docker-auth-report.md
+          fi
+      
+      - name: Upload diagnostic report
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-auth-diagnostic-report
+          path: docker-auth-report.md
+          retention-days: 3
