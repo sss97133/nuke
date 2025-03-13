@@ -13,8 +13,15 @@ const indexPath = path.resolve(__dirname, '../dist/index.html');
 const env = {
   VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || '',
   VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || '',
+  VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY || '',
   NODE_ENV: process.env.NODE_ENV || 'production'
 };
+
+// Log environment variables to help with debugging
+console.log('Environment variables being injected:');
+console.log('- VITE_SUPABASE_URL present:', !!process.env.VITE_SUPABASE_URL);
+console.log('- VITE_SUPABASE_ANON_KEY present:', !!process.env.VITE_SUPABASE_ANON_KEY);
+console.log('- VITE_SUPABASE_SERVICE_KEY present:', !!process.env.VITE_SUPABASE_SERVICE_KEY);
 
 try {
   // Read the index.html file
