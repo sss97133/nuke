@@ -26,9 +26,9 @@
     "test": "NODE_OPTIONS='--max-old-space-size=8192' vitest",
     "test:ci": "vitest run --coverage",
     "test:watch": "NODE_OPTIONS='--max-old-space-size=8192' vitest watch",
-    "validate:schema": "NODE_ENV=test node --loader ts-node/esm scripts/validate-schema.ts",
-    "validate:queries": "node --loader ts-node/esm scripts/validate-queries.ts",
-    "validate:queries:fix": "node --loader ts-node/esm scripts/validate-queries.ts --fix",
+    "validate:schema": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-schema.ts",
+    "validate:queries": "NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-queries.ts",
+    "validate:queries:fix": "NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-queries.ts --fix",
     "validate:all": "npm run validate:schema && npm run validate:queries",
     "pre-commit": "lint-staged"
   },
