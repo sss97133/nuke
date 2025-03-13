@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:prod",
   "devCommand": "npm run dev",
   "outputDirectory": "dist",
   "framework": "vite",

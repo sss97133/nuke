@@ -39,11 +39,40 @@ export enum ImagePosition {
   FEATURES = "features",
 }
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Get environment variables based on the current environment
+const getEnvValue = (key: string): string => {
+  // For Vite builds
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key] || '';
+  }
+  
+  // For production builds where import.meta might not be available
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key] || '';
+  }
+  
+  // For browser environments where window.__env might be set
+  if (typeof window !== 'undefined' && window.__env && window.__env[key]) {
+    return window.__env[key];
+  }
+  
+  return '';
+};
 
+// Add type definition for window.__env
+declare global {
+  interface Window {
+    __env?: Record<string, string>;
+  }
+}
+
+const supabaseUrl = getEnvValue('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
+
+// Validate environment configuration
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables");
+  console.error(`Invalid configuration: missing URL or key for environment ${process.env.NODE_ENV || 'production'}`);
+  throw new Error(`Invalid configuration: missing URL for environment ${process.env.NODE_ENV || 'production'}`);
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
