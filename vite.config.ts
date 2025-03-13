@@ -50,7 +50,14 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
+        // Force all react-syntax-highlighter imports to use CJS path
+        // This fixes build issues with ESM imports in CI/CD
+        'react-syntax-highlighter/dist/esm/': 'react-syntax-highlighter/dist/cjs/',
       },
+      // Improve module resolution and avoid import issues
+      mainFields: ['browser', 'module', 'main'],
+      extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
+      preserveSymlinks: false,
     },
     build: {
       sourcemap: !isProd,
@@ -90,6 +97,20 @@ export default defineConfig(({ mode }) => {
             'vendor-query': ['@tanstack/react-query'],
           },
         },
+        // Improve build error reporting
+        onwarn(warning, defaultHandler) {
+          // Provide more detailed warnings for import issues
+          if (warning.code === 'UNRESOLVED_IMPORT') {
+            console.error('❌ Build error: Unable to resolve import:', warning.source, 
+              '\nMake sure the package is installed and the import path is correct.');
+            console.error('If using react-syntax-highlighter, make sure to use the CJS path:');
+            console.error('import { style } from "react-syntax-highlighter/dist/cjs/styles/prism"');
+          } else if (warning.code === 'CIRCULAR_DEPENDENCY') {
+            console.warn('⚠️ Circular dependency detected:', warning.message);
+          } else {
+            defaultHandler(warning);
+          }
+        }
       },
       terserOptions: isProd ? {
         compress: {
@@ -115,6 +136,9 @@ export default defineConfig(({ mode }) => {
         'jotai',
         '@tanstack/react-query',
         'react-helmet-async',
+        // Add explicit include for react-syntax-highlighter to ensure proper bundling
+        'react-syntax-highlighter',
+        'react-syntax-highlighter/dist/cjs/styles/prism',
       ],
       exclude: ['fsevents'],
       force: true,
