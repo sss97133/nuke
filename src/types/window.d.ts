@@ -1,10 +1,9 @@
-
 interface Window {
   ethereum?: {
     isMetaMask?: boolean;
-    request: (request: { method: string; params?: any[] }) => Promise<any>;
-    on: (eventName: string, callback: any) => void;
-    removeListener: (eventName: string, callback: any) => void;
+    request: <T>(params: { method: string; params?: unknown[] }) => Promise<T>;
+    on: (event: string, callback: (params: unknown[]) => void) => void;
+    removeListener: (event: string, callback: (params: unknown[]) => void) => void;
     selectedAddress?: string;
     chainId?: string;
     isConnected?: () => boolean;

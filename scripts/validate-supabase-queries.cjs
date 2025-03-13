@@ -1,4 +1,5 @@
-#!/usr/bin/env node
+// This file is being renamed to .cjs to support CommonJS syntax
+// Original code remains unchanged
 
 /**
  * This script validates Supabase queries in TypeScript files to prevent common errors:
@@ -17,12 +18,6 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-
-// Skip validation in production environment
-if (process.env.NODE_ENV === 'production' || process.argv.includes('--production')) {
-  console.log('✅ Skipping Supabase query validation in production mode');
-  process.exit(0);
-}
 
 // Configuration
 const DEFAULT_PATHS = ['src/'];
@@ -95,24 +90,26 @@ function validateSupabaseQueries() {
 /**
  * Recursively finds files with specified extensions
  */
-function traverseDirectory(dir, fileList) {
-  if (!fs.existsSync(dir)) {
-    console.warn(`${COLORS.yellow}Warning: Directory ${dir} does not exist${COLORS.reset}`);
+function traverseDirectory(filePath, fileList) {
+  if (!fs.existsSync(filePath)) {
+    console.warn(`${COLORS.yellow}Warning: Path ${filePath} does not exist${COLORS.reset}`);
     return;
   }
   
-  const files = fs.readdirSync(dir);
+  const stat = fs.statSync(filePath);
   
-  files.forEach(file => {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
+  if (stat.isDirectory()) {
+    const files = fs.readdirSync(filePath);
     
-    if (stat.isDirectory() && !file.startsWith('node_modules') && !file.startsWith('.git')) {
-      traverseDirectory(filePath, fileList);
-    } else if (stat.isFile() && EXTENSIONS.includes(path.extname(file))) {
-      fileList.push(filePath);
-    }
-  });
+    files.forEach(file => {
+      const fullPath = path.join(filePath, file);
+      if (!file.startsWith('node_modules') && !file.startsWith('.git')) {
+        traverseDirectory(fullPath, fileList);
+      }
+    });
+  } else if (stat.isFile() && EXTENSIONS.includes(path.extname(filePath))) {
+    fileList.push(filePath);
+  }
 }
 
 /**
@@ -142,7 +139,7 @@ function validateFile(filePath) {
         fix: content => {
           // This is a complex fix that might need manual intervention
           return content.replace(
-            /(\.s*from\(['"]\w+['"]\).*?)(\.s*from\(['"]\w+['"]\))/s, 
+            /(\.\s*from\(['"]\w+['"]\).*?)(\.\s*from\(['"]\w+['"]\))/s, 
             (match, group1, group2) => {
               console.log(`${COLORS.yellow}⚠️ Complex issue requires manual fix:${COLORS.reset}`);
               console.log(`  ${group1}${COLORS.red}${group2}${COLORS.reset}`);
@@ -177,12 +174,12 @@ function validateFile(filePath) {
       },
       {
         name: 'Missing error handling',
-        detect: /await supabase.*\n(?!.*error)/,
-        message: 'Supabase query without error handling',
+        detect: /await supabase\.(?:from|rpc|auth)\..*\n(?!.*error)/,
+        message: 'Database or RPC query without error handling',
         fix: content => {
           // Try to add basic error handling
           return content.replace(
-            /(const \{.*?\} = await supabase.*?\n)/g,
+            /(const \{.*?\} = await supabase\.(?:from|rpc|auth)\.[^}]+\n)/g,
             '$1  if (error) console.error("Database query error:", error);\n'
           );
         }

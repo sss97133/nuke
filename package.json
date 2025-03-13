@@ -18,8 +18,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "lint:queries": "node scripts/validate-supabase-queries.cjs",
-    "lint:queries:fix": "node scripts/validate-supabase-queries.cjs --fix",
+    "lint:queries": "node scripts/validate-supabase-queries.mjs",
+    "lint:queries:fix": "node scripts/validate-supabase-queries.mjs --fix",
     "validate:schema": "cross-env NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm --no-warnings' node scripts/validate-schema.ts",
     "validate:all": "npm run type-check && npm run lint && npm run lint:queries && npm run validate:schema",
     "fix-deps": "node scripts/fix-deps.js",
@@ -27,7 +27,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
     "clean": "rimraf dist node_modules/.vite",
-    "prepare": "echo 'Ready for development!'",
+    "prepare": "husky",
     "test": "NODE_OPTIONS='--max-old-space-size=8192' vitest",
     "test:ci": "vitest run --coverage",
     "test:watch": "NODE_OPTIONS='--max-old-space-size=8192' vitest watch",
@@ -154,17 +154,11 @@
     "vitest": "^3.0.8",
     "cross-env": "^7.0.3"
   },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged",
-      "pre-push": "npm run validate:all"
-    }
-  },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "eslint --fix",
       "prettier --write",
-      "node scripts/validate-supabase-queries.js"
+      "node scripts/validate-supabase-queries.mjs"
     ],
     "*.{json,css,scss,md}": [
       "prettier --write"

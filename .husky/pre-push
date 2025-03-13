@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -e
+
+echo "🔍 Running pre-push checks..."
+npm run validate:all
+echo "✅ All pre-push checks passed!"

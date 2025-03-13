@@ -5,7 +5,7 @@
 import { SocialLinks, StreamingLinks, Achievement } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 
-type ProfileAnalysisResult = {
+export type ProfileAnalysisResult = {
   userPersona: string;
   contentAffinities: string[];
   developerSpectrum: Record<string, number>;
