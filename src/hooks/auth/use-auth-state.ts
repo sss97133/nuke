@@ -11,10 +11,7 @@ export const useAuthState = () => {
 
   const fetchSession = useCallback(async () => {
     try {
-      setLoading(true);
-      
       const { data, error } = await supabase.auth.getSession();
-      
       if (error) {
         console.error('[useAuthState] Error fetching session:', error);
         setError(error);
@@ -23,57 +20,75 @@ export const useAuthState = () => {
           description: "We're having trouble verifying your login. Please try again.",
           variant: "destructive",
         });
+        setSession(null);
         return;
       }
       
       if (data?.session) {
-        console.info('[useAuthState] Auth event: INITIAL_SESSION');
-        console.info('[useAuthState] Auth state changed, session:', data.session.user?.email);
-        console.info('[useAuthState] Active session detected, user ID:', data.session.user?.id);
+        console.info('[useAuthState] Active session detected, user:', data.session.user?.email);
+        setSession(data.session);
       } else {
         console.info('[useAuthState] No active session found');
+        setSession(null);
       }
-      
-      setSession(data.session);
-      setLoading(false);
     } catch (err) {
       console.error('[useAuthState] Unexpected error in auth state:', err);
       setError(err instanceof Error ? err : new Error('Unknown authentication error'));
-      setLoading(false);
+      toast({
+        title: "Authentication Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+      setSession(null);
     }
   }, [toast]);
 
   useEffect(() => {
     console.info('[useAuthState] Setting up auth state management');
-
     let mounted = true;
-    
+    const timeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('[useAuthState] Loading timeout reached, forcing state update');
+        setLoading(false);
+        setError(new Error('Authentication timed out. Please refresh the page.'));
+        toast({
+          title: "Authentication Timeout",
+          description: "Taking longer than expected. Please refresh the page.",
+          variant: "destructive",
+        });
+      }
+    }, 10000); // 10 second timeout
+
     // Initialize by fetching the session
-    fetchSession();
+    fetchSession().finally(() => {
+      if (mounted) setLoading(false);
+    });
 
     // Set up auth state change listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.info('[useAuthState] Auth event:', event);
       
       if (mounted) {
         if (newSession) {
-          console.info('[useAuthState] Auth state changed, session:', newSession.user?.email);
-          console.info('[useAuthState] Auth state changed, user ID:', newSession.user?.id);
+          console.info('[useAuthState] Auth state changed, user:', newSession.user?.email);
+          setSession(newSession);
+        } else {
+          setSession(null);
         }
-        
-        setSession(newSession);
         setLoading(false);
       }
     });
 
-    // Clean up the listener when the component unmounts
+
+
+    // Clean up
     return () => {
       console.info('[useAuthState] Cleaning up auth state');
       mounted = false;
-      if (authListener) authListener.subscription.unsubscribe();
+      clearTimeout(timeoutId);
+      if (data) data.subscription.unsubscribe();
     };
-  }, [fetchSession]);
+  }, [fetchSession, loading, toast]);
 
-  // Return the session and loading state
   return { session, loading, error };
 };

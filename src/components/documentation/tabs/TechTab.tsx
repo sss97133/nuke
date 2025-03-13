@@ -3,9 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings, ArrowLeft, Search, Copy, Check } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-// Fix the import path to avoid ESM-specific import which causes build issues
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import { codeToHtml } from 'shiki';
+import { useEffect, useCallback } from 'react';
 
 // Import technical documentation as a string
 const TECHNICAL_DOC = `# Technical Documentation
@@ -61,6 +60,34 @@ export const TechTab = () => {
   const [showIntegrationDocs, setShowIntegrationDocs] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [highlightedCode, setHighlightedCode] = useState<{ [key: string]: string }>({});
+
+  const highlightCode = useCallback(async (code: string) => {
+    try {
+      // Only highlight if not already cached
+      if (!highlightedCode[code]) {
+        const html = await codeToHtml(code, {
+          lang: 'typescript',
+          theme: 'dark-plus'
+        });
+        setHighlightedCode(prev => ({ ...prev, [code]: html }));
+      }
+    } catch (error) {
+      console.error('Failed to highlight code:', error);
+    }
+  }, [highlightedCode]);
+
+  useEffect(() => {
+    // Find all code blocks and highlight them
+    TECHNICAL_DOC.split('\n').forEach((line) => {
+      if (line.startsWith('```')) {
+        const code = line.replace('```', '').trim();
+        if (code) {
+          highlightCode(code);
+        }
+      }
+    });
+  }, [highlightCode]);
 
   const tableOfContents = useMemo(() => {
     const items: TableOfContentsItem[] = [];
@@ -196,13 +223,13 @@ export const TechTab = () => {
                     const code = paragraph.replace('```', '').trim();
                     return (
                       <div key={index} className="relative group">
-                        <SyntaxHighlighter
-                          language="typescript"
-                          style={vscDarkPlus}
-                          className="rounded-lg"
-                        >
-                          {code}
-                        </SyntaxHighlighter>
+                        <div className="relative rounded-md bg-[#1E1E1E] p-4 overflow-x-auto">
+                          <div 
+                            dangerouslySetInnerHTML={{ 
+                              __html: highlightedCode[code] || `<pre class="text-white">${code}</pre>`
+                            }} 
+                          />
+                        </div>
                         <Button
                           variant="ghost"
                           size="icon"
