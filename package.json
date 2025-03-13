@@ -8,12 +8,12 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run validate:all && tsc && vite build",
     "build:alt": "node build.js",
     "build:esm": "node build.mjs",
-    "build:ci": "CI=true node build.mjs",
+    "build:ci": "CI=true npm run validate:all && node build.mjs",
     "build:dev": "vite build --mode development",
-    "build:prod": "tsc && vite build --mode production",
+    "build:prod": "npm run validate:all && tsc && vite build --mode production",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -22,10 +22,15 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
     "clean": "rimraf dist node_modules/.vite",
-    "prepare": "echo 'Ready for development!'",
+    "prepare": "husky install",
     "test": "NODE_OPTIONS='--max-old-space-size=8192' vitest",
     "test:ci": "vitest run --coverage",
-    "test:watch": "NODE_OPTIONS='--max-old-space-size=8192' vitest watch"
+    "test:watch": "NODE_OPTIONS='--max-old-space-size=8192' vitest watch",
+    "validate:schema": "NODE_ENV=test node --loader ts-node/esm scripts/validate-schema.ts",
+    "validate:queries": "node --loader ts-node/esm scripts/validate-queries.ts",
+    "validate:queries:fix": "node --loader ts-node/esm scripts/validate-queries.ts --fix",
+    "validate:all": "npm run validate:schema && npm run validate:queries",
+    "pre-commit": "lint-staged"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
@@ -103,6 +108,16 @@
     "vaul": "^1.1.2",
     "zod": "^3.24.2"
   },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write",
+      "npm run validate:queries"
+    ],
+    "*.{js,jsx,json,css,scss}": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.0",
     "@eslint/js": "^9.22.0",
@@ -129,8 +144,10 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jsdom": "^26.0.0",
+    "lint-staged": "^15.5.0",
     "postcss": "^8.5.3",
     "postcss-nesting": "^12.0.2",
     "prettier": "^3.5.3",
@@ -138,6 +155,8 @@
     "rimraf": "^6.0.1",
     "terser": "^5.39.0",
     "ts-jest": "^29.2.6",
+    "ts-morph": "^22.0.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.2",
     "vite": "^6.2.1",
     "vite-plugin-compression2": "^1.3.3",
