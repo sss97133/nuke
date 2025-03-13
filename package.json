@@ -12,7 +12,7 @@
     "build:alt": "cross-env NODE_ENV=production ts-node build.ts",
     "build:ci": "cross-env CI=true NODE_ENV=production ts-node build.ts",
     "build:dev": "cross-env NODE_ENV=development vite build --mode development",
-    "build:prod": "cross-env NODE_ENV=production tsc && vite build --mode production",
+    "build:prod": "cross-env NODE_ENV=production tsc && vite build --config vite.config.vercel.js",
     "vercel-build": "npm ci && npm run build:prod",
     "preview": "vite preview",
     "lint": "eslint .",

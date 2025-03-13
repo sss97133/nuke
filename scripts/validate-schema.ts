@@ -2,6 +2,7 @@ import {
   createClient,
   SupabaseClient,
   PostgrestError,
+  SupabaseClientOptions,
 } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import { fileURLToPath } from "url";
@@ -77,8 +78,8 @@ class SchemaValidationError extends Error {
 }
 
 class SchemaValidator {
-  private client: SupabaseClient<Database, "public">;
-  private logger: typeof console;
+  protected client: SupabaseClient<Database, "public">;
+  protected logger: typeof console;
 
   constructor(url: string, key: string, logger = console) {
     this.client = createClient<Database>(url, key);
@@ -280,21 +281,56 @@ class MockSchemaValidator extends SchemaValidator {
   private readonly mockSchema: RequiredSchema = {
     team_members: ["id", "status", "profile_id", "member_type"],
     profiles: ["id", "email", "created_at"],
-    vehicles: ["id", "vin", "status", "created_at"],
+    vehicles: ["id", "vin", "status", "created_at"]
   };
 
-  constructor() {
-    // In test environment, we use a mock client to avoid real database calls
-    const mockClient = {
-      rpc: (functionName: string, params?: { table_name?: string }) => {
-        if (functionName === "get_table_columns" && params?.table_name) {
-          const tableName = params.table_name;
-          const columns = this.mockSchema[tableName] || [];
+  constructor(logger = console) {
+    // Use test-specific URLs and keys
+    const testUrl = "http://localhost:54321";
+    const testKey = "test-service-key";
+    
+    super(testUrl, testKey, logger);
+
+    // Create mock client options
+    const options: SupabaseClientOptions<"public"> = {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      },
+      global: {
+        headers: { "x-test-mode": "true" }
+      }
+    };
+
+    // Create mock client with base configuration
+    const mockClient = createClient<Database>(testUrl, testKey, options);
+
+    // Create a custom error factory
+    const createError = (message: string): PostgrestError => {
+      const error = new Error(message) as PostgrestError;
+      error.details = "";
+      error.hint = "";
+      error.code = "404";
+      return error;
+    };
+
+        // Create a mock implementation that matches the test environment
+    const mockImplementation = {
+      rpc: <T = any>(fn: string, args?: { table_name?: string }) => {
+        if (fn === "get_table_columns" && args?.table_name) {
+          const tableName = args.table_name;
+          if (!(tableName in this.mockSchema)) {
+            return Promise.resolve({
+              data: null,
+              error: createError(`Table ${tableName} does not exist`),
+            });
+          }
           return Promise.resolve({
-            data: columns.map((name) => ({
+            data: this.mockSchema[tableName].map((name) => ({
               column_name: name,
               data_type: "text",
-              is_nullable: false,
+              is_nullable: "NO",
             })),
             error: null,
           });
@@ -306,41 +342,49 @@ class MockSchemaValidator extends SchemaValidator {
           limit: () => {
             const exists = tableName in this.mockSchema;
             return Promise.resolve({
-              data: exists ? [] : null,
-              error: exists
-                ? null
-                : new Error(`Table ${tableName} does not exist`),
+              data: exists ? [{ id: 1 }] : null,
+              error: exists ? null : createError(`Table ${tableName} does not exist`),
             });
           },
         }),
       }),
+    };
+
+    // Create a custom mock client that extends the base client
+    const customMockClient = {
+      ...mockClient,
+      ...mockImplementation,
     } as unknown as SupabaseClient<Database>;
 
-    super("http://localhost:54321", "test-service-key");
-    // Override the client with our mock
-    Object.defineProperty(this, "client", {
-      value: mockClient,
-      writable: false,
-    });
+    // Override the client with our custom mock
+    this.client = customMockClient;
+
+    // Log test mode
+    this.logger.info("🧰 Running in test mode with mock Supabase client");
   }
 
   async validateSchema(): Promise<void> {
-    console.info("🔍 Starting mock schema validation...");
+    this.logger.info("🔍 Starting mock schema validation...");
 
     try {
       // Simulate validation of each table
       for (const [tableName, columns] of Object.entries(this.mockSchema)) {
-        console.info(`📋 Checking table: ${tableName}`);
-        await this.validateTable(tableName, columns);
-
-        console.info(
-          `✅ Table ${tableName} validated successfully (${columns.length} columns)`,
-        );
+        this.logger.info(`📋 Checking table: ${tableName}`);
+        try {
+          await this.validateTable(tableName, columns);
+          this.logger.info(`✅ Table ${tableName} validated successfully (${columns.length} columns)`);
+        } catch (error) {
+          this.logger.error(
+            `❌ Failed to validate table ${tableName}:`,
+            error instanceof Error ? error.message : String(error),
+          );
+          throw error;
+        }
       }
 
-      console.info("✅ Mock schema validation completed successfully");
+      this.logger.info("✅ Mock schema validation completed successfully");
     } catch (error) {
-      console.error(
+      this.logger.error(
         "❌ Mock schema validation failed:",
         error instanceof Error ? error.message : String(error),
       );
@@ -351,55 +395,22 @@ class MockSchemaValidator extends SchemaValidator {
 
 // Main execution
 const main = async (): Promise<void> => {
-  const ENV = process.env.NODE_ENV || "development";
-  let validator: SchemaValidator;
+  const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY;
 
-  try {
-    // Use mock validator in test environment
-    if (ENV === "test") {
-      validator = new MockSchemaValidator();
-    } else {
-      const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-      const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY;
-
-      if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-        throw new Error(
-          "❌ Missing required environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_KEY",
-        );
-      }
-
-      validator = new SchemaValidator(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    }
-
-    await validator.validateSchema();
-
-    console.info("✅ Schema validation completed successfully");
-    process.exit(0);
-  } catch (error) {
-    console.error(
-      "❌ Schema validation failed:",
-      error instanceof Error ? error.message : String(error),
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    throw new Error(
+      "❌ Missing required environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_KEY",
     );
-    process.exit(1);
   }
+
+  const validator = new SchemaValidator(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  await validator.validateSchema();
+  console.log("✅ Schema validation completed successfully");
 };
 
-// Handle unhandled promise rejections
-process.on("unhandledRejection", (error: unknown) => {
-  console.error(
-    "❌ Unhandled promise rejection:",
-    error instanceof Error ? error.message : String(error),
-  );
+// Run the script
+main().catch((error) => {
+  console.error("❌ Schema validation failed:", error instanceof Error ? error.message : String(error));
   process.exit(1);
 });
-
-// Run the script and properly handle any errors
-Promise.resolve()
-  .then(() => main())
-  .catch((error) => {
-    console.error(
-      "❌ Fatal error:",
-      error instanceof Error ? error.message : String(error),
-    );
-    process.exit(1);
-  });

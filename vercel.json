@@ -11,12 +11,11 @@
     "silent": false,
     "autoAlias": true
   },
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/node"
-    }
-  ],
+  "env": {
+    "VITE_SUPABASE_URL": "@vite_supabase_url",
+    "VITE_SUPABASE_SERVICE_KEY": "@vite_supabase_service_key",
+    "NODE_ENV": "production"
+  },
   "routes": [
     {
       "src": "/assets/(.*)",
