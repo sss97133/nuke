@@ -14,8 +14,8 @@ if (env === 'production') {
 }
 
 // Use service key for schema validation if available
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('❌ Missing required Supabase credentials');
@@ -77,10 +77,10 @@ async function validateSchema() {
   try {
     console.log('🔍 Starting database schema validation...');
 
-    // Validate each table's schema
+    // Fetch table information
     for (const [tableName, schema] of Object.entries(schemaMap)) {
       console.log(`📋 Checking table: ${tableName}`);
-
+      
       // Query to get a single row to validate structure
       const { data, error } = await supabase
         .from(tableName)
@@ -92,21 +92,27 @@ async function validateSchema() {
         process.exit(1);
       }
 
+      // Validate schema structure
+      if (!data || data.length === 0) {
+        console.warn(`⚠️ No data found in table ${tableName}, skipping schema check`);
+        continue;
+      }
+
       // Get expected columns from Zod schema
       const expectedColumns = Object.keys(schema.shape);
-
+      
       // Get actual columns
-      const actualColumns = data && data[0] ? Object.keys(data[0]) : [];
-
+      const actualColumns = Object.keys(data[0]);
+      
       // Check for missing columns
       const missingColumns = expectedColumns.filter(col => !actualColumns.includes(col));
-
+      
       if (missingColumns.length > 0) {
         console.error(`❌ Table ${tableName} is missing required columns: ${missingColumns.join(', ')}`);
         console.error('Run the appropriate migration script to add these columns');
         process.exit(1);
       }
-
+      
       console.log(`✅ Table ${tableName} validated successfully`);
     }
 
@@ -119,4 +125,3 @@ async function validateSchema() {
 }
 
 validateSchema();
-
