@@ -85,7 +85,7 @@ class SchemaValidator {
     this.logger = logger;
   }
 
-  private async validateTable(
+  protected async validateTable(
     tableName: string,
     requiredColumns: string[],
   ): Promise<void> {
@@ -277,46 +277,87 @@ class SchemaValidator {
 
 // Mock implementation for test environment
 class MockSchemaValidator extends SchemaValidator {
+  private readonly mockSchema: RequiredSchema = {
+    team_members: ["id", "status", "profile_id", "member_type"],
+    profiles: ["id", "email", "created_at"],
+    vehicles: ["id", "vin", "status", "created_at"],
+  };
+
   constructor() {
+    // In test environment, we use a mock client to avoid real database calls
+    const mockClient = {
+      rpc: (functionName: string, params?: { table_name?: string }) => {
+        if (functionName === "get_table_columns" && params?.table_name) {
+          const tableName = params.table_name;
+          const columns = this.mockSchema[tableName] || [];
+          return Promise.resolve({
+            data: columns.map((name) => ({
+              column_name: name,
+              data_type: "text",
+              is_nullable: false,
+            })),
+            error: null,
+          });
+        }
+        return Promise.resolve({ data: [], error: null });
+      },
+      from: (tableName: string) => ({
+        select: () => ({
+          limit: () => {
+            const exists = tableName in this.mockSchema;
+            return Promise.resolve({
+              data: exists ? [] : null,
+              error: exists
+                ? null
+                : new Error(`Table ${tableName} does not exist`),
+            });
+          },
+        }),
+      }),
+    } as unknown as SupabaseClient<Database>;
+
     super("http://localhost:54321", "test-service-key");
+    // Override the client with our mock
+    Object.defineProperty(this, "client", {
+      value: mockClient,
+      writable: false,
+    });
   }
 
   async validateSchema(): Promise<void> {
-    // In test environment, we mock the validation since we know
-    // the schema is already validated in development and production
-    const mockSchema: RequiredSchema = {
-      team_members: ["id", "status", "profile_id", "member_type"],
-      profiles: ["id", "email", "created_at"],
-      vehicles: ["id", "vin", "status", "created_at"],
-    };
+    console.info("🔍 Starting mock schema validation...");
 
-    console.log("🔍 Starting mock schema validation...");
+    try {
+      // Simulate validation of each table
+      for (const [tableName, columns] of Object.entries(this.mockSchema)) {
+        console.info(`📋 Checking table: ${tableName}`);
+        await this.validateTable(tableName, columns);
 
-    // Simulate validation of each table
-    for (const [tableName, columns] of Object.entries(mockSchema)) {
-      console.log(`📋 Checking table: ${tableName}`);
+        console.info(
+          `✅ Table ${tableName} validated successfully (${columns.length} columns)`,
+        );
+      }
 
-      console.log(
-        `✅ Table ${tableName} validated successfully (${columns.length} columns)`,
+      console.info("✅ Mock schema validation completed successfully");
+    } catch (error) {
+      console.error(
+        "❌ Mock schema validation failed:",
+        error instanceof Error ? error.message : String(error),
       );
+      throw error;
     }
-
-    console.log("✅ Mock schema validation completed successfully");
   }
 }
 
 // Main execution
-const main = async () => {
-  try {
-    const ENV = process.env.NODE_ENV || "development";
+const main = async (): Promise<void> => {
+  const ENV = process.env.NODE_ENV || "development";
+  let validator: SchemaValidator;
 
+  try {
     // Use mock validator in test environment
     if (ENV === "test") {
-      const validator = new MockSchemaValidator();
-      await validator.validateSchema();
-
-      console.log("✅ Schema validation completed successfully");
-      process.exit(0);
+      validator = new MockSchemaValidator();
     } else {
       const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
       const SUPABASE_SERVICE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY;
@@ -327,12 +368,13 @@ const main = async () => {
         );
       }
 
-      const validator = new SchemaValidator(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-      await validator.validateSchema();
-
-      console.log("✅ Schema validation completed successfully");
-      process.exit(0);
+      validator = new SchemaValidator(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     }
+
+    await validator.validateSchema();
+
+    console.info("✅ Schema validation completed successfully");
+    process.exit(0);
   } catch (error) {
     console.error(
       "❌ Schema validation failed:",
@@ -343,7 +385,7 @@ const main = async () => {
 };
 
 // Handle unhandled promise rejections
-process.on("unhandledRejection", (error) => {
+process.on("unhandledRejection", (error: unknown) => {
   console.error(
     "❌ Unhandled promise rejection:",
     error instanceof Error ? error.message : String(error),
@@ -351,5 +393,13 @@ process.on("unhandledRejection", (error) => {
   process.exit(1);
 });
 
-// Run the script
-void main();
+// Run the script and properly handle any errors
+Promise.resolve()
+  .then(() => main())
+  .catch((error) => {
+    console.error(
+      "❌ Fatal error:",
+      error instanceof Error ? error.message : String(error),
+    );
+    process.exit(1);
+  });

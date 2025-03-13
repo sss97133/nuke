@@ -19,7 +19,7 @@
     "lint:fix": "eslint . --fix",
     "lint:queries": "node scripts/validate-supabase-queries.cjs",
     "lint:queries:fix": "node scripts/validate-supabase-queries.cjs --fix",
-    "validate:schema": "cross-env NODE_ENV=test NODE_OPTIONS='--experimental-specifier-resolution=node --loader ts-node/esm' ts-node --esm scripts/validate-schema.ts",
+    "validate:schema": "cross-env NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm' ts-node --esm scripts/validate-schema.ts",
     "validate:all": "npm run type-check && npm run lint && npm run lint:queries && npm run validate:schema",
     "fix-deps": "node scripts/fix-deps.js",
     "type-check": "tsc --noEmit",
