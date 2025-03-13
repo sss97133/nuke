@@ -13,7 +13,7 @@
     "build:esm": "node build.mjs",
     "build:ci": "CI=true node build.mjs",
     "build:dev": "npm run validate:all && vite build --mode development",
-    "build:prod": "tsc && vite build --mode production",
+    "build:prod": "NODE_ENV=production tsc && vite build --mode production",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -27,8 +27,8 @@
     "test:ci": "vitest run --coverage",
     "test:watch": "NODE_OPTIONS='--max-old-space-size=8192' vitest watch",
     "validate:schema": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-schema.ts",
-    "validate:queries": "NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-queries.ts",
-    "validate:queries:fix": "NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-queries.ts --fix",
+    "validate:queries": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-queries.ts",
+    "validate:queries:fix": "NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm' node scripts/validate-queries.ts --fix",
     "validate:all": "npm run validate:schema && npm run validate:queries",
     "pre-commit": "lint-staged"
   },
@@ -112,7 +112,7 @@
     "*.{ts,tsx}": [
       "eslint --fix",
       "prettier --write",
-      "npm run validate:queries"
+      "NODE_ENV=test npm run validate:queries"
     ],
     "*.{js,jsx,json,css,scss}": [
       "prettier --write"
