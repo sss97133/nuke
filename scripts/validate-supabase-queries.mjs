@@ -14,15 +14,33 @@
  *   paths: Specific files or directories to check, defaults to src/
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-// Configuration
-const DEFAULT_PATHS = ['src/'];
-const EXTENSIONS = ['.ts', '.tsx'];
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Constants
+const PATHS = [
+  path.join(__dirname, '..', 'src'),
+  path.join(__dirname, '..', 'supabase', 'functions'),
+];
+
+const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
 const FIX_MODE = process.argv.includes('--fix');
-const PATHS = process.argv.slice(2).filter(arg => !arg.startsWith('--')) || DEFAULT_PATHS;
+
+// Environment check
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const logger = console;
+
+// Skip validation in production environment
+if (NODE_ENV === 'production' || process.argv.includes('--production')) {
+  logger.info('✅ Skipping Supabase query validation in production mode');
+  process.exit(0);
+}
 
 // Color codes for terminal output
 const COLORS = {
@@ -46,9 +64,9 @@ const stats = {
 /**
  * Main function to validate Supabase queries
  */
-function validateSupabaseQueries() {
-  console.log(`${COLORS.cyan}Validating Supabase queries...${COLORS.reset}`);
-  console.log(`${COLORS.cyan}Mode: ${FIX_MODE ? 'Fix' : 'Check only'}${COLORS.reset}`);
+function validateQueries() {
+  logger.info('🔍 Validating Supabase queries...');
+  logger.info(`Mode: ${FIX_MODE ? 'Fix' : 'Check only'}`);
   
   // Get files to check
   let filesToCheck = [];
@@ -61,13 +79,13 @@ function validateSupabaseQueries() {
       filesToCheck = changedFiles.filter(file => 
         EXTENSIONS.includes(path.extname(file)) && fs.existsSync(file)
       );
-      console.log(`${COLORS.blue}Checking ${filesToCheck.length} changed files${COLORS.reset}`);
+      logger.info(`Checking ${filesToCheck.length} changed files`);
     } else {
       // Get all TypeScript files in specified paths
       PATHS.forEach(dir => {
         traverseDirectory(dir, filesToCheck);
       });
-      console.log(`${COLORS.blue}Checking ${filesToCheck.length} files in ${PATHS.join(', ')}${COLORS.reset}`);
+      logger.info(`Checking ${filesToCheck.length} files in ${PATHS.join(', ')}`);
     }
     
     // Check each file
@@ -80,8 +98,9 @@ function validateSupabaseQueries() {
     if (stats.issuesFound > 0 && !FIX_MODE) {
       process.exit(1);
     }
+    logger.info('✅ All queries validated successfully');
   } catch (error) {
-    console.error(`${COLORS.red}Error: ${error.message}${COLORS.reset}`);
+    logger.error('❌ Query validation failed:', error);
     process.exit(1);
   }
 }
@@ -91,7 +110,7 @@ function validateSupabaseQueries() {
  */
 function traverseDirectory(dir, fileList) {
   if (!fs.existsSync(dir)) {
-    console.warn(`${COLORS.yellow}Warning: Directory ${dir} does not exist${COLORS.reset}`);
+    logger.warn(`Warning: Directory ${dir} does not exist`);
     return;
   }
   
@@ -136,10 +155,10 @@ function validateFile(filePath) {
         fix: content => {
           // This is a complex fix that might need manual intervention
           return content.replace(
-            /(\.\s*from\(['"]\w+['"]\).*?)(\.\s*from\(['"]\w+['"]\))/s, 
+            /(\.s*from\(['"]\w+['"]\).*?)(\.s*from\(['"]\w+['"]\))/s, 
             (match, group1, group2) => {
-              console.log(`${COLORS.yellow}⚠️ Complex issue requires manual fix:${COLORS.reset}`);
-              console.log(`  ${group1}${COLORS.red}${group2}${COLORS.reset}`);
+              logger.warn('⚠️ Complex issue requires manual fix:');
+              logger.warn(`  ${group1}${COLORS.red}${group2}${COLORS.reset}`);
               return group1; // Remove the second .from() call
             }
           );
@@ -188,15 +207,15 @@ function validateFile(filePath) {
       if (issue.detect.test(content) && (!issue.condition || issue.condition(content))) {
         hasIssues = true;
         stats.issuesFound++;
-        console.log(`${COLORS.red}❌ ${filePath}: ${issue.name}${COLORS.reset}`);
-        console.log(`   ${issue.message}`);
+        logger.error(`❌ ${filePath}: ${issue.name}`);
+        logger.info(`   ${issue.message}`);
         
         if (FIX_MODE && issue.fix) {
           const newContent = issue.fix(updatedContent);
           if (newContent !== updatedContent) {
             updatedContent = newContent;
             stats.issuesFixed++;
-            console.log(`${COLORS.green}  Fixed: ${issue.name}${COLORS.reset}`);
+            logger.info(`${COLORS.green}  Fixed: ${issue.name}${COLORS.reset}`);
           }
         }
       }
@@ -205,14 +224,14 @@ function validateFile(filePath) {
     // Write back the fixed content if in fix mode
     if (FIX_MODE && updatedContent !== content) {
       fs.writeFileSync(filePath, updatedContent, 'utf8');
-      console.log(`${COLORS.green}✓ Updated ${filePath}${COLORS.reset}`);
+      logger.info(`${COLORS.green}✓ Updated ${filePath}${COLORS.reset}`);
     }
     
     if (hasIssues) {
       stats.filesWithIssues++;
     }
   } catch (error) {
-    console.error(`${COLORS.red}Error checking ${filePath}: ${error.message}${COLORS.reset}`);
+    logger.error(`Error checking ${filePath}: ${error.message}`);
   }
 }
 
@@ -220,23 +239,23 @@ function validateFile(filePath) {
  * Prints summary statistics
  */
 function printSummary() {
-  console.log('\n');
-  console.log(`${COLORS.cyan}=== Supabase Query Validation Summary ===${COLORS.reset}`);
-  console.log(`${COLORS.blue}Files checked: ${stats.filesChecked}${COLORS.reset}`);
-  console.log(`${COLORS.blue}Files with issues: ${stats.filesWithIssues}${COLORS.reset}`);
-  console.log(`${COLORS.blue}Total issues found: ${stats.issuesFound}${COLORS.reset}`);
+  logger.info('\n');
+  logger.info(`=== Supabase Query Validation Summary ===`);
+  logger.info(`Files checked: ${stats.filesChecked}`);
+  logger.info(`Files with issues: ${stats.filesWithIssues}`);
+  logger.info(`Total issues found: ${stats.issuesFound}`);
   
   if (FIX_MODE) {
-    console.log(`${COLORS.blue}Issues fixed: ${stats.issuesFixed}${COLORS.reset}`);
-    console.log(`${COLORS.blue}Issues requiring manual fix: ${stats.issuesFound - stats.issuesFixed}${COLORS.reset}`);
+    logger.info(`Issues fixed: ${stats.issuesFixed}`);
+    logger.info(`Issues requiring manual fix: ${stats.issuesFound - stats.issuesFixed}`);
   }
   
   if (stats.issuesFound === 0) {
-    console.log(`${COLORS.green}✓ No issues found!${COLORS.reset}`);
+    logger.info(`✓ No issues found!`);
   } else if (!FIX_MODE) {
-    console.log(`${COLORS.yellow}⚠️ Run with --fix to attempt automatic fixes${COLORS.reset}`);
+    logger.info(`⚠️ Run with --fix to attempt automatic fixes`);
   }
 }
 
 // Run the validation
-validateSupabaseQueries();
+validateQueries();

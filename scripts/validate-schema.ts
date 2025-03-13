@@ -1,10 +1,7 @@
-import {
-  createClient,
-  SupabaseClient,
-  PostgrestError,
-  SupabaseClientOptions,
-} from "@supabase/supabase-js";
-import * as dotenv from "dotenv";
+import { createClient, SupabaseClient, PostgrestError, SupabaseClientOptions } from '@supabase/supabase-js';
+import { z } from 'zod';
+import * as dotenv from 'dotenv';
+import type { Database } from '../src/types/database';
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
@@ -12,49 +9,9 @@ import { dirname } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables
-dotenv.config();
-
-// Minimal type definition for Database
-type Database = {
-  public: {
-    Tables: {
-      team_members: {
-        Row: {
-          id: string;
-          status: string;
-          profile_id: string;
-          member_type: string;
-        };
-      };
-      profiles: {
-        Row: {
-          id: string;
-          email: string;
-          created_at: string;
-        };
-      };
-      vehicles: {
-        Row: {
-          id: string;
-          vin: string;
-          status: string;
-          created_at: string;
-        };
-      };
-    };
-    Functions: {
-      get_table_columns: {
-        Args: { table_name: string };
-        Returns: TableColumn[];
-      };
-      execute_sql: {
-        Args: { sql: string };
-        Returns: unknown;
-      };
-    };
-  };
-};
+// Load environment variables based on environment
+const env = process.env.NODE_ENV || 'development';
+dotenv.config({ path: `.env.${env}` });
 
 interface TableColumn {
   column_name: string;
@@ -78,7 +35,7 @@ class SchemaValidationError extends Error {
 }
 
 class SchemaValidator {
-  protected client: SupabaseClient<Database, "public">;
+  protected client: SupabaseClient<Database>;
   protected logger: typeof console;
 
   constructor(url: string, key: string, logger = console) {

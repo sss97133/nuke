@@ -9,17 +9,18 @@
   "scripts": {
     "dev": "vite",
     "build": "cross-env NODE_ENV=production tsc && vite build",
-    "build:alt": "cross-env NODE_ENV=production ts-node build.ts",
-    "build:ci": "cross-env CI=true NODE_ENV=production ts-node build.ts",
-    "build:dev": "cross-env NODE_ENV=development vite build --mode development",
-    "build:prod": "cross-env NODE_ENV=production tsc && vite build --config vite.config.vercel.js",
+    "build:alt": "cross-env NODE_ENV=production node build.js",
+    "build:esm": "cross-env NODE_ENV=production node build.mjs",
+    "build:ci": "cross-env CI=true NODE_ENV=production node build.mjs",
+    "build:dev": "cross-env NODE_ENV=development npm run validate:all && vite build --mode development",
+    "build:prod": "cross-env NODE_ENV=production tsc && vite build --mode production",
     "vercel-build": "npm ci && npm run build:prod",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "lint:queries": "node scripts/validate-supabase-queries.cjs",
-    "lint:queries:fix": "node scripts/validate-supabase-queries.cjs --fix",
-    "validate:schema": "cross-env NODE_ENV=production node scripts/validate-schema.cjs",
+    "lint:queries": "node scripts/validate-supabase-queries.mjs",
+    "lint:queries:fix": "node scripts/validate-supabase-queries.mjs --fix",
+    "validate:schema": "cross-env NODE_ENV=test NODE_OPTIONS='--loader ts-node/esm --no-warnings' node scripts/validate-schema.ts",
     "validate:all": "npm run type-check && npm run lint && npm run lint:queries && npm run validate:schema",
     "fix-deps": "node scripts/fix-deps.js",
     "type-check": "tsc --noEmit",
@@ -157,7 +158,7 @@
     "*.{js,jsx,ts,tsx}": [
       "eslint --fix",
       "prettier --write",
-      "node scripts/validate-supabase-queries.cjs"
+      "node scripts/validate-supabase-queries.mjs"
     ],
     "*.{json,css,scss,md}": [
       "prettier --write"
