@@ -83,36 +83,58 @@ const SUPABASE_ERROR_PATTERNS = [
             // Add catch block after the try block ends
             const tryBlockEndIndex = content.indexOf('}', content.indexOf(matched) + matched.length);
             if (tryBlockEndIndex !== -1) {
+              // Add vehicle-centric error handling with confidence scoring for data reliability
               return matched + content.substring(content.indexOf(matched) + matched.length, tryBlockEndIndex + 1) +
                 ` catch (error) {
-                  console.error('Error in Supabase query:', error);
-                  // Handle the error appropriately
+                  console.error('Vehicle data operation failed:', error);
+                  // Add vehicle data error tracking for reliability metrics
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('vehicle-data-error', { 
+                      detail: { source: '${path.basename(file)}', timestamp: new Date().toISOString(), error } 
+                    }));
+                  }
+                  return { error, data: null, confidence: 0 };
                 }`;
             }
           }
           return matched;
         }
         
-        // Wrap in try-catch if not already in one
+        // Wrap in try-catch if not already in one - with vehicle-specific error handling
         if (matched.includes('await')) {
           // Extract the variable declaration if it exists
-          const declarationMatch = matched.match(/(const|let|var)?\s*(\w+)\s*=\s*(await.*)/);
+          const declarationMatch = matched.match(/(const|let|var)?\s*(\w+)\s*=\s*(await.*)/); 
           if (declarationMatch) {
             const [_, declarationType, varName, query] = declarationMatch;
+            
+            // Add vehicle-centric error handling that maintains the multi-source connector framework principles
             return `try {
                 ${declarationType || 'const'} ${varName} = ${query}
               } catch (error) {
-                console.error('Error in Supabase query:', error);
-                // Handle the error appropriately
+                console.error('Vehicle data operation failed:', error);
+                // Add vehicle data error tracking for reliability metrics
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('vehicle-data-error', { 
+                    detail: { source: '${path.basename(file)}', timestamp: new Date().toISOString(), error } 
+                  }));
+                }
+                const ${varName} = { error, data: null, confidence: 0 };
               }`;
           }
         }
         
+        // Default case with vehicle-centric error handling
         return `try {
             ${matched}
           } catch (error) {
-            console.error('Error in Supabase query:', error);
-            // Handle the error appropriately
+            console.error('Vehicle data operation failed:', error);
+            // Add vehicle data error tracking for reliability metrics
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('vehicle-data-error', { 
+                detail: { source: '${path.basename(file)}', timestamp: new Date().toISOString(), error } 
+              }));
+            }
+            return { error, data: null, confidence: 0 };
           }`;
       });
     }
@@ -166,6 +188,12 @@ function processFile(filePath) {
   console.log(`Processing ${filePath}...`);
   let content = fs.readFileSync(filePath, 'utf8');
   let modified = false;
+  
+  // Skip if file doesn't contain supabase references
+  if (!content.includes('supabase') && !content.includes('.from(') && !content.includes('createClient')) {
+    console.log(`  Skipping ${filePath} - no Supabase queries found`);
+    return false;
+  }
 
   SUPABASE_ERROR_PATTERNS.forEach(pattern => {
     const matches = [...content.matchAll(pattern.regex)];
@@ -224,27 +252,40 @@ async function main() {
   if (files.length === 0) {
     console.log('No specific files with Supabase query issues found from validator, scanning relevant directories...');
     
-    // Scan for all potential files containing Supabase queries
-    for (const pattern of VEHICLE_DATA_PATTERNS) {
+    // Scan for all potential files containing Supabase queries using a more robust method
+    for (const dirPath of [
+      'src/components/VehicleTimeline',
+      'src/components/vehicles',
+      'src/components/marketplace',
+      'src/components/auctions',
+      'src/lib/timeline',
+      'src/services',
+      'src/utils',
+      'supabase/functions'
+    ]) {
       try {
-        const command = `find "$(git rev-parse --show-toplevel)" -path "${pattern}" -type f | grep -v "node_modules"`;
-        const globFiles = execSync(command, { encoding: 'utf8' })
+        // Use a different approach with find that works better on macOS
+        const command = `find ${dirPath} -type f -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" | grep -v node_modules`;
+        console.log(`Scanning ${dirPath}...`);
+        const globFiles = execSync(command, { encoding: 'utf8', cwd: process.cwd() })
           .split('\n')
           .filter(Boolean);
+        
+        console.log(`Found ${globFiles.length} files in ${dirPath}`);
         files.push(...globFiles);
       } catch (err) {
-        console.error(`Error finding files with pattern ${pattern}:`, err.message);
+        // It's okay if a directory doesn't exist
+        if (!err.message.includes('No such file or directory')) {
+          console.error(`Error scanning directory ${dirPath}:`, err.message);
+        }
       }
     }
   }
   
-  // Filter files that likely contain Supabase queries
+  // Filter out non-existent files
   files = files.filter(file => {
     try {
-      const content = fs.readFileSync(file, 'utf8');
-      return content.includes('supabase') || 
-             content.includes('.from(') || 
-             content.includes('createClient');
+      return fs.existsSync(file);
     } catch (err) {
       return false;
     }
