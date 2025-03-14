@@ -1,4 +1,4 @@
-Bacteria mineral#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Check Timeline Environment Configuration
  * 
