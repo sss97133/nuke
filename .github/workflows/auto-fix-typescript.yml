@@ -1,4 +1,4 @@
-name: Auto Fix TypeScript Errors
+name: Auto Fix Code Issues
 
 on:
   workflow_run:
@@ -66,12 +66,14 @@ jobs:
             }
 
       - name: Make scripts executable
-        run: chmod +x .github/scripts/auto-fix-typescript.mjs
-          
-      - name: Apply specialized automatic fixes
-        id: auto-fix
         run: |
-          # Run our specialized auto-fix script first
+          chmod +x .github/scripts/auto-fix-typescript.mjs
+          chmod +x .github/scripts/auto-fix-supabase-queries.mjs
+          
+      - name: Apply specialized automatic TypeScript fixes
+        id: auto-fix-typescript
+        run: |
+          # Run our specialized TypeScript auto-fix script
           node .github/scripts/auto-fix-typescript.mjs
           
           # Run ESLint with --fix option and our specialized config
@@ -79,6 +81,12 @@ jobs:
           
           # Run general ESLint fixes on other files
           npx eslint --fix "src/**/*.{ts,tsx}" || true
+
+      - name: Fix Supabase query patterns
+        id: auto-fix-supabase
+        run: |
+          # Run the Supabase query pattern fixing script
+          node .github/scripts/auto-fix-supabase-queries.mjs
           
           # Run TypeScript compiler with --noEmit to check if issues are fixed
           npx tsc --noEmit || true
@@ -93,35 +101,39 @@ jobs:
           fi
 
       - name: Commit and push changes
-        if: steps.auto-fix.outputs.changes_made == 'true'
+        if: steps.auto-fix-typescript.outputs.changes_made == 'true' || steps.auto-fix-supabase.outputs.changes_made == 'true'
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@github.com"
           
           git add -A
-          git commit -m "🤖 Auto-fix TypeScript errors [skip ci]"
+          git commit -m "🤖 Auto-fix code issues in vehicle-centric components [skip ci]"
           git push
           
           echo "✅ Pushed automatic fixes to ${{ github.event.workflow_run.head_branch }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Create Pull Request if branch is not main
-        if: steps.auto-fix.outputs.changes_made == 'true' && github.event.workflow_run.head_branch != 'main'
+        if: (steps.auto-fix-typescript.outputs.changes_made == 'true' || steps.auto-fix-supabase.outputs.changes_made == 'true') && github.event.workflow_run.head_branch != 'main'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "🤖 Auto-fix TypeScript errors"
-          branch: auto-fix-typescript/${{ github.event.workflow_run.head_sha }}
+          commit-message: "🤖 Auto-fix code issues in vehicle-centric components"
+          branch: auto-fix-code/${{ github.event.workflow_run.head_sha }}
           delete-branch: true
-          title: "🤖 Auto-fix TypeScript errors for VehicleTimeline"
+          title: "🤖 Auto-fix code issues in vehicle-centric components"
           body: |
-            This PR was automatically created by the Auto Fix TypeScript Errors workflow.
+            This PR was automatically created by the Auto Fix Code Issues workflow.
             
-            It contains fixes for TypeScript errors found in the CI workflow run.
+            It contains fixes for both TypeScript errors and Supabase query patterns found in the CI workflow run.
             
             ### What was fixed
             - Fixed TypeScript errors related to accessing properties on potentially null objects
-            - Added proper null checks for timeline events
+            - Added proper null checks for timeline events and vehicle data
             - Fixed type assertions for the multi-source connector framework
             - Ensured proper ID handling for temporary timeline events
+            - Improved Supabase query patterns for better reliability
+            - Enhanced error handling for vehicle data operations
+            - Fixed incorrect filter columns in vehicle-related queries
+            - Replaced multiple .from() calls with proper joins
             
-            These changes maintain the integrity of the vehicle-centric architecture and multi-source connector framework while preserving the confidence scoring and data reliability mechanisms.
+            These changes maintain the integrity of the vehicle-centric architecture and multi-source connector framework while preserving the confidence scoring and data reliability mechanisms. All fixes use real vehicle data rather than mock data, maintaining consistency with existing patterns.
