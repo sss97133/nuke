@@ -91,7 +91,7 @@ export function useTimelineActions(vehicleId?: string) {
       'Update Timeline Event',
       async () => {
         // Format updates for database
-        const dbUpdates: Record<string, any> = {};
+        const dbUpdates: Record<string, unknown> = {};
         
         if (updates.eventType) dbUpdates.event_type = updates.eventType;
         if (updates.eventSource) dbUpdates.source = updates.eventSource;

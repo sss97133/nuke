@@ -38,7 +38,7 @@ export interface VehicleTimelineProps {
   model?: string;
   year?: number;
   className?: string;
-  onEventClick?: (event: any) => void;
+  onEventClick?: (event: TimelineEvent) => void;
   onTimespanChange?: (timespan: { start: Date; end: Date }) => void;
 }
 
@@ -52,7 +52,7 @@ export interface TimelineEvent {
   title: string;
   description?: string;
   confidenceScore: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   sourceUrl?: string;
   imageUrls?: string[];
 }
@@ -69,7 +69,7 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
 }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [vehicle, setVehicle] = useState<any | null>(null);
+  const [vehicle, setVehicle] = useState<Record<string, unknown> | null>(null);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<TimelineEvent[]>([]);
   const [sources, setSources] = useState<string[]>([]);
@@ -155,7 +155,7 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
         if (timelineError) throw timelineError;
         
         // Convert to our timeline event format
-        const formattedEvents: TimelineEvent[] = (timelineData || []).map((event: any) => ({
+        const formattedEvents: TimelineEvent[] = (timelineData || []).map((event: Record<string, unknown>) => ({
           id: event.id,
           vehicleId: event.vehicle_id,
           eventType: event.event_type,
@@ -181,7 +181,7 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
         setSelectedSources(uniqueSources);
         setSelectedEventTypes(uniqueEventTypes);
         
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching vehicle data:', err);
         setError(err.message || 'Failed to load vehicle data');
       } finally {

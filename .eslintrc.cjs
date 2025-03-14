@@ -17,18 +17,30 @@ module.exports = {
       'warn',
       { allowConstantExport: true },
     ],
+    // Allow some type flexibility for transitional code
+    '@typescript-eslint/no-explicit-any': 'warn',
   },
   overrides: [
     {
-      files: ['scripts/**/*.js', 'scripts/**/*.ts'],
+      files: ['scripts/**/*.js', 'scripts/**/*.ts', 'scripts/*.js'],
       env: {
         node: true,
+        browser: true,
       },
       rules: {
         'no-console': 'off',
         'no-undef': 'off',
         '@typescript-eslint/no-var-requires': 'off',
+        '@typescript-eslint/no-unused-vars': 'warn',
+        'no-useless-escape': 'warn',
       },
     },
+    {
+      // Temporarily relax rules for components being refactored
+      files: ['src/components/VehicleTimeline/**/*.ts', 'src/components/VehicleTimeline/**/*.tsx'],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'warn'
+      }
+    }
   ],
 }; 

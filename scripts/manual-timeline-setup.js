@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * Run the Vehicle Timeline Migration Script
- * Creates the necessary database tables for the timeline component
+ * Manual Timeline Setup Script
+ * This script sets up the timeline database structure regardless of 
+ * environment configuration issues.
  */
 
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import readline from 'readline';
 
 // Setup path handling for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -21,53 +22,50 @@ const YELLOW = '\x1b[33m';
 const RED = '\x1b[31m';
 const RESET = '\x1b[0m';
 
-// Load environment variables following the established pattern
-// Load test environment variables explicitly
-dotenv.config({ path: path.join(rootDir, '.env.test') });
-dotenv.config({ path: path.join(rootDir, '.env') });
-dotenv.config({ path: path.join(rootDir, '.env.local') });
-
-// Debug environment loading
-console.log(`${YELLOW}Environment loading:${RESET}`);
-console.log(`Checking for variables in .env.test, .env, and .env.local`);
-
-console.log(`${YELLOW}Vehicle Timeline Database Migration${RESET}`);
+console.log(`${YELLOW}Manual Vehicle Timeline Database Setup${RESET}`);
 console.log('=======================================');
 
-// Get Supabase credentials using the established fallback pattern
-const getEnvVar = (name) => {
-  // Following the three-tier fallback mechanism:
-  // First check import.meta.env (Vite)
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[name]) {
-    return import.meta.env[name];
-  }
-  // Then check process.env (Node)
-  if (process.env && process.env[name]) {
-    return process.env[name];
-  }
-  // Finally check window.__env (Browser runtime)
-  if (typeof window !== 'undefined' && window.__env && window.__env[name]) {
-    return window.__env[name];
-  }
-  return undefined;
-};
+// Create readline interface
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
-// Use service key for admin operations as specified in the project structure
-const supabaseKey = getEnvVar('VITE_SUPABASE_SERVICE_KEY');
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error(`${RED}❌ Missing required environment variables${RESET}`);
-  console.error(`${YELLOW}Ensure VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_KEY are set in your .env file${RESET}`);
-  process.exit(1);
+// Prompt for Supabase credentials if needed
+async function promptForCredentials() {
+  return new Promise((resolve) => {
+    // Check if we already have the env vars in GitHub secrets
+    console.log(`${YELLOW}Checking for credentials in environment...${RESET}`);
+    
+    // Get from GitHub secrets if available
+    const url = process.env.VITE_SUPABASE_URL;
+    const serviceKey = process.env.VITE_SUPABASE_SERVICE_KEY;
+    
+    if (url && serviceKey) {
+      console.log(`${GREEN}✅ Found credentials in environment${RESET}`);
+      resolve({ url, serviceKey });
+      return;
+    }
+    
+    console.log(`${YELLOW}Please enter your Supabase credentials:${RESET}`);
+    
+    rl.question('Supabase URL: ', (url) => {
+      rl.question('Supabase Service Key: ', (serviceKey) => {
+        resolve({ url, serviceKey });
+        rl.close();
+      });
+    });
+  });
 }
-
-// Initialize Supabase client
-console.log(`${YELLOW}Connecting to Supabase...${RESET}`);
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function runMigration() {
   try {
+    const credentials = await promptForCredentials();
+    
+    // Initialize Supabase client
+    console.log(`${YELLOW}Connecting to Supabase...${RESET}`);
+    const supabase = createClient(credentials.url, credentials.serviceKey);
+    
     // Read the migration file
     const migrationPath = path.join(rootDir, 'migrations', 'vehicle_timeline.sql');
     console.log(`${YELLOW}Reading migration file: ${migrationPath}${RESET}`);
