@@ -1,0 +1,96 @@
+{
+  "vehicle": {
+    "id": "f1cfffd1-2f9c-4782-ace3-4036c1dbe7fc",
+    "vin": "",
+    "make": "GMC",
+    "model": "Suburban",
+    "year": 1987,
+    "user_id": "c2cbd55a-ed7c-48c0-beb9-cc019efe7a16",
+    "created_at": "2025-03-14T06:33:08.952Z",
+    "updated_at": "2025-03-14T06:33:08.953Z"
+  },
+  "events": [
+    {
+      "id": "66245e64-b916-4ea3-8761-a64493b444e0",
+      "vehicle_id": "f1cfffd1-2f9c-4782-ace3-4036c1dbe7fc",
+      "event_type": "manufacture",
+      "source": "vin_database",
+      "event_date": "1987-01-01T00:00:00Z",
+      "title": "Vehicle Manufactured",
+      "description": "1987 GMC Suburban manufactured",
+      "confidence_score": 95,
+      "metadata": {
+        "year": 1987,
+        "make": "GMC",
+        "model": "Suburban",
+        "vin": ""
+      },
+      "source_url": "https://vpic.nhtsa.dot.gov/decoder/Decoder/DecodeVin/",
+      "image_urls": [
+        "https://bringatrailer.com/wp-content/uploads/2022/07/1987_gmc_suburban_1987-gmc-suburban-v2500-0011-01196.jpg?w=620&resize=620%2C413"
+      ],
+      "created_at": "2025-03-14T06:33:08.953Z",
+      "updated_at": "2025-03-14T06:33:08.953Z"
+    },
+    {
+      "id": "714fd050-12f9-48a5-b7c7-de0ea970f234",
+      "vehicle_id": "f1cfffd1-2f9c-4782-ace3-4036c1dbe7fc",
+      "event_type": "listing",
+      "source": "bat_auction",
+      "event_date": "2025-03-14T06:33:08.953Z",
+      "title": "Sold on Bring a Trailer",
+      "description": "Sold on Bring a Trailer",
+      "confidence_score": 98,
+      "metadata": {
+        "auction_id": "",
+        "sold_price": null,
+        "seller": "",
+        "buyer": "",
+        "specs": {},
+        "title": "1987 GMC Suburban V2500 4×4",
+        "mileage": {
+          "value": null,
+          "unit": "miles",
+          "tmu": false
+        }
+      },
+      "source_url": "https://bringatrailer.com/listing/1987-gmc-suburban-3/",
+      "image_urls": [
+        "https://bringatrailer.com/wp-content/uploads/2022/07/1987_gmc_suburban_1987-gmc-suburban-v2500-0011-01196.jpg?w=620&resize=620%2C413",
+        "https://bringatrailer.com/wp-content/uploads/2022/07/1987-GMC-Suburban-V2500-0035-51502.jpg?w=620&resize=620%2C413",
+        "https://bringatrailer.com/wp-content/uploads/2022/07/1987_gmc_suburban_1987-gmc-suburban-v2500-0037-01331.jpg?w=620&resize=620%2C413",
+        "https://bringatrailer.com/wp-content/uploads/2022/07/1987_gmc_suburban_1987-gmc-suburban-v2500-0206-01388.jpg?w=620&resize=620%2C413",
+        "https://bringatrailer.com/wp-content/uploads/2022/07/1987_gmc_suburban_1987-gmc-suburban-v2500-0039-01433.jpg?w=620&resize=620%2C413"
+      ],
+      "created_at": "2025-03-14T06:33:08.953Z",
+      "updated_at": "2025-03-14T06:33:08.953Z"
+    },
+    {
+      "id": "268a4a20-bda2-440e-b40b-c8eeee374374",
+      "vehicle_id": "f1cfffd1-2f9c-4782-ace3-4036c1dbe7fc",
+      "event_type": "ownership",
+      "source": "bat_auction",
+      "event_date": "2025-03-14T06:33:08.953Z",
+      "title": "Transfer of Ownership",
+      "description": "Sold to new owner",
+      "confidence_score": 95,
+      "metadata": {
+        "seller": "",
+        "buyer": "",
+        "price": null,
+        "auction_site": "Bring a Trailer"
+      },
+      "source_url": "https://bringatrailer.com/listing/1987-gmc-suburban-3/",
+      "image_urls": [],
+      "created_at": "2025-03-14T06:33:08.953Z",
+      "updated_at": "2025-03-14T06:33:08.953Z"
+    }
+  ],
+  "user_id": "c2cbd55a-ed7c-48c0-beb9-cc019efe7a16",
+  "metadata": {
+    "extracted_at": "2025-03-14T06:33:08.953Z",
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/1987-gmc-suburban-3/",
+    "version": "1.0.0"
+  }
+}
