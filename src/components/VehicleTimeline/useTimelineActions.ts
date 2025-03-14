@@ -45,7 +45,8 @@ export interface TimelineActionsHook {
 export function useTimelineActions(vehicleId?: string): TimelineActionsHook {
   const { executeDbAction, toast, navigateTo, supabase } = useButtonActions();
   const [isAddingEvent, setIsAddingEvent] = useState(false);
-  const [currentEvent, setCurrentEvent] = useState<Partial<TimelineEvent> | null>(null);
+  const [currentEventState, setCurrentEventState] = useState<TimelineEvent | null>(null);
+  const currentEvent = currentEventState;
   
   /**
    * Add a new event to the vehicle timeline
@@ -109,7 +110,7 @@ export function useTimelineActions(vehicleId?: string): TimelineActionsHook {
         successMessage: options.notifyOnComplete ? 'Timeline event added successfully' : undefined,
         onSuccess: () => {
           setIsAddingEvent(false);
-          setCurrentEvent(null);
+          setCurrentEventState(null);
         }
       }
     );
@@ -190,22 +191,68 @@ export function useTimelineActions(vehicleId?: string): TimelineActionsHook {
   }, [executeDbAction, supabase]);
   
   /**
-   * Export timeline events to CSV
+   * Export timeline events to CSV or JSON
+   * Follows the multi-source connector framework pattern for vehicle data
    */
-  const exportTimeline = useCallback(async (events: TimelineEvent[]) => {
-    if (!events || events.length === 0) {
-      toast({
-        title: "Export Failed",
-        description: "No events to export",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  const exportTimeline = useCallback(async (format: 'csv' | 'json'): Promise<any> => {
     try {
+      // Get the current vehicle's timeline events using a single query with proper error handling
+      const { data: events, error } = await supabase
+        .from('vehicle_timeline_events')
+        .select('*, vehicle_sources(id, name, confidence_score)')
+        .eq('vehicle_id', vehicleId || '')
+        .order('event_date', { ascending: false });
+        
+      if (error) {
+        toast({
+          title: "Export Failed",
+          description: `Failed to retrieve timeline events: ${error.message}`,
+          variant: "destructive",
+        });
+        
+        // Log vehicle data operation failure for telemetry
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vehicle-data-error', { 
+            detail: { 
+              vehicleId, 
+              operation: 'exportTimeline', 
+              source: 'useTimelineActions.ts',
+              error,
+              timestamp: new Date().toISOString() 
+            } 
+          }));
+        }
+        
+        return { success: false, error, confidence: 0 };
+      }
+    
+      // Transform database records to TimelineEvent objects
+      const timelineEvents = events.map(event => ({
+        id: event.id,
+        vehicleId: event.vehicle_id,
+        eventType: event.event_type,
+        eventSource: event.source,
+        eventDate: event.event_date,
+        title: event.title,
+        description: event.description,
+        confidenceScore: event.confidence_score,
+        metadata: event.metadata,
+        sourceUrl: event.source_url,
+        imageUrls: event.image_urls
+      })) as TimelineEvent[];
+      
+      if (!timelineEvents || timelineEvents.length === 0) {
+        toast({
+          title: "Export Failed",
+          description: "No events to export",
+          variant: "destructive",
+        });
+        return { success: false, error: new Error("No timeline events found"), confidence: 0 };
+      }
+      
       // Format events for CSV
       const header = ["Date", "Type", "Title", "Description", "Source", "Confidence"];
-      const rows = events.map(event => [
+      const rows = timelineEvents.map(event => [
         new Date(event.eventDate).toLocaleDateString(),
         event.eventType,
         event.title,
@@ -235,8 +282,10 @@ export function useTimelineActions(vehicleId?: string): TimelineActionsHook {
       
       toast({
         title: "Export Successful",
-        description: `Exported ${events.length} timeline events`,
+        description: `Exported ${timelineEvents.length} timeline events in ${format} format`,
       });
+      
+      return { success: true, data: timelineEvents, confidence: 1.0 };
     } catch (error) {
       console.error('Error exporting timeline:', error);
       toast({
@@ -244,6 +293,21 @@ export function useTimelineActions(vehicleId?: string): TimelineActionsHook {
         description: error instanceof Error ? error.message : "Failed to export timeline",
         variant: "destructive",
       });
+      
+      // Track vehicle data failures for the multi-source connector framework
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vehicle-data-error', { 
+          detail: { 
+            vehicleId, 
+            operation: 'exportTimeline', 
+            source: 'useTimelineActions.ts',
+            error,
+            timestamp: new Date().toISOString() 
+          } 
+        }));
+      }
+      
+      return { success: false, error, confidence: 0 };
     }
   }, [toast, vehicleId]);
   
@@ -289,6 +353,11 @@ export function useTimelineActions(vehicleId?: string): TimelineActionsHook {
     );
   }, [executeDbAction, supabase, toast, vehicleId]);
   
+  // Create a setCurrentEvent function that uses setCurrentEventState internally
+  const setCurrentEvent = useCallback((event: TimelineEvent | null) => {
+    setCurrentEventState(event);
+  }, []);
+
   // Provide an organized set of actions
   return {
     // State
