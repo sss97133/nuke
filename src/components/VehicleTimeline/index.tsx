@@ -474,37 +474,81 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
               });
             } else {
               // Add new event
-              addTimelineEvent({
-                vehicleId: currentEvent?.vehicleId || '',
-                eventType: currentEvent?.eventType || '',
-                eventSource: currentEvent?.eventSource || 'user',
-                eventDate: currentEvent?.eventDate || new Date().toISOString(),
-                title: currentEvent?.title || '',
-                description: currentEvent?.description || '',
-                confidenceScore: currentEvent?.confidenceScore || 100,
-                metadata: currentEvent?.metadata || {},
-                sourceUrl: currentEvent?.sourceUrl,
-                imageUrls: currentEvent?.imageUrls || []
-              }, {
+              // Type assertion to ensure currentEvent is treated as a TimelineEvent
+              if (!currentEvent) {
+                setError('Cannot add event: missing event data');
+                return;
+              }
+
+              // Create new event with proper typing to avoid 'never' type errors
+              // Using type assertion to ensure TypeScript understands we're accessing safe properties
+              const typedCurrentEvent = currentEvent as {
+                vehicleId?: string,
+                eventType?: string,
+                eventSource?: string,
+                eventDate?: string,
+                title?: string,
+                description?: string,
+                confidenceScore?: number,
+                metadata?: Record<string, unknown>,
+                sourceUrl?: string,
+                imageUrls?: string[]
+              };
+              
+              const newEventData: TimelineEvent = {
+                id: 'temp-' + Date.now(), // Adding a temporary ID to satisfy the type system
+                vehicleId: typedCurrentEvent.vehicleId || '',
+                eventType: typedCurrentEvent.eventType || '',
+                eventSource: typedCurrentEvent.eventSource || 'user',
+                eventDate: typedCurrentEvent.eventDate || new Date().toISOString(),
+                title: typedCurrentEvent.title || '',
+                description: typedCurrentEvent.description || '',
+                confidenceScore: typedCurrentEvent.confidenceScore || 100,
+                metadata: typedCurrentEvent.metadata || {},
+                sourceUrl: typedCurrentEvent.sourceUrl,
+                imageUrls: typedCurrentEvent.imageUrls || []
+              };
+              
+              addTimelineEvent(newEventData, {
                 notifyOnComplete: true
               }).then(result => {
                 if (result.success && result.data && typeof result.data === 'object' && 'id' in result.data) {
                   // Define the response data type to avoid 'Property does not exist on type never' error
                   const responseData = result.data as { id: string };
                   
-                  // Add to local state
-                  const newEvent = {
+                  // Ensure currentEvent is properly typed
+                  if (!currentEvent) {
+                    setError('Cannot process result: missing event data');
+                    return;
+                  }
+                  
+                  // Type assertion for safe property access
+                  const typedCurrentEvent = currentEvent as {
+                    vehicleId?: string,
+                    eventType?: string,
+                    eventSource?: string,
+                    eventDate?: string,
+                    title?: string,
+                    description?: string,
+                    confidenceScore?: number,
+                    metadata?: Record<string, unknown>,
+                    sourceUrl?: string,
+                    imageUrls?: string[]
+                  };
+                  
+                  // Add to local state with proper typing to avoid 'never' type errors
+                  const newEvent: TimelineEvent = {
                     id: responseData.id,
-                    vehicleId: currentEvent?.vehicleId || '',
-                    eventType: currentEvent?.eventType || '',
-                    eventSource: currentEvent?.eventSource || 'user',
-                    eventDate: currentEvent?.eventDate || new Date().toISOString(),
-                    title: currentEvent?.title || '',
-                    description: currentEvent?.description || '',
-                    confidenceScore: currentEvent?.confidenceScore || 100,
-                    metadata: currentEvent?.metadata || {},
-                    sourceUrl: currentEvent?.sourceUrl,
-                    imageUrls: currentEvent?.imageUrls || []
+                    vehicleId: typedCurrentEvent.vehicleId || '',
+                    eventType: typedCurrentEvent.eventType || '',
+                    eventSource: typedCurrentEvent.eventSource || 'user',
+                    eventDate: typedCurrentEvent.eventDate || new Date().toISOString(),
+                    title: typedCurrentEvent.title || '',
+                    description: typedCurrentEvent.description || '',
+                    confidenceScore: typedCurrentEvent.confidenceScore || 100,
+                    metadata: typedCurrentEvent.metadata || {},
+                    sourceUrl: typedCurrentEvent.sourceUrl,
+                    imageUrls: typedCurrentEvent.imageUrls || []
                   };
                   
                   setEvents(prev => [...prev, newEvent]);
@@ -520,7 +564,11 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
                 id="event-title"
                 type="text"
                 value={currentEvent?.title || ''}
-                onChange={(e) => setCurrentEvent(prev => prev ? {...prev, title: e.target.value} : null)}
+                onChange={(e) => {
+                  if (currentEvent) {
+                    setCurrentEvent({...currentEvent, title: e.target.value});
+                  }
+                }}
                 required
               />
             </div>
@@ -530,7 +578,11 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
               <select
                 id="event-type"
                 value={currentEvent?.eventType || ''}
-                onChange={(e) => setCurrentEvent(prev => prev ? {...prev, eventType: e.target.value} : null)}
+                onChange={(e) => {
+                  if (currentEvent) {
+                    setCurrentEvent({...currentEvent, eventType: e.target.value});
+                  }
+                }}
                 required
               >
                 <option value="">Select event type</option>
@@ -558,8 +610,12 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
               <input 
                 id="event-date"
                 type="date"
-                value={currentEvent.eventDate?.toString().split('T')[0] || ''}
-                onChange={(e) => setCurrentEvent({...currentEvent, eventDate: e.target.value})}
+                value={currentEvent?.eventDate?.toString().split('T')[0] || ''}
+                onChange={(e) => {
+                if (currentEvent) {
+                  setCurrentEvent({...currentEvent, eventDate: e.target.value});
+                }
+              }}
                 required
               />
             </div>
@@ -568,8 +624,12 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
               <label htmlFor="event-description">Description</label>
               <textarea 
                 id="event-description"
-                value={currentEvent.description || ''}
-                onChange={(e) => setCurrentEvent({...currentEvent, description: e.target.value})}
+                value={currentEvent?.description || ''}
+                onChange={(e) => {
+                  if (currentEvent) {
+                    setCurrentEvent({...currentEvent, description: e.target.value});
+                  }
+                }}
                 rows={3}
               />
             </div>
@@ -628,14 +688,14 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
             <div className="timeline-actions">
               <button 
                 className="timeline-action-button"
-                onClick={() => enrichTimelineData(vehicle.vin, vehicle.id)}
+                onClick={() => vehicle && enrichTimelineData(vehicle.vin, vehicle.id)}
                 title="Fetch additional data from external sources"
               >
                 Enrich Data
               </button>
               <button 
                 className="timeline-action-button"
-                onClick={() => exportTimeline(filteredEvents)}
+                onClick={() => exportTimeline('csv')}
                 disabled={filteredEvents.length === 0}
                 title="Export timeline to CSV"
               >
@@ -644,17 +704,23 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
               <button 
                 className="timeline-action-button"
                 onClick={() => {
-                  setCurrentEvent({
-                    id: '',
-                    vehicleId: vehicle.id,
-                    eventType: '',
-                    eventSource: 'user',
-                    eventDate: new Date().toISOString().split('T')[0],
-                    title: '',
-                    confidenceScore: 100,
-                    metadata: {}
-                  });
-                  setIsAddingEvent(true);
+                  if (vehicle) {
+                    // Create properly typed event object with all required fields
+                    const newEvent: TimelineEvent = {
+                      id: 'temp-' + Date.now(), // Temporary ID to satisfy the type system
+                      vehicleId: vehicle.id,
+                      eventType: '',
+                      eventSource: 'user',
+                      eventDate: new Date().toISOString().split('T')[0],
+                      title: '',
+                      confidenceScore: 100,
+                      metadata: {},
+                      description: '',
+                      imageUrls: []
+                    };
+                    setCurrentEvent(newEvent);
+                    setIsAddingEvent(true);
+                  }
                 }}
                 title="Add new event"
               >

@@ -52,9 +52,25 @@ jobs:
         ls -la ./node_modules/.bin/
     
     - name: Run TypeScript check
+      id: typescript_check
       run: |
         echo "Running TypeScript check..."
-        CI=true npx tsc --noEmit || echo "TypeScript check failed but continuing"
+        CI=true npx tsc --noEmit > typescript-errors.log 2>&1 || {
+          echo "TypeScript check failed, collecting error details for auto-fix"
+          echo "typescript_failed=true" >> $GITHUB_OUTPUT
+          exit 1
+        }
+        echo "typescript_failed=false" >> $GITHUB_OUTPUT
+      continue-on-error: true
+        
+    - name: Upload TypeScript errors
+      if: steps.typescript_check.outputs.typescript_failed == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: typescript-errors
+        path: typescript-errors.log
+        retention-days: 7
+        if-no-files-found: warn
     
     - name: Build
       run: |
