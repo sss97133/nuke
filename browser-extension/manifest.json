@@ -4,17 +4,11 @@
   "version": "1.0.0",
   "description": "Discover and import vehicles from Craigslist and Facebook Marketplace to your Nuke profile",
   "icons": {
-    "16": "public/icon16.png",
-    "48": "public/icon48.png",
-    "128": "public/icon128.png"
+    "48": "public/favicon.ico"
   },
   "action": {
     "default_popup": "public/popup.html",
-    "default_icon": {
-      "16": "public/icon16.png",
-      "48": "public/icon48.png",
-      "128": "public/icon128.png"
-    }
+    "default_icon": "public/favicon.ico"
   },
   "permissions": [
     "activeTab",
@@ -24,7 +18,10 @@
   ],
   "host_permissions": [
     "https://*.craigslist.org/*",
-    "https://*.facebook.com/*"
+    "https://*.facebook.com/*",
+    "https://api.nuke.app/*",
+    "https://nuke.app/*",
+    "http://localhost:3000/*"
   ],
   "background": {
     "service_worker": "src/background.js"
@@ -42,11 +39,13 @@
     }
   ],
   "oauth2": {
-    "client_id": "${FACEBOOK_CLIENT_ID}",
+    "client_id": "nuke-browser-extension",
     "scopes": [
       "email",
-      "public_profile",
-      "user_likes"
+      "profile",
+      "vehicles:read",
+      "vehicles:write"
     ]
-  }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvUPBZogHqEVjhqKaVQbgO04+TVvfZi29tyWurwJF6kxQRWCynnZXsq2wXzM3i1VTCbfOhrhWQB6fVQr7ZvO6Rw2vxlsIVWpoSQW1eEpF3sIcKUm6+jj8xLbMxBA3N+iVHVmGUxS7qkrM8R9V3ntCgx99SiWQIvuQHvNZwm05UhxNnFfxFNFq0ZmkkVjw4kjWF/j8ZXA3P+RjCEFgZZ0w7/2KIwgV1QCPw5Xt0xJfQw5xo+whzkT8HRVkQGsyTGsPCkTx5JhFF3uh3T7Y0P33/SrheouE1hc1+ezM5qNjqMAQpWYoJD0UizTRKxpZc5i9POBbGCDVBjUG7b7LHwIDAQAB"
 }

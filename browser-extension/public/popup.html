@@ -5,39 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nuke Vehicle Discovery</title>
   <style>
+    :root {
+      --nuke-primary: #3e63dd;
+      --nuke-primary-dark: #2a4cb9;
+      --nuke-bg: #f8fafc;
+      --nuke-card-bg: rgba(255, 255, 255, 0.7);
+      --nuke-text: #111827;
+      --nuke-text-secondary: #6b7280;
+      --nuke-border: rgba(229, 231, 235, 0.5);
+      --glass-blur: blur(10px);
+      --glass-border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       width: 320px;
       margin: 0;
       padding: 0;
-      background: #f9fafb;
-      color: #111827;
+      background: var(--nuke-bg);
+      color: var(--nuke-text);
+      overflow-x: hidden;
     }
     
     .container {
       padding: 16px;
+      position: relative;
+    }
+    
+    /* Glassmorphism elements */
+    .glass {
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-radius: 10px;
+      border: var(--glass-border);
+      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
     }
     
     .header {
       display: flex;
       align-items: center;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--nuke-border);
     }
     
     .logo {
-      width: 36px;
-      height: 36px;
+      width: 42px;
+      height: 42px;
       margin-right: 12px;
-      background: #3e63dd;
-      border-radius: 8px;
+      background: var(--nuke-primary);
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
       font-weight: bold;
-      font-size: 18px;
+      font-size: 20px;
+      box-shadow: 0 4px 10px rgba(62, 99, 221, 0.25);
     }
     
     .title {
@@ -49,39 +74,51 @@
     .subtitle {
       margin: 0;
       font-size: 13px;
-      color: #6b7280;
+      color: var(--nuke-text-secondary);
     }
     
     .section {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
     
     .section-title {
       font-weight: 600;
-      margin: 0 0 8px 0;
+      margin: 0 0 10px 0;
       font-size: 14px;
+      color: var(--nuke-text);
     }
     
     .card {
-      background: white;
-      border-radius: 8px;
-      padding: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      margin-bottom: 12px;
+      background: var(--nuke-card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      margin-bottom: 16px;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: var(--glass-border);
     }
     
     .vehicle-card {
       display: flex;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .vehicle-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
     }
     
     .vehicle-image {
-      width: 60px;
-      height: 60px;
-      border-radius: 4px;
+      width: 70px;
+      height: 70px;
+      border-radius: 8px;
       background-size: cover;
       background-position: center;
-      margin-right: 12px;
+      margin-right: 14px;
       flex-shrink: 0;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
     
     .vehicle-details {
@@ -90,106 +127,127 @@
     
     .vehicle-title {
       font-weight: 600;
-      margin: 0 0 4px 0;
-      font-size: 14px;
+      margin: 0 0 6px 0;
+      font-size: 15px;
     }
     
     .vehicle-meta {
-      color: #6b7280;
-      font-size: 12px;
-      margin: 0 0 4px 0;
+      color: var(--nuke-text-secondary);
+      font-size: 13px;
+      margin: 0 0 6px 0;
     }
     
     .badge {
       display: inline-block;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 500;
     }
     
     .badge-craigslist {
-      background-color: #fef3c7;
+      background-color: rgba(252, 211, 77, 0.2);
       color: #92400e;
     }
     
     .badge-facebook {
-      background-color: #e0f2fe;
+      background-color: rgba(59, 130, 246, 0.2);
       color: #0369a1;
     }
     
     button {
       width: 100%;
-      padding: 10px 16px;
-      border-radius: 6px;
+      padding: 12px 18px;
+      border-radius: 10px;
       border: none;
-      background-color: #3e63dd;
+      background-color: var(--nuke-primary);
       color: white;
       font-weight: 600;
       cursor: pointer;
       font-size: 14px;
-      transition: background-color 0.2s ease;
+      transition: all 0.2s ease;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: 0 4px 12px rgba(62, 99, 221, 0.25);
     }
     
     button:hover {
-      background-color: #2a4cb9;
+      background-color: var(--nuke-primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(62, 99, 221, 0.35);
+    }
+    
+    button:active {
+      transform: translateY(0);
     }
     
     button.secondary {
-      background-color: white;
-      border: 1px solid #d1d5db;
-      color: #374151;
+      background-color: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(209, 213, 219, 0.5);
+      color: var(--nuke-text);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     }
     
     button.secondary:hover {
-      background-color: #f9fafb;
+      background-color: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
     
     .icon {
       margin-right: 8px;
+      font-size: 16px;
     }
     
     .message {
       font-size: 14px;
       text-align: center;
-      color: #6b7280;
-      padding: 12px;
+      color: var(--nuke-text-secondary);
+      padding: 16px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: var(--glass-border);
     }
     
     .not-signed-in {
       text-align: center;
-      padding: 16px 0;
+      padding: 30px 0;
     }
     
     .not-signed-in p {
-      margin-bottom: 16px;
-      font-size: 14px;
-      color: #374151;
+      margin-bottom: 20px;
+      font-size: 15px;
+      color: var(--nuke-text);
+      line-height: 1.5;
     }
     
     .status {
-      padding: 8px 12px;
-      border-radius: 6px;
+      padding: 12px 16px;
+      border-radius: 10px;
       font-size: 13px;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
     
     .status-success {
-      background-color: #ecfdf5;
+      background-color: rgba(16, 185, 129, 0.1);
       color: #065f46;
+      border: 1px solid rgba(16, 185, 129, 0.2);
     }
     
     .status-error {
-      background-color: #fef2f2;
+      background-color: rgba(239, 68, 68, 0.1);
       color: #b91c1c;
+      border: 1px solid rgba(239, 68, 68, 0.2);
     }
     
     .status-warning {
-      background-color: #fffbeb;
+      background-color: rgba(245, 158, 11, 0.1);
       color: #92400e;
+      border: 1px solid rgba(245, 158, 11, 0.2);
     }
     
     .discovered-title {
@@ -199,50 +257,66 @@
     }
     
     .discovered-title span {
-      color: #6b7280;
+      color: var(--nuke-text-secondary);
       font-size: 12px;
       font-weight: 400;
     }
     
     .tabs {
       display: flex;
-      margin-bottom: 16px;
-      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--nuke-border);
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 10px 10px 0 0;
+      padding: 4px;
     }
     
     .tab {
-      padding: 8px 16px;
+      padding: 10px 16px;
       font-size: 14px;
       cursor: pointer;
       border-bottom: 2px solid transparent;
-      color: #6b7280;
+      color: var(--nuke-text-secondary);
+      transition: all 0.2s ease;
+      border-radius: 8px 8px 0 0;
+      flex: 1;
+      text-align: center;
     }
     
     .tab.active {
-      color: #3e63dd;
-      border-bottom-color: #3e63dd;
+      color: var(--nuke-primary);
+      border-bottom-color: var(--nuke-primary);
       font-weight: 500;
+      background: rgba(62, 99, 221, 0.05);
+    }
+    
+    .tab:hover:not(.active) {
+      background: rgba(62, 99, 221, 0.03);
+      color: var(--nuke-text);
     }
     
     footer {
-      padding: 12px 16px;
-      border-top: 1px solid #e5e7eb;
+      padding: 14px 16px;
+      border-top: 1px solid var(--nuke-border);
       font-size: 12px;
-      color: #6b7280;
+      color: var(--nuke-text-secondary);
       text-align: center;
+      background: rgba(255, 255, 255, 0.3);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
     
     .loading {
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 24px 0;
+      padding: 30px 0;
     }
     
     .spinner {
-      border: 3px solid rgba(0, 0, 0, 0.1);
+      border: 3px solid rgba(62, 99, 221, 0.1);
       border-radius: 50%;
-      border-top: 3px solid #3e63dd;
+      border-top: 3px solid var(--nuke-primary);
       width: 24px;
       height: 24px;
       animation: spin 1s linear infinite;
@@ -252,9 +326,51 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    
+    /* Background gradient effect */
+    .bg-gradient {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      background: linear-gradient(135deg, rgba(62, 99, 221, 0.1), rgba(255, 255, 255, 0));
+      opacity: 0.6;
+    }
+    
+    /* Blob effects */
+    .blob {
+      position: absolute;
+      filter: blur(40px);
+      opacity: 0.15;
+      z-index: -1;
+      border-radius: 50%;
+    }
+    
+    .blob-1 {
+      width: 150px;
+      height: 150px;
+      background: var(--nuke-primary);
+      top: -50px;
+      right: -50px;
+    }
+    
+    .blob-2 {
+      width: 200px;
+      height: 200px;
+      background: #4f46e5;
+      bottom: -100px;
+      left: -100px;
+    }
   </style>
 </head>
 <body>
+  <!-- Background effects -->
+  <div class="bg-gradient"></div>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  
   <div class="container">
     <div class="header">
       <div class="logo">N</div>
@@ -266,7 +382,7 @@
     
     <!-- Signed-in state -->
     <div id="signed-in-view" style="display:none;">
-      <div class="tabs">
+      <div class="tabs glass">
         <div class="tab active" id="tab-discover">Discover</div>
         <div class="tab" id="tab-recent">Recent Finds</div>
         <div class="tab" id="tab-settings">Settings</div>
@@ -281,7 +397,7 @@
         <div id="current-vehicle" style="display:none;">
           <div class="section">
             <div class="section-title">Current Vehicle</div>
-            <div class="card vehicle-card">
+            <div class="card glass vehicle-card">
               <div class="vehicle-image" id="vehicle-image"></div>
               <div class="vehicle-details">
                 <h3 class="vehicle-title" id="vehicle-title">Loading...</h3>
@@ -321,7 +437,7 @@
       <div id="settings-content" style="display:none;">
         <div class="section">
           <div class="section-title">Account</div>
-          <div class="card">
+          <div class="card glass">
             <p style="margin-top:0;">Signed in as:</p>
             <p id="user-email" style="font-weight:500;margin-bottom:0;">user@example.com</p>
           </div>
@@ -329,7 +445,7 @@
         
         <div class="section">
           <div class="section-title">Preferences</div>
-          <div class="card">
+          <div class="card glass">
             <label style="display:flex;align-items:center;margin-bottom:8px;">
               <input type="checkbox" id="auto-discover" style="margin-right:8px;">
               Enable auto-discovery suggestions

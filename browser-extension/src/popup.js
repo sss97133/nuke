@@ -3,6 +3,19 @@
  * Popup Script - Handles the extension popup UI and interactions
  */
 
+// Initialize the API configuration
+const API_CONFIG = {
+  baseUrl: 'https://nuke.app/api',  // Replace with actual API URL when deploying
+  endpoints: {
+    discover: '/vehicles/discover',
+    vehicles: '/vehicles',
+    user: '/users',
+    profile: '/profile',
+    recent: '/vehicles/recent',
+    timeline: '/timeline'
+  }
+};
+
 // DOM Elements
 const elements = {
   // Views
@@ -126,15 +139,46 @@ function setupEventListeners() {
   
   // Sign in button
   elements.signInButton.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'authenticate' });
-    window.close();
+    // Show a loading indicator
+    elements.signInButton.innerHTML = '<div class="spinner" style="width:16px;height:16px;margin:0 auto;"></div>';
+    elements.signInButton.disabled = true;
+    
+    console.log('Sign in button clicked, sending authentication request');
+    
+    // Send message to background script to start real authentication flow
+    chrome.runtime.sendMessage({ action: 'signIn' }, (response) => {
+      if (response && response.success) {
+        // Success is handled by the message listener
+        console.log('Authentication request sent!');
+      } else {
+        console.error('Authentication request failed:', response && response.error);
+        
+        // Show error
+        elements.signInButton.innerHTML = 'Sign In with Nuke';
+        elements.signInButton.disabled = false;
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'status status-error';
+        errorDiv.textContent = (response && response.error) || 'Authentication failed. Please try again.';
+        elements.notSignedInView.insertBefore(errorDiv, elements.notSignedInView.firstChild);
+        
+        setTimeout(() => {
+          errorDiv.remove();
+        }, 5000);
+      }
+    });
   });
   
   // Sign out button
   elements.signOutButton.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'logout' }, () => {
-      state.isAuthenticated = false;
-      updateAuthUI();
+    chrome.runtime.sendMessage({ action: 'signOut' }, (response) => {
+      if (response && response.success) {
+        state.isAuthenticated = false;
+        updateAuthUI();
+        // Clear any displayed vehicle data
+        elements.currentVehicle.style.display = 'none';
+        elements.notVehicleMessage.style.display = 'block';
+      }
     });
   });
   
@@ -196,14 +240,49 @@ function saveSettings() {
  * Loads user data from storage or API
  */
 function loadUserData() {
-  chrome.storage.local.get(['nukeUserEmail', 'nukeUserId'], (result) => {
+  chrome.storage.local.get(['nukeUserEmail', 'nukeUserId', 'nukeAuthToken'], (result) => {
     if (result.nukeUserEmail) {
       elements.userEmail.textContent = result.nukeUserEmail;
+    } else if (result.nukeAuthToken && result.nukeUserId) {
+      // If we have a token but no email, try to fetch user data from API
+      fetchUserProfile(result.nukeAuthToken, result.nukeUserId);
     } else {
-      // TODO: Fetch user data from API
       elements.userEmail.textContent = 'Nuke User';
     }
   });
+}
+
+/**
+ * Fetches user profile data from the API
+ * @param {string} token - Authentication token
+ * @param {string} userId - User ID
+ */
+async function fetchUserProfile(token, userId) {
+  try {
+    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.user}/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch user profile');
+    }
+    
+    const userData = await response.json();
+    
+    if (userData && userData.email) {
+      elements.userEmail.textContent = userData.email;
+      chrome.storage.local.set({ nukeUserEmail: userData.email });
+    }
+    
+    return userData;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
 }
 
 /**
@@ -257,6 +336,21 @@ function updateCurrentVehicleUI() {
   // Set image if available
   if (vehicle.images && vehicle.images.length > 0) {
     elements.vehicleImage.style.backgroundImage = `url(${vehicle.images[0]})`;
+  } else if (vehicle.image_urls && vehicle.image_urls.length > 0) {
+    // Handle the API response format which might have image_urls instead of images
+    elements.vehicleImage.style.backgroundImage = `url(${vehicle.image_urls[0]})`;
+  } else if (vehicle.timeline_events && vehicle.timeline_events.length > 0) {
+    // Look for images in timeline events
+    const eventWithImages = vehicle.timeline_events.find(event => 
+      event.image_urls && event.image_urls.length > 0
+    );
+    
+    if (eventWithImages && eventWithImages.image_urls.length > 0) {
+      elements.vehicleImage.style.backgroundImage = `url(${eventWithImages.image_urls[0]})`;
+    } else {
+      elements.vehicleImage.style.backgroundImage = 'none';
+      elements.vehicleImage.style.backgroundColor = '#e5e7eb';
+    }
   } else {
     elements.vehicleImage.style.backgroundImage = 'none';
     elements.vehicleImage.style.backgroundColor = '#e5e7eb';
@@ -269,37 +363,57 @@ function updateCurrentVehicleUI() {
 function loadRecentVehicles() {
   elements.recentVehicles.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   
-  // In a real implementation, this would call the API
-  // For now, we'll use mock data
-  setTimeout(() => {
-    const mockVehicles = [
-      {
-        id: 'v1',
-        title: '1987 GMC Suburban',
-        year: 1987,
-        make: 'GMC',
-        model: 'Suburban',
-        price: 5500,
-        images: ['https://example.com/image1.jpg'],
-        source: 'craigslist',
-        discovered_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 'v2',
-        title: '2018 Tesla Model 3',
-        year: 2018,
-        make: 'Tesla',
-        model: 'Model 3',
-        price: 35000,
-        images: ['https://example.com/image2.jpg'],
-        source: 'facebook',
-        discovered_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  // First check storage for cached vehicles
+  chrome.storage.local.get(['discoveredVehicles', 'nukeAuthToken', 'nukeUserId'], async (result) => {
+    try {
+      // If we have auth token and user id, fetch from API
+      if (result.nukeAuthToken && result.nukeUserId) {
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.vehicles}?user_id=${result.nukeUserId}&limit=10`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${result.nukeAuthToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch vehicles');
+        }
+        
+        const data = await response.json();
+        
+        if (data && Array.isArray(data.vehicles)) {
+          // Update storage with the latest vehicles
+          chrome.storage.local.set({ discoveredVehicles: data.vehicles });
+          
+          state.recentVehicles = data.vehicles;
+          updateRecentVehiclesUI();
+          return;
+        }
       }
-    ];
-    
-    state.recentVehicles = mockVehicles;
-    updateRecentVehiclesUI();
-  }, 1000);
+      
+      // Fall back to storage if API call fails or we're not authenticated
+      if (result.discoveredVehicles && Array.isArray(result.discoveredVehicles)) {
+        state.recentVehicles = result.discoveredVehicles;
+        updateRecentVehiclesUI();
+      } else {
+        // No vehicles found
+        state.recentVehicles = [];
+        updateRecentVehiclesUI();
+      }
+    } catch (error) {
+      console.error('Error loading recent vehicles:', error);
+      
+      // If we have cached vehicles in storage, use those
+      if (result.discoveredVehicles && Array.isArray(result.discoveredVehicles)) {
+        state.recentVehicles = result.discoveredVehicles;
+      } else {
+        state.recentVehicles = [];
+      }
+      
+      updateRecentVehiclesUI();
+    }
+  });
 }
 
 /**
@@ -319,13 +433,32 @@ function updateRecentVehiclesUI() {
   
   vehicles.forEach(vehicle => {
     const card = document.createElement('div');
-    card.className = 'card vehicle-card';
+    card.className = 'card glass vehicle-card';
     
     // Create image element
     const imageDiv = document.createElement('div');
     imageDiv.className = 'vehicle-image';
+    
+    // Try to find an image from various possible sources in the API response
+    let imageUrl = null;
+    
     if (vehicle.images && vehicle.images.length > 0) {
-      imageDiv.style.backgroundImage = `url(${vehicle.images[0]})`;
+      imageUrl = vehicle.images[0];
+    } else if (vehicle.image_urls && vehicle.image_urls.length > 0) {
+      imageUrl = vehicle.image_urls[0];
+    } else if (vehicle.timeline_events && vehicle.timeline_events.length > 0) {
+      // Look for images in timeline events
+      const eventWithImages = vehicle.timeline_events.find(event => 
+        event.image_urls && event.image_urls.length > 0
+      );
+      
+      if (eventWithImages && eventWithImages.image_urls.length > 0) {
+        imageUrl = eventWithImages.image_urls[0];
+      }
+    }
+    
+    if (imageUrl) {
+      imageDiv.style.backgroundImage = `url(${imageUrl})`;
     } else {
       imageDiv.style.backgroundColor = '#e5e7eb';
     }
@@ -380,20 +513,45 @@ function updateRecentVehiclesUI() {
  * Handles the discover button click
  */
 function handleDiscoverClick() {
-  if (!state.currentVehicle) return;
+  if (!state.currentVehicle) {
+    console.error('No vehicle to discover');
+    return;
+  }
   
   // Update button to show loading state
   elements.discoverButton.textContent = 'Discovering...';
   elements.discoverButton.disabled = true;
   
-  // Send message to background script to handle discovery
-  chrome.runtime.sendMessage({
-    action: 'discoverVehicle',
-    data: state.currentVehicle
-  }, (response) => {
-    // Reset button
-    elements.discoverButton.innerHTML = '<span class="icon">+</span> Discover This Vehicle';
-    elements.discoverButton.disabled = false;
+  // Get the current tab URL to ensure we have a valid URL for the vehicle
+  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+    if (!tabs || !tabs.length) {
+      console.error('Could not get current tab');
+      return;
+    }
+    
+    // Create a complete vehicle object with all required properties
+    // This ensures we're using real data for the vehicle discovery
+    const vehicleToDiscover = {
+      ...state.currentVehicle,
+      url: state.currentVehicle.url || tabs[0].url, // Ensure URL exists
+      title: state.currentVehicle.title || 'Unknown Vehicle',
+      description: state.currentVehicle.description || '',
+      source: state.currentVehicle.source || 'extension',
+      discovered_at: new Date().toISOString()
+    };
+    
+    console.log('Discovering vehicle with data:', vehicleToDiscover);
+    
+    // Send message to background script to handle discovery
+    chrome.runtime.sendMessage({
+      action: 'discoverVehicle',
+      data: vehicleToDiscover
+    }, (response) => {
+      console.log('Discovery response:', response);
+      
+      // Reset button
+      elements.discoverButton.innerHTML = '<span class="icon">+</span> Discover This Vehicle';
+      elements.discoverButton.disabled = false;
     
     if (response.success) {
       // Show success status and add to recent vehicles
@@ -425,7 +583,8 @@ function handleDiscoverClick() {
         signInBtn.textContent = 'Sign In';
         signInBtn.style.marginTop = '8px';
         signInBtn.addEventListener('click', () => {
-          chrome.runtime.sendMessage({ action: 'authenticate' });
+          console.log('Sign in button clicked from error message');
+          chrome.runtime.sendMessage({ action: 'signIn' });
           window.close();
         });
         
@@ -447,13 +606,41 @@ function handleDiscoverClick() {
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('Message received in popup:', message.action);
+  
   if (message.action === 'authComplete') {
     if (message.success) {
+      console.log('Authentication completed successfully');
       state.isAuthenticated = true;
       updateAuthUI();
       loadUserData();
       loadRecentVehicles();
+      
+      // If we have a userEmail from the authentication process, use it
+      if (message.userEmail) {
+        elements.userEmail.textContent = message.userEmail;
+        chrome.storage.local.set({ nukeUserEmail: message.userEmail });
+      }
     }
+  } else if (message.action === 'authError') {
+    console.error('Authentication error:', message.error);
+    
+    // Show error message to user
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'status status-error';
+    errorDiv.textContent = message.error || 'Authentication failed. Please try again.';
+    
+    if (state.isAuthenticated) {
+      // Show in the settings panel if already authenticated
+      elements.settingsContent.insertBefore(errorDiv, elements.settingsContent.firstChild);
+    } else {
+      // Show in the not-signed-in view
+      elements.notSignedInView.insertBefore(errorDiv, elements.notSignedInView.firstChild);
+    }
+    
+    setTimeout(() => {
+      errorDiv.remove();
+    }, 5000);
   }
 });
 
