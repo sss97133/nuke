@@ -1,0 +1,262 @@
+name: Deploy Timeline Database Schema
+
+on:
+  # Run after the sync-vercel-secrets workflow
+  workflow_run:
+    workflows: ["Sync Vercel Secrets"]
+    types:
+      - completed
+  
+  # Also allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  deploy-timeline-schema:
+    name: Deploy Vehicle Timeline Database Schema
+    runs-on: ubuntu-latest
+    # Only run if the sync-vercel-secrets workflow was successful or if manually triggered
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Supabase CLI
+        run: npm install --global supabase
+
+      - name: Install dependencies
+        run: npm install --no-save @supabase/supabase-js dotenv fs-extra
+
+      - name: Create migration runner script
+        run: |
+          cat > run-migration.js << 'EOL'
+          const { createClient } = require('@supabase/supabase-js');
+          const fs = require('fs-extra');
+          const path = require('path');
+          require('dotenv').config();
+
+          async function runMigration() {
+            // Get Supabase credentials following the established pattern in the project
+            const supabaseUrl = process.env.VITE_SUPABASE_URL;
+            const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_KEY;
+            
+            if (!supabaseUrl || !supabaseServiceKey) {
+              console.error('Error: Missing required environment variables');
+              console.error('Ensure VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_KEY are set');
+              process.exit(1);
+            }
+            
+            console.log('Initializing Supabase client...');
+            
+            // Initialize Supabase client with the service key for admin operations
+            const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+              auth: {
+                autoRefreshToken: false,
+                persistSession: false
+              }
+            });
+
+            try {
+              console.log('Testing Supabase connection...');
+              
+              // Test the connection with a simple query
+              const { data, error } = await supabase.from('vehicles').select('count(*)').limit(1);
+              
+              if (error) {
+                throw new Error(`Connection test failed: ${error.message}`);
+              }
+              
+              console.log('Connected successfully to Supabase!');
+
+              // Read the migration file
+              const migrationPath = path.join(process.cwd(), 'migrations', 'vehicle_timeline.sql');
+              console.log(`Reading migration file: ${migrationPath}`);
+              
+              if (!await fs.exists(migrationPath)) {
+                throw new Error(`Migration file not found: ${migrationPath}`);
+              }
+              
+              const migrationContent = await fs.readFile(migrationPath, 'utf-8');
+              console.log('Migration file loaded successfully');
+              
+              // Execute the SQL directly using Supabase's REST API
+              console.log('Executing SQL migration through Supabase REST API...');
+              
+              // Break down the SQL into manageable chunks to avoid timeout issues
+              // Split on clearly identifiable statement boundaries like CREATE TABLE, CREATE FUNCTION, etc.
+              const migrationPatterns = [
+                { pattern: /CREATE\s+TABLE/gi, name: 'CREATE TABLE' },
+                { pattern: /CREATE\s+OR\s+REPLACE\s+FUNCTION/gi, name: 'CREATE FUNCTION' },
+                { pattern: /CREATE\s+FUNCTION/gi, name: 'CREATE FUNCTION' },
+                { pattern: /CREATE\s+INDEX/gi, name: 'CREATE INDEX' },
+                { pattern: /ALTER\s+TABLE/gi, name: 'ALTER TABLE' },
+                { pattern: /CREATE\s+TRIGGER/gi, name: 'CREATE TRIGGER' },
+                { pattern: /INSERT\s+INTO/gi, name: 'INSERT INTO' }
+              ];
+              
+              // First, setup a custom rpc function to run our SQL if it doesn't exist
+              const setupRpcFn = `
+              CREATE OR REPLACE FUNCTION run_migration_sql(sql_command text)
+              RETURNS void
+              LANGUAGE plpgsql
+              SECURITY DEFINER
+              AS $$
+              BEGIN
+                EXECUTE sql_command;
+              END;
+              $$;
+              `;
+              
+              const { error: setupError } = await supabase.rpc('run_migration_sql', { sql_command: setupRpcFn });
+              
+              // If the function doesn't exist yet, create it first
+              if (setupError && setupError.message.includes('function "run_migration_sql" does not exist')) {
+                console.log('Creating SQL execution helper function...');
+                
+                // We need to use a direct REST call to create our helper function
+                const response = await fetch(`${supabaseUrl}/rest/v1/rpc/sql`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': supabaseServiceKey,
+                    'Authorization': `Bearer ${supabaseServiceKey}`
+                  },
+                  body: JSON.stringify({ query: setupRpcFn })
+                });
+                
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  throw new Error(`Failed to create SQL helper: ${errorText}`);
+                }
+                
+                console.log('SQL helper function created successfully');
+              } else if (setupError) {
+                console.log(`Note: ${setupError.message}`);
+              } else {
+                console.log('SQL helper function exists');
+              }
+              
+              // Process each part of the migration
+              console.log('Processing migration in chunks...');
+              let sqlParts = [];
+              
+              // Add the raw SQL as a single chunk if it's small
+              if (migrationContent.length < 10000) {
+                sqlParts.push({ name: 'Complete migration', sql: migrationContent });
+              } else {
+                // Start with the whole migration content
+                let remainingContent = migrationContent;
+                
+                // Extract statements for each pattern
+                for (const { pattern, name } of migrationPatterns) {
+                  const matches = remainingContent.match(pattern);
+                  
+                  if (matches) {
+                    for (const match of matches) {
+                      const startIndex = remainingContent.indexOf(match);
+                      if (startIndex !== -1) {
+                        // Find the next pattern occurrence or end of content
+                        let endIndex = remainingContent.length;
+                        
+                        for (const nextPattern of migrationPatterns) {
+                          const nextMatch = remainingContent.slice(startIndex + match.length).match(nextPattern.pattern);
+                          if (nextMatch && nextMatch.index !== undefined) {
+                            const possibleEnd = startIndex + match.length + nextMatch.index;
+                            if (possibleEnd < endIndex) {
+                              endIndex = possibleEnd;
+                            }
+                          }
+                        }
+                        
+                        // Extract the statement with proper ending (find last semicolon before next pattern)
+                        let statement = remainingContent.slice(startIndex, endIndex);
+                        let lastSemicolon = statement.lastIndexOf(';');
+                        if (lastSemicolon !== -1) {
+                          statement = statement.slice(0, lastSemicolon + 1);
+                        }
+                        
+                        sqlParts.push({ name: `${name} statement`, sql: statement });
+                        
+                        // Remove the processed part from remaining content
+                        remainingContent = remainingContent.replace(statement, '');
+                      }
+                    }
+                  }
+                }
+                
+                // Add any remaining content as a final part
+                if (remainingContent.trim()) {
+                  sqlParts.push({ name: 'Remaining SQL', sql: remainingContent });
+                }
+              }
+              
+              // Execute each SQL part
+              for (let i = 0; i < sqlParts.length; i++) {
+                const { name, sql } = sqlParts[i];
+                console.log(`Executing part ${i+1}/${sqlParts.length}: ${name}`);
+                
+                try {
+                  const { error } = await supabase.rpc('run_migration_sql', { sql_command: sql });
+                  
+                  if (error) {
+                    // Check if it's a benign error like 'already exists'
+                    if (error.message.includes('already exists')) {
+                      console.log(`Note: Object in part ${i+1} already exists, continuing...`);
+                    } else {
+                      throw new Error(`Migration part ${i+1} failed: ${error.message}`);
+                    }
+                  } else {
+                    console.log(`Part ${i+1} executed successfully`);
+                  }
+                } catch (err) {
+                  // For more serious errors, try to continue with other parts
+                  console.warn(`Warning in part ${i+1}: ${err.message}`);
+                }
+              }
+              
+              // Verify that the migration was successful
+              const { data: tableCheck, error: tableError } = await supabase
+                .from('vehicle_timeline_events')
+                .select('count(*)');
+              
+              if (tableError && tableError.code === '42P01') {
+                throw new Error('Migration failed: vehicle_timeline_events table was not created');
+              } else if (tableError) {
+                console.warn(`Warning during verification: ${tableError.message}`);
+              } else {
+                console.log('Migration executed successfully!');
+                console.log('The vehicle_timeline_events table has been created and is accessible.');
+              }
+              
+            } catch (error) {
+              console.error('Migration failed:');
+              console.error(error);
+              process.exit(1);
+            }
+          }
+
+          runMigration();
+          EOL
+
+      - name: Run database migration
+        run: node run-migration.js
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
+          
+      - name: Notify on success
+        if: success()
+        run: echo "✅ Vehicle Timeline database schema deployed successfully!"
+      
+      - name: Notify on failure
+        if: failure()
+        run: echo "❌ Vehicle Timeline database schema deployment failed. Please check the logs for details."

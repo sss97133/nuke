@@ -36,6 +36,7 @@ import Streaming from '@/pages/Streaming';
 import StreamViewer from '@/pages/StreamViewer';
 import VehicleImport from "@/pages/VehicleImport"; // Import the new VehicleImport page
 import AdminPanel from '@/pages/AdminPanel'; // Import the AdminPanel component
+import VehicleTimelinePage from '@/pages/VehicleTimelinePage'; // Import the VehicleTimeline page
 
 // Route type definitions
 export enum RouteType {
@@ -59,6 +60,9 @@ export const authRoutes: RouteConfig[] = [
 
 // Public routes configuration
 export const publicRoutes: RouteConfig[] = [
+  { path: '/vehicle/:vin', element: <VehicleTimelinePage />, type: RouteType.PUBLIC },
+  { path: '/vehicle/id/:id', element: <VehicleTimelinePage />, type: RouteType.PUBLIC },
+  { path: '/vehicle-timeline', element: <VehicleTimelinePage />, type: RouteType.PUBLIC },
   { path: '/explore', element: <Explore />, type: RouteType.PUBLIC },
   { path: '/discover', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC, redirectTo: '/explore' },
   { path: '/marketplace', element: <Marketplace />, type: RouteType.PUBLIC },
