@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +29,7 @@ export const UserDiscoveredVehicles = ({ userId }: { userId: string }) => {
     queryKey: ['user-discovered-vehicles', userId],
     queryFn: async () => {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('discovered_vehicles')
         .select('*')
         .eq('user_id', userId)

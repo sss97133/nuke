@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from '@/hooks/use-toast';
@@ -11,6 +12,7 @@ export const useAuthNavigation = () => {
       console.log("[useAuthNavigation] Checking profile for user:", userId);
       
       const { data: profile, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('onboarding_completed')
         .eq('id', userId)

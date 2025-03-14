@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DbUserPreferences } from "@/types/preferences";
@@ -9,6 +10,7 @@ export const usePreferencesSave = () => {
   const savePreferences = async (updates: Partial<DbUserPreferences>) => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!user || userError) {
         toast({
@@ -20,6 +22,7 @@ export const usePreferencesSave = () => {
       }
 
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('user_preferences')
         .update(updates)
         .eq('user_id', user.id);

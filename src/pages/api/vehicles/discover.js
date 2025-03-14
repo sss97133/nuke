@@ -23,6 +23,9 @@ export default async function handler(req, res) {
 
   // Get user session
   const { data: { session } } = await supabase.auth.getSession();
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
   
   if (!session) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -60,6 +63,9 @@ export default async function handler(req, res) {
     
     // Create vehicle in database
     const { data: vehicleResult, error: vehicleError } = await supabase
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
       .from('vehicles')
       .insert(vehicle)
       .select()
@@ -91,7 +97,7 @@ export default async function handler(req, res) {
         
         // Create timeline event
         return supabase
-          .from('vehicle_timeline')
+          
           .insert(timelineEvent);
       });
       
@@ -117,7 +123,7 @@ export default async function handler(req, res) {
         
         // Create image record
         return supabase
-          .from('vehicle_images')
+          
           .insert(imageRecord);
       });
       
@@ -138,7 +144,7 @@ export default async function handler(req, res) {
       };
       
       await supabase
-        .from('vehicle_raw_data')
+        
         .insert(rawData);
     }
 

@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Vehicle } from '@/components/vehicles/discovery/types';
@@ -16,6 +17,7 @@ export const useVehicleDetail = (id: string) => {
       try {
         // First try to fetch from real data in Supabase
         const { data: vehicleData, error: vehicleError } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('vehicles')
           .select('*')
           .eq('id', id)
@@ -26,7 +28,8 @@ export const useVehicleDetail = (id: string) => {
           
           // Get relationships for this vehicle if they exist
           const { data: relationshipsData, error: relationshipsError } = await supabase
-            .from('vehicle_relationships')
+  if (error) console.error("Database query error:", error);
+            
             .select('*')
             .eq('vehicle_id', id);
           

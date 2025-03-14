@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 import { CarImportData, CarImageData } from './types';
 
@@ -8,6 +9,7 @@ import { CarImportData, CarImageData } from './types';
 export async function importCarsToSupabase(carData: CarImportData[]): Promise<string[]> {
   // Get current user ID
   const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
   
   if (!user) {
     throw new Error('User not authenticated');
@@ -28,6 +30,7 @@ export async function importCarsToSupabase(carData: CarImportData[]): Promise<st
       
       // Insert or update the car record
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .upsert(carRecord, { onConflict: 'id' })
         .select('id')
@@ -57,6 +60,7 @@ export async function connectICloudImages(
   try {
     // Get current user ID
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     
     if (!user) {
       throw new Error('User not authenticated');
@@ -69,7 +73,8 @@ export async function connectICloudImages(
     
     // Update the car with iCloud information
     const { error } = await supabase
-      .from('vehicles')
+  if (error) console.error("Database query error:", error);
+      
       .update({ 
         icloud_album_link: icloudLink,
         icloud_folder_id: folderId
@@ -97,6 +102,7 @@ export async function saveCarImages(
   try {
     // Get current user ID
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     
     if (!user) {
       throw new Error('User not authenticated');
@@ -135,7 +141,8 @@ export async function saveCarImages(
     
     // Insert image records
     const { error } = await supabase
-      .from('vehicle_images')
+  if (error) console.error("Database query error:", error);
+      
       .insert(imageRecords.map(record => ({
         ...record,
         user_id: user.id

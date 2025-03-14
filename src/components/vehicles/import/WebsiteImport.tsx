@@ -21,6 +21,7 @@ export const WebsiteImport = ({ onNormalizedData }: WebsiteImportProps) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('process-vehicle-import', {
+  if (error) console.error("Database query error:", error);
         body: { data: url, fileType: 'url' }
       });
 

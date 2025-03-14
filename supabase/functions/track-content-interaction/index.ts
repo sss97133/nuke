@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { serve } from "https://deno.land/std@0.131.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.1";
 
@@ -49,6 +50,7 @@ serve(async (req) => {
 
     // Get user ID from JWT
     const { data: { user }, error: userError } = await supabase.auth.getUser(
+  if (error) console.error("Database query error:", error);
       authHeader.replace('Bearer ', '')
     );
 
@@ -61,6 +63,7 @@ serve(async (req) => {
 
     // Insert the interaction
     const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('content_interactions')
       .insert({
         user_id: user.id,

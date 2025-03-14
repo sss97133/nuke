@@ -60,6 +60,7 @@ export const usePhotoCapture = (onPhotoCapture: (file: File) => Promise<void>) =
     setIsAnalyzing(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-inventory-image', {
+  if (error) console.error("Database query error:", error);
         body: { imageUrl: preview.url }
       });
 

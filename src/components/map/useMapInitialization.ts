@@ -17,6 +17,7 @@ export const useMapInitialization = (
     const initializeMap = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+  if (error) console.error("Database query error:", error);
         
         if (error || !data?.secret) {
           toast({

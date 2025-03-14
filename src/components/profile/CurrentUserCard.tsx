@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,9 +10,11 @@ export const CurrentUserCard: React.FC = () => {
     queryKey: ['current-user'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       if (!user) return null;
 
       const { data: profile } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('*')
         .eq('id', user.id)

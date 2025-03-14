@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { UserPreferences, DbUserPreferences } from "@/types/preferences";
@@ -31,6 +32,7 @@ export const usePreferencesBase = () => {
       setError(null);
       
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!user) {
         console.log('No user found, using default preferences');
@@ -39,6 +41,7 @@ export const usePreferencesBase = () => {
       }
       
       const { data, error: fetchError } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('user_preferences')
         .select('*')
         .eq('user_id', user.id)

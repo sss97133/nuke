@@ -22,10 +22,36 @@ export const useWatchlist = () => {
       try {
         const savedWatchlist = localStorage.getItem('watchlist');
         if (savedWatchlist) {
-          setWatchlist(JSON.parse(savedWatchlist));
+          // Validate data before parsing to avoid security issues
+          if (!/[^\w\s\-\[\]\{\},:\"\'\.]/.test(savedWatchlist)) {
+            const parsed = JSON.parse(savedWatchlist);
+            
+            // Validate the structure of the parsed data
+            if (Array.isArray(parsed) && parsed.every(item => 
+              typeof item === 'object' && 
+              typeof item.id === 'string' && 
+              ['listing', 'vehicle', 'garage'].includes(item.type) && 
+              typeof item.addedAt === 'string'
+            )) {
+              setWatchlist(parsed);
+            } else {
+              // If validation fails, reset watchlist and log error
+              console.error('Invalid watchlist structure in localStorage');
+              localStorage.removeItem('watchlist');
+              setWatchlist([]);
+            }
+          } else {
+            // If data contains invalid characters, reset watchlist
+            console.error('Invalid characters in watchlist data');
+            localStorage.removeItem('watchlist');
+            setWatchlist([]);
+          }
         }
       } catch (error) {
         console.error('Error loading watchlist from localStorage:', error);
+        // Reset watchlist on error
+        localStorage.removeItem('watchlist');
+        setWatchlist([]);
       } finally {
         setIsLoading(false);
       }

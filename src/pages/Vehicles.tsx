@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -112,6 +113,7 @@ export default function Vehicles() {
       setLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
         
         if (!user) {
           toast({
@@ -257,6 +259,7 @@ export default function Vehicles() {
     try {
       // For real implementation, refetch from the database
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!user) {
         toast({
@@ -269,7 +272,7 @@ export default function Vehicles() {
       }
       
       const { data, error } = await safeSelect(
-        supabase.from('vehicles'),
+        supabase,
         '*'
       )
         .eq('user_id', user.id)

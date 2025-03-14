@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 import { ContentItem } from './types';
 
@@ -49,7 +50,7 @@ export async function fetchContentByType(
         
     case 'vehicles':
       let vehiclesQuery = supabase
-        .from('vehicles')
+        
         .select(`
           id,
           make,
@@ -72,7 +73,7 @@ export async function fetchContentByType(
         
     case 'auctions':
       let auctionsQuery = supabase
-        .from('auctions')
+        
         .select(`
           id,
           vehicle_id,
@@ -96,7 +97,7 @@ export async function fetchContentByType(
         
     case 'live_streams':
       let streamsQuery = supabase
-        .from('live_streams')
+        
         .select(`
           id,
           title,

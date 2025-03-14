@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +15,7 @@ export const usePhoneAuth = () => {
       setIsLoading(true);
       
       const { error } = await supabase.auth.signInWithOtp({
+  if (error) console.error("Database query error:", error);
         phone: formattedPhone,
       });
 
@@ -49,6 +51,7 @@ export const usePhoneAuth = () => {
       setIsLoading(true);
       
       const { data, error } = await supabase.auth.verifyOtp({
+  if (error) console.error("Database query error:", error);
         phone: formattedPhone,
         token: otp,
         type: "sms",
@@ -67,6 +70,7 @@ export const usePhoneAuth = () => {
         
         if (userId) {
           const { data: profile } = await supabase
+  if (error) console.error("Database query error:", error);
             .from('profiles')
             .select('username')
             .eq('id', userId)

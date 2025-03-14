@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
@@ -156,6 +157,9 @@ serve(async (req) => {
       
       // Insert the vehicle into the cars table
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
         .from('cars')
         .upsert(vehicleWithUser)
         .select('id')
@@ -183,7 +187,7 @@ serve(async (req) => {
         
         // Add a record in the car_images table to indicate iCloud source
         await supabase
-          .from('car_images')
+          
           .insert({
             car_id: vehicleId,
             file_path: processedVehicle.icloud_album_link,

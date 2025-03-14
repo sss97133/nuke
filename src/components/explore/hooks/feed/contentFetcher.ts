@@ -19,6 +19,7 @@ export async function fetchFeedContent(
     
     // Get current user for personalization
     const { data: userData } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     const userId = userData?.user?.id;
     
     // Determine which tables to query based on filter

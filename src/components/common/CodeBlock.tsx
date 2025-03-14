@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getHighlighter } from 'shiki';
-import { transformerTwoslash } from '@shikijs/transformers';
+import { getHighlighter, bundledLanguages, bundledThemes } from 'shiki';
+import DOMPurify from 'dompurify';
 
 interface CodeBlockProps {
   code: string;
@@ -23,8 +23,7 @@ export const CodeBlock = ({
       try {
         const highlighter = await getHighlighter({
           themes: [theme === 'dark' ? 'github-dark' : 'github-light'],
-          langs: [language],
-          transformers: [transformerTwoslash()]
+          langs: [language]
         });
 
         const highlighted = await highlighter.codeToHtml(code, {
@@ -36,7 +35,14 @@ export const CodeBlock = ({
       } catch (error) {
         console.error('Error highlighting code:', error);
         // Fallback to plain text if highlighting fails
-        setHtml(`<pre><code>${code}</code></pre>`);
+        // Escape HTML entities to prevent XSS
+        const escapedCode = code
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+        setHtml(`<pre><code>${escapedCode}</code></pre>`);
       } finally {
         setIsLoading(false);
       }
@@ -53,7 +59,7 @@ export const CodeBlock = ({
     <div className="relative">
       <div 
         className="font-mono text-sm overflow-x-auto rounded-lg"
-        dangerouslySetInnerHTML={{ __html: html }} 
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html, { USE_PROFILES: { html: true } }) }} 
       />
       {showLineNumbers && (
         <div className="absolute left-0 top-0 bottom-0 w-12 bg-gray-100 dark:bg-gray-800 opacity-75" />

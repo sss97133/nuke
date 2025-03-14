@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthState } from '@/hooks/auth/use-auth-state';
@@ -21,6 +22,7 @@ export const useProfileData = () => {
 
       // Fetch profile data
       const { data: profileData, error: profileError } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
@@ -32,7 +34,8 @@ export const useProfileData = () => {
 
       // Fetch achievements data
       const { data: achievementsData, error: achievementsError } = await supabase
-        .from('user_achievements')
+  if (error) console.error("Database query error:", error);
+        
         .select('*')
         .eq('user_id', session.user.id);
 

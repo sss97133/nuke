@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ export const TestUserManager: React.FC = () => {
       // Try to get users from auth.users view (requires admin access)
       try {
         const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+  if (error) console.error("Database query error:", error);
         
         if (!authError && authUsers) {
           // Map auth users to our format
@@ -53,6 +55,7 @@ export const TestUserManager: React.FC = () => {
       
       // Fallback to profiles table
       const { data: profiles, error: profilesError } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('id, email, created_at, username, full_name')
         .order('created_at', { ascending: false });
@@ -86,6 +89,7 @@ export const TestUserManager: React.FC = () => {
     try {
       // Create user with Supabase Auth using service role
       const { data, error } = await supabase.auth.admin.createUser({
+  if (error) console.error("Database query error:", error);
         email,
         password,
         email_confirm: true, // Auto-confirm the email
@@ -107,7 +111,8 @@ export const TestUserManager: React.FC = () => {
 
       // Create profile using service role
       const { error: profileError } = await supabase
-        .from('profiles')
+  if (error) console.error("Database query error:", error);
+        
         .insert({
           id: data.user.id,
           email: data.user.email,
@@ -163,6 +168,7 @@ export const TestUserManager: React.FC = () => {
       // Try to delete user with admin API
       try {
         const { error: adminError } = await supabase.auth.admin.deleteUser(userId);
+  if (error) console.error("Database query error:", error);
         if (!adminError) {
           authDeleted = true;
           console.log('User deleted from auth successfully');
@@ -176,7 +182,8 @@ export const TestUserManager: React.FC = () => {
       // Always try to delete from profiles table
       try {
         const { error: profileError } = await supabase
-          .from('profiles')
+  if (error) console.error("Database query error:", error);
+          
           .delete()
           .eq('id', userId);
 

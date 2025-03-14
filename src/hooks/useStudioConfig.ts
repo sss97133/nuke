@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isWorkspaceDimensions, isPTZConfigurations } from '@/types/studio';
@@ -11,12 +12,14 @@ export const useStudioConfig = (defaultDimensions: WorkspaceDimensions) => {
       console.log('Fetching studio config...');
       
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       if (!user) {
         console.log('No user found');
         throw new Error('No user found');
       }
       
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('studio_configurations')
         .select('*')
         .eq('user_id', user.id)

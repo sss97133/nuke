@@ -1,13 +1,16 @@
 
+import type { Database } from '../types';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const fetchTokenBalance = async (tokenId: string) => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     if (!user) return 0;
 
     const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('token_holdings')
       .select('balance')
       .eq('user_id', user.id)
@@ -32,6 +35,7 @@ export const createStake = async (
   try {
     // Get the current authenticated user
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     
     if (!user) {
       throw new Error("You must be logged in to stake tokens");
@@ -39,7 +43,8 @@ export const createStake = async (
     
     // Check if the user has enough tokens to stake
     const { data: holdings, error: holdingsError } = await supabase
-      .from('token_holdings')
+  if (error) console.error("Database query error:", error);
+      
       .select('balance')
       .eq('user_id', user.id)
       .eq('token_id', selectedToken)
@@ -79,6 +84,7 @@ export const createStake = async (
     
     // Direct insert
     const { error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('token_stakes' as any)
       .insert([stakeData]);
           
@@ -86,7 +92,8 @@ export const createStake = async (
 
     // Update the user's token holdings
     const { error: updateError } = await supabase
-      .from('token_holdings')
+  if (error) console.error("Database query error:", error);
+      
       .update({ balance: Number(balance) - stakeAmount })
       .eq('user_id', user.id)
       .eq('token_id', selectedToken);

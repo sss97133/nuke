@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,9 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
   const onSubmit = async (data: any) => {
     try {
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .insert([
           {

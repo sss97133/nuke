@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -43,6 +44,7 @@ serve(async (req) => {
 
     // Store the probability data
     const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('vehicle_probability_zones')
       .insert([probabilityData])
       .select()

@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React, { useState, useEffect } from 'react';
 import { Car, Wrench, Users, TrendingUp } from "lucide-react";
 import StatCard from './StatCard';
@@ -26,6 +27,7 @@ const StatsOverview = () => {
         
         // Get current user
         const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
         
         if (!user) {
           toast({
@@ -47,14 +49,14 @@ const StatsOverview = () => {
             
           // Fetch active services  
           supabase
-            .from('service_tickets')
+            
             .select('id')
             .eq('user_id', user.id)
             .in('status', ['pending', 'in_progress']),
             
           // Fetch active team members with status filter
           supabase
-            .from('team_members')
+            
             .select('id')
             .eq('status', 'active')
         ]);

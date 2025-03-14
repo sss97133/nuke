@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,6 +80,7 @@ const TokensPage = () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('tokens')
         .select('*');
 
@@ -112,7 +114,8 @@ const TokensPage = () => {
       }
 
       const { data, error } = await supabase
-        .from('tokens')
+  if (error) console.error("Database query error:", error);
+        
         .insert([{
           name: newToken.name,
           symbol: newToken.symbol.toUpperCase(),
@@ -146,7 +149,8 @@ const TokensPage = () => {
   const handleUpdateTokenStatus = async (id: string, newStatus: string) => {
     try {
       const { error } = await supabase
-        .from('tokens')
+  if (error) console.error("Database query error:", error);
+        
         .update({ status: newStatus })
         .eq('id', id);
 

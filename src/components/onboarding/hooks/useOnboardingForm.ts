@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -73,9 +74,11 @@ export const useOnboardingForm = () => {
   const handleComplete = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       if (!user) throw new Error('No user found');
 
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({
           first_name: formData.firstName,

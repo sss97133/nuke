@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +12,7 @@ export const useVehiclesData = () => {
   const fetchVehicles = useCallback(async () => {
     try {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .select('id, make, model, year');
       

@@ -17,6 +17,7 @@ export const useGarageSearch = (userLocation: { lat: number; lng: number } | nul
       
       try {
         const { data, error } = await supabase.functions.invoke('search-local-garages', {
+  if (error) console.error("Database query error:", error);
           body: {
             lat: userLocation.lat,
             lng: userLocation.lng,

@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
@@ -32,6 +33,7 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({ vehicleId }) 
         setLoading(true);
         console.log('Fetching images for vehicle:', vehicleId);
         const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('vehicle_images')
           .select('*')
           .eq('car_id', vehicleId)
@@ -59,7 +61,7 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({ vehicleId }) 
     console.log('New image uploaded:', imageUrl);
     // Refetch images to ensure we have the latest data
     supabase
-      .from('vehicle_images')
+      
       .select('*')
       .eq('car_id', vehicleId)
       .order('uploaded_at', { ascending: false })

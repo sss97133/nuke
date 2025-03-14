@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,6 +16,7 @@ export const useGarages = () => {
   useEffect(() => {
     const fetchGarages = async () => {
       const { data } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('garages')
         .select('id, name, location, address')
         .not('location', 'is', null);

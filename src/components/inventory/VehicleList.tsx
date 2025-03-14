@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +13,7 @@ export const VehicleList = () => {
   useEffect(() => {
     const fetchVehicles = async () => {
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!user) {
         toast({
@@ -23,6 +25,7 @@ export const VehicleList = () => {
       }
 
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from("vehicles")
         .select("*")
         .eq('user_id', user.id);

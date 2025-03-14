@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -39,6 +40,7 @@ export const UserProfileHeader = ({
     // Refresh profile data
     try {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('full_name, username, avatar_url, bio')
         .eq('id', userId)

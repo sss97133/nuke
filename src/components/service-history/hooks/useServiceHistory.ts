@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ServiceRecord, parsePartsUsed, ServiceStatus } from '../types';
@@ -23,6 +24,7 @@ export const useServiceHistory = () => {
 
     try {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('service_tickets')
         .select(`
           *,

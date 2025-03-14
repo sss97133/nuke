@@ -12,8 +12,8 @@ paths:
   - '!dist'
   - '!build'
   - '!coverage'
-  - '!**/*.test.{ts,tsx,js,jsx}'
-  - '!**/*.spec.{ts,tsx,js,jsx}'
+  - '!**/**/*.test.{ts,tsx,js,jsx}'
+  - '!**/**/*.spec.{ts,tsx,js,jsx}'
   - '!**/__tests__'
 
 # Path filters for specific languages

@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -26,6 +27,7 @@ export const VideoAnalysis = () => {
     queryKey: ['video-job', jobId],
     queryFn: async () => {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('video_processing_jobs')
         .select('*, live_streams(id, stream_url)')
         .eq('id', jobId)

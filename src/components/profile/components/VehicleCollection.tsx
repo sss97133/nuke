@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React from 'react';
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,7 +101,8 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
           
           // Fetch timeline events for all vehicles in one query
           const { data: timelineEvents, error: timelineError } = await supabase
-            .from('vehicle_timeline_events')
+  if (error) console.error("Database query error:", error);
+            
             .select('*')
             .in('vehicle_id', vehicleIds)
             .order('event_date', { ascending: false });

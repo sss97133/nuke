@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -46,6 +47,7 @@ const VehicleDetail = () => {
         console.info('Vehicle ID:', id);
         
         const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('vehicles')
           .select('*')
           .eq('id', id)

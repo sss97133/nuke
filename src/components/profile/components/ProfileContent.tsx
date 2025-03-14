@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import UserProfileHeader from "../UserProfileHeader";
@@ -37,6 +38,7 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
       setIsLoading(true);
       try {
         const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('profiles')
           .select('*')
           .eq('id', userId)
@@ -72,7 +74,8 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
       setVehiclesLoading(true);
       try {
         const { data, error } = await supabase
-          .from('vehicles')
+  if (error) console.error("Database query error:", error);
+          
           .select('*')
           .eq('user_id', userId)
           .order('created_at', { ascending: false });

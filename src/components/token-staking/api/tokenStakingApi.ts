@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { supabase } from "@/integrations/supabase/client";
 import { Token, Vehicle, TokenStake, TokenStakeStats } from "@/types/token";
 import { nullToUndefined } from "@/utils/vehicle/types";
@@ -9,6 +10,7 @@ import { nullToUndefined } from "@/utils/vehicle/types";
 export const fetchTokens = async (): Promise<Token[]> => {
   try {
     const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('tokens')
       .select('*')
       .order('name');
@@ -37,7 +39,8 @@ export const fetchTokens = async (): Promise<Token[]> => {
 export const fetchVehicles = async (): Promise<Vehicle[]> => {
   try {
     const { data, error } = await supabase
-      .from('vehicles')
+  if (error) console.error("Database query error:", error);
+      
       .select('*')
       .order('make');
     
@@ -74,6 +77,7 @@ export const fetchUserStakes = async (): Promise<TokenStake[]> => {
   try {
     // Get the current authenticated user
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     
     if (!user) {
       console.warn("No authenticated user found");
@@ -84,6 +88,7 @@ export const fetchUserStakes = async (): Promise<TokenStake[]> => {
     try {
       // Using a direct query with casting
       const { data: stakesData, error: stakesError } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('token_stakes' as any)
         .select(`
           id, user_id, token_id, vehicle_id, amount, start_date, end_date, 
@@ -130,6 +135,7 @@ export const fetchStakingStats = async (userId: string): Promise<TokenStakeStats
   try {
     // Fallback: Fetch user stakes
     const { data: stakesData, error: stakesError } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('token_stakes' as any)
       .select('*')
       .eq('user_id', userId);
@@ -208,6 +214,7 @@ export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
   try {
     // Get the stake details first
     const { data: stakeData, error: stakeError } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('token_stakes' as any)
       .select('*')
       .eq('id', stakeId)
@@ -228,6 +235,7 @@ export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
     
     // Get the current authenticated user
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     if (!user) throw new Error('User not authenticated');
     
     // Verify the user owns this stake
@@ -237,6 +245,7 @@ export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
     
     // Update the stake status
     const { error: updateError } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('token_stakes' as any)
       .update({ status: 'completed' })
       .eq('id', stakeId);
@@ -245,7 +254,8 @@ export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
     
     // Get the current user balance
     const { data: currentBalance, error: balanceError } = await supabase
-      .from('token_holdings')
+  if (error) console.error("Database query error:", error);
+      
       .select('balance')
       .eq('user_id', user.id)
       .eq('token_id', stake.token_id)
@@ -259,7 +269,8 @@ export const unstakeTokens = async (stakeId: string): Promise<boolean> => {
     
     // Update the user's token balance
     const { error: holdingsError } = await supabase
-      .from('token_holdings')
+  if (error) console.error("Database query error:", error);
+      
       .upsert([
         {
           user_id: user.id,

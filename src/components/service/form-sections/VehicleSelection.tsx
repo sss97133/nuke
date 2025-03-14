@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +64,7 @@ export const VehicleSelection = ({
     const fetchVehicles = async () => {
       try {
         const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from("vehicles")
           .select("*");
 

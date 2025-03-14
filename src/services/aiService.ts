@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 import { ProfileAnalysisResult } from '@/components/profile/services/ProfileAnalysisService';
 
@@ -5,6 +6,7 @@ export async function fetchUserHabits(userId: string): Promise<string[]> {
   try {
     // Get user's profile analysis
     const { data: profile, error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('profiles')
       .select('ai_analysis')
       .eq('id', userId)
@@ -33,7 +35,8 @@ export async function fetchUserKeywords(userId: string): Promise<string[]> {
   try {
     // Get user's profile analysis
     const { data: profile, error } = await supabase
-      .from('profiles')
+  if (error) console.error("Database query error:", error);
+      
       .select('ai_analysis')
       .eq('id', userId)
       .single();
@@ -70,7 +73,8 @@ export async function calculateContentRelevance(
   try {
     // Get user's profile analysis
     const { data: profile, error } = await supabase
-      .from('profiles')
+  if (error) console.error("Database query error:", error);
+      
       .select('ai_analysis')
       .eq('id', userId)
       .single();
@@ -82,7 +86,8 @@ export async function calculateContentRelevance(
 
     // Get user's engagement metrics
     const { data: engagements, error: engagementError } = await supabase
-      .from('engagement_metrics')
+  if (error) console.error("Database query error:", error);
+      
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })

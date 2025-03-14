@@ -5,6 +5,7 @@
  * with fallback to Supabase stored images.
  */
 
+import type { Database } from '../types';
 import { ICloudAlbumData, ICloudImage } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { mockFetchICloudImages } from './mock';
@@ -102,6 +103,9 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
     try {
       // Try to get the album metadata
       const { data: albumData, error: albumError } = await supabase
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
         .from('icloud_albums')
         .select('*')
         .eq('album_id', albumId)
@@ -114,7 +118,10 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
       
       // Get the associated images
       const { data: imagesData, error: imagesError } = await supabase
-        .from('icloud_images')
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+        
         .select('*')
         .eq('album_id', albumId)
         .order('created_at', { ascending: false });
@@ -174,7 +181,7 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
       try {
         // Store album metadata
         await supabase
-          .from('icloud_albums')
+          
           .upsert({
             album_id: albumId,
             title: processedData.album.title,
@@ -200,7 +207,7 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
         }));
         
         await supabase
-          .from('icloud_images')
+          
           .upsert(imagesToInsert);
           
         console.log('Stored iCloud data in Supabase for future use');

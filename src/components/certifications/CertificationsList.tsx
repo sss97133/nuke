@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +19,7 @@ export const CertificationsList = () => {
     queryKey: ['user-certifications'],
     queryFn: async () => {
       const { data: userCerts, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('user_certifications')
         .select(`
           *,

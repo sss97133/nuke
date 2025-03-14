@@ -15,6 +15,7 @@ const UserProfile = () => {
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) console.error("Database query error:", error);
       if (session?.user) {
         setCurrentUserId(session.user.id);
       }

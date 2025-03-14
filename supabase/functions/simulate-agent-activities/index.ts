@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -26,6 +27,7 @@ serve(async (req) => {
 
     // Get all active agents
     const { data: agents, error: agentsError } = await supabaseClient
+  if (error) console.error("Database query error:", error);
       .from('ai_agents')
       .select('*')
       .eq('status', 'active')
@@ -58,7 +60,8 @@ serve(async (req) => {
     // Record all actions
     for (const action of actions) {
       const { error: actionError } = await supabaseClient
-        .from('agent_actions')
+  if (error) console.error("Database query error:", error);
+        
         .insert({
           agent_id: action.agentId,
           action_type: action.actionType,
@@ -72,7 +75,8 @@ serve(async (req) => {
 
     // Update agents' last_action_at timestamp
     const { error: updateError } = await supabaseClient
-      .from('ai_agents')
+  if (error) console.error("Database query error:", error);
+      
       .update({ last_action_at: new Date().toISOString() })
       .eq('status', 'active')
 

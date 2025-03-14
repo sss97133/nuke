@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ export const CreateGarage = () => {
     }
 
     const { error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('garages')
       .insert([{ name: newGarageName.trim() }]);
 

@@ -166,8 +166,12 @@ export const PrivacySettings: React.FC<PrivacySettingsProps> = ({
     setIsSaving(true);
     
     try {
-      // Simulating API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Simulating API call with proper timeout handling
+      const PRIVACY_SETTINGS_TIMEOUT_MS = 1000; // Use constant for timeout value
+      await new Promise(resolve => {
+        const timeoutId = setTimeout(resolve, PRIVACY_SETTINGS_TIMEOUT_MS);
+        return () => clearTimeout(timeoutId); // Ensure cleanup if promise is canceled
+      });
       
       // Here you would save to your database
       

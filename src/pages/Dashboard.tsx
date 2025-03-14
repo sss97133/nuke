@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DashboardHeader from '@/components/dashboard/DashboardHeader';

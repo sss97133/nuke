@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +34,7 @@ export const useAvatarUpload = (userId: string, onSuccess: (url: string) => void
 
       // Upload the file to Supabase Storage
       const { error: uploadError, data } = await supabase.storage
+  if (error) console.error("Database query error:", error);
         .from(AVATAR_BUCKET)
         .upload(filePath, file, { 
           upsert: true,
@@ -53,6 +55,7 @@ export const useAvatarUpload = (userId: string, onSuccess: (url: string) => void
 
       // Update profile with new avatar URL
       const { error: updateError } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({ avatar_url: publicUrl })
         .eq('id', userId);

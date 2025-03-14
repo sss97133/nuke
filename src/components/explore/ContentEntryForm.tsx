@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,7 @@ export const ContentEntryForm = () => {
     try {
       // Insert content item to Supabase
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('explore_content')
         .insert([{
           type: contentItem.type,

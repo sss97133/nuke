@@ -113,6 +113,7 @@ serve(async (req) => {
       
       // Query auctions table with joins for vehicle data
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('auctions')
         .select(`
           *,

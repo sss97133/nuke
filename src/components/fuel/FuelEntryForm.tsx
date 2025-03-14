@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,7 @@ export const FuelEntryForm = ({ onEntryAdded }: FuelEntryFormProps) => {
     try {
       // In a real implementation, this would save to Supabase
       // const { error } = await supabase.from('fuel_entries').insert([{
+  if (error) console.error("Database query error:", error);
       //   vehicle_id: formData.vehicleId,
       //   amount: parseFloat(formData.amount),
       //   price_per_unit: parseFloat(formData.price),

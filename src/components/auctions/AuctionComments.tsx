@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +39,7 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
 
   const fetchComments = async () => {
     const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from("auction_comments")
       .select(`
         *,
@@ -62,7 +64,8 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
   const handleSubmitComment = async () => {
     if (!newComment.trim()) return;
 
-    const { error } = await supabase.from("auction_comments").insert([
+    const { error } = await supabase.insert([
+  if (error) console.error("Database query error:", error);
       {
         auction_id: auctionId,
         comment: newComment,

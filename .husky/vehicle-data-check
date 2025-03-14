@@ -1,0 +1,48 @@
+#!/usr/bin/env sh
+# Vehicle Data Integrity Check
+# This pre-commit hook validates that vehicle data handling follows team standards
+# - Ensures proper typing for vehicle data and timeline events
+# - Validates real data usage preference
+# - Checks for proper error handling in vehicle data operations
+
+set -e
+
+echo "🚗 Running vehicle data integrity checks..."
+
+# Check if there are any changes to vehicle-related files
+VEHICLE_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(vehicle|timeline|Vehicle)' || true)
+
+if [ -z "$VEHICLE_FILES" ]; then
+  echo "✅ No vehicle-related files changed, skipping vehicle data checks"
+  exit 0
+fi
+
+echo "Found vehicle-related changes in the following files:"
+echo "$VEHICLE_FILES"
+
+# Run TypeScript check specifically for vehicle files
+echo "🔍 Checking TypeScript integrity for vehicle data..."
+node scripts/typescript-diagnostics.js --vehicle-only
+
+# Check for mock data usage (as per USER preference for real data)
+echo "🔍 Checking for mock data usage..."
+MOCK_DATA_USAGE=$(git diff --cached -G"mock.*data|MOCK_|test.*data" --name-only | grep -E '(vehicle|timeline|Vehicle)' || true)
+
+if [ -n "$MOCK_DATA_USAGE" ]; then
+  echo "⚠️ Warning: Potential mock data usage detected in these files:"
+  echo "$MOCK_DATA_USAGE"
+  echo "Remember: Use real vehicle data over mock data in all circumstances."
+  # Not failing the commit as this is just a warning based on user preference
+fi
+
+# Check for proper error handling in vehicle data operations
+echo "🔍 Checking for proper error handling in vehicle data operations..."
+ERROR_HANDLING=$(git diff --cached -G"try|catch|error" --name-only | grep -E '(vehicle|timeline|Vehicle)' || true)
+
+if [ -z "$ERROR_HANDLING" ] && [ -n "$VEHICLE_FILES" ]; then
+  echo "⚠️ Warning: No error handling detected in vehicle data operations."
+  echo "Consider adding proper error handling for data operations."
+fi
+
+# Vehicle-centric architecture validation
+echo "✅ Vehicle data integrity checks completed"

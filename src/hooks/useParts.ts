@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect } from 'react';
 import { supabase, useSupabaseWithToast } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -67,7 +68,7 @@ export const useParts = () => {
       // In production, we would insert to Supabase
       const data = await safeFetch(() => 
         supabase
-          .from('inventory')
+          
           .insert([newPart])
           .select()
       );
@@ -112,7 +113,7 @@ export const useParts = () => {
       // In production, we would update in Supabase
       const data = await safeFetch(() => 
         supabase
-          .from('inventory')
+          
           .update(updates)
           .eq('id', id)
           .select()
@@ -156,7 +157,8 @@ export const useParts = () => {
       
       // In production, we would delete from Supabase
       const { error } = await supabase
-        .from('inventory')
+  if (error) console.error("Database query error:", error);
+        
         .delete()
         .eq('id', id);
       

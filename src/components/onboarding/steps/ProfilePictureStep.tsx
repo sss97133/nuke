@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -22,6 +23,7 @@ export const ProfilePictureStep = ({ avatarUrl, onUpdate }: ProfilePictureStepPr
 
       // Get user session to ensure they're authenticated
       const { data: { session } } = await supabase.auth.getSession();
+  if (error) console.error("Database query error:", error);
       if (!session?.user) {
         throw new Error('User must be authenticated to upload avatar');
       }
@@ -31,18 +33,20 @@ export const ProfilePictureStep = ({ avatarUrl, onUpdate }: ProfilePictureStepPr
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
+  if (error) console.error("Database query error:", error);
         .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
+        
         .getPublicUrl(filePath);
 
       // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
-        .from('profiles')
+  if (error) console.error("Database query error:", error);
+        
         .update({ avatar_url: publicUrl })
         .eq('id', session.user.id);
 

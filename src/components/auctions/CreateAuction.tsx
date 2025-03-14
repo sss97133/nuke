@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,9 @@ export const CreateAuction = () => {
     const endTime = addDays(startTime, parseInt(formData.duration));
 
     const { error } = await supabase
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
       .from('auctions')
       .insert([{
         vehicle_id: formData.vehicleId,

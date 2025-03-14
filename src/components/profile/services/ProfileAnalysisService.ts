@@ -2,6 +2,7 @@
 /**
  * Service for analyzing user profile data and generating insights
  */
+import type { Database } from '../types';
 import { SocialLinks, StreamingLinks, Achievement } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -115,6 +116,7 @@ export class ProfileAnalysisService {
       console.log('Saving analysis results for user:', userId);
       
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({
           ai_analysis: analysisResults,

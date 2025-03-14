@@ -19,6 +19,7 @@ export const MendableChat = () => {
     setIsLoading(true)
     try {
       const { data, error } = await supabase.functions.invoke('query-mendable', {
+  if (error) console.error("Database query error:", error);
         body: { query: query.trim() }
       })
 

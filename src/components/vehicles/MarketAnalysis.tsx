@@ -21,6 +21,7 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke(
+  if (error) console.error("Database query error:", error);
         "analyze-vehicle-data",
         {
           body: { vehicleData },

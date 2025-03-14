@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -11,6 +12,7 @@ export async function checkExistingInteraction(
 ): Promise<boolean> {
   try {
     const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('content_interactions')
       .select('id')
       .eq('content_id', contentId)
@@ -41,6 +43,7 @@ export async function trackContentInteraction(
   try {
     // Get current user
     const { data: userData } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     const userId = userData?.user?.id;
     
     if (!userId) {
@@ -51,7 +54,8 @@ export async function trackContentInteraction(
     
     // Insert interaction - explicitly specify only the columns we know exist
     const { data, error } = await supabase
-      .from('content_interactions')
+  if (error) console.error("Database query error:", error);
+      
       .insert({
         content_id: contentId,
         user_id: userId,

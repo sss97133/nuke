@@ -21,6 +21,7 @@ export const PasswordResetForm = () => {
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({
+  if (error) console.error("Database query error:", error);
         password: newPassword
       });
 

@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
@@ -34,6 +35,7 @@ serve(async (req) => {
 
     // Fetch vehicle details
     const { data: vehicle, error: vehicleError } = await supabaseClient
+  if (error) console.error("Database query error:", error);
       .from('vehicles')
       .select('*')
       .eq('id', vehicleId)
@@ -95,7 +97,8 @@ serve(async (req) => {
 
     // Update the vehicle record in the database
     const { error: updateError } = await supabaseClient
-      .from('vehicles')
+  if (error) console.error("Database query error:", error);
+      
       .update({ historical_data: historicalData })
       .eq('id', vehicleId);
 

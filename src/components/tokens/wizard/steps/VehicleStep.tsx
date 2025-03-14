@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -59,10 +60,12 @@ const VehicleStep = ({
     try {
       // First, get the active garage id from the user's profile
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!user) throw new Error("No authenticated user");
       
       const { data: profileData, error: profileError } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('active_garage_id')
         .eq('id', user.id)
@@ -78,7 +81,8 @@ const VehicleStep = ({
       
       // Now fetch vehicles associated with that garage
       const { data, error } = await supabase
-        .from('vehicles')
+  if (error) console.error("Database query error:", error);
+        
         .select('id, make, model, year, vin')
         .eq('user_id', user.id);
       
@@ -99,7 +103,8 @@ const VehicleStep = ({
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from('vehicles')
+  if (error) console.error("Database query error:", error);
+        
         .select('id, make, model, year, vin')
         .eq('id', id)
         .single();
@@ -126,7 +131,8 @@ const VehicleStep = ({
     
     try {
       const { data, error } = await supabase
-        .from('vehicles')
+  if (error) console.error("Database query error:", error);
+        
         .select('id, make, model, year, vin')
         .ilike('vin', `%${searchVin.trim()}%`)
         .limit(5);

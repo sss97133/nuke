@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 const corsHeaders = {
@@ -44,6 +45,7 @@ Deno.serve(async (req) => {
 
     // Get user's algorithm preferences
     const { data: preferences, error: preferencesError } = await supabaseClient
+  if (error) console.error("Database query error:", error);
       .from('algorithm_preferences')
       .select('*')
       .eq('user_id', user_id)
@@ -57,7 +59,8 @@ Deno.serve(async (req) => {
 
     // Get user's engagement metrics with interaction weights
     const { data: engagements, error: engagementsError } = await supabaseClient
-      .from('engagement_metrics')
+  if (error) console.error("Database query error:", error);
+      
       .select('feed_item_id, interaction_type, view_duration_seconds')
       .eq('user_id', user_id)
       .order('created_at', { ascending: false })
@@ -97,7 +100,8 @@ Deno.serve(async (req) => {
 
     // Update feed items with new relevance scores
     const { data: feedItems, error: feedItemsError } = await supabaseClient
-      .from('feed_items')
+  if (error) console.error("Database query error:", error);
+      
       .select('*')
       .is('expiration_time', null)
       .order('created_at', { ascending: false })
@@ -136,7 +140,7 @@ Deno.serve(async (req) => {
         geoRelevance
 
       return supabaseClient
-        .from('feed_items')
+        
         .update({ relevance_score: newRelevanceScore })
         .eq('id', item.id)
     })

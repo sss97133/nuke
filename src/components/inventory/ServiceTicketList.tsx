@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +11,7 @@ export const ServiceTicketList = () => {
   useEffect(() => {
     const fetchTickets = async () => {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from("service_tickets")
         .select("*");
 

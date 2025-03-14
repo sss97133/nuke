@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +28,7 @@ export const SkillTree = () => {
     queryFn: async () => {
       try {
         const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('skills')
           .select('*');
         
@@ -46,13 +48,15 @@ export const SkillTree = () => {
     queryFn: async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
         if (!user) {
           console.log('No authenticated user found');
           return [];
         }
 
         const { data, error } = await supabase
-          .from('user_skills')
+  if (error) console.error("Database query error:", error);
+          
           .select('*')
           .eq('user_id', user.id);
         

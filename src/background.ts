@@ -29,6 +29,7 @@ const handleAuthStateChange = async (session: any) => {
   if (session) {
     // User is signed in
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     if (user) {
       // Update extension state
       chrome.storage.local.set({ 

@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SocialLinks, StreamingLinks, toJson } from '@/types/profile';
@@ -8,9 +9,11 @@ export const useProfileActions = (refetch: () => void) => {
 
   const handleSocialLinksUpdate = async (socialLinks: SocialLinks) => {
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     if (!user) return;
 
     const { error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('profiles')
       .update({ social_links: toJson(socialLinks) })
       .eq('id', user.id);
@@ -33,10 +36,12 @@ export const useProfileActions = (refetch: () => void) => {
 
   const handleStreamingLinksUpdate = async (streamingLinks: StreamingLinks) => {
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     if (!user) return;
 
     const { error } = await supabase
-      .from('profiles')
+  if (error) console.error("Database query error:", error);
+      
       .update({ streaming_links: toJson(streamingLinks) })
       .eq('id', user.id);
 

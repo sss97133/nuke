@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,7 @@ export const GarageDropdown = () => {
       }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!assert(!userError, "User fetch for update succeeded")) {
         throw userError;
@@ -38,6 +40,7 @@ export const GarageDropdown = () => {
       }
 
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({ active_garage_id: garageId })
         .eq('id', user.id);

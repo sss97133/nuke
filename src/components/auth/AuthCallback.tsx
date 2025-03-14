@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +14,7 @@ export const AuthCallback = () => {
       try {
         console.log("[AuthCallback] Starting callback processing");
         const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) console.error("Database query error:", error);
         
         console.log("[AuthCallback] Processing callback", { session, error });
         
@@ -30,6 +32,7 @@ export const AuthCallback = () => {
         
         // Check if user has a profile
         const { data: profile, error: profileError } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('profiles')
           .select('username, onboarding_completed')
           .eq('id', session.user.id)

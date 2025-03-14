@@ -30,12 +30,15 @@ const MarketplaceListingHeader: React.FC<MarketplaceListingHeaderProps> = ({ lis
       navigator.share({
         title: listing.title,
         text: `Check out this ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`,
-        url: window.location.href,
+        // Use a sanitized URL that only includes pathname and search parameters, not hash fragments
+        url: `${window.location.origin}${window.location.pathname}${window.location.search}`,
       }).catch(err => {
         console.error('Error sharing:', err);
       });
     } else {
-      navigator.clipboard.writeText(window.location.href);
+      // Use a sanitized URL for clipboard operations
+      const safeUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+      navigator.clipboard.writeText(safeUrl);
       toast({
         title: "Link copied",
         description: "The link to this listing has been copied to your clipboard.",

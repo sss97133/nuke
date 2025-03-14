@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
     setIsImporting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       const vehiclesToInsert = editedVehicles.map(vehicle => ({
         make: vehicle.make,
@@ -40,6 +42,7 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
       }));
 
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .insert(vehiclesToInsert);
 

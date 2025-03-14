@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,6 +81,7 @@ export default function SimpleImport() {
 
     // Check user authentication first
     const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
     if (!user) {
       setIsImporting(false);
       setStatus('error');
@@ -149,6 +151,7 @@ export default function SimpleImport() {
 
               // First check if we need to update user profile
               const { data: profileData, error: profileError } = await supabase
+  if (error) console.error("Database query error:", error);
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
@@ -162,7 +165,8 @@ export default function SimpleImport() {
               // If profile doesn't exist or needs updating
               if (!profileData) {
                 const { error: updateError } = await supabase
-                  .from('profiles')
+  if (error) console.error("Database query error:", error);
+                  
                   .upsert([{
                     id: user.id,
                     email: user.email,
@@ -181,7 +185,8 @@ export default function SimpleImport() {
                 // Update name for consistency if needed
                 if (profileData.full_name !== "Skylar Williams") {
                   const { error: updateError } = await supabase
-                    .from('profiles')
+  if (error) console.error("Database query error:", error);
+                    
                     .update({
                       full_name: "Skylar Williams",
                       first_name: "Skylar",
@@ -200,7 +205,8 @@ export default function SimpleImport() {
 
               // Insert into Supabase
               const { error } = await supabase
-                .from('vehicles')
+  if (error) console.error("Database query error:", error);
+                
                 .insert([processedVehicle]);
 
               if (error) {

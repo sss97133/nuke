@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useQuery } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ export const Location = ({
     queryFn: async () => {
       console.log('🔍 Fetching verified locations...');
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('verified_locations')
         .select('*')
         .eq('status', 'approved');

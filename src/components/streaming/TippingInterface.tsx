@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,7 @@ export const TippingInterface = ({ streamId, recipientId }: TippingInterfaceProp
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       if (!user) {
         toast({
           title: 'Error',
@@ -39,6 +41,7 @@ export const TippingInterface = ({ streamId, recipientId }: TippingInterfaceProp
       }
 
       const { error } = await supabase.from('stream_tips').insert({
+  if (error) console.error("Database query error:", error);
         stream_id: streamId,
         recipient_id: recipientId,
         sender_id: user.id,

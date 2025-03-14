@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Settings } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
@@ -26,9 +27,15 @@ export const GeoFenceFilter = ({ onFilterChange, className }: GeoFenceFilterProp
     const fetchUserLocation = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
         
         if (session?.user) {
           const { data: profile } = await supabase
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
             .from('profiles')
             .select('home_location')
             .eq('id', session.user.id)
@@ -98,10 +105,13 @@ export const GeoFenceFilter = ({ onFilterChange, className }: GeoFenceFilterProp
   const updateUserProfileLocation = async (location: { lat: number; lng: number }) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
       
       if (session?.user) {
         await supabase
-          .from('profiles')
+          
           .update({ home_location: location })
           .eq('id', session.user.id);
       }

@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +12,7 @@ export const useBioUpdate = (userId: string) => {
     try {
       setIsUpdating(true);
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({ bio })
         .eq('id', userId);

@@ -14,6 +14,7 @@ export function useLikeContent() {
       try {
         // Get current user
         const { data: userData } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
         const userId = userData.user?.id;
         
         if (!userId) {

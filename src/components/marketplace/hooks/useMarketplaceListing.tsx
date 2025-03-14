@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -265,7 +266,7 @@ export function useMarketplaceListing(id: string) {
           .eq('listing_id', listing.id);
       } else {
         await supabase
-          .from('user_watched_listings')
+          
           .insert({
             user_id: userId,
             listing_id: listing.id

@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -50,6 +51,7 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
 
   const fetchBids = async () => {
     const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('auction_bids')
       .select(`
         id,

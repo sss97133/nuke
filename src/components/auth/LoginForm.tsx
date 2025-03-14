@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +21,7 @@ export function LoginForm() {
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
+  if (error) console.error("Database query error:", error);
         email,
         password,
       });
@@ -30,6 +32,7 @@ export function LoginForm() {
         // Trigger initial profile analysis
         try {
           const { data: profile } = await supabase
+  if (error) console.error("Database query error:", error);
             .from('profiles')
             .select('*')
             .eq('id', data.user.id)

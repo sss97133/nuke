@@ -43,6 +43,7 @@ export const ServiceTicketForm = () => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       const serviceTicket: Database['public']['Tables']['service_tickets']['Insert'] = {
         vehicle_id: selectedVehicle.id,
@@ -55,6 +56,7 @@ export const ServiceTicketForm = () => {
       };
 
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('service_tickets')
         .insert(serviceTicket);
 

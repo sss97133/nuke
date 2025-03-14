@@ -30,6 +30,7 @@ export const TeamSection = () => {
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+  if (error) console.error("Database query error:", error);
       if (!session) {
         toast({
           title: "Authentication required",

@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect } from 'react';
 import { supabase, useSupabaseWithToast } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +21,7 @@ export const useVehicles = () => {
       
       // In production, we would fetch from Supabase
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .select('id, make, model, year, vin, notes, status, mileage')
         .order('year', { ascending: false });
@@ -86,7 +88,8 @@ export const useVehicles = () => {
       
       // In production, we would insert to Supabase
       const { data, error } = await supabase
-        .from('vehicles')
+  if (error) console.error("Database query error:", error);
+        
         .insert([vehicleData])
         .select();
       

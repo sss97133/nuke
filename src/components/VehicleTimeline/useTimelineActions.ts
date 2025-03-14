@@ -6,6 +6,7 @@
  * confidence-based data resolution patterns.
  */
 
+import type { Database } from '@/integrations/supabase/types';
 import { useCallback, useState } from 'react';
 import { useButtonActions } from '@/utils/button-actions';
 import { TimelineEvent } from './index';
@@ -19,7 +20,29 @@ export interface TimelineActionOptions {
   notifyOnComplete?: boolean;
 }
 
-export function useTimelineActions(vehicleId?: string) {
+export interface TimelineActionsHook {
+  // State
+  isAddingEvent: boolean;
+  setIsAddingEvent: (value: boolean) => void;
+  currentEvent: TimelineEvent | null;
+  setCurrentEvent: (event: TimelineEvent | null) => void;
+  
+  // Actions
+  addTimelineEvent: (event: TimelineEvent, options?: TimelineActionOptions) => Promise<any>;
+  updateTimelineEvent: (eventId: string, updates: Partial<TimelineEvent>, options?: TimelineActionOptions) => Promise<any>;
+  deleteTimelineEvent: (eventId: string, options?: TimelineActionOptions) => Promise<any>;
+  exportTimeline: (format: 'csv' | 'json') => Promise<any>;
+  enrichTimelineData: () => Promise<any>;
+  
+  // Navigation
+  navigateToVehicleDetails: (id: string) => void;
+  navigateToSource: (sourceUrl?: string) => void;
+  
+  // Utilities
+  toast: any;
+}
+
+export function useTimelineActions(vehicleId?: string): TimelineActionsHook {
   const { executeDbAction, toast, navigateTo, supabase } = useButtonActions();
   const [isAddingEvent, setIsAddingEvent] = useState(false);
   const [currentEvent, setCurrentEvent] = useState<Partial<TimelineEvent> | null>(null);
@@ -39,11 +62,16 @@ export function useTimelineActions(vehicleId?: string) {
           throw new Error('Vehicle ID is required');
         }
         
+        // Using proper type and error handling
         const { data: vehicleExists, error: vehicleError } = await supabase
           .from('vehicles')
           .select('id')
           .eq('id', event.vehicleId)
           .single();
+          
+        if (vehicleError) {
+          console.error("Database query error:", vehicleError);
+        }
           
         if (vehicleError || !vehicleExists) {
           throw new Error('Vehicle not found');
@@ -63,11 +91,19 @@ export function useTimelineActions(vehicleId?: string) {
           image_urls: event.imageUrls || []
         };
         
-        return supabase
+        // Using proper Supabase query pattern with error handling
+        const { data, error } = await supabase
           .from('vehicle_timeline_events')
           .insert(dbEvent)
           .select()
           .single();
+          
+        if (error) {
+          console.error('Error inserting timeline event:', error);
+          throw new Error(`Failed to add timeline event: ${error.message}`);
+        }
+        
+        return data;
       },
       {
         successMessage: options.notifyOnComplete ? 'Timeline event added successfully' : undefined,
@@ -103,12 +139,20 @@ export function useTimelineActions(vehicleId?: string) {
         if (updates.sourceUrl !== undefined) dbUpdates.source_url = updates.sourceUrl;
         if (updates.imageUrls) dbUpdates.image_urls = updates.imageUrls;
         
-        return supabase
+        // Using proper Supabase query pattern with error handling
+        const { data, error } = await supabase
           .from('vehicle_timeline_events')
           .update(dbUpdates)
           .eq('id', eventId)
           .select()
           .single();
+          
+        if (error) {
+          console.error('Error updating timeline event:', error);
+          throw new Error(`Failed to update timeline event: ${error.message}`);
+        }
+        
+        return data;
       },
       {
         successMessage: options.notifyOnComplete ? 'Timeline event updated successfully' : undefined
@@ -126,13 +170,21 @@ export function useTimelineActions(vehicleId?: string) {
     return executeDbAction(
       'Delete Timeline Event',
       async () => {
-        return supabase
+        // Using proper Supabase query pattern with error handling
+        const { error } = await supabase
           .from('vehicle_timeline_events')
           .delete()
           .eq('id', eventId);
+          
+        if (error) {
+          console.error('Error deleting timeline event:', error);
+          throw new Error(`Failed to delete timeline event: ${error.message}`);
+        }
+        
+        return { data: { success: true }, error: null };
       },
       {
-        successMessage: options.notifyOnComplete ? 'Timeline event deleted successfully' : undefined
+        successMessage: options?.notifyOnComplete ? 'Timeline event deleted successfully' : undefined
       }
     );
   }, [executeDbAction, supabase]);

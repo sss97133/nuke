@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useState } from 'react';
 import { parseICloudSharedLink } from '@/utils/icloud';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,6 +81,7 @@ export const useICloudUpload = ({ vehicleId, vehicleInfo, onConnect }: UseICloud
         const filePath = `${folderPath}/${fileName}`;
         
         const { error } = await supabase.storage
+  if (error) console.error("Database query error:", error);
           .from('vehicle-images')
           .upload(filePath, file);
         

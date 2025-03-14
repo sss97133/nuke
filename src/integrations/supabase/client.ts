@@ -171,6 +171,7 @@ export async function safeSelect<T extends Record<string, unknown>>(
 ): Promise<T[] | null> {
   try {
     const { data, error } = await supabase.from(table).select(select || "*");
+  if (error) console.error("Database query error:", error);
     if (error) console.error("Database query error:", error);
     return data as T[] | null;
   } catch (error) {
@@ -273,6 +274,7 @@ export async function uploadVehicleImages(
 
         // Then do the upload (async)
         const { data, error } = await supabase.storage
+  if (error) console.error("Database query error:", error);
           .from("vehicle-images")
           .upload(fileName, file, { cacheControl: "3600", upsert: false });
         if (error) console.error("Database query error:", error);

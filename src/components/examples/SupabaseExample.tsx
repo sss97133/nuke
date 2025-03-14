@@ -38,6 +38,7 @@ export function SupabaseExample() {
   } = useJoinQuery<(Achievement & { user: Profile })[]>(
     async () => {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('achievements')
         .select(`
           *,

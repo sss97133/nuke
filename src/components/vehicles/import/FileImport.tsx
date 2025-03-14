@@ -32,6 +32,7 @@ export const FileImport = ({ onNormalizedData }: FileImportProps) => {
         const content = e.target?.result;
         
         const { data, error } = await supabase.functions.invoke('process-vehicle-import', {
+  if (error) console.error("Database query error:", error);
           body: { data: content, fileType }
         });
 

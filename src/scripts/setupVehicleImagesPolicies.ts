@@ -17,6 +17,7 @@ async function setupVehicleImagesPolicies() {
 
     // Execute the SQL
     const { error } = await supabaseAdmin.rpc('exec_sql', {
+  if (error) console.error("Database query error:", error);
       sql
     });
 

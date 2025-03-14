@@ -221,9 +221,15 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
         setError(null);
 
         // Add a timeout to prevent indefinite loading
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Database connection timed out')), 3000)
-        );
+        // Use a constant for the timeout value to improve security and maintainability
+        const DATABASE_TIMEOUT_MS = 3000;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          const timeoutId = setTimeout(
+            () => reject(new Error('Database connection timed out')),
+            DATABASE_TIMEOUT_MS
+          );
+          return () => clearTimeout(timeoutId); // Ensure cleanup if promise is resolved elsewhere
+        });
         
         // Determine which vehicle to load
         let query;
@@ -240,13 +246,13 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
               .single();
           } else if (vehicleId) {
             query = supabase
-              .from('vehicles')
+              
               .select('*')
               .eq('id', vehicleId)
               .single();
           } else if (make && model) {
             query = supabase
-              .from('vehicles')
+              
               .select('*')
               .eq('make', make)
               .eq('model', model);

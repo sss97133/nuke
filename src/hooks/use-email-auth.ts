@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +17,7 @@ export const useEmailAuth = () => {
 
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
+  if (error) console.error("Database query error:", error);
           email,
           password,
           options: {
@@ -37,6 +39,7 @@ export const useEmailAuth = () => {
 
         if (data?.user) {
           const { error: profileError } = await supabase
+  if (error) console.error("Database query error:", error);
             .from('profiles')
             .insert([
               { 
@@ -57,6 +60,7 @@ export const useEmailAuth = () => {
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
+  if (error) console.error("Database query error:", error);
           email,
           password,
         });
@@ -97,6 +101,7 @@ export const useEmailAuth = () => {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  if (error) console.error("Database query error:", error);
         redirectTo: `${window.location.origin}/login?reset=true`,
       });
 

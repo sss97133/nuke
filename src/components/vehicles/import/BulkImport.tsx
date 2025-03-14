@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -93,6 +94,7 @@ export default function BulkImport() {
     try {
       // Get the current user
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!user) {
         throw new Error('User not authenticated');
@@ -136,6 +138,7 @@ export default function BulkImport() {
             };
 
             const { error } = await supabase
+  if (error) console.error("Database query error:", error);
               .from('vehicles')
               .insert([processedVehicle]);
 

@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { supabase } from "@/integrations/supabase/client";
 
 export interface SystemMetrics {

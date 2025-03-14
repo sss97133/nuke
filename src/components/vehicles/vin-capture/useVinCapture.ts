@@ -57,6 +57,7 @@ export const useVinCapture = (onVinData: (data: any) => void) => {
 
       updateProcessingStatus("Verifying with database...", 80);
       const { data, error } = await supabase.functions.invoke('process-vin', {
+  if (error) console.error("Database query error:", error);
         body: formData,
       });
 

@@ -5,6 +5,7 @@
  * Leverages the multi-source connector framework to aggregate and normalize data
  */
 
+import type { Database } from '../types';
 import { supabaseClient } from '../supabase-client';
 import { MarketplaceConnector } from '../connectors/marketplace-connector';
 import { resolveConflictingEvents, recalculateConfidenceScores } from './confidence-scoring';
@@ -178,7 +179,8 @@ export class TimelineService {
     try {
       // Get all timeline events for the vehicle
       const { data: events, error } = await supabaseClient
-        .from('vehicle_timeline')
+  if (error) console.error("Database query error:", error);
+        
         .select('*')
         .eq('vehicle_id', vehicleId);
       
@@ -228,7 +230,7 @@ export class TimelineService {
         // Update each event's resolution status
         const updatePromises = resolutionNeeded.map(resolution => 
           supabaseClient
-            .from('vehicle_timeline')
+            
             .update({
               resolved_by: resolution.resolved_by,
               resolution_reason: resolution.resolution_reason,
@@ -275,7 +277,8 @@ export class TimelineService {
       
       // Insert the event
       const { data, error } = await supabaseClient
-        .from('vehicle_timeline')
+  if (error) console.error("Database query error:", error);
+        
         .insert(fullEvent)
         .select()
         .single();
@@ -308,6 +311,7 @@ export class TimelineService {
     try {
       // Get the current event
       const { data: currentEvent, error: fetchError } = await supabaseClient
+  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .select('*')
         .eq('id', eventId)
@@ -330,6 +334,7 @@ export class TimelineService {
       
       // Update the event
       const { data, error } = await supabaseClient
+  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .update(updatedEvent)
         .eq('id', eventId)
@@ -363,6 +368,7 @@ export class TimelineService {
     try {
       // Get the current event to know which vehicle it belongs to
       const { data: currentEvent, error: fetchError } = await supabaseClient
+  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .select('vehicle_id')
         .eq('id', eventId)
@@ -374,6 +380,7 @@ export class TimelineService {
       
       // Delete the event
       const { error } = await supabaseClient
+  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .delete()
         .eq('id', eventId);
@@ -407,6 +414,7 @@ export class TimelineService {
     try {
       // Get all timeline events for the vehicle
       const { data: events, error } = await supabaseClient
+  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .select('*')
         .eq('vehicle_id', vehicleId)

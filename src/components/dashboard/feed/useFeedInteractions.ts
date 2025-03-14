@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { supabase } from "@/integrations/supabase/client";
 
 export const useFeedInteractions = () => {
@@ -10,6 +11,7 @@ export const useFeedInteractions = () => {
     try {
       // Get the current user's ID
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!user) {
         console.error('No authenticated user found');
@@ -17,6 +19,7 @@ export const useFeedInteractions = () => {
       }
 
       const { error } = await supabase.from('engagement_metrics').insert({
+  if (error) console.error("Database query error:", error);
         feed_item_id: feedItemId,
         interaction_type: interactionType,
         view_duration_seconds: viewDurationSeconds || 0,

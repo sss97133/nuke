@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SystemStatus } from "./SystemStatus";
@@ -8,6 +9,7 @@ export const DashboardSummary = () => {
     queryKey: ['vehicles'],
     queryFn: async () => {
       const { data } = await supabase.from('vehicles').select('*');
+  if (error) console.error("Database query error:", error);
       return data;
     }
   });
@@ -15,7 +17,8 @@ export const DashboardSummary = () => {
   const { data: assets } = useQuery({
     queryKey: ['assets'],
     queryFn: async () => {
-      const { data } = await supabase.from('assets').select('*');
+      const { data } = await supabase.select('*');
+  if (error) console.error("Database query error:", error);
       return data;
     }
   });
@@ -23,7 +26,8 @@ export const DashboardSummary = () => {
   const { data: serviceTickets } = useQuery({
     queryKey: ['service_tickets'],
     queryFn: async () => {
-      const { data } = await supabase.from('service_tickets').select('*');
+      const { data } = await supabase.select('*');
+  if (error) console.error("Database query error:", error);
       return data;
     }
   });

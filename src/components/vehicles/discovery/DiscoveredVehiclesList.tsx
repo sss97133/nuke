@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,6 +81,7 @@ export const DiscoveredVehiclesList = () => {
     queryKey: ['discovered-vehicles'],
     queryFn: async () => {
       const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('discovered_vehicles')
         .select('*')
         .order('created_at', { ascending: false });
@@ -96,7 +98,8 @@ export const DiscoveredVehiclesList = () => {
   const addVehicleMutation = useMutation({
     mutationFn: async (vehicleData: Omit<DiscoveredVehicle, 'id' | 'created_at' | 'updated_at' | 'status'> & { user_id: string }) => {
       const { data, error } = await supabase
-        .from('discovered_vehicles')
+  if (error) console.error("Database query error:", error);
+        
         .insert([vehicleData])
         .select()
         .single();
@@ -136,7 +139,8 @@ export const DiscoveredVehiclesList = () => {
   const deleteVehicleMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('discovered_vehicles')
+  if (error) console.error("Database query error:", error);
+        
         .delete()
         .eq('id', id);
       
@@ -173,6 +177,7 @@ export const DiscoveredVehiclesList = () => {
     
     try {
       const { data: userData } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       
       if (!userData?.user) {
         throw new Error("User not authenticated");

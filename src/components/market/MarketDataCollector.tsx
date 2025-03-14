@@ -32,6 +32,7 @@ export const MarketDataCollector = () => {
     try {
       console.log('Starting crawl for URL:', url);
       const { data, error } = await supabase.functions.invoke('crawl-market-data', {
+  if (error) console.error("Database query error:", error);
         body: { url }
       });
 

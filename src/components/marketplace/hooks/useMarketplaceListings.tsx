@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
@@ -172,7 +173,8 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
         try {
           // Get watched listings first
           const { data: watchData, error: watchError } = await supabase
-            .from('user_watched_listings')
+  if (error) console.error("Database query error:", error);
+            
             .select('listing_id')
             .eq('user_id', userId);
             
@@ -197,7 +199,8 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
         // Get user's location preference
         try {
           const { data: userData, error: userError } = await supabase
-            .from('user_preferences')
+  if (error) console.error("Database query error:", error);
+            
             .select('location')
             .eq('user_id', userId)
             .single();

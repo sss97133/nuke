@@ -26,6 +26,7 @@ async function setupSkillStructure() {
 
     // Execute the SQL
     const { error: structureError } = await supabaseAdmin.rpc('exec_sql', {
+  if (error) console.error("Database query error:", error);
       sql: structureSql
     });
 
@@ -35,6 +36,7 @@ async function setupSkillStructure() {
     }
 
     const { error: functionsError } = await supabaseAdmin.rpc('exec_sql', {
+  if (error) console.error("Database query error:", error);
       sql: functionsSql
     });
 

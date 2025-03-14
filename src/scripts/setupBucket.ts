@@ -9,6 +9,7 @@ async function setupBucket() {
   try {
     // Create the vehicle-images bucket if it doesn't exist
     const { data: bucket, error: bucketError } = await supabase
+  if (error) console.error("Database query error:", error);
       .storage
       .createBucket('vehicle-images', {
         public: true,
@@ -28,6 +29,7 @@ async function setupBucket() {
 
     // Enable RLS on the storage.objects table
     const { error: rlsError } = await supabase.rpc('exec_sql', {
+  if (error) console.error("Database query error:", error);
       sql: 'ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;'
     });
 
@@ -95,6 +97,7 @@ async function setupBucket() {
 
     for (const policy of policies) {
       const { error: policyError } = await supabase.rpc('exec_sql', {
+  if (error) console.error("Database query error:", error);
         sql: policy.sql
       });
 

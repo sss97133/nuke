@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -16,6 +17,7 @@ export function useOnboarding() {
       try {
         // Get current user
         const { data: { session } } = await supabase.auth.getSession();
+  if (error) console.error("Database query error:", error);
         if (!session?.user) {
           setIsLoading(false);
           return;
@@ -25,6 +27,7 @@ export function useOnboarding() {
         
         // Check if the profiles table has onboarding data
         const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('profiles')
           .select('onboarding_completed, onboarding_step')
           .eq('id', session.user.id)
@@ -55,7 +58,8 @@ export function useOnboarding() {
     
     try {
       const { error } = await supabase
-        .from('profiles')
+  if (error) console.error("Database query error:", error);
+        
         .update({
           onboarding_step: step,
           onboarding_completed: completed,

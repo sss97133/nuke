@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -21,6 +22,7 @@ export const usePreferencesData = () => {
       };
 
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('user_preferences')
         .update(defaultPreferences)
         .eq('user_id', user.id);
@@ -47,7 +49,8 @@ export const usePreferencesData = () => {
       if (!user) throw new Error('No user found');
 
       const { error } = await supabase
-        .from('user_preferences')
+  if (error) console.error("Database query error:", error);
+        
         .delete()
         .eq('user_id', user.id);
 

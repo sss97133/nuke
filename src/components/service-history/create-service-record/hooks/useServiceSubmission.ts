@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +29,7 @@ export const useServiceSubmission = (
     try {
       // Get user ID
       const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -49,6 +51,7 @@ export const useServiceSubmission = (
 
       // Use type assertion to tell TypeScript this is a valid table
       const { error } = await supabase
+  if (error) console.error("Database query error:", error);
         .from('service_records' as any)
         .insert([serviceRecord]);
 

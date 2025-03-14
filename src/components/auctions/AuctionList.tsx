@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -166,6 +167,9 @@ export const AuctionList = () => {
     queryFn: async () => {
       console.log('🔍 Fetching external auctions...');
       const { data, error } = await supabase.functions.invoke('fetch-market-auctions');
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
       
       if (error) {
         console.error('❌ Error fetching external auctions:', error);
@@ -181,7 +185,10 @@ export const AuctionList = () => {
   const handleBidSubmit = async (auctionId: string, amount: number) => {
     console.log('💸 Submitting bid:', { auctionId, amount });
     const { error } = await supabase
-      .from('auction_bids')
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+      
       .insert([{
         auction_id: auctionId,
         amount: amount,

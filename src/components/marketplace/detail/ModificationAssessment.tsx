@@ -91,6 +91,9 @@ const ModificationAssessment: React.FC<ModificationAssessmentProps> = ({
     try {
       // Call the vehicle data analyzer function to get market assessment
       const { data, error } = await supabase.functions.invoke('analyze-vehicle-data', {
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
+  if (error) console.error("Database query error:", error);
         body: { 
           vehicleData: {
             make: vehicleMake,

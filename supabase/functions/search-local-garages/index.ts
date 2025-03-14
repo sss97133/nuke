@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -40,6 +41,7 @@ serve(async (req) => {
 
     if (content_type === 'garages') {
       const { data, error } = await supabaseClient
+  if (error) console.error("Database query error:", error);
         .from('garages')
         .select('id, name, address, contact_info, location, created_at')
         .filter('location', 'not.is', null)
@@ -68,7 +70,8 @@ serve(async (req) => {
     else if (content_type === 'discovered_vehicles') {
       // For discovered vehicles, we need to parse location strings
       const { data, error } = await supabaseClient
-        .from('discovered_vehicles')
+  if (error) console.error("Database query error:", error);
+        
         .select('*')
         .limit(50);
 

@@ -5,6 +5,7 @@
  * from marketplace sources like Craigslist and Facebook Marketplace
  */
 
+import type { Database } from '../types';
 import { supabaseClient } from '../supabase-client';
 import { BaseConnector } from './base-connector';
 import { calculateConfidenceScore } from '../timeline/confidence-scoring';
@@ -152,7 +153,8 @@ export class MarketplaceConnector extends BaseConnector {
     try {
       // Insert all events into the timeline
       const { data, error } = await supabaseClient
-        .from('vehicle_timeline')
+  if (error) console.error("Database query error:", error);
+        
         .insert(validatedData);
       
       if (error) {

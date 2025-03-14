@@ -1,3 +1,4 @@
+import type { Database } from '../types';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -28,12 +29,14 @@ function AddVehicle() {
     onSubmitSuccess: async (data) => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
+  if (error) console.error("Database query error:", error);
         if (!user) {
           throw new Error('User not authenticated');
         }
 
         // Insert the vehicle data into the database
         const { data: vehicle, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('vehicles')
           .insert([{
             user_id: user.id,
@@ -78,7 +81,8 @@ function AddVehicle() {
           
           // Move the file to the correct vehicle folder
           const { error: moveError } = await supabase.storage
-            .from('vehicles')
+  if (error) console.error("Database query error:", error);
+            
             .move(`${user.id}/${oldPath}`, newPath);
 
           if (moveError) {
@@ -88,7 +92,8 @@ function AddVehicle() {
 
           // Update the vehicle_images table
           const { error: imageError } = await supabase
-            .from('vehicle_images')
+  if (error) console.error("Database query error:", error);
+            
             .update({ car_id: vehicle.id })
             .eq('image_url', primaryImageUrl);
 

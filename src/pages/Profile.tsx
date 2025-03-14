@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React, { useState, useEffect } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import UserProfile from "@/components/profile/UserProfile";
@@ -26,6 +27,7 @@ export const Profile = () => {
       try {
         setLoadingUsername(true);
         const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('profiles')
           .select('username')
           .eq('id', userId)

@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +23,7 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
     queryFn: async () => {
       if (isStreaming) {
         const { data, error } = await supabase
+  if (error) console.error("Database query error:", error);
           .from('realtime_video_segments')
           .select('*')
           .eq('job_id', jobId)
@@ -32,7 +34,8 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
         return data;
       } else {
         const { data, error } = await supabase
-          .from('video_analysis_results')
+  if (error) console.error("Database query error:", error);
+          
           .select('*')
           .eq('job_id', jobId)
           .order('timestamp', { ascending: false })

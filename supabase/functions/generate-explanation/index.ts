@@ -1,4 +1,5 @@
 
+import type { Database } from '../types';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -46,6 +47,7 @@ serve(async (req) => {
 
     // Store the explanation in the database
     const { data: supabaseData, error: supabaseError } = await supabase
+  if (error) console.error("Database query error:", error);
       .from('ai_explanations')
       .insert([
         {
