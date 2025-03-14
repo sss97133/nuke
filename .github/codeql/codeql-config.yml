@@ -12,9 +12,15 @@ paths:
   - '!dist'
   - '!build'
   - '!coverage'
-  - '!**/*.test.{ts,tsx,js,jsx}'
-  - '!**/*.spec.{ts,tsx,js,jsx}'
-  - '!**/__tests__'
+  - '!src/**/*.test.ts'
+  - '!src/**/*.test.tsx'
+  - '!src/**/*.test.js'
+  - '!src/**/*.test.jsx'
+  - '!src/**/*.spec.ts'
+  - '!src/**/*.spec.tsx'
+  - '!src/**/*.spec.js'
+  - '!src/**/*.spec.jsx'
+  - '!src/**/__tests__'
 
 # Path filters for specific languages
 paths-ignore:
