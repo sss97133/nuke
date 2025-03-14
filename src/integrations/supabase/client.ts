@@ -273,28 +273,76 @@ export async function uploadVehicleImages(
           .getPublicUrl(fileName);
 
         // Then do the upload (async)
-        const { data, error } = await supabase.storage
-  if (error) console.error("Database query error:", error);
-          .from("vehicle-images")
-          .upload(fileName, file, { cacheControl: "3600", upsert: false });
-        if (error) console.error("Database query error:", error);
-
-        if (!urlData?.publicUrl) {
-          const error = new Error("Failed to get public URL");
+        try {
+          const { data, error } = await supabase.storage
+            .from("vehicle-images")
+            .upload(fileName, file, { cacheControl: "3600", upsert: false });
+          
+          if (error) {
+            console.error("Vehicle image upload error:", error);
+            // Track vehicle data failures for the multi-source connector framework
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('vehicle-data-error', { 
+                detail: { 
+                  vehicleId, 
+                  operation: 'uploadVehicleImage', 
+                  source: 'supabase/client.ts',
+                  error,
+                  timestamp: new Date().toISOString() 
+                } 
+              }));
+            }
+            
+            // Update progress to error state
+            uploadProgress[file.name] = {
+              file: file.name,
+              progress: 0,
+              status: "error",
+              error: error.message
+            };
+            onProgress({ ...uploadProgress });
+            continue; // Skip this file and move to the next one
+          }
+          
+          if (!urlData?.publicUrl) {
+            throw new Error("Failed to get public URL");
+          }
+          
+          // Update progress and store URL
+          uploadProgress[file.name] = {
+            file: file.name,
+            progress: 100,
+            status: "success"
+          };
+          onProgress({ ...uploadProgress });
+          imageUrls.push(urlData.publicUrl);
+        } catch (error) {
           console.error("Public URL error:", handleSupabaseError(error));
-          throw error;
+          
+          // Track vehicle data failures for the multi-source connector framework
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('vehicle-data-error', { 
+              detail: { 
+                vehicleId, 
+                operation: 'uploadVehicleImage', 
+                source: 'supabase/client.ts',
+                error,
+                timestamp: new Date().toISOString() 
+              } 
+            }));
+          }
+          
+          // Update progress to error state
+          uploadProgress[file.name] = {
+            file: file.name,
+            progress: 0,
+            status: "error",
+            error: error instanceof Error ? error.message : "Unknown error"
+          };
+          onProgress({ ...uploadProgress });
         }
 
-        // Update progress and store URL
-        uploadProgress[file.name] = {
-          file: file.name,
-          progress: 100,
-          status: "success",
-        };
-        onProgress({ ...uploadProgress });
-        imageUrls.push(urlData.publicUrl);
-
-        // Update progress is already handled in the try block above
+        // Progress is handled inside the try/catch block above
       } catch (error) {
         uploadProgress[file.name] = {
           file: file.name,
