@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "Nuke Vehicle Discovery",
+  "version": "1.0.0",
+  "description": "Discover and import vehicles from Craigslist and Facebook Marketplace to your Nuke profile",
+  "icons": {
+    "16": "public/icon16.png",
+    "48": "public/icon48.png",
+    "128": "public/icon128.png"
+  },
+  "action": {
+    "default_popup": "public/popup.html",
+    "default_icon": {
+      "16": "public/icon16.png",
+      "48": "public/icon48.png",
+      "128": "public/icon128.png"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://*.craigslist.org/*",
+    "https://*.facebook.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.craigslist.org/*/cars-trucks/*",
+        "https://*.craigslist.org/*/auto-parts/*",
+        "https://*.craigslist.org/*/motorcycles/*",
+        "https://www.facebook.com/marketplace/*vehicles*"
+      ],
+      "js": ["src/content.js"],
+      "css": ["src/content.css"]
+    }
+  ],
+  "oauth2": {
+    "client_id": "${FACEBOOK_CLIENT_ID}",
+    "scopes": [
+      "email",
+      "public_profile",
+      "user_likes"
+    ]
+  }
+}

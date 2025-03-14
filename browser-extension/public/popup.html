@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuke Vehicle Discovery</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      width: 320px;
+      margin: 0;
+      padding: 0;
+      background: #f9fafb;
+      color: #111827;
+    }
+    
+    .container {
+      padding: 16px;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .logo {
+      width: 36px;
+      height: 36px;
+      margin-right: 12px;
+      background: #3e63dd;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    
+    .title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      margin: 0;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    
+    .section {
+      margin-bottom: 16px;
+    }
+    
+    .section-title {
+      font-weight: 600;
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 12px;
+    }
+    
+    .vehicle-card {
+      display: flex;
+    }
+    
+    .vehicle-image {
+      width: 60px;
+      height: 60px;
+      border-radius: 4px;
+      background-size: cover;
+      background-position: center;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+    
+    .vehicle-details {
+      flex: 1;
+    }
+    
+    .vehicle-title {
+      font-weight: 600;
+      margin: 0 0 4px 0;
+      font-size: 14px;
+    }
+    
+    .vehicle-meta {
+      color: #6b7280;
+      font-size: 12px;
+      margin: 0 0 4px 0;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    
+    .badge-craigslist {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+    
+    .badge-facebook {
+      background-color: #e0f2fe;
+      color: #0369a1;
+    }
+    
+    button {
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: none;
+      background-color: #3e63dd;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    button:hover {
+      background-color: #2a4cb9;
+    }
+    
+    button.secondary {
+      background-color: white;
+      border: 1px solid #d1d5db;
+      color: #374151;
+    }
+    
+    button.secondary:hover {
+      background-color: #f9fafb;
+    }
+    
+    .icon {
+      margin-right: 8px;
+    }
+    
+    .message {
+      font-size: 14px;
+      text-align: center;
+      color: #6b7280;
+      padding: 12px;
+    }
+    
+    .not-signed-in {
+      text-align: center;
+      padding: 16px 0;
+    }
+    
+    .not-signed-in p {
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: #374151;
+    }
+    
+    .status {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    
+    .status-success {
+      background-color: #ecfdf5;
+      color: #065f46;
+    }
+    
+    .status-error {
+      background-color: #fef2f2;
+      color: #b91c1c;
+    }
+    
+    .status-warning {
+      background-color: #fffbeb;
+      color: #92400e;
+    }
+    
+    .discovered-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .discovered-title span {
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 400;
+    }
+    
+    .tabs {
+      display: flex;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .tab {
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: #6b7280;
+    }
+    
+    .tab.active {
+      color: #3e63dd;
+      border-bottom-color: #3e63dd;
+      font-weight: 500;
+    }
+    
+    footer {
+      padding: 12px 16px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+      color: #6b7280;
+      text-align: center;
+    }
+    
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 0;
+    }
+    
+    .spinner {
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top: 3px solid #3e63dd;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">N</div>
+      <div>
+        <h1 class="title">Nuke Vehicle Discovery</h1>
+        <p class="subtitle">Find and collect vehicles across the web</p>
+      </div>
+    </div>
+    
+    <!-- Signed-in state -->
+    <div id="signed-in-view" style="display:none;">
+      <div class="tabs">
+        <div class="tab active" id="tab-discover">Discover</div>
+        <div class="tab" id="tab-recent">Recent Finds</div>
+        <div class="tab" id="tab-settings">Settings</div>
+      </div>
+      
+      <!-- Discover Tab -->
+      <div id="discover-content">
+        <div class="message" id="not-vehicle-message" style="display:none;">
+          Visit a vehicle listing on Craigslist or Facebook Marketplace to discover a vehicle.
+        </div>
+        
+        <div id="current-vehicle" style="display:none;">
+          <div class="section">
+            <div class="section-title">Current Vehicle</div>
+            <div class="card vehicle-card">
+              <div class="vehicle-image" id="vehicle-image"></div>
+              <div class="vehicle-details">
+                <h3 class="vehicle-title" id="vehicle-title">Loading...</h3>
+                <p class="vehicle-meta" id="vehicle-meta">Loading...</p>
+                <span class="badge" id="vehicle-source">Loading...</span>
+              </div>
+            </div>
+          </div>
+          
+          <button id="discover-button">
+            <span class="icon">+</span> Discover This Vehicle
+          </button>
+        </div>
+      </div>
+      
+      <!-- Recent Finds Tab -->
+      <div id="recent-content" style="display:none;">
+        <div class="section">
+          <div class="discovered-title">
+            <div class="section-title">Recently Discovered</div>
+            <span id="recent-count">0 vehicles</span>
+          </div>
+          
+          <div id="recent-vehicles">
+            <div class="loading">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+        
+        <button class="secondary" id="view-all-button">
+          View All in Nuke Profile
+        </button>
+      </div>
+      
+      <!-- Settings Tab -->
+      <div id="settings-content" style="display:none;">
+        <div class="section">
+          <div class="section-title">Account</div>
+          <div class="card">
+            <p style="margin-top:0;">Signed in as:</p>
+            <p id="user-email" style="font-weight:500;margin-bottom:0;">user@example.com</p>
+          </div>
+        </div>
+        
+        <div class="section">
+          <div class="section-title">Preferences</div>
+          <div class="card">
+            <label style="display:flex;align-items:center;margin-bottom:8px;">
+              <input type="checkbox" id="auto-discover" style="margin-right:8px;">
+              Enable auto-discovery suggestions
+            </label>
+            <label style="display:flex;align-items:center;">
+              <input type="checkbox" id="save-history" style="margin-right:8px;">
+              Save browsing history in Nuke
+            </label>
+          </div>
+        </div>
+        
+        <button class="secondary" id="sign-out-button">
+          Sign Out
+        </button>
+      </div>
+    </div>
+    
+    <!-- Not signed-in state -->
+    <div id="not-signed-in-view">
+      <div class="not-signed-in">
+        <p>Sign in to Nuke to start discovering vehicles across the web.</p>
+        <button id="sign-in-button">
+          Sign In with Nuke
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <footer>
+    Nuke Vehicle Discovery v1.0.0
+  </footer>
+  
+  <script src="../src/popup.js"></script>
+</body>
+</html>
