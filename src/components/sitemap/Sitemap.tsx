@@ -1,23 +1,10 @@
 
 import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+import { useButtonActions } from "@/utils/button-actions";
+import { trackButtonAction } from "@/utils/button-debug";
 
 export const Sitemap = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const handleNavigation = (path: string, implemented: boolean) => {
-    if (!implemented) {
-      toast({
-        title: "Page not available",
-        description: "This page is currently under development",
-        variant: "destructive",
-      });
-      return;
-    }
-    navigate(path);
-  };
+  const { navigateTo, siteMapActions } = useButtonActions();
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -40,7 +27,11 @@ export const Sitemap = () => {
           <ul className="list-disc pl-5 space-y-2">
             <li>
               <button 
-                onClick={() => handleNavigation('/vehicles', true)}
+                onClick={() => navigateTo(
+                  siteMapActions.vehicleManagement.path, 
+                  siteMapActions.vehicleManagement.implemented,
+                  { trackAs: 'sitemap:vehicleManagement' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Vehicle Management
@@ -48,7 +39,11 @@ export const Sitemap = () => {
             </li>
             <li>
               <button 
-                onClick={() => handleNavigation('/inventory', true)}
+                onClick={() => navigateTo(
+                  siteMapActions.inventory.path, 
+                  siteMapActions.inventory.implemented,
+                  { trackAs: 'sitemap:inventory' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Inventory
@@ -62,7 +57,11 @@ export const Sitemap = () => {
           <ul className="list-disc pl-5 space-y-2">
             <li>
               <button 
-                onClick={() => handleNavigation('/token-management', false)}
+                onClick={() => navigateTo(
+                  siteMapActions.tokenManagement.path, 
+                  siteMapActions.tokenManagement.implemented,
+                  { trackAs: 'sitemap:tokenManagement' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Token Management
@@ -70,7 +69,11 @@ export const Sitemap = () => {
             </li>
             <li>
               <button 
-                onClick={() => handleNavigation('/dao-governance', false)}
+                onClick={() => navigateTo(
+                  siteMapActions.daoGovernance.path, 
+                  siteMapActions.daoGovernance.implemented,
+                  { trackAs: 'sitemap:daoGovernance' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 DAO Governance
@@ -78,7 +81,11 @@ export const Sitemap = () => {
             </li>
             <li>
               <button 
-                onClick={() => handleNavigation('/vehicle-tokens', false)}
+                onClick={() => navigateTo(
+                  siteMapActions.vehicleTokens.path, 
+                  siteMapActions.vehicleTokens.implemented,
+                  { trackAs: 'sitemap:vehicleTokens' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Vehicle Tokens
@@ -86,7 +93,11 @@ export const Sitemap = () => {
             </li>
             <li>
               <button 
-                onClick={() => handleNavigation('/proposals', false)}
+                onClick={() => navigateTo(
+                  siteMapActions.daoProposals.path, 
+                  siteMapActions.daoProposals.implemented,
+                  { trackAs: 'sitemap:daoProposals' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 DAO Proposals
@@ -94,7 +105,11 @@ export const Sitemap = () => {
             </li>
             <li>
               <button 
-                onClick={() => handleNavigation('/terminal', true)}
+                onClick={() => navigateTo(
+                  siteMapActions.terminal.path, 
+                  siteMapActions.terminal.implemented,
+                  { trackAs: 'sitemap:terminal' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Bloomberg Terminal
@@ -108,7 +123,11 @@ export const Sitemap = () => {
           <ul className="list-disc pl-5 space-y-2">
             <li>
               <button 
-                onClick={() => handleNavigation('/service', true)}
+                onClick={() => navigateTo(
+                  siteMapActions.service.path, 
+                  siteMapActions.service.implemented,
+                  { trackAs: 'sitemap:service' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Service Management
@@ -122,7 +141,11 @@ export const Sitemap = () => {
           <ul className="list-disc pl-5 space-y-2">
             <li>
               <button 
-                onClick={() => handleNavigation('/garages', true)}
+                onClick={() => navigateTo(
+                  siteMapActions.mapView.path, 
+                  siteMapActions.mapView.implemented,
+                  { trackAs: 'sitemap:mapView' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Map View
@@ -136,7 +159,11 @@ export const Sitemap = () => {
           <ul className="list-disc pl-5 space-y-2">
             <li>
               <button 
-                onClick={() => handleNavigation('/professional', false)}
+                onClick={() => navigateTo(
+                  siteMapActions.professional.path, 
+                  siteMapActions.professional.implemented,
+                  { trackAs: 'sitemap:professional' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Professional Dashboard
@@ -144,7 +171,11 @@ export const Sitemap = () => {
             </li>
             <li>
               <button 
-                onClick={() => handleNavigation('/auctions', false)}
+                onClick={() => navigateTo(
+                  '/auctions', 
+                  false,
+                  { trackAs: 'sitemap:auctions' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Auctions
@@ -158,7 +189,11 @@ export const Sitemap = () => {
           <ul className="list-disc pl-5 space-y-2">
             <li>
               <button 
-                onClick={() => handleNavigation('/studio', false)}
+                onClick={() => navigateTo(
+                  '/studio', 
+                  false,
+                  { trackAs: 'sitemap:studio' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Studio Configuration
@@ -172,7 +207,11 @@ export const Sitemap = () => {
           <ul className="list-disc pl-5 space-y-2">
             <li>
               <button 
-                onClick={() => handleNavigation('/algorithms', true)}
+                onClick={() => navigateTo(
+                  '/algorithms', 
+                  true,
+                  { trackAs: 'sitemap:algorithms' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 System Algorithms
@@ -180,7 +219,11 @@ export const Sitemap = () => {
             </li>
             <li>
               <button 
-                onClick={() => handleNavigation('/glossary', true)}
+                onClick={() => navigateTo(
+                  '/glossary', 
+                  true,
+                  { trackAs: 'sitemap:glossary' }
+                )}
                 className="text-blue-600 hover:underline text-left"
               >
                 Glossary

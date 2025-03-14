@@ -7,8 +7,9 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Import the timeline component and styles
+// Import the timeline component, actions and styles
 import './VehicleTimeline.css';
+import { useTimelineActions } from './useTimelineActions';
 
 // Environment variable handling per established pattern
 const getEnvVar = (name: string): string | undefined => {
@@ -80,6 +81,24 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
   const [minConfidence, setMinConfidence] = useState<number>(0);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  
+  // Get timeline actions
+  const {
+    isAddingEvent,
+    setIsAddingEvent,
+    currentEvent,
+    setCurrentEvent,
+    addTimelineEvent,
+    updateTimelineEvent,
+    deleteTimelineEvent,
+    exportTimeline,
+    enrichTimelineData
+  } = useTimelineActions(vehicleId);
+  
+  // Type guard for currentEvent to check if it has an ID (existing event)
+  const isExistingEvent = (event: Partial<TimelineEvent> | null): event is TimelineEvent => {
+    return !!event && 'id' in event && typeof event.id === 'string';
+  };
 
   // Load vehicle data
   useEffect(() => {
@@ -242,8 +261,142 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
   };
   
   // Render component
+  // Event form modal
+  const renderEventForm = () => {
+    if (!isAddingEvent || !currentEvent) return null;
+    
+    return (
+      <div className="timeline-modal-overlay">
+        <div className="timeline-modal">
+          <h3>{isExistingEvent(currentEvent) ? 'Edit Event' : 'Add New Event'}</h3>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (isExistingEvent(currentEvent)) {
+              // Update existing event
+              updateTimelineEvent(currentEvent.id, currentEvent, {
+                notifyOnComplete: true
+              }).then(result => {
+                if (result.success) {
+                  // Update local state
+                  setEvents(prev => prev.map(e => 
+                    e.id === currentEvent.id ? {...e, ...currentEvent} : e
+                  ));
+                  setIsAddingEvent(false);
+                  setCurrentEvent(null);
+                }
+              });
+            } else {
+              // Add new event
+              addTimelineEvent(currentEvent as any, {
+                notifyOnComplete: true
+              }).then(result => {
+                if (result.success && result.data) {
+                  // Add to local state
+                  const newEvent = {
+                    id: result.data.id,
+                    vehicleId: currentEvent.vehicleId || '',
+                    eventType: currentEvent.eventType || '',
+                    eventSource: currentEvent.eventSource || 'user',
+                    eventDate: currentEvent.eventDate || new Date().toISOString(),
+                    title: currentEvent.title || '',
+                    description: currentEvent.description,
+                    confidenceScore: currentEvent.confidenceScore || 100,
+                    metadata: currentEvent.metadata || {},
+                    sourceUrl: currentEvent.sourceUrl,
+                    imageUrls: currentEvent.imageUrls || []
+                  };
+                  
+                  setEvents(prev => [...prev, newEvent]);
+                  setIsAddingEvent(false);
+                  setCurrentEvent(null);
+                }
+              });
+            }
+          }}>
+            <div className="form-group">
+              <label htmlFor="event-title">Title</label>
+              <input 
+                id="event-title"
+                type="text"
+                value={currentEvent.title || ''}
+                onChange={(e) => setCurrentEvent({...currentEvent, title: e.target.value})}
+                required
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="event-type">Event Type</label>
+              <select
+                id="event-type"
+                value={currentEvent.eventType || ''}
+                onChange={(e) => setCurrentEvent({...currentEvent, eventType: e.target.value})}
+                required
+              >
+                <option value="">Select event type</option>
+                {eventTypes.length > 0 ? (
+                  eventTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))
+                ) : (
+                  <>
+                    <option value="purchase">Purchase</option>
+                    <option value="sale">Sale</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="modification">Modification</option>
+                    <option value="accident">Accident</option>
+                    <option value="auction">Auction</option>
+                    <option value="registration">Registration</option>
+                    <option value="other">Other</option>
+                  </>
+                )}
+              </select>
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="event-date">Date</label>
+              <input 
+                id="event-date"
+                type="date"
+                value={currentEvent.eventDate?.toString().split('T')[0] || ''}
+                onChange={(e) => setCurrentEvent({...currentEvent, eventDate: e.target.value})}
+                required
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="event-description">Description</label>
+              <textarea 
+                id="event-description"
+                value={currentEvent.description || ''}
+                onChange={(e) => setCurrentEvent({...currentEvent, description: e.target.value})}
+                rows={3}
+              />
+            </div>
+            
+            <div className="form-actions">
+              <button 
+                type="button" 
+                className="cancel-button"
+                onClick={() => {
+                  setIsAddingEvent(false);
+                  setCurrentEvent(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="save-button">
+                {isExistingEvent(currentEvent) ? 'Update' : 'Add'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div className={`vehicle-timeline-container ${className || ''}`}>
+      {renderEventForm()}
       {loading ? (
         <div className="loading-container">
           <div className="loading-spinner"></div>
@@ -253,7 +406,12 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
         <div className="error-container">
           <h3>Error loading timeline</h3>
           <p>{error}</p>
-          <button onClick={() => window.location.reload()}>Try Again</button>
+          <button 
+            onClick={() => window.location.reload()}
+            className="retry-button"
+          >
+            Try Again
+          </button>
         </div>
       ) : !vehicle ? (
         <div className="error-container">
@@ -266,6 +424,41 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
           <div className="vehicle-info-header">
             <h2>{vehicle.year} {vehicle.make} {vehicle.model}</h2>
             {vehicle.vin && <p className="vin">VIN: {vehicle.vin}</p>}
+            <div className="timeline-actions">
+              <button 
+                className="timeline-action-button"
+                onClick={() => enrichTimelineData(vehicle.vin, vehicle.id)}
+                title="Fetch additional data from external sources"
+              >
+                Enrich Data
+              </button>
+              <button 
+                className="timeline-action-button"
+                onClick={() => exportTimeline(filteredEvents)}
+                disabled={filteredEvents.length === 0}
+                title="Export timeline to CSV"
+              >
+                Export
+              </button>
+              <button 
+                className="timeline-action-button"
+                onClick={() => {
+                  setCurrentEvent({
+                    vehicleId: vehicle.id,
+                    eventType: '',
+                    eventSource: 'user',
+                    eventDate: new Date().toISOString().split('T')[0],
+                    title: '',
+                    confidenceScore: 100,
+                    metadata: {}
+                  });
+                  setIsAddingEvent(true);
+                }}
+                title="Add new event"
+              >
+                Add Event
+              </button>
+            </div>
           </div>
           
           <div className="timeline-content">
@@ -388,6 +581,34 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
                                       <span className={`event-badge ${event.eventType.toLowerCase().replace(/\s+/g, '-')}`}>
                                         {event.eventType}
                                       </span>
+                                      <div className="event-actions">
+                                        <button 
+                                          className="event-action-button edit"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCurrentEvent(event);
+                                            setIsAddingEvent(true);
+                                          }}
+                                          title="Edit event"
+                                        >
+                                          ✏️
+                                        </button>
+                                        <button 
+                                          className="event-action-button delete"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm('Are you sure you want to delete this event?')) {
+                                              deleteTimelineEvent(event.id, { notifyOnComplete: true });
+                                              // Remove from local state
+                                              setEvents(prev => prev.filter(e => e.id !== event.id));
+                                              setFilteredEvents(prev => prev.filter(e => e.id !== event.id));
+                                            }
+                                          }}
+                                          title="Delete event"
+                                        >
+                                          🗑️
+                                        </button>
+                                      </div>
                                     </div>
                                     <div className="event-details">
                                       <span className="event-date">
@@ -395,7 +616,12 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
                                       </span>
                                       <span className="event-source">
                                         {event.sourceUrl ? (
-                                          <a href={event.sourceUrl} target="_blank" rel="noopener noreferrer">
+                                          <a 
+                                            href={event.sourceUrl} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
                                             {event.eventSource}
                                           </a>
                                         ) : (
@@ -407,6 +633,7 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
                                           event.confidenceScore >= 80 ? 'high' : 
                                           event.confidenceScore >= 50 ? 'medium' : 'low'
                                         }`}
+                                        title={`Confidence score: ${event.confidenceScore}%`}
                                       >
                                         <div 
                                           className="confidence-bar" 
@@ -440,7 +667,15 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
                                           />
                                         ))}
                                         {event.imageUrls.length > 3 && (
-                                          <div className="more-images">
+                                          <div 
+                                            className="more-images"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (event.imageUrls && event.imageUrls.length > 3) {
+                                                alert(`All images: ${event.imageUrls.join('\n')}`);
+                                              }
+                                            }}
+                                          >
                                             +{event.imageUrls.length - 3} more
                                           </div>
                                         )}
