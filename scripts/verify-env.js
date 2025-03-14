@@ -166,8 +166,8 @@ if (processEnvMissing.length > 0) {
   console.error('The following variables must be set:');
   processEnvMissing.forEach(name => console.error(`  - ${name}`));
   console.error('\nEnsure these are set in your Vercel project settings or environment.');
-  // Don't exit with error to allow deployment to complete
-  // process.exit(1);
+  // Exit with error to prevent deployment with missing variables
+  process.exit(1);
 } else {
   console.log('\n✅ All required environment variables are present!');
 }
