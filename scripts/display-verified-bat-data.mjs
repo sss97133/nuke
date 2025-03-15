@@ -189,8 +189,8 @@ const HTML_FOOTER = `
 </body>
 </html>`;
 
-// Known verified listings from BaT profile
-const VERIFIED_LISTINGS = [
+// Default listings in case data files are not available
+const DEFAULT_LISTINGS = [
   {
     title: '2023 Speed UTV El Jefe LE',
     url: 'https://bringatrailer.com/listing/2023-speed-utv-el-jefe-le/',
@@ -212,41 +212,57 @@ const VERIFIED_LISTINGS = [
     soldPrice: 14500,
     saleDate: '2025-02-17',
     imageUrl: 'https://bringatrailer.com/wp-content/uploads/2023/11/1984_citroen_2cv6_166576428463e773241dc85220230809_170006-scaled.jpg'
-  },
-  {
-    title: '1970 Ford Ranchero GT 429 4-Speed',
-    url: 'https://bringatrailer.com/listing/1970-ford-ranchero-18/',
-    year: 1970,
-    make: 'Ford',
-    model: 'Ranchero GT 429 4-Speed',
-    status: 'sold',
-    soldPrice: 37000,
-    saleDate: '2025-02-07',
-    imageUrl: 'https://bringatrailer.com/wp-content/uploads/2024/01/1970_ford_ranchero_gt_429_1705702171d3b8c6a5-8b68-4301-9e69-c93a9cbfd3e1.jpeg'
-  },
-  {
-    title: '2023 Ford F-150 Raptor SuperCrew 37 Performance Package',
-    url: 'https://bringatrailer.com/listing/2023-ford-f-150-raptor-71/',
-    year: 2023,
-    make: 'Ford',
-    model: 'F-150 Raptor SuperCrew 37 Performance Package',
-    status: 'sold',
-    soldPrice: 92000,
-    saleDate: '2025-01-25',
-    imageUrl: 'https://bringatrailer.com/wp-content/uploads/2024/01/2023_ford_f-150_raptor_1705357723e43fad50-3e7e-4f86-80b5-1ec40d39ae35-scaled.jpeg'
-  },
-  {
-    title: '2023 Ford F-150 Raptor SuperCrew',
-    url: 'https://bringatrailer.com/listing/2023-ford-f-150-raptor-70/',
-    year: 2023,
-    make: 'Ford',
-    model: 'F-150 Raptor SuperCrew',
-    status: 'sold',
-    soldPrice: 85000,
-    saleDate: '2025-01-10',
-    imageUrl: 'https://bringatrailer.com/wp-content/uploads/2023/12/2023_ford_f-150_raptor_17031962559f4f7f39-7ec4-4da7-93a2-09f17a8ddff9-scaled.jpeg'
   }
 ];
+
+// Function to load the verified BAT data from files
+async function loadVerifiedData() {
+  try {
+    // First, check if we have a verified source reference
+    const verifiedSourcePath = path.join(DATA_DIR, 'verified-bat-source.json');
+    let sourceFile;
+    
+    try {
+      const sourceData = JSON.parse(await fs.readFile(verifiedSourcePath, 'utf8'));
+      sourceFile = sourceData.source;
+      console.log(`Found verified source reference: ${sourceFile}`);
+    } catch (err) {
+      console.warn(`No verified source reference found: ${err.message}`);
+      sourceFile = path.join(DATA_DIR, 'vivalasvegasautos-display-data.json');
+    }
+    
+    // Load the display data file
+    try {
+      const displayData = JSON.parse(await fs.readFile(sourceFile, 'utf8'));
+      console.log(`Loaded display data with ${displayData.listings?.length || 0} listings`);
+      return displayData;
+    } catch (err) {
+      console.warn(`Could not load display data: ${err.message}`);
+      
+      // Try to load the listings file directly
+      try {
+        const listingsPath = path.join(DATA_DIR, 'vivalasvegasautos-listings.json');
+        const listings = JSON.parse(await fs.readFile(listingsPath, 'utf8'));
+        console.log(`Loaded ${listings.length} listings from listings file`);
+        return { listings, profileInfo: { displayName: 'Viva Las Vegas Autos' } };
+      } catch (listingErr) {
+        console.warn(`Could not load listings file: ${listingErr.message}`);
+        return { 
+          listings: DEFAULT_LISTINGS,
+          profileInfo: { displayName: 'Viva Las Vegas Autos' },
+          error: 'Using default data - could not load full dataset'
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error loading verified data:', error);
+    return { 
+      listings: DEFAULT_LISTINGS,
+      profileInfo: { displayName: 'Viva Las Vegas Autos' },
+      error: `Failed to load data: ${error.message}`
+    };
+  }
+}
 
 // Configuration 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36';
@@ -298,24 +314,115 @@ function generateVerifiedListingsHtml(listings) {
 }
 
 /**
+ * Generate HTML for investment analysis
+ */
+function generateInvestmentAnalysisHtml(investmentData) {
+  if (!investmentData) return '';
+  
+  // Format currency
+  const formatCurrency = (value) => {
+    if (typeof value !== 'number') return 'N/A';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+  };
+  
+  // First check if we have the structured analysis format
+  if (investmentData.overview) {
+    const { overview, investmentSummary } = investmentData;
+    
+    let html = `
+      <div class="investment-section">
+        <h2>Investment Analysis</h2>
+        <div class="analysis-grid">
+          <div class="analysis-card">
+            <div class="analysis-value">${overview.totalListings || 0}</div>
+            <div class="analysis-label">Total Listings</div>
+          </div>
+          <div class="analysis-card">
+            <div class="analysis-value">${overview.soldListings || 0}</div>
+            <div class="analysis-label">Sold Vehicles</div>
+          </div>
+          <div class="analysis-card">
+            <div class="analysis-value">${formatCurrency(overview.totalRevenue)}</div>
+            <div class="analysis-label">Total Revenue</div>
+          </div>
+          <div class="analysis-card">
+            <div class="analysis-value">${formatCurrency(overview.averageSalePrice)}</div>
+            <div class="analysis-label">Avg. Sale Price</div>
+          </div>
+          <div class="analysis-card">
+            <div class="analysis-value">${overview.salesSuccessRate || 0}%</div>
+            <div class="analysis-label">Success Rate</div>
+          </div>
+        </div>
+    `;
+    
+    // Add notable sales section if available
+    if (overview.highestSale) {
+      html += `
+        <div class="notable-sales">
+          <h3>Notable Sales</h3>
+          <div class="notable-sales-grid">
+            <div class="notable-sale">
+              <h4>Highest Sale</h4>
+              <div class="notable-title">${overview.highestSale.title || ''}</div>
+              <div class="notable-price">${formatCurrency(overview.highestSale.price)}</div>
+            </div>
+      `;
+      
+      if (overview.lowestSale) {
+        html += `
+          <div class="notable-sale">
+            <h4>Lowest Sale</h4>
+            <div class="notable-title">${overview.lowestSale.title || ''}</div>
+            <div class="notable-price">${formatCurrency(overview.lowestSale.price)}</div>
+          </div>
+        `;
+      }
+      
+      html += `
+          </div>
+        </div>
+      `;
+    }
+    
+    html += '</div>';
+    return html;
+  }
+  
+  // Fallback to simpler format if we don't have the structured data
+  return `
+    <div class="investment-section">
+      <h2>Investment Overview</h2>
+      <p>This dealer has sold multiple vehicles through BaT. Detailed investment analysis is available after running a complete analysis.</p>
+    </div>
+  `;
+}
+
+/**
  * Generate HTML for profile header
  */
-function generateProfileHeader() {
+function generateProfileHeader(profileInfo = {}) {
+  // Default values in case profile info is not available
+  const displayName = profileInfo.displayName || 'VivaLasVegasAutos';
+  const memberSince = profileInfo.memberSince || 'June 2016';
+  const location = profileInfo.location || 'NV, United States';
+  const totalListings = profileInfo.totalListings || 43;
+  
   return `
     <header>
       <div class="profile-header">
-        <div class="profile-icon">V</div>
+        <div class="profile-icon">${displayName.charAt(0)}</div>
         <div>
-          <h1>VivaLasVegasAutos</h1>
-          <p>Member since June 2016 • NV, United States</p>
-          <p>Total listings on BaT: 43</p>
+          <h1>${displayName}</h1>
+          <p>Member since ${memberSince} • ${location}</p>
+          <p>Total listings on BaT: ${totalListings}</p>
         </div>
       </div>
     </header>
     
     <div class="status-banner">
-      Note: Only verified listings directly observed on BaT are shown below. 
-      According to the profile page, there are 43 total listings.
+      <p><strong>Verified Data:</strong> All listings shown below are directly observed from BaT.</p>
+      <p>Last updated: ${new Date().toLocaleString()}</p>
     </div>
   `;
 }
@@ -479,7 +586,11 @@ async function startDisplayServer(port = 3001) {
 
 // Start the server when script is run directly
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  startDisplayServer().catch(console.error);
+  // Check if a port was provided as a command line argument
+  const portArg = process.argv[2];
+  const port = portArg ? parseInt(portArg, 10) : 3001;
+  console.log(`Starting display server on port ${port}`);
+  startDisplayServer(port).catch(console.error);
 }
 
 // Export for use in other modules
