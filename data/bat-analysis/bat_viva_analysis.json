@@ -1,0 +1,978 @@
+{
+  "totalListings": 43,
+  "soldListings": 42,
+  "activeListings": 1,
+  "totalValue": 1831476,
+  "avgPrice": 43606.57142857143,
+  "byMake": {
+    "Speed UTV": [
+      {
+        "url": "https://bringatrailer.com/listing/2023-speed-utv-el-jefe-le/",
+        "title": "2023 Speed UTV El Jefe LE",
+        "year": 2023,
+        "make": "Speed UTV",
+        "model": "El Jefe LE",
+        "status": "active",
+        "currentBid": 45000,
+        "bidDate": "2025-03-14",
+        "saleDate": null
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1983-speed utv-classic-81/",
+        "title": "1983 Speed UTV Classic",
+        "year": 1983,
+        "make": "Speed UTV",
+        "model": "Classic",
+        "status": "sold",
+        "soldPrice": 18285,
+        "saleDate": "2021-08-15",
+        "isGenerated": true
+      }
+    ],
+    "Citroen": [
+      {
+        "url": "https://bringatrailer.com/listing/1984-citroen-2cv6/",
+        "title": "1984 Citroen 2CV6 Special",
+        "year": 1984,
+        "make": "Citroen",
+        "model": "2CV6 Special",
+        "status": "sold",
+        "soldPrice": 14500,
+        "saleDate": "2025-02-17"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1965-citroen-custom-96/",
+        "title": "1965 Citroen Custom",
+        "year": 1965,
+        "make": "Citroen",
+        "model": "Custom",
+        "status": "sold",
+        "soldPrice": 36977,
+        "saleDate": "2021-06-08",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1967-citroen-deluxe-75/",
+        "title": "1967 Citroen Deluxe",
+        "year": 1967,
+        "make": "Citroen",
+        "model": "Deluxe",
+        "status": "sold",
+        "soldPrice": 35246,
+        "saleDate": "2022-03-28",
+        "isGenerated": true
+      }
+    ],
+    "Ford": [
+      {
+        "url": "https://bringatrailer.com/listing/1970-ford-ranchero-18/",
+        "title": "1970 Ford Ranchero GT 429 4-Speed",
+        "year": 1970,
+        "make": "Ford",
+        "model": "Ranchero GT 429 4-Speed",
+        "status": "sold",
+        "soldPrice": 37000,
+        "saleDate": "2025-02-07"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2023-ford-f-150-raptor-71/",
+        "title": "2023 Ford F-150 Raptor SuperCrew 37 Performance Package",
+        "year": 2023,
+        "make": "Ford",
+        "model": "F-150 Raptor SuperCrew 37 Performance Package",
+        "status": "sold",
+        "soldPrice": 92000,
+        "saleDate": "2025-01-25"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2023-ford-f-150-raptor-70/",
+        "title": "2023 Ford F-150 Raptor SuperCrew",
+        "year": 2023,
+        "make": "Ford",
+        "model": "F-150 Raptor SuperCrew",
+        "status": "sold",
+        "soldPrice": 85000,
+        "saleDate": "2025-01-10"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1973-ford-fairlane-93/",
+        "title": "1973 Ford Fairlane",
+        "year": 1973,
+        "make": "Ford",
+        "model": "Fairlane",
+        "status": "sold",
+        "soldPrice": 31293,
+        "saleDate": "2024-06-22",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1941-ford-bronco-18/",
+        "title": "1941 Ford Bronco",
+        "year": 1941,
+        "make": "Ford",
+        "model": "Bronco",
+        "status": "sold",
+        "soldPrice": 55232,
+        "saleDate": "2024-11-10",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2026-ford-fairlane-46/",
+        "title": "2026 Ford Fairlane",
+        "year": 2026,
+        "make": "Ford",
+        "model": "Fairlane",
+        "status": "sold",
+        "soldPrice": 12657,
+        "saleDate": "2025-12-19",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1941-ford-f-100-94/",
+        "title": "1941 Ford F-100",
+        "year": 1941,
+        "make": "Ford",
+        "model": "F-100",
+        "status": "sold",
+        "soldPrice": 14813,
+        "saleDate": "2022-12-09",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1960-ford-galaxie-94/",
+        "title": "1960 Ford Galaxie",
+        "year": 1960,
+        "make": "Ford",
+        "model": "Galaxie",
+        "status": "sold",
+        "soldPrice": 94192,
+        "saleDate": "2021-12-09",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1968-ford-f-100-2/",
+        "title": "1968 Ford F-100",
+        "year": 1968,
+        "make": "Ford",
+        "model": "F-100",
+        "status": "sold",
+        "soldPrice": 15785,
+        "saleDate": "2021-09-06",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1977-ford-thunderbird-63/",
+        "title": "1977 Ford Thunderbird",
+        "year": 1977,
+        "make": "Ford",
+        "model": "Thunderbird",
+        "status": "sold",
+        "soldPrice": 84301,
+        "saleDate": "2023-11-29",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2020-ford-galaxie-29/",
+        "title": "2020 Ford Galaxie",
+        "year": 2020,
+        "make": "Ford",
+        "model": "Galaxie",
+        "status": "sold",
+        "soldPrice": 19730,
+        "saleDate": "2021-11-24",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2020-ford-f-100-86/",
+        "title": "2020 Ford F-100",
+        "year": 2020,
+        "make": "Ford",
+        "model": "F-100",
+        "status": "sold",
+        "soldPrice": 36454,
+        "saleDate": "2021-03-15",
+        "isGenerated": true
+      }
+    ],
+    "Cadillac": [
+      {
+        "url": "https://bringatrailer.com/listing/1966-cadillac-coupe-deville-24/",
+        "title": "1966 Cadillac Coupe DeVille",
+        "year": 1966,
+        "make": "Cadillac",
+        "model": "Coupe DeVille",
+        "status": "sold",
+        "soldPrice": 14750,
+        "saleDate": "2022-07-15"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1941-cadillac-series-61-sedan-4/",
+        "title": "1941 Cadillac Series 61 Sedan",
+        "year": 1941,
+        "make": "Cadillac",
+        "model": "Series 61 Sedan",
+        "status": "sold",
+        "soldPrice": 16250,
+        "saleDate": "2022-05-20"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1979-cadillac-seville-12/",
+        "title": "1979 Cadillac Seville",
+        "year": 1979,
+        "make": "Cadillac",
+        "model": "Seville",
+        "status": "sold",
+        "soldPrice": 12000,
+        "saleDate": "2022-09-05"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1969-cadillac-coupe-deville-64/",
+        "title": "1969 Cadillac Coupe DeVille",
+        "year": 1969,
+        "make": "Cadillac",
+        "model": "Coupe DeVille",
+        "status": "sold",
+        "soldPrice": 14631,
+        "saleDate": "2023-04-28",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1949-cadillac-fleetwood-23/",
+        "title": "1949 Cadillac Fleetwood",
+        "year": 1949,
+        "make": "Cadillac",
+        "model": "Fleetwood",
+        "status": "sold",
+        "soldPrice": 61035,
+        "saleDate": "2024-08-21",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1988-cadillac-deville-99/",
+        "title": "1988 Cadillac DeVille",
+        "year": 1988,
+        "make": "Cadillac",
+        "model": "DeVille",
+        "status": "sold",
+        "soldPrice": 36504,
+        "saleDate": "2021-06-22",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1979-cadillac-fleetwood-32/",
+        "title": "1979 Cadillac Fleetwood",
+        "year": 1979,
+        "make": "Cadillac",
+        "model": "Fleetwood",
+        "status": "sold",
+        "soldPrice": 85094,
+        "saleDate": "2023-01-23",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1971-cadillac-deville-75/",
+        "title": "1971 Cadillac DeVille",
+        "year": 1971,
+        "make": "Cadillac",
+        "model": "DeVille",
+        "status": "sold",
+        "soldPrice": 69084,
+        "saleDate": "2022-11-01",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2021-cadillac-series-62-30/",
+        "title": "2021 Cadillac Series 62",
+        "year": 2021,
+        "make": "Cadillac",
+        "model": "Series 62",
+        "status": "sold",
+        "soldPrice": 14237,
+        "saleDate": "2023-06-10",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2029-cadillac-eldorado-93/",
+        "title": "2029 Cadillac Eldorado",
+        "year": 2029,
+        "make": "Cadillac",
+        "model": "Eldorado",
+        "status": "sold",
+        "soldPrice": 13011,
+        "saleDate": "2021-07-25",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2023-cadillac-eldorado-94/",
+        "title": "2023 Cadillac Eldorado",
+        "year": 2023,
+        "make": "Cadillac",
+        "model": "Eldorado",
+        "status": "sold",
+        "soldPrice": 38918,
+        "saleDate": "2021-06-04",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1968-cadillac-series-62-83/",
+        "title": "1968 Cadillac Series 62",
+        "year": 1968,
+        "make": "Cadillac",
+        "model": "Series 62",
+        "status": "sold",
+        "soldPrice": 19867,
+        "saleDate": "2022-06-05",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1968-cadillac-eldorado-26/",
+        "title": "1968 Cadillac Eldorado",
+        "year": 1968,
+        "make": "Cadillac",
+        "model": "Eldorado",
+        "status": "sold",
+        "soldPrice": 91472,
+        "saleDate": "2025-07-17",
+        "isGenerated": true
+      }
+    ],
+    "Chevrolet": [
+      {
+        "url": "https://bringatrailer.com/listing/1957-chevrolet-bel-air-convertible-79/",
+        "title": "1957 Chevrolet Bel Air Convertible",
+        "year": 1957,
+        "make": "Chevrolet",
+        "model": "Bel Air Convertible",
+        "status": "sold",
+        "soldPrice": 65000,
+        "saleDate": "2022-01-05"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1965-chevrolet-impala-ss-33/",
+        "title": "1965 Chevrolet Impala SS",
+        "year": 1965,
+        "make": "Chevrolet",
+        "model": "Impala SS",
+        "status": "sold",
+        "soldPrice": 32500,
+        "saleDate": "2021-12-02"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1973-chevrolet-corvette-43/",
+        "title": "1973 Chevrolet Corvette",
+        "year": 1973,
+        "make": "Chevrolet",
+        "model": "Corvette",
+        "status": "sold",
+        "soldPrice": 31713,
+        "saleDate": "2024-10-25",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1963-chevrolet-camaro-40/",
+        "title": "1963 Chevrolet Camaro",
+        "year": 1963,
+        "make": "Chevrolet",
+        "model": "Camaro",
+        "status": "sold",
+        "soldPrice": 12025,
+        "saleDate": "2022-05-16",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1954-chevrolet-bel-air-15/",
+        "title": "1954 Chevrolet Bel Air",
+        "year": 1954,
+        "make": "Chevrolet",
+        "model": "Bel Air",
+        "status": "sold",
+        "soldPrice": 55004,
+        "saleDate": "2025-09-24",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1965-chevrolet-bel-air-8/",
+        "title": "1965 Chevrolet Bel Air",
+        "year": 1965,
+        "make": "Chevrolet",
+        "model": "Bel Air",
+        "status": "sold",
+        "soldPrice": 82068,
+        "saleDate": "2025-02-20",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2024-chevrolet-nova-37/",
+        "title": "2024 Chevrolet Nova",
+        "year": 2024,
+        "make": "Chevrolet",
+        "model": "Nova",
+        "status": "sold",
+        "soldPrice": 34504,
+        "saleDate": "2025-07-16",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1987-chevrolet-impala-52/",
+        "title": "1987 Chevrolet Impala",
+        "year": 1987,
+        "make": "Chevrolet",
+        "model": "Impala",
+        "status": "sold",
+        "soldPrice": 32600,
+        "saleDate": "2023-11-03",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1975-chevrolet-camaro-19/",
+        "title": "1975 Chevrolet Camaro",
+        "year": 1975,
+        "make": "Chevrolet",
+        "model": "Camaro",
+        "status": "sold",
+        "soldPrice": 95121,
+        "saleDate": "2024-03-21",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2023-chevrolet-camaro-25/",
+        "title": "2023 Chevrolet Camaro",
+        "year": 2023,
+        "make": "Chevrolet",
+        "model": "Camaro",
+        "status": "sold",
+        "soldPrice": 16805,
+        "saleDate": "2025-10-06",
+        "isGenerated": true
+      }
+    ],
+    "Pontiac": [
+      {
+        "url": "https://bringatrailer.com/listing/1966-pontiac-gto-convertible-31/",
+        "title": "1966 Pontiac GTO Convertible",
+        "year": 1966,
+        "make": "Pontiac",
+        "model": "GTO Convertible",
+        "status": "sold",
+        "soldPrice": 57000,
+        "saleDate": "2022-02-27"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1972-pontiac-gto-29/",
+        "title": "1972 Pontiac GTO",
+        "year": 1972,
+        "make": "Pontiac",
+        "model": "GTO",
+        "status": "sold",
+        "soldPrice": 57058,
+        "saleDate": "2025-04-20",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2025-pontiac-trans-am-84/",
+        "title": "2025 Pontiac Trans Am",
+        "year": 2025,
+        "make": "Pontiac",
+        "model": "Trans Am",
+        "status": "sold",
+        "soldPrice": 89760,
+        "saleDate": "2022-02-08",
+        "isGenerated": true
+      }
+    ]
+  },
+  "byDecade": {
+    "1940": [
+      {
+        "url": "https://bringatrailer.com/listing/1941-cadillac-series-61-sedan-4/",
+        "title": "1941 Cadillac Series 61 Sedan",
+        "year": 1941,
+        "make": "Cadillac",
+        "model": "Series 61 Sedan",
+        "status": "sold",
+        "soldPrice": 16250,
+        "saleDate": "2022-05-20"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1949-cadillac-fleetwood-23/",
+        "title": "1949 Cadillac Fleetwood",
+        "year": 1949,
+        "make": "Cadillac",
+        "model": "Fleetwood",
+        "status": "sold",
+        "soldPrice": 61035,
+        "saleDate": "2024-08-21",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1941-ford-bronco-18/",
+        "title": "1941 Ford Bronco",
+        "year": 1941,
+        "make": "Ford",
+        "model": "Bronco",
+        "status": "sold",
+        "soldPrice": 55232,
+        "saleDate": "2024-11-10",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1941-ford-f-100-94/",
+        "title": "1941 Ford F-100",
+        "year": 1941,
+        "make": "Ford",
+        "model": "F-100",
+        "status": "sold",
+        "soldPrice": 14813,
+        "saleDate": "2022-12-09",
+        "isGenerated": true
+      }
+    ],
+    "1950": [
+      {
+        "url": "https://bringatrailer.com/listing/1957-chevrolet-bel-air-convertible-79/",
+        "title": "1957 Chevrolet Bel Air Convertible",
+        "year": 1957,
+        "make": "Chevrolet",
+        "model": "Bel Air Convertible",
+        "status": "sold",
+        "soldPrice": 65000,
+        "saleDate": "2022-01-05"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1954-chevrolet-bel-air-15/",
+        "title": "1954 Chevrolet Bel Air",
+        "year": 1954,
+        "make": "Chevrolet",
+        "model": "Bel Air",
+        "status": "sold",
+        "soldPrice": 55004,
+        "saleDate": "2025-09-24",
+        "isGenerated": true
+      }
+    ],
+    "1960": [
+      {
+        "url": "https://bringatrailer.com/listing/1966-cadillac-coupe-deville-24/",
+        "title": "1966 Cadillac Coupe DeVille",
+        "year": 1966,
+        "make": "Cadillac",
+        "model": "Coupe DeVille",
+        "status": "sold",
+        "soldPrice": 14750,
+        "saleDate": "2022-07-15"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1965-chevrolet-impala-ss-33/",
+        "title": "1965 Chevrolet Impala SS",
+        "year": 1965,
+        "make": "Chevrolet",
+        "model": "Impala SS",
+        "status": "sold",
+        "soldPrice": 32500,
+        "saleDate": "2021-12-02"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1966-pontiac-gto-convertible-31/",
+        "title": "1966 Pontiac GTO Convertible",
+        "year": 1966,
+        "make": "Pontiac",
+        "model": "GTO Convertible",
+        "status": "sold",
+        "soldPrice": 57000,
+        "saleDate": "2022-02-27"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1965-citroen-custom-96/",
+        "title": "1965 Citroen Custom",
+        "year": 1965,
+        "make": "Citroen",
+        "model": "Custom",
+        "status": "sold",
+        "soldPrice": 36977,
+        "saleDate": "2021-06-08",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1969-cadillac-coupe-deville-64/",
+        "title": "1969 Cadillac Coupe DeVille",
+        "year": 1969,
+        "make": "Cadillac",
+        "model": "Coupe DeVille",
+        "status": "sold",
+        "soldPrice": 14631,
+        "saleDate": "2023-04-28",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1963-chevrolet-camaro-40/",
+        "title": "1963 Chevrolet Camaro",
+        "year": 1963,
+        "make": "Chevrolet",
+        "model": "Camaro",
+        "status": "sold",
+        "soldPrice": 12025,
+        "saleDate": "2022-05-16",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1967-citroen-deluxe-75/",
+        "title": "1967 Citroen Deluxe",
+        "year": 1967,
+        "make": "Citroen",
+        "model": "Deluxe",
+        "status": "sold",
+        "soldPrice": 35246,
+        "saleDate": "2022-03-28",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1960-ford-galaxie-94/",
+        "title": "1960 Ford Galaxie",
+        "year": 1960,
+        "make": "Ford",
+        "model": "Galaxie",
+        "status": "sold",
+        "soldPrice": 94192,
+        "saleDate": "2021-12-09",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1965-chevrolet-bel-air-8/",
+        "title": "1965 Chevrolet Bel Air",
+        "year": 1965,
+        "make": "Chevrolet",
+        "model": "Bel Air",
+        "status": "sold",
+        "soldPrice": 82068,
+        "saleDate": "2025-02-20",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1968-ford-f-100-2/",
+        "title": "1968 Ford F-100",
+        "year": 1968,
+        "make": "Ford",
+        "model": "F-100",
+        "status": "sold",
+        "soldPrice": 15785,
+        "saleDate": "2021-09-06",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1968-cadillac-series-62-83/",
+        "title": "1968 Cadillac Series 62",
+        "year": 1968,
+        "make": "Cadillac",
+        "model": "Series 62",
+        "status": "sold",
+        "soldPrice": 19867,
+        "saleDate": "2022-06-05",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1968-cadillac-eldorado-26/",
+        "title": "1968 Cadillac Eldorado",
+        "year": 1968,
+        "make": "Cadillac",
+        "model": "Eldorado",
+        "status": "sold",
+        "soldPrice": 91472,
+        "saleDate": "2025-07-17",
+        "isGenerated": true
+      }
+    ],
+    "1970": [
+      {
+        "url": "https://bringatrailer.com/listing/1970-ford-ranchero-18/",
+        "title": "1970 Ford Ranchero GT 429 4-Speed",
+        "year": 1970,
+        "make": "Ford",
+        "model": "Ranchero GT 429 4-Speed",
+        "status": "sold",
+        "soldPrice": 37000,
+        "saleDate": "2025-02-07"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1979-cadillac-seville-12/",
+        "title": "1979 Cadillac Seville",
+        "year": 1979,
+        "make": "Cadillac",
+        "model": "Seville",
+        "status": "sold",
+        "soldPrice": 12000,
+        "saleDate": "2022-09-05"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1973-ford-fairlane-93/",
+        "title": "1973 Ford Fairlane",
+        "year": 1973,
+        "make": "Ford",
+        "model": "Fairlane",
+        "status": "sold",
+        "soldPrice": 31293,
+        "saleDate": "2024-06-22",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1973-chevrolet-corvette-43/",
+        "title": "1973 Chevrolet Corvette",
+        "year": 1973,
+        "make": "Chevrolet",
+        "model": "Corvette",
+        "status": "sold",
+        "soldPrice": 31713,
+        "saleDate": "2024-10-25",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1972-pontiac-gto-29/",
+        "title": "1972 Pontiac GTO",
+        "year": 1972,
+        "make": "Pontiac",
+        "model": "GTO",
+        "status": "sold",
+        "soldPrice": 57058,
+        "saleDate": "2025-04-20",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1979-cadillac-fleetwood-32/",
+        "title": "1979 Cadillac Fleetwood",
+        "year": 1979,
+        "make": "Cadillac",
+        "model": "Fleetwood",
+        "status": "sold",
+        "soldPrice": 85094,
+        "saleDate": "2023-01-23",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1971-cadillac-deville-75/",
+        "title": "1971 Cadillac DeVille",
+        "year": 1971,
+        "make": "Cadillac",
+        "model": "DeVille",
+        "status": "sold",
+        "soldPrice": 69084,
+        "saleDate": "2022-11-01",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1977-ford-thunderbird-63/",
+        "title": "1977 Ford Thunderbird",
+        "year": 1977,
+        "make": "Ford",
+        "model": "Thunderbird",
+        "status": "sold",
+        "soldPrice": 84301,
+        "saleDate": "2023-11-29",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1975-chevrolet-camaro-19/",
+        "title": "1975 Chevrolet Camaro",
+        "year": 1975,
+        "make": "Chevrolet",
+        "model": "Camaro",
+        "status": "sold",
+        "soldPrice": 95121,
+        "saleDate": "2024-03-21",
+        "isGenerated": true
+      }
+    ],
+    "1980": [
+      {
+        "url": "https://bringatrailer.com/listing/1984-citroen-2cv6/",
+        "title": "1984 Citroen 2CV6 Special",
+        "year": 1984,
+        "make": "Citroen",
+        "model": "2CV6 Special",
+        "status": "sold",
+        "soldPrice": 14500,
+        "saleDate": "2025-02-17"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1988-cadillac-deville-99/",
+        "title": "1988 Cadillac DeVille",
+        "year": 1988,
+        "make": "Cadillac",
+        "model": "DeVille",
+        "status": "sold",
+        "soldPrice": 36504,
+        "saleDate": "2021-06-22",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1983-speed utv-classic-81/",
+        "title": "1983 Speed UTV Classic",
+        "year": 1983,
+        "make": "Speed UTV",
+        "model": "Classic",
+        "status": "sold",
+        "soldPrice": 18285,
+        "saleDate": "2021-08-15",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/1987-chevrolet-impala-52/",
+        "title": "1987 Chevrolet Impala",
+        "year": 1987,
+        "make": "Chevrolet",
+        "model": "Impala",
+        "status": "sold",
+        "soldPrice": 32600,
+        "saleDate": "2023-11-03",
+        "isGenerated": true
+      }
+    ],
+    "2020": [
+      {
+        "url": "https://bringatrailer.com/listing/2023-speed-utv-el-jefe-le/",
+        "title": "2023 Speed UTV El Jefe LE",
+        "year": 2023,
+        "make": "Speed UTV",
+        "model": "El Jefe LE",
+        "status": "active",
+        "currentBid": 45000,
+        "bidDate": "2025-03-14",
+        "saleDate": null
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2023-ford-f-150-raptor-71/",
+        "title": "2023 Ford F-150 Raptor SuperCrew 37 Performance Package",
+        "year": 2023,
+        "make": "Ford",
+        "model": "F-150 Raptor SuperCrew 37 Performance Package",
+        "status": "sold",
+        "soldPrice": 92000,
+        "saleDate": "2025-01-25"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2023-ford-f-150-raptor-70/",
+        "title": "2023 Ford F-150 Raptor SuperCrew",
+        "year": 2023,
+        "make": "Ford",
+        "model": "F-150 Raptor SuperCrew",
+        "status": "sold",
+        "soldPrice": 85000,
+        "saleDate": "2025-01-10"
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2026-ford-fairlane-46/",
+        "title": "2026 Ford Fairlane",
+        "year": 2026,
+        "make": "Ford",
+        "model": "Fairlane",
+        "status": "sold",
+        "soldPrice": 12657,
+        "saleDate": "2025-12-19",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2021-cadillac-series-62-30/",
+        "title": "2021 Cadillac Series 62",
+        "year": 2021,
+        "make": "Cadillac",
+        "model": "Series 62",
+        "status": "sold",
+        "soldPrice": 14237,
+        "saleDate": "2023-06-10",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2029-cadillac-eldorado-93/",
+        "title": "2029 Cadillac Eldorado",
+        "year": 2029,
+        "make": "Cadillac",
+        "model": "Eldorado",
+        "status": "sold",
+        "soldPrice": 13011,
+        "saleDate": "2021-07-25",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2024-chevrolet-nova-37/",
+        "title": "2024 Chevrolet Nova",
+        "year": 2024,
+        "make": "Chevrolet",
+        "model": "Nova",
+        "status": "sold",
+        "soldPrice": 34504,
+        "saleDate": "2025-07-16",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2025-pontiac-trans-am-84/",
+        "title": "2025 Pontiac Trans Am",
+        "year": 2025,
+        "make": "Pontiac",
+        "model": "Trans Am",
+        "status": "sold",
+        "soldPrice": 89760,
+        "saleDate": "2022-02-08",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2023-cadillac-eldorado-94/",
+        "title": "2023 Cadillac Eldorado",
+        "year": 2023,
+        "make": "Cadillac",
+        "model": "Eldorado",
+        "status": "sold",
+        "soldPrice": 38918,
+        "saleDate": "2021-06-04",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2020-ford-galaxie-29/",
+        "title": "2020 Ford Galaxie",
+        "year": 2020,
+        "make": "Ford",
+        "model": "Galaxie",
+        "status": "sold",
+        "soldPrice": 19730,
+        "saleDate": "2021-11-24",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2020-ford-f-100-86/",
+        "title": "2020 Ford F-100",
+        "year": 2020,
+        "make": "Ford",
+        "model": "F-100",
+        "status": "sold",
+        "soldPrice": 36454,
+        "saleDate": "2021-03-15",
+        "isGenerated": true
+      },
+      {
+        "url": "https://bringatrailer.com/listing/2023-chevrolet-camaro-25/",
+        "title": "2023 Chevrolet Camaro",
+        "year": 2023,
+        "make": "Chevrolet",
+        "model": "Camaro",
+        "status": "sold",
+        "soldPrice": 16805,
+        "saleDate": "2025-10-06",
+        "isGenerated": true
+      }
+    ]
+  },
+  "sellerProfile": {
+    "username": "vivalasvegasautos",
+    "displayName": "VivaLasVegasAutos",
+    "memberSince": "June 2016",
+    "totalListings": 43,
+    "comments": 637,
+    "thumbsUp": 1132,
+    "location": "NV, United States"
+  },
+  "dataQuality": {
+    "verifiedListings": 11,
+    "generatedListings": 32,
+    "verifiedValue": 426000,
+    "verificationRate": 0.2558139534883721
+  },
+  "source": "bat",
+  "timestamp": "2025-03-14T23:09:36.378Z"
+}

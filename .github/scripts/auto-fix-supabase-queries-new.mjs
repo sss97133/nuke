@@ -349,62 +349,27 @@ function processFile(filePath) {
   }
 }
 
-// Get files to process based on grep search for Supabase patterns
-function findFilesWithSupabaseOperations() {
-  // Use simpler patterns that are compatible with command-line grep
-  const patterns = [
-    // Basic pattern for Supabase database query operations
-    'supabase.from',
-    // Basic pattern for Supabase storage operations
-    'supabase.storage',
-    // Basic pattern for destructuring data/error from Supabase
-    '{data,error}',
-    // Alternative destructuring pattern
-    '{error,data}'
-  ];
-  
-  const files = new Set();
-  
-  for (const pattern of patterns) {
-    try {
-      // Look for potentially problematic Supabase operations in vehicle-related files
-      const vehicleDirs = [
-        './src/components/VehicleTimeline',
-        './src/components/vehicles',
-        './src/components/marketplace',
-        './src/components/auctions',
-        './src/integrations/supabase',
-        './src/lib/timeline',
-        './src/utils',
-        './src/services',
-        './supabase/functions'
-      ];
-      
-      for (const dir of vehicleDirs) {
-        if (!fs.existsSync(dir)) continue;
-        
-        // Use fixed string pattern matching (-F) to avoid regex interpretation
-        const grepCmd = `grep -F -r --include="*.{ts,tsx,js,jsx}" -l "${pattern}" ${dir}`;
-        try {
-          const output = execSync(grepCmd, { encoding: 'utf8' }).trim();
-          if (output) {
-            output.split('\n').forEach(file => files.add(file));
-          }
-        } catch (e) {
-          // grep returns non-zero exit code when no matches are found, which is not an error for us
-        }
-      }
-    } catch (error) {
-      console.error(`Warning: Error finding files with pattern '${pattern}':`, error.message);
+// Get files to process based on validation output
+function getFilesFromValidationOutput() {
+  try {
+    const output = execSync('cd "$(git rev-parse --show-toplevel)" && node scripts/validate-supabase-queries.mjs --list', 
+                            { encoding: 'utf8' });
+    
+    // Parse the output to get file paths
+    const matches = [...output.matchAll(/\s*File: ([^\n]+)/g)];
+    if (matches.length === 0) {
+      console.log('No files need fixing according to validation');
+      return [];
     }
+    
+    // Extract unique file paths
+    const files = [...new Set(matches.map(match => match[1].trim()))];
+    console.log(`Found ${files.length} files to process from validation output`);
+    return files;
+  } catch (error) {
+    console.error('❌ Error getting files from validation output:', error.message);
+    return [];
   }
-  
-  const fileArray = Array.from(files);
-  if (fileArray.length > 0) {
-    console.log(`🔍 Found ${fileArray.length} files with Supabase operations`);
-  }
-  
-  return fileArray;
 }
 
 // Main function
@@ -422,28 +387,38 @@ async function main() {
   // Change to repository root
   process.chdir(repoRoot);
   
-  // Directly specify the key files we know need fixing
-  // These files are important for the vehicle-centric architecture
-  const filesToProcess = [
-    // Key vehicle timeline component files
-    './src/components/VehicleTimeline/index.tsx',
-    './src/components/VehicleTimeline/useTimelineActions.ts',
-    // Supabase integration files
-    './src/integrations/supabase/client.ts',
-    // Vehicle-related components
-    './src/components/vehicles/VehicleForm.tsx',
-    // Multi-source connector framework files
-    './src/lib/timeline/timeline-service.js',
-    // Other key files with Supabase operations
-    './src/components/auctions/AuctionList.tsx',
-    './src/components/marketplace/hooks/useMarketplaceListing.tsx',
-    './src/utils/systemMetrics.ts'
-  ].filter(file => fs.existsSync(file)); // Only include files that exist
+  // Get files to process
+  let filesToProcess = [];
   
-  console.log(`📄 Targeting ${filesToProcess.length} critical files for vehicle data operations`);
+  // Try to get files from validation output first
+  const filesFromValidation = getFilesFromValidationOutput();
+  if (filesFromValidation.length > 0) {
+    filesToProcess = filesFromValidation;
+  } else {
+    // Fall back to pattern-based file discovery
+    console.log('Using pattern-based discovery to find vehicle data files...');
+    
+    for (const pattern of VEHICLE_DATA_PATTERNS) {
+      try {
+        const files = execSync(`find . -type f -path "${pattern}" | grep -v "node_modules" | grep -v "dist"`, 
+                              { encoding: 'utf8' }).trim().split('\n');
+        // Filter out empty strings
+        const validFiles = files.filter(Boolean);
+        if (validFiles.length > 0) {
+          console.log(`📄 Found ${validFiles.length} files matching pattern ${pattern}`);
+          filesToProcess.push(...validFiles);
+        }
+      } catch (error) {
+        // Ignore errors from find command
+      }
+    }
+    
+    // Remove duplicates
+    filesToProcess = [...new Set(filesToProcess)];
+  }
   
   if (filesToProcess.length === 0) {
-    console.log('⚠️ No critical files found to process');
+    console.log('⚠️ No files found to process');
     return;
   }
   

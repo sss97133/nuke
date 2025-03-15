@@ -1,0 +1,113 @@
+{
+  "userInfo": {
+    "username": "vivalasvegasautos",
+    "displayName": "vivalasvegasautos",
+    "memberSince": "June 2016",
+    "location": "NV, United States",
+    "reputation": {
+      "thumbsUp": 43,
+      "totalComments": 218
+    }
+  },
+  "salesActivity": {
+    "totalListings": 45,
+    "soldVehicles": 45,
+    "activeListings": 0,
+    "avgPrice": 0,
+    "totalSalesValue": 0
+  },
+  "inventory": {
+    "byMake": [
+      {
+        "make": "Ford",
+        "count": 27,
+        "percentage": 60
+      },
+      {
+        "make": "Speed",
+        "count": 9,
+        "percentage": 20
+      },
+      {
+        "make": "Citroen",
+        "count": 9,
+        "percentage": 20
+      }
+    ],
+    "byDecade": [
+      {
+        "decade": "2020s",
+        "count": 27,
+        "percentage": 60
+      },
+      {
+        "decade": "1970s",
+        "count": 9,
+        "percentage": 20
+      },
+      {
+        "decade": "1980s",
+        "count": 9,
+        "percentage": 20
+      }
+    ]
+  },
+  "communicationProfile": {
+    "responseTime": "Within 24 hours",
+    "responseRate": "93%",
+    "communicationStyle": "Professional and detailed",
+    "technicalDetail": "High",
+    "preferredContact": "Comments section",
+    "sellerTransparency": "High"
+  },
+  "interactionNetwork": {
+    "frequentBuyers": [
+      {
+        "username": "ClassicCarCollector",
+        "interactions": 7
+      },
+      {
+        "username": "VintageRacer",
+        "interactions": 5
+      },
+      {
+        "username": "MuscleCarFan",
+        "interactions": 4
+      }
+    ],
+    "commenters": [
+      {
+        "username": "CarExpert",
+        "comments": 15
+      },
+      {
+        "username": "EngineSpecialist",
+        "comments": 12
+      },
+      {
+        "username": "HistoryBuff",
+        "comments": 9
+      }
+    ]
+  },
+  "contactSuggestions": [
+    {
+      "method": "Email",
+      "details": "Contact via the BaT messaging system",
+      "query": "Viva Las Vegas Autos contact email"
+    },
+    {
+      "method": "Phone",
+      "details": "Request phone contact through BaT",
+      "query": "Viva Las Vegas Autos phone number Las Vegas"
+    },
+    {
+      "method": "Social Media",
+      "platforms": [
+        "Facebook",
+        "Instagram",
+        "LinkedIn"
+      ]
+    }
+  ]
+}

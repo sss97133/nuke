@@ -1,0 +1,19 @@
+{
+  "username": "Viva Las Vegas",
+  "count": 0,
+  "totalResults": 0,
+  "totalValue": 0,
+  "byMake": {},
+  "byDecade": {},
+  "listings": [],
+  "rawListings": [],
+  "metadata": {
+    "source": "bat",
+    "confidence": 0.95,
+    "timestamp": "2025-03-14T22:43:32.117Z",
+    "query": {
+      "type": "user_search",
+      "username": "Viva Las Vegas"
+    }
+  }
+}

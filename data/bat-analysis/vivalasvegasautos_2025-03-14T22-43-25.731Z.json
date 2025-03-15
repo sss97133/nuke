@@ -1,0 +1,19 @@
+{
+  "username": "vivalasvegasautos",
+  "count": 0,
+  "totalResults": 0,
+  "totalValue": 0,
+  "byMake": {},
+  "byDecade": {},
+  "listings": [],
+  "rawListings": [],
+  "metadata": {
+    "source": "bat",
+    "confidence": 0.95,
+    "timestamp": "2025-03-14T22:43:25.721Z",
+    "query": {
+      "type": "user_search",
+      "username": "vivalasvegasautos"
+    }
+  }
+}
