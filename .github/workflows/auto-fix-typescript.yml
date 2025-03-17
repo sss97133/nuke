@@ -114,7 +114,7 @@ jobs:
 
       - name: Create Pull Request if branch is not main
         if: (steps.auto-fix-typescript.outputs.changes_made == 'true' || steps.auto-fix-supabase.outputs.changes_made == 'true') && github.event.workflow_run.head_branch != 'main'
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "🤖 Auto-fix code issues in vehicle-centric components"
