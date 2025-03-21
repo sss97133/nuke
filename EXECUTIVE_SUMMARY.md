@@ -198,7 +198,7 @@ Create API integrations with existing industry players:
 
 ## Funding Requirements
 
-We are seeking a $X million seed investment to:
+We are seeking a $X seed investment to:
 
 1. **Complete the Digital Platform** ($X)
    - Core vehicle profile functionality
