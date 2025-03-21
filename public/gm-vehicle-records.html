@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classic GM Vehicle Service Records</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #d22730;
+            padding-bottom: 20px;
+        }
+        .logo {
+            max-width: 300px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #d22730;
+            margin-bottom: 10px;
+        }
+        .tagline {
+            font-style: italic;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+        }
+        .main-content {
+            flex: 2;
+            min-width: 300px;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .sidebar {
+            flex: 1;
+            min-width: 250px;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .service-highlights {
+            margin-top: 40px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .highlight-box {
+            flex: 1;
+            min-width: 200px;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #d22730;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .required:after {
+            content: " *";
+            color: #d22730;
+        }
+        .btn {
+            background-color: #d22730;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #b51f27;
+        }
+        .price-box {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .price {
+            font-size: 32px;
+            color: #d22730;
+            font-weight: bold;
+        }
+        .testimonials {
+            margin-top: 30px;
+        }
+        .testimonial {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .testimonial-text {
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+        .testimonial-author {
+            font-weight: bold;
+            text-align: right;
+        }
+        .steps {
+            margin: 30px 0;
+        }
+        .step {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .step-number {
+            background: #d22730;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .vehicles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .vehicle-brand {
+            background: #eee;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        footer {
+            margin-top: 50px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #666;
+        }
+        .faq {
+            margin-top: 40px;
+        }
+        .faq-item {
+            margin-bottom: 20px;
+        }
+        .faq-question {
+            font-weight: bold;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        .faq-answer {
+            padding-left: 20px;
+        }
+        .mobile-only {
+            display: none;
+        }
+        @media (max-width: 768px) {
+            .mobile-only {
+                display: block;
+                margin: 20px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="/placeholder.svg" alt="Classic GM Records Service Logo" class="logo">
+        <h1>Classic GM Vehicle Service Records</h1>
+        <p class="tagline">Your trusted source for authentic GM heritage documentation</p>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <h2>Access Official GM Service Records</h2>
+            <p>Are you restoring a classic GM vehicle? Need documentation for insurance, valuation, or authentication? We specialize in obtaining official service records directly from GM's Heritage Center Archive for your vintage vehicle.</p>
+            
+            <div class="vehicles">
+                <span class="vehicle-brand">Chevrolet</span>
+                <span class="vehicle-brand">GMC</span>
+                <span class="vehicle-brand">Buick</span>
+                <span class="vehicle-brand">Oldsmobile</span>
+                <span class="vehicle-brand">Pontiac</span>
+                <span class="vehicle-brand">Cadillac</span>
+                <span class="vehicle-brand">Saturn</span>
+                <span class="vehicle-brand">Hummer</span>
+            </div>
+            
+            <p>Our service handles the entire process on your behalf - saving you time, paperwork headaches, and ensuring your request is processed correctly the first time.</p>
+
+            <div class="steps">
+                <h3>How It Works</h3>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <strong>Submit your vehicle information</strong>
+                        <p>Fill out our simple form with your vehicle details, including VIN, make, model, and year.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <strong>We process your request</strong>
+                        <p>Our specialists submit your request directly to GM's Heritage Center Archive and follow up to ensure it's processed promptly.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <strong>Receive your documentation</strong>
+                        <p>Once received from GM, we'll deliver your complete service records in digital format within 14-21 business days.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="price-box mobile-only">
+                <h3>Our Service Fee</h3>
+                <div class="price">$149.99</div>
+                <p>Includes all GM archival fees and processing</p>
+                <button class="btn">Request Records Now</button>
+            </div>
+
+            <h3>Request Form</h3>
+            <form id="recordsRequestForm">
+                <div class="form-group">
+                    <label for="name" class="required">Full Name</label>
+                    <input type="text" id="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email" class="required">Email</label>
+                    <input type="email" id="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone" class="required">Phone</label>
+                    <input type="tel" id="phone" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="vin" class="required">Vehicle Identification Number (VIN)</label>
+                    <input type="text" id="vin" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="make" class="required">Make</label>
+                    <select id="make" required>
+                        <option value="">Select Make</option>
+                        <option value="Chevrolet">Chevrolet</option>
+                        <option value="GMC">GMC</option>
+                        <option value="Buick">Buick</option>
+                        <option value="Oldsmobile">Oldsmobile</option>
+                        <option value="Pontiac">Pontiac</option>
+                        <option value="Cadillac">Cadillac</option>
+                        <option value="Saturn">Saturn</option>
+                        <option value="Hummer">Hummer</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="model" class="required">Model</label>
+                    <input type="text" id="model" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="year" class="required">Year</label>
+                    <input type="number" id="year" min="1900" max="2025" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="additionalInfo">Additional Information (Optional)</label>
+                    <textarea id="additionalInfo" rows="4"></textarea>
+                </div>
+                
+                <button type="submit" class="btn">Submit Request</button>
+            </form>
+
+            <div class="service-highlights">
+                <div class="highlight-box">
+                    <h4>100% Official Documentation</h4>
+                    <p>All records come directly from GM's official Heritage Center Archive.</p>
+                </div>
+                <div class="highlight-box">
+                    <h4>Fast Turnaround</h4>
+                    <p>We expedite the process to get your records as quickly as possible.</p>
+                </div>
+                <div class="highlight-box">
+                    <h4>Restoration Ready</h4>
+                    <p>Ideal for restoration projects, insurance validation, and collectors.</p>
+                </div>
+            </div>
+
+            <div class="faq">
+                <h3>Frequently Asked Questions</h3>
+                
+                <div class="faq-item">
+                    <div class="faq-question">What kind of records can I receive?</div>
+                    <div class="faq-answer">
+                        <p>Depending on the vehicle and availability, records may include build sheets, shipping records, dealer invoice copies, factory options, and production information.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">How far back do GM's records go?</div>
+                    <div class="faq-answer">
+                        <p>GM maintains various records dating back to the early 1900s, but availability varies by brand, model, and year. The most complete records typically exist for vehicles from the 1960s forward.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">Why use your service instead of contacting GM directly?</div>
+                    <div class="faq-answer">
+                        <p>Our service handles all the paperwork, follows up on your request, and ensures proper documentation. We have experience with the specific requirements needed for successful retrieval, saving you time and potential frustration.</p>
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">How will I receive my records?</div>
+                    <div class="faq-answer">
+                        <p>Records are delivered digitally via secure email. Physical copies can be mailed for an additional fee.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sidebar">
+            <div class="price-box">
+                <h3>Our Service Fee</h3>
+                <div class="price">$149.99</div>
+                <p>Includes all GM archival fees and processing</p>
+                <button class="btn">Request Records Now</button>
+            </div>
+            
+            <div class="testimonials">
+                <h3>Customer Testimonials</h3>
+                
+                <div class="testimonial">
+                    <p class="testimonial-text">"I spent weeks trying to get records for my '69 Camaro with no success. Your service delivered everything I needed in just 12 days. Worth every penny!"</p>
+                    <p class="testimonial-author">- Michael R., Texas</p>
+                </div>
+                
+                <div class="testimonial">
+                    <p class="testimonial-text">"The build sheet you obtained confirmed my Chevelle was indeed a factory SS. Increased the value by thousands. Thank you!"</p>
+                    <p class="testimonial-author">- James T., Michigan</p>
+                </div>
+                
+                <div class="testimonial">
+                    <p class="testimonial-text">"Professional service from start to finish. The documentation helped me complete my restoration with confidence."</p>
+                    <p class="testimonial-author">- Sarah L., California</p>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h3>Why Documentation Matters</h3>
+                <p>Authentic GM service records can:</p>
+                <ul>
+                    <li>Verify original equipment and options</li>
+                    <li>Confirm matching numbers authenticity</li>
+                    <li>Increase resale value</li>
+                    <li>Assist with accurate restoration</li>
+                    <li>Provide historical context for your vehicle</li>
+                    <li>Support insurance claims and valuations</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>&copy; 2025 Classic GM Records Service. Not affiliated with General Motors Company.</p>
+        <p>We provide a third-party service to help customers obtain official GM Heritage Center Archive records.</p>
+    </footer>
+
+    <script>
+        document.getElementById("recordsRequestForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            // Collect form data
+            const formData = {
+                name: document.getElementById("name").value,
+                email: document.getElementById("email").value,
+                phone: document.getElementById("phone").value,
+                vin: document.getElementById("vin").value,
+                make: document.getElementById("make").value,
+                model: document.getElementById("model").value,
+                year: document.getElementById("year").value,
+                additionalInfo: document.getElementById("additionalInfo").value
+            };
+            
+            // Here you would send this data to your backend or email service
+            // For demonstration, we'll just alert the user
+            alert("Thank you for your request! We'll begin processing it immediately and contact you within 1 business day to confirm.");
+            
+            // In a real implementation, you would redirect to a thank you page
+            // or payment processing page
+            // window.location.href = "/thank-you";
+            
+            // For demo purposes, we'll just log the data
+            console.log("Form data:", formData);
+        });
+        
+        // Simple FAQ toggle functionality
+        const faqQuestions = document.querySelectorAll(".faq-question");
+        faqQuestions.forEach(question => {
+            question.addEventListener("click", function() {
+                const answer = this.nextElementSibling;
+                if (answer.style.display === "none" || answer.style.display === "") {
+                    answer.style.display = "block";
+                } else {
+                    answer.style.display = "none";
+                }
+            });
+        });
+    </script>
+</body>
+</html>

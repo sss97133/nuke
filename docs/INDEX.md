@@ -34,7 +34,8 @@ This index organizes all documentation files in order of importance, from founda
 19. [Ownership Components](./ownership-components.md) - Ownership and file upload component architecture
 20. [Contributing](./CONTRIBUTING.md) - Contribution workflow and branch strategy
 21. [Getting Started](./GETTING_STARTED.md) - Basic setup and installation guide
-22. [Timeline Testing](../TIMELINE_TESTING.md) - Vehicle timeline component testing procedures
+22. [GM Records Service](./GM_RECORDS_SERVICE.md) - Classic GM vehicle service records integration
+23. [Timeline Testing](../TIMELINE_TESTING.md) - Vehicle timeline component testing procedures
 
 ## Key Architectural Concepts
 
