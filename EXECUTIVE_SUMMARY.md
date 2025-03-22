@@ -198,7 +198,7 @@ Create API integrations with existing industry players:
 
 ## Funding Requirements
 
-We are seeking a $X million seed investment to:
+We are seeking a $X seed investment to:
 
 1. **Complete the Digital Platform** ($X)
    - Core vehicle profile functionality
@@ -251,8 +251,4 @@ Our impact extends beyond business metrics to transforming:
 By creating the definitive digital identity layer for vehicles, Nuke will become the foundation upon which the future of automotive ownership, investment, and appreciation is built.
 
 ## Contact Information
-
-[Founder Name]
-[Email Address]
-[Phone Number]
-[LinkedIn/Other Social]
+SSS97133

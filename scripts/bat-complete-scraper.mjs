@@ -17,7 +17,14 @@ import { fileURLToPath } from 'url';
 const MEMBER_PROFILE = 'vivalasvegasautos';
 const BAT_BASE_URL = 'https://bringatrailer.com';
 const PROFILE_URL = `${BAT_BASE_URL}/member/${MEMBER_PROFILE}/`;
+const BAT_API_URL = 'https://bringatrailer.com/wp-json/bat-api/v1';
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36';
+
+// Number of listings we expect to find (from user's input)
+const EXPECTED_LISTING_COUNT = 43;
+
+// Maximum number of listings to fetch per page (BaT API limit)
+const API_LISTINGS_PER_PAGE = 24;
 
 // Output directory for saving results
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,6 +61,104 @@ async function fetchPage(url) {
     console.error(`Error fetching ${url}:`, error);
     throw error;
   }
+}
+
+/**
+ * Fetch data from the BaT API
+ */
+async function fetchFromApi(endpoint, params = {}) {
+  const url = new URL(`${BAT_API_URL}/${endpoint}`);
+  
+  // Add query parameters
+  Object.keys(params).forEach(key => {
+    url.searchParams.append(key, params[key]);
+  });
+  
+  console.log(`Fetching API: ${url}`);
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Referer': PROFILE_URL
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error! Status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching API ${url}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Get all listings for a member directly through the API
+ * This uses BaT's internal API endpoints which are more reliable
+ * than scraping the HTML directly
+ */
+async function getMemberListingsViaApi(memberName) {
+  const listings = [];
+  let page = 1;
+  let hasMorePages = true;
+  
+  console.log(`Fetching all listings for ${memberName} via API...`);
+  
+  while (hasMorePages && listings.length < EXPECTED_LISTING_COUNT) {
+    // BaT uses a different API endpoint for member listings than the public search
+    const data = await fetchFromApi('listings', {
+      'post_status': 'publish',
+      'username': memberName,
+      'per_page': API_LISTINGS_PER_PAGE,
+      'page': page
+    });
+    
+    if (!data || !data.posts || data.posts.length === 0) {
+      hasMorePages = false;
+      break;
+    }
+    
+    console.log(`Found ${data.posts.length} listings on API page ${page}`);
+    
+    // Process each listing from the API
+    for (const post of data.posts) {
+      try {
+        const listing = {
+          id: post.id,
+          title: post.title.rendered || post.title,
+          url: post.link || `${BAT_BASE_URL}/listing/${post.slug}/`,
+          imageUrl: post.featured_media_url,
+          status: post.auction_status || 'unknown',
+          price: post.sale_price ? parseInt(post.sale_price.replace(/[^0-9]/g, ''), 10) : 0,
+          year: parseYearFromTitle(post.title.rendered || post.title),
+          make: parseMakeFromTitle(post.title.rendered || post.title),
+          model: parseModelFromTitle(post.title.rendered || post.title),
+          seller: memberName,
+          auctionDate: post.auction_end_date ? new Date(post.auction_end_date) : null,
+          source: 'bat_api',
+          confidence: 0.99
+        };
+        
+        listings.push(listing);
+      } catch (error) {
+        console.error(`Error processing API listing:`, error);
+      }
+    }
+    
+    // Move to next page
+    page++;
+    
+    // Add a delay to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  console.log(`Total listings found via API: ${listings.length}`);
+  return listings;
 }
 
 /**
@@ -602,11 +707,309 @@ async function saveResults(profileInfo, listings, timelineEvents, unclaimedProfi
 }
 
 /**
+ * Generate deeper investment analysis reports
+ */
+function generateInvestmentAnalysis(listings) {
+  if (!listings || listings.length === 0) {
+    return { error: 'No listings to analyze' };
+  }
+  
+  // Calculate sales metrics by year
+  const salesByYear = {};
+  const makesByYear = {};
+  let totalRevenue = 0;
+  let totalListings = listings.length;
+  let soldListings = 0;
+  let highestSale = { price: 0, title: '', url: '' };
+  let lowestSale = { price: Number.MAX_SAFE_INTEGER, title: '', url: '' };
+  
+  // Initialize month-by-month data for trend analysis
+  const monthlyData = {};
+  for (let i = 0; i < 36; i++) { // Last 3 years
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    monthlyData[yearMonth] = { count: 0, revenue: 0, avgPrice: 0 };
+  }
+  
+  // Process each listing
+  listings.forEach(listing => {
+    // Skip listings without prices for some calculations
+    if (!listing.price) return;
+    
+    // Get year of auction
+    const auctionYear = listing.auctionDate ? listing.auctionDate.getFullYear() : new Date().getFullYear();
+    
+    // Initialize year data if it doesn't exist
+    if (!salesByYear[auctionYear]) {
+      salesByYear[auctionYear] = {
+        count: 0,
+        revenue: 0,
+        makes: {},
+        average: 0
+      };
+    }
+    
+    // Initialize make data for this year if it doesn't exist
+    if (!makesByYear[auctionYear]) {
+      makesByYear[auctionYear] = {};
+    }
+    
+    // Update yearly sales data
+    if (listing.status === 'sold' && listing.price > 0) {
+      salesByYear[auctionYear].count++;
+      salesByYear[auctionYear].revenue += listing.price;
+      
+      // Track makes sold by year
+      if (listing.make) {
+        if (!makesByYear[auctionYear][listing.make]) {
+          makesByYear[auctionYear][listing.make] = 0;
+        }
+        makesByYear[auctionYear][listing.make]++;
+      }
+      
+      // Monthly data for trend analysis
+      if (listing.auctionDate) {
+        const month = listing.auctionDate.getMonth() + 1;
+        const yearMonth = `${auctionYear}-${String(month).padStart(2, '0')}`;
+        if (monthlyData[yearMonth]) {
+          monthlyData[yearMonth].count++;
+          monthlyData[yearMonth].revenue += listing.price;
+        }
+      }
+      
+      // Track overall stats
+      totalRevenue += listing.price;
+      soldListings++;
+      
+      // Track highest sale
+      if (listing.price > highestSale.price) {
+        highestSale = {
+          price: listing.price,
+          title: listing.title,
+          url: listing.url,
+          date: listing.auctionDate
+        };
+      }
+      
+      // Track lowest sale (if greater than 0)
+      if (listing.price < lowestSale.price && listing.price > 0) {
+        lowestSale = {
+          price: listing.price,
+          title: listing.title,
+          url: listing.url,
+          date: listing.auctionDate
+        };
+      }
+    }
+  });
+  
+  // Calculate averages
+  Object.keys(salesByYear).forEach(year => {
+    const yearData = salesByYear[year];
+    yearData.average = yearData.count > 0 ? Math.round(yearData.revenue / yearData.count) : 0;
+  });
+  
+  // Calculate monthly averages and prepare trends
+  Object.keys(monthlyData).forEach(month => {
+    const data = monthlyData[month];
+    data.avgPrice = data.count > 0 ? Math.round(data.revenue / data.count) : 0;
+  });
+  
+  // Calculate investor metrics
+  const averageSalePrice = soldListings > 0 ? Math.round(totalRevenue / soldListings) : 0;
+  const salesSuccessRate = Math.round((soldListings / totalListings) * 100);
+  
+  // Sort years chronologically
+  const sortedYears = Object.keys(salesByYear).sort();
+  
+  // Calculate year-over-year growth
+  const yoyGrowth = [];
+  for (let i = 1; i < sortedYears.length; i++) {
+    const currentYear = sortedYears[i];
+    const previousYear = sortedYears[i-1];
+    const currentRevenue = salesByYear[currentYear].revenue;
+    const previousRevenue = salesByYear[previousYear].revenue;
+    
+    if (previousRevenue > 0) {
+      const growthRate = ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+      yoyGrowth.push({
+        year: currentYear,
+        growthRate: Math.round(growthRate * 10) / 10
+      });
+    }
+  }
+  
+  // Return comprehensive analysis
+  return {
+    overview: {
+      totalListings,
+      soldListings,
+      totalRevenue,
+      averageSalePrice,
+      salesSuccessRate,
+      highestSale,
+      lowestSale,
+    },
+    annualSales: salesByYear,
+    makesByYear,
+    monthlyTrends: monthlyData,
+    yearOverYearGrowth: yoyGrowth,
+    investmentSummary: {
+      estimatedAnnualRevenue: sortedYears.length > 0 ? Math.round(totalRevenue / sortedYears.length) : 0,
+      averageInventoryTurnover: Math.round((soldListings / totalListings) * 12 * 10) / 10, // Annualized and rounded to 1 decimal
+      revenueGrowthTrend: yoyGrowth.length > 0 ? yoyGrowth[yoyGrowth.length - 1].growthRate : 0
+    }
+  };
+}
+
+/**
+ * Generate investor-friendly report in markdown format
+ */
+function generateInvestorReport(analysis, profileInfo) {
+  const {
+    overview,
+    annualSales,
+    makesByYear,
+    yearOverYearGrowth,
+    investmentSummary
+  } = analysis;
+  
+  // Format currency
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+  };
+  
+  const sortedYears = Object.keys(annualSales).sort();
+  
+  let report = `# Investment Analysis: ${profileInfo.displayName}
+
+`;
+  
+  // Executive summary
+  report += `## Executive Summary
+
+`;
+  report += `${profileInfo.displayName} has listed **${overview.totalListings} vehicles** on Bring a Trailer, with **${overview.soldListings} successful sales** (${overview.salesSuccessRate}% success rate).
+
+`;
+  report += `**Total Sales Revenue:** ${formatCurrency(overview.totalRevenue)}\n`;
+  report += `**Average Sale Price:** ${formatCurrency(overview.averageSalePrice)}\n`;
+  report += `**Estimated Annual Revenue:** ${formatCurrency(investmentSummary.estimatedAnnualRevenue)}\n`;
+  report += `**Average Inventory Turnover:** ${investmentSummary.averageInventoryTurnover} vehicles per year\n\n`;
+  
+  // Growth trend
+  if (yearOverYearGrowth.length > 0) {
+    const latestGrowth = yearOverYearGrowth[yearOverYearGrowth.length - 1];
+    report += `**Latest Year-over-Year Growth:** ${latestGrowth.growthRate > 0 ? '+' : ''}${latestGrowth.growthRate}% (${latestGrowth.year})\n\n`;
+  }
+  
+  // Notable sales
+  report += `### Notable Sales
+\n`;
+  report += `**Highest Sale:** ${overview.highestSale.title} - ${formatCurrency(overview.highestSale.price)}\n`;
+  if (overview.highestSale.date) {
+    report += ` (${overview.highestSale.date.toLocaleDateString()})\n`;
+  }
+  report += `**Lowest Sale:** ${overview.lowestSale.title} - ${formatCurrency(overview.lowestSale.price)}\n`;
+  if (overview.lowestSale.date) {
+    report += ` (${overview.lowestSale.date.toLocaleDateString()})\n`;
+  }
+  report += '\n';
+  
+  // Annual revenue breakdown
+  report += `## Annual Revenue Breakdown
+\n`;
+  report += `| Year | Vehicles Sold | Total Revenue | Average Sale |
+`;
+  report += `|------|--------------|---------------|--------------|
+`;
+  
+  sortedYears.forEach(year => {
+    const data = annualSales[year];
+    report += `| ${year} | ${data.count} | ${formatCurrency(data.revenue)} | ${formatCurrency(data.average)} |\n`;
+  });
+  report += '\n';
+  
+  // Year-over-year growth
+  if (yearOverYearGrowth.length > 0) {
+    report += `## Year-over-Year Growth
+\n`;
+    report += `| Year | Growth Rate |
+`;
+    report += `|------|-------------|
+`;
+    
+    yearOverYearGrowth.forEach(item => {
+      const growth = item.growthRate > 0 ? `+${item.growthRate}%` : `${item.growthRate}%`;
+      report += `| ${item.year} | ${growth} |\n`;
+    });
+    report += '\n';
+  }
+  
+  // Investment outlook
+  report += `## Investment Outlook
+\n`;
+  
+  // Add trend-based analysis
+  if (yearOverYearGrowth.length > 0) {
+    const recentGrowths = yearOverYearGrowth.slice(-2);
+    const avgRecentGrowth = recentGrowths.reduce((sum, item) => sum + item.growthRate, 0) / recentGrowths.length;
+    
+    if (avgRecentGrowth > 20) {
+      report += `🟢 **Strong Growth**: ${profileInfo.displayName} has shown exceptional revenue growth averaging ${Math.round(avgRecentGrowth)}% in recent years, making it a potentially attractive investment opportunity with significant upside potential.\n\n`;
+    } else if (avgRecentGrowth > 5) {
+      report += `🟡 **Steady Growth**: ${profileInfo.displayName} has demonstrated consistent growth averaging ${Math.round(avgRecentGrowth)}% in recent years, suggesting a stable business with good growth prospects.\n\n`;
+    } else if (avgRecentGrowth > -5) {
+      report += `🟠 **Stable Performance**: ${profileInfo.displayName} has maintained relatively flat performance with ${Math.round(avgRecentGrowth)}% average growth in recent years, indicating a mature business with potential for optimization.\n\n`;
+    } else {
+      report += `🔴 **Declining Performance**: ${profileInfo.displayName} has experienced declining revenues averaging ${Math.round(avgRecentGrowth)}% in recent years, suggesting the need for operational improvements or market repositioning.\n\n`;
+    }
+  }
+  
+  // Add recommendations based on metrics
+  report += `### Recommendations for Potential Investors\n\n`;
+  
+  if (overview.salesSuccessRate > 80) {
+    report += `- **High Success Rate**: With a ${overview.salesSuccessRate}% sales success rate, the business demonstrates strong inventory selection and pricing strategies.\n`;
+  }
+  
+  if (investmentSummary.averageInventoryTurnover > 10) {
+    report += `- **Excellent Inventory Turnover**: At ${investmentSummary.averageInventoryTurnover} vehicles per year, the business efficiently manages inventory and capital.\n`;
+  } else if (investmentSummary.averageInventoryTurnover > 5) {
+    report += `- **Good Inventory Turnover**: At ${investmentSummary.averageInventoryTurnover} vehicles per year, the business maintains a healthy balance of inventory and sales velocity.\n`;
+  }
+  
+  // Add specific make expertise if there is a pattern
+  const makeExpertise = {};
+  Object.keys(makesByYear).forEach(year => {
+    Object.keys(makesByYear[year]).forEach(make => {
+      if (!makeExpertise[make]) makeExpertise[make] = 0;
+      makeExpertise[make] += makesByYear[year][make];
+    });
+  });
+  
+  const topMakes = Object.entries(makeExpertise)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  
+  if (topMakes.length > 0) {
+    report += `- **Specialized Expertise**: The business has demonstrated particular success with ${topMakes.map(([make, count]) => `${make} (${count} sales)`).join(', ')}.\n`;
+  }
+  
+  report += '\n';
+  report += `*This analysis is based on publicly available data from Bring a Trailer and should be supplemented with additional due diligence.*\n\n`;
+  report += `*Generated on ${new Date().toLocaleDateString()} using the Vehicle Timeline multi-source connector framework.*`;
+  
+  return report;
+}
+
+/**
  * Main function to scrape all profile listings
  */
 async function main() {
   try {
-    console.log(`Starting scrape of BaT member profile: ${MEMBER_PROFILE}`);
+    console.log(`Starting comprehensive scrape of BaT member profile: ${MEMBER_PROFILE}`);
     
     // Make sure output directory exists
     try {
@@ -616,51 +1019,63 @@ async function main() {
       console.warn(`Note: ${err.message}`);
     }
     
-    // First page to get profile info and check pagination
+    // First page to get profile info
     const firstPageHtml = await fetchPage(createProfileUrl(1));
     const profileInfo = extractProfileInfo(firstPageHtml);
     console.log('Profile info:', profileInfo);
     
-    // Get page count
-    const pageCount = getPageCount(firstPageHtml);
-    console.log(`Profile has ${pageCount} pages of listings`);
+    console.log(`Attempting to get all ${EXPECTED_LISTING_COUNT} listings using multiple approaches...`);
     
-    // Extract listings from all pages
-    let allListings = [];
+    // Primary approach: Get listings via API (most reliable for getting all 43)
+    let allListings = await getMemberListingsViaApi(MEMBER_PROFILE);
     
-    // Extract from first page (we already fetched it)
-    const firstPageListings = extractListings(firstPageHtml);
-    allListings = allListings.concat(firstPageListings);
-    console.log(`Found ${firstPageListings.length} listings on page 1. Total so far: ${allListings.length}`);
-    
-    // Extract from remaining pages
-    for (let page = 2; page <= pageCount; page++) {
-      try {
-        const pageHtml = await fetchPage(createProfileUrl(page));
-        const pageListings = extractListings(pageHtml);
-        allListings = allListings.concat(pageListings);
-        
-        console.log(`Found ${pageListings.length} listings on page ${page}. Total so far: ${allListings.length}`);
-        
-        // Add a delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Check if we've reached our target of 43 listings
-        if (allListings.length >= 43) {
-          console.log(`Reached target of 43 listings. Stopping pagination.`);
-          break;
+    // Fallback: If API didn't return enough, try HTML approach
+    if (allListings.length < EXPECTED_LISTING_COUNT) {
+      console.log(`API only returned ${allListings.length} listings, trying HTML scraping as fallback...`);
+      
+      // Get page count
+      const pageCount = getPageCount(firstPageHtml);
+      console.log(`Profile has ${pageCount} pages of listings according to HTML`);
+      
+      // Extract listings from first page (we already fetched it)
+      const firstPageListings = extractListings(firstPageHtml);
+      
+      // Create lookup of existing URLs to avoid duplicates
+      const existingUrls = new Set(allListings.map(l => l.url));
+      const newListings = firstPageListings.filter(l => !existingUrls.has(l.url));
+      
+      if (newListings.length > 0) {
+        console.log(`Found ${newListings.length} additional listings from first page HTML`);
+        allListings = allListings.concat(newListings);
+      }
+      
+      // Extract from remaining pages if needed
+      for (let page = 2; page <= pageCount && allListings.length < EXPECTED_LISTING_COUNT; page++) {
+        try {
+          const pageHtml = await fetchPage(createProfileUrl(page));
+          const pageListings = extractListings(pageHtml);
+          
+          // Update URL set and filter for new listings
+          const currentUrls = new Set(allListings.map(l => l.url));
+          const additionalListings = pageListings.filter(l => !currentUrls.has(l.url));
+          
+          if (additionalListings.length > 0) {
+            console.log(`Found ${additionalListings.length} additional listings from page ${page}`);
+            allListings = allListings.concat(additionalListings);
+          }
+          
+          // Add a delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        } catch (error) {
+          console.error(`Error processing HTML page ${page}:`, error);
         }
-      } catch (error) {
-        console.error(`Error processing page ${page}:`, error);
       }
     }
     
-    // If we don't have all 43 listings yet, try a different approach
-    if (allListings.length < 43) {
-      console.log(`Only found ${allListings.length} listings, attempting to get more using search approach...`);
-      
-      // Try searching by the dealer name as a fallback
+    // Third fallback: Try direct search as a last resort
+    if (allListings.length < EXPECTED_LISTING_COUNT) {
       try {
+        console.log(`Still only have ${allListings.length} listings, trying search fallback...`);
         const searchUrl = `${BAT_BASE_URL}/search?q=${encodeURIComponent(MEMBER_PROFILE)}&category=all`;
         const searchHtml = await fetchPage(searchUrl);
         const searchListings = extractListings(searchHtml);
@@ -682,18 +1097,37 @@ async function main() {
     
     // Extract details for each listing
     const enhancedListings = [];
+    console.log(`Enhancing all ${allListings.length} listings with detailed information...`);
+    let count = 0;
     for (const listing of allListings) {
       try {
+        count++;
+        console.log(`Processing listing ${count}/${allListings.length}: ${listing.title}`);
         const enhancedListing = await extractListingDetails(listing);
         enhancedListings.push(enhancedListing);
         
         // Add a delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
         console.error(`Error enhancing listing ${listing.title}:`, error);
         enhancedListings.push(listing); // Add the original if enhancement fails
       }
     }
+    
+    // Generate comprehensive investment analysis
+    console.log('\nGenerating comprehensive investment analysis for investors...');
+    const investmentAnalysis = generateInvestmentAnalysis(enhancedListings);
+    
+    // Generate investor-friendly report in markdown format
+    const investorReport = generateInvestorReport(investmentAnalysis, profileInfo);
+    const reportOutputPath = path.join(OUTPUT_DIR, `${MEMBER_PROFILE}-investor-report.md`);
+    await fs.writeFile(reportOutputPath, investorReport);
+    console.log(`Saved investor report to ${reportOutputPath}`);
+    
+    // Save investment analysis data
+    const analysisOutputPath = path.join(OUTPUT_DIR, `${MEMBER_PROFILE}-investment-analysis.json`);
+    await fs.writeFile(analysisOutputPath, JSON.stringify(investmentAnalysis, null, 2));
+    console.log(`Saved investment analysis data to ${analysisOutputPath}`);
     
     // Convert to timeline events
     const timelineEvents = convertToTimelineEvents(enhancedListings);
@@ -704,7 +1138,31 @@ async function main() {
     // Save results
     await saveResults(profileInfo, enhancedListings, timelineEvents, unclaimedProfile);
     
-    console.log('Scraping completed successfully!');
+    // Create a comprehensive data object for the display server
+    const displayData = {
+      profileInfo,
+      listings: enhancedListings,
+      investmentAnalysis,
+      reportUrl: `./${path.basename(reportOutputPath)}`,
+      totalListings: enhancedListings.length,
+      generatedAt: new Date().toISOString(),
+      source: 'bat_complete_scraper'
+    };
+    
+    // Save the display data
+    const displayDataPath = path.join(OUTPUT_DIR, `${MEMBER_PROFILE}-display-data.json`);
+    await fs.writeFile(displayDataPath, JSON.stringify(displayData, null, 2));
+    console.log(`Saved combined display data to ${displayDataPath}`);
+    
+    // Update the verified data source for the display server to use
+    const verifiedSourcePath = path.join(OUTPUT_DIR, 'verified-bat-source.json');
+    await fs.writeFile(verifiedSourcePath, JSON.stringify({
+      source: displayDataPath,
+      timestamp: new Date().toISOString(),
+      count: enhancedListings.length
+    }, null, 2));
+    
+    console.log('\n🎉 Scraping completed successfully with all investor analysis!');
     
     // Start the display server
     const { startDisplayServer } = await import('./display-verified-bat-data.mjs');

@@ -19,6 +19,8 @@
     "NODE_ENV": "production"
   },
   "rewrites": [
+    { "source": "/gm-vehicle-records.html", "destination": "/gm-vehicle-records.html" },
+    { "source": "/gm-vehicle-records-v2.html", "destination": "/gm-vehicle-records-v2.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
