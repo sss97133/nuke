@@ -45,6 +45,10 @@
     "test": "NODE_OPTIONS='--max-old-space-size=8192' vitest",
     "test:ci": "vitest run --coverage",
     "test:watch": "NODE_OPTIONS='--max-old-space-size=8192' vitest watch",
+    "test:spatiallm": "vitest src/services/spatiallm/__tests__/WorkspaceProcessor.test.ts",
+    "test:spatiallm:watch": "vitest watch src/services/spatiallm/__tests__/WorkspaceProcessor.test.ts",
+    "test:spatiallm:integration": "vitest src/integrations/spatiallm/__tests__/SpatialLMIntegration.test.ts",
+    "test:spatiallm:integration:watch": "vitest watch src/integrations/spatiallm/__tests__/SpatialLMIntegration.test.ts",
     "postbuild": "echo 'Build completed successfully!'",
     "verify:docs": "node scripts/verify-docs.js"
   },
@@ -85,6 +89,7 @@
     "@types/dompurify": "^3.2.0",
     "@types/marked": "^6.0.0",
     "axios": "^1.8.3",
+    "canvas": "^3.1.0",
     "chalk": "^5.4.1",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
