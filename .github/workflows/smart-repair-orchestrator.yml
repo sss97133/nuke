@@ -35,10 +35,27 @@ jobs:
           mkdir -p .repair/analysis
           
           # Check for common files
-          [ -f package.json ] && echo "HAS_PACKAGE_JSON=true" >> $GITHUB_ENV || echo "HAS_PACKAGE_JSON=false" >> $GITHUB_ENV
-          [ -f tsconfig.json ] && echo "HAS_TSCONFIG=true" >> $GITHUB_ENV || echo "HAS_TSCONFIG=false" >> $GITHUB_ENV
-          [ -f docker-compose.yml ] || [ -f docker-compose.yaml ] && echo "HAS_DOCKER_COMPOSE=true" >> $GITHUB_ENV || echo "HAS_DOCKER_COMPOSE=false" >> $GITHUB_ENV
-          [ -f Dockerfile ] && echo "HAS_DOCKERFILE=true" >> $GITHUB_ENV || echo "HAS_DOCKERFILE=false" >> $GITHUB_ENV
+          if [ -f package.json ]; then
+            echo "HAS_PACKAGE_JSON=true" >> $GITHUB_ENV
+          else
+            echo "HAS_PACKAGE_JSON=false" >> $GITHUB_ENV
+          fi
+          
+          if [ -f tsconfig.json ]; then
+            echo "HAS_TSCONFIG=true" >> $GITHUB_ENV
+          else
+            echo "HAS_TSCONFIG=false" >> $GITHUB_ENV
+          fi
+          if [ -f docker-compose.yml ] || [ -f docker-compose.yaml ]; then
+            echo "HAS_DOCKER_COMPOSE=true" >> $GITHUB_ENV
+          else
+            echo "HAS_DOCKER_COMPOSE=false" >> $GITHUB_ENV
+          fi
+          if [ -f Dockerfile ]; then
+            echo "HAS_DOCKERFILE=true" >> $GITHUB_ENV
+          else
+            echo "HAS_DOCKERFILE=false" >> $GITHUB_ENV
+          fi
           
           # Identify repository type
           if [ -f supabase/config.toml ]; then
