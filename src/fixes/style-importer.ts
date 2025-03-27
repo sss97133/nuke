@@ -5,6 +5,8 @@
  * It helps prevent style loading issues in different environments.
  */
 
+/* global console */
+
 // Import global styles
 import '../index.css';
 import '../App.css';
@@ -17,7 +19,7 @@ import '../pages/VehicleTimelinePage.css';
 
 console.log('Styles imported successfully');
 
-export default function ensureStyles() {
+export default function ensureStyles(): boolean {
   // This function is just a wrapper to ensure the imports above are included
   return true;
-}
+} 
