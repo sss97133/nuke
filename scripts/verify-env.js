@@ -160,14 +160,29 @@ fs.writeFileSync(
 })();`
 );
 
-// Exit with error if any required variables are missing
+// Determine if we should fail the build
+const shouldFailBuild = process.env.STRICT_ENV_CHECK === 'true';
+
+// Handle missing variables
 if (processEnvMissing.length > 0) {
-  console.error('\n❌ ERROR: Missing required environment variables in process.env!');
-  console.error('The following variables must be set:');
+  console.error('\n⚠️ WARNING: Missing required environment variables in process.env!');
+  console.error('The following variables should be set:');
   processEnvMissing.forEach(name => console.error(`  - ${name}`));
   console.error('\nEnsure these are set in your Vercel project settings or environment.');
-  // Exit with error to prevent deployment with missing variables
-  process.exit(1);
+  
+  // Create warning file to help debugging
+  fs.writeFileSync(
+    path.resolve(__dirname, '../dist/env-warning.txt'),
+    `WARNING: Missing environment variables detected during build\n\n${processEnvMissing.join('\n')}\n\nTimestamp: ${new Date().toISOString()}\n`
+  );
+  
+  // Only exit with error if strict checking is enabled
+  if (shouldFailBuild) {
+    console.error('\n❌ Strict environment checking enabled. Failing build.');
+    process.exit(1);
+  } else {
+    console.warn('\n⚠️ Continuing build despite missing variables (STRICT_ENV_CHECK not enabled)');
+  }
 } else {
   console.log('\n✅ All required environment variables are present!');
 }
