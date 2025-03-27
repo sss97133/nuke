@@ -45,6 +45,10 @@ jobs:
           VITE_APP_DESCRIPTION: "Vehicle Management Platform"
           NODE_OPTIONS: "--max-old-space-size=4096"
           CI: "true"
+          # Critical Supabase credentials from GitHub secrets
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
         run: |
           # Run build with verbose logging
           echo "Running build in Docker container"
@@ -64,6 +68,14 @@ jobs:
             echo "✅ Build directory exists"
             ls -la dist/
             find dist -type f | wc -l
+            
+            # Check for window.__env in the HTML for three-tier fallback
+            if grep -q "window.__env" dist/index.html; then
+              echo "✅ Environment variables properly injected for runtime"
+            else
+              echo "⚠️ Runtime environment variables may be missing - injecting fallback"
+              sed -i 's|</head>|<script>window.__env = { VITE_SUPABASE_URL: "$VITE_SUPABASE_URL", VITE_SUPABASE_ANON_KEY: "$VITE_SUPABASE_ANON_KEY" };</script></head>|' dist/index.html
+            fi
           else
             echo "❌ No dist directory found - creating empty directory"
             mkdir -p dist

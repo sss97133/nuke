@@ -6,11 +6,19 @@ ARG VITE_APP_NAME="Nuke"
 ARG VITE_APP_DESCRIPTION="Vehicle Management Platform"
 ARG NODE_OPTIONS="--max-old-space-size=4096"
 
+# Supabase credentials - these need to be provided at build time
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_SUPABASE_SERVICE_KEY
+
 # Set environment variables
 ENV NODE_ENV=${NODE_ENV}
 ENV VITE_APP_NAME=${VITE_APP_NAME}
 ENV VITE_APP_DESCRIPTION=${VITE_APP_DESCRIPTION}
 ENV NODE_OPTIONS=${NODE_OPTIONS}
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+ENV VITE_SUPABASE_SERVICE_KEY=${VITE_SUPABASE_SERVICE_KEY}
 ENV CI=true
 
 # Set working directory
@@ -41,10 +49,13 @@ COPY build.mjs ./
 # Copy source files
 COPY src/ ./src/
 COPY public/ ./public/
+COPY scripts/ ./scripts/
 
 # Build with fallback mechanism
 RUN echo "Running primary build method..." && \
-    (npx tsc && npx vite build || \
+    (npx tsc && npx vite build && \
+     # Run environment variable injection script if it exists
+     (test -f scripts/inject-env.js && node scripts/inject-env.js || echo "No env injection script found") || \
      (echo "Primary build failed, trying alternative..." && \
       node build.mjs || \
       echo "All build attempts failed but continuing"))
