@@ -47,7 +47,6 @@ const VehicleDetail = () => {
         console.info('Vehicle ID:', id);
         
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
           .from('vehicles')
           .select('*')
           .eq('id', id)

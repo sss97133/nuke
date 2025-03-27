@@ -91,45 +91,64 @@ const getEnvValue = (key: string): string => {
   return '';
 };
 
-// Add type definition for window.__env
+// Add type definition for window.__env and reconnection function
 declare global {
   interface Window {
     __env?: Record<string, string>;
+    __reconnectSupabase?: () => boolean;
   }
 }
 
 const supabaseUrl = getEnvValue('VITE_SUPABASE_URL');
 const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
 
-// Validate environment configuration
+// Get current environment
+const environment = typeof process !== 'undefined' && process.env && process.env.NODE_ENV 
+  ? process.env.NODE_ENV 
+  : (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE) 
+    ? import.meta.env.MODE 
+    : 'production';
+
+// More resilient handling of missing credentials
 if (!supabaseUrl || !supabaseAnonKey) {
-  const environment = typeof process !== 'undefined' && process.env && process.env.NODE_ENV 
-    ? process.env.NODE_ENV 
-    : (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE) 
-      ? import.meta.env.MODE 
-      : 'production';
-      
-  console.error(`Invalid configuration: missing Supabase credentials for environment ${environment}`);
-  console.error('VITE_SUPABASE_URL present:', !!supabaseUrl);
-  console.error('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
+  // Log warning but don't crash the app immediately
+  console.warn(`⚠️ Missing Supabase credentials for environment ${environment}`);
+  console.warn('VITE_SUPABASE_URL present:', !!supabaseUrl);
+  console.warn('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
   
-  // In production, display a more user-friendly error
-  if (typeof document !== 'undefined') {
-    const rootElement = document.getElementById('app') || document.body;
-    if (rootElement) {
-      rootElement.innerHTML = `
-        <div style="padding: 20px; font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #e11d48;">Configuration Error</h2>
-          <p>The application cannot connect to its backend services due to missing configuration.</p>
-          <p>If you're the site owner, please ensure environment variables are correctly set in Vercel.</p>
-          <p><strong>Environment:</strong> ${environment}</p>
-        </div>
-      `;
-    }
+  // In browser environments, add a hidden error state
+  // but let the app attempt to load
+  if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+    // Create a global reconnection function
+    window.__reconnectSupabase = () => {
+      try {
+        // Try to get values again (may be set by async scripts)
+        const retryUrl = getEnvValue('VITE_SUPABASE_URL');
+        const retryKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
+        
+        if (retryUrl && retryKey) {
+          console.log('Found Supabase credentials, reconnecting...');
+          window.location.reload();
+          return true;
+        }
+      } catch (e) {
+        console.error('Reconnection failed:', e);
+      }
+      return false;
+    };
+    
+    // Try reconnection after a delay (env vars might be set async)
+    setTimeout(() => {
+      if (window.__reconnectSupabase) {
+        window.__reconnectSupabase();
+      }
+    }, 1000);
   }
   
-  // Still throw error for non-browser environments
-  throw new Error(`Invalid Supabase configuration: missing credentials for environment ${environment}`);
+  // In non-browser environments or development, throw error
+  if (environment !== 'production' || typeof document === 'undefined') {
+    throw new Error(`Invalid Supabase configuration: missing credentials for environment ${environment}`);
+  }
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);

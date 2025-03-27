@@ -27,7 +27,6 @@ export const Profile = () => {
       try {
         setLoadingUsername(true);
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
           .from('profiles')
           .select('username')
           .eq('id', userId)

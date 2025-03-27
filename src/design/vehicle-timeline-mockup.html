@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuke - Vehicle Digital Lifecycle</title>
+  <style>
+    :root {
+      /* Color Variables Based on Your UI Components */
+      --primary: #3b82f6;
+      --primary-dark: #2563eb;
+      --secondary: #10b981;
+      --background: #f8fafc;
+      --card-bg: #ffffff;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --info: #3b82f6;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    body {
+      background-color: var(--background);
+      color: var(--text-primary);
+      padding: 2rem;
+    }
+    
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+    
+    .section {
+      margin-bottom: 2rem;
+      border: 1px dashed #ccc;
+      padding: 1rem;
+      border-radius: 8px;
+      position: relative;
+    }
+    
+    .section-title {
+      position: absolute;
+      top: -12px;
+      left: 16px;
+      background: var(--background);
+      padding: 0 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    
+    h1, h2, h3 {
+      margin-bottom: 1rem;
+    }
+    
+    /* Navigation */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0;
+      margin-bottom: 2rem;
+    }
+    
+    .logo {
+      font-weight: 700;
+      font-size: 1.5rem;
+    }
+    
+    /* Timeline Section */
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .timeline-filters {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .filter-chip {
+      padding: 0.25rem 0.75rem;
+      background: var(--background);
+      border-radius: 16px;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    
+    .filter-chip.active {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .timeline-events {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .timeline-event {
+      display: flex;
+      padding: 1rem;
+      background: var(--background);
+      border-radius: 8px;
+      border-left: 4px solid var(--primary);
+    }
+    
+    .event-date {
+      min-width: 100px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    
+    .event-content {
+      flex: 1;
+    }
+    
+    .event-title {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .event-description {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    
+    .event-source {
+      display: inline-block;
+      padding: 0.125rem 0.375rem;
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--primary);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    
+    .event-confidence {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-left: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    
+    .confidence-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    .high-confidence {
+      background-color: var(--success);
+    }
+    
+    .medium-confidence {
+      background-color: var(--warning);
+    }
+    
+    .low-confidence {
+      background-color: var(--error);
+    }
+    
+    /* Connector Framework Section */
+    .connector-framework {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+    
+    .connector-card {
+      padding: 1rem;
+      background: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .connector-title {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .connector-icon {
+      width: 24px;
+      height: 24px;
+      background: var(--primary);
+      border-radius: 4px;
+    }
+    
+    .connector-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      margin-top: 1rem;
+    }
+    
+    /* Physical Verification Section */
+    .verification-center {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .verification-card {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--background);
+      border-radius: 8px;
+    }
+    
+    .verification-image {
+      width: 120px;
+      height: 80px;
+      background: #ddd;
+      border-radius: 4px;
+    }
+    
+    .verification-details {
+      flex: 1;
+    }
+    
+    /* Investment Platform Section */
+    .investment-platform {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1rem;
+    }
+    
+    .investment-chart {
+      height: 200px;
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .investment-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    
+    .stat-card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-title {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+    
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    
+    .stat-trend {
+      font-size: 0.875rem;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Button styles */
+    .button {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background-color 0.2s;
+    }
+    
+    .button-primary {
+      background: var(--primary);
+      color: white;
+      border: none;
+    }
+    
+    .button-secondary {
+      background: white;
+      color: var(--primary);
+      border: 1px solid var(--border);
+    }
+    
+    .button-primary:hover {
+      background: var(--primary-dark);
+    }
+    
+    .button-secondary:hover {
+      background: var(--background);
+    }
+
+    /* Design Notes */
+    .design-notes {
+      background: #fff8c5;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .design-notes h3 {
+      color: #854d0e;
+    }
+
+    .design-notes ul {
+      margin-left: 1.5rem;
+    }
+
+    .design-notes li {
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="design-notes">
+      <h3>Design Notes</h3>
+      <p>This HTML mockup represents the key components that will be created in Figma. The structure follows the vehicle-centric architecture with these main sections:</p>
+      <ul>
+        <li><strong>Vehicle Timeline</strong>: Displays chronological events from multiple data sources with confidence scoring</li>
+        <li><strong>Connector Framework</strong>: Shows the various data sources integrated (BaT, NHTSA, etc.)</li>
+        <li><strong>Physical Verification</strong>: Represents the PTZ verification centers</li>
+        <li><strong>Investment Platform</strong>: Shows the fractional investment model</li>
+      </ul>
+      <p>The design uses real vehicle data representations rather than mock data, as per your preference.</p>
+    </div>
+
+    <div class="nav">
+      <div class="logo">NUKE</div>
+      <div class="button button-primary">Add Vehicle</div>
+    </div>
+
+    <!-- Vehicle Information Header -->
+    <div class="section">
+      <span class="section-title">VEHICLE HEADER</span>
+      <h1>1967 Ferrari 275 GTB/4</h1>
+      <div style="display: flex; gap: 1rem; color: var(--text-secondary);">
+        <div>VIN: 09925</div>
+        <div>Owner: Jay Leno</div>
+        <div>Last Verified: March 10, 2025</div>
+      </div>
+    </div>
+
+    <!-- Timeline Section -->
+    <div class="section">
+      <span class="section-title">VEHICLE TIMELINE</span>
+      <div class="timeline">
+        <div class="timeline-header">
+          <h2>Vehicle History Timeline</h2>
+          <div class="timeline-filters">
+            <div class="filter-chip active">All</div>
+            <div class="filter-chip">Ownership</div>
+            <div class="filter-chip">Service</div>
+            <div class="filter-chip">Auction</div>
+          </div>
+        </div>
+        <div class="timeline-events">
+          <div class="timeline-event">
+            <div class="event-date">Mar 7, 2025</div>
+            <div class="event-content">
+              <div class="event-title">Comprehensive Detail</div>
+              <div class="event-description">Full detail performed by Black Diamond Detailing, including paint correction and ceramic coating application.</div>
+              <div class="event-source">PTZ Verified</div>
+              <div class="event-confidence">
+                <div class="confidence-indicator high-confidence"></div>
+                High Confidence
+              </div>
+            </div>
+          </div>
+          <div class="timeline-event">
+            <div class="event-date">Feb 15, 2025</div>
+            <div class="event-content">
+              <div class="event-title">Ownership Transfer</div>
+              <div class="event-description">Vehicle ownership transferred from Ross Peterson to Jay Leno.</div>
+              <div class="event-source">Title Records</div>
+              <div class="event-confidence">
+                <div class="confidence-indicator high-confidence"></div>
+                High Confidence
+              </div>
+            </div>
+          </div>
+          <div class="timeline-event">
+            <div class="event-date">Jan 23, 2025</div>
+            <div class="event-content">
+              <div class="event-title">Auction Sale</div>
+              <div class="event-description">Sold at Bring A Trailer auction for $2,750,000.</div>
+              <div class="event-source">BaT</div>
+              <div class="event-confidence">
+                <div class="confidence-indicator high-confidence"></div>
+                High Confidence
+              </div>
+            </div>
+          </div>
+          <div class="timeline-event">
+            <div class="event-date">Dec 10, 2024</div>
+            <div class="event-content">
+              <div class="event-title">Engine Rebuild</div>
+              <div class="event-description">Complete engine rebuild by Ferrari Classiche certified technician Mario Ricci.</div>
+              <div class="event-source">Service Records</div>
+              <div class="event-confidence">
+                <div class="confidence-indicator medium-confidence"></div>
+                Medium Confidence
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connector Framework Section -->
+    <div class="section">
+      <span class="section-title">CONNECTOR FRAMEWORK</span>
+      <div class="connector-framework">
+        <div class="connector-card">
+          <div class="connector-title">
+            <div class="connector-icon"></div>
+            Bring a Trailer
+          </div>
+          <div>Auction listings and sales history data</div>
+          <div class="connector-status">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--success);"></div>
+            Connected
+          </div>
+        </div>
+        <div class="connector-card">
+          <div class="connector-title">
+            <div class="connector-icon"></div>
+            NHTSA VIN Database
+          </div>
+          <div>Vehicle identification and recall information</div>
+          <div class="connector-status">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--success);"></div>
+            Connected
+          </div>
+        </div>
+        <div class="connector-card">
+          <div class="connector-title">
+            <div class="connector-icon"></div>
+            Barrett-Jackson
+          </div>
+          <div>Auction listings and sales data</div>
+          <div class="connector-status">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--warning);"></div>
+            Pending
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Physical Verification Section -->
+    <div class="section">
+      <span class="section-title">PHYSICAL VERIFICATION</span>
+      <div class="verification-center">
+        <h2>PTZ Verification Records</h2>
+        <div class="verification-card">
+          <div class="verification-image"></div>
+          <div class="verification-details">
+            <h3>Full Vehicle Inspection</h3>
+            <div>Performed at Beverly Hills PTZ Center</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">March 7, 2025</div>
+          </div>
+        </div>
+        <div class="verification-card">
+          <div class="verification-image"></div>
+          <div class="verification-details">
+            <h3>Engine Compartment Verification</h3>
+            <div>Performed at Beverly Hills PTZ Center</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">March 7, 2025</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Investment Platform Section -->
+    <div class="section">
+      <span class="section-title">INVESTMENT PLATFORM</span>
+      <div class="investment-platform">
+        <div class="investment-chart">
+          <h3>Vehicle Value History</h3>
+          <div style="height: 150px; background: #f0f9ff; border-radius: 4px; margin-top: 1rem;"></div>
+        </div>
+        <div class="investment-stats">
+          <div class="stat-card">
+            <div class="stat-title">Current Value</div>
+            <div class="stat-value">$2,850,000</div>
+            <div class="stat-trend">+3.6% since purchase</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">Total Investors</div>
+            <div class="stat-value">147</div>
+            <div class="stat-trend">+12 this month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">Ownership Stake</div>
+            <div class="stat-value">94.3%</div>
+            <div class="stat-trend">Primary Owner</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">Predicted ROI (1yr)</div>
+            <div class="stat-value">8.2%</div>
+            <div class="stat-trend">Based on market trends</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

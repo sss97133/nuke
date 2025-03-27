@@ -21,7 +21,10 @@ const env = {
   VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || '',
   VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || '',
   VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY || '',
-  NODE_ENV: process.env.NODE_ENV || 'production'
+  NODE_ENV: process.env.NODE_ENV || 'production',
+  // Add deployment metadata to help with debugging
+  VITE_DEPLOY_TIMESTAMP: new Date().toISOString(),
+  VITE_DEPLOY_VERSION: process.env.VERCEL_GIT_COMMIT_SHA || 'local'
 };
 
 // Log environment variables to help with debugging
