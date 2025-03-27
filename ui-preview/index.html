@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuke UI Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      /* Theme colors - light mode defaults */
+      --bg-primary: #ffffff;
+      --bg-secondary: #f3f4f6;
+      --text-primary: #111827;
+      --text-secondary: #6b7280;
+      --accent-color: #2563eb;
+      --border-color: rgba(0, 0, 0, 0.1);
+      --card-bg: #ffffff;
+      --hover-overlay: rgba(0, 0, 0, 0.02);
+    }
+    
+    .dark {
+      --bg-primary: #121212;
+      --bg-secondary: #1e1e1e;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0a0;
+      --accent-color: #3b82f6;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --card-bg: #1e1e1e;
+      --hover-overlay: rgba(255, 255, 255, 0.05);
+    }
+    
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    
+    /* Button styles */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border-radius: 0.375rem;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    
+    .btn-primary {
+      background-color: var(--accent-color);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      filter: brightness(110%);
+    }
+    
+    .btn-secondary {
+      background-color: white;
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+    
+    .dark .btn-secondary {
+      background-color: #2d2d2d;
+      color: var(--text-primary);
+    }
+    
+    .btn-secondary:hover {
+      background-color: var(--bg-secondary);
+    }
+    
+    .btn-danger {
+      background-color: #ef4444;
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      background-color: #dc2626;
+    }
+    
+    /* Card styles */
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      transition: all 0.2s;
+    }
+    
+    .card-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+    
+    .dark .card-header {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+    
+    .card-body {
+      padding: 1rem;
+    }
+    
+    .card-footer {
+      padding: 1rem;
+      border-top: 1px solid var(--border-color);
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+    
+    .dark .card-footer {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+    
+    /* Form styles */
+    .form-input {
+      display: block;
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+    
+    .form-input:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .form-label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    
+    .form-helper {
+      margin-top: 0.25rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    
+    .form-error {
+      margin-top: 0.25rem;
+      font-size: 0.75rem;
+      color: #ef4444;
+    }
+    
+    /* Badge styles */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    
+    .badge-blue {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+    
+    .dark .badge-blue {
+      background-color: rgba(37, 99, 235, 0.2);
+      color: #93c5fd;
+    }
+    
+    .badge-green {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+    
+    .dark .badge-green {
+      background-color: rgba(22, 163, 74, 0.2);
+      color: #86efac;
+    }
+    
+    .badge-red {
+      background-color: #fee2e2;
+      color: #b91c1c;
+    }
+    
+    .dark .badge-red {
+      background-color: rgba(220, 38, 38, 0.2);
+      color: #fca5a5;
+    }
+    
+    /* Navigation styles */
+    .nav-link {
+      display: inline-block;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    
+    .nav-link:hover {
+      color: var(--text-primary);
+      background-color: var(--hover-overlay);
+    }
+    
+    .nav-link-active {
+      color: var(--text-primary);
+      background-color: var(--hover-overlay);
+    }
+  </style>
+</head>
+<body>
+  <div class="p-8 max-w-6xl mx-auto">
+    <header class="mb-8 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold">Nuke UI Preview</h1>
+        <p class="text-gray-500 dark:text-gray-400">A preview of your improved UI components and CSS</p>
+      </div>
+      
+      <button id="theme-toggle" class="btn btn-secondary flex items-center gap-2">
+        <svg id="light-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
+        </svg>
+        <svg id="dark-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+        </svg>
+        <span id="theme-text">Toggle theme</span>
+      </button>
+    </header>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Buttons -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="text-xl font-semibold">Buttons</h2>
+        </div>
+        <div class="card-body space-y-4">
+          <div class="flex flex-wrap gap-2">
+            <button class="btn btn-primary">Primary Button</button>
+            <button class="btn btn-secondary">Secondary Button</button>
+            <button class="btn btn-danger">Danger Button</button>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button disabled class="btn btn-primary opacity-50 cursor-not-allowed">Primary Disabled</button>
+            <button disabled class="btn btn-secondary opacity-50 cursor-not-allowed">Secondary Disabled</button>
+            <button disabled class="btn btn-danger opacity-50 cursor-not-allowed">Danger Disabled</button>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn btn-primary flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              With Icon
+            </button>
+            <button class="btn btn-secondary flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              With Icon
+            </button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Form elements -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="text-xl font-semibold">Form Elements</h2>
+        </div>
+        <div class="card-body space-y-4">
+          <div>
+            <label class="form-label">Text Input</label>
+            <input type="text" class="form-input" placeholder="Enter your name">
+            <p class="form-helper">Please enter your full name</p>
+          </div>
+          <div>
+            <label class="form-label">Text Input with Error</label>
+            <input type="text" class="form-input border-red-500" value="Invalid email">
+            <p class="form-error">Please enter a valid email address</p>
+          </div>
+          <div>
+            <label class="form-label">Select Input</label>
+            <select class="form-input">
+              <option>Select an option</option>
+              <option>Option 1</option>
+              <option>Option 2</option>
+              <option>Option 3</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="remember" class="h-4 w-4 rounded border-gray-300 text-blue-600">
+            <label for="remember" class="text-sm">Remember me</label>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Cards -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="text-xl font-semibold">Cards</h2>
+        </div>
+        <div class="card-body space-y-4">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="text-lg font-medium">Card Title</h3>
+            </div>
+            <div class="card-body">
+              <p>This is a standard card with header, body, and footer sections.</p>
+              <p class="mt-2">Cards are useful for grouping related content together.</p>
+            </div>
+            <div class="card-footer flex justify-end gap-2">
+              <button class="btn btn-secondary">Cancel</button>
+              <button class="btn btn-primary">Save</button>
+            </div>
+          </div>
+          
+          <div class="card overflow-hidden">
+            <img src="https://images.unsplash.com/photo-1522252234503-e356532cafd5?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60" class="w-full h-48 object-cover" alt="Code">
+            <div class="p-4">
+              <h3 class="text-lg font-medium mb-2">Card with Image</h3>
+              <p class="mb-4">Cards work great with images and other media content.</p>
+              <div class="flex gap-2">
+                <span class="badge badge-blue">Programming</span>
+                <span class="badge badge-green">Development</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Navigation & Badges -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="text-xl font-semibold">Navigation & Badges</h2>
+        </div>
+        <div class="card-body">
+          <div class="mb-6">
+            <h3 class="text-lg font-medium mb-2">Navigation</h3>
+            <nav class="flex space-x-1">
+              <a href="#" class="nav-link nav-link-active">Dashboard</a>
+              <a href="#" class="nav-link">Projects</a>
+              <a href="#" class="nav-link">Team</a>
+              <a href="#" class="nav-link">Settings</a>
+            </nav>
+          </div>
+          
+          <div>
+            <h3 class="text-lg font-medium mb-2">Badges</h3>
+            <div class="flex flex-wrap gap-2">
+              <span class="badge badge-blue">New</span>
+              <span class="badge badge-green">Completed</span>
+              <span class="badge badge-red">Urgent</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // Theme toggling
+    const themeToggle = document.getElementById('theme-toggle');
+    const lightIcon = document.getElementById('light-icon');
+    const darkIcon = document.getElementById('dark-icon');
+    const themeText = document.getElementById('theme-text');
+    
+    // Check for saved theme preference or use prefers-color-scheme
+    const userPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedTheme = localStorage.getItem('theme');
+    
+    if (savedTheme === 'dark' || (!savedTheme && userPrefersDark)) {
+      document.documentElement.classList.add('dark');
+      lightIcon.classList.add('hidden');
+      darkIcon.classList.remove('hidden');
+      themeText.textContent = 'Light Mode';
+    } else {
+      themeText.textContent = 'Dark Mode';
+    }
+    
+    // Toggle theme
+    themeToggle.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.toggle('dark');
+      
+      if (isDark) {
+        lightIcon.classList.add('hidden');
+        darkIcon.classList.remove('hidden');
+        themeText.textContent = 'Light Mode';
+        localStorage.setItem('theme', 'dark');
+      } else {
+        lightIcon.classList.remove('hidden');
+        darkIcon.classList.add('hidden');
+        themeText.textContent = 'Dark Mode';
+        localStorage.setItem('theme', 'light');
+      }
+    });
+  </script>
+</body>
+</html>

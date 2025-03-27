@@ -165,8 +165,7 @@ export default function SimpleImport() {
               // If profile doesn't exist or needs updating
               if (!profileData) {
                 const { error: updateError } = await supabase
-  if (error) console.error("Database query error:", error);
-                  
+                  .from('profiles')
                   .upsert([{
                     id: user.id,
                     email: user.email,
@@ -185,8 +184,7 @@ export default function SimpleImport() {
                 // Update name for consistency if needed
                 if (profileData.full_name !== "Skylar Williams") {
                   const { error: updateError } = await supabase
-  if (error) console.error("Database query error:", error);
-                    
+                    .from('profiles')
                     .update({
                       full_name: "Skylar Williams",
                       first_name: "Skylar",
@@ -194,6 +192,8 @@ export default function SimpleImport() {
                       updated_at: new Date().toISOString()
                     })
                     .eq('id', user.id);
+                  
+                  if (updateError) console.error("Database update error:", updateError);
                     
                   if (updateError) {
                     addLog(`Error updating profile name: ${updateError.message}`);

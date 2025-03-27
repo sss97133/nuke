@@ -17,8 +17,38 @@ export const StyleFix = () => {
   const [styleStatus, setStyleStatus] = useState('checking');
   
   useEffect(() => {
+    // Apply theme colors based on user preference
+    const applyThemeColors = (isDarkMode: boolean) => {
+      const themeColors = isDarkMode
+        ? {
+            '--bg-primary': '#121212',
+            '--bg-secondary': '#1e1e1e',
+            '--text-primary': '#ffffff',
+            '--text-secondary': '#a0a0a0',
+            '--accent-color': '#3b82f6',
+            '--border-color': 'rgba(255, 255, 255, 0.1)',
+            '--card-bg': '#1e1e1e',
+            '--hover-overlay': 'rgba(255, 255, 255, 0.05)',
+          }
+        : {
+            '--bg-primary': '#ffffff',
+            '--bg-secondary': '#f3f4f6',
+            '--text-primary': '#111827',
+            '--text-secondary': '#6b7280',
+            '--accent-color': '#2563eb',
+            '--border-color': 'rgba(0, 0, 0, 0.1)',
+            '--card-bg': '#ffffff',
+            '--hover-overlay': 'rgba(0, 0, 0, 0.02)',
+          };
+
+      // Apply theme variables to document root
+      Object.entries(themeColors).forEach(([prop, value]) => {
+        document.documentElement.style.setProperty(prop, value);
+      });
+    };
+    
     // Check if a stylesheet has any valid rules
-    const hasRules = (sheet) => {
+    const hasRules = (sheet: CSSStyleSheet) => {
       try {
         // Check if the stylesheet has any CSS rules
         return sheet.cssRules && sheet.cssRules.length > 0;

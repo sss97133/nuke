@@ -155,12 +155,13 @@ export const useParts = () => {
     try {
       setLoading(true);
       
-      // In production, we would delete from Supabase
+      // Delete from Supabase
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
+        .from('parts')
         .delete()
         .eq('id', id);
+        
+      if (error) console.error("Database query error:", error);
       
       if (error) throw error;
       

@@ -19,12 +19,13 @@ export const useVehicles = () => {
       setLoading(true);
       setError(null);
       
-      // In production, we would fetch from Supabase
+      // Fetch from Supabase
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .select('id, make, model, year, vin, notes, status, mileage')
         .order('year', { ascending: false });
+        
+      if (error) console.error("Database query error:", error);
         
       if (error) throw error;
       

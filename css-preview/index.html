@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuke CSS Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Configure Tailwind to match your project settings
+    tailwind.config = {
+      darkMode: ["class"],
+      theme: {
+        extend: {
+          // Add your theme extensions from tailwind.config.js here
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Base styles */
+    @layer base {
+      html {
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        font-weight: bold;
+      }
+    }
+    
+    /* Custom component classes */
+    .btn {
+      @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors;
+    }
+    .btn-primary {
+      @apply btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+    }
+    .btn-secondary {
+      @apply btn bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-blue-500;
+    }
+    .btn-danger {
+      @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+    }
+
+    .card {
+      @apply bg-white rounded-lg shadow overflow-hidden;
+    }
+    .card-header {
+      @apply px-4 py-3 border-b border-gray-200;
+    }
+    .card-body {
+      @apply p-4;
+    }
+    .card-footer {
+      @apply px-4 py-3 border-t border-gray-200;
+    }
+
+    .form-input {
+      @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    }
+    .form-label {
+      @apply block text-sm font-medium text-gray-700 mb-1;
+    }
+    .form-helper {
+      @apply mt-1 text-sm text-gray-500;
+    }
+    .form-error {
+      @apply mt-1 text-sm text-red-600;
+    }
+
+    /* Dark mode overrides */
+    .dark body {
+      @apply bg-gray-900 text-white;
+    }
+    .dark .card {
+      @apply bg-gray-800;
+    }
+    .dark .card-header,
+    .dark .card-footer {
+      @apply border-gray-700;
+    }
+    .dark .btn-secondary {
+      @apply bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700;
+    }
+    .dark .form-input {
+      @apply bg-gray-800 border-gray-700 text-white;
+    }
+    .dark .form-label {
+      @apply text-gray-300;
+    }
+    .dark .form-helper {
+      @apply text-gray-400;
+    }
+  </style>
+</head>
+<body class="p-4">
+  <div class="max-w-7xl mx-auto">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold">Nuke CSS Preview</h1>
+      <p class="text-gray-600 dark:text-gray-400">A preview of styles and UI components</p>
+      <div class="flex gap-2 mt-4">
+        <button id="theme-toggle" class="btn-secondary">Toggle Dark Mode</button>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Buttons Section -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="text-xl font-semibold">Buttons</h2>
+        </div>
+        <div class="card-body space-y-4">
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-primary">Primary Button</button>
+            <button class="btn-secondary">Secondary Button</button>
+            <button class="btn-danger">Danger Button</button>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-primary" disabled>Primary Disabled</button>
+            <button class="btn-secondary" disabled>Secondary Disabled</button>
+            <button class="btn-danger" disabled>Danger Disabled</button>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-primary flex items-center">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              With Icon
+            </button>
+            <button class="btn-secondary flex items-center">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+              </svg>
+              With Icon
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Form Elements -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="text-xl font-semibold">Form Elements</h2>
+        </div>
+        <div class="card-body space-y-4">
+          <div>
+            <label class="form-label">Text Input</label>
+            <input type="text" class="form-input" placeholder="Enter text...">
+            <p class="form-helper">This is a helper text for this field</p>
+          </div>
+          <div>
+            <label class="form-label">Text Input with Error</label>
+            <input type="text" class="form-input border-red-500" value="Invalid input">
+            <p class="form-error">This field has an error</p>
+          </div>
+          <div>
+            <label class="form-label">Select Input</label>
+            <select class="form-input">
+              <option>Option 1</option>
+              <option>Option 2</option>
+              <option>Option 3</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="checkbox1" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+            <label for="checkbox1" class="text-sm text-gray-700 dark:text-gray-300">Checkbox example</label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cards -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="text-xl font-semibold">Card Examples</h2>
+        </div>
+        <div class="card-body">
+          <div class="space-y-4">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="text-lg font-medium">Card Title</h3>
+              </div>
+              <div class="card-body">
+                <p>This is a basic card with header, body, and footer sections.</p>
+                <p>Cards can be used for all sorts of content containers.</p>
+              </div>
+              <div class="card-footer flex justify-end">
+                <button class="btn-secondary mr-2">Cancel</button>
+                <button class="btn-primary">Save</button>
+              </div>
+            </div>
+            
+            <div class="card overflow-hidden">
+              <img src="https://images.unsplash.com/photo-1527842891421-42eec2a46211?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60" alt="Example" class="w-full h-48 object-cover">
+              <div class="p-4">
+                <h3 class="text-lg font-medium mb-2">Card With Image</h3>
+                <p class="text-gray-600 dark:text-gray-400">Cards work great with images too.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Typography -->
+      <section class="card">
+        <div class="card-header">
+          <h2 class="text-xl font-semibold">Typography</h2>
+        </div>
+        <div class="card-body">
+          <div class="space-y-4">
+            <div>
+              <h1 class="text-4xl font-bold">Heading 1</h1>
+              <h2 class="text-3xl font-bold">Heading 2</h2>
+              <h3 class="text-2xl font-bold">Heading 3</h3>
+              <h4 class="text-xl font-bold">Heading 4</h4>
+              <h5 class="text-lg font-bold">Heading 5</h5>
+              <h6 class="text-base font-bold">Heading 6</h6>
+            </div>
+            <div>
+              <p class="text-base">This is a paragraph of regular text. It demonstrates the default text size and styling used throughout the application.</p>
+              <p class="text-sm">This is smaller text, often used for less important information or metadata.</p>
+              <p class="text-xs">This is the smallest text size, used for fine print and very secondary information.</p>
+            </div>
+            <div>
+              <p><a href="#" class="text-blue-600 hover:underline dark:text-blue-400">This is a link</a> within a paragraph.</p>
+              <p><strong>This text is bold</strong> and <em>this text is italicized</em>.</p>
+              <p><code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">This is inline code</code></p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // Toggle dark mode
+    const themeToggle = document.getElementById('theme-toggle');
+    themeToggle.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>
