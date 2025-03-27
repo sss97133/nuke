@@ -227,7 +227,7 @@ const DesignSystem = () => {
                     <h3 className="text-lg font-semibold">Variants</h3>
                     {buttonVariants.map((variant) => (
                       <div key={variant.name} className="flex justify-between items-center">
-                        <Button variant={variant.name === 'default' ? undefined : variant.name as any}>
+                        <Button variant={variant.name === 'default' ? undefined : variant.name as "secondary" | "outline" | "ghost" | "link" | "destructive"}>
                           {variant.name}
                         </Button>
                         <p className="text-sm text-muted-foreground">
@@ -281,7 +281,7 @@ const DesignSystem = () => {
                 <div className="space-y-4">
                   {badgeVariants.map((variant) => (
                     <div key={variant.name} className="flex justify-between items-center">
-                      <Badge variant={variant.name === 'default' ? undefined : variant.name as any}>
+                      <Badge variant={variant.name === 'default' ? undefined : variant.name as "secondary" | "outline" | "destructive"}>
                         {variant.name}
                       </Badge>
                       <p className="text-sm text-muted-foreground">
@@ -303,7 +303,7 @@ const DesignSystem = () => {
               <CardContent>
                 <div className="space-y-4">
                   {alertVariants.map((variant) => (
-                    <Alert key={variant.name} variant={variant.name === 'default' ? undefined : variant.name as any}>
+                    <Alert key={variant.name} variant={variant.name === 'default' ? undefined : variant.name === 'destructive' ? 'destructive' : undefined}>
                       {variant.icon}
                       <AlertTitle>
                         {variant.name.charAt(0).toUpperCase() + variant.name.slice(1)} Alert

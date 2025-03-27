@@ -140,7 +140,7 @@ export default function Vehicles() {
           });
         } else {
           // Process the vehicles data
-          const processedVehicles = data.map((vehicle: any) => ({
+          const processedVehicles = data.map((vehicle: Database['public']['Tables']['vehicles']['Row']) => ({
             ...vehicle,
             lastUpdated: formatDate(vehicle.updated_at),
             // Add image_url if it exists in your data structure
@@ -279,7 +279,7 @@ export default function Vehicles() {
       if (error) throw error;
       
       // Map the data to match our Vehicle interface
-      const formattedVehicles = data.map((vehicle: any) => ({
+      const formattedVehicles = data.map((vehicle: Database['public']['Tables']['vehicles']['Row']) => ({
         ...vehicle,
         image: vehicle.image_url,
         lastUpdated: formatDate(vehicle.updated_at),
