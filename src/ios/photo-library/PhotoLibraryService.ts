@@ -1,123 +1,309 @@
-
 /**
  * PhotoLibraryService.ts
  * 
- * This file defines the TypeScript interface for photo library access functionality
- * that will be implemented in Swift when the app is packaged for iOS.
+ * A TypeScript interface for the iOS PhotoLibraryService
+ * This will communicate with the native Swift implementation when the app is packaged for iOS.
  * 
- * This serves as documentation and a contract for the future native implementation.
+ * This file acts as a bridge between our React components and the native iOS functionality.
  */
 
-export interface PhotoAsset {
+interface PhotoAsset {
   id: string;
   filename: string;
   creationDate: string;
   width: number;
   height: number;
-  mediaType: 'image' | 'video';
-  duration?: number; // for videos
+  mediaType: string;
   location?: {
     latitude: number;
     longitude: number;
   };
 }
 
-export interface PhotoBatch {
+interface BatchData {
   assets: PhotoAsset[];
   batchId: string;
   totalAssets: number;
   batchIndex: number;
 }
 
-export interface PhotoLibraryConfig {
-  batchSize: number;
-  imageQuality: 'high' | 'medium' | 'low';
-  includeMetadata: boolean;
-  allowBackgroundUploads: boolean;
+interface Callback<T> {
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
 }
 
-/**
- * Interface for the future iOS PhotoLibraryService
- * This will be implemented in Swift and exposed to JS through a bridge
- */
-export interface PhotoLibraryServiceInterface {
-  /**
-   * Request access to the user's photo library
-   * Returns true if "Allow Access to All Photos" is granted
-   */
-  requestFullAccess(): Promise<boolean>;
+interface WebKitMessageHandlers {
+  photoLibrary: {
+    postMessage: (message: unknown) => void;
+  };
+}
+
+declare global {
+  interface Window {
+    webkit?: {
+      messageHandlers: WebKitMessageHandlers;
+    };
+    photoLibraryCallback?: (callbackId: string, result: unknown, error?: string) => void;
+    photoUploadProgress?: (callbackId: string, progress: number) => void;
+    photoUploadComplete?: (callbackId: string, success: boolean, error?: string) => void;
+  }
+}
+
+class PhotoLibraryBridge {
+  private isNative: boolean;
+  private mockAssets: PhotoAsset[];
+  private callbacks: Record<string, Callback<unknown>>;
+  private progressHandlers: Record<string, (progress: number) => void>;
+
+  constructor() {
+    this.isNative = false;
+    this.mockAssets = [];
+    this.callbacks = {};
+    this.progressHandlers = {};
+    
+    // Check if we're running in a native iOS environment with the bridge available
+    if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.photoLibrary) {
+      this.isNative = true;
+      console.log('iOS Photo Library bridge is available');
+    } else {
+      console.log('Running in web environment, using mock PhotoLibraryService');
+      
+      // Generate some mock assets for testing
+      for (let i = 1; i <= 20; i++) {
+        this.mockAssets.push({
+          id: `mock-asset-${i}`,
+          filename: `image_${i}.jpg`,
+          creationDate: new Date(Date.now() - i * 86400000).toISOString(),
+          width: 1200,
+          height: 800,
+          mediaType: 'image',
+          location: i % 3 === 0 ? {
+            latitude: 37.7749 + (Math.random() - 0.5) * 0.1,
+            longitude: -122.4194 + (Math.random() - 0.5) * 0.1
+          } : undefined
+        });
+      }
+    }
+    
+    // Set up message handlers for native callbacks
+    if (typeof window !== 'undefined') {
+      window.photoLibraryCallback = this._handleNativeCallback.bind(this);
+      window.photoUploadProgress = this._handleUploadProgress.bind(this);
+      window.photoUploadComplete = this._handleUploadComplete.bind(this);
+    }
+  }
+  
+  // Private method to generate a unique callback ID
+  private _generateCallbackId(): string {
+    return `cb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  // Handle callbacks from native code
+  private _handleNativeCallback(callbackId: string, result: unknown, error?: string): void {
+    if (this.callbacks[callbackId]) {
+      if (error) {
+        this.callbacks[callbackId].reject(new Error(error));
+      } else {
+        this.callbacks[callbackId].resolve(result);
+      }
+      
+      // Clean up
+      delete this.callbacks[callbackId];
+    }
+  }
+  
+  // Handle upload progress updates from native code
+  private _handleUploadProgress(callbackId: string, progress: number): void {
+    if (this.progressHandlers[callbackId]) {
+      this.progressHandlers[callbackId](progress);
+    }
+  }
+  
+  // Handle upload completion from native code
+  private _handleUploadComplete(callbackId: string, success: boolean, error?: string): void {
+    console.log(`Upload complete for ${callbackId}: ${success ? 'Success' : 'Failed'}`, error);
+  }
   
   /**
-   * Check current authorization status
+   * Requests full access to the user's photo library
+   * Returns a promise that resolves to true if access was granted
    */
-  getAuthorizationStatus(): Promise<'authorized' | 'limited' | 'denied' | 'restricted' | 'notDetermined'>;
+  requestFullAccess(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      if (this.isNative) {
+        const callbackId = this._generateCallbackId();
+        this.callbacks[callbackId] = { resolve: (value: unknown) => resolve(value as boolean), reject };
+        
+        window.webkit?.messageHandlers.photoLibrary.postMessage({
+          method: 'requestFullAccess',
+          callbackId
+        });
+      } else {
+        // Mock implementation for web
+        console.log('PhotoLibraryService: requestFullAccess() called');
+        setTimeout(() => {
+          // Simulate permission dialog and randomly grant access
+          const granted = Math.random() > 0.3;
+          console.log(`PhotoLibraryService: Access ${granted ? 'granted' : 'denied'}`);
+          resolve(granted);
+        }, 500);
+      }
+    });
+  }
   
   /**
-   * Fetch all assets from the photo library
+   * Gets the current authorization status
    */
-  fetchAllPhotos(config?: Partial<PhotoLibraryConfig>): Promise<PhotoAsset[]>;
+  getAuthorizationStatus(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (this.isNative) {
+        const callbackId = this._generateCallbackId();
+        this.callbacks[callbackId] = { resolve: (value: unknown) => resolve(value as string), reject };
+        
+        window.webkit?.messageHandlers.photoLibrary.postMessage({
+          method: 'getAuthorizationStatus',
+          callbackId
+        });
+      } else {
+        // Mock implementation for web
+        setTimeout(() => {
+          // Randomly return a status for testing
+          const statuses = ['authorized', 'limited', 'denied', 'restricted', 'notDetermined'];
+          const status = statuses[Math.floor(Math.random() * statuses.length)];
+          resolve(status);
+        }, 100);
+      }
+    });
+  }
   
   /**
-   * Fetch photos in batches (for efficient processing of large libraries)
+   * Fetches all photos from the library
+   */
+  fetchAllPhotos(config: Record<string, unknown> = {}): Promise<PhotoAsset[]> {
+    return new Promise((resolve, reject) => {
+      if (this.isNative) {
+        const callbackId = this._generateCallbackId();
+        this.callbacks[callbackId] = { resolve: (value: unknown) => resolve(value as PhotoAsset[]), reject };
+        
+        window.webkit?.messageHandlers.photoLibrary.postMessage({
+          method: 'fetchAllPhotos',
+          callbackId,
+          config
+        });
+      } else {
+        // Mock implementation for web
+        console.log('PhotoLibraryService: fetchAllPhotos() called with config:', config);
+        setTimeout(() => {
+          resolve([...this.mockAssets]);
+        }, 800);
+      }
+    });
+  }
+  
+  /**
+   * Fetch photos in batches with a callback for each batch
    */
   fetchPhotosBatched(
-    callback: (batch: PhotoBatch) => Promise<void>, 
-    config?: Partial<PhotoLibraryConfig>
-  ): Promise<void>;
+    callback: (batch: BatchData) => Promise<void>,
+    config: { batchSize?: number } = { batchSize: 20 }
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.isNative) {
+        // In native mode, we'd set up a system where the native code can call back multiple times
+        // This is a simplification
+        this.fetchAllPhotos(config)
+          .then(assets => {
+            // Manually batch the results
+            const batches: PhotoAsset[][] = [];
+            const batchSize = config.batchSize ?? 20;
+            for (let i = 0; i < assets.length; i += batchSize) {
+              batches.push(assets.slice(i, i + batchSize));
+            }
+            
+            // Process batches sequentially
+            return batches.reduce((promise, batch, index) => {
+              return promise.then(() => {
+                return callback({
+                  assets: batch,
+                  batchId: `batch_${index}`,
+                  totalAssets: assets.length,
+                  batchIndex: index
+                });
+              });
+            }, Promise.resolve());
+          })
+          .then(resolve)
+          .catch(reject);
+      } else {
+        // Mock implementation for web
+        console.log('PhotoLibraryService: fetchPhotosBatched() called');
+        
+        // Create batches of the mock assets
+        const batchSize = config.batchSize ?? 5;
+        const totalAssets = this.mockAssets.length;
+        const batchCount = Math.ceil(totalAssets / batchSize);
+        
+        // Process batches with setTimeout to simulate async operations
+        let currentBatch = 0;
+        
+        const processBatch = () => {
+          if (currentBatch >= batchCount) {
+            resolve();
+            return;
+          }
+          
+          const start = currentBatch * batchSize;
+          const end = Math.min(start + batchSize, totalAssets);
+          const batchAssets = this.mockAssets.slice(start, end);
+          
+          const batchData: BatchData = {
+            assets: batchAssets,
+            batchId: `mock_batch_${currentBatch}`,
+            totalAssets,
+            batchIndex: currentBatch
+          };
+          
+          // Call the callback with this batch
+          Promise.resolve(callback(batchData))
+            .then(() => {
+              currentBatch++;
+              setTimeout(processBatch, 300); // Delay to simulate network
+            })
+            .catch(reject);
+        };
+        
+        // Start processing
+        setTimeout(processBatch, 300);
+      }
+    });
+  }
   
   /**
-   * Request the image data for a specific asset
+   * Get image data for a specific asset
    */
-  getImageData(assetId: string, quality?: 'high' | 'medium' | 'low'): Promise<Blob>;
-  
-  /**
-   * Upload all photos to the server
-   */
-  uploadAllPhotos(vehicleId: string, config?: Partial<PhotoLibraryConfig>): Promise<string[]>;
-  
-  /**
-   * Cancel ongoing uploads
-   */
-  cancelUploads(): Promise<void>;
+  getImageData(assetId: string, quality: 'low' | 'medium' | 'high' = 'high'): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      if (this.isNative) {
+        const callbackId = this._generateCallbackId();
+        this.callbacks[callbackId] = { resolve: (value: unknown) => resolve(value as Blob), reject };
+        
+        window.webkit?.messageHandlers.photoLibrary.postMessage({
+          method: 'getImageData',
+          callbackId,
+          assetId,
+          quality
+        });
+      } else {
+        // Mock implementation for web
+        console.log(`PhotoLibraryService: getImageData() called for asset ${assetId} with quality ${quality}`);
+        setTimeout(() => {
+          // Create a mock blob
+          const mockBlob = new Blob(['mock image data'], { type: 'image/jpeg' });
+          resolve(mockBlob);
+        }, 300);
+      }
+    });
+  }
 }
 
-/**
- * Placeholder implementation for web development
- * This will be replaced with the actual iOS implementation
- */
-export class WebMockPhotoLibraryService implements PhotoLibraryServiceInterface {
-  async requestFullAccess(): Promise<boolean> {
-    console.log('iOS Photo Library: requestFullAccess() called');
-    return false; // Always false on web
-  }
-  
-  async getAuthorizationStatus(): Promise<'authorized' | 'limited' | 'denied' | 'restricted' | 'notDetermined'> {
-    return 'notDetermined';
-  }
-  
-  async fetchAllPhotos(): Promise<PhotoAsset[]> {
-    console.log('iOS Photo Library: fetchAllPhotos() called');
-    return [];
-  }
-  
-  async fetchPhotosBatched(): Promise<void> {
-    console.log('iOS Photo Library: fetchPhotosBatched() called');
-  }
-  
-  async getImageData(): Promise<Blob> {
-    console.log('iOS Photo Library: getImageData() called');
-    return new Blob();
-  }
-  
-  async uploadAllPhotos(): Promise<string[]> {
-    console.log('iOS Photo Library: uploadAllPhotos() called');
-    return [];
-  }
-  
-  async cancelUploads(): Promise<void> {
-    console.log('iOS Photo Library: cancelUploads() called');
-  }
-}
-
-// Export a mock implementation for web
-export const photoLibraryService = new WebMockPhotoLibraryService();
+export default new PhotoLibraryBridge();
