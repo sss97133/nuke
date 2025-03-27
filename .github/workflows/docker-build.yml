@@ -31,6 +31,13 @@ jobs:
           echo "NPM version: $(npm -v)"
           echo "Running in Docker container"
           
+      - name: Install Python and build dependencies
+        run: |
+          echo "Installing Python and build dependencies..."
+          apk add --no-cache python3 make g++ cairo-dev pango-dev jpeg-dev giflib-dev pixman-dev pangomm-dev libjpeg-turbo-dev freetype-dev
+          ln -sf python3 /usr/bin/python
+          echo "Python version: $(python --version)"
+          
       - name: Setup .npmrc
         run: |
           echo "legacy-peer-deps=true" > .npmrc
@@ -39,15 +46,31 @@ jobs:
           
       - name: Install dependencies
         run: |
-          # Retry npm ci up to 3 times
+          # Set NPM config for native module builds
+          npm config set python /usr/bin/python
+          
+          # Skip optional dependencies to reduce build complexity
+          echo "Installing dependencies with --no-optional to avoid canvas issues..."
+          export NUKE_SKIP_CANVAS=true
+          
+          # Retry npm ci up to 3 times with reduced dependency set
           for i in 1 2 3; do
-            npm ci && break || echo "Retry $i..."
+            npm ci --no-optional --ignore-scripts && break || echo "Retry $i..."
+            if [ $i -eq 2 ]; then
+              echo "Trying with --legacy-peer-deps..."
+              npm ci --no-optional --ignore-scripts --legacy-peer-deps && break || echo "Legacy mode failed too"
+            fi
             if [ $i -eq 3 ]; then
-              echo "⚠️ npm ci failed, falling back to npm install"
-              npm install --no-save
+              echo "⚠️ npm ci failed, trying minimal install for build only"
+              # Install only the bare minimum packages needed for build
+              npm install --no-save --no-optional --ignore-scripts typescript vite @vitejs/plugin-react
             fi
             sleep 5
           done
+          
+          # Install only essential dependencies post-config
+          echo "Installing essential build packages directly..."
+          npm install --no-save vite typescript @vitejs/plugin-react
           
       - name: Verify Supabase credentials are available
         id: verify-creds
