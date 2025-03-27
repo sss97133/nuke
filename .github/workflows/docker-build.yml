@@ -49,6 +49,22 @@ jobs:
             sleep 5
           done
           
+      - name: Verify Supabase credentials are available
+        id: verify-creds
+        run: |
+          # Check if credentials are available
+          if [ -n "${{ secrets.VITE_SUPABASE_URL }}" ] && [ -n "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "SUPABASE_CREDS_AVAILABLE=true" >> $GITHUB_OUTPUT
+            echo "✅ Supabase credentials are available"
+          else
+            echo "SUPABASE_CREDS_AVAILABLE=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Supabase credentials are missing! This will likely cause build failure."
+            # Create .env file with placeholders to allow build to try to continue
+            echo "VITE_SUPABASE_URL=http://placeholder-url.example.com" > .env
+            echo "VITE_SUPABASE_ANON_KEY=placeholder-key" >> .env
+            echo "VITE_SUPABASE_SERVICE_KEY=placeholder-service-key" >> .env
+          fi
+
       - name: Build directly in Docker
         env:
           NODE_ENV: production
@@ -85,7 +101,19 @@ jobs:
               echo "✅ Environment variables properly injected for runtime"
             else
               echo "⚠️ Runtime environment variables may be missing - injecting fallback"
-              sed -i 's|</head>|<script>window.__env = { VITE_SUPABASE_URL: "$VITE_SUPABASE_URL", VITE_SUPABASE_ANON_KEY: "$VITE_SUPABASE_ANON_KEY" };</script></head>|' dist/index.html
+              
+              # Use direct string values for fallback when environment variables might be empty
+              if [ "${{ steps.verify-creds.outputs.SUPABASE_CREDS_AVAILABLE }}" = "true" ]; then
+                # Use actual values from secrets
+                echo "Using actual Supabase credentials for window.__env fallback"
+                sed -i 's|</head>|<script>window.__env = { VITE_SUPABASE_URL: "${{ secrets.VITE_SUPABASE_URL }}", VITE_SUPABASE_ANON_KEY: "${{ secrets.VITE_SUPABASE_ANON_KEY }}" };</script></head>|' dist/index.html
+              else
+                # Use placeholders since credentials aren't available
+                echo "Using placeholder values for window.__env fallback"
+                sed -i 's|</head>|<script>window.__env = { VITE_SUPABASE_URL: "YOUR_SUPABASE_URL", VITE_SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY" };</script></head>|' dist/index.html
+                # Leave note in build artifact about missing credentials
+                echo "⚠️ IMPORTANT: This build is using placeholder Supabase credentials! Replace them before using this build." > dist/CREDENTIALS_WARNING.txt
+              fi
             fi
           else
             echo "❌ No dist directory found - creating empty directory"
