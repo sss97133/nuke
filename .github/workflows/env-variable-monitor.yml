@@ -146,83 +146,88 @@ jobs:
       - name: Create or update environment helper
         if: env.FALLBACK_DETECTED != 'true' && env.USES_SUPABASE == 'true'
         run: |
-          echo "Creating environment helper with three-tier fallback system..."
-          
-          # Create utils directory if it doesn't exist
-          mkdir -p src/utils
-          
-          # Create environment.ts file with the three-tier fallback
-          cat > src/utils/environment.ts << EOF
+          # Skip creating environment.ts if it already exists
+          if [ -f "src/utils/environment.ts" ]; then
+            echo "Environment helper already exists, skipping creation"
+          else
+            echo "Creating environment helper with three-tier fallback system..."
+            
+            # Create utils directory if it doesn't exist
+            mkdir -p src/utils
+            
+            # Create environment.ts file with the three-tier fallback
+            cat > src/utils/environment.ts << EOF
           /**
-           * Three-tier environment variable fallback system
-           * 
-           * This utility provides a consistent way to access environment variables
-           * across different environments with proper fallback mechanisms:
-           * 
-           * 1. First checks import.meta.env (Vite - development)
-           * 2. Then checks process.env (Node - build time)
-           * 3. Finally checks window.__env (Browser - runtime, injected during build)
-           * 
-           * This ensures environment variables are accessible in all contexts.
+           * Environment utilities for handling variables using the three-tier fallback system
+           * 1. First checks import.meta.env (Vite)
+           * 2. Then checks process.env (Node)
+           * 3. Finally checks window.__env (Browser runtime)
            */
 
-          // Add TypeScript type definition for window.__env
+          // Type definition for window.__env
           declare global {
             interface Window {
               __env?: Record<string, string>;
             }
           }
-          
+
           /**
-           * Get an environment variable with three-tier fallback
-           * @param key The environment variable key to retrieve
-           * @param defaultValue Optional default value if not found in any tier
-           * @returns The environment variable value or the default value if not found
+           * Gets an environment variable using the three-tier fallback system
+           * @param key The environment variable key
+           * @param defaultValue Optional fallback value if not found in any tier
+           * @returns The environment variable value or defaultValue if not found
            */
           export const getEnv = (key: string, defaultValue: string = ''): string => {
-            // Check Vite environment (development)
-            if (import.meta.env && import.meta.env[key]) {
-              return import.meta.env[key];
+            // 1. Check Vite environment (import.meta.env)
+            const viteEnv = typeof import !== 'undefined' && 
+                        typeof import.meta !== 'undefined' && 
+                        typeof import.meta.env !== 'undefined' ? 
+                        import.meta.env : {};
+                        
+            if (viteEnv[key]) {
+              return viteEnv[key];
             }
-            
-            // Check Node environment (build time)
+
+            // 2. Check Node environment (process.env)
             if (typeof process !== 'undefined' && process.env && process.env[key]) {
               return process.env[key];
             }
-            
-            // Check Browser injected environment (runtime)
+
+            // 3. Check Browser runtime environment (window.__env)
             if (typeof window !== 'undefined' && window.__env && window.__env[key]) {
               return window.__env[key];
             }
-            
+
             // Return the default value if not found in any tier
             return defaultValue;
           };
-          
+
           /**
-           * Helper to specifically get Supabase credentials consistently
+           * Gets the Supabase URL using the three-tier fallback system
+           * @returns The Supabase URL
            */
-          export const getSupabaseCredentials = () => {
-            return {
-              supabaseUrl: getEnv('VITE_SUPABASE_URL', 'http://localhost:54321'),
-              supabaseAnonKey: getEnv('VITE_SUPABASE_ANON_KEY'),
-              supabaseServiceKey: getEnv('VITE_SUPABASE_SERVICE_KEY')
-            };
+          export const getSupabaseUrl = (): string => {
+            return getEnv('VITE_SUPABASE_URL', 'http://localhost:54321');
           };
-          
+
           /**
-           * Checks if the current environment is production
+           * Gets the Supabase anonymous key using the three-tier fallback system
+           * @returns The Supabase anonymous key
            */
-          export const isProduction = (): boolean => {
-            return getEnv('NODE_ENV') === 'production';
+          export const getSupabaseAnonKey = (): string => {
+            return getEnv('VITE_SUPABASE_ANON_KEY', '');
           };
-          
+
           /**
-           * Checks if the current environment is development
+           * Gets the Supabase service key using the three-tier fallback system
+           * @returns The Supabase service key
            */
-          export const isDevelopment = (): boolean => {
-            return getEnv('NODE_ENV', 'development') === 'development';
+          export const getSupabaseServiceKey = (): string => {
+            return getEnv('VITE_SUPABASE_SERVICE_KEY', '');
           };
+          EOF
+            echo "Created environment helper with three-tier fallback system"
+          fi
           EOF
           
           echo "Created environment helper with three-tier fallback system"
