@@ -1,8 +1,19 @@
 name: Docker Build Test
 on: 
   workflow_dispatch:
+  # Run after environment variable monitor completes
+  workflow_run:
+    workflows: ["Environment Variable Monitor"]
+    types:
+      - completed
+    branches:
+      - main
+  # Also allow direct triggering on Dockerfile changes
   push:
     branches: [ main ]
+    paths:
+      - 'Dockerfile'
+      - 'nginx.conf'
 
 jobs:
   build:

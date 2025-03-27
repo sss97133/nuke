@@ -2,6 +2,14 @@ name: Environment Variable Monitor
 
 on:
   workflow_dispatch:  # Can be triggered manually
+  # Run after the smart repair orchestrator completes
+  workflow_run:
+    workflows: ["Smart Repair Orchestrator"]
+    types:
+      - completed
+    branches:
+      - main
+  # Also run when environment-related files change
   push:
     branches:
       - main
