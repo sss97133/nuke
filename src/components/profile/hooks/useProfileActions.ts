@@ -13,8 +13,7 @@ export const useProfileActions = (refetch: () => void) => {
     if (!user) return;
 
     const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from('profiles')
+        .from('profiles')
       .update({ social_links: toJson(socialLinks) })
       .eq('id', user.id);
 
@@ -40,9 +39,7 @@ export const useProfileActions = (refetch: () => void) => {
     if (!user) return;
 
     const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-      
-      .update({ streaming_links: toJson(streamingLinks) })
+        .update({ streaming_links: toJson(streamingLinks) })
       .eq('id', user.id);
 
     if (error) {

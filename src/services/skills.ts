@@ -13,8 +13,7 @@ export const skillsService = {
   // Skills
   async getSkills(): Promise<Skill[]> {
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from('skills')
+        .from('skills')
       .select('*')
       .order('name');
     
@@ -24,9 +23,7 @@ export const skillsService = {
 
   async getSkillById(id: string): Promise<Skill> {
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      
-      .select('*')
+        .select('*')
       .eq('id', id)
       .single();
     
@@ -36,9 +33,7 @@ export const skillsService = {
 
   async createSkill(skill: Omit<Skill, 'id' | 'created_at' | 'updated_at'>): Promise<Skill> {
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      
-      .insert([skill])
+        .insert([skill])
       .select()
       .single();
     
@@ -49,9 +44,7 @@ export const skillsService = {
   // Contributions
   async getContributions(): Promise<Contribution[]> {
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      
-      .select(`
+        .select(`
         *,
         vehicle_contributions(vehicle_id),
         project_contributions(project_id),
@@ -70,8 +63,7 @@ export const skillsService = {
 
   async getContributionsByVehicle(vehicleId: string): Promise<Contribution[]> {
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from('contributions')
+        .from('contributions')
       .select(`
         *,
         vehicle_contributions!inner(vehicle_id),

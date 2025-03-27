@@ -17,8 +17,7 @@ export const useTeamData = () => {
     queryFn: async () => {
       try {
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('team_members')
+        .from('team_members')
           .select(`
             id,
             member_type,

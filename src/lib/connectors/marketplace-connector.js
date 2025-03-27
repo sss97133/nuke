@@ -153,9 +153,7 @@ export class MarketplaceConnector extends BaseConnector {
     try {
       // Insert all events into the timeline
       const { data, error } = await supabaseClient
-  if (error) console.error("Database query error:", error);
-        
-        .insert(validatedData);
+  .insert(validatedData);
       
       if (error) {
         console.error('Error saving marketplace events to timeline:', error);

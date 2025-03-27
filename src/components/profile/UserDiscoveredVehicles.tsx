@@ -29,7 +29,6 @@ export const UserDiscoveredVehicles = ({ userId }: { userId: string }) => {
     queryKey: ['user-discovered-vehicles', userId],
     queryFn: async () => {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('discovered_vehicles')
         .select('*')
         .eq('user_id', userId)

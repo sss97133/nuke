@@ -63,10 +63,7 @@ export default async function handler(req, res) {
     
     // Create vehicle in database
     const { data: vehicleResult, error: vehicleError } = await supabase
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-      .from('vehicles')
+        .from('vehicles')
       .insert(vehicle)
       .select()
       .single();

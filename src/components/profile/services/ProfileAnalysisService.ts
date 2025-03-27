@@ -116,7 +116,6 @@ export class ProfileAnalysisService {
       console.log('Saving analysis results for user:', userId);
       
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({
           ai_analysis: analysisResults,

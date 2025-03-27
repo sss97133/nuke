@@ -14,7 +14,6 @@ export const ActivityFeed = () => {
     queryKey: ["feed-items"],
     queryFn: async () => {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('feed_items')
         .select('*, profile:profiles(username, avatar_url)')
         .order('created_at', { ascending: false })
@@ -35,8 +34,6 @@ export const ActivityFeed = () => {
       if (!selectedItem) return [];
       
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .select('*')
         .eq('feed_item_id', selectedItem)
         .order('created_at', { ascending: true });

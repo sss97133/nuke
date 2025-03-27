@@ -103,9 +103,6 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
     try {
       // Try to get the album metadata
       const { data: albumData, error: albumError } = await supabase
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
         .from('icloud_albums')
         .select('*')
         .eq('album_id', albumId)
@@ -118,11 +115,8 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
       
       // Get the associated images
       const { data: imagesData, error: imagesError } = await supabase
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-        
-        .select('*')
+        if (error) console.error("Database query error:", error);
+  .select('*')
         .eq('album_id', albumId)
         .order('created_at', { ascending: false });
       

@@ -16,7 +16,6 @@ export const useGarages = () => {
   useEffect(() => {
     const fetchGarages = async () => {
       const { data } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('garages')
         .select('id, name, location, address')
         .not('location', 'is', null);

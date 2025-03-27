@@ -6,8 +6,7 @@ export async function fetchUserHabits(userId: string): Promise<string[]> {
   try {
     // Get user's profile analysis
     const { data: profile, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from('profiles')
+        .from('profiles')
       .select('ai_analysis')
       .eq('id', userId)
       .single();
@@ -35,9 +34,7 @@ export async function fetchUserKeywords(userId: string): Promise<string[]> {
   try {
     // Get user's profile analysis
     const { data: profile, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      
-      .select('ai_analysis')
+        .select('ai_analysis')
       .eq('id', userId)
       .single();
 
@@ -73,9 +70,7 @@ export async function calculateContentRelevance(
   try {
     // Get user's profile analysis
     const { data: profile, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      
-      .select('ai_analysis')
+        .select('ai_analysis')
       .eq('id', userId)
       .single();
 
@@ -86,9 +81,7 @@ export async function calculateContentRelevance(
 
     // Get user's engagement metrics
     const { data: engagements, error: engagementError } = await supabase
-  if (error) console.error("Database query error:", error);
-      
-      .select('*')
+        .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(100);

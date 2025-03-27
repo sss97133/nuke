@@ -9,8 +9,7 @@ async function setupBucket() {
   try {
     // Create the vehicle-images bucket if it doesn't exist
     const { data: bucket, error: bucketError } = await supabase
-  if (error) console.error("Database query error:", error);
-      .storage
+        .storage
       .createBucket('vehicle-images', {
         public: true,
         allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],

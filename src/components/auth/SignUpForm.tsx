@@ -21,7 +21,6 @@ export function SignUpForm() {
 
     try {
       const { data, error } = await supabase.auth.signUp({
-  if (error) console.error("Database query error:", error);
         email,
         password,
       });
@@ -31,8 +30,7 @@ export function SignUpForm() {
       if (data.user) {
         // Create initial profile
         const { error: profileError } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('profiles')
+        .from('profiles')
           .insert({
             id: data.user.id,
             email: data.user.email,
@@ -45,9 +43,7 @@ export function SignUpForm() {
         // Trigger initial profile analysis
         try {
           const { data: profile } = await supabase
-  if (error) console.error("Database query error:", error);
-            
-            .select('*')
+        .select('*')
             .eq('id', data.user.id)
             .single();
 

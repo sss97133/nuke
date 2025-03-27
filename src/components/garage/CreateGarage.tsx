@@ -22,8 +22,7 @@ export const CreateGarage = () => {
     }
 
     const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from('garages')
+        .from('garages')
       .insert([{ name: newGarageName.trim() }]);
 
     if (error) {

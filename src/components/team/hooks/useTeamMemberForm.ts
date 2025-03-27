@@ -77,7 +77,6 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       let profileData;
       
       const { data, error: createError } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .insert({
           id: newId,
@@ -93,9 +92,7 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
         if (createError.code === '23505' || createError.message.includes('duplicate key')) {
           console.log("Profile with this email might already exist, checking...");
           const { data: existingProfile, error: fetchError } = await supabase
-  if (error) console.error("Database query error:", error);
-            
-            .select('id')
+        .select('id')
             .eq('email', formData.email)
             .maybeSingle();
 
@@ -130,8 +127,6 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       // Now create the team member with reference to profile
       console.log("Creating team member with profile ID:", profileId);
       const { data: teamMember, error: teamMemberError } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .insert({
           profile_id: profileId,
           position: formData.position,

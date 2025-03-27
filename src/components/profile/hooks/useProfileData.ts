@@ -22,7 +22,6 @@ export const useProfileData = () => {
 
       // Fetch profile data
       const { data: profileData, error: profileError } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
@@ -34,8 +33,6 @@ export const useProfileData = () => {
 
       // Fetch achievements data
       const { data: achievementsData, error: achievementsError } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .select('*')
         .eq('user_id', session.user.id);
 

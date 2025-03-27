@@ -33,10 +33,7 @@ export const GeoFenceFilter = ({ onFilterChange, className }: GeoFenceFilterProp
         
         if (session?.user) {
           const { data: profile } = await supabase
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-            .from('profiles')
+        .from('profiles')
             .select('home_location')
             .eq('id', session.user.id)
             .single();

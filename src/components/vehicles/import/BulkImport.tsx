@@ -138,8 +138,7 @@ export default function BulkImport() {
             };
 
             const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-              .from('vehicles')
+        .from('vehicles')
               .insert([processedVehicle]);
 
             if (error) {

@@ -44,8 +44,7 @@ const fetchGarages = async (): Promise<Garage[]> => {
 
     console.log("[GarageSelector] Fetching memberships for user:", user.id);
     const { data: memberships, error: membershipError } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from('garage_members')
+        .from('garage_members')
       .select('garage_id, role, status')
       .eq('user_id', user.id)
       .eq('status', 'active')
@@ -71,9 +70,7 @@ const fetchGarages = async (): Promise<Garage[]> => {
     
     console.log("[GarageSelector] Fetching garages with IDs:", garageIds);
     const { data: garages, error: garagesError } = await supabase
-  if (error) console.error("Database query error:", error);
-      
-      .select('id, name')
+        .select('id, name')
       .in('id', garageIds)
       .limit(MAX_GARAGES);
 

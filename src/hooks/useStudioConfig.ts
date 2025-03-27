@@ -19,7 +19,6 @@ export const useStudioConfig = (defaultDimensions: WorkspaceDimensions) => {
       }
       
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('studio_configurations')
         .select('*')
         .eq('user_id', user.id)

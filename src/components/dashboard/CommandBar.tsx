@@ -47,8 +47,7 @@ export const CommandBar = () => {
         case "garage":
           if (args[0] === "list") {
             const { data: garages } = await supabase
-  if (error) console.error("Database query error:", error);
-              .from('garages')
+        .from('garages')
               .select('name')
               .limit(5);
             
@@ -58,9 +57,7 @@ export const CommandBar = () => {
             });
           } else if (args[0] === "count") {
             const { count } = await supabase
-  if (error) console.error("Database query error:", error);
-              
-              .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true });
             
             toast({
               title: "Garage Count",
@@ -72,9 +69,7 @@ export const CommandBar = () => {
         case "asset":
           if (args[0] === "count") {
             const { count } = await supabase
-  if (error) console.error("Database query error:", error);
-              
-              .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true });
             
             toast({
               title: "Asset Count",
@@ -82,9 +77,7 @@ export const CommandBar = () => {
             });
           } else if (args[0] === "search" && args[1]) {
             const { data: items } = await supabase
-  if (error) console.error("Database query error:", error);
-              
-              .select('name')
+        .select('name')
               .ilike('name', `%${args[1]}%`)
               .limit(5);
             
@@ -98,8 +91,7 @@ export const CommandBar = () => {
         case "ticket":
           if (args[0] === "list") {
             const { data: tickets } = await supabase
-  if (error) console.error("Database query error:", error);
-              .from('service_tickets')
+        .from('service_tickets')
               .select('description, status')
               .limit(5);
             
@@ -109,8 +101,7 @@ export const CommandBar = () => {
             });
           } else if (args[0] === "count") {
             const { count } = await supabase
-  if (error) console.error("Database query error:", error);
-              .from('service_tickets')
+        .from('service_tickets')
               .select('*', { count: 'exact', head: true });
             
             toast({
@@ -123,8 +114,7 @@ export const CommandBar = () => {
         case "vehicle":
           if (args[0] === "count") {
             const { count } = await supabase
-  if (error) console.error("Database query error:", error);
-              .from('vehicles')
+        .from('vehicles')
               .select('*', { count: 'exact', head: true });
             
             toast({
@@ -133,8 +123,7 @@ export const CommandBar = () => {
             });
           } else if (args[0] === "search" && args[1]) {
             const { data: vehicles } = await supabase
-  if (error) console.error("Database query error:", error);
-              .from('vehicles')
+        .from('vehicles')
               .select('make, model, year')
               .or(`make.ilike.%${args[1]}%,model.ilike.%${args[1]}%`)
               .limit(5);

@@ -42,7 +42,6 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
       }));
 
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .insert(vehiclesToInsert);
 

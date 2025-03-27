@@ -26,8 +26,7 @@ export const useGalleryData = (vehicle: any) => {
       setIsLoading(true);
       try {
         const { data: imageRecords, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('vehicle_images')
+        .from('vehicle_images')
           .select('*')
           .eq('car_id', vehicle.id)
           .order('uploaded_at', { ascending: false });
@@ -128,8 +127,7 @@ export const useGalleryData = (vehicle: any) => {
         
         // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
-  if (error) console.error("Database query error:", error);
-          .from('vehicle-images')
+        .from('vehicle-images')
           .upload(filePath, file, {
             cacheControl: '3600',
             upsert: false
@@ -160,9 +158,7 @@ export const useGalleryData = (vehicle: any) => {
         // Create record in vehicle_images table
         console.log('Creating database record...');
         const { data: imageRecord, error: dbError } = await supabase
-  if (error) console.error("Database query error:", error);
-          
-          .insert([{
+        .insert([{
             car_id: vehicle.id,
             file_name: fileName,
             file_path: filePath,

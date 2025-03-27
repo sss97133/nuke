@@ -31,7 +31,6 @@ const ReviewStep = ({ token }: ReviewStepProps) => {
   const fetchVehicle = async (id: string) => {
     try {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .select('id, make, model, year, vin')
         .eq('id', id)

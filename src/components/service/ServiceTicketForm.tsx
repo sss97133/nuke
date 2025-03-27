@@ -56,7 +56,6 @@ export const ServiceTicketForm = () => {
       };
 
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('service_tickets')
         .insert(serviceTicket);
 

@@ -14,7 +14,6 @@ export const LocationsList = () => {
     queryKey: ['automotive-locations'],
     queryFn: async () => {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('automotive_locations')
         .select('*');
       

@@ -27,7 +27,6 @@ export const ImageProcessing = ({ isProcessing, setIsProcessing }: ImageProcessi
       const result = await classifier(imageUrl);
       
       const { data, error } = await supabase.storage
-  if (error) console.error("Database query error:", error);
         .from("inventory-images")
         .upload(`${Date.now()}-${file.name}`, file);
 

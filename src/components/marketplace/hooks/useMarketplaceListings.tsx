@@ -173,9 +173,7 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
         try {
           // Get watched listings first
           const { data: watchData, error: watchError } = await supabase
-  if (error) console.error("Database query error:", error);
-            
-            .select('listing_id')
+        .select('listing_id')
             .eq('user_id', userId);
             
           if (watchError) throw watchError;
@@ -199,9 +197,7 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
         // Get user's location preference
         try {
           const { data: userData, error: userError } = await supabase
-  if (error) console.error("Database query error:", error);
-            
-            .select('location')
+        .select('location')
             .eq('user_id', userId)
             .single();
             

@@ -22,7 +22,6 @@ export const usePreferencesSave = () => {
       }
 
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('user_preferences')
         .update(updates)
         .eq('user_id', user.id);

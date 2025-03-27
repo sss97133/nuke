@@ -40,7 +40,6 @@ export const GarageDropdown = () => {
       }
 
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({ active_garage_id: garageId })
         .eq('id', user.id);

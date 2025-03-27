@@ -51,8 +51,7 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
 
   const fetchBids = async () => {
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from('auction_bids')
+        .from('auction_bids')
       .select(`
         id,
         amount,

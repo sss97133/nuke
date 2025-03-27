@@ -21,7 +21,6 @@ export function LoginForm() {
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-  if (error) console.error("Database query error:", error);
         email,
         password,
       });
@@ -32,8 +31,7 @@ export function LoginForm() {
         // Trigger initial profile analysis
         try {
           const { data: profile } = await supabase
-  if (error) console.error("Database query error:", error);
-            .from('profiles')
+        .from('profiles')
             .select('*')
             .eq('id', data.user.id)
             .single();

@@ -19,7 +19,6 @@ export const AIExplanations = () => {
     queryKey: ['ai-explanations'],
     queryFn: async () => {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('ai_explanations')
         .select('*')
         .order('created_at', { ascending: false });

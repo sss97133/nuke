@@ -185,11 +185,8 @@ export const AuctionList = () => {
   const handleBidSubmit = async (auctionId: string, amount: number) => {
     console.log('💸 Submitting bid:', { auctionId, amount });
     const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-      
-      .insert([{
+        if (error) console.error("Database query error:", error);
+  .insert([{
         auction_id: auctionId,
         amount: amount,
         bidder_id: (await supabase.auth.getUser()).data.user?.id

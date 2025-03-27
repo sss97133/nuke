@@ -19,7 +19,6 @@ export const CertificationsList = () => {
     queryKey: ['user-certifications'],
     queryFn: async () => {
       const { data: userCerts, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('user_certifications')
         .select(`
           *,

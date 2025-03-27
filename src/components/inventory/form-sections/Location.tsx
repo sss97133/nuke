@@ -35,7 +35,6 @@ export const Location = ({
     queryFn: async () => {
       console.log('🔍 Fetching verified locations...');
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('verified_locations')
         .select('*')
         .eq('status', 'approved');

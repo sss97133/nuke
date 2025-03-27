@@ -38,8 +38,7 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
       setIsLoading(true);
       try {
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('profiles')
+        .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
@@ -74,9 +73,7 @@ export const ProfileContentContainer = ({ userId, isOwnProfile }: ProfileContent
       setVehiclesLoading(true);
       try {
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          
-          .select('*')
+        .select('*')
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
           

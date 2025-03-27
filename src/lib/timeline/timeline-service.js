@@ -179,9 +179,7 @@ export class TimelineService {
     try {
       // Get all timeline events for the vehicle
       const { data: events, error } = await supabaseClient
-  if (error) console.error("Database query error:", error);
-        
-        .select('*')
+  .select('*')
         .eq('vehicle_id', vehicleId);
       
       if (error) {
@@ -277,9 +275,7 @@ export class TimelineService {
       
       // Insert the event
       const { data, error } = await supabaseClient
-  if (error) console.error("Database query error:", error);
-        
-        .insert(fullEvent)
+  .insert(fullEvent)
         .select()
         .single();
       
@@ -311,7 +307,6 @@ export class TimelineService {
     try {
       // Get the current event
       const { data: currentEvent, error: fetchError } = await supabaseClient
-  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .select('*')
         .eq('id', eventId)
@@ -334,7 +329,6 @@ export class TimelineService {
       
       // Update the event
       const { data, error } = await supabaseClient
-  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .update(updatedEvent)
         .eq('id', eventId)
@@ -368,7 +362,6 @@ export class TimelineService {
     try {
       // Get the current event to know which vehicle it belongs to
       const { data: currentEvent, error: fetchError } = await supabaseClient
-  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .select('vehicle_id')
         .eq('id', eventId)
@@ -380,7 +373,6 @@ export class TimelineService {
       
       // Delete the event
       const { error } = await supabaseClient
-  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .delete()
         .eq('id', eventId);
@@ -414,7 +406,6 @@ export class TimelineService {
     try {
       // Get all timeline events for the vehicle
       const { data: events, error } = await supabaseClient
-  if (error) console.error("Database query error:", error);
         .from('vehicle_timeline')
         .select('*')
         .eq('vehicle_id', vehicleId)

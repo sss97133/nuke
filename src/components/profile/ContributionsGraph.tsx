@@ -26,7 +26,6 @@ export const ContributionsGraph = ({ userId }: { userId: string }) => {
       const startDate = subMonths(endDate, 12);
 
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('video_analysis_contributions')
         .select('date, label_count')
         .eq('user_id', userId)

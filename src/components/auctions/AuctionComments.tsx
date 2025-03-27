@@ -39,8 +39,7 @@ export const AuctionComments = ({ auctionId }: AuctionCommentsProps) => {
 
   const fetchComments = async () => {
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from("auction_comments")
+        .from("auction_comments")
       .select(`
         *,
         profiles:user_id (

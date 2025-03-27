@@ -11,8 +11,7 @@ export const handleExport = async (toast: ToastFunction) => {
     }
     
     const { data: exportData, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      .from('vehicles')
+        .from('vehicles')
       .select('*')
       .eq('user_id', user.user.id);
       

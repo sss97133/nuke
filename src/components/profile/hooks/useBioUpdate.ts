@@ -12,7 +12,6 @@ export const useBioUpdate = (userId: string) => {
     try {
       setIsUpdating(true);
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({ bio })
         .eq('id', userId);

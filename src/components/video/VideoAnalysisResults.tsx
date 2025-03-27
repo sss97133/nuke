@@ -23,8 +23,7 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
     queryFn: async () => {
       if (isStreaming) {
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('realtime_video_segments')
+        .from('realtime_video_segments')
           .select('*')
           .eq('job_id', jobId)
           .order('segment_number', { ascending: false })
@@ -34,9 +33,7 @@ export const VideoAnalysisResults = ({ jobId, isStreaming }: VideoAnalysisResult
         return data;
       } else {
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          
-          .select('*')
+        .select('*')
           .eq('job_id', jobId)
           .order('timestamp', { ascending: false })
           .range(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE - 1);

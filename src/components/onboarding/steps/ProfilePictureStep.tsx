@@ -33,7 +33,6 @@ export const ProfilePictureStep = ({ avatarUrl, onUpdate }: ProfilePictureStepPr
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-  if (error) console.error("Database query error:", error);
         .from('avatars')
         .upload(filePath, file);
 
@@ -45,8 +44,6 @@ export const ProfilePictureStep = ({ avatarUrl, onUpdate }: ProfilePictureStepPr
 
       // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .update({ avatar_url: publicUrl })
         .eq('id', session.user.id);
 

@@ -25,7 +25,6 @@ export const VehicleList = () => {
       }
 
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from("vehicles")
         .select("*")
         .eq('user_id', user.id);

@@ -39,8 +39,6 @@ export const useDashboardData = () => {
     queryKey: ['feed'],
     queryFn: async () => {
       const { data: feedData, error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .select(`
           *,
           profile:profiles(username, avatar_url)

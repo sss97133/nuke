@@ -78,7 +78,6 @@ export const useOnboardingForm = () => {
       if (!user) throw new Error('No user found');
 
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .update({
           first_name: formData.firstName,

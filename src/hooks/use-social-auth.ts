@@ -20,7 +20,6 @@ export const useSocialAuth = () => {
       console.log("[useSocialAuth] Using redirect URL:", redirectUrl);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
-  if (error) console.error("Database query error:", error);
         provider,
         options: {
           redirectTo: redirectUrl,

@@ -46,7 +46,6 @@ export function useCreateVehicle() {
       
       // Insert the vehicle into Supabase
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .insert([processedVehicle])
         .select();
@@ -74,8 +73,7 @@ export function useCreateVehicle() {
               
               // Upload to Supabase storage
               const { data: uploadData, error: uploadError } = await supabase.storage
-  if (error) console.error("Database query error:", error);
-                .from('vehicle-images')
+        .from('vehicle-images')
                 .upload(`${vehicleId}/${file.name}`, file);
               
               if (uploadError) {
@@ -85,9 +83,7 @@ export function useCreateVehicle() {
               
               // Create record in vehicle_images table
               const { error: imageInsertError } = await supabase
-  if (error) console.error("Database query error:", error);
-                
-                .insert([{
+        .insert([{
                   vehicle_id: vehicleId,
                   file_path: uploadData?.path,
                   is_primary: i === 0, // First image is primary

@@ -96,7 +96,6 @@ describe('MarketplaceContent', () => {
     // Wait for real data to load
     await waitFor(async () => {
       const { data: listings } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('marketplace_listings')
         .select('*')
         .eq('featured', true)
@@ -119,8 +118,6 @@ describe('MarketplaceContent', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'All Listings' }));
     await waitFor(async () => {
       const { data: allListings } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .select('*')
         .single();
 
@@ -133,8 +130,6 @@ describe('MarketplaceContent', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Verified History' }));
     await waitFor(async () => {
       const { data: verifiedListings } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .select('*')
         .eq('verification_status', 'verified')
         .single();

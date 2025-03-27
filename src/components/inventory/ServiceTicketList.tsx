@@ -11,7 +11,6 @@ export const ServiceTicketList = () => {
   useEffect(() => {
     const fetchTickets = async () => {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from("service_tickets")
         .select("*");
 

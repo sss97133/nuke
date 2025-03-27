@@ -34,8 +34,7 @@ export function useVehicleRelationships(userId: string) {
         // For now, we'll just fetch vehicles and simulate relationships
         // Until the actual vehicle_relationships table is created
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('vehicles')
+        .from('vehicles')
           .select('id, make, model, year, status')
           .eq('user_id', userId);
         

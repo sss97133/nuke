@@ -12,7 +12,6 @@ export const useVehiclesData = () => {
   const fetchVehicles = useCallback(async () => {
     try {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('vehicles')
         .select('id, make, model, year');
       

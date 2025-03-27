@@ -17,7 +17,6 @@ export const useUserLocation = () => {
       }
 
       const { data: profile, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('home_location')
         .eq('id', user.id)

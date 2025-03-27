@@ -1,4 +1,3 @@
-import type { Database } from '../types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skill, UserSkill } from '@/types/skills';
@@ -13,7 +12,6 @@ export const useSkillsData = (propSkills?: Skill[], propUserSkills?: UserSkill[]
     queryKey: ['skills'],
     queryFn: async () => {
       const { data, error } = await supabase.from('skills').select('*');
-  if (error) console.error("Database query error:", error);
       if (error) throw error;
       return data as Skill[];
     },
@@ -24,12 +22,10 @@ export const useSkillsData = (propSkills?: Skill[], propUserSkills?: UserSkill[]
     queryKey: ['user-skills'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
       if (!user) return [];
       
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
+        .from('user_skills')
         .select('*')
         .eq('user_id', user.id);
       

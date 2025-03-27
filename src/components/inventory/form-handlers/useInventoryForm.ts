@@ -69,7 +69,6 @@ export const useInventoryForm = () => {
       const filePath = `${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-  if (error) console.error("Database query error:", error);
         .from('asset-images')
         .upload(filePath, file);
 
@@ -112,7 +111,6 @@ export const useInventoryForm = () => {
 
     try {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from("assets")
         .insert([{
           name: formData.name,

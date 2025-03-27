@@ -14,7 +14,6 @@ export const CurrentUserCard: React.FC = () => {
       if (!user) return null;
 
       const { data: profile } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('*')
         .eq('id', user.id)

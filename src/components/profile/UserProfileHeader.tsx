@@ -40,7 +40,6 @@ export const UserProfileHeader = ({
     // Refresh profile data
     try {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('profiles')
         .select('full_name, username, avatar_url, bio')
         .eq('id', userId)

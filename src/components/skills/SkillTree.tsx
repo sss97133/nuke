@@ -28,8 +28,7 @@ export const SkillTree = () => {
     queryFn: async () => {
       try {
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('skills')
+        .from('skills')
           .select('*');
         
         if (error) throw error;
@@ -55,9 +54,7 @@ export const SkillTree = () => {
         }
 
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-          
-          .select('*')
+        .select('*')
           .eq('user_id', user.id);
         
         if (error) throw error;

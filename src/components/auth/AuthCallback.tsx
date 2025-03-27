@@ -32,8 +32,7 @@ export const AuthCallback = () => {
         
         // Check if user has a profile
         const { data: profile, error: profileError } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('profiles')
+        .from('profiles')
           .select('username, onboarding_completed')
           .eq('id', session.user.id)
           .single();

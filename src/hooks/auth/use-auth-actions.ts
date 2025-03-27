@@ -14,7 +14,6 @@ export const useAuthActions = () => {
       const redirectTo = `${window.location.origin}/auth/callback`;
       
       const { data, error } = await supabase.auth.signInWithOAuth({
-  if (error) console.error("Database query error:", error);
         provider,
         options: {
           redirectTo,

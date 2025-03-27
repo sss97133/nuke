@@ -15,8 +15,8 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-// Get the list of files with potential issues
-const findCommand = 'find /Users/skylar/nuke/src -type f -name "*.tsx" -o -name "*.ts" | xargs grep -l "if (error) console.error" 2>/dev/null';
+// Get the list of files with potential issues - broader search
+const findCommand = 'find /Users/skylar/nuke/src -type f -name "*.tsx" -o -name "*.ts" -o -name "*.jsx" -o -name "*.js" | xargs grep -l "if (error) console.error" 2>/dev/null';
 const filePaths = execSync(findCommand).toString().trim().split('\n');
 
 console.log(`Found ${filePaths.length} files with potential issues.`);
@@ -29,19 +29,49 @@ let totalIssuesFixed = 0;
 const patterns = [
   {
     // Pattern 1: Misplaced error check after await supabase before method chain
-    regex: /(const\s+\{[^}]*error[^}]*\}\s*=\s*await\s+supabase)\s*\n\s*(if\s*\(\s*error\s*\)\s*console\.error\([^)]*\);\s*)\n\s*(\.\s*from)/g,
+    regex: /(const\s+\{[^}]*error[^}]*\}\s*=\s*await\s+supabase[^;]*)\s*\n\s*(if\s*\(\s*error\s*\)\s*console\.error\([^)]*\);\s*)\n\s*(\.\s*from)/g,
     replacement: '$1\n        $3'
   },
   {
-    // Pattern 2: Misplaced error check in the middle of a function call's parameters
+    // Pattern 2: Misplaced error check after await supabase.something before method chain
+    regex: /(const\s+\{[^}]*\}\s*=\s*await\s+supabase\.[a-zA-Z0-9._]+[^;]*)\s*\n\s*(if\s*\(\s*error\s*\)\s*console\.error\([^)]*\);\s*)\n\s*(\.\s*[a-zA-Z])/g,
+    replacement: '$1\n        $3'
+  },
+  {
+    // Pattern 3: Misplaced error check in the middle of a function call's parameters
     regex: /(=\s*await\s+supabase(?:\.(?:[a-zA-Z0-9_]+))*\.[a-zA-Z0-9_]+\(\{)\s*\n\s*(if\s*\(\s*error\s*\)\s*console\.error\([^)]*\);\s*)\n\s*/g,
     replacement: '$1\n        '
+  },
+  {
+    // Pattern 4: Error check after supabase instantiation but before from()
+    regex: /(const\s+\{[^}]*\}\s*=\s*await\s+supabase)\s*\n\s*(if\s*\(\s*error\s*\)\s*console\.error\([^)]*\);\s*)\s*\n\s*/g,
+    replacement: '$1\n        '
+  },
+  {
+    // Pattern 5: Error check after get session
+    regex: /(const\s+\{[^}]*\}\s*=\s*await\s+supabase\.auth\.[a-zA-Z]+[^;]*)\s*\n\s*(if\s*\(\s*error\s*\)\s*console\.error\([^)]*\);\s*)\s*\n/g,
+    replacement: '$1\n        \n'
+  },
+  {
+    // Pattern 6: Error check alone before method chain
+    regex: /(\s*)(if\s*\(\s*error\s*\)\s*console\.error\([^)]*\);\s*)\s*\n\s*(\.\s*from)/g,
+    replacement: '$1$3'
+  },
+  {
+    // Pattern 7: Error check before any method (from, update, delete, etc.)
+    regex: /(\s*)(if\s*\(\s*error\s*\)\s*console\.error\([^)]*\);\s*)\s*\n\s*(\.\s*[a-zA-Z])/g,
+    replacement: '$1$3'
   }
 ];
 
 // Process each file
 filePaths.forEach(filePath => {
   try {
+    // Skip node_modules or dist folders
+    if (filePath.includes('node_modules') || filePath.includes('dist')) {
+      return;
+    }
+    
     // Read file content
     const content = fs.readFileSync(filePath, 'utf8');
     let newContent = content;

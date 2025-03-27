@@ -17,8 +17,7 @@ export const useVehicleDetail = (id: string) => {
       try {
         // First try to fetch from real data in Supabase
         const { data: vehicleData, error: vehicleError } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('vehicles')
+        .from('vehicles')
           .select('*')
           .eq('id', id)
           .single();
@@ -28,9 +27,7 @@ export const useVehicleDetail = (id: string) => {
           
           // Get relationships for this vehicle if they exist
           const { data: relationshipsData, error: relationshipsError } = await supabase
-  if (error) console.error("Database query error:", error);
-            
-            .select('*')
+        .select('*')
             .eq('vehicle_id', id);
           
           if (!relationshipsError) {

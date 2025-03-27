@@ -22,7 +22,6 @@ export const useTokenStaking = () => {
     setHasError(false);
     try {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('tokens')
         .select('*');
 
@@ -42,8 +41,6 @@ export const useTokenStaking = () => {
     setHasError(false);
     try {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .select('*');
 
       if (error) throw error;
@@ -71,8 +68,6 @@ export const useTokenStaking = () => {
       }
 
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .select(`
           *,
           token:token_id(*),
@@ -102,8 +97,6 @@ export const useTokenStaking = () => {
     try {
       // Get all active stakes for the user
       const { data: stakes, error: stakesError } = await supabase
-  if (error) console.error("Database query error:", error);
-        
         .select(`
           *,
           vehicle:vehicle_id(make, model, year)
@@ -183,7 +176,6 @@ export const useTokenStaking = () => {
 
       // Get the stake information
       const { data: stake, error: stakeError } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('token_stakes')
         .select('*')
         .eq('id', stakeId)
@@ -197,7 +189,6 @@ export const useTokenStaking = () => {
 
       // Update the stake status to completed
       const { error: updateError } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('token_stakes')
         .update({ status: 'completed' })
         .eq('id', stakeId)
@@ -213,7 +204,6 @@ export const useTokenStaking = () => {
       
       // Check if user already has holdings for this token
       const { data: holdings, error: holdingsError } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('token_holdings')
         .select('*')
         .eq('user_id', user.id)
@@ -229,8 +219,7 @@ export const useTokenStaking = () => {
         // Update existing holdings
         const newBalance = Number(holdings.balance) + totalAmount;
         const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('token_holdings')
+        .from('token_holdings')
           .update({ balance: newBalance })
           .eq('id', holdings.id);
           
@@ -241,8 +230,7 @@ export const useTokenStaking = () => {
       } else {
         // Create new holdings
         const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-          .from('token_holdings')
+        .from('token_holdings')
           .insert([{ 
             user_id: user.id, 
             token_id: stake.token_id,
