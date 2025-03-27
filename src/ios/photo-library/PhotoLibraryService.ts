@@ -29,7 +29,7 @@ interface BatchData {
 
 interface Callback<T> {
   resolve: (value: T) => void;
-  reject: (reason?: unknown) => void;
+  reject: (error: Error) => void;
 }
 
 interface WebKitMessageHandlers {
@@ -69,13 +69,13 @@ declare global {
 class PhotoLibraryBridge {
   private isNative: boolean;
   private mockAssets: PhotoAsset[];
-  private callbacks: Record<string, Callback<unknown>>;
+  private callbacks: Map<string, Callback<unknown>> = new Map();
+  private callbackIdCounter = 0;
   private progressHandlers: Record<string, (progress: number) => void>;
 
   constructor() {
     this.isNative = false;
     this.mockAssets = [];
-    this.callbacks = {};
     this.progressHandlers = {};
     
     // Check if we're running in a native iOS environment with the bridge available
@@ -110,22 +110,33 @@ class PhotoLibraryBridge {
     }
   }
   
-  // Private method to generate a unique callback ID
-  private _generateCallbackId(): string {
-    return `cb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  private generateCallbackId(): string {
+    return `callback_${this.callbackIdCounter++}`;
+  }
+
+  private addCallback<T>(callbackId: string, callback: Callback<T>): void {
+    this.callbacks.set(callbackId, callback as Callback<unknown>);
+  }
+
+  private removeCallback(callbackId: string): void {
+    this.callbacks.delete(callbackId);
+  }
+
+  private getCallback(callbackId: string): Callback<unknown> | undefined {
+    return this.callbacks.get(callbackId);
   }
   
   // Handle callbacks from native code
   private _handleNativeCallback(callbackId: string, result: unknown, error?: string): void {
-    if (this.callbacks[callbackId]) {
+    if (this.getCallback(callbackId)) {
       if (error) {
-        this.callbacks[callbackId].reject(new Error(error));
+        this.getCallback(callbackId)?.reject(new Error(error));
       } else {
-        this.callbacks[callbackId].resolve(result);
+        this.getCallback(callbackId)?.resolve(result);
       }
       
       // Clean up
-      delete this.callbacks[callbackId];
+      this.removeCallback(callbackId);
     }
   }
   
@@ -148,8 +159,8 @@ class PhotoLibraryBridge {
   requestFullAccess(): Promise<boolean> {
     return new Promise((resolve, reject) => {
       if (this.isNative) {
-        const callbackId = this._generateCallbackId();
-        this.callbacks[callbackId] = { resolve: (value: unknown) => resolve(value as boolean), reject };
+        const callbackId = this.generateCallbackId();
+        this.addCallback(callbackId, { resolve: (value: unknown) => resolve(value as boolean), reject });
         
         window.webkit?.messageHandlers.photoLibrary.postMessage({
           method: 'requestFullAccess',
@@ -174,8 +185,8 @@ class PhotoLibraryBridge {
   getAuthorizationStatus(): Promise<string> {
     return new Promise((resolve, reject) => {
       if (this.isNative) {
-        const callbackId = this._generateCallbackId();
-        this.callbacks[callbackId] = { resolve: (value: unknown) => resolve(value as string), reject };
+        const callbackId = this.generateCallbackId();
+        this.addCallback(callbackId, { resolve: (value: unknown) => resolve(value as string), reject });
         
         window.webkit?.messageHandlers.photoLibrary.postMessage({
           method: 'getAuthorizationStatus',
@@ -199,8 +210,8 @@ class PhotoLibraryBridge {
   fetchAllPhotos(config: Record<string, unknown> = {}): Promise<PhotoAsset[]> {
     return new Promise((resolve, reject) => {
       if (this.isNative) {
-        const callbackId = this._generateCallbackId();
-        this.callbacks[callbackId] = { resolve: (value: unknown) => resolve(value as PhotoAsset[]), reject };
+        const callbackId = this.generateCallbackId();
+        this.addCallback(callbackId, { resolve: (value: unknown) => resolve(value as PhotoAsset[]), reject });
         
         window.webkit?.messageHandlers.photoLibrary.postMessage({
           method: 'fetchAllPhotos',
@@ -301,8 +312,8 @@ class PhotoLibraryBridge {
   getImageData(assetId: string, quality: 'low' | 'medium' | 'high' = 'high'): Promise<Blob> {
     return new Promise((resolve, reject) => {
       if (this.isNative) {
-        const callbackId = this._generateCallbackId();
-        this.callbacks[callbackId] = { resolve: (value: unknown) => resolve(value as Blob), reject };
+        const callbackId = this.generateCallbackId();
+        this.addCallback(callbackId, { resolve: (value: unknown) => resolve(value as Blob), reject });
         
         window.webkit?.messageHandlers.photoLibrary.postMessage({
           method: 'getImageData',
