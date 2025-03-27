@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=18.x"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,7 @@
     "prepare": "husky",
     "validate:all": "npm run lint && tsc --noEmit",
     "start": "node serve.js",
-    "vercel-build": "npm run build"
+    "vercel-build": "NODE_ENV=production tsc && vite build"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",

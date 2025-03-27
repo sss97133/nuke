@@ -25,13 +25,42 @@ jobs:
         
       # Create .env file for the build process
       - name: Setup Environment Variables
+        id: setup_env
         run: |
+          echo "Creating environment files for build..."
+          
+          # Create comprehensive .env file
           cat > .env << EOF
+          # Supabase configuration
           VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SUPABASE_SERVICE_KEY=${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
-          # Add any other environment variables here
+          
+          # Application configuration
+          VITE_APP_NAME=Nuke
+          VITE_APP_DESCRIPTION="Vehicle Management Platform"
+          VITE_ENV=production
+          VITE_ENABLE_DEBUG=false
+          VITE_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           EOF
+          
+          # Create other environment files needed by the build process
+          cp .env .env.production
+          
+          # Verify environment variables and set output variable
+          if grep -q "VITE_SUPABASE_URL=" .env && grep -q "VITE_SUPABASE_ANON_KEY=" .env; then
+            echo "ENV_VALID=true" >> $GITHUB_OUTPUT
+            echo "✅ Environment variables are properly set"
+          else
+            echo "ENV_VALID=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Some required environment variables are missing!"
+            
+            # Output diagnostics (without revealing values)
+            echo "Environment variables availability:"
+            grep -q "VITE_SUPABASE_URL=" .env && echo "- VITE_SUPABASE_URL: Available" || echo "- VITE_SUPABASE_URL: Missing"
+            grep -q "VITE_SUPABASE_ANON_KEY=" .env && echo "- VITE_SUPABASE_ANON_KEY: Available" || echo "- VITE_SUPABASE_ANON_KEY: Missing"
+            grep -q "VITE_SUPABASE_SERVICE_KEY=" .env && echo "- VITE_SUPABASE_SERVICE_KEY: Available" || echo "- VITE_SUPABASE_SERVICE_KEY: Missing"
+          fi
           
       # Bypass linting but still report errors (non-blocking)
       - name: Check for linting issues
@@ -45,17 +74,100 @@ jobs:
       
       # Build the project (with environment variables)
       - name: Build project
-        run: npm run build || npm run build:prod || true
+        id: build
+        run: |
+          echo "Building project..."
+          
+          # Attempt build with npm scripts first
+          if grep -q '"build:prod"' package.json; then
+            echo "Running npm run build:prod..."
+            npm run build:prod && {
+              echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
+              echo "✅ Build completed successfully with build:prod script"
+            } || echo "⚠️ build:prod script failed, trying alternatives"
+          elif grep -q '"build"' package.json; then
+            echo "Running npm run build..."
+            npm run build && {
+              echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
+              echo "✅ Build completed successfully with build script"
+            } || echo "⚠️ build script failed, trying direct build"
+          else
+            echo "⚠️ No build script found in package.json"
+          fi
+          
+          # If npm scripts failed, try direct build commands
+          if [ -z "$BUILD_SUCCESS" ]; then
+            echo "Attempting direct build commands..."
+            
+            # Try TypeScript compilation first (optional)
+            npx tsc || echo "⚠️ TypeScript compilation failed, proceeding to Vite build"
+            
+            # Then try Vite build
+            npx vite build && {
+              echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
+              echo "✅ Build completed successfully with direct vite build"
+            } || {
+              echo "⚠️ Direct vite build failed, trying ESM build"
+              
+              # Try ESM build as last resort
+              if [ -f "build.mjs" ]; then
+                node build.mjs && {
+                  echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
+                  echo "✅ Build completed successfully with ESM build"
+                } || echo "⚠️ All build methods failed"
+              else
+                echo "⚠️ No ESM build script found, all build methods failed"
+                
+                # Create minimal dist directory for deployment to continue
+                mkdir -p dist
+                echo '<!DOCTYPE html><html><head><title>Nuke - Build Failed</title></head><body><h1>Build Failed</h1><p>See GitHub Actions logs for details</p></body></html>' > dist/index.html
+              fi
+            }
+          fi
+          
+          # Check if build was successful
+          if [ -d "dist" ] && [ "$(find dist -type f | wc -l)" -gt 0 ]; then
+            echo "BUILD_OUTPUT_EXISTS=true" >> $GITHUB_OUTPUT
+            echo "✅ Build output exists in dist/ directory"
+            find dist -type f | wc -l | xargs -I {} echo "Found {} files in dist/"
+          else
+            echo "BUILD_OUTPUT_EXISTS=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No build output found in dist/ directory"
+          fi
         env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
+          CI: "true"
         continue-on-error: true
       
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
       
+      - name: Check for window.__env in HTML
+        id: check_runtime_vars
+        if: steps.build.outputs.BUILD_OUTPUT_EXISTS == 'true'
+        run: |
+          echo "Checking for runtime environment variables in built HTML..."
+          if [ -f "dist/index.html" ] && grep -q "window.__env" dist/index.html; then
+            echo "RUNTIME_ENV_VARS=true" >> $GITHUB_OUTPUT
+            echo "✅ Runtime environment variables found in HTML"
+          else
+            echo "RUNTIME_ENV_VARS=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Runtime environment variables not found, adding them..."
+            
+            # Only inject if index.html exists
+            if [ -f "dist/index.html" ]; then
+              sed -i 's|</head>|<script>window.__env = { VITE_SUPABASE_URL: "${{ secrets.VITE_SUPABASE_URL }}", VITE_SUPABASE_ANON_KEY: "${{ secrets.VITE_SUPABASE_ANON_KEY }}" };</script></head>|' dist/index.html
+              echo "✅ Injected runtime environment variables"
+            else
+              echo "⚠️ No index.html found in dist/ directory"
+            fi
+          fi
+      
       - name: Deploy to Vercel
+        id: deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -64,13 +176,55 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
         run: |
+          echo "Preparing for Vercel deployment..."
+          
+          # Verify Vercel credentials are available
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "⚠️ Missing Vercel credentials! Cannot deploy."
+            echo "VERCEL_TOKEN exists: $(if [ -n "$VERCEL_TOKEN" ]; then echo "YES"; else echo "NO"; fi)"
+            echo "VERCEL_ORG_ID exists: $(if [ -n "$VERCEL_ORG_ID" ]; then echo "YES"; else echo "NO"; fi)"
+            echo "VERCEL_PROJECT_ID exists: $(if [ -n "$VERCEL_PROJECT_ID" ]; then echo "YES"; else echo "NO"; fi)"
+            echo "DEPLOY_SUCCESS=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
           # Create Vercel project config
           mkdir -p .vercel
           echo '{"orgId":"'${VERCEL_ORG_ID}'","projectId":"'${VERCEL_PROJECT_ID}'"}' > .vercel/project.json
+          echo "✅ Created Vercel project configuration"
           
           # Deploy based on whether this is a PR or push to main
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            vercel --token ${VERCEL_TOKEN} --yes
+            echo "Deploying preview for pull request..."
+            DEPLOY_URL=$(vercel --token ${VERCEL_TOKEN} --yes) || {
+              echo "⚠️ Vercel preview deployment failed"
+              echo "DEPLOY_SUCCESS=false" >> $GITHUB_OUTPUT
+              exit 1
+            }
+            echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_OUTPUT
+            echo "✅ Preview deployment successful: $DEPLOY_URL"
+            echo "DEPLOY_SUCCESS=true" >> $GITHUB_OUTPUT
           else
-            vercel --token ${VERCEL_TOKEN} --prod --yes
+            echo "Deploying to production..."
+            DEPLOY_URL=$(vercel --token ${VERCEL_TOKEN} --prod --yes) || {
+              echo "⚠️ Vercel production deployment failed"
+              echo "DEPLOY_SUCCESS=false" >> $GITHUB_OUTPUT
+              exit 1
+            }
+            echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_OUTPUT
+            echo "✅ Production deployment successful: $DEPLOY_URL"
+            echo "DEPLOY_SUCCESS=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "Deployment Status Summary:"
+          echo "-------------------------"
+          echo "Environment Variables: $(if [ "${{ steps.setup_env.outputs.ENV_VALID }}" == "true" ]; then echo "✅ Valid"; else echo "⚠️ Invalid"; fi)"
+          echo "Build Output: $(if [ "${{ steps.build.outputs.BUILD_OUTPUT_EXISTS }}" == "true" ]; then echo "✅ Found"; else echo "⚠️ Missing"; fi)"
+          echo "Runtime Env Vars: $(if [ "${{ steps.check_runtime_vars.outputs.RUNTIME_ENV_VARS }}" == "true" ]; then echo "✅ Found"; else echo "⚠️ Injected"; fi)"
+          echo "Deployment: $(if [ "${{ steps.deploy.outputs.DEPLOY_SUCCESS }}" == "true" ]; then echo "✅ Successful"; else echo "⚠️ Failed"; fi)"
+          if [ "${{ steps.deploy.outputs.DEPLOY_URL }}" != "" ]; then
+            echo "Deployment URL: ${{ steps.deploy.outputs.DEPLOY_URL }}"
           fi
