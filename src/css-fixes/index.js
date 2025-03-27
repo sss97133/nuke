@@ -3,6 +3,8 @@
  * This file imports all CSS fixes and enhancements to ensure they're properly applied
  */
 
+/* global console */
+
 // Import base fixes
 import './base.css';
 import './components.css';
