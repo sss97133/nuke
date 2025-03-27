@@ -30,121 +30,67 @@ permissions:
 jobs:
   analyze-env-variables:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
+          cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci || npm install
-
-      - name: Create analysis directory
+      - name: Detect project structure
+        id: detect-structure
         run: |
-          mkdir -p .repair/env-analysis
+          # Initialize variables with safe defaults
+          echo "FALLBACK_DETECTED=false" >> $GITHUB_ENV
+          echo "USES_SUPABASE=false" >> $GITHUB_ENV
+          echo "HAS_ENV_INJECT=false" >> $GITHUB_ENV
+          echo "HAS_VERCEL_CONFIG=false" >> $GITHUB_ENV
           
-      - name: Identify environment variable usage
-        run: |
-          # Look for env variable patterns in the codebase
-          echo "Analyzing environment variable usage patterns..."
-          
-          # Find all direct env variable access patterns
-          grep -r "process.env" --include="*.ts" --include="*.tsx" --include="*.js" src/ > .repair/env-analysis/node-env.txt || true
-          grep -r "import.meta.env" --include="*.ts" --include="*.tsx" --include="*.js" src/ > .repair/env-analysis/vite-env.txt || true
-          grep -r "window.__env" --include="*.ts" --include="*.tsx" --include="*.js" src/ > .repair/env-analysis/browser-env.txt || true
-          
-          # Create a list of all used environment variables
-          cat .repair/env-analysis/*.txt | grep -o "process.env\.[A-Z0-9_]*" | sort | uniq | sed 's/process.env\.//g' > .repair/env-analysis/node-vars.txt || true
-          cat .repair/env-analysis/*.txt | grep -o "import\.meta\.env\.[A-Z0-9_]*" | sort | uniq | sed 's/import\.meta\.env\.//g' > .repair/env-analysis/vite-vars.txt || true
-          cat .repair/env-analysis/*.txt | grep -o "window\.__env\.[A-Z0-9_]*" | sort | uniq | sed 's/window\.__env\.//g' > .repair/env-analysis/browser-vars.txt || true
-          
-          # Combine all variables into a comprehensive list
-          cat .repair/env-analysis/*-vars.txt | sort | uniq > .repair/env-analysis/all-env-vars.txt
-          
-          echo "Environment variables used in codebase:"
-          cat .repair/env-analysis/all-env-vars.txt
-          
-          # Check for fallback patterns
-          if grep -q "getEnv" --include="*.ts" --include="*.tsx" --include="*.js" src/; then
-            echo "Fallback system detected with getEnv function"
-            FALLBACK_DETECTED=true
-          else
-            echo "No consistent fallback system detected"
-            FALLBACK_DETECTED=false
+          # Check for various environment or Supabase usage patterns
+          if grep -q "import.meta.env" $(find src -type f -name "*.ts" -o -name "*.tsx" | head -50) 2>/dev/null; then
+            echo "Found Vite environment variable usage (import.meta.env)"
+            echo "FALLBACK_DETECTED=true" >> $GITHUB_ENV
           fi
-          echo "FALLBACK_DETECTED=$FALLBACK_DETECTED" >> $GITHUB_ENV
           
-          # Check Supabase variables specifically
-          echo "Checking Supabase variables..."
-          if grep -q "VITE_SUPABASE_URL\|SUPABASE_URL" .repair/env-analysis/all-env-vars.txt; then
-            echo "Supabase URL configuration detected"
-            USES_SUPABASE=true
-          else
-            USES_SUPABASE=false
+          if grep -q "process.env" $(find src -type f -name "*.ts" -o -name "*.tsx" | head -50) 2>/dev/null; then
+            echo "Found Node environment variable usage (process.env)"
+            echo "FALLBACK_DETECTED=true" >> $GITHUB_ENV
           fi
-          echo "USES_SUPABASE=$USES_SUPABASE" >> $GITHUB_ENV
-      
-      - name: Check environment file configuration
-        run: |
-          # Create a report on env file status
-          echo "Analyzing environment files..."
           
-          # Check for environment files
-          if [ -f ".env" ]; then
-            echo "Found .env file"
-            HAS_ENV=true
-          else
-            echo "No .env file found"
-            HAS_ENV=false
+          if grep -q "window.__env" $(find src -type f -name "*.ts" -o -name "*.tsx" | head -50) 2>/dev/null; then
+            echo "Found browser environment variable usage (window.__env)"
+            echo "FALLBACK_DETECTED=true" >> $GITHUB_ENV
           fi
-          echo "HAS_ENV=$HAS_ENV" >> $GITHUB_ENV
           
-          if [ -f ".env.production" ]; then
-            echo "Found .env.production file"
-            HAS_ENV_PROD=true
-          else  
-            echo "No .env.production file found"
-            HAS_ENV_PROD=false
+          # Check for Supabase usage
+          if grep -q "createClient" $(find src -type f -name "*.ts" -o -name "*.tsx" | head -50) 2>/dev/null || [ -d "supabase" ]; then
+            echo "Detected Supabase usage"
+            echo "USES_SUPABASE=true" >> $GITHUB_ENV
           fi
-          echo "HAS_ENV_PROD=$HAS_ENV_PROD" >> $GITHUB_ENV
           
-          if [ -f ".env.test" ]; then
-            echo "Found .env.test file"
-            HAS_ENV_TEST=true
-          else
-            echo "No .env.test file found"
-            HAS_ENV_TEST=false
-          fi
-          echo "HAS_ENV_TEST=$HAS_ENV_TEST" >> $GITHUB_ENV
-          
-          # Look for scripts that inject environment variables
-          if grep -q "inject-env" package.json; then
-            echo "Found environment injection script in package.json"
-            HAS_ENV_INJECT=true
+          # Check environment injection script
+          if [ -f "scripts/inject-env.js" ]; then
+            echo "Found environment injection script"
+            echo "HAS_ENV_INJECT=true" >> $GITHUB_ENV
           else
             echo "No environment injection script found"
-            HAS_ENV_INJECT=false
           fi
-          echo "HAS_ENV_INJECT=$HAS_ENV_INJECT" >> $GITHUB_ENV
           
           # Check Vercel configuration
           if [ -f "vercel.json" ]; then
             echo "Found Vercel configuration"
-            HAS_VERCEL_CONFIG=true
+            echo "HAS_VERCEL_CONFIG=true" >> $GITHUB_ENV
           else
             echo "No Vercel configuration found"
-            HAS_VERCEL_CONFIG=false
           fi
-          echo "HAS_VERCEL_CONFIG=$HAS_VERCEL_CONFIG" >> $GITHUB_ENV
       
       - name: Create or update environment helper
-        if: env.FALLBACK_DETECTED != 'true' && env.USES_SUPABASE == 'true'
+        if: ${{ env.FALLBACK_DETECTED == 'true' && env.USES_SUPABASE == 'true' }}
         run: |
           # Skip creating environment.ts if it already exists
           if [ -f "src/utils/environment.ts" ]; then
@@ -163,198 +109,236 @@ jobs:
            * 2. Then checks process.env (Node)
            * 3. Finally checks window.__env (Browser runtime)
            */
-
-          // Type definition for window.__env
-          declare global {
-            interface Window {
-              __env?: Record<string, string>;
-            }
-          }
-
+          
           /**
-           * Gets an environment variable using the three-tier fallback system
+           * Gets an environment variable value from various sources with fallbacks
            * @param key The environment variable key
-           * @param defaultValue Optional fallback value if not found in any tier
-           * @returns The environment variable value or defaultValue if not found
+           * @param defaultValue Optional default value if environment variable is not found
+           * @returns The environment variable value or default value
            */
           export const getEnv = (key: string, defaultValue: string = ''): string => {
-            // 1. Check Vite environment (import.meta.env)
-            const viteEnv = typeof import !== 'undefined' && 
-                        typeof import.meta !== 'undefined' && 
-                        typeof import.meta.env !== 'undefined' ? 
-                        import.meta.env : {};
-                        
-            if (viteEnv[key]) {
-              return viteEnv[key];
+            // First try Vite's import.meta.env
+            if (typeof import.meta !== 'undefined' && 
+                import.meta.env && 
+                import.meta.env[key] !== undefined) {
+              return import.meta.env[key];
             }
-
-            // 2. Check Node environment (process.env)
-            if (typeof process !== 'undefined' && process.env && process.env[key]) {
+            
+            // Then try Node's process.env
+            if (typeof process !== 'undefined' && 
+                process.env && 
+                process.env[key] !== undefined) {
               return process.env[key];
             }
-
-            // 3. Check Browser runtime environment (window.__env)
-            if (typeof window !== 'undefined' && window.__env && window.__env[key]) {
+            
+            // Finally try window.__env for runtime injected variables
+            if (typeof window !== 'undefined' && 
+                window.__env && 
+                window.__env[key] !== undefined) {
               return window.__env[key];
             }
-
-            // Return the default value if not found in any tier
+            
+            // Return default value if not found anywhere
             return defaultValue;
           };
-
-          /**
-           * Gets the Supabase URL using the three-tier fallback system
-           * @returns The Supabase URL
-           */
-          export const getSupabaseUrl = (): string => {
-            return getEnv('VITE_SUPABASE_URL', 'http://localhost:54321');
-          };
-
-          /**
-           * Gets the Supabase anonymous key using the three-tier fallback system
-           * @returns The Supabase anonymous key
-           */
-          export const getSupabaseAnonKey = (): string => {
-            return getEnv('VITE_SUPABASE_ANON_KEY', '');
-          };
-
-          /**
-           * Gets the Supabase service key using the three-tier fallback system
-           * @returns The Supabase service key
-           */
-          export const getSupabaseServiceKey = (): string => {
-            return getEnv('VITE_SUPABASE_SERVICE_KEY', '');
-          };
-          EOF
-            echo "Created environment helper with three-tier fallback system"
-          fi
-          EOF
           
-          echo "Created environment helper with three-tier fallback system"
+          /**
+           * Checks if an environment variable is defined in any context
+           * @param key The environment variable key
+           * @returns boolean indicating if the variable exists
+           */
+          export const hasEnv = (key: string): boolean => {
+            return (
+              (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key] !== undefined) ||
+              (typeof process !== 'undefined' && process.env && process.env[key] !== undefined) ||
+              (typeof window !== 'undefined' && window.__env && window.__env[key] !== undefined)
+            );
+          };
+          
+          /**
+           * Environment variable type declaration for TypeScript
+           */
+          declare global {
+            interface Window {
+              __env?: Record<string, any>;
+            }
+          }
+          EOF
+          fi
       
       - name: Create environment variable injection script
-        if: env.HAS_ENV_INJECT != 'true' && env.USES_SUPABASE == 'true'
+        if: ${{ env.HAS_ENV_INJECT != 'true' && env.USES_SUPABASE == 'true' }}
         run: |
           echo "Creating environment variable injection script..."
           
           # Create scripts directory if it doesn't exist
           mkdir -p scripts
           
-          # Create inject-env.js for runtime environment variable injection
+          # Create inject-env.js script to handle runtime environment variables
           cat > scripts/inject-env.js << EOF
           /**
-           * Environment Variable Injection Script
-           * 
-           * This script injects environment variables into the HTML at build time
-           * to make them available at runtime in the browser via window.__env
-           * 
-           * This solves the issue where environment variables are only available
-           * at build time in static deployments like Vercel.
+           * This script injects environment variables into the built HTML file
+           * for use in production static deployments.
            */
-          
           const fs = require('fs');
           const path = require('path');
           
-          // Get the build output directory (default for Vite is 'dist')
-          const buildDir = path.resolve(process.cwd(), 'dist');
-          const htmlFile = path.resolve(buildDir, 'index.html');
+          // Path to the built index.html
+          const indexPath = path.resolve(__dirname, '../dist/index.html');
           
-          // Read the HTML file
-          let htmlContent = fs.readFileSync(htmlFile, 'utf8');
+          // Environment variables to inject (only VITE_ prefixed ones for security)
+          const envVars = Object.keys(process.env)
+            .filter(key => key.startsWith('VITE_'))
+            .reduce((obj, key) => {
+              obj[key] = process.env[key];
+              return obj;
+            }, {});
           
-          // Environment variables to inject (must start with VITE_)
-          const envVars = {
-            VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || '',
-            VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || '',
-            // Only include service key if explicitly provided to this script
-            ...(process.env.VITE_SUPABASE_SERVICE_KEY ? 
-              { VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY } : {}),
-            // Add other environment variables as needed
-          };
-          
-          // Create the script to inject
-          const envScript = \`
-            <script>
-              window.__env = \${JSON.stringify(envVars)};
-            </script>
-          \`;
-          
-          // Inject the script right after the <head> tag
-          htmlContent = htmlContent.replace('</head>', \`\${envScript}</head>\`);
-          
-          // Write the modified HTML back to the file
-          fs.writeFileSync(htmlFile, htmlContent);
-          
-          console.log('Injected environment variables into index.html for runtime access');
-          EOF
-          
-          # Update package.json to include the script in the build process
-          if [ -f "package.json" ]; then
-            # Create backup
-            cp package.json package.json.bak
-            
-            # Check if build:prod script exists
-            if grep -q "\"build:prod\":" package.json; then
-              # Update existing build:prod script
-              sed -i 's/"build:prod": "/"build:prod": "npm run build \&\& node scripts\/inject-env.js \&\& /g' package.json
-            else
-              # Add new build:prod script
-              sed -i '/"build": /a \    "build:prod": "npm run build \&\& node scripts\/inject-env.js",' package.json
-            fi
-          fi
-          
-          echo "Created environment variable injection script and updated package.json"
-      
-      - name: Create or update Vercel configuration
-        if: env.HAS_VERCEL_CONFIG != 'true' && env.USES_SUPABASE == 'true'
-        run: |
-          echo "Creating Vercel configuration..."
-          
-          # Create vercel.json
-          cat > vercel.json << EOF
-          {
-            "version": 2,
-            "builds": [
-              {
-                "src": "package.json",
-                "use": "@vercel/static-build",
-                "config": {
-                  "buildCommand": "npm run build:prod",
-                  "outputDirectory": "dist"
-                }
-              }
-            ],
-            "routes": [
-              { "handle": "filesystem" },
-              { "src": "/(.*)", "dest": "/index.html" }
-            ],
-            "env": {
-              "VITE_DEPLOYMENT_ENV": "production"
+          // Read the built index.html
+          fs.readFile(indexPath, 'utf8', (err, data) => {
+            if (err) {
+              console.error('Error reading index.html:', err);
+              process.exit(1);
             }
-          }
+          
+            // Create the environment variables script tag
+            const envScript = \`
+              <script>
+                window.__env = \${JSON.stringify(envVars, null, 2)};
+              </script>
+            \`;
+          
+            // Insert the script tag before the closing </head> tag
+            const updatedHTML = data.replace('</head>', \`\${envScript}</head>\`);
+          
+            // Write the updated index.html
+            fs.writeFile(indexPath, updatedHTML, 'utf8', err => {
+              if (err) {
+                console.error('Error writing updated index.html:', err);
+                process.exit(1);
+              }
+              console.log('Environment variables successfully injected into index.html');
+            });
+          });
           EOF
           
-          echo "Created Vercel configuration file"
+          echo "Created environment variable injection script"
+          
+          # Add the script to package.json build process if needed
+          if grep -q "\"build\":" package.json && ! grep -q "inject-env.js" package.json; then
+            echo "Updating package.json to include injection script in build process..."
+            sed -i 's/"build": "vite build"/"build": "vite build \&\& node scripts\/inject-env.js"/' package.json
+          fi
+      
+      - name: Verify environment variables in Dockerfile
+        if: ${{ env.USES_SUPABASE == 'true' }}
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "Checking Dockerfile for environment variable handling..."
+            
+            # Check if ARG is used for environment variables
+            if ! grep -q "ARG VITE_SUPABASE" Dockerfile; then
+              echo "Updating Dockerfile to handle Supabase environment variables..."
+              
+              # Append ARG declarations if not present
+              cat >> Dockerfile << EOF
+          
+          # Environment variables
+          ARG VITE_SUPABASE_URL
+          ARG VITE_SUPABASE_ANON_KEY
+          ARG VITE_SUPABASE_SERVICE_KEY
+          
+          # Pass environment variables to the build process
+          ENV VITE_SUPABASE_URL=\${VITE_SUPABASE_URL}
+          ENV VITE_SUPABASE_ANON_KEY=\${VITE_SUPABASE_ANON_KEY}
+          ENV VITE_SUPABASE_SERVICE_KEY=\${VITE_SUPABASE_SERVICE_KEY}
+          EOF
+            fi
+          else
+            echo "No Dockerfile found, skipping"
+          fi
+      
+      - name: Create verify-env.js script
+        if: ${{ env.USES_SUPABASE == 'true' }}
+        run: |
+          echo "Creating environment variable verification script..."
+          
+          # Create scripts directory if it doesn't exist
+          mkdir -p scripts
+          
+          # Create verify-env.js script
+          cat > scripts/verify-env.js << EOF
+          /**
+           * This script verifies that the necessary environment variables are available
+           * after building. It should be run after the build process completes.
+           */
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Path to the built index.html
+          const indexPath = path.resolve(__dirname, '../dist/index.html');
+          
+          // Required environment variables
+          const requiredVars = [
+            'VITE_SUPABASE_URL',
+            'VITE_SUPABASE_ANON_KEY'
+          ];
+          
+          // Check if the built HTML contains the environment variables
+          fs.readFile(indexPath, 'utf8', (err, data) => {
+            if (err) {
+              console.error('Error reading built index.html:', err);
+              process.exit(1);
+            }
+            
+            // Check if window.__env is present
+            if (!data.includes('window.__env')) {
+              console.error('Error: window.__env is not defined in the built index.html');
+              console.error('Make sure inject-env.js script ran correctly during build');
+              process.exit(1);
+            }
+            
+            // Check for each required variable placeholder
+            let missingVars = [];
+            for (const varName of requiredVars) {
+              if (!data.includes(varName)) {
+                missingVars.push(varName);
+              }
+            }
+            
+            if (missingVars.length > 0) {
+              console.error(\`Error: Missing environment variables in the built HTML: \${missingVars.join(', ')}\`);
+              console.error('Make sure these variables are defined during build time');
+              process.exit(1);
+            }
+            
+            console.log('Environment variable verification successful!');
+          });
+          EOF
+          
+          echo "Created environment variable verification script"
+          
+          # Add the script to package.json if needed
+          if grep -q "\"build\":" package.json && ! grep -q "verify-env.js" package.json; then
+            echo "Consider adding 'node scripts/verify-env.js' to your build script to verify environment variables"
+          fi
       
       - name: Create sync-vercel-secrets workflow
+        if: ${{ env.HAS_VERCEL_CONFIG == 'true' && env.USES_SUPABASE == 'true' }}
         run: |
           echo "Creating Vercel secrets synchronization workflow..."
           
           # Create workflow directory if it doesn't exist
           mkdir -p .github/workflows
           
-          # Create workflow file for syncing secrets
+          # Create sync-vercel-secrets.yml workflow
           cat > .github/workflows/sync-vercel-secrets.yml << EOF
           name: Sync Vercel Secrets
           
           on:
             workflow_dispatch:  # Can be triggered manually
-            push:
-              branches:
-                - main
-              paths:
-                - 'vercel.json'
-                - '.env.production'
+            schedule:
+              - cron: '0 0 * * 1'  # Run weekly on Mondays
           
           jobs:
             sync-secrets:
@@ -363,106 +347,80 @@ jobs:
               steps:
                 - name: Checkout repository
                   uses: actions/checkout@v3
-                  
+                
+                - name: Setup Node.js
+                  uses: actions/setup-node@v3
+                  with:
+                    node-version: '18'
+                
                 - name: Install Vercel CLI
-                  run: npm install -g vercel
-                  
+                  run: npm install --global vercel@latest
+                
                 - name: Sync GitHub Secrets to Vercel
                   env:
                     VERCEL_TOKEN: \${{ secrets.VERCEL_TOKEN }}
-                    VERCEL_ORG_ID: \${{ secrets.VERCEL_ORG_ID }}
-                    VERCEL_PROJECT_ID: \${{ secrets.VERCEL_PROJECT_ID }}
                     VITE_SUPABASE_URL: \${{ secrets.VITE_SUPABASE_URL }}
                     VITE_SUPABASE_ANON_KEY: \${{ secrets.VITE_SUPABASE_ANON_KEY }}
                     VITE_SUPABASE_SERVICE_KEY: \${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
                   run: |
-                    # Authenticate with Vercel
+                    # Login to Vercel
                     vercel login --token \$VERCEL_TOKEN
                     
-                    # Remove existing environment variables to prevent duplicates
-                    echo "Removing existing environment variables..."
-                    vercel env rm VITE_SUPABASE_URL production -y --token \$VERCEL_TOKEN || true
-                    vercel env rm VITE_SUPABASE_ANON_KEY production -y --token \$VERCEL_TOKEN || true
-                    vercel env rm VITE_SUPABASE_SERVICE_KEY production -y --token \$VERCEL_TOKEN || true
+                    # Get project info from vercel.json
+                    PROJECT_NAME=\$(cat vercel.json | grep -o '"name": "[^"]*' | cut -d'"' -f4)
                     
-                    # Add environment variables from GitHub secrets
-                    echo "Adding environment variables to Vercel..."
-                    echo \$VITE_SUPABASE_URL | vercel env add VITE_SUPABASE_URL production --token \$VERCEL_TOKEN
-                    echo \$VITE_SUPABASE_ANON_KEY | vercel env add VITE_SUPABASE_ANON_KEY production --token \$VERCEL_TOKEN
-                    echo \$VITE_SUPABASE_SERVICE_KEY | vercel env add VITE_SUPABASE_SERVICE_KEY production --token \$VERCEL_TOKEN
+                    # Sync each secret from GitHub to Vercel
+                    echo "Syncing VITE_SUPABASE_URL..."
+                    vercel env add VITE_SUPABASE_URL production \$VITE_SUPABASE_URL --token \$VERCEL_TOKEN --yes
                     
-                    # Trigger a new deployment to apply the changes
-                    echo "Triggering new deployment..."
-                    vercel --prod --token \$VERCEL_TOKEN
+                    echo "Syncing VITE_SUPABASE_ANON_KEY..."
+                    vercel env add VITE_SUPABASE_ANON_KEY production \$VITE_SUPABASE_ANON_KEY --token \$VERCEL_TOKEN --yes
+                    
+                    echo "Syncing VITE_SUPABASE_SERVICE_KEY..."
+                    vercel env add VITE_SUPABASE_SERVICE_KEY production \$VITE_SUPABASE_SERVICE_KEY --token \$VERCEL_TOKEN --yes
+                    
+                    echo "Secrets synchronized successfully!"
           EOF
           
-          echo "Created Vercel secrets synchronization workflow"
+          echo "Created sync-vercel-secrets workflow"
       
       - name: Create PR with environment improvements
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Configure git
-          git config --global user.name "Environment Fix Bot"
-          git config --global user.email "env-bot@example.com"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
           
-          # Create a branch for the fixes
-          BRANCH_NAME="auto-fix/env-variables-$(date +%Y%m%d%H%M%S)"
+          # Create a branch for the PR
+          BRANCH_NAME="fix/environment-variables-$(date +%s)"
           git checkout -b $BRANCH_NAME
           
-          # Add changes
-          git add .
-          
-          # Prepare PR title and message based on what we created
-          TITLE="🔧 Environment Configuration: Improved Three-Tier Fallback System"
-          BODY="This PR implements or enhances the three-tier environment variable fallback system required for reliable static deployments.
-
-          ## Changes Made:
-          "
-          
-          if [ "$FALLBACK_DETECTED" = "false" ]; then
-            BODY="${BODY}
-          - ✅ Added environment.ts helper with three-tier fallback system
-          "
+          # Check if we made any changes
+          if git status --porcelain | grep -q .; then
+            # Add all changes
+            git add src/utils/environment.ts scripts/inject-env.js scripts/verify-env.js .github/workflows/sync-vercel-secrets.yml || true
+            
+            # Commit the changes
+            git commit -m "Fix: Implement environment variable handling best practices" || true
+            
+            # Push the branch
+            git push origin $BRANCH_NAME
+            
+            # Create the PR
+            PR_URL=$(gh pr create --title "Fix: Environment Variable Handling" \
+              --body "This PR implements best practices for environment variable handling:
+              
+              - Creates a three-tier fallback system for environment variables
+              - Adds runtime environment injection for static deployments
+              - Ensures all Supabase credentials are properly available
+              - Synchronizes environment variables between GitHub and Vercel
+              
+              Please review and merge to improve the reliability of your deployments." \
+              --base main \
+              --head $BRANCH_NAME)
+            
+            echo "Created PR: $PR_URL"
+          else
+            echo "No changes needed, environment variable handling is already optimal!"
           fi
-          
-          if [ "$HAS_ENV_INJECT" = "false" ]; then
-            BODY="${BODY}
-          - ✅ Added inject-env.js script for runtime environment variables
-          - ✅ Updated package.json build:prod script to inject variables
-          "
-          fi
-          
-          if [ "$HAS_VERCEL_CONFIG" = "false" ]; then
-            BODY="${BODY}
-          - ✅ Created Vercel configuration file for static deployments
-          "
-          fi
-          
-          BODY="${BODY}
-          - ✅ Added sync-vercel-secrets workflow to synchronize environment variables
-          
-          This implementation ensures environment variables are consistently accessible across:
-          1. Development (import.meta.env)
-          2. Build time (process.env)
-          3. Runtime in browser (window.__env)
-          
-          For Supabase integration, the credentials will be properly available in all environments."
-          
-          # Commit changes
-          git commit -m "$TITLE" -m "$BODY"
-          
-          # Push branch
-          git push origin $BRANCH_NAME
-          
-          # Create PR
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls \
-            -d "{
-              \"title\": \"$TITLE\",
-              \"body\": \"$BODY\",
-              \"head\": \"$BRANCH_NAME\",
-              \"base\": \"main\"
-            }"
