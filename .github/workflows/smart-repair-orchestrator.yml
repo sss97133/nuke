@@ -2,6 +2,9 @@ name: Smart Repair Orchestrator
 
 on:
   workflow_dispatch:  # Can be triggered manually
+  push:
+    branches:
+      - main
   schedule:
     - cron: '0 */4 * * *'  # Run every 4 hours
   workflow_run:
@@ -128,7 +131,7 @@ jobs:
           fi
       
       - name: Fix TypeScript errors
-        if: env.FAILURE_TYPESCRIPT == 'true' || github.event_name != 'workflow_run'
+        if: ${{ env.FAILURE_TYPESCRIPT == 'true' || github.event_name != 'workflow_run' }}
         run: |
           echo "Attempting to fix TypeScript errors..."
           
@@ -173,7 +176,7 @@ jobs:
           npx tsc --noEmit || echo "TypeScript check failed but continuing"
       
       - name: Fix ESLint errors
-        if: env.FAILURE_ESLINT == 'true' || github.event_name != 'workflow_run'
+        if: ${{ env.FAILURE_ESLINT == 'true' || github.event_name != 'workflow_run' }}
         run: |
           echo "Attempting to fix ESLint errors..."
           
@@ -194,7 +197,7 @@ jobs:
           npx eslint --fix --config .eslintrc.ci.json "src/**/*.{ts,tsx}" || echo "ESLint fix attempt complete with issues"
       
       - name: Fix Docker issues
-        if: env.FAILURE_DOCKER == 'true' || github.event_name != 'workflow_run'
+        if: ${{ env.FAILURE_DOCKER == 'true' || github.event_name != 'workflow_run' }}
         run: |
           echo "Attempting to fix Docker issues..."
           
@@ -230,7 +233,7 @@ jobs:
           fi
       
       - name: Fix Database schema issues
-        if: env.FAILURE_DATABASE == 'true' || github.event_name != 'workflow_run'
+        if: ${{ env.FAILURE_DATABASE == 'true' || github.event_name != 'workflow_run' }}
         run: |
           echo "Attempting to fix database schema issues..."
           
@@ -257,7 +260,7 @@ jobs:
           fi
       
       - name: Fix dependency and import issues
-        if: env.FAILURE_IMPORTS == 'true' || github.event_name != 'workflow_run' 
+        if: ${{ env.FAILURE_IMPORTS == 'true' || github.event_name != 'workflow_run' }}
         run: |
           echo "Attempting to fix dependency and import issues..."
           
@@ -310,13 +313,13 @@ jobs:
           git commit -m "🤖 Smart CI Repair: Fix workflow failures
 
           This automated commit fixes the following issues:
-          ${FAILURE_SYNTAX:+- Syntax errors detected and fixed
-          }${FAILURE_TYPESCRIPT:+- TypeScript errors fixed with more flexible configuration
-          }${FAILURE_ESLINT:+- ESLint errors addressed with temporary rule adjustments
-          }${FAILURE_DOCKER:+- Docker configuration improved for better reliability
-          }${FAILURE_DATABASE:+- Database schema validation adjusted for CI environments
-          }${FAILURE_IMPORTS:+- Import and dependency issues resolved
-          }" || echo "No changes to commit"
+          ${{ env.FAILURE_SYNTAX == 'true' && '- Syntax errors detected and fixed
+          ' || '' }}${{ env.FAILURE_TYPESCRIPT == 'true' && '- TypeScript errors fixed with more flexible configuration
+          ' || '' }}${{ env.FAILURE_ESLINT == 'true' && '- ESLint errors addressed with temporary rule adjustments
+          ' || '' }}${{ env.FAILURE_DOCKER == 'true' && '- Docker configuration improved for better reliability
+          ' || '' }}${{ env.FAILURE_DATABASE == 'true' && '- Database schema validation adjusted for CI environments
+          ' || '' }}${{ env.FAILURE_IMPORTS == 'true' && '- Import and dependency issues resolved
+          ' || '' }}" || echo "No changes to commit"
           
           # If we have changes to commit, push the branch and create PR
           if [ $? -eq 0 ]; then
@@ -330,7 +333,7 @@ jobs:
               https://api.github.com/repos/${{ github.repository }}/pulls \
               -d '{
                 "title": "🤖 Smart CI Repair: Fix workflow failures",
-                "body": "This PR was automatically created by the Smart Repair Orchestrator to fix CI/CD failures. Please review the changes.\n\n**Issues fixed:**\n'"${FAILURE_SYNTAX:+- Syntax errors\n}${FAILURE_TYPESCRIPT:+- TypeScript errors\n}${FAILURE_ESLINT:+- ESLint errors\n}${FAILURE_DOCKER:+- Docker configuration issues\n}${FAILURE_DATABASE:+- Database schema validation\n}${FAILURE_IMPORTS:+- Import and dependency issues\n}"'",
+                "body": "This PR was automatically created by the Smart Repair Orchestrator to fix CI/CD failures. Please review the changes.\n\n**Issues fixed:**\n${{ env.FAILURE_SYNTAX == 'true' && '- Syntax errors\n' || '' }}${{ env.FAILURE_TYPESCRIPT == 'true' && '- TypeScript errors\n' || '' }}${{ env.FAILURE_ESLINT == 'true' && '- ESLint errors\n' || '' }}${{ env.FAILURE_DOCKER == 'true' && '- Docker configuration issues\n' || '' }}${{ env.FAILURE_DATABASE == 'true' && '- Database schema validation\n' || '' }}${{ env.FAILURE_IMPORTS == 'true' && '- Import and dependency issues\n' || '' }}",
                 "head": "'$BRANCH_NAME'",
                 "base": "main"
               }')
