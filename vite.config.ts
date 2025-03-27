@@ -2,7 +2,6 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { configDefaults } from 'vitest/config';
-import { componentTagger } from "lovable-tagger";
 import autoprefixer from 'autoprefixer';
 import tailwindcss from 'tailwindcss';
 
@@ -45,7 +44,6 @@ export default defineConfig(({ mode }) => {
           ] : []
         }
       }),
-      mode === 'development' && componentTagger(),
     ].filter(Boolean),
     resolve: {
       alias: {
@@ -101,8 +99,7 @@ export default defineConfig(({ mode }) => {
         onwarn(warning, defaultHandler) {
           // Provide more detailed warnings for import issues
           if (warning.code === 'UNRESOLVED_IMPORT') {
-            console.error('❌ Build error: Unable to resolve import:', warning.source, 
-              '\nMake sure the package is installed and the import path is correct.');
+            console.error('❌ Build error: Unable to resolve import:', warning.message);
             console.error('If using react-syntax-highlighter, make sure to use the CJS path:');
             console.error('import { style } from "react-syntax-highlighter/dist/cjs/styles/prism"');
           } else if (warning.code === 'CIRCULAR_DEPENDENCY') {
