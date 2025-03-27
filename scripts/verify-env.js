@@ -1,4 +1,4 @@
-/* eslint-disable no-console, no-undef */
+/* eslint-disable no-undef */
 /**
  * Verifies environment variables are properly set and accessible
  * Run this script during build to explicitly check all required variables

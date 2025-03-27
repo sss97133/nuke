@@ -1,4 +1,4 @@
-/* eslint-disable no-console, no-undef */
+/* eslint-disable no-undef */
 /**
  * Script to copy GM vehicle records HTML file from public to dist directory
  * This script ensures the file is properly copied and retained throughout the build process

@@ -85,6 +85,6 @@ async function build(): Promise<void> {
 }
 
 // Allow console usage in build scripts
-/* eslint-disable no-console */
+ 
 
 void build();

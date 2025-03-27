@@ -38,6 +38,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
+          cache: 'npm'
       
       - name: Analyze Repository Health
         id: repo-health
@@ -93,7 +94,8 @@ jobs:
           
           # Install specialized tools based on repository type
           if [ "$REPO_TYPE" = "supabase" ]; then
-            npm install --global supabase
+            # Supabase CLI doesn't support global installation
+            npm install --save-dev supabase
           elif [ "$REPO_TYPE" = "firebase" ]; then
             npm install --global firebase-tools
           fi

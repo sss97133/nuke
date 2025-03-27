@@ -39,7 +39,7 @@ serve(async (req) => {
     }
     
     // Use a pre-trained model to detect car parts and modifications
-    let detectedModifications = await analyzeImageWithHuggingFace(imageUrl, hfToken);
+    const detectedModifications = await analyzeImageWithHuggingFace(imageUrl, hfToken);
     
     // Step 2: Assess market value of modifications using Perplexity API
     const perplexityApiKey = Deno.env.get('PERPLEXITY_API_KEY');
