@@ -46,12 +46,12 @@ jobs:
           
       - name: Install dependencies
         run: |
-          # Set NPM config for native module builds
-          npm config set python /usr/bin/python
+          # Set environment variables for native module builds
+          export NUKE_SKIP_CANVAS=true
+          export npm_config_python=/usr/bin/python
           
           # Skip optional dependencies to reduce build complexity
           echo "Installing dependencies with --no-optional to avoid canvas issues..."
-          export NUKE_SKIP_CANVAS=true
           
           # Retry npm ci up to 3 times with reduced dependency set
           for i in 1 2 3; do
