@@ -111,9 +111,26 @@ jobs:
           NODE_ENV: production
           NODE_OPTIONS: "--max-old-space-size=4096"
           CI: "true"
+          # Direct env injection
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
         run: |
           # Run build with verbose logging
           echo "Running build in Docker container"
+          
+          # Verify environment access
+          echo "VITE_SUPABASE_URL exists: $(if [ -n "$VITE_SUPABASE_URL" ]; then echo "YES"; else echo "NO"; fi)"
+          echo "VITE_SUPABASE_ANON_KEY exists: $(if [ -n "$VITE_SUPABASE_ANON_KEY" ]; then echo "YES"; else echo "NO"; fi)"
+          
+          # Use existing .env.test in fallback chain
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "Using existing credentials from .env.test file"
+            cp .env.test .env
+          fi
+          
+          # Run build commands
+          export NUKE_SKIP_CANVAS=true
           npx --no -- tsc || echo "TypeScript compilation failed but continuing"
           npx --no -- vite build --debug || echo "Vite build failed but continuing"
           
