@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,14 +20,16 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke(
-  if (error) console.error("Database query error:", error);
         "analyze-vehicle-data",
         {
           body: { vehicleData },
         }
       );
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database query error:", error);
+        throw error;
+      }
 
       setAnalysis(data);
       toast({
@@ -47,7 +48,7 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
     }
   };
 
-  const chartData = analysis?.priceAnalysis.comparableSales.map((sale) => ({
+  const chartData = analysis?.priceAnalysis?.comparableSales?.map((sale) => ({
     date: new Date(sale.date).toLocaleDateString(),
     price: sale.price,
     notes: sale.notes,
@@ -82,7 +83,12 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
 
           {analysis.tokenAnalysis?.derivativesData && (
             <DerivativesCard
-              derivativesData={analysis.tokenAnalysis.derivativesData}
+              analysis={{
+                tokenPrice: analysis.tokenAnalysis.derivativesData[0]?.price || 0,
+                marketCap: analysis.tokenAnalysis.derivativesData.reduce((acc, curr) => acc + curr.price, 0),
+                volume24h: analysis.tokenAnalysis.derivativesData.reduce((acc, curr) => acc + curr.price, 0),
+                holders: analysis.tokenAnalysis.derivativesData.length
+              }}
             />
           )}
 
