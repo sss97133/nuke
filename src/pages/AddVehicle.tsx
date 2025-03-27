@@ -103,17 +103,29 @@ function AddVehicle() {
         }
 
         console.log('Vehicle submitted:', vehicle);
+        setIsFormModified(false); // Clear the form modified state to prevent navigation warnings
+        
+        // Show success message with action to view details
         toast({
           title: 'Vehicle Added Successfully! 🚗',
-          description: `Your ${data.year} ${data.make} ${data.model} has been added to your collection. Redirecting to vehicle details...`,
+          description: (
+            <div className="flex flex-col gap-2">
+              <div>Your {data.year} {data.make} {data.model} has been added to your collection.</div>
+              <Button 
+                className="mt-2" 
+                size="sm" 
+                onClick={() => navigate(`/vehicles/${vehicle.id}`)}
+              >
+                View Vehicle Details
+              </Button>
+            </div>
+          ),
           variant: 'default',
-          duration: 3000,
+          duration: 5000,
         });
-
-        // Navigate to the new vehicle's detail page after showing the success message
-        setTimeout(() => {
-          navigate(`/vehicles/${vehicle.id}`, { replace: true });
-        }, 2000);
+        
+        // Navigate back to the vehicles page to show all vehicles including the new one
+        navigate('/vehicles', { state: { fromAdd: true, newVehicleId: vehicle.id } });
       } catch (error) {
         console.error('Error submitting vehicle:', error);
         toast({
@@ -140,7 +152,7 @@ function AddVehicle() {
     cancelNavigation,
     saveAndNavigate,
   } = useNavigationProtection({
-    shouldPreventNavigation: isFormModified,
+    shouldPreventNavigation: isFormModified && !form.formState.isSubmitSuccessful,
     onSave: () => {
       // If the form is valid, submit it before navigating
       if (form.formState.isValid) {
@@ -160,10 +172,12 @@ function AddVehicle() {
   // Detect form changes
   useEffect(() => {
     const subscription = form.watch(() => {
-      setIsFormModified(true);
+      if (!form.formState.isSubmitSuccessful) {
+        setIsFormModified(true);
+      }
     });
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form, form.formState.isSubmitSuccessful]);
 
   return (
     <div className="container mx-auto py-6">
@@ -172,7 +186,7 @@ function AddVehicle() {
           <CardTitle>Add New Vehicle</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
             Fill out the details below to add a new vehicle to your collection.
-            You'll be redirected to the vehicle's page once it's added.
+            After adding, you'll be able to view it in your vehicles list or go to the detail page to add more information.
           </p>
         </CardHeader>
         <CardContent>

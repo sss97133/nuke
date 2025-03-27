@@ -37,6 +37,7 @@ import StreamViewer from '@/pages/StreamViewer';
 import VehicleImport from "@/pages/VehicleImport"; // Import the new VehicleImport page
 import AdminPanel from '@/pages/AdminPanel'; // Import the AdminPanel component
 import VehicleTimelinePage from '@/pages/VehicleTimelinePage'; // Import the VehicleTimeline page
+import DesignSystem from '@/components/ui/design-system'; // Import the Design System documentation
 
 // Route type definitions
 export enum RouteType {
@@ -105,6 +106,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/streaming', element: <Streaming />, type: RouteType.PROTECTED },
   { path: '/streaming/watch/:username', element: <StreamViewer />, type: RouteType.PROTECTED },
   { path: '/admin', element: <AdminPanel />, type: RouteType.PROTECTED },
+  { path: '/design-system', element: <DesignSystem />, type: RouteType.PROTECTED },
 ];
 
 // Special routes
