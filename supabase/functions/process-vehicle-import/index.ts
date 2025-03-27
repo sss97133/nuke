@@ -1,4 +1,3 @@
-
 import type { Database } from '../types';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -62,6 +61,15 @@ function processICloudLink(vehicle: VehicleImport): VehicleImport {
   return vehicle;
 }
 
+// Add this function before the main handler
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -115,13 +123,69 @@ serve(async (req) => {
     }
     
     // Parse the request body
-    const { vehicles } = await req.json();
+    const body = await req.json();
     
-    if (!vehicles || !Array.isArray(vehicles) || vehicles.length === 0) {
+    let vehicles: any[] = [];
+    
+    // Handle file upload
+    if (body.data && body.fileType) {
+      try {
+        // For now, we'll just handle CSV files
+        if (body.fileType === 'csv') {
+          const rows = body.data.split('\n').map((row: string) => row.split(','));
+          const headers = rows[0];
+          
+          vehicles = rows.slice(1).map((row: string[]) => {
+            const vehicle: any = {};
+            headers.forEach((header: string, index: number) => {
+              vehicle[header.trim()] = row[index]?.trim();
+            });
+            return vehicle;
+          });
+        } else {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: `Unsupported file type: ${body.fileType}` 
+            }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          );
+        }
+      } catch (error) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Error processing file: ${error.message}` 
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        );
+      }
+    } else if (body.vehicles) {
+      vehicles = body.vehicles;
+    } else {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Invalid request: No vehicles provided' 
+          error: 'Invalid request: No vehicles or file data provided' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+    
+    if (!Array.isArray(vehicles) || vehicles.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid request: No vehicles found in the data' 
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -157,9 +221,6 @@ serve(async (req) => {
       
       // Insert the vehicle into the cars table
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
         .from('cars')
         .upsert(vehicleWithUser)
         .select('id')
@@ -187,7 +248,6 @@ serve(async (req) => {
         
         // Add a record in the car_images table to indicate iCloud source
         await supabase
-          
           .insert({
             car_id: vehicleId,
             file_path: processedVehicle.icloud_album_link,

@@ -4,7 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
+<<<<<<< HEAD
     "node": "20.x"
+=======
+    "node": ">=18.x"
+>>>>>>> da911bd (fix: improve vehicle addition and error handling)
   },
   "scripts": {
     "dev": "vite",
@@ -13,7 +17,8 @@
     "preview": "vite preview",
     "prepare": "husky",
     "validate:all": "npm run lint && tsc --noEmit",
-    "start": "node serve.js"
+    "start": "node serve.js",
+    "deploy:static": "npm run build && vercel ./dist --prod"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",

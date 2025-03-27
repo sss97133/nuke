@@ -105,3 +105,19 @@ docker run -p 8080:80 yourdockerhubusername/nuke:latest
 - [Founder Q&A](docs/FOUNDER_QA.md)
 
 # Production environment config updated on Thu Mar 13 14:24:03 PDT 2025
+
+## Deployment
+
+To deploy the application to Vercel:
+
+1. Build the project locally:
+   ```
+   npm run build
+   ```
+
+2. Deploy the static site to Vercel:
+   ```
+   vercel ./dist --prod
+   ```
+
+This approach bypasses the build process on Vercel and deploys the pre-built static site directly, avoiding any dependency or environment issues during deployment.

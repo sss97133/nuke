@@ -86,3 +86,6 @@ src/scripts/setupStorage.ts
 *.backup
 *_backup
 .env*
+
+# Cursor configuration
+.cursor/config.json

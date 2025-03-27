@@ -1,0 +1,5 @@
+make,model,year,vin,color,mileage,trim,notes
+Chevrolet,C10,1973,1GCCK14H3YF123456,Blue,85000,Silverado,Original paint
+Chevrolet,K20,1978,1GKE14H3YF123457,Red,65000,Scottsdale,4x4
+Chevrolet,C30,1985,1GCHK14H3YF123458,White,45000,Silverado,Long bed
+Chevrolet,K10,1987,1GKE14H3YF123459,Black,35000,Silverado,4x4 short bed

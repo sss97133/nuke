@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/lib/supabase';
+import { supabase, handleDatabaseError } from '@/integrations/supabase/client';
 import ImageUploader from '@/components/vehicle-images/ImageUploader';
 
 function AddVehicle() {
@@ -64,7 +64,7 @@ function AddVehicle() {
             significance: data.significance,
             public_notes: data.public_notes,
             private_notes: data.private_notes,
-            image: primaryImageUrl, // Use the uploaded image URL
+            image: primaryImageUrl,
             tags: data.tags,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -72,9 +72,14 @@ function AddVehicle() {
           .select()
           .single();
 
+        if (error) {
+          console.error('Error inserting vehicle:', error);
+          throw new Error(handleDatabaseError(error));
+        }
+
         // If we have a temporary image, update its vehicle ID
         if (primaryImageUrl && vehicle) {
-          const oldPath = primaryImageUrl.split('/').pop(); // Get the filename
+          const oldPath = primaryImageUrl.split('/').pop();
           const newPath = `${vehicle.id}/${oldPath}`;
           
           // Move the file to the correct vehicle folder
@@ -98,14 +103,9 @@ function AddVehicle() {
           }
         }
 
-        if (error) {
-          throw error;
-        }
-
         console.log('Vehicle submitted:', vehicle);
-        setIsFormModified(false); // Clear the form modified state to prevent navigation warnings
+        setIsFormModified(false);
         
-        // Show success message with action to view details
         toast({
           title: 'Vehicle Added Successfully! 🚗',
           description: (
@@ -124,13 +124,12 @@ function AddVehicle() {
           duration: 5000,
         });
         
-        // Navigate back to the vehicles page to show all vehicles including the new one
         navigate('/vehicles', { state: { fromAdd: true, newVehicleId: vehicle.id } });
       } catch (error) {
         console.error('Error submitting vehicle:', error);
         toast({
           title: 'Error',
-          description: 'Failed to add vehicle. Please try again.',
+          description: error instanceof Error ? error.message : 'Failed to add vehicle. Please try again.',
           variant: 'destructive',
         });
       }

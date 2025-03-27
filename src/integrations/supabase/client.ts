@@ -78,6 +78,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(`⚠️ Missing Supabase credentials for environment ${environment}`);
   console.warn('VITE_SUPABASE_URL present:', !!supabaseUrl);
   console.warn('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
+  console.warn('Environment:', environment);
+  console.warn('import.meta.env available:', typeof import.meta !== 'undefined');
+  console.warn('process.env available:', typeof process !== 'undefined');
   
   // In browser environments, add a hidden error state
   // but let the app attempt to load
@@ -114,11 +117,63 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
+<<<<<<< HEAD
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true
+=======
+// Create Supabase client with error handling
+export const supabase = createClient<Database>(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: {
+        getItem: (key) => {
+          try {
+            return localStorage.getItem(key);
+          } catch (error) {
+            console.error('Error getting auth storage:', error);
+            return null;
+          }
+        },
+        setItem: (key, value) => {
+          try {
+            localStorage.setItem(key, value);
+          } catch (error) {
+            console.error('Error setting auth storage:', error);
+          }
+        },
+        removeItem: (key) => {
+          try {
+            localStorage.removeItem(key);
+          } catch (error) {
+            console.error('Error removing auth storage:', error);
+          }
+        }
+      }
+    },
+    global: {
+      headers: {
+        'x-application-name': 'nuke',
+      },
+    },
+  }
+);
+
+// Add error event listener for auth state changes
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth state changed:', event, session?.user?.email);
+  if (event === 'SIGNED_IN') {
+    console.log('User signed in:', session?.user?.email);
+  } else if (event === 'SIGNED_OUT') {
+    console.log('User signed out');
+>>>>>>> da911bd (fix: improve vehicle addition and error handling)
   }
 });
 
@@ -431,4 +486,16 @@ export const getPublicUrl = (bucketName: string, filePath: string): string | nul
     console.error(`Error getting public URL for ${filePath} in ${bucketName}:`, error);
     return null;
   }
+};
+
+// Add error handling for database operations
+export const handleDatabaseError = (error: any) => {
+  console.error('Database operation error:', error);
+  if (error.code === '23505') { // Unique violation
+    return 'This record already exists.';
+  }
+  if (error.code === '23503') { // Foreign key violation
+    return 'Related record not found.';
+  }
+  return error.message || 'An unexpected error occurred.';
 };
