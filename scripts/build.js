@@ -26,19 +26,4 @@ execSync('tsc', { stdio: 'inherit' });
 console.log('Building with Vite...');
 execSync('vite build --mode production', { stdio: 'inherit' });
 
-// Run post-build scripts
-console.log('Running post-build scripts...');
-const scripts = [
-  'copy-gm-records.js',
-  'inject-env.js',
-  'fix-production-assets.js',
-  'verify-env.js',
-  'verify-gm-records.js'
-];
-
-for (const script of scripts) {
-  console.log(`Running ${script}...`);
-  execSync(`node scripts/${script}`, { stdio: 'inherit' });
-}
-
 console.log('Build completed successfully!'); 
