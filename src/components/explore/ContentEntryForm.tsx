@@ -74,7 +74,6 @@ export const ContentEntryForm = () => {
     try {
       // Insert content item to Supabase
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('explore_content')
         .insert([{
           type: contentItem.type,
@@ -86,8 +85,11 @@ export const ContentEntryForm = () => {
           location: contentItem.location,
           relevance_score: contentItem.relevanceScore
         }]);
-
-      if (error) throw error;
+        
+      if (error) {
+        console.error("Database query error:", error);
+        throw error;
+      }
 
       toast({
         title: 'Content Added',

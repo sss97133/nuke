@@ -80,8 +80,15 @@ export default function SimpleImport() {
     addLog('Starting import process...');
 
     // Check user authentication first
-    const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error("Authentication error:", authError);
+      setIsImporting(false);
+      setStatus('error');
+      setErrorMessage('Authentication error');
+      return;
+    }
     if (!user) {
       setIsImporting(false);
       setStatus('error');
@@ -151,7 +158,6 @@ export default function SimpleImport() {
 
               // First check if we need to update user profile
               const { data: profileData, error: profileError } = await supabase
-  if (error) console.error("Database query error:", error);
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
@@ -159,6 +165,7 @@ export default function SimpleImport() {
                 
               if (profileError && profileError.code !== 'PGRST116') {
                 // If error other than "no rows returned"
+                console.error("Profile query error:", profileError);
                 addLog(`Error checking user profile: ${profileError.message}`);
               }
               
@@ -204,13 +211,13 @@ export default function SimpleImport() {
               }
 
               // Insert into Supabase
-              const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-                
+              const { error: insertError } = await supabase
+                .from('vehicles') // Assuming the table name is 'vehicles'
                 .insert([processedVehicle]);
-
-              if (error) {
-                addLog(`Error importing vehicle: ${error.message}`);
+                
+              if (insertError) {
+                console.error("Database query error:", insertError);
+                addLog(`Error importing vehicle: ${insertError.message}`);
                 continue;
               }
 

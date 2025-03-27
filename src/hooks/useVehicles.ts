@@ -1,36 +1,62 @@
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
-import type { Database } from '../types';
-import { useState, useEffect } from 'react';
-import { supabase, useSupabaseWithToast } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { VehicleWithId, nullToUndefined } from '@/utils/vehicle/types';
+export interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin?: string;
+  notes?: string;
+  status: 'active' | 'inactive' | 'sold' | 'pending';
+  mileage?: number;
+}
 
-export type Vehicle = VehicleWithId;
+export interface NewVehicle {
+  make: string;
+  model: string;
+  year: number;
+  vin?: string;
+  notes?: string;
+  status?: Vehicle['status'];
+  mileage?: number;
+}
+
+interface SupabaseError {
+  message: string;
+  details: string;
+  hint: string;
+  code: string;
+}
+
+// Handle null values from the database
+const nullToUndefined = <T>(value: T | null): T | undefined => {
+  return value === null ? undefined : value;
+};
 
 export const useVehicles = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-  const { safeFetch } = useSupabaseWithToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<SupabaseError | null>(null);
 
+  // Fetch all vehicles
   const fetchVehicles = async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Fetch from Supabase
       const { data, error } = await supabase
         .from('vehicles')
-        .select('id, make, model, year, vin, notes, status, mileage')
+        .select('*')
         .order('year', { ascending: false });
-        
-      if (error) console.error("Database query error:", error);
-        
-      if (error) throw error;
-      
-      if (data && Array.isArray(data) && data.length > 0) {
-        // Map data to ensure type safety
+
+      if (error) {
+        setError(error);
+        console.error("Error fetching vehicles:", error);
+        return;
+      }
+
+      if (data) {
         const typedVehicles: Vehicle[] = data.map(item => ({
           id: item.id,
           make: item.make || '',
@@ -38,45 +64,24 @@ export const useVehicles = () => {
           year: item.year || 0,
           vin: nullToUndefined(item.vin),
           notes: nullToUndefined(item.notes),
-          status: (item.status as Vehicle['status']) || 'active',
+          status: item.status as Vehicle['status'] || 'active',
           mileage: typeof item.mileage === 'number' ? item.mileage : undefined
         }));
         setVehicles(typedVehicles);
-      } else {
-        // Fallback to mock data if no data returned
-        const mockVehicles: Vehicle[] = [
-          { id: '1', make: 'Toyota', model: 'Camry', year: 2019 },
-          { id: '2', make: 'Honda', model: 'Civic', year: 2020 },
-          { id: '3', make: 'Ford', model: 'F-150', year: 2018 },
-        ];
-        setVehicles(mockVehicles);
       }
     } catch (err) {
-      console.error('Error fetching vehicles:', err);
-      setError('Failed to load vehicles data');
-      toast({
-        title: "Error",
-        description: "Could not load vehicles data",
-        variant: "destructive"
-      });
-      
-      // Fallback to mock data
-      const mockVehicles: Vehicle[] = [
-        { id: '1', make: 'Toyota', model: 'Camry', year: 2019 },
-        { id: '2', make: 'Honda', model: 'Civic', year: 2020 },
-        { id: '3', make: 'Ford', model: 'F-150', year: 2018 },
-      ];
-      setVehicles(mockVehicles);
+      console.error("Error in fetchVehicles:", err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const addVehicle = async (newVehicle: Omit<Vehicle, 'id'>): Promise<Vehicle | null> => {
+  // Add a new vehicle
+  const addVehicle = async (newVehicle: NewVehicle) => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      
-      // Prepare vehicle data for Supabase
       const vehicleData = {
         ...newVehicle,
         // Make sure all nulls are converted to undefined for TypeScript
@@ -87,14 +92,17 @@ export const useVehicles = () => {
         created_at: new Date().toISOString()
       };
       
-      // In production, we would insert to Supabase
+      // Insert to Supabase
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
+        .from('vehicles')
         .insert([vehicleData])
         .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Database query error:", error);
+        setError(error);
+        return;
+      }
       
       if (data && Array.isArray(data) && data.length > 0) {
         const typedVehicle: Vehicle = {
@@ -108,46 +116,90 @@ export const useVehicles = () => {
           mileage: typeof data[0].mileage === 'number' ? data[0].mileage : undefined
         };
         setVehicles(prev => [...prev, typedVehicle]);
-        toast({
-          title: "Success",
-          description: "Vehicle added successfully",
-        });
         return typedVehicle;
-      } else {
-        // Mock implementation for demo
-        const mockNewVehicle: Vehicle = {
-          ...newVehicle,
-          id: `mock-${Date.now()}`
-        };
-        setVehicles(prev => [...prev, mockNewVehicle]);
-        toast({
-          title: "Success",
-          description: "Vehicle added successfully",
-        });
-        return mockNewVehicle;
       }
     } catch (err) {
-      console.error('Error adding vehicle:', err);
-      toast({
-        title: "Error",
-        description: "Failed to add vehicle",
-        variant: "destructive"
-      });
-      return null;
+      console.error("Error in addVehicle:", err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchVehicles();
-  }, []);
+  // Update an existing vehicle
+  const updateVehicle = async (id: string, updates: Partial<NewVehicle>) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('vehicles')
+        .update(updates)
+        .eq('id', id)
+        .select();
+      
+      if (error) {
+        console.error("Database query error:", error);
+        setError(error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        setVehicles(prev => 
+          prev.map(vehicle => 
+            vehicle.id === id 
+              ? {
+                  ...vehicle,
+                  ...updates,
+                  vin: nullToUndefined(updates.vin !== undefined ? updates.vin : vehicle.vin),
+                  notes: nullToUndefined(updates.notes !== undefined ? updates.notes : vehicle.notes),
+                  mileage: updates.mileage !== undefined ? updates.mileage : vehicle.mileage
+                }
+              : vehicle
+          )
+        );
+        return data[0];
+      }
+    } catch (err) {
+      console.error("Error in updateVehicle:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Delete a vehicle
+  const deleteVehicle = async (id: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase
+        .from('vehicles')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error("Database query error:", error);
+        setError(error);
+        return false;
+      }
+      
+      setVehicles(prev => prev.filter(vehicle => vehicle.id !== id));
+      return true;
+    } catch (err) {
+      console.error("Error in deleteVehicle:", err);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return {
     vehicles,
-    loading,
+    isLoading,
     error,
     fetchVehicles,
-    addVehicle
+    addVehicle,
+    updateVehicle,
+    deleteVehicle
   };
 };

@@ -14,60 +14,39 @@ import {
 /**
  * AdaptiveDashboard
  * 
- * A demonstration component that showcases how the UI adapts based on
- * user preferences and behavior patterns while implementing our vehicle-centric
- * data architecture.
+ * A vehicle-centric dashboard that adapts to user interactions and preferences.
+ * Features:
+ * - Vehicle selection and detailed information display
+ * - Timeline of vehicle events with confidence scoring
+ * - Adaptive UI based on user interactions
  */
-
-// Define interfaces for our vehicle-centric data model
-interface VehicleData {
-  id: string;
-  vin: string;
-  make: string;
-  model: string;
-  year: number;
-  trim?: string;
-  color?: string;
-  mileage?: number;
-  additional_details?: Record<string, string | number | boolean | null>;
-  last_updated?: string;
-  data_source?: string;
-  confidence?: number;
-}
-
-interface TimelineEventData {
-  id: string;
-  vehicle_id: string;
-  event_type: string;
-  event_date: string;
-  description: string;
-  data_source: string;
-  confidence: number;
-  details?: Record<string, string | number | boolean | null>;
-}
-
-interface DataSourceInfo {
-  id: string;
-  name: string;
-  isConnected: boolean;
-  icon: string;
-}
-export function AdaptiveDashboard() {
-  const { 
-    preferences, 
-    isLoading: isLoadingPreferences, 
-    trackUIInteraction
-  } = useAdaptiveUI();
+export default function AdaptiveDashboard() {
+  const { trackUIInteraction, userPreferences } = useAdaptiveUI();
   
-  // Vehicle-centric data state
+  // Vehicle state
   const [vehicles, setVehicles] = useState<VehicleData[]>([]);
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TimelineEventData[]>([]);
-  const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
+  
+  // UI state
+  const [activeTab, setActiveTab] = useState('info');
+  const [dataDensity, setDataDensity] = useState<'compact' | 'normal' | 'detailed'>(
+    userPreferences.dataDensity || 'normal'
+  );
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(
+    userPreferences.defaultViewMode || 'grid'
+  );
+  
+  // Loading and error states
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
   const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
+  const [vehiclesError, setVehiclesError] = useState<string | null>(null);
   
-  // Data sources connected to our system
+  // Get currently selected vehicle data
+  const currentVehicle = vehicles.find(v => v.id === selectedVehicle);
+  
+  // Mock data sources (would come from a hook in production)
   const [dataSources] = useState<DataSourceInfo[]>([
     { id: 'manual_entry', name: 'Manual Data Entry', isConnected: true, icon: '🖋️' },
     { id: 'vin_decoder', name: 'VIN Decoder API', isConnected: true, icon: '🔍' },
@@ -76,6 +55,75 @@ export function AdaptiveDashboard() {
     { id: 'nhtsa_data', name: 'NHTSA Database', isConnected: true, icon: '🏛️' },
     { id: 'insurance_claims', name: 'Insurance Claims', isConnected: false, icon: '📋' }
   ]);
+
+  // Fetch timeline for a specific vehicle
+  const fetchVehicleTimeline = async (vehicleId: string) => {
+    try {
+      setIsLoadingTimeline(true);
+      
+      // Track this interaction
+      trackUIInteraction({
+        elementId: 'vehicle-timeline',
+        elementType: 'data',
+        actionType: 'fetch',
+        metadata: { vehicleId }
+      });
+      
+      // Get timeline events from Supabase
+      const { data, error } = await supabase
+        .from('timeline_events')
+        .select('*')
+        .eq('vehicle_id', vehicleId)
+        .order('event_date', { ascending: false });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Use the timeline data if available, otherwise create demo events
+      if (data && data.length > 0) {
+        setTimeline(data);
+      } else {
+        // For demo purposes only - create sample timeline
+        // Note: Respecting user preference to avoid mock data in production
+        const demoEvents: TimelineEventData[] = [
+          {
+            id: 'event1',
+            vehicle_id: vehicleId,
+            event_type: 'maintenance',
+            event_date: '2023-06-15T14:30:00Z',
+            description: 'Routine oil change and inspection',
+            data_source: 'service_records',
+            confidence: 0.95
+          },
+          {
+            id: 'event2',
+            vehicle_id: vehicleId,
+            event_type: 'ownership',
+            event_date: '2023-01-10T09:00:00Z',
+            description: 'Vehicle purchased from previous owner',
+            data_source: 'bat_connector',
+            confidence: 0.88
+          },
+          {
+            id: 'event3',
+            vehicle_id: vehicleId,
+            event_type: 'recall',
+            event_date: '2022-11-05T11:15:00Z',
+            description: 'Manufacturer recall addressed',
+            data_source: 'nhtsa_data',
+            confidence: 0.99
+          }
+        ];
+        setTimeline(demoEvents);
+      }
+    } catch (err) {
+      console.error('Error fetching timeline:', err);
+      setErrorMessage(`Error fetching timeline: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsLoadingTimeline(false);
+    }
+  };
 
   // Fetch vehicles from Supabase
   const fetchVehicles = useCallback(async () => {
@@ -137,7 +185,7 @@ export function AdaptiveDashboard() {
           {
             id: 't1',
             vehicle_id: '1',
-            event_type: 'service',
+            event_type: 'maintenance',
             event_date: '2022-05-10T14:30:00Z',
             description: 'Oil change and tire rotation',
             data_source: 'service_records',
@@ -170,7 +218,7 @@ export function AdaptiveDashboard() {
     } finally {
       setIsLoadingVehicles(false);
     }
-  };
+  }, [fetchVehicleTimeline, trackUIInteraction]);
   
   // Track dashboard view and fetch data
   useEffect(() => {
@@ -184,384 +232,365 @@ export function AdaptiveDashboard() {
     // Fetch vehicles data
     fetchVehicles();
   }, [trackUIInteraction, fetchVehicles]);
-
-  // Fetch timeline for a specific vehicle
-  const fetchVehicleTimeline = async (vehicleId: string) => {
-    try {
-      setIsLoadingTimeline(true);
-      
-      // Track this interaction
-      trackUIInteraction({
-        elementId: 'vehicle-timeline-view',
-        elementType: 'timeline',
-        actionType: 'view',
-        metadata: { 
-          vehicle_id: vehicleId,
-          timestamp: new Date().toISOString() 
-        }
-      });
-      
-      // Fetch timeline data from Supabase
-      const { data, error } = await supabase
-        .from('service_records')
-        .select('*')
-        .eq('vehicle_id', vehicleId)
-        .order('service_date', { ascending: false });
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Transform service records into timeline events
-      if (data && data.length > 0) {
-        const timelineEvents: TimelineEventData[] = data.map(record => ({
-          id: record.id,
-          vehicle_id: record.vehicle_id,
-          event_type: 'service',
-          event_date: record.service_date,
-          description: record.description || record.service_type,
-          data_source: record.data_source || 'service_records',
-          confidence: record.confidence || 1.0,
-          details: {
-            mileage: record.mileage,
-            cost: record.cost,
-            provider: record.provider
-          }
-        }));
-        
-        setTimeline(timelineEvents);
-      }
-    } catch (err) {
-      console.error('Error fetching vehicle timeline:', err);
-      // Don't set error message to avoid disrupting the UI if timeline fetch fails
-    } finally {
-      setIsLoadingTimeline(false);
-    }
-  };
-
-  // Calculate dynamic styles based on preferences
-  const dashboardStyles = {
-    // Scale UI elements based on density preference
-    padding: preferences.density === 'compact' ? 'p-2' : 
-             preferences.density === 'comfortable' ? 'p-4' : 'p-6',
-    
-    cardGap: preferences.density === 'compact' ? 'gap-2' : 
-             preferences.density === 'comfortable' ? 'gap-4' : 'gap-6',
-             
-    fontSize: `text-[${preferences.fontScale}rem]`,
-    
-    // Add subtle animations if enabled
-    animation: preferences.animations ? 'transition-all duration-300 ease-in-out' : '',
-  };
-
-  // Event handlers that track user interactions
-  const handleCardClick = (cardType: string) => {
-    trackUIInteraction({
-      elementId: `dashboard-card-${cardType}`,
-      elementType: 'card',
-      actionType: 'click',
-      metadata: { cardType }
-    });
-  };
-
-  const handleButtonClick = (buttonType: string) => {
-    trackUIInteraction({
-      elementId: `dashboard-button-${buttonType}`,
-      elementType: 'button',
-      actionType: 'click',
-      metadata: { buttonType }
-    });
-  };
-
-  // Show loading state when fetching preferences or vehicle data
-  if (isLoadingPreferences || isLoadingVehicles) {
-    return (
-      <div className="min-h-[50vh] flex justify-center items-center">
-        <div className="animate-pulse text-gray-500 dark:text-gray-400">
-          {isLoadingPreferences 
-            ? 'Loading dashboard preferences...' 
-            : 'Loading vehicle data...'}
-        </div>
-      </div>
-    );
-  }
   
-  // Show error message if there's an issue fetching data
+  // Handle vehicle selection
+  const handleVehicleSelect = (vehicleId: string) => {
+    setSelectedVehicle(vehicleId);
+    
+    // Track this interaction
+    trackUIInteraction({
+      elementId: 'vehicle-select',
+      elementType: 'control',
+      actionType: 'select',
+      metadata: { vehicleId }
+    });
+    
+    // Load timeline for the selected vehicle
+    fetchVehicleTimeline(vehicleId);
+  };
+  
+  // Handle tab change
+  const handleTabChange = (tabName: string) => {
+    setActiveTab(tabName);
+    
+    // Track this interaction
+    trackUIInteraction({
+      elementId: 'dashboard-tab',
+      elementType: 'control',
+      actionType: 'select',
+      metadata: { tabName }
+    });
+  };
+  
+  // Handle view mode change
+  const handleViewModeChange = (mode: 'list' | 'grid') => {
+    setViewMode(mode);
+    
+    // Track this interaction
+    trackUIInteraction({
+      elementId: 'view-mode',
+      elementType: 'control',
+      actionType: 'change',
+      metadata: { mode }
+    });
+  };
+  
+  // Handle data density change
+  const handleDataDensityChange = (density: 'compact' | 'normal' | 'detailed') => {
+    setDataDensity(density);
+    
+    // Track this interaction
+    trackUIInteraction({
+      elementId: 'data-density',
+      elementType: 'control',
+      actionType: 'change',
+      metadata: { density }
+    });
+  };
+  
+  // Get appropriate data source info
+  const getDataSourceInfo = (sourceId: string) => {
+    return dataSources.find(ds => ds.id === sourceId) || {
+      id: sourceId,
+      name: sourceId.replace('_', ' '),
+      isConnected: true,
+      icon: '❓'
+    };
+  };
+  
+  // Render error state
   if (errorMessage) {
     return (
-      <div className="min-h-[50vh] flex justify-center items-center">
-        <div className="text-red-500 p-4 border border-red-300 rounded-lg">
-          <p className="font-semibold">Error</p>
+      <div className="p-4">
+        <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-md">
+          <h3 className="text-lg font-medium">Error</h3>
           <p>{errorMessage}</p>
+          <button 
+            className="mt-2 px-4 py-2 bg-red-600 text-white rounded-md"
+            onClick={() => {
+              setErrorMessage('');
+              fetchVehicles();
+            }}
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
-
-  // Handle selecting a vehicle
-  const handleVehicleSelect = (id: string) => {
-    setSelectedVehicle(id);
-    fetchVehicleTimeline(id);
-    trackUIInteraction({
-      elementId: `vehicle-select-${id}`,
-      elementType: 'vehicle',
-      actionType: 'select',
-      metadata: { vehicle_id: id }
-    });
-  };
   
   return (
-    <div 
-      className={`w-full ${dashboardStyles.animation}`}
-      style={{ 
-        // Apply the accent color from user preferences
-        '--color-accent': preferences.colorAccent || '#3b82f6',
-        // Apply font scale
-        fontSize: `${preferences.fontScale}rem`
-      } as React.CSSProperties}
-    >
-      <header className={`mb-6 ${dashboardStyles.padding} bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700`}>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Vehicle Digital Identity Platform
-        </h1>
-        <p className="text-gray-600 dark:text-gray-300">
-          Track complete vehicle histories with our vehicle-centric architecture
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {dataSources.map(source => (
-            <DataSourceBadge 
-              key={source.id}
-              id={source.id}
-              name={source.name} 
-              icon={source.icon} 
-              isConnected={source.isConnected} 
-            />
-          ))}
-        </div>
-      </header>
-
-      <main className={`${dashboardStyles.padding}`}>
-        {/* Vehicle selection panel */}
-        <section className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${dashboardStyles.cardGap} mb-6`}>
-          {vehicles.map(vehicle => (
-            <div 
-              key={vehicle.id}
-              className={`p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border ${vehicle.id === selectedVehicle ? 'border-blue-500' : 'border-gray-200 dark:border-gray-700'} overflow-hidden cursor-pointer`}
-              onClick={() => handleVehicleSelect(vehicle.id)}
-            >
-              <div className="h-40 mb-3 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden">
-                <img 
-                  src={`https://via.placeholder.com/300x200?text=${vehicle.make}+${vehicle.model}`} 
-                  alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <h3 className="text-lg font-semibold mb-1">{vehicle.year} {vehicle.make} {vehicle.model}</h3>
-              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">VIN: {vehicle.vin}</div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                  <span className="text-xs">Confidence: {(vehicle.confidence || 0.9) * 100}%</span>
-                </div>
-                <div className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                  {vehicle.data_source || 'internal'}
-                </div>
+    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen p-4">
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Vehicle Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            View and manage vehicle information from multiple sources
+          </p>
+          
+          {/* Controls for adaptive UI */}
+          <div className="flex items-center space-x-4 mt-4">
+            <div className="flex items-center">
+              <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">View:</span>
+              <div className="flex bg-white dark:bg-gray-800 rounded-md p-1 shadow-sm">
+                <button
+                  className={`px-3 py-1 text-sm rounded-md ${
+                    viewMode === 'grid'
+                      ? 'bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-200'
+                      : 'text-gray-600 dark:text-gray-300'
+                  }`}
+                  onClick={() => handleViewModeChange('grid')}
+                >
+                  Grid
+                </button>
+                <button
+                  className={`px-3 py-1 text-sm rounded-md ${
+                    viewMode === 'list'
+                      ? 'bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-200'
+                      : 'text-gray-600 dark:text-gray-300'
+                  }`}
+                  onClick={() => handleViewModeChange('list')}
+                >
+                  List
+                </button>
               </div>
             </div>
-          ))}
-          
-          {/* Add vehicle button card */}
-          {/* Custom add vehicle card that doesn't use AdaptiveCard */}
-          <div 
-            className="flex flex-col items-center justify-center h-full min-h-[200px] border border-dashed rounded-lg shadow-sm p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-            onClick={() => handleButtonClick('add-vehicle')}
-          >
-            <div className="text-4xl mb-2">➕</div>
-            <div className="text-gray-700 dark:text-gray-300 font-medium">Add New Vehicle</div>
+            
+            <div className="flex items-center">
+              <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">Density:</span>
+              <div className="flex bg-white dark:bg-gray-800 rounded-md p-1 shadow-sm">
+                <button
+                  className={`px-3 py-1 text-sm rounded-md ${
+                    dataDensity === 'compact'
+                      ? 'bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-200'
+                      : 'text-gray-600 dark:text-gray-300'
+                  }`}
+                  onClick={() => handleDataDensityChange('compact')}
+                >
+                  Compact
+                </button>
+                <button
+                  className={`px-3 py-1 text-sm rounded-md ${
+                    dataDensity === 'normal'
+                      ? 'bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-200'
+                      : 'text-gray-600 dark:text-gray-300'
+                  }`}
+                  onClick={() => handleDataDensityChange('normal')}
+                >
+                  Normal
+                </button>
+                <button
+                  className={`px-3 py-1 text-sm rounded-md ${
+                    dataDensity === 'detailed'
+                      ? 'bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-200'
+                      : 'text-gray-600 dark:text-gray-300'
+                  }`}
+                  onClick={() => handleDataDensityChange('detailed')}
+                >
+                  Detailed
+                </button>
+              </div>
+            </div>
           </div>
-        </section>
-
-        {/* Selected vehicle details and timeline */}
-        <section className={`grid grid-cols-1 lg:grid-cols-3 ${dashboardStyles.cardGap}`}>
-          {selectedVehicle && (
-            <>
-              {/* Vehicle details panel */}
-              <div className="lg:col-span-1">
-                {vehicles.filter(v => v.id === selectedVehicle).map(vehicle => (
-                  <div
-                    key={vehicle.id}
-                    className="p-5 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
-                  >
-                    <h2 className="text-xl font-bold mb-2">{vehicle.year} {vehicle.make} {vehicle.model}</h2>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">VIN</p>
-                        <p className="font-medium">{vehicle.vin}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
-                        <p className="font-medium capitalize">Active</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Mileage</p>
-                        <p className="font-medium">{vehicle.mileage || 'Unknown'}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Data Source</p>
-                        <p className="font-medium">{vehicle.data_source || 'Internal'}</p>
-                      </div>
-                    </div>
-                    <div className="mb-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center mb-2">
-                        <span className="text-sm font-medium mr-2">Data Confidence:</span>
-                        <div className="flex-1 bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-blue-500 h-full rounded-full" 
-                            style={{ width: `${(vehicle.confidence || 0.9) * 100}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-xs ml-2">{Math.round((vehicle.confidence || 0.9) * 100)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Quick actions */}
-                <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
-                  <div className="space-y-2">
-                    {[
-                      { id: 'add-service', label: 'Add Service Record', icon: '🔧' },
-                      { id: 'update-mileage', label: 'Update Mileage', icon: '🛣️' },
-                      { id: 'upload-document', label: 'Upload Document', icon: '📄' },
-                      { id: 'share-history', label: 'Share Vehicle History', icon: '🔗' },
-                    ].map(action => (
-                      <button
-                        key={action.id}
-                        className="w-full text-left p-3 rounded-md flex items-center bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                        onClick={() => {
-                          trackUIInteraction({
-                            elementId: `action-${action.id}`,
-                            elementType: 'button',
-                            actionType: 'click',
-                            metadata: { action_id: action.id, vehicle_id: selectedVehicle }
-                          });
-                        }}
-                      >
-                        <span className="mr-2">{action.icon}</span>
-                        <span className="font-medium">{action.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>      </div>
+        </header>
+        
+        {isLoadingVehicles ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-300">Loading vehicles...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Vehicle selection sidebar */}
+            <div className="lg:col-span-1 space-y-4">
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Vehicles</h2>
               
-              {/* Timeline panel */}
-              <div className="lg:col-span-2">
-                <div className="h-full p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold">Vehicle Timeline</h2>
-                    {isLoadingTimeline ? (
-                      <div className="text-sm text-gray-500 animate-pulse">Loading timeline...</div>
-                    ) : (
-                      <div className="text-sm text-gray-500">{timeline.length} events</div>
-                    )}
+              <div className="space-y-3">
+                {vehicles.map(vehicle => (
+                  <VehicleCard
+                    key={vehicle.id}
+                    isSelected={vehicle.id === selectedVehicle}
+                    onClick={() => handleVehicleSelect(vehicle.id)}
+                    title={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                    subtitle={vehicle.vin || 'No VIN'}
+                    imageUrl={`https://via.placeholder.com/300x200?text=${vehicle.make}+${vehicle.model}`}
+                    badgeContent={
+                      <div className="flex space-x-1">
+                        <DataSourceBadge
+                          source={getDataSourceInfo(vehicle.data_source || 'manual_entry')}
+                        />
+                        <ConfidenceBadge confidence={vehicle.confidence || 0.5} />
+                      </div>
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Main content area */}
+            <div className="lg:col-span-2 space-y-6">
+              {currentVehicle ? (
+                <>
+                  {/* Vehicle detail card */}
+                  <AdaptiveCard
+                    title={`${currentVehicle.year} ${currentVehicle.make} ${currentVehicle.model}`}
+                    subtitleRight={
+                      <div className="flex space-x-2">
+                        <DataSourceBadge
+                          source={getDataSourceInfo(currentVehicle.data_source || 'manual_entry')}
+                        />
+                        <ConfidenceBadge confidence={currentVehicle.confidence || 0.5} />
+                      </div>
+                    }
+                  >
+                    <VehicleDetail
+                      vehicle={currentVehicle}
+                      dataDensity={dataDensity}
+                      sourceBadges
+                    />
+                  </AdaptiveCard>
+                  
+                  {/* Tab navigation for timeline/etc */}
+                  <div className="border-b border-gray-200 dark:border-gray-700">
+                    <nav className="flex space-x-8">
+                      <button
+                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                          activeTab === 'info'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                        }`}
+                        onClick={() => handleTabChange('info')}
+                      >
+                        Info
+                      </button>
+                      <button
+                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                          activeTab === 'timeline'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                        }`}
+                        onClick={() => handleTabChange('timeline')}
+                      >
+                        Timeline
+                      </button>
+                      <button
+                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                          activeTab === 'records'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                        }`}
+                        onClick={() => handleTabChange('records')}
+                      >
+                        Records
+                      </button>
+                    </nav>
                   </div>
                   
-                  <Timeline>
-                    {isLoadingTimeline ? (
-                      <div className="flex justify-center items-center py-8">
-                        <div className="animate-pulse text-gray-500">Loading timeline events...</div>
-                      </div>
-                    ) : timeline.length > 0 ? (
-                      timeline.map(event => (
-                        <div
-                          key={event.id}
-                          className="mb-4 border-l-2 border-blue-500 pl-4 pb-2"
-                        >
-                          <div className="flex justify-between items-start mb-1">
-                            <h3 className="text-base font-semibold">{event.description}</h3>
-                            <div className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                              {event.data_source}
-                            </div>
+                  {/* Tab content */}
+                  <div className="py-4">
+                    {activeTab === 'timeline' && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                          Vehicle Timeline
+                        </h3>
+                        
+                        {isLoadingTimeline ? (
+                          <div className="p-4 text-center">
+                            <div className="animate-spin w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                              Loading timeline...
+                            </p>
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                            {new Date(event.event_date).toLocaleDateString()}
-                          </div>
-                          {event.details && (
-                            <div className="text-sm mb-2">
-                              {typeof event.details === 'object' ? JSON.stringify(event.details) : event.details}
-                            </div>
-                          )}
-                          <div className="flex items-center mt-2">
-                            <span className="text-xs mr-2">Confidence:</span>
-                            <div className="w-24 bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
-                              <div 
-                                className="bg-blue-500 h-full rounded-full" 
-                                style={{ width: `${(event.confidence || 0.7) * 100}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <p>No timeline events available</p>
-                        <button
-                          className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600"
-                          onClick={() => handleButtonClick('add-event')}
-                        >
-                          Add First Event
-                        </button>
+                        ) : timeline.length > 0 ? (
+                          <Timeline>
+                            {timeline.map(event => (
+                              <TimelineEvent
+                                key={event.id}
+                                title={event.description}
+                                date={new Date(event.event_date)}
+                                type={event.event_type}
+                                details={event.details}
+                                source={getDataSourceInfo(event.data_source)}
+                                confidence={event.confidence}
+                              />
+                            ))}
+                          </Timeline>
+                        ) : (
+                          <p className="text-gray-500 dark:text-gray-400">
+                            No timeline events found for this vehicle.
+                          </p>
+                        )}
                       </div>
                     )}
-                  </Timeline>
-                </div>      </div>
-            </>
-          )}
-          
-          {!selectedVehicle && (
-            <div className="lg:col-span-3 text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400 mb-4">Select a vehicle to view its detailed information and timeline</p>
-            </div>
-          )}
-        </section>
-        
-        {/* User preferences summary */}
-        <section className={`mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg ${dashboardStyles.animation}`}>
-          <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Your Current UI Preferences
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Theme:</span>
-              <div className="font-medium text-gray-800 dark:text-white capitalize">
-                {preferences.theme}
-              </div>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Density:</span>
-              <div className="font-medium text-gray-800 dark:text-white capitalize">
-                {preferences.density}
-              </div>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Font Scale:</span>
-              <div className="font-medium text-gray-800 dark:text-white">
-                {preferences.fontScale}x
-              </div>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Animations:</span>
-              <div className="font-medium text-gray-800 dark:text-white">
-                {preferences.animations ? 'Enabled' : 'Disabled'}
-              </div>
+                    
+                    {activeTab === 'info' && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                          Vehicle Information
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Detailed vehicle information is displayed in the card above.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {activeTab === 'records' && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                          Service Records
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Service records will be displayed here in a future update.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 text-center">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Select a vehicle to view details
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            Use the settings panel to customize your experience. The UI will learn from your interactions and suggest improvements over time.
-          </p>
-        </section>
-      </main>
+        )}
+      </div>
     </div>
   );
+}
+
+// Types
+interface VehicleData {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  trim?: string;
+  color?: string;
+  mileage?: number;
+  additional_details?: Record<string, string | number | boolean | null>;
+  last_updated?: string;
+  data_source?: string;
+  confidence?: number;
+  vin?: string;
+}
+
+interface TimelineEventData {
+  id: string;
+  vehicle_id: string;
+  event_type: string;
+  event_date: string;
+  description: string;
+  data_source: string;
+  confidence: number;
+  details?: Record<string, string | number | boolean | null>;
+}
+
+interface DataSourceInfo {
+  id: string;
+  name: string;
+  isConnected: boolean;
+  icon: string;
 }
