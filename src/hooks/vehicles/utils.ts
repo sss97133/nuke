@@ -1,5 +1,7 @@
+import { Database } from '@/types/supabase';
+import { Vehicle } from '@/types/vehicle';
 
-import { Vehicle } from '../../components/vehicles/discovery/types';
+type DbVehicle = Database['public']['Tables']['vehicles']['Row'];
 
 // Helper function to convert timestamp to "X days ago" format
 export function getRelativeTimeString(date: Date): string {
@@ -15,36 +17,18 @@ export function getRelativeTimeString(date: Date): string {
 }
 
 // Adapter function to map database fields to component-expected schema with null safety
-export function adaptVehicleFromDB(dbVehicle: any): Vehicle {
-  if (!dbVehicle) {
-    throw new Error("Cannot adapt undefined or null vehicle data");
-  }
-  
+export function adaptVehicleFromDB(dbVehicle: DbVehicle): Vehicle {
   return {
     id: dbVehicle.id,
-    make: dbVehicle.make || '',
-    model: dbVehicle.model || '',
-    year: dbVehicle.year || 0,
-    price: dbVehicle.price || 0,
-    market_value: dbVehicle.market_value || dbVehicle.price || 0,
-    price_trend: dbVehicle.price_trend || 'stable',
-    mileage: dbVehicle.mileage || 0,
-    image: dbVehicle.image_url || '/placeholder.png',
-    location: dbVehicle.location || '',
-    added: dbVehicle.created_at ? getRelativeTimeString(new Date(dbVehicle.created_at)) : '',
-    tags: Array.isArray(dbVehicle.tags) ? dbVehicle.tags : [],
-    condition_rating: typeof dbVehicle.condition_rating === 'number' ? dbVehicle.condition_rating : 5,
-    vehicle_type: dbVehicle.vehicle_type || '',
-    body_type: dbVehicle.body_type || '',
-    transmission: dbVehicle.transmission || '',
-    drivetrain: dbVehicle.drivetrain || '',
-    rarity_score: typeof dbVehicle.rarity_score === 'number' ? dbVehicle.rarity_score : 0,
-    era: dbVehicle.era || '',
-    restoration_status: dbVehicle.restoration_status || 'original',
-    special_edition: Boolean(dbVehicle.special_edition),
-    status: dbVehicle.status || 'discovered',
-    source: dbVehicle.source || '',
-    source_url: dbVehicle.source_url || '',
+    make: dbVehicle.make,
+    model: dbVehicle.model,
+    year: dbVehicle.year,
+    vin: dbVehicle.vin,
+    status: dbVehicle.status,
+    metadata: dbVehicle.metadata as Vehicle['metadata'],
+    created_at: dbVehicle.created_at,
+    updated_at: dbVehicle.updated_at,
+    user_id: dbVehicle.user_id
   };
 }
 

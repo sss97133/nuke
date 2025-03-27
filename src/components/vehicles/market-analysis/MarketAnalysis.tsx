@@ -1,13 +1,8 @@
 import React from "react";
 import { Analysis, MarketAnalysisProps } from "./types";
-import { MarketPositionCard } from "./MarketPositionCard";
-import { FeaturesAndFactors } from "./FeaturesAndFactors";
-import { PriceHistoryChart } from "./PriceHistoryChart";
-import { InvestmentOutlookCard } from "./InvestmentOutlookCard";
-import { TokenAnalysisCard } from "./TokenAnalysisCard";
-import { DerivativesCard } from "./DerivativesCard";
 import { Card } from "@/components/ui/card";
 import { PriceAnalysisCard } from "./PriceAnalysisCard";
+import { DerivativesCard } from "./DerivativesCard";
 import { supabase } from "@/lib/supabase";
 import { Database } from '@/types/supabase';
 import { useState, useEffect } from 'react';
@@ -30,13 +25,13 @@ interface TokenAnalysis {
 }
 
 export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [analysis, setAnalysis] = React.useState<Analysis | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [priceAnalysis, setPriceAnalysis] = useState<PriceAnalysis | null>(null);
   const [tokenAnalysis, setTokenAnalysis] = useState<TokenAnalysis | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     async function fetchMarketAnalysis() {
       try {
         setLoading(true);
@@ -148,43 +143,31 @@ export const MarketAnalysis = ({ vehicleData }: MarketAnalysisProps) => {
 
   return (
     <div className="space-y-6">
-      {loading ? (
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
-        </div>
-      ) : error ? (
-        <div className="text-red-500 dark:text-red-400">{error}</div>
-      ) : analysis ? (
-        <>
-          <div className="prose dark:prose-invert max-w-none">
-            <p>{analysis.marketAnalysis}</p>
-            <h3>Unique Features</h3>
-            <ul>
-              {analysis.uniqueFeatures.map((feature, index) => (
-                <li key={index}>{feature}</li>
-              ))}
-            </ul>
-            <h3>Value Factors</h3>
-            <ul>
-              {analysis.valueFactors.map((factor, index) => (
-                <li key={index}>{factor}</li>
-              ))}
-            </ul>
-            <h3>Investment Outlook</h3>
-            <p>{analysis.investmentOutlook}</p>
-          </div>
-          
-          {priceAnalysis && (
-            <PriceAnalysisCard analysis={priceAnalysis} />
-          )}
-          
-          {tokenAnalysis && (
-            <DerivativesCard analysis={tokenAnalysis} />
-          )}
-        </>
-      ) : null}
+      <div className="prose dark:prose-invert max-w-none">
+        <p>{analysis.marketAnalysis}</p>
+        <h3>Unique Features</h3>
+        <ul>
+          {analysis.uniqueFeatures.map((feature, index) => (
+            <li key={index}>{feature}</li>
+          ))}
+        </ul>
+        <h3>Value Factors</h3>
+        <ul>
+          {analysis.valueFactors.map((factor, index) => (
+            <li key={index}>{factor}</li>
+          ))}
+        </ul>
+        <h3>Investment Outlook</h3>
+        <p>{analysis.investmentOutlook}</p>
+      </div>
+      
+      {priceAnalysis && (
+        <PriceAnalysisCard analysis={priceAnalysis} />
+      )}
+      
+      {tokenAnalysis && (
+        <DerivativesCard analysis={tokenAnalysis} />
+      )}
     </div>
   );
 };
