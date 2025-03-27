@@ -138,7 +138,7 @@ const VehicleDigitalIdentity = () => {
       try {
         setLoading(true);
         
-        // Fetch vehicle basic data
+        // Fetch vehicle data
         const { data: vehicleData, error: vehicleError } = await supabase
           .from('vehicles')
           .select('*')
@@ -152,55 +152,67 @@ const VehicleDigitalIdentity = () => {
           return;
         }
         
-        // Fetch related data using Promise.all for parallel requests
-        // Simulate fetching related data from available tables or mock data when tables don't exist
-        // This allows the UI to work even if some tables aren't in your schema yet
-        const { data: profilesData } = await supabase
-          .from('profiles')
+        // Fetch documents
+        const { data: documents, error: documentsError } = await supabase
+          .from('documents')
           .select('*')
-          .limit(3); // Get some profiles to show as owners
-          
-        // Create mock data for relations that aren't in the database yet
-        const mockOwners: OwnerData[] = (profilesData || []).map((profile, index) => ({
-          id: profile.id,
-          full_name: profile.full_name || `${profile.first_name || 'Owner'} ${profile.last_name || index + 1}`,
-          owned_since: new Date(2020, index * 3, 15).toISOString(),
-          owned_until: index === 0 ? undefined : new Date(2022, index * 3, 10).toISOString(),
-          location: ['California', 'New York', 'Texas'][index % 3],
-          verified: index % 2 === 0
+          .eq('vehicle_id', id)
+          .order('created_at', { ascending: false });
+        
+        if (documentsError) throw documentsError;
+        
+        // Fetch services
+        const { data: services, error: servicesError } = await supabase
+          .from('services')
+          .select('*')
+          .eq('vehicle_id', id)
+          .order('service_date', { ascending: false });
+        
+        if (servicesError) throw servicesError;
+        
+        // Fetch verifications
+        const { data: verifications, error: verificationsError } = await supabase
+          .from('verifications')
+          .select('*')
+          .eq('vehicle_id', id)
+          .order('verification_date', { ascending: false });
+        
+        if (verificationsError) throw verificationsError;
+        
+        // Transform the data
+        const transformedDocuments: DocumentData[] = (documents || []).map(doc => ({
+          id: doc.id,
+          document_type: doc.document_type,
+          title: doc.title,
+          created_at: doc.created_at,
+          verified: doc.verified
         }));
         
-        const mockDocuments: DocumentData[] = [
-          { id: '1', document_type: 'Title', title: 'Vehicle Title', created_at: new Date(2020, 2, 15).toISOString(), verified: true },
-          { id: '2', document_type: 'Service Record', title: 'Oil Change Documentation', created_at: new Date(2021, 5, 22).toISOString(), verified: true },
-          { id: '3', document_type: 'Registration', title: 'Vehicle Registration', created_at: new Date(2022, 1, 10).toISOString(), verified: false }
-        ];
+        const transformedServices: ServiceData[] = (services || []).map(service => ({
+          id: service.id,
+          service_date: service.service_date,
+          service_type: service.service_type,
+          provider_id: service.provider_id,
+          provider_name: service.provider_name,
+          description: service.description,
+          verification_status: service.verification_status
+        }));
         
-        const mockServices: ServiceData[] = [
-          { id: '1', service_date: new Date(2021, 3, 10).toISOString(), service_type: 'Oil Change', provider_id: '1', provider_name: 'Premium Auto Service', description: 'Regular oil change with filter replacement', verification_status: 'verified' },
-          { id: '2', service_date: new Date(2021, 9, 22).toISOString(), service_type: 'Brake Service', provider_id: '2', provider_name: 'Midas Auto', description: 'Front brake pad replacement', verification_status: 'verified' },
-          { id: '3', service_date: new Date(2022, 2, 5).toISOString(), service_type: 'Tire Rotation', provider_id: '1', provider_name: 'Premium Auto Service', description: 'Rotation and balancing of all four tires', verification_status: 'pending' }
-        ];
-        
-        const mockVerifications: VerificationData[] = [
-          { id: '1', verification_date: new Date(2021, 1, 15).toISOString(), status: 'Complete', confidence_score: 92, verified_by: 'PTZ Center #42' },
-          { id: '2', verification_date: new Date(2022, 3, 8).toISOString(), status: 'Complete', confidence_score: 88, verified_by: 'PTZ Center #17' }
-        ];
-        
-        const mockMarketData: MarketData[] = [
-          { id: '1', source: 'BaT Auction', date: new Date(2021, 0, 20).toISOString(), value: 32500, current_value: 35800, condition: 'Excellent', source_url: 'https://bringatrailer.com', updated_at: new Date(2022, 3, 15).toISOString() },
-          { id: '2', source: 'Hagerty Valuation', date: new Date(2021, 6, 15).toISOString(), value: 31000, current_value: 35800, condition: 'Good', source_url: 'https://hagerty.com', updated_at: new Date(2022, 3, 12).toISOString() },
-          { id: '3', source: 'Recent Private Sale', date: new Date(2022, 1, 8).toISOString(), value: 33500, current_value: 35800, condition: 'Very Good', source_url: undefined, updated_at: new Date(2022, 3, 10).toISOString() }
-        ];
+        const transformedVerifications: VerificationData[] = (verifications || []).map(verification => ({
+          id: verification.id,
+          verification_date: verification.verification_date,
+          status: verification.status,
+          confidence_score: verification.confidence_score,
+          verified_by: verification.verified_by
+        }));
         
         // Combine vehicle data with real or mock related data
         const completeVehicle: VehicleWithRelations = {
           ...vehicleData,
-          owners: mockOwners,
-          documents: mockDocuments,
-          services: mockServices,
-          verification: mockVerifications,
-          market_data: mockMarketData
+          documents: transformedDocuments,
+          services: transformedServices,
+          verification: transformedVerifications,
+          market_data: []
         };
         
         setVehicle(completeVehicle);

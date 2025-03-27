@@ -1,11 +1,14 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Award, Calendar, Clock, TrendingUp, CheckCircle, Star } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AchievementProps {
+  id: string;
   title: string;
   description: string;
   earnedOn: string;
@@ -51,50 +54,60 @@ const AchievementCard = ({ achievement }: { achievement: AchievementProps }) => 
 };
 
 const Achievements = () => {
-  const achievements: AchievementProps[] = [
-    {
-      title: "First Service Completed",
-      description: "Successfully completed your first vehicle service",
-      earnedOn: "Apr 15, 2023",
-      icon: <CheckCircle className="h-4 w-4" />,
-      type: "common"
-    },
-    {
-      title: "Master Diagnostician",
-      description: "Diagnosed 50 complex vehicle issues accurately",
-      earnedOn: "Jun 22, 2023",
-      icon: <TrendingUp className="h-4 w-4" />,
-      type: "rare"
-    },
-    {
-      title: "Speed Demon",
-      description: "Completed 10 services in record time",
-      earnedOn: "Aug 05, 2023",
-      icon: <Clock className="h-4 w-4" />,
-      type: "rare"
-    },
-    {
-      title: "Restoration Wizard",
-      description: "Fully restored a classic vehicle to mint condition",
-      earnedOn: "Oct 17, 2023",
-      icon: <Star className="h-4 w-4" />,
-      type: "epic"
-    },
-    {
-      title: "Industry Legend",
-      description: "Recognized by peers for outstanding contributions",
-      earnedOn: "Jan 30, 2024",
-      icon: <Award className="h-4 w-4" />,
-      type: "legendary"
-    }
-  ];
+  const { session } = useAuth();
+  const [achievements, setAchievements] = useState<AchievementProps[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const fetchAchievements = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        if (!session?.user?.id) {
+          throw new Error('User not authenticated');
+        }
+
+        const { data, error: fetchError } = await supabase
+          .from('achievements')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        // Transform the data to match our interface
+        const transformedAchievements: AchievementProps[] = (data || []).map(achievement => ({
+          id: achievement.id,
+          title: achievement.title,
+          description: achievement.description,
+          earnedOn: new Date(achievement.created_at).toLocaleDateString(),
+          icon: <Award className="h-4 w-4" />,
+          type: achievement.category as 'rare' | 'common' | 'epic' | 'legendary'
+        }));
+
+        setAchievements(transformedAchievements);
+      } catch (err) {
+        console.error('Error fetching achievements:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch achievements');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAchievements();
+  }, [session?.user?.id]);
+
+  // Calculate achievement stats
   const achievementStats = {
-    total: 27,
-    common: 15,
-    rare: 8,
-    epic: 3,
-    legendary: 1
+    total: achievements.length,
+    common: achievements.filter(a => a.type === 'common').length,
+    rare: achievements.filter(a => a.type === 'rare').length,
+    epic: achievements.filter(a => a.type === 'epic').length,
+    legendary: achievements.filter(a => a.type === 'legendary').length
   };
 
   return (
@@ -150,11 +163,55 @@ const Achievements = () => {
           </Card>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {achievements.map((achievement, index) => (
-            <AchievementCard key={index} achievement={achievement} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="overflow-hidden">
+                <Skeleton className="h-2 w-full" />
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : error ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center text-muted-foreground">
+                <p>Failed to load achievements. Please try again later.</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : achievements.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center text-muted-foreground">
+                <p>No achievements earned yet. Complete tasks and milestones to earn achievements!</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {achievements.map((achievement) => (
+              <AchievementCard key={achievement.id} achievement={achievement} />
+            ))}
+          </div>
+        )}
       </div>
     </ScrollArea>
   );

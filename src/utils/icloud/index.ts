@@ -1,4 +1,3 @@
-
 /**
  * iCloud Shared Album Integration - Main Entry Point
  * 
@@ -15,4 +14,4 @@ export * from './core';
 export * from './utils';
 
 // Re-export mock functions
-export * from './mock';
+export { mockFetchICloudImages } from './mock';

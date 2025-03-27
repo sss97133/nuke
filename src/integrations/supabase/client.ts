@@ -62,8 +62,8 @@ declare global {
   }
 }
 
-const supabaseUrl = getEnvValue('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 // Get current environment
 const environment = typeof process !== 'undefined' && process.env && process.env.NODE_ENV 
@@ -114,7 +114,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
 
 export type SupabaseError = {
   message: string;

@@ -1,5 +1,4 @@
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { ContentCardProps } from './types/ContentCardTypes';
 import { ContentCardImage } from './components/ContentCardImage';
@@ -20,6 +19,8 @@ export const ContentCard: React.FC<ContentCardProps> = ({
   onShare,
   onSave 
 }) => {
+  const viewTracked = useRef(false);
+  
   const { 
     id, 
     title = 'Untitled Content', 
@@ -44,9 +45,10 @@ export const ContentCard: React.FC<ContentCardProps> = ({
   
   // Track view when card is rendered - with error handling
   useEffect(() => {
-    if (onView && id) {
+    if (onView && id && !viewTracked.current) {
       try {
         onView(id, type);
+        viewTracked.current = true;
       } catch (error) {
         console.warn('Error tracking view:', error);
         // Continue rendering even if tracking fails

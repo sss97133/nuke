@@ -48,82 +48,6 @@ export interface MarketplaceListing {
   is_watched: boolean;
 }
 
-const USE_REAL_DATA = {
-  marketplaceDetail: true
-};
-
-const getMockListing = (id: string): MarketplaceListing => ({
-  id,
-  title: "2019 Porsche 911 Carrera S",
-  price: 124900,
-  description: "This beautiful Porsche 911 Carrera S is in excellent condition with low mileage. It features a twin-turbocharged 3.0L flat-six engine producing 443 horsepower, paired with a PDK transmission. The car comes with sport chrono package, sport exhaust, and PASM sport suspension.",
-  condition: "Excellent",
-  created_at: "2023-08-15T14:30:00Z",
-  updated_at: "2023-09-01T10:15:00Z",
-  seller: {
-    id: "seller123",
-    name: "Premium Auto Sales",
-    avatar: "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80",
-    rating: 4.8,
-    listings_count: 27,
-    joinedDate: "2020-03-15T00:00:00Z"
-  },
-  vehicle: {
-    id: "veh789",
-    make: "Porsche",
-    model: "911",
-    year: 2019,
-    trim: "Carrera S",
-    type: "Coupe",
-    vin: "WP0AB2A99KS123456",
-    mileage: 12450,
-    fuel_type: "Gasoline",
-    transmission: "Automatic",
-    engine: "3.0L Twin-Turbo Flat-Six",
-    exterior_color: "GT Silver Metallic",
-    interior_color: "Black"
-  },
-  location: {
-    city: "Beverly Hills",
-    state: "CA",
-    country: "USA",
-    postal_code: "90210"
-  },
-  features: [
-    "Sport Chrono Package",
-    "Sport Exhaust System",
-    "PASM Sport Suspension",
-    "Panoramic Roof",
-    "Premium Audio System",
-    "Heated and Ventilated Seats",
-    "Navigation System",
-    "Bluetooth Connectivity",
-    "Apple CarPlay",
-    "Backup Camera"
-  ],
-  specifications: {
-    horsepower: 443,
-    torque: 390,
-    acceleration: 3.5,
-    top_speed: 191,
-    weight: 3382,
-    length: 177.9,
-    width: 72.9,
-    height: 51.3,
-    wheelbase: 96.5,
-    ground_clearance: 4.9
-  },
-  images: [
-    "https://images.unsplash.com/photo-1584060622420-0673aad46068?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1626668893537-fc08bf57d5d7?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1542282088-fe8426682b8f?auto=format&fit=crop&w=1200&q=80"
-  ],
-  views_count: 342,
-  is_featured: true,
-  is_watched: false
-});
-
 function adaptListingFromDB(data: any, userId?: string): MarketplaceListing {
   try {
     return {
@@ -185,11 +109,11 @@ function adaptListingFromDB(data: any, userId?: string): MarketplaceListing {
     };
   } catch (err) {
     console.error('Error adapting DB data:', err);
-    return getMockListing(data.id || 'unknown');
+    throw new Error('Failed to adapt listing data from database');
   }
 }
 
-export function useMarketplaceListing(id: string) {
+export const useMarketplaceListing = (id: string) => {
   const { session } = useAuth();
   const userId = session?.user?.id;
   
@@ -201,98 +125,91 @@ export function useMarketplaceListing(id: string) {
     try {
       setIsLoading(true);
       setError(null);
-      
-      console.log("Fetching listing data for ID:", id);
-      
-      if (!USE_REAL_DATA.marketplaceDetail) {
-        console.log('Using mock marketplace detail data (feature flag off)');
-        const mockData = getMockListing(id);
-        if (userId) {
-          mockData.is_watched = Math.random() > 0.7;
-        }
-        setListing(mockData);
-        setIsLoading(false);
-        return;
+
+      // Fetch listing data from Supabase
+      const { data, error: fetchError } = await supabase
+        .from('marketplace_listings')
+        .select(`
+          *,
+          seller:user_id (
+            id,
+            name,
+            avatar_url,
+            rating,
+            listings_count,
+            created_at
+          ),
+          vehicle:vehicle_id (
+            id,
+            make,
+            model,
+            year,
+            trim,
+            type,
+            vin,
+            mileage,
+            fuel_type,
+            transmission,
+            engine,
+            exterior_color,
+            interior_color
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        throw fetchError;
       }
-      
-      console.log("Using mock listing data until database tables are created");
-      const mockData = getMockListing(id);
-      if (userId) {
-        mockData.is_watched = Math.random() > 0.7;
+
+      if (!data) {
+        throw new Error('Listing not found');
       }
-      setListing(mockData);
-      setIsLoading(false);
-      
-      console.log("Simulating view count increment for listing:", id);
+
+      // Adapt the data to our interface
+      const adaptedListing = adaptListingFromDB(data, userId);
+      setListing(adaptedListing);
     } catch (err) {
-      console.error("Error in useMarketplaceListing hook:", err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setListing(getMockListing(id));
+      console.error('Error fetching listing:', err);
+      setError(err instanceof Error ? err : new Error('Failed to fetch listing'));
+    } finally {
+      setIsLoading(false);
     }
   }, [id, userId]);
 
   useEffect(() => {
-    let isMounted = true;
-    
-    console.log("useMarketplaceListing hook called with id:", id);
-    if (!id) {
-      console.error("No listing ID provided to useMarketplaceListing");
-      if (isMounted) {
-        setIsLoading(false);
-        setError(new Error("No listing ID provided"));
-      }
-      return;
-    }
-
     fetchListing();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [id, fetchListing]);
+  }, [fetchListing]);
 
   const toggleWatchListing = async () => {
-    if (!listing || !userId) return;
-    
+    if (!userId || !listing) return;
+
     try {
-      console.log(`${listing.is_watched ? 'Unwatching' : 'Watching'} listing:`, listing.id);
-      
-      /*
-      if (listing.is_watched) {
-        await supabase
-          .from('user_watched_listings')
-          .delete()
-          .eq('user_id', userId)
-          .eq('listing_id', listing.id);
-      } else {
-        await supabase
-          
-          .insert({
-            user_id: userId,
-            listing_id: listing.id
-          });
+      const { error: watchError } = await supabase
+        .from('watched_listings')
+        .upsert({
+          user_id: userId,
+          listing_id: listing.id,
+          is_watched: !listing.is_watched
+        });
+
+      if (watchError) {
+        throw watchError;
       }
-      */
-      
-      setListing(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          is_watched: !prev.is_watched
-        };
-      });
+
+      // Update local state
+      setListing(prev => prev ? { ...prev, is_watched: !prev.is_watched } : null);
     } catch (err) {
-      console.error("Error toggling watch status:", err);
+      console.error('Error toggling watch status:', err);
+      // You might want to show a toast notification here
     }
   };
 
-  console.log("useMarketplaceListing hook returning:", { listing, isLoading, error });
-  return { 
-    listing, 
-    isLoading, 
+  return {
+    listing,
+    isLoading,
     error,
-    actions: {
-      toggleWatchListing
-    }
+    refresh: fetchListing,
+    toggleWatchListing
   };
 }

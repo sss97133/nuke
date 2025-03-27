@@ -1,7 +1,21 @@
-
-import type { Database } from '../types';
+import type { Database } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { ContentItem } from './types';
+
+const AUCTION_STATUS = {
+  ACTIVE: 'active',
+  ENDED: 'ended',
+  CANCELLED: 'cancelled'
+} as const;
+
+const STREAM_STATUS = {
+  LIVE: 'live',
+  ENDED: 'ended',
+  SCHEDULED: 'scheduled'
+} as const;
+
+type AuctionStatus = typeof AUCTION_STATUS[keyof typeof AUCTION_STATUS];
+type StreamStatus = typeof STREAM_STATUS[keyof typeof STREAM_STATUS];
 
 export async function fetchContentByType(
   contentType: string, 
@@ -50,7 +64,7 @@ export async function fetchContentByType(
         
     case 'vehicles':
       let vehiclesQuery = supabase
-        
+        .from('vehicles')
         .select(`
           id,
           make,
@@ -69,11 +83,16 @@ export async function fetchContentByType(
         vehiclesQuery = vehiclesQuery.or(searchFilter);
       }
       
-      return await vehiclesQuery.range(from, to);
+      const { data: vehiclesData, error: vehiclesError } = await vehiclesQuery.range(from, to);
+      if (vehiclesError) {
+        console.error('Error fetching vehicles:', vehiclesError);
+        return { data: [], error: vehiclesError };
+      }
+      return { data: vehiclesData, error: null };
         
     case 'auctions':
       let auctionsQuery = supabase
-        
+        .from('auctions')
         .select(`
           id,
           vehicle_id,
@@ -85,7 +104,7 @@ export async function fetchContentByType(
           profiles!seller_id(full_name, avatar_url),
           vehicles!vehicle_id(make, model, year, vin_image_url)
         `)
-        .eq('status', 'active')
+        .eq('status', AUCTION_STATUS.ACTIVE)
         .order('end_time', { ascending: true });
         
       // Apply search if provided
@@ -93,11 +112,16 @@ export async function fetchContentByType(
         auctionsQuery = auctionsQuery.or(searchFilter);
       }
       
-      return await auctionsQuery.range(from, to);
+      const { data: auctionsData, error: auctionsError } = await auctionsQuery.range(from, to);
+      if (auctionsError) {
+        console.error('Error fetching auctions:', auctionsError);
+        return { data: [], error: auctionsError };
+      }
+      return { data: auctionsData, error: null };
         
     case 'live_streams':
       let streamsQuery = supabase
-        
+        .from('live_streams')
         .select(`
           id,
           title,
@@ -109,7 +133,7 @@ export async function fetchContentByType(
           user_id,
           profiles(full_name, avatar_url)
         `)
-        .eq('status', 'live')
+        .eq('status', STREAM_STATUS.LIVE)
         .order('viewer_count', { ascending: false });
         
       // Apply search if provided
@@ -117,7 +141,12 @@ export async function fetchContentByType(
         streamsQuery = streamsQuery.or(searchFilter);
       }
       
-      return await streamsQuery.range(from, to);
+      const { data: streamsData, error: streamsError } = await streamsQuery.range(from, to);
+      if (streamsError) {
+        console.error('Error fetching streams:', streamsError);
+        return { data: [], error: streamsError };
+      }
+      return { data: streamsData, error: null };
         
     case 'garages':
       let garagesQuery = supabase
@@ -137,7 +166,12 @@ export async function fetchContentByType(
         garagesQuery = garagesQuery.or(searchFilter);
       }
       
-      return await garagesQuery.range(from, to);
+      const { data: garagesData, error: garagesError } = await garagesQuery.range(from, to);
+      if (garagesError) {
+        console.error('Error fetching garages:', garagesError);
+        return { data: [], error: garagesError };
+      }
+      return { data: garagesData, error: null };
         
     // Add more content types as needed
         
