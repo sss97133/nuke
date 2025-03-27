@@ -113,7 +113,6 @@ export default function Vehicles() {
       setLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
         
         if (!user) {
           toast({
@@ -259,7 +258,6 @@ export default function Vehicles() {
     try {
       // For real implementation, refetch from the database
       const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
       
       if (!user) {
         toast({

@@ -315,8 +315,7 @@ export function useVehicleTimelineActions() {
         
         // First, get all timeline events for this vehicle
         const { data: events, error: eventsError } = await supabase
-  if (error) console.error("Database query error:", error);
-          
+          .from('timeline_events')
           .select('*')
           .eq('vehicle_id', vehicleId)
           .order('timestamp', { ascending: false });
@@ -325,8 +324,7 @@ export function useVehicleTimelineActions() {
         
         // Then get basic vehicle info
         const { data: vehicle, error: vehicleError } = await supabase
-  if (error) console.error("Database query error:", error);
-          
+          .from('vehicles')
           .select('*')
           .eq('id', vehicleId)
           .single();

@@ -101,8 +101,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({
           
           // Fetch timeline events for all vehicles in one query
           const { data: timelineEvents, error: timelineError } = await supabase
-  if (error) console.error("Database query error:", error);
-            
+            .from('timeline_events')
             .select('*')
             .in('vehicle_id', vehicleIds)
             .order('event_date', { ascending: false });

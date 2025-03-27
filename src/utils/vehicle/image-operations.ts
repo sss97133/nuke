@@ -10,7 +10,6 @@ export async function fetchCarImages(carId: string) {
   try {
     // Get car details
     const { data: car, error: carError } = await supabase
-  if (error) console.error("Database query error:", error);
       .from('vehicles')
       .select('*')
       .eq('id', carId)
@@ -20,8 +19,7 @@ export async function fetchCarImages(carId: string) {
     
     // Get Supabase-stored images
     const { data: storedImages, error: imagesError } = await supabase
-  if (error) console.error("Database query error:", error);
-      
+      .from('car_images')
       .select('*')
       .eq('car_id', carId)
       .order('uploaded_at', { ascending: false });

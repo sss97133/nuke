@@ -12,7 +12,6 @@ export async function checkExistingInteraction(
 ): Promise<boolean> {
   try {
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
       .from('content_interactions')
       .select('id')
       .eq('content_id', contentId)
@@ -54,8 +53,7 @@ export async function trackContentInteraction(
     
     // Insert interaction - explicitly specify only the columns we know exist
     const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-      
+      .from('content_interactions')
       .insert({
         content_id: contentId,
         user_id: userId,

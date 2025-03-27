@@ -29,14 +29,12 @@ function AddVehicle() {
     onSubmitSuccess: async (data) => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
         if (!user) {
           throw new Error('User not authenticated');
         }
 
         // Insert the vehicle data into the database
         const { data: vehicle, error } = await supabase
-  if (error) console.error("Database query error:", error);
           .from('vehicles')
           .insert([{
             user_id: user.id,
@@ -81,8 +79,6 @@ function AddVehicle() {
           
           // Move the file to the correct vehicle folder
           const { error: moveError } = await supabase.storage
-  if (error) console.error("Database query error:", error);
-            
             .move(`${user.id}/${oldPath}`, newPath);
 
           if (moveError) {
@@ -92,8 +88,7 @@ function AddVehicle() {
 
           // Update the vehicle_images table
           const { error: imageError } = await supabase
-  if (error) console.error("Database query error:", error);
-            
+            .from('car_images')
             .update({ car_id: vehicle.id })
             .eq('image_url', primaryImageUrl);
 

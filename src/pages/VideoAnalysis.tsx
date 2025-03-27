@@ -27,7 +27,6 @@ export const VideoAnalysis = () => {
     queryKey: ['video-job', jobId],
     queryFn: async () => {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('video_processing_jobs')
         .select('*, live_streams(id, stream_url)')
         .eq('id', jobId)

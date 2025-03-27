@@ -81,7 +81,6 @@ export const useICloudUpload = ({ vehicleId, vehicleInfo, onConnect }: UseICloud
         const filePath = `${folderPath}/${fileName}`;
         
         const { error } = await supabase.storage
-  if (error) console.error("Database query error:", error);
           .from('vehicle-images')
           .upload(filePath, file);
         
