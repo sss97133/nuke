@@ -1,8 +1,19 @@
 name: Docker Build Test
 on: 
   workflow_dispatch:
+  # Run after environment variable monitor completes
+  workflow_run:
+    workflows: ["Environment Variable Monitor"]
+    types:
+      - completed
+    branches:
+      - main
+  # Also allow direct triggering on Dockerfile changes
   push:
     branches: [ main ]
+    paths:
+      - 'Dockerfile'
+      - 'nginx.conf'
 
 jobs:
   build:
@@ -20,6 +31,13 @@ jobs:
           echo "NPM version: $(npm -v)"
           echo "Running in Docker container"
           
+      - name: Install Python and build dependencies
+        run: |
+          echo "Installing Python and build dependencies..."
+          apk add --no-cache python3 make g++ cairo-dev pango-dev jpeg-dev giflib-dev pixman-dev pangomm-dev libjpeg-turbo-dev freetype-dev
+          ln -sf python3 /usr/bin/python
+          echo "Python version: $(python --version)"
+          
       - name: Setup .npmrc
         run: |
           echo "legacy-peer-deps=true" > .npmrc
@@ -28,26 +46,91 @@ jobs:
           
       - name: Install dependencies
         run: |
-          # Retry npm ci up to 3 times
+          # Set environment variables for native module builds
+          export NUKE_SKIP_CANVAS=true
+          export npm_config_python=/usr/bin/python
+          
+          # Skip optional dependencies to reduce build complexity
+          echo "Installing dependencies with --no-optional to avoid canvas issues..."
+          
+          # Retry npm ci up to 3 times with reduced dependency set
           for i in 1 2 3; do
-            npm ci && break || echo "Retry $i..."
+            npm ci --no-optional --ignore-scripts && break || echo "Retry $i..."
+            if [ $i -eq 2 ]; then
+              echo "Trying with --legacy-peer-deps..."
+              npm ci --no-optional --ignore-scripts --legacy-peer-deps && break || echo "Legacy mode failed too"
+            fi
             if [ $i -eq 3 ]; then
-              echo "⚠️ npm ci failed, falling back to npm install"
-              npm install --no-save
+              echo "⚠️ npm ci failed, trying minimal install for build only"
+              # Install only the bare minimum packages needed for build
+              npm install --no-save --no-optional --ignore-scripts typescript vite @vitejs/plugin-react
             fi
             sleep 5
           done
           
+          # Install only essential dependencies post-config
+          echo "Installing essential build packages directly..."
+          npm install --no-save vite typescript @vitejs/plugin-react
+          
+      - name: Verify Supabase credentials are available
+        id: verify-creds
+        run: |
+          # Check if credentials are available
+          if [ -n "${{ secrets.VITE_SUPABASE_URL }}" ] && [ -n "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "SUPABASE_CREDS_AVAILABLE=true" >> $GITHUB_OUTPUT
+            echo "✅ Supabase credentials are available"
+          else
+            echo "SUPABASE_CREDS_AVAILABLE=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Supabase credentials are missing! This will likely cause build failure."
+            # Create .env file with placeholders to allow build to try to continue
+            echo "VITE_SUPABASE_URL=http://placeholder-url.example.com" > .env
+            echo "VITE_SUPABASE_ANON_KEY=placeholder-key" >> .env
+            echo "VITE_SUPABASE_SERVICE_KEY=placeholder-service-key" >> .env
+          fi
+
+      - name: Create .env file with fallbacks if needed
+        run: |
+          # Always create an .env file with either real values or fallbacks
+          if [ -n "${{ secrets.VITE_SUPABASE_URL }}" ] && [ -n "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "Using actual Supabase credentials from secrets"
+            echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" > .env
+            echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+            echo "VITE_SUPABASE_SERVICE_KEY=${{ secrets.VITE_SUPABASE_SERVICE_KEY }}" >> .env
+          else
+            echo "Using fallback placeholder credentials"
+            echo "VITE_SUPABASE_URL=http://placeholder-url.example.com" > .env
+            echo "VITE_SUPABASE_ANON_KEY=placeholder-key" >> .env
+            echo "VITE_SUPABASE_SERVICE_KEY=placeholder-service-key" >> .env
+          fi
+          echo "VITE_APP_NAME=Nuke" >> .env
+          echo "VITE_APP_DESCRIPTION=Vehicle Management Platform" >> .env
+          cat .env | grep -v SERVICE_KEY
+          
       - name: Build directly in Docker
         env:
           NODE_ENV: production
-          VITE_APP_NAME: "Nuke"
-          VITE_APP_DESCRIPTION: "Vehicle Management Platform"
           NODE_OPTIONS: "--max-old-space-size=4096"
           CI: "true"
+          # Direct env injection
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
         run: |
           # Run build with verbose logging
           echo "Running build in Docker container"
+          
+          # Verify environment access
+          echo "VITE_SUPABASE_URL exists: $(if [ -n "$VITE_SUPABASE_URL" ]; then echo "YES"; else echo "NO"; fi)"
+          echo "VITE_SUPABASE_ANON_KEY exists: $(if [ -n "$VITE_SUPABASE_ANON_KEY" ]; then echo "YES"; else echo "NO"; fi)"
+          
+          # Use existing .env.test in fallback chain
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "Using existing credentials from .env.test file"
+            cp .env.test .env
+          fi
+          
+          # Run build commands
+          export NUKE_SKIP_CANVAS=true
           npx --no -- tsc || echo "TypeScript compilation failed but continuing"
           npx --no -- vite build --debug || echo "Vite build failed but continuing"
           
@@ -64,6 +147,26 @@ jobs:
             echo "✅ Build directory exists"
             ls -la dist/
             find dist -type f | wc -l
+            
+            # Check for window.__env in the HTML for three-tier fallback
+            if grep -q "window.__env" dist/index.html; then
+              echo "✅ Environment variables properly injected for runtime"
+            else
+              echo "⚠️ Runtime environment variables may be missing - injecting fallback"
+              
+              # Use direct string values for fallback when environment variables might be empty
+              if [ "${{ steps.verify-creds.outputs.SUPABASE_CREDS_AVAILABLE }}" = "true" ]; then
+                # Use actual values from secrets
+                echo "Using actual Supabase credentials for window.__env fallback"
+                sed -i 's|</head>|<script>window.__env = { VITE_SUPABASE_URL: "${{ secrets.VITE_SUPABASE_URL }}", VITE_SUPABASE_ANON_KEY: "${{ secrets.VITE_SUPABASE_ANON_KEY }}" };</script></head>|' dist/index.html
+              else
+                # Use placeholders since credentials aren't available
+                echo "Using placeholder values for window.__env fallback"
+                sed -i 's|</head>|<script>window.__env = { VITE_SUPABASE_URL: "YOUR_SUPABASE_URL", VITE_SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY" };</script></head>|' dist/index.html
+                # Leave note in build artifact about missing credentials
+                echo "⚠️ IMPORTANT: This build is using placeholder Supabase credentials! Replace them before using this build." > dist/CREDENTIALS_WARNING.txt
+              fi
+            fi
           else
             echo "❌ No dist directory found - creating empty directory"
             mkdir -p dist

@@ -80,7 +80,6 @@ const TokensPage = () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
         .from('tokens')
         .select('*');
 
@@ -114,8 +113,7 @@ const TokensPage = () => {
       }
 
       const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
+        .from('tokens')
         .insert([{
           name: newToken.name,
           symbol: newToken.symbol.toUpperCase(),
@@ -149,8 +147,7 @@ const TokensPage = () => {
   const handleUpdateTokenStatus = async (id: string, newStatus: string) => {
     try {
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
+        .from('tokens')
         .update({ status: newStatus })
         .eq('id', id);
 

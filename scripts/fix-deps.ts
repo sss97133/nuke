@@ -90,7 +90,7 @@ async function cleanPackageLock(): Promise<void> {
 }
 
 async function fixDependencies(): Promise<void> {
-  // eslint-disable-next-line no-console
+   
   console.info('🔧 Starting dependency fix process...');
 
   try {
@@ -102,25 +102,25 @@ async function fixDependencies(): Promise<void> {
     await cleanPackageLock();
 
     // Install dependencies
-    // eslint-disable-next-line no-console
+     
     console.info('📦 Installing dependencies with npm...');
     await safeExec('npm install --legacy-peer-deps', { stdio: 'inherit' });
 
     // Test build
-    // eslint-disable-next-line no-console
+     
     console.info('🧪 Testing build...');
     await safeExec('npm run build', { stdio: 'inherit' });
 
-    // eslint-disable-next-line no-console
+     
     console.info('✅ Dependencies fixed successfully!\n');
-    // eslint-disable-next-line no-console
+     
     console.info('Next steps:\n1. Commit the new package-lock.json file\n2. Push to your repository');
   } catch (error) {
     if (error instanceof DependencyFixError) {
-      // eslint-disable-next-line no-console
+       
       console.error(`❌ Error during ${error.step}: ${error.message}`);
     } else {
-      // eslint-disable-next-line no-console
+       
       console.error('❌ Unexpected error:', error instanceof Error ? error.message : String(error));
     }
     process.exit(1);

@@ -18,7 +18,6 @@ const AdminPanel: React.FC = () => {
       try {
         // Get the current user
         const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
         
         if (!user) {
           navigate('/login');
@@ -36,7 +35,6 @@ const AdminPanel: React.FC = () => {
         
         // If not in metadata, check the profile
         const { data: profile, error: profileError } = await supabase
-  if (error) console.error("Database query error:", error);
           .from('profiles')
           .select('user_type')
           .eq('id', user.id)

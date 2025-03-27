@@ -158,7 +158,7 @@ async function createAllTestUsers(): Promise<void> {
   // Log results only in development environment
   if (process.env.NODE_ENV === 'development') {
     results.forEach(result => {
-      // eslint-disable-next-line no-console
+       
       console.log(`${result.email}: ${result.success ? 'SUCCESS' : 'FAILED'}`);
     });
   }
@@ -166,7 +166,7 @@ async function createAllTestUsers(): Promise<void> {
 
 // Execute the function
 void createAllTestUsers().catch((error: unknown) => {
-  // eslint-disable-next-line no-console
+   
   console.error(
     'Error in createAllTestUsers:',
     error instanceof Error ? error.message : String(error)

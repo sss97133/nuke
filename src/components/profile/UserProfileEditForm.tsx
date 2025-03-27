@@ -67,7 +67,6 @@ export const UserProfileEditForm = ({
       setCheckingUsername(true);
       try {
         const { data, error } = await supabase
-  if (error) console.error("Database query error:", error);
           .from('profiles')
           .select('username')
           .eq('username', username)
@@ -119,7 +118,7 @@ export const UserProfileEditForm = ({
 
     try {
       // Handle avatar upload if there's a new file
-      let avatarUrl = currentAvatarUrl;
+      const avatarUrl = currentAvatarUrl;
       if (avatarFile) {
         try {
           // Use the dedicated avatar upload hook
@@ -133,8 +132,7 @@ export const UserProfileEditForm = ({
 
       // Update profile data in Supabase
       const { error } = await supabase
-  if (error) console.error("Database query error:", error);
-        
+        .from('profiles')
         .update({
           username: data.username,
           full_name: data.fullName,

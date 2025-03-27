@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/TooltipProvider';
 import OnboardingCheck from '@/components/onboarding/OnboardingCheck';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { HelmetProvider } from '@/components/providers/HelmetProvider';
+import StyleFix from './fixes/ensure-styles';
 
 // Create a client with advanced configurations for caching and error handling
 const queryClient = new QueryClient({
@@ -44,6 +45,9 @@ function App() {
           <TooltipProvider>
             {/* Initialize global toast functions */}
             <ToastInitializer />
+            
+            {/* Ensure styles are loaded properly in production */}
+            <StyleFix />
             
             {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
             <AppRouter />

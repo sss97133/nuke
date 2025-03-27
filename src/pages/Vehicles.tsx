@@ -113,7 +113,6 @@ export default function Vehicles() {
       setLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
         
         if (!user) {
           toast({
@@ -141,7 +140,7 @@ export default function Vehicles() {
           });
         } else {
           // Process the vehicles data
-          const processedVehicles = data.map((vehicle: any) => ({
+          const processedVehicles = data.map((vehicle: Database['public']['Tables']['vehicles']['Row']) => ({
             ...vehicle,
             lastUpdated: formatDate(vehicle.updated_at),
             // Add image_url if it exists in your data structure
@@ -259,7 +258,6 @@ export default function Vehicles() {
     try {
       // For real implementation, refetch from the database
       const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
       
       if (!user) {
         toast({
@@ -281,7 +279,7 @@ export default function Vehicles() {
       if (error) throw error;
       
       // Map the data to match our Vehicle interface
-      const formattedVehicles = data.map((vehicle: any) => ({
+      const formattedVehicles = data.map((vehicle: Database['public']['Tables']['vehicles']['Row']) => ({
         ...vehicle,
         image: vehicle.image_url,
         lastUpdated: formatDate(vehicle.updated_at),
@@ -313,11 +311,11 @@ export default function Vehicles() {
   const getOwnershipStatusBadge = (status: string) => {
     switch (status) {
       case 'owned':
-        return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Owned</span>;
+        return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300">Owned</Badge>;
       case 'claimed':
-        return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">Claimed</span>;
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-300">Claimed</Badge>;
       case 'discovered':
-        return <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Discovered</span>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-300">Discovered</Badge>;
       default:
         return null;
     }
@@ -328,7 +326,7 @@ export default function Vehicles() {
     const isRecentlyImported = !!vehicle.bulk_upload_batch_id;
     
     return (
-      <Card key={vehicle.id} className={`overflow-hidden ${isRecentlyImported ? 'border-green-500 border-2 shadow-md' : ''}`}>
+      <Card key={vehicle.id} className={`overflow-hidden h-full flex flex-col ${isRecentlyImported ? 'border-green-500 border-2 shadow-md' : ''}`}>
         <CardContent className="p-0">
           <div className="relative aspect-[16/9] bg-muted">
             {vehicle.image_url ? (
@@ -338,8 +336,8 @@ export default function Vehicles() {
                 className="object-cover w-full h-full"
               />
             ) : (
-              <div className="flex items-center justify-center h-full">
-                <Car className="h-10 w-10 text-muted-foreground" />
+              <div className="flex items-center justify-center h-full bg-secondary/10">
+                <Car className="h-12 w-12 text-muted-foreground" />
                 <span className="sr-only">No image available</span>
               </div>
             )}
@@ -352,7 +350,7 @@ export default function Vehicles() {
           </div>
           
           <div className="p-4">
-            <h3 className="text-lg font-semibold">{vehicle.year} {vehicle.make} {vehicle.model}</h3>
+            <h3 className="text-md sm:text-lg font-semibold truncate">{vehicle.year} {vehicle.make} {vehicle.model}</h3>
             <div className="mt-2 space-y-1">
               {vehicle.color && (
                 <p className="text-sm flex items-center gap-2">
@@ -362,15 +360,15 @@ export default function Vehicles() {
               )}
               {vehicle.mileage && (
                 <p className="text-sm flex items-center gap-2">
-                  <Gauge className="h-3 w-3" />
-                  <span>{vehicle.mileage.toLocaleString()} miles</span>
+                  <Gauge className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{vehicle.mileage.toLocaleString()} miles</span>
                 </p>
               )}
               <p className="text-sm flex items-center gap-2">
-                <Calendar className="h-3 w-3" />
-                <span>Updated {vehicle.lastUpdated}</span>
+                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">Updated {vehicle.lastUpdated}</span>
               </p>
-              <div className="mt-2">
+              <div className="mt-3">
                 {getOwnershipStatusBadge(vehicle.ownership_status)}
               </div>
             </div>
@@ -380,10 +378,11 @@ export default function Vehicles() {
           <Button 
             variant="outline" 
             size="sm" 
-            className="w-full" 
+            className="w-full flex items-center justify-center gap-2" 
             onClick={() => handleEditVehicle(vehicle.id)}
           >
-            View Details
+            <span>View Details</span>
+            <ChevronDown className="h-4 w-4" />
           </Button>
         </CardFooter>
       </Card>
@@ -393,9 +392,9 @@ export default function Vehicles() {
   return (
     <ScrollArea className="h-[calc(100vh-4rem)]">
       <div className="container max-w-7xl p-6 space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">My Vehicles</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">My Vehicles</h1>
             <p className="text-muted-foreground">
               View and manage all your vehicles
             </p>
@@ -414,7 +413,7 @@ export default function Vehicles() {
           </div>
         </div>
 
-        <div className="flex gap-3 flex-col sm:flex-row">
+        <div className="flex gap-3 flex-col sm:flex-row w-full">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input

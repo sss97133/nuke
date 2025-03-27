@@ -85,3 +85,4 @@ src/scripts/setupStorage.ts
 *.bak
 *.backup
 *_backup
+.env*

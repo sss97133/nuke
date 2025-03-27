@@ -1,4 +1,4 @@
-/* eslint-disable no-console, no-undef */
+/* eslint-disable no-undef */
 /**
  * Script to verify GM vehicle records HTML is correctly deployed
  * This runs as the final step in the build process

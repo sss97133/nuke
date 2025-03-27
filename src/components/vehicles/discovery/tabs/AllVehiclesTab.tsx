@@ -27,7 +27,7 @@ const AllVehiclesTab = ({
 }: AllVehiclesTabProps) => {
   // Filter vehicles based on search term and sort them
   const filteredAndSortedVehicles = useMemo(() => {
-    let result = vehicles.filter(vehicle => {
+    const result = vehicles.filter(vehicle => {
       const searchString = `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.location}`.toLowerCase();
       return searchString.includes(searchTerm.toLowerCase());
     });

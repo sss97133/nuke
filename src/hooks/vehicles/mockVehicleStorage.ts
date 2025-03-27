@@ -21,7 +21,7 @@ export interface VehicleRelationship {
 }
 
 // In-memory storage for mock vehicles
-let storedVehicles: Vehicle[] = [
+const storedVehicles: Vehicle[] = [
   {
     id: 1,
     make: 'Toyota',
@@ -73,7 +73,7 @@ let storedVehicles: Vehicle[] = [
 ];
 
 // Mock storage for user-vehicle relationships
-let storedRelationships: VehicleRelationship[] = [
+const storedRelationships: VehicleRelationship[] = [
   {
     id: '1',
     userId: 'mock-user-1',

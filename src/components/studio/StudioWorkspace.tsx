@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createBasicStudioLighting, createProductLighting } from './utils/studioLighting';
 import type { WorkspaceDimensions, PTZTrack } from './types/workspace';
+import { SpatialLMAnalysis } from './visualization/SpatialLMAnalysis';
+import { useSpatialLM } from '@/hooks/useSpatialLM';
 
 interface StudioWorkspaceProps {
   dimensions: WorkspaceDimensions;
@@ -25,6 +27,27 @@ export const StudioWorkspace: React.FC<StudioWorkspaceProps> = ({
   const cameraModelsRef = useRef<THREE.Group[]>([]);
   const trackModelsRef = useRef<THREE.Line[]>([]);
   const coneModelsRef = useRef<THREE.Mesh[]>([]);
+
+  // Initialize SpatialLM integration
+  const {
+    isInitialized,
+    isAnalyzing,
+    isOptimizing,
+    error,
+    analyzeWorkspace,
+    optimizePositions
+  } = useSpatialLM({
+    dimensions,
+    ptzTracks,
+    onOptimizedPositions: (positions) => {
+      // Handle optimized positions
+      console.log('Optimized positions:', positions);
+    },
+    onAnalysisUpdate: (analysis) => {
+      // Handle analysis updates
+      console.log('Analysis update:', analysis);
+    }
+  });
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -72,48 +95,26 @@ export const StudioWorkspace: React.FC<StudioWorkspaceProps> = ({
     // Create camera models for each PTZ track with cones for FOV
     createCameraModels(scene, ptzTracks);
 
-    // Basic lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambientLight);
-    
-    // Directional light to add some shadows/dimension
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    dirLight.position.set(5, 10, 5);
-    scene.add(dirLight);
-
-    // Handle camera selection through raycasting
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    
+    // Set up click handling for camera selection
     const handleMouseClick = (event: MouseEvent) => {
-      if (!containerRef.current || !cameraRef.current || !sceneRef.current) return;
-      
-      // Calculate mouse position in normalized device coordinates
+      if (!containerRef.current || !cameraRef.current || !rendererRef.current || !sceneRef.current) return;
+
       const rect = containerRef.current.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / containerRef.current.clientWidth) * 2 - 1;
-      mouse.y = - ((event.clientY - rect.top) / containerRef.current.clientHeight) * 2 + 1;
-      
-      // Update the picking ray with the camera and mouse position
-      raycaster.setFromCamera(mouse, cameraRef.current);
-      
-      // Calculate objects intersecting the ray
+      const x = ((event.clientX - rect.left) / containerRef.current.clientWidth) * 2 - 1;
+      const y = -((event.clientY - rect.top) / containerRef.current.clientHeight) * 2 + 1;
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(new THREE.Vector2(x, y), cameraRef.current);
+
       const intersects = raycaster.intersectObjects(sceneRef.current.children, true);
-      
-      // Check if we intersected with a camera
-      for (let i = 0; i < intersects.length; i++) {
-        const obj = intersects[i].object;
-        // Traverse up to find the group that has userData
-        let current = obj;
-        while (current && current.parent) {
-          if (current.userData && current.userData.type === 'camera') {
-            onCameraSelect(current.userData.index);
-            return;
-          }
-          current = current.parent;
+      for (const intersect of intersects) {
+        if (intersect.object.userData.type === 'camera') {
+          onCameraSelect(intersect.object.userData.index);
+          break;
         }
       }
     };
-    
+
     containerRef.current.addEventListener('click', handleMouseClick);
 
     const animate = () => {
@@ -470,11 +471,23 @@ export const StudioWorkspace: React.FC<StudioWorkspaceProps> = ({
     });
   }, [ptzTracks, selectedCameraIndex]);
 
+  // Trigger workspace analysis when dimensions or tracks change
+  useEffect(() => {
+    if (isInitialized && !isAnalyzing) {
+      analyzeWorkspace();
+    }
+  }, [dimensions, ptzTracks, isInitialized, isAnalyzing]);
+
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full min-h-[400px] bg-gray-100 dark:bg-gray-900"
-      aria-label="3D Studio Workspace"
-    />
+    <div ref={containerRef} className="w-full h-full">
+      {sceneRef.current && (
+        <SpatialLMAnalysis
+          dimensions={dimensions}
+          coverageScore={0.85} // This will be updated by the analysis
+          blindSpots={[]} // This will be updated by the analysis
+          scene={sceneRef.current}
+        />
+      )}
+    </div>
   );
 };

@@ -23,7 +23,7 @@ export async function fetchFeedContent(
     const userId = userData?.user?.id;
     
     // Determine which tables to query based on filter
-    let contentSources = filter === 'all' ? 
+    const contentSources = filter === 'all' ? 
       ['explore_content', 'vehicles', 'auctions', 'live_streams'] : 
       filter === 'vehicle' ? ['vehicles'] :
       filter === 'auction' ? ['auctions'] :
