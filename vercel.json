@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build:prod",
+  "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "outputDirectory": "dist",
   "framework": "vite",
@@ -37,12 +37,16 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
         },
         {
           "key": "X-Frame-Options",
           "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         },
         {
           "key": "X-XSS-Protection",
