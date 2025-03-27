@@ -13,7 +13,9 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "prepare": "husky",
-    "validate:all": "npm run lint && tsc --noEmit"
+    "validate:all": "npm run lint && tsc --noEmit",
+    "start": "node serve.js",
+    "vercel-build": "npm run build"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.0.5",
