@@ -1,6 +1,9 @@
 {
   "version": 2,
-  "framework": "vite",
+  "buildCommand": false,
+  "devCommand": null,
+  "installCommand": false,
+  "framework": null,
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
