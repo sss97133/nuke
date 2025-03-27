@@ -38,10 +38,27 @@ interface WebKitMessageHandlers {
   };
 }
 
+interface Window {
+  webkit?: {
+    messageHandlers: {
+      photoLibrary: {
+        postMessage: (message: unknown) => void;
+      };
+    };
+  };
+  photoLibraryCallback?: (callbackId: string, result: unknown, error?: string) => void;
+  photoUploadProgress?: (callbackId: string, progress: number) => void;
+  photoUploadComplete?: (callbackId: string, success: boolean, error?: string) => void;
+}
+
 declare global {
   interface Window {
     webkit?: {
-      messageHandlers: WebKitMessageHandlers;
+      messageHandlers: {
+        photoLibrary: {
+          postMessage: (message: unknown) => void;
+        };
+      };
     };
     photoLibraryCallback?: (callbackId: string, result: unknown, error?: string) => void;
     photoUploadProgress?: (callbackId: string, progress: number) => void;
