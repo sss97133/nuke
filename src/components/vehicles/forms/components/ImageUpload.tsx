@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -105,7 +104,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         ? updatedPreviewUrls 
         : updatedPreviewUrls[0] || '';
       
-      form.setValue(name as any, imageValue);
+      form.setValue(name, imageValue as VehicleFormValues[typeof name]);
       setIsUploading(false);
       
       toast({
@@ -117,7 +116,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   
   // Clear all images
   const clearAllImages = () => {
-    form.setValue(name as any, multiple ? [] : '');
+    form.setValue(name, (multiple ? [] : '') as VehicleFormValues[typeof name]);
     previewUrls.forEach(url => URL.revokeObjectURL(url));
     setPreviewUrls([]);
   };
@@ -130,11 +129,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     setPreviewUrls(newPreviewUrls);
     
     if (multiple) {
-      form.setValue(name as any, newPreviewUrls);
+      form.setValue(name, newPreviewUrls as VehicleFormValues[typeof name]);
     } else if (newPreviewUrls.length > 0) {
-      form.setValue(name as any, newPreviewUrls[0]);
+      form.setValue(name, newPreviewUrls[0] as VehicleFormValues[typeof name]);
     } else {
-      form.setValue(name as any, '');
+      form.setValue(name, '' as VehicleFormValues[typeof name]);
     }
   };
   
@@ -169,7 +168,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   };
   
   // Convert the form value to preview URLs if necessary
-  const formValue = form.watch(name as any);
+  const formValue = form.watch(name);
   const displayUrls = previewUrls.length > 0 ? previewUrls : (
     Array.isArray(formValue) ? formValue : (formValue ? [formValue] : [])
   );
@@ -177,7 +176,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   return (
     <FormField
       control={form.control}
-      name={name as any}
+      name={name}
       render={({ field }) => (
         <FormItem>
           <FormLabel>{label}</FormLabel>
@@ -248,32 +247,26 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                   htmlFor={`${name}-upload`}
                   className="cursor-pointer block"
                 >
-                  <div className="flex flex-col items-center justify-center gap-2 py-4">
-                    <ImagePlus className="h-10 w-10 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      {isUploading 
-                        ? 'Uploading...' 
-                        : isDragging 
-                          ? 'Drop images here'
-                          : 'Drag & drop images here or click to browse'
-                      }
-                    </p>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {multiple ? 'Select Images' : 'Select Image'}
-                    </Button>
+                  <div className="flex flex-col items-center gap-2">
+                    <ImagePlus className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-sm text-muted-foreground">
+                      {isUploading ? (
+                        <span className="flex items-center gap-2">
+                          <Upload className="h-4 w-4 animate-bounce" />
+                          Uploading...
+                        </span>
+                      ) : (
+                        <span>
+                          Drag and drop images here, or click to select
+                        </span>
+                      )}
+                    </div>
+                    {description && (
+                      <FormDescription>{description}</FormDescription>
+                    )}
                   </div>
                 </label>
               </div>
-              
-              {description && <FormDescription>{description}</FormDescription>}
             </div>
           </FormControl>
           <FormMessage />
