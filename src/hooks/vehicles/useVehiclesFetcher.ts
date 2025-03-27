@@ -1,19 +1,19 @@
-
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Vehicle } from '../../components/vehicles/discovery/types';
-import { adaptVehicleFromDB, USE_REAL_DATA } from './utils';
-import { getStoredVehicles, getVehiclesByRelationship } from './mockVehicleStorage';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Database } from '@/types/supabase';
+import { Vehicle } from '@/types/vehicle';
+import { adaptVehicleFromDB } from './utils';
+import { Session } from '@supabase/supabase-js';
 
 export function useVehiclesFetcher(
   vehicleStatus: 'discovered' | 'owned', 
-  session: any,
+  session: Session | null,
   sortField: string,
   sortDirection: string
 ) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -23,63 +23,58 @@ export function useVehiclesFetcher(
         setIsLoading(true);
         console.log(`Fetching ${vehicleStatus} vehicles...`);
         
-        if (USE_REAL_DATA.vehicles) {
-          // Try to get authenticated user
-          const userId = session?.user?.id;
-          
-          if (!userId) {
-            console.log('User not authenticated, using mock data');
-            if (isMounted) {
-              // Use getStoredVehicles to get mock vehicles based on status
-              const mockVehicles = getStoredVehicles().filter(v => v.status === vehicleStatus);
-              console.log(`Loaded mock ${vehicleStatus} vehicles:`, mockVehicles.length);
-              setVehicles(mockVehicles);
-              setIsLoading(false);
-            }
-            return;
-          }
-          
-          try {
-            // Mock implementation using our in-memory storage
-            const relationshipType = vehicleStatus === 'owned' ? 'claimed' : 'discovered';
-            const filteredVehicles = getVehiclesByRelationship(userId, relationshipType);
-            if (isMounted) {
-              setVehicles(filteredVehicles);
-            }
-          } catch (err) {
-            console.error(`Error fetching ${vehicleStatus} relationships:`, err);
-            if (isMounted) {
-              setError(`Failed to fetch ${vehicleStatus} vehicle relationships`);
-              
-              // Fall back to mock data
-              const relationshipType = vehicleStatus === 'owned' ? 'claimed' : 'discovered';
-              const mockVehicles = getVehiclesByRelationship('mock-user-1', relationshipType);
-              console.log(`Loaded mock ${vehicleStatus} vehicles (fallback):`, mockVehicles.length);
-              setVehicles(mockVehicles);
-            }
-          }
-        } else {
-          // Use mock data directly when feature flag is off
+        // Get authenticated user
+        const userId = session?.user?.id;
+        
+        if (!userId) {
+          console.log('User not authenticated');
           if (isMounted) {
-            // Use mock data with relationship filter
-            const relationshipType = vehicleStatus === 'owned' ? 'claimed' : 'discovered';
-            const mockVehicles = getVehiclesByRelationship('mock-user-1', relationshipType);
-            console.log(`Loaded mock ${vehicleStatus} vehicles:`, mockVehicles.length);
-            setVehicles(mockVehicles);
+            setVehicles([]);
+            setIsLoading(false);
+          }
+          return;
+        }
+        
+        try {
+          // Build query based on vehicle status
+          let query = supabase
+            .from('vehicles')
+            .select('*')
+            .eq('user_id', userId);
+            
+          if (vehicleStatus === 'owned') {
+            query = query.eq('ownership_status', 'owned');
+          } else {
+            query = query.eq('ownership_status', 'discovered');
+          }
+          
+          // Add sorting if specified
+          if (sortField && sortDirection) {
+            query = query.order(sortField, { ascending: sortDirection === 'asc' });
+          }
+          
+          const { data, error: fetchError } = await query;
+          
+          if (fetchError) {
+            throw fetchError;
+          }
+          
+          if (isMounted) {
+            const adaptedVehicles = data.map(adaptVehicleFromDB);
+            setVehicles(adaptedVehicles);
+          }
+        } catch (err) {
+          console.error(`Error fetching ${vehicleStatus} vehicles:`, err);
+          if (isMounted) {
+            setError(err instanceof Error ? err : new Error(`Failed to fetch ${vehicleStatus} vehicles`));
+            setVehicles([]);
           }
         }
-      } catch (err: any) {
-        console.error(`Error fetching ${vehicleStatus} vehicles:`, err);
-        
+      } catch (err: unknown) {
+        console.error(`Error in fetchVehicles:`, err);
         if (isMounted) {
-          // Set error message
-          setError(err.message || `Failed to fetch ${vehicleStatus} vehicles`);
-          
-          // Fall back to mock data
-          const relationshipType = vehicleStatus === 'owned' ? 'claimed' : 'discovered';
-          const mockVehicles = getVehiclesByRelationship('mock-user-1', relationshipType);
-          console.log(`Loaded mock ${vehicleStatus} vehicles (fallback):`, mockVehicles.length);
-          setVehicles(mockVehicles);
+          setError(err instanceof Error ? err : new Error(`Failed to fetch ${vehicleStatus} vehicles`));
+          setVehicles([]);
         }
       } finally {
         if (isMounted) {

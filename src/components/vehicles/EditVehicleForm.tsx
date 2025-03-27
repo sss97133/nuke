@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -15,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase";
 
 interface EditVehicleFormProps {
   open: boolean;
@@ -65,28 +65,47 @@ const EditVehicleForm: React.FC<EditVehicleFormProps> = ({
     if (open && vehicleId) {
       setIsLoading(true);
       
-      // In a real application, you would fetch the vehicle data from your API
-      // For this demo, we'll use mock data
-      setTimeout(() => {
-        // Mock data based on the vehicle ID
-        const mockVehicle = {
-          make: vehicleId === '1' ? 'Ford' : vehicleId === '2' ? 'Chevrolet' : 'Porsche',
-          model: vehicleId === '1' ? 'Mustang' : vehicleId === '2' ? 'Corvette' : '911',
-          year: vehicleId === '1' ? '1967' : vehicleId === '2' ? '1963' : '1973',
-          color: vehicleId === '1' ? 'blue' : vehicleId === '2' ? 'red' : 'silver',
-          vin: `SAMPLE${vehicleId}23456789`,
-          licensePlate: `ABC${vehicleId}23`,
-          mileage: vehicleId === '1' ? '78500' : vehicleId === '2' ? '120300' : '45200',
-          ownership_status: vehicleId === '1' ? 'owned' : vehicleId === '2' ? 'claimed' : 'discovered',
-          purchaseDate: '2024-01-15',
-          notes: `Sample notes for vehicle ${vehicleId}.`
-        };
-        
-        setFormData(mockVehicle);
-        setIsLoading(false);
-      }, 500);
+      async function fetchVehicleData() {
+        try {
+          const { data, error } = await supabase
+            .from('vehicles')
+            .select('*')
+            .eq('id', vehicleId)
+            .single();
+            
+          if (error) {
+            throw error;
+          }
+          
+          if (data) {
+            setFormData({
+              make: data.make || '',
+              model: data.model || '',
+              year: data.year || '',
+              color: data.color || '',
+              vin: data.vin || '',
+              licensePlate: data.license_plate || '',
+              mileage: data.mileage || '',
+              ownership_status: data.ownership_status || 'owned',
+              purchaseDate: data.purchase_date || '',
+              notes: data.notes || ''
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching vehicle data:', err);
+          toast({
+            title: "Error",
+            description: "Failed to load vehicle data",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+      
+      fetchVehicleData();
     }
-  }, [open, vehicleId]);
+  }, [open, vehicleId, toast]);
   
   // Form field handlers
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

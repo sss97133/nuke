@@ -6,6 +6,7 @@ import { Car, Wrench, List, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useVehicles, Vehicle } from '@/hooks/useVehicles';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 
 // Define part compatibility type
 interface PartCompatibility {
@@ -18,7 +19,7 @@ interface PartCompatibility {
 }
 
 const VehiclePartsViewer = () => {
-  const { vehicles, loading: vehiclesLoading, addVehicle } = useVehicles();
+  const { vehicles, isLoading: vehiclesLoading, addVehicle } = useVehicles();
   const [compatibleParts, setCompatibleParts] = useState<Record<string, PartCompatibility[]>>({});
   const [loading, setLoading] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
@@ -33,17 +34,38 @@ const VehiclePartsViewer = () => {
       if (vehicles.length > 0) {
         setSelectedVehicle(vehicles[0].id);
         
-        // In a real implementation, this would fetch compatible parts from your database
-        // For now, using mock data
-        const mockParts: Record<string, PartCompatibility[]> = {};
+        // Fetch compatible parts from Supabase
+        const { data, error } = await supabase
+          .from('vehicle_parts')
+          .select(`
+            *,
+            vehicles:vehicle_id (id, make, model, year)
+          `)
+          .in('vehicle_id', vehicles.map(v => v.id));
+          
+        if (error) {
+          throw error;
+        }
         
-        // Generate mock parts for each vehicle
-        vehicles.forEach(vehicle => {
-          const vehicleParts = getPartsForVehicle(vehicle);
-          mockParts[vehicle.id] = vehicleParts;
+        // Transform data into the expected format
+        const partsByVehicle: Record<string, PartCompatibility[]> = {};
+        
+        data.forEach(part => {
+          if (!partsByVehicle[part.vehicle_id]) {
+            partsByVehicle[part.vehicle_id] = [];
+          }
+          
+          partsByVehicle[part.vehicle_id].push({
+            id: part.id,
+            name: part.name,
+            category: part.category,
+            compatibleWith: part.compatible_vehicles,
+            price: part.price,
+            notes: part.notes
+          });
         });
         
-        setCompatibleParts(mockParts);
+        setCompatibleParts(partsByVehicle);
       }
     } catch (err) {
       console.error('Error fetching compatible parts:', err);
@@ -60,63 +82,6 @@ const VehiclePartsViewer = () => {
   useEffect(() => {
     fetchCompatibleParts();
   }, [fetchCompatibleParts]);
-
-  // Helper function to generate mock parts for a vehicle
-  const getPartsForVehicle = (vehicle: Vehicle): PartCompatibility[] => {
-    const { make, model, year } = vehicle;
-    
-    // Basic parts all vehicles need
-    const basicParts = [
-      { 
-        id: `oil-${vehicle.id}`, 
-        name: 'Oil Filter', 
-        category: 'Filters', 
-        compatibleWith: [`${make} ${model} ${year-1}-${year+3}`], 
-        price: 12.99, 
-        notes: 'Recommended replacement every 5,000 miles' 
-      },
-      { 
-        id: `air-${vehicle.id}`, 
-        name: 'Air Filter', 
-        category: 'Filters', 
-        compatibleWith: [`${make} ${model} ${year-2}-${year+2}`, `${make} various models`], 
-        price: 18.50, 
-        notes: 'Recommended replacement every 15,000 miles' 
-      },
-    ];
-    
-    // Add some make-specific parts
-    if (make === 'Toyota') {
-      basicParts.push({ 
-        id: `brake-${vehicle.id}`, 
-        name: 'Brake Pads (Front)', 
-        category: 'Brakes', 
-        compatibleWith: ['Toyota Camry 2019-2022'], 
-        price: 45.99, 
-        notes: 'Ceramic pads, low dust' 
-      });
-    } else if (make === 'Honda') {
-      basicParts.push({ 
-        id: `cabin-${vehicle.id}`, 
-        name: 'Cabin Air Filter', 
-        category: 'Filters', 
-        compatibleWith: ['Honda Civic 2016-2022'], 
-        price: 24.99, 
-        notes: 'HEPA filter available' 
-      });
-    } else if (make === 'Ford') {
-      basicParts.push({ 
-        id: `fuel-${vehicle.id}`, 
-        name: 'Fuel Filter', 
-        category: 'Filters', 
-        compatibleWith: ['Ford F-150 2018-2022'], 
-        price: 29.99, 
-        notes: 'Recommended replacement every 30,000 miles' 
-      });
-    }
-    
-    return basicParts;
-  };
 
   const getVehicleFullName = (vehicle: Vehicle) => {
     return `${vehicle.year} ${vehicle.make} ${vehicle.model}`;

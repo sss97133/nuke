@@ -1,9 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Component style enhancements */
 @layer components {
   /* Buttons */
   .btn {
-    @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus-ring animated-transition;
+    @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-all duration-200 ease-in-out;
   }
   .btn-primary {
     @apply btn bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600;
@@ -17,7 +20,7 @@
 
   /* Cards */
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden animated-transition;
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transition-all duration-200 ease-in-out;
   }
   .card-header {
     @apply px-4 py-3 border-b border-gray-200 dark:border-gray-700;
@@ -31,13 +34,13 @@
 
   /* Forms */
   .form-input {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus-ring dark:bg-gray-800 dark:border-gray-700 dark:text-white;
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white;
   }
   .form-select {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus-ring dark:bg-gray-800 dark:border-gray-700 dark:text-white;
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white;
   }
   .form-checkbox {
-    @apply rounded border-gray-300 text-blue-600 shadow-sm focus-ring dark:border-gray-700;
+    @apply rounded border-gray-300 text-blue-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 dark:border-gray-700;
   }
   .form-label {
     @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;

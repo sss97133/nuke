@@ -61,7 +61,7 @@ function App() {
             </div>
             
             {/* Adaptive UI Panel that learns from user behavior */}
-            <AdaptiveUIPanel />
+            <SimpleAdaptivePanel />
             
             {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
             <AppRouter />

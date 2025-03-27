@@ -5,6 +5,10 @@
  * It provides consistent styling and better defaults across the application.
  */
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Base styles */
 @layer base {
   :root {

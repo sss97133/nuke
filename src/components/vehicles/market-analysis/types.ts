@@ -1,4 +1,3 @@
-
 export interface TokenAnalysis {
   currentTokenPrice: number;
   tokenVolume24h: number;
@@ -16,20 +15,44 @@ export interface Analysis {
   uniqueFeatures: string[];
   valueFactors: string[];
   investmentOutlook: string;
-  priceAnalysis: {
+  priceAnalysis?: {
     estimatedValue: number;
     confidence: number;
-    trendDirection: "up" | "down" | "stable";
-    comparableSales: Array<{ price: number; date: string; notes: string }>;
+    trendDirection: string;
+    comparableSales: Array<{
+      price: number;
+      date: string;
+      notes: string;
+    }>;
   };
-  tokenAnalysis?: TokenAnalysis;
+  tokenAnalysis?: {
+    currentTokenPrice: number;
+    tokenVolume24h: number;
+    marketCap: number;
+    circulatingSupply: number;
+    derivativesData: Array<{
+      type: string;
+      price: number;
+      expirationDate: string;
+    }>;
+  };
 }
 
 export interface MarketAnalysisProps {
   vehicleData: {
+    id: string;
     make: string;
     model: string;
     year: number;
-    historical_data?: any;
+    historical_data?: {
+      prices: Array<{
+        date: string;
+        price: number;
+      }>;
+      events: Array<{
+        date: string;
+        description: string;
+      }>;
+    };
   };
 }

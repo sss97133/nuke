@@ -1,11 +1,11 @@
-
-import type { Database } from '../types';
+import type { Database } from '@/types/database';
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Camera, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { uploadVehicleImage } from '@/lib/image-upload';
 
 interface ProfilePictureStepProps {
   avatarUrl: string;
@@ -23,7 +23,6 @@ export const ProfilePictureStep = ({ avatarUrl, onUpdate }: ProfilePictureStepPr
 
       // Get user session to ensure they're authenticated
       const { data: { session } } = await supabase.auth.getSession();
-  if (error) console.error("Database query error:", error);
       if (!session?.user) {
         throw new Error('User must be authenticated to upload avatar');
       }
@@ -32,18 +31,19 @@ export const ProfilePictureStep = ({ avatarUrl, onUpdate }: ProfilePictureStepPr
       const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
+      const publicUrl = await uploadVehicleImage(
+        'avatars',
+        file,
+        filePath
+      );
 
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        
-        .getPublicUrl(filePath);
+      if (!publicUrl) {
+        throw new Error('Failed to upload avatar');
+      }
 
       // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
+        .from('profiles')
         .update({ avatar_url: publicUrl })
         .eq('id', session.user.id);
 

@@ -7,10 +7,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as process from 'process';
+import * as dotenv from 'dotenv';
 
 // Get the directory name using ES modules approach
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load environment variables from .env file
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Path to the built index.html and GM records page
 const indexPath = path.resolve(__dirname, '../dist/index.html');

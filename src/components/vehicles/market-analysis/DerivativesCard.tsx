@@ -1,42 +1,36 @@
-
-import { Card } from "@/components/ui/card";
-import { CandlestickChart } from "lucide-react";
-import { TokenAnalysis } from "./types";
-import { formatCurrency } from "./utils";
+import { formatCurrency } from '@/utils/format';
 
 interface DerivativesCardProps {
-  derivativesData: TokenAnalysis["derivativesData"];
+  analysis: {
+    tokenPrice: number;
+    marketCap: number;
+    volume24h: number;
+    holders: number;
+  };
 }
 
-export const DerivativesCard = ({ derivativesData }: DerivativesCardProps) => {
+export function DerivativesCard({ analysis }: DerivativesCardProps) {
   return (
-    <Card className="p-6">
-      <div className="flex items-start gap-4">
-        <CandlestickChart className="h-5 w-5 text-[#283845] mt-1" />
-        <div className="w-full">
-          <h4 className="font-mono text-sm font-semibold mb-4">
-            Derivatives Market
-          </h4>
-          <div className="divide-y">
-            {derivativesData.map((derivative, index) => (
-              <div
-                key={index}
-                className="py-3 grid grid-cols-3 gap-4"
-              >
-                <div className="font-mono text-sm">
-                  {derivative.type}
-                </div>
-                <div className="font-mono text-sm">
-                  {formatCurrency(derivative.price)}
-                </div>
-                <div className="font-mono text-sm text-[#666]">
-                  Expires: {new Date(derivative.expirationDate).toLocaleDateString()}
-                </div>
-              </div>
-            ))}
-          </div>
+    <div className="bg-white rounded-lg shadow p-6">
+      <h3 className="text-lg font-semibold mb-4">Token Analysis</h3>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-gray-600">Token Price</span>
+          <span className="font-semibold">{formatCurrency(analysis.tokenPrice)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-gray-600">Market Cap</span>
+          <span className="font-semibold">{formatCurrency(analysis.marketCap)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-gray-600">24h Volume</span>
+          <span className="font-semibold">{formatCurrency(analysis.volume24h)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-gray-600">Holders</span>
+          <span className="font-semibold">{analysis.holders.toLocaleString()}</span>
         </div>
       </div>
-    </Card>
+    </div>
   );
-};
+}

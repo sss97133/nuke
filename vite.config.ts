@@ -4,7 +4,7 @@ import path from "path";
 import { configDefaults } from 'vitest/config';
 import { componentTagger } from "lovable-tagger";
 import autoprefixer from 'autoprefixer';
-import postcssNesting from 'postcss-nesting';
+import tailwindcss from 'tailwindcss';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -65,7 +65,7 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       target: 'es2020',
       assetsInlineLimit: 4096,
-      cssCodeSplit: true,
+      cssCodeSplit: false,
       chunkSizeWarningLimit: 1500,
       rollupOptions: {
         input: {
@@ -156,8 +156,8 @@ export default defineConfig(({ mode }) => {
       },
       postcss: {
         plugins: [
+          tailwindcss,
           autoprefixer,
-          postcssNesting,
         ],
       },
     },

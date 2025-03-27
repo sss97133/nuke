@@ -5,6 +5,10 @@
  * These provide consistent styling for common UI elements.
  */
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @layer components {
   /* Button variants */
   .btn {
