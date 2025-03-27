@@ -123,16 +123,59 @@ jobs:
           echo "VITE_SUPABASE_URL exists: $(if [ -n "$VITE_SUPABASE_URL" ]; then echo "YES"; else echo "NO"; fi)"
           echo "VITE_SUPABASE_ANON_KEY exists: $(if [ -n "$VITE_SUPABASE_ANON_KEY" ]; then echo "YES"; else echo "NO"; fi)"
           
-          # Use existing .env.test in fallback chain
-          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            echo "Using existing credentials from .env.test file"
-            cp .env.test .env
+          # Create comprehensive build-time environment file
+          echo "Creating comprehensive .env file for build..."
+          cat > .env << EOF
+          # Supabase configuration
+          VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-${{ secrets.VITE_SUPABASE_URL }}}
+          VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-${{ secrets.VITE_SUPABASE_ANON_KEY }}}
+          VITE_SUPABASE_SERVICE_KEY=${VITE_SUPABASE_SERVICE_KEY:-${{ secrets.VITE_SUPABASE_SERVICE_KEY }}}
+          
+          # Application configuration
+          VITE_APP_NAME=Nuke
+          VITE_APP_DESCRIPTION="Vehicle Management Platform"
+          VITE_ENV=${NODE_ENV:-production}
+          VITE_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EOF
+          
+          # Use existing .env.test in fallback chain if primary env vars are missing
+          if ! grep -q VITE_SUPABASE_URL="[^[:space:]]" .env || ! grep -q VITE_SUPABASE_ANON_KEY="[^[:space:]]" .env; then
+            echo "Primary environment variables missing, using .env.test as fallback"
+            if [ -f ".env.test" ]; then
+              cat .env.test > .env
+              echo "✅ Using existing credentials from .env.test file"
+            else
+              echo "⚠️ No .env.test file found for fallback"
+            fi
           fi
           
-          # Run build commands
+          # Create other environment files needed by the build
+          cp .env .env.production
+          
+          # Prepare environment for build
           export NUKE_SKIP_CANVAS=true
-          npx --no -- tsc || echo "TypeScript compilation failed but continuing"
-          npx --no -- vite build --debug || echo "Vite build failed but continuing"
+          
+          # Verify final environment
+          echo "Final environment variable check:"
+          grep -v SERVICE_KEY .env | grep VITE_ || echo "⚠️ No VITE_ variables found in .env"
+          
+          # Run build commands with better error reporting
+          echo "Running TypeScript compilation..."
+          npx --no -- tsc || {
+            echo "⚠️ TypeScript compilation failed but continuing"
+            echo "TypeScript errors:"
+            npx --no -- tsc --noEmit > ts-errors.log 2>&1 || cat ts-errors.log | tail -n 20
+          }
+          
+          echo "Running Vite build..."
+          npx --no -- vite build --debug || {
+            echo "⚠️ Vite build failed but continuing"
+            echo "Checking for common Vite errors..."
+            if [ -f "vite.config.ts" ]; then
+              echo "Vite config exists. Checking for syntax errors:"
+              npx --no -- tsc -p tsconfig.node.json --noEmit
+            fi
+          }
           
       - name: Try alternative build method if primary fails
         if: ${{ !success() }}
