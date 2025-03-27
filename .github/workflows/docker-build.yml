@@ -88,17 +88,29 @@ jobs:
             echo "VITE_SUPABASE_SERVICE_KEY=placeholder-service-key" >> .env
           fi
 
+      - name: Create .env file with fallbacks if needed
+        run: |
+          # Always create an .env file with either real values or fallbacks
+          if [ -n "${{ secrets.VITE_SUPABASE_URL }}" ] && [ -n "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "Using actual Supabase credentials from secrets"
+            echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" > .env
+            echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+            echo "VITE_SUPABASE_SERVICE_KEY=${{ secrets.VITE_SUPABASE_SERVICE_KEY }}" >> .env
+          else
+            echo "Using fallback placeholder credentials"
+            echo "VITE_SUPABASE_URL=http://placeholder-url.example.com" > .env
+            echo "VITE_SUPABASE_ANON_KEY=placeholder-key" >> .env
+            echo "VITE_SUPABASE_SERVICE_KEY=placeholder-service-key" >> .env
+          fi
+          echo "VITE_APP_NAME=Nuke" >> .env
+          echo "VITE_APP_DESCRIPTION=Vehicle Management Platform" >> .env
+          cat .env | grep -v SERVICE_KEY
+          
       - name: Build directly in Docker
         env:
           NODE_ENV: production
-          VITE_APP_NAME: "Nuke"
-          VITE_APP_DESCRIPTION: "Vehicle Management Platform"
           NODE_OPTIONS: "--max-old-space-size=4096"
           CI: "true"
-          # Critical Supabase credentials from GitHub secrets
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
         run: |
           # Run build with verbose logging
           echo "Running build in Docker container"
