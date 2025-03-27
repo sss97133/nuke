@@ -6,12 +6,6 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "serve.js"
-    }
-  ],
   "buildCommand": "npm run build:prod",
   "devCommand": "npm run dev",
   "outputDirectory": "dist",
