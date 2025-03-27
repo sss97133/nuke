@@ -1,58 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "npm run vercel-build",
-  "devCommand": "npm run dev",
-  "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "npm install --production=false",
-  "public": false,
-  "github": {
-    "enabled": true,
-    "silent": false,
-    "autoAlias": true
-  },
-  "env": {
-    "VITE_SUPABASE_URL": "${VITE_SUPABASE_URL}",
-    "VITE_SUPABASE_ANON_KEY": "${VITE_SUPABASE_ANON_KEY}",
-    "VITE_SUPABASE_SERVICE_KEY": "${VITE_SUPABASE_SERVICE_KEY}",
-    "VITE_VERCEL_API_KEY": "${VITE_VERCEL_API_KEY}",
-    "NODE_ENV": "production"
-  },
+  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/gm-vehicle-records.html", "destination": "/gm-vehicle-records.html" },
-    { "source": "/gm-vehicle-records-v2.html", "destination": "/gm-vehicle-records-v2.html" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
-      ]
-    }
   ]
 }

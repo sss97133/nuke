@@ -9,13 +9,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:prod": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "prepare": "husky",
     "validate:all": "npm run lint && tsc --noEmit",
-    "start": "node serve.js",
-    "vercel-build": "NODE_ENV=production tsc && vite build"
+    "start": "node serve.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
