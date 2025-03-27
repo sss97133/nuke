@@ -12,7 +12,8 @@
     "build:prod": "node scripts/build.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "prepare": "husky"
+    "prepare": "husky",
+    "validate:all": "npm run lint && tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.0.5",
