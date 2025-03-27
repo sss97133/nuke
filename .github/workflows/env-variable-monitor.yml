@@ -165,37 +165,38 @@ jobs:
            * 
            * This ensures environment variables are accessible in all contexts.
            */
+
+          // Add TypeScript type definition for window.__env
+          declare global {
+            interface Window {
+              __env?: Record<string, string>;
+            }
+          }
           
           /**
            * Get an environment variable with three-tier fallback
            * @param key The environment variable key to retrieve
-           * @returns The environment variable value or null if not found
+           * @param defaultValue Optional default value if not found in any tier
+           * @returns The environment variable value or the default value if not found
            */
-          export const getEnv = (key: string): string | null => {
+          export const getEnv = (key: string, defaultValue: string = ''): string => {
             // Check Vite environment (development)
-            if (typeof import !== 'undefined' && 
-                import.meta && 
-                import.meta.env && 
-                import.meta.env[key]) {
-              return import.meta.env[key] as string;
+            if (import.meta.env && import.meta.env[key]) {
+              return import.meta.env[key];
             }
             
             // Check Node environment (build time)
-            if (typeof process !== 'undefined' && 
-                process.env && 
-                process.env[key]) {
-              return process.env[key] as string;
+            if (typeof process !== 'undefined' && process.env && process.env[key]) {
+              return process.env[key];
             }
             
             // Check Browser injected environment (runtime)
-            if (typeof window !== 'undefined' && 
-                window.__env && 
-                window.__env[key]) {
-              return window.__env[key] as string;
+            if (typeof window !== 'undefined' && window.__env && window.__env[key]) {
+              return window.__env[key];
             }
             
-            // Not found in any environment
-            return null;
+            // Return the default value if not found in any tier
+            return defaultValue;
           };
           
           /**
@@ -203,18 +204,25 @@ jobs:
            */
           export const getSupabaseCredentials = () => {
             return {
-              supabaseUrl: getEnv('VITE_SUPABASE_URL') || '',
-              supabaseAnonKey: getEnv('VITE_SUPABASE_ANON_KEY') || '',
-              supabaseServiceKey: getEnv('VITE_SUPABASE_SERVICE_KEY') || ''
+              supabaseUrl: getEnv('VITE_SUPABASE_URL', 'http://localhost:54321'),
+              supabaseAnonKey: getEnv('VITE_SUPABASE_ANON_KEY'),
+              supabaseServiceKey: getEnv('VITE_SUPABASE_SERVICE_KEY')
             };
           };
           
-          // Add TypeScript type definition for window.__env
-          declare global {
-            interface Window {
-              __env: Record<string, string>;
-            }
-          }
+          /**
+           * Checks if the current environment is production
+           */
+          export const isProduction = (): boolean => {
+            return getEnv('NODE_ENV') === 'production';
+          };
+          
+          /**
+           * Checks if the current environment is development
+           */
+          export const isDevelopment = (): boolean => {
+            return getEnv('NODE_ENV', 'development') === 'development';
+          };
           EOF
           
           echo "Created environment helper with three-tier fallback system"
