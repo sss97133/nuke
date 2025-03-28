@@ -29,6 +29,7 @@ import ExploreContentManagement from '@/pages/ExploreContentManagement';
 import VehicleDetail from '@/pages/VehicleDetail';
 import TeamMembers from '@/pages/TeamMembers';
 import Profile from '@/pages/Profile';
+import TestSupabase from '@/pages/TestSupabase';
 import Marketplace from '@/pages/Marketplace';
 import MarketplaceListingDetail from '@/pages/MarketplaceListingDetail';
 import { AuthForm } from '@/components/auth/AuthForm';
@@ -71,6 +72,7 @@ export const publicRoutes: RouteConfig[] = [
   { path: '/glossary', element: <Glossary />, type: RouteType.PUBLIC },
   { path: '/documentation', element: <Documentation />, type: RouteType.PUBLIC },
   { path: '/sitemap', element: <Sitemap />, type: RouteType.PUBLIC },
+  { path: '/test-supabase', element: <TestSupabase />, type: RouteType.PUBLIC },
   // Ensure the crypto route has proper redirectTo property
   { path: '/crypto', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC, redirectTo: '/explore' },
 ];
