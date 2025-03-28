@@ -62,8 +62,8 @@ declare global {
   }
 }
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = getEnvValue('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
 
 // Get current environment
 const environment = typeof process !== 'undefined' && process.env && process.env.NODE_ENV 
@@ -117,17 +117,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
-<<<<<<< HEAD
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-=======
+// Ensure we have non-empty strings for Supabase client initialization
+const safeSupabaseUrl = supabaseUrl || 'https://missing-url-error';
+const safeSupabaseAnonKey = supabaseAnonKey || 'missing-key-error';
+
 // Create Supabase client with error handling
 export const supabase = createClient<Database>(
-  supabaseUrl,
-  supabaseAnonKey,
+  safeSupabaseUrl,
+  safeSupabaseAnonKey,
   {
     auth: {
       persistSession: true,
@@ -173,7 +170,6 @@ supabase.auth.onAuthStateChange((event, session) => {
     console.log('User signed in:', session?.user?.email);
   } else if (event === 'SIGNED_OUT') {
     console.log('User signed out');
->>>>>>> da911bd (fix: improve vehicle addition and error handling)
   }
 });
 
