@@ -133,7 +133,12 @@ export const supabase = createClient<Database>(
       storage: {
         getItem: (key) => {
           try {
-            return localStorage.getItem(key);
+            // Browser environment
+            if (typeof localStorage !== 'undefined') {
+              return localStorage.getItem(key);
+            }
+            // Node.js environment or SSR
+            return null;
           } catch (error) {
             console.error('Error getting auth storage:', error);
             return null;
@@ -141,14 +146,22 @@ export const supabase = createClient<Database>(
         },
         setItem: (key, value) => {
           try {
-            localStorage.setItem(key, value);
+            // Browser environment
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(key, value);
+            }
+            // In Node.js we just log but don't throw
           } catch (error) {
             console.error('Error setting auth storage:', error);
           }
         },
         removeItem: (key) => {
           try {
-            localStorage.removeItem(key);
+            // Browser environment
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem(key);
+            }
+            // In Node.js we just log but don't throw
           } catch (error) {
             console.error('Error removing auth storage:', error);
           }
