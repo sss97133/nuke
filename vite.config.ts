@@ -4,6 +4,7 @@ import path from "path";
 import { configDefaults } from 'vitest/config';
 import autoprefixer from 'autoprefixer';
 import tailwindcss from 'tailwindcss';
+import { componentTagger } from 'lovable-tagger';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -44,6 +45,7 @@ export default defineConfig(({ mode }) => {
           ] : []
         }
       }),
+      componentTagger(),
     ].filter(Boolean),
     resolve: {
       alias: {

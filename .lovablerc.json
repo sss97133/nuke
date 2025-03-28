@@ -6,7 +6,9 @@
     "customKnowledge": true,
     "debugging": true,
     "deployment": true,
-    "hooks": true
+    "hooks": true,
+    "select": true,
+    "componentTagger": true
   },
   "ui": {
     "showBadge": true,
