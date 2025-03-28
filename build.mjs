@@ -50,7 +50,7 @@ async function build() {
   console.log(`Environment: NODE_ENV=${process.env.NODE_ENV}, CI=${process.env.CI}`);
   
   // TypeScript compilation - continue even if it fails
-  const tsResult = await runCommand('npx tsc --noEmit false');
+  const tsResult = await runCommand('npx tsc --noEmit');
   
   if (!tsResult.success) {
     console.warn('⚠️ TypeScript compilation had errors, but continuing with build');

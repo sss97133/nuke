@@ -1,0 +1,17 @@
+{
+  "name": "garage",
+  "description": "Garage and vehicle management",
+  "sections": [
+    "Garage Overview",
+    "Vehicle Management",
+    "Service History",
+    "Maintenance Schedule"
+  ],
+  "components": [],
+  "styles": {
+    "colors": [],
+    "typography": [],
+    "spacing": [],
+    "effects": []
+  }
+}

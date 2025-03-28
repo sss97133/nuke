@@ -1,0 +1,17 @@
+{
+  "name": "profile",
+  "description": "User profile pages",
+  "sections": [
+    "Profile Overview",
+    "Settings",
+    "Preferences",
+    "Account Management"
+  ],
+  "components": [],
+  "styles": {
+    "colors": [],
+    "typography": [],
+    "spacing": [],
+    "effects": []
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "dashboard",
+  "description": "Dashboard layout and components",
+  "sections": [
+    "Overview",
+    "Analytics",
+    "Recent Activity",
+    "Quick Actions"
+  ],
+  "components": [],
+  "styles": {
+    "colors": [],
+    "typography": [],
+    "spacing": [],
+    "effects": []
+  }
+}

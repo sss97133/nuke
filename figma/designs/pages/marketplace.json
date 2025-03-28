@@ -1,0 +1,17 @@
+{
+  "name": "marketplace",
+  "description": "Marketplace and auction pages",
+  "sections": [
+    "Marketplace List",
+    "Auction Details",
+    "Bidding Interface",
+    "Search and Filters"
+  ],
+  "components": [],
+  "styles": {
+    "colors": [],
+    "typography": [],
+    "spacing": [],
+    "effects": []
+  }
+}
