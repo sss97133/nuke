@@ -1,6 +1,6 @@
 
-import type { Database } from '../types';
 import { supabase } from "@/integrations/supabase/client";
+import { checkQueryError } from "@/utils/supabase-helpers";
 
 export const useFeedInteractions = () => {
   const trackEngagement = async (
@@ -10,16 +10,15 @@ export const useFeedInteractions = () => {
   ) => {
     try {
       // Get the current user's ID
-      const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+      const { data: { user }, error } = await supabase.auth.getUser();
+      checkQueryError(error);
       
       if (!user) {
         console.error('No authenticated user found');
         return;
       }
 
-      const { error } = await supabase.from('engagement_metrics').insert({
-  if (error) console.error("Database query error:", error);
+      const { error: insertError } = await supabase.from('engagement_metrics').insert({
         feed_item_id: feedItemId,
         interaction_type: interactionType,
         view_duration_seconds: viewDurationSeconds || 0,
@@ -27,9 +26,7 @@ export const useFeedInteractions = () => {
         interaction_weight: interactionType === 'click' ? 2.0 : 1.0
       });
 
-      if (error) {
-        console.error('Error tracking engagement:', error);
-      }
+      checkQueryError(insertError);
     } catch (err) {
       console.error('Failed to track engagement:', err);
     }
