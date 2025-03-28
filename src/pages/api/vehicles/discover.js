@@ -1,3 +1,4 @@
+
 /**
  * API Handler for Vehicle Discovery
  * 
@@ -22,10 +23,11 @@ export default async function handler(req, res) {
   const supabase = createServerSupabaseClient({ req, res });
 
   // Get user session
-  const { data: { session } } = await supabase.auth.getSession();
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error("Database query error:", error);
+    return res.status(500).json({ error: 'Authentication error' });
+  }
   
   if (!session) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -94,7 +96,7 @@ export default async function handler(req, res) {
         
         // Create timeline event
         return supabase
-          
+          .from('vehicle_timeline_events')
           .insert(timelineEvent);
       });
       
@@ -120,7 +122,7 @@ export default async function handler(req, res) {
         
         // Create image record
         return supabase
-          
+          .from('vehicle_images')
           .insert(imageRecord);
       });
       
@@ -141,7 +143,7 @@ export default async function handler(req, res) {
       };
       
       await supabase
-        
+        .from('vehicle_raw_data')
         .insert(rawData);
     }
 
