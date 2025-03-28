@@ -1,0 +1,17 @@
+{
+  "styleSourceFiles": [
+    "src/components/VehicleCard.css",
+    "src/styles/global-css-fixes.css"
+  ],
+  "componentDefinitions": [
+    {
+      "name": "VehicleCard",
+      "componentPath": "src/components/VehicleCard.tsx",
+      "cssPath": "src/components/VehicleCard.css"
+    }
+  ],
+  "importOptions": {
+    "preprocessor": "css",
+    "moduleResolution": "node"
+  }
+}
