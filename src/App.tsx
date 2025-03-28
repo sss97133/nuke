@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { AppRouter } from './routes/AppRouter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,7 +8,6 @@ import OnboardingCheck from '@/components/onboarding/OnboardingCheck';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { HelmetProvider } from '@/components/providers/HelmetProvider';
 import StyleFix from './fixes/ensure-styles';
-import ThemeToggle from './components/ui/theme-toggle';
 import { SimpleAdaptivePanel } from './components/ui/SimpleAdaptivePanel';
 import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
 
@@ -54,11 +54,6 @@ function App() {
             
             {/* Ensure styles are loaded properly in production */}
             <StyleFix />
-            
-            {/* Theme toggle for light/dark mode switching */}
-            <div className="fixed top-4 right-4 z-50">
-              <ThemeToggle />
-            </div>
             
             {/* Adaptive UI Panel that learns from user behavior */}
             <SimpleAdaptivePanel />

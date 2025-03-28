@@ -8,7 +8,8 @@
     "deployment": true,
     "hooks": true,
     "select": true,
-    "componentTagger": true
+    "componentTagger": true,
+    "adaptiveChat": true
   },
   "ui": {
     "showBadge": true,

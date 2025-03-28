@@ -3214,6 +3214,54 @@ export type Database = {
           },
         ]
       }
+      vehicle_timeline_events: {
+        Row: {
+          confidence_score: number
+          created_at: string | null
+          description: string | null
+          event_date: string
+          event_type: string
+          id: string
+          image_urls: string[] | null
+          metadata: Json | null
+          source: string
+          source_url: string | null
+          title: string
+          updated_at: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          confidence_score: number
+          created_at?: string | null
+          description?: string | null
+          event_date: string
+          event_type: string
+          id?: string
+          image_urls?: string[] | null
+          metadata?: Json | null
+          source: string
+          source_url?: string | null
+          title: string
+          updated_at?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          confidence_score?: number
+          created_at?: string | null
+          description?: string | null
+          event_date?: string
+          event_type?: string
+          id?: string
+          image_urls?: string[] | null
+          metadata?: Json | null
+          source?: string
+          source_url?: string | null
+          title?: string
+          updated_at?: string | null
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
       vehicle_tokens: {
         Row: {
           contract_uri: string | null
