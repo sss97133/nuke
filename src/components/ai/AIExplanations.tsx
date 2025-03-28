@@ -1,5 +1,4 @@
 
-import type { Database } from '../types';
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +34,6 @@ export const AIExplanations = () => {
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-explanation', {
-  if (error) console.error("Database query error:", error);
         body: { question: question.trim() }
       });
 

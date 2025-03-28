@@ -30,7 +30,6 @@ export const ImportGarages = () => {
       });
 
       const { data, error } = await supabase.functions.invoke('search-local-garages', {
-  if (error) console.error("Database query error:", error);
         body: {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,

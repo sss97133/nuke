@@ -7,8 +7,35 @@ export { supabase };
 // Re-export specific functions, potentially renaming them for clarity within this module
 export { uploadVehicleImage, getPublicUrl };
 
-// You can add more specific utility functions here that build upon the base client functions
-// For example, a function specifically for uploading user profile pictures:
+/**
+ * Safely invoke a Supabase Edge Function with proper error handling
+ * @param functionName Name of the Edge Function to invoke
+ * @param body Request body to send to the function
+ * @returns Object containing data and error properties
+ */
+export async function invokeFunction<T = any>(
+  functionName: string,
+  body: any
+): Promise<{ data: T | null; error: Error | null }> {
+  try {
+    const { data, error } = await supabase.functions.invoke(functionName, { body });
+    
+    if (error) {
+      console.error(`Error invoking ${functionName}:`, error.message);
+      return { data: null, error: new Error(error.message) };
+    }
+    
+    return { data: data as T, error: null };
+  } catch (error) {
+    console.error(`Failed to invoke ${functionName}:`, error);
+    return { 
+      data: null, 
+      error: error instanceof Error 
+        ? error 
+        : new Error(String(error)) 
+    };
+  }
+}
 
 /**
  * Uploads a user's profile picture.
