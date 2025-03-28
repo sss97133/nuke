@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Vehicle } from "@/types/inventory";
 import { Loader2 } from "lucide-react";
+import { checkQueryError } from "@/utils/supabase-helpers";
 
 interface WebsiteImportProps {
   onNormalizedData: (vehicles: Vehicle[]) => void;
@@ -21,11 +23,10 @@ export const WebsiteImport = ({ onNormalizedData }: WebsiteImportProps) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('process-vehicle-import', {
-  if (error) console.error("Database query error:", error);
         body: { data: url, fileType: 'url' }
       });
 
-      if (error) throw error;
+      checkQueryError(error);
       
       onNormalizedData(data.vehicles);
     } catch (error: any) {

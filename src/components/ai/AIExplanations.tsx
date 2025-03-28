@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { checkQueryError } from "@/utils/supabase-helpers";
 
 export const AIExplanations = () => {
   const [question, setQuestion] = useState("");
@@ -22,7 +23,7 @@ export const AIExplanations = () => {
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      checkQueryError(error);
       return data;
     },
   });
@@ -37,7 +38,7 @@ export const AIExplanations = () => {
         body: { question: question.trim() }
       });
 
-      if (error) throw error;
+      checkQueryError(error);
 
       await refetch();
       setQuestion("");

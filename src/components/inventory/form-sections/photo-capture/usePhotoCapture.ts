@@ -1,6 +1,8 @@
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { checkQueryError } from "@/utils/supabase-helpers";
 
 interface FilePreview {
   url: string;
@@ -63,7 +65,7 @@ export const usePhotoCapture = (onPhotoCapture: (file: File) => Promise<void>) =
         body: { imageUrl: preview.url }
       });
 
-      if (error) throw error;
+      checkQueryError(error);
 
       setAiResults(data.classifications || []);
       

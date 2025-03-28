@@ -1,3 +1,4 @@
+
 import { PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';

@@ -2,9 +2,10 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import { Loader2 } from "lucide-react"
+import { checkQueryError } from "@/utils/supabase-helpers"
 
 export const MendableChat = () => {
   const [query, setQuery] = useState("")
@@ -22,10 +23,7 @@ export const MendableChat = () => {
         body: { query: query.trim() }
       })
 
-      if (error) {
-        console.error('Supabase function error:', error)
-        throw new Error(error.message)
-      }
+      checkQueryError(error);
 
       if (!data?.answer) {
         throw new Error('No answer received from AI')

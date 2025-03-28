@@ -1,4 +1,4 @@
-import type { Database } from '../types';
+
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import type { Vehicle } from "@/types/inventory";
 import { Loader2 } from "lucide-react";
+import { checkQueryError } from "@/utils/supabase-helpers";
 
 interface ImportPreviewProps {
   vehicles: Vehicle[];
@@ -28,8 +29,9 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
   const handleImport = async () => {
     setIsImporting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      checkQueryError(error);
       
       const vehiclesToInsert = editedVehicles.map(vehicle => ({
         make: vehicle.make,
@@ -41,11 +43,11 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
         historical_data: vehicle.historical_data ? JSON.stringify(vehicle.historical_data) : null
       }));
 
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('vehicles')
         .insert(vehiclesToInsert);
 
-      if (error) throw error;
+      checkQueryError(insertError);
 
       toast({
         title: "Success",
