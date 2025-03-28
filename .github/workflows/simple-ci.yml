@@ -25,6 +25,11 @@ jobs:
           node-version: '18.x'
           cache: 'npm'
       
+      - name: Remove node_modules and package-lock.json
+        run: |
+          rm -rf node_modules
+          rm -f package-lock.json
+      
       - name: Install dependencies
         run: npm ci || npm install
       
