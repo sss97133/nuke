@@ -1,128 +1,62 @@
-
 import { useState, useEffect } from "react";
-import { Token, Vehicle, TokenStake, TokenStakeStats } from "@/types/token";
-import { 
-  fetchTokens, 
-  fetchVehicles, 
-  fetchUserStakes, 
-  fetchStakingStats,
-  unstakeTokens
-} from "./api/tokenStakingApi";
+import { StakingToken, StakingPosition, StakingStats, getStakingTokens, getStakingPositions, getStakingStats, unstakeTokens } from "./api/tokenStakingApi";
 
-export const useTokenStaking = () => {
-  const [tokens, setTokens] = useState<Token[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [isLoadingTokens, setIsLoadingTokens] = useState(true);
-  const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
-  const [userStakes, setUserStakes] = useState<TokenStake[]>([]);
-  const [isLoadingStakes, setIsLoadingStakes] = useState(true);
-  const [stakingStats, setStakingStats] = useState<TokenStakeStats | null>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const [hasError, setHasError] = useState<boolean>(false);
+export const useTokenStaking = (address: string) => {
+  const [tokens, setTokens] = useState<StakingToken[]>([]);
+  const [positions, setPositions] = useState<StakingPosition[]>([]);
+  const [stats, setStats] = useState<StakingStats>({
+    totalStaked: '0',
+    totalRewards: '0',
+    stakersCount: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    loadTokens();
-    loadVehicles();
-    loadUserStakes();
-  }, []);
-
-  const loadTokens = async () => {
-    setIsLoadingTokens(true);
-    setHasError(false);
+  const refreshData = async () => {
     try {
-      const data = await fetchTokens();
-      setTokens(data);
-    } catch (error) {
-      console.error("Error loading tokens:", error);
-      setHasError(true);
+      setIsLoading(true);
+      setError(null);
+      const [newTokens, newPositions, newStats] = await Promise.all([
+        getStakingTokens(),
+        getStakingPositions(address),
+        getStakingStats()
+      ]);
+      setTokens(newTokens);
+      setPositions(newPositions);
+      setStats(newStats);
+    } catch (err) {
+      console.error("Error loading staking data:", err);
+      setError(err instanceof Error ? err : new Error('Failed to fetch staking data'));
     } finally {
-      setIsLoadingTokens(false);
+      setIsLoading(false);
     }
   };
 
-  const loadVehicles = async () => {
-    setIsLoadingVehicles(true);
-    setHasError(false);
+  const handleUnstake = async (positionId: string) => {
     try {
-      const data = await fetchVehicles();
-      setVehicles(data);
-    } catch (error) {
-      console.error("Error loading vehicles:", error);
-      setHasError(true);
-    } finally {
-      setIsLoadingVehicles(false);
-    }
-  };
-
-  const loadUserStakes = async () => {
-    setIsLoadingStakes(true);
-    setHasError(false);
-    try {
-      const data = await fetchUserStakes();
-      setUserStakes(data);
-      
-      // After loading stakes, fetch stats if we have a user
-      if (data.length > 0) {
-        await loadStakingStats(data[0].user_id);
-      } else {
-        setStakingStats(null);
-        setIsLoadingStats(false);
-      }
-    } catch (error) {
-      console.error("Error loading user stakes:", error);
-      setHasError(true);
-      setIsLoadingStats(false);
-    } finally {
-      setIsLoadingStakes(false);
-    }
-  };
-
-  const loadStakingStats = async (userId: string) => {
-    setIsLoadingStats(true);
-    setHasError(false);
-    try {
-      const stats = await fetchStakingStats(userId);
-      setStakingStats(stats);
-    } catch (error) {
-      console.error("Error loading staking stats:", error);
-      setHasError(true);
-    } finally {
-      setIsLoadingStats(false);
-    }
-  };
-
-  const handleUnstake = async (stakeId: string) => {
-    try {
-      const success = await unstakeTokens(stakeId);
+      const success = await unstakeTokens(positionId);
       if (success) {
-        // Refresh user stakes
-        loadUserStakes();
+        // Refresh data after successful unstake
+        await refreshData();
       }
       return success;
     } catch (error) {
       console.error("Error unstaking tokens:", error);
-      return false;
+      throw error;
     }
   };
 
-  const retry = () => {
-    loadTokens();
-    loadVehicles();
-    loadUserStakes();
-  };
+  useEffect(() => {
+    refreshData();
+  }, [address]);
 
   return {
     tokens,
-    vehicles,
-    isLoadingTokens,
-    isLoadingVehicles,
-    userStakes,
-    isLoadingStakes,
-    stakingStats,
-    isLoadingStats,
-    hasError,
-    fetchUserStakes: loadUserStakes,
-    handleUnstake,
-    retry
+    positions,
+    stats,
+    isLoading,
+    error,
+    refreshData,
+    handleUnstake
   };
-};
+}; 

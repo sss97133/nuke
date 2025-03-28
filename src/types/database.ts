@@ -46,17 +46,13 @@ export interface Database {
           created_at: string;
           updated_at: string;
           ai_analysis: {
-            interests: string[];
             skills: string[];
-            achievements: string[];
-            engagement_patterns: {
-              content_type: string;
-              interaction_count: number;
-            }[];
+            interests: string[];
+            expertise: string[];
           } | null;
         };
         Insert: {
-          id?: string;
+          id: string;
           email: string;
           full_name: string;
           avatar_url?: string | null;
@@ -64,13 +60,9 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           ai_analysis?: {
-            interests: string[];
             skills: string[];
-            achievements: string[];
-            engagement_patterns: {
-              content_type: string;
-              interaction_count: number;
-            }[];
+            interests: string[];
+            expertise: string[];
           } | null;
         };
         Update: {
@@ -82,13 +74,9 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           ai_analysis?: {
-            interests: string[];
             skills: string[];
-            achievements: string[];
-            engagement_patterns: {
-              content_type: string;
-              interaction_count: number;
-            }[];
+            interests: string[];
+            expertise: string[];
           } | null;
         };
       };
@@ -229,81 +217,42 @@ export interface Database {
       vehicles: {
         Row: {
           id: string;
-          user_id: string;
           make: string;
           model: string;
           year: number;
           vin?: string;
-          color?: string;
-          purchase_date?: string;
-          purchase_price?: number;
-          current_value?: number;
-          mileage?: number;
-          condition?: string;
-          location?: string;
-          license_plate?: string;
-          insurance_policy?: string;
           notes?: string;
-          status: 'active' | 'inactive' | 'maintenance' | 'sold';
+          current_value?: number;
+          status?: string;
+          user_id?: string;
           created_at: string;
           updated_at: string;
-          collection_id?: string;
-          is_discovered: boolean;
-          source?: string; // e.g., 'craigslist', 'manual', 'import'
-          source_url?: string;
-          source_data?: Record<string, any>;
         };
         Insert: {
           id?: string;
-          user_id: string;
           make: string;
           model: string;
           year: number;
           vin?: string;
-          color?: string;
-          purchase_date?: string;
-          purchase_price?: number;
-          current_value?: number;
-          mileage?: number;
-          condition?: string;
-          location?: string;
-          license_plate?: string;
-          insurance_policy?: string;
           notes?: string;
-          status?: 'active' | 'inactive' | 'maintenance' | 'sold';
+          current_value?: number;
+          status?: string;
+          user_id?: string;
           created_at?: string;
           updated_at?: string;
-          collection_id?: string;
-          is_discovered?: boolean;
-          source?: string;
-          source_url?: string;
-          source_data?: Record<string, any>;
         };
         Update: {
           id?: string;
-          user_id?: string;
           make?: string;
           model?: string;
           year?: number;
           vin?: string;
-          color?: string;
-          purchase_date?: string;
-          purchase_price?: number;
-          current_value?: number;
-          mileage?: number;
-          condition?: string;
-          location?: string;
-          license_plate?: string;
-          insurance_policy?: string;
           notes?: string;
-          status?: 'active' | 'inactive' | 'maintenance' | 'sold';
+          current_value?: number;
+          status?: string;
+          user_id?: string;
           created_at?: string;
           updated_at?: string;
-          collection_id?: string;
-          is_discovered?: boolean;
-          source?: string;
-          source_url?: string;
-          source_data?: Record<string, any>;
         };
       };
       vehicle_collections: {
@@ -394,6 +343,144 @@ export interface Database {
           source?: 'upload' | 'craigslist' | 'icloud';
           created_at?: string;
           metadata?: Record<string, any>;
+        };
+      };
+      tokens: {
+        Row: {
+          id: string;
+          name: string;
+          symbol: string;
+          total_supply: number;
+          metadata: Record<string, any>;
+          contract_address: string;
+          created_at: string;
+          decimals: number;
+          description: string;
+          owner_id: string;
+          status: string;
+          updated_at: string;
+          vehicle_id?: string;
+          current_price?: number;
+          image_url?: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          symbol: string;
+          total_supply: number;
+          metadata: Record<string, any>;
+          contract_address: string;
+          created_at?: string;
+          decimals: number;
+          description: string;
+          owner_id: string;
+          status: string;
+          updated_at?: string;
+          vehicle_id?: string;
+          current_price?: number;
+          image_url?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          symbol?: string;
+          total_supply?: number;
+          metadata?: Record<string, any>;
+          contract_address?: string;
+          created_at?: string;
+          decimals?: number;
+          description?: string;
+          owner_id?: string;
+          status?: string;
+          updated_at?: string;
+          vehicle_id?: string;
+          current_price?: number;
+          image_url?: string;
+        };
+      };
+      stakes: {
+        Row: {
+          id: string;
+          user_id: string;
+          token_id: string;
+          vehicle_id: string;
+          amount: number;
+          start_date: string;
+          end_date: string;
+          status: 'active' | 'completed' | 'cancelled';
+          predicted_roi: number;
+          actual_roi?: number;
+          created_at: string;
+          vehicle_name?: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token_id: string;
+          vehicle_id: string;
+          amount: number;
+          start_date: string;
+          end_date: string;
+          status: 'active' | 'completed' | 'cancelled';
+          predicted_roi: number;
+          actual_roi?: number;
+          created_at?: string;
+          vehicle_name?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          token_id?: string;
+          vehicle_id?: string;
+          amount?: number;
+          start_date?: string;
+          end_date?: string;
+          status?: 'active' | 'completed' | 'cancelled';
+          predicted_roi?: number;
+          actual_roi?: number;
+          created_at?: string;
+          vehicle_name?: string;
+        };
+      };
+      staking_stats: {
+        Row: {
+          total_staked: number;
+          total_predicted_roi: number;
+          active_stakes: number;
+          completed_stakes: number;
+          avg_roi_percent: number;
+          vehicle_count: number;
+          distribution_by_vehicle?: {
+            vehicle_name: string;
+            amount: number;
+            percentage: number;
+          }[];
+        };
+        Insert: {
+          total_staked: number;
+          total_predicted_roi: number;
+          active_stakes: number;
+          completed_stakes: number;
+          avg_roi_percent: number;
+          vehicle_count: number;
+          distribution_by_vehicle?: {
+            vehicle_name: string;
+            amount: number;
+            percentage: number;
+          }[];
+        };
+        Update: {
+          total_staked?: number;
+          total_predicted_roi?: number;
+          active_stakes?: number;
+          completed_stakes?: number;
+          avg_roi_percent?: number;
+          vehicle_count?: number;
+          distribution_by_vehicle?: {
+            vehicle_name: string;
+            amount: number;
+            percentage: number;
+          }[];
         };
       };
     };

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet, Clock, TrendingUp, Coins } from "lucide-react";
@@ -18,22 +17,19 @@ import StakeForm from "@/components/token-staking/StakeForm";
 import StakesList from "@/components/token-staking/StakesList";
 import StakingHeader from "@/components/token-staking/StakingHeader";
 import StakingPortfolioStats from "@/components/token-staking/StakingPortfolioStats";
-import { useTokenStaking } from '@/components/token-staking/useTokenStaking';
+import { useTokenStaking } from '@/components/token-staking/hooks/useTokenStaking';
+import { TokenStake } from '@/types/token';
 
 const TokenStaking = () => {
   const {
     tokens,
     vehicles,
-    isLoadingTokens,
-    isLoadingVehicles,
-    userStakes,
-    isLoadingStakes,
+    stakes,
     stakingStats,
-    isLoadingStats,
-    hasError,
+    isLoading,
+    error,
     handleUnstake,
-    fetchUserStakes,
-    retry
+    refreshData
   } = useTokenStaking();
 
   // State for documentation dialog
@@ -41,7 +37,7 @@ const TokenStaking = () => {
 
   // Function to handle when a new stake is created
   const handleStakeCreated = () => {
-    fetchUserStakes();
+    refreshData();
   };
 
   return (
@@ -120,8 +116,8 @@ const TokenStaking = () => {
                   <StakeForm 
                     tokens={tokens}
                     vehicles={vehicles}
-                    isLoadingTokens={isLoadingTokens}
-                    isLoadingVehicles={isLoadingVehicles}
+                    isLoadingTokens={isLoading}
+                    isLoadingVehicles={isLoading}
                     onStakeCreated={handleStakeCreated}
                   />
                 </CardContent>
@@ -139,11 +135,11 @@ const TokenStaking = () => {
                 </CardHeader>
                 <CardContent>
                   <StakesList 
-                    userStakes={userStakes}
-                    isLoadingStakes={isLoadingStakes}
-                    hasError={hasError}
+                    userStakes={stakes}
+                    isLoadingStakes={isLoading}
+                    hasError={!!error}
                     onUnstake={handleUnstake}
-                    onRetry={retry}
+                    onRetry={refreshData}
                   />
                 </CardContent>
               </Card>
@@ -161,9 +157,9 @@ const TokenStaking = () => {
             <CardContent>
               <StakingPortfolioStats 
                 stats={stakingStats}
-                isLoading={isLoadingStats}
-                hasError={hasError}
-                onRetry={retry}
+                isLoading={isLoading}
+                hasError={!!error}
+                onRetry={refreshData}
               />
             </CardContent>
           </Card>

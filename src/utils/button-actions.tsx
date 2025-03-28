@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { atom, useAtom } from 'jotai';
 import { createClient } from '@supabase/supabase-js';
-import { SupabaseError } from '@/utils/supabase-helpers';
+import { SupabaseError } from './supabase-helpers';
 
 // Button implementation status tracking
 interface ButtonMetadata {
