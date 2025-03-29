@@ -1,8 +1,60 @@
-import type { Database } from '../types';
+import type { Database } from '@/types/database';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/integrations/supabase/client';
+
+// Mock data for development
+const mockListings = [
+  {
+    id: '1',
+    title: '2020 Tesla Model 3',
+    price: 35000,
+    condition: 'Excellent',
+    imageUrl: 'https://placehold.co/600x400/grey/white?text=Tesla+Model+3',
+    location: {
+      city: 'San Francisco',
+      state: 'CA'
+    },
+    created_at: '2024-02-20T10:00:00.000Z',
+    views_count: 150,
+    commentCount: 8,
+    is_featured: true,
+    user_id: 'user1'
+  },
+  {
+    id: '2',
+    title: '2019 BMW M3',
+    price: 45000,
+    condition: 'Like New',
+    imageUrl: 'https://placehold.co/600x400/grey/white?text=BMW+M3',
+    location: {
+      city: 'Los Angeles',
+      state: 'CA'
+    },
+    created_at: '2024-02-19T15:30:00.000Z',
+    views_count: 120,
+    commentCount: 5,
+    is_featured: false,
+    user_id: 'user2'
+  },
+  {
+    id: '3',
+    title: '2021 Ford Mustang GT',
+    price: 40000,
+    condition: 'Good',
+    imageUrl: 'https://placehold.co/600x400/grey/white?text=Ford+Mustang',
+    location: {
+      city: 'Austin',
+      state: 'TX'
+    },
+    created_at: '2024-02-18T09:15:00.000Z',
+    views_count: 200,
+    commentCount: 12,
+    is_featured: true,
+    user_id: 'user3'
+  }
+];
 
 // Helper function to adapt DB results to the expected format
 function adaptMarketplaceListings(dbListings: any[]) {
@@ -144,9 +196,9 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
       // Adapt data to expected format
       return adaptMarketplaceListings(data);
       */
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error in useMarketplaceListings:', err);
-      setFetchError(err.message || 'An error occurred fetching listings');
+      setFetchError(err instanceof Error ? err.message : 'An error occurred fetching listings');
       
       // Fall back to mock data
       return filterMockData(mockListings, options, userId);
