@@ -1,4 +1,3 @@
-
 import { UseFormReturn } from 'react-hook-form';
 import { VehicleFormValues } from '../../types';
 import { useFileUpload } from './hooks/useFileUpload';
@@ -10,6 +9,8 @@ interface UseImageUploadProps {
   maxSize?: number;
   maxFiles?: number;
 }
+
+type FormValue = string | string[];
 
 export const useImageUpload = ({
   form,
@@ -34,7 +35,7 @@ export const useImageUpload = ({
   });
 
   // Convert the form value to preview URLs if necessary
-  const formValue = form.watch(name as any);
+  const formValue = form.watch(name) as FormValue;
   
   // Process the display URLs based on available data
   const displayUrls = previewUrls.length > 0 ? previewUrls : (
