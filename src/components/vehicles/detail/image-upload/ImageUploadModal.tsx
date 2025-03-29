@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Dialog, 
@@ -7,10 +6,9 @@ import {
   DialogHeader, 
   DialogTitle 
 } from "@/components/ui/dialog";
-import { FileUploader } from './FileUploader';
+import { ImageUpload } from '@/components/shared/ImageUpload';
 import { ImageTypeSelect } from './ImageTypeSelect';
 import { DescriptionInput } from './DescriptionInput';
-import { ImagePreview } from './ImagePreview';
 import { ModalFooter } from './ModalFooter';
 import { useImageUpload } from './useImageUpload';
 import { ImageUploadModalProps } from './types';
@@ -24,16 +22,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isLoading = false,
 }) => {
   const {
-    selectedFiles,
-    previewUrls,
     imageType,
     setImageType,
     description,
     setDescription,
-    handleFileChange,
     handleSubmit,
     resetForm,
-    removePreview,
   } = useImageUpload(onUpload);
 
   return (
@@ -62,11 +56,18 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             setDescription={setDescription} 
           />
           
-          <FileUploader handleFileChange={handleFileChange} />
-          
-          <ImagePreview 
-            previewUrls={previewUrls} 
-            removePreview={removePreview} 
+          <ImageUpload
+            multiple
+            maxFiles={10}
+            maxSize={10 * 1024 * 1024} // 10MB
+            onUploadComplete={(urls) => {
+              if (urls.length > 0) {
+                handleSubmit(urls, imageType, description);
+              }
+            }}
+            onError={(error) => {
+              console.error('Image upload error:', error);
+            }}
           />
           
           <div className="bg-muted p-3 rounded-md">
@@ -78,8 +79,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         </div>
 
         <ModalFooter 
-          handleSubmit={handleSubmit} 
-          hasSelectedFiles={selectedFiles !== null && selectedFiles.length > 0}
+          handleSubmit={() => handleSubmit([], imageType, description)}
+          hasSelectedFiles={false}
           onOpenChange={onOpenChange}
           isLoading={isLoading}
         />
