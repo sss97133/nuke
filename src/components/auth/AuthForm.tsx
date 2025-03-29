@@ -10,8 +10,10 @@ import { AuthFooter } from "./AuthFooter";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { PasswordResetForm } from "./password-reset/PasswordResetForm";
 import { EmailLoginForm } from "./email-form/EmailLoginForm";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Info, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { formatAuthError, handleAuthError, isSchemaError } from "@/utils/supabase-helpers";
 
 export const AuthForm = () => {
   const { isLoading, handlePhoneLogin, verifyOtp, handleSocialLogin, session } = useAuth();
@@ -25,6 +27,8 @@ export const AuthForm = () => {
   const [searchParams] = useSearchParams();
   const [isResetFlow, setIsResetFlow] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Track if we're seeing database connectivity issues
+  const [hasDbIssue, setHasDbIssue] = useState<boolean>(false);
 
   // Debug logging to verify the component is rendering
   console.log("Rendering AuthForm component", { session, isLoading, authError });
@@ -44,6 +48,23 @@ export const AuthForm = () => {
     
     // Clear any previous errors when changing forms
     setAuthError(null);
+    setHasDbIssue(false);
+    
+    // Perform a quick health check on Supabase when the component loads
+    const checkSupabaseHealth = async () => {
+      try {
+        const response = await fetch(`${import.meta.env?.VITE_SUPABASE_URL || 'http://127.0.0.1:54321'}/auth/v1/health`);
+        if (!response.ok) {
+          console.error('Supabase health check failed:', response.status);
+          setHasDbIssue(true);
+        }
+      } catch (error) {
+        console.error('Supabase health check error:', error);
+        setHasDbIssue(true);
+      }
+    };
+    
+    checkSupabaseHealth();
   }, [searchParams]);
 
   const formatPhoneNumber = (phone: string) => {
@@ -69,7 +90,13 @@ export const AuthForm = () => {
       }
     } catch (error: any) {
       console.error("Error sending OTP:", error);
-      setAuthError(error.message || "Failed to send verification code");
+      const errorMessage = handleAuthError(error);
+      setAuthError(errorMessage);
+      
+      // Check if this is a schema/database issue
+      if (isSchemaError(error)) {
+        setHasDbIssue(true);
+      }
     }
   };
 
@@ -81,7 +108,13 @@ export const AuthForm = () => {
       await verifyOtp(formattedPhone, otp);
     } catch (error: any) {
       console.error("Error verifying OTP:", error);
-      setAuthError(error.message || "Failed to verify code");
+      const errorMessage = handleAuthError(error);
+      setAuthError(errorMessage);
+      
+      // Check if this is a schema/database issue
+      if (isSchemaError(error)) {
+        setHasDbIssue(true);
+      }
     }
   };
 
@@ -91,7 +124,13 @@ export const AuthForm = () => {
 
   const handleSocialLoginError = (error: any) => {
     console.error("Social login error:", error);
-    setAuthError(error.message || "Social login failed");
+    const errorMessage = handleAuthError(error);
+    setAuthError(errorMessage);
+    
+    // Check if this is a schema/database issue
+    if (isSchemaError(error)) {
+      setHasDbIssue(true);
+    }
   };
 
   if (isResetFlow) {
@@ -115,6 +154,30 @@ export const AuthForm = () => {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Authentication Error</AlertTitle>
                 <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
+            
+            {hasDbIssue && (
+              <Alert className="mb-4 bg-yellow-50 border border-yellow-200">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Local Supabase Connection Issue Detected</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>There might be an issue with your local Supabase instance.</p>
+                  <p className="text-sm">Common fixes:</p>
+                  <ul className="text-sm pl-5 list-disc">
+                    <li>Check if Supabase is running: <code className="bg-gray-100 px-1 py-0.5 rounded">docker ps | grep supabase</code></li>
+                    <li>Check for port conflicts: <code className="bg-gray-100 px-1 py-0.5 rounded">lsof -i :54321-54324</code></li>
+                    <li>Restart Supabase: <code className="bg-gray-100 px-1 py-0.5 rounded">supabase stop && supabase start</code></li>
+                  </ul>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="mt-2 text-xs" 
+                    onClick={() => window.open('http://localhost:54323', '_blank')}
+                  >
+                    Open Supabase Studio <ExternalLink className="h-3 w-3 ml-1" />
+                  </Button>
+                </AlertDescription>
               </Alert>
             )}
 
