@@ -1,4 +1,4 @@
-import type { Database } from '../types';
+import type { Database } from '@/types/database';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -84,12 +84,15 @@ function AddVehicle() {
           const newPath = `${vehicle.id}/${oldPath}`;
           
           // Move the file to the correct vehicle folder
-          const { error: moveError } = await supabase.storage
-            .move(`${user.id}/${oldPath}`, newPath);
+          if (oldPath) {
+            const { error: moveError } = await supabase.storage
+              .from('vehicle-images')
+              .move(oldPath, newPath);
 
-          if (moveError) {
-            console.error('Error moving image:', moveError);
-            // Don't throw here, we still want to create the vehicle
+            if (moveError) {
+              console.error('Error moving image:', moveError);
+              // Don't throw here, we still want to create the vehicle
+            }
           }
 
           // Update the vehicle_images table
@@ -192,9 +195,9 @@ function AddVehicle() {
         <CardContent>
           <VehicleForm 
             onSubmit={handleSubmit}
-            initialValues={{
+            initialValues={primaryImageUrl ? {
               image: primaryImageUrl
-            }}
+            } : undefined}
           />
         </CardContent>
       </Card>

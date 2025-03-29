@@ -122,60 +122,28 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const safeSupabaseUrl = (supabaseUrl || 'https://missing-url-error').replace(/\/$/, '');
 const safeSupabaseAnonKey = supabaseAnonKey || 'missing-key-error';
 
-// Create Supabase client with error handling
-export const supabase = createClient<Database>(
-  safeSupabaseUrl,
-  safeSupabaseAnonKey,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storage: {
-        getItem: (key) => {
-          try {
-            // Browser environment
-            if (typeof localStorage !== 'undefined') {
-              return localStorage.getItem(key);
-            }
-            // Node.js environment or SSR
-            return null;
-          } catch (error) {
-            console.error('Error getting auth storage:', error);
-            return null;
-          }
-        },
-        setItem: (key, value) => {
-          try {
-            // Browser environment
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(key, value);
-            }
-            // In Node.js we just log but don't throw
-          } catch (error) {
-            console.error('Error setting auth storage:', error);
-          }
-        },
-        removeItem: (key) => {
-          try {
-            // Browser environment
-            if (typeof localStorage !== 'undefined') {
-              localStorage.removeItem(key);
-            }
-            // In Node.js we just log but don't throw
-          } catch (error) {
-            console.error('Error removing auth storage:', error);
-          }
-        }
+let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
+
+export const getSupabaseClient = () => {
+  if (!supabaseInstance) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Missing Supabase credentials');
+    }
+    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        storageKey: 'nuke.auth.token',
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        detectSessionInUrl: true,
+        flowType: 'pkce'
       }
-    },
-    global: {
-      headers: {
-        'x-application-name': 'nuke',
-      },
-    },
+    });
   }
-);
+  return supabaseInstance;
+};
+
+// Export a default client for backward compatibility
+export const supabase = getSupabaseClient();
 
 // Add error event listener for auth state changes
 supabase.auth.onAuthStateChange((event, session) => {
