@@ -1,10 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Vehicle } from './types';
+import type { VehicleWithId } from './types';
 
 /**
  * Creates a new vehicle record in the database
  */
-export const createVehicle = async (vehicleData: Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>) => {
+export const createVehicle = async (vehicleData: Omit<VehicleWithId, 'id' | 'created_at' | 'updated_at'>) => {
   const { data, error } = await supabase
     .from('vehicles')
     .insert([vehicleData])
@@ -18,7 +18,7 @@ export const createVehicle = async (vehicleData: Omit<Vehicle, 'id' | 'created_a
 /**
  * Updates an existing vehicle record
  */
-export const updateVehicle = async (id: string, vehicleData: Partial<Vehicle>) => {
+export const updateVehicle = async (id: string, vehicleData: Partial<VehicleWithId>) => {
   const { data, error } = await supabase
     .from('vehicles')
     .update({
