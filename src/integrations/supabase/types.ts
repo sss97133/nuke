@@ -3329,8 +3329,11 @@ export type Database = {
       }
       vehicles: {
         Row: {
+          added: string | null
           body_type: string | null
           bulk_upload_batch_id: string | null
+          color: string | null
+          condition: string | null
           condition_description: string | null
           condition_rating: number | null
           created_at: string
@@ -3341,12 +3344,19 @@ export type Database = {
           icloud_album_link: string | null
           icloud_folder_id: string | null
           id: string
+          license_plate: string | null
           location: Json | null
           make: string
           market_value: number | null
+          mileage: number | null
           model: string
           notes: string | null
+          ownership_status: string | null
           price_trend: string | null
+          public_vehicle: boolean | null
+          purchase_date: string | null
+          purchase_location: string | null
+          purchase_price: number | null
           rarity_score: number | null
           relevance_score: number | null
           restoration_status: string | null
@@ -3366,8 +3376,11 @@ export type Database = {
           year: number
         }
         Insert: {
+          added?: string | null
           body_type?: string | null
           bulk_upload_batch_id?: string | null
+          color?: string | null
+          condition?: string | null
           condition_description?: string | null
           condition_rating?: number | null
           created_at?: string
@@ -3378,12 +3391,19 @@ export type Database = {
           icloud_album_link?: string | null
           icloud_folder_id?: string | null
           id?: string
+          license_plate?: string | null
           location?: Json | null
           make: string
           market_value?: number | null
+          mileage?: number | null
           model: string
           notes?: string | null
+          ownership_status?: string | null
           price_trend?: string | null
+          public_vehicle?: boolean | null
+          purchase_date?: string | null
+          purchase_location?: string | null
+          purchase_price?: number | null
           rarity_score?: number | null
           relevance_score?: number | null
           restoration_status?: string | null
@@ -3403,8 +3423,11 @@ export type Database = {
           year: number
         }
         Update: {
+          added?: string | null
           body_type?: string | null
           bulk_upload_batch_id?: string | null
+          color?: string | null
+          condition?: string | null
           condition_description?: string | null
           condition_rating?: number | null
           created_at?: string
@@ -3415,12 +3438,19 @@ export type Database = {
           icloud_album_link?: string | null
           icloud_folder_id?: string | null
           id?: string
+          license_plate?: string | null
           location?: Json | null
           make?: string
           market_value?: number | null
+          mileage?: number | null
           model?: string
           notes?: string | null
+          ownership_status?: string | null
           price_trend?: string | null
+          public_vehicle?: boolean | null
+          purchase_date?: string | null
+          purchase_location?: string | null
+          purchase_price?: number | null
           rarity_score?: number | null
           relevance_score?: number | null
           restoration_status?: string | null
@@ -3678,9 +3708,9 @@ export type Database = {
       }
       column_exists: {
         Args: {
-          schema_name: string
-          table_name: string
-          column_name: string
+          p_schema_name: string
+          p_table_name: string
+          p_column_name: string
         }
         Returns: boolean
       }

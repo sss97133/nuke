@@ -1,5 +1,4 @@
 
-import type { Database } from '../types';
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,8 +7,12 @@ export const useUserLocation = () => {
 
   useEffect(() => {
     const fetchUserLocation = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error("Auth error:", authError);
+        return;
+      }
       
       if (!user) {
         console.log('No authenticated user found');

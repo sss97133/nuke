@@ -1,3 +1,4 @@
+
 /// <reference types="chrome" />
 
 import { supabase } from '@/integrations/supabase/client';
@@ -28,8 +29,8 @@ chrome.runtime.onMessage.addListener((message: AuthMessage, sender, sendResponse
 const handleAuthStateChange = async (session: any) => {
   if (session) {
     // User is signed in
-    const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) console.error("Database query error:", error);
     if (user) {
       // Update extension state
       chrome.storage.local.set({ 
