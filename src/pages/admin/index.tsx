@@ -1,6 +1,7 @@
 import React from 'react';
 import { DataCheck } from '../../components/admin/DataCheck';
 import { UploadTest } from '../../components/admin/UploadTest';
+import { AdminCheck } from '../../components/admin/AdminCheck';
 
 export const AdminPage: React.FC = () => {
   return (
@@ -8,6 +9,9 @@ export const AdminPage: React.FC = () => {
       <h1 className="text-2xl font-bold mb-8">Admin Dashboard</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div>
+          <AdminCheck />
+        </div>
         <div>
           <UploadTest />
         </div>
