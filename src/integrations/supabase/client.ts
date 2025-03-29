@@ -118,7 +118,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Ensure we have non-empty strings for Supabase client initialization
-const safeSupabaseUrl = supabaseUrl || 'https://missing-url-error';
+// Remove potential trailing slash from the URL
+const safeSupabaseUrl = (supabaseUrl || 'https://missing-url-error').replace(/\/$/, '');
 const safeSupabaseAnonKey = supabaseAnonKey || 'missing-key-error';
 
 // Create Supabase client with error handling
