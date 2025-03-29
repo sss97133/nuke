@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useWebSocketStatus } from '@/integrations/supabase/WebSocketManager';
 
 export const useAuctionSubscription = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const { status: connectionStatus, reconnect } = useWebSocketStatus();
+  const [subscribed, setSubscribed] = useState(false);
 
   useEffect(() => {
     // Create channel for auction updates
@@ -34,27 +36,22 @@ export const useAuctionSubscription = () => {
       .on('system', (event) => {
         // Handle connection status updates
         if (event === 'connected') {
-          setConnectionStatus('connected');
           console.log('Connected to auction updates channel');
+          setSubscribed(true);
         } else if (event === 'disconnected') {
-          setConnectionStatus('disconnected');
           console.error('Disconnected from auction updates channel');
+          setSubscribed(false);
           
-          // Attempt to reconnect after a delay
-          setTimeout(() => {
-            if (channel.state !== 'joined') {
-              console.log('Attempting to reconnect to auction updates channel');
-              channel.subscribe();
-            }
-          }, 5000);
+          // Don't try to reconnect immediately as the WebSocketManager will handle this
         }
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log('Successfully subscribed to auction updates');
+          setSubscribed(true);
         } else if (status === 'CHANNEL_ERROR') {
           console.error('Failed to subscribe to auction updates');
-          setConnectionStatus('disconnected');
+          setSubscribed(false);
         }
       });
 
@@ -77,14 +74,6 @@ export const useAuctionSubscription = () => {
           console.log('Connected to bid updates channel');
         } else if (event === 'disconnected') {
           console.error('Disconnected from bid updates channel');
-          
-          // Attempt to reconnect after a delay
-          setTimeout(() => {
-            if (bidsChannel.state !== 'joined') {
-              console.log('Attempting to reconnect to bid updates channel');
-              bidsChannel.subscribe();
-            }
-          }, 5000);
         }
       })
       .subscribe();
@@ -96,5 +85,18 @@ export const useAuctionSubscription = () => {
     };
   }, [queryClient, toast]);
 
-  return { connectionStatus };
+  // Re-subscribe if connection is lost and restored
+  useEffect(() => {
+    if (connectionStatus === 'connected' && !subscribed) {
+      // Give a slight delay to ensure WebSocket is stable
+      const timer = setTimeout(() => {
+        console.log('Reconnecting to auction channels after connection restored');
+        reconnect();
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [connectionStatus, subscribed, reconnect]);
+
+  return { connectionStatus, subscribed };
 };

@@ -10,6 +10,8 @@ import { HelmetProvider } from '@/components/providers/HelmetProvider';
 import StyleFix from './fixes/ensure-styles';
 import { SimpleAdaptivePanel } from './components/ui/SimpleAdaptivePanel';
 import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
+import { WebSocketManager } from './integrations/supabase/WebSocketManager';
+import { WebSocketDiagnostics } from './integrations/utils/WebSocketDiagnostics';
 
 // Import enhanced component styles
 import './styles/component-classes.css';
@@ -52,15 +54,21 @@ function App() {
             {/* Initialize global toast functions */}
             <ToastInitializer />
             
-            {/* Ensure styles are loaded properly in production */}
-            <StyleFix />
-            
-            {/* Adaptive UI Panel that learns from user behavior */}
-            <SimpleAdaptivePanel />
-            
-            {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
-            <AppRouter />
-            <Toaster />
+            {/* Add WebSocket Manager for connection management */}
+            <WebSocketManager>
+              {/* Add WebSocket diagnostics for debugging */}
+              <WebSocketDiagnostics />
+              
+              {/* Ensure styles are loaded properly in production */}
+              <StyleFix />
+              
+              {/* Adaptive UI Panel that learns from user behavior */}
+              <SimpleAdaptivePanel />
+              
+              {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
+              <AppRouter />
+              <Toaster />
+            </WebSocketManager>
           </TooltipProvider>
         </QueryClientProvider>
       </HelmetProvider>
