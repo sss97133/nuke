@@ -39,6 +39,7 @@ import VehicleImport from "@/pages/VehicleImport"; // Import the new VehicleImpo
 import AdminPanel from '@/pages/AdminPanel'; // Import the AdminPanel component
 import VehicleTimelinePage from '@/pages/VehicleTimelinePage'; // Import the VehicleTimeline page
 import DesignSystem from '@/components/ui/design-system'; // Import the Design System documentation
+import TestVehicleInput from '@/test-vehicle-input'; // Import the TestVehicleInput component
 
 // Route type definitions
 export enum RouteType {
@@ -107,6 +108,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/explore/manage', element: <ExploreContentManagement />, type: RouteType.PROTECTED },
   { path: '/streaming', element: <Streaming />, type: RouteType.PROTECTED },
   { path: '/streaming/watch/:username', element: <StreamViewer />, type: RouteType.PROTECTED },
+  { path: '/test-vehicle-input', element: <TestVehicleInput />, type: RouteType.PROTECTED },
   { path: '/admin', element: <AdminPanel />, type: RouteType.PROTECTED },
   { path: '/design-system', element: <DesignSystem />, type: RouteType.PROTECTED },
 ];

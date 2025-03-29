@@ -44,7 +44,8 @@ interface AuctionBid {
   };
 }
 
-interface ExternalAuction {
+// Auction interface for external data sources if needed in the future
+interface VehicleDetails {
   make: string;
   model: string;
   year: number;

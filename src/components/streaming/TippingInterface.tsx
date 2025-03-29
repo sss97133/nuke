@@ -1,100 +1,147 @@
-import type { Database } from '../types';
 import React, { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 interface TippingInterfaceProps {
   streamId: string;
   recipientId: string;
+  onTipComplete?: () => void;
 }
 
-export const TippingInterface = ({ streamId, recipientId }: TippingInterfaceProps) => {
-  const [amount, setAmount] = useState('');
-  const [message, setMessage] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+export const TippingInterface: React.FC<TippingInterfaceProps> = ({
+  streamId,
+  recipientId,
+  onTipComplete
+}) => {
+  const [amount, setAmount] = useState<number>(5);
+  const [message, setMessage] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const handleTip = async () => {
-    if (!amount || isNaN(Number(amount))) {
+    if (!amount || amount <= 0) {
       toast({
-        title: 'Invalid Amount',
-        description: 'Please enter a valid amount',
-        variant: 'destructive',
+        title: "Invalid Amount",
+        description: "Please enter a valid tip amount",
+        variant: "destructive"
       });
       return;
     }
 
-    setIsProcessing(true);
+    setIsSubmitting(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
-      if (!user) {
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session.session?.user) {
         toast({
-          title: 'Error',
-          description: 'You must be logged in to send tips',
-          variant: 'destructive',
+          title: "Authentication Required",
+          description: "Please login to send tips",
+          variant: "destructive"
         });
         return;
       }
-
-      const { error } = await supabase.from('stream_tips').insert({
-  if (error) console.error("Database query error:", error);
-        stream_id: streamId,
-        recipient_id: recipientId,
-        sender_id: user.id,
-        amount: Number(amount),
-        message: message.trim(),
-      });
-
-      if (error) throw error;
-
+      
+      const senderId = session.session.user.id;
+      
+      const { error } = await supabase
+        .from('stream_tips')
+        .insert({
+          stream_id: streamId,
+          sender_id: senderId,
+          recipient_id: recipientId,
+          amount: amount,
+          message: message || null
+        });
+      
+      if (error) {
+        console.error("Database query error:", error);
+        throw new Error(error.message);
+      }
+      
       toast({
-        title: 'Tip Sent!',
-        description: `Successfully sent $${amount} tip`,
+        title: "Tip Sent!",
+        description: `You sent a $${amount} tip`
       });
-
-      setAmount('');
+      
+      // Reset form
+      setAmount(5);
       setMessage('');
+      
+      // Notify parent component
+      if (onTipComplete) {
+        onTipComplete();
+      }
+      
     } catch (error) {
       console.error('Error sending tip:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to send tip',
-        variant: 'destructive',
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send tip",
+        variant: "destructive"
       });
     } finally {
-      setIsProcessing(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="p-4 space-y-4 border rounded-lg">
+    <div className="space-y-4 p-4 border rounded-md bg-card">
       <h3 className="text-lg font-semibold">Send a Tip</h3>
-      <div className="space-y-2">
+      
+      <div>
+        <Label htmlFor="amount">Amount ($)</Label>
+        <div className="flex space-x-2 mt-1">
+          {[1, 5, 10, 20].map((value) => (
+            <Button
+              key={value}
+              type="button"
+              variant={amount === value ? "default" : "outline"}
+              onClick={() => setAmount(value)}
+              size="sm"
+              className="flex-1"
+            >
+              ${value}
+            </Button>
+          ))}
+        </div>
+        <div className="mt-2">
+          <Input
+            id="custom-amount"
+            type="number"
+            min="1"
+            step="1"
+            value={amount}
+            onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
+            className="w-full"
+          />
+        </div>
+      </div>
+      
+      <div>
+        <Label htmlFor="message">Message (Optional)</Label>
         <Input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount ($)"
-          min="1"
-          step="1"
-        />
-        <Input
+          id="message"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Add a message (optional)"
+          placeholder="Add a message with your tip"
+          className="w-full mt-1"
+          maxLength={100}
         />
-        <Button
-          onClick={handleTip}
-          disabled={isProcessing || !amount}
-          className="w-full"
-        >
-          {isProcessing ? 'Processing...' : 'Send Tip'}
-        </Button>
       </div>
+      
+      <Button 
+        className="w-full" 
+        onClick={handleTip}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? 'Processing...' : `Tip $${amount}`}
+      </Button>
     </div>
   );
 };
+
+export default TippingInterface;
