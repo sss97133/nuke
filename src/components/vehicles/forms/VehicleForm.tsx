@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -13,17 +12,19 @@ import { OwnershipSection } from './components/OwnershipSection';
 import { DiscoveryDetailsSection } from './components/DiscoveryDetailsSection';
 
 interface VehicleFormProps {
-  onSubmit: (data: VehicleFormValues) => Promise<void>;
-  isSubmitting: boolean;
+  onSubmit?: (data: VehicleFormValues) => Promise<void>;
   initialValues?: Partial<VehicleFormValues>;
 }
 
 const VehicleForm: React.FC<VehicleFormProps> = ({ 
-  onSubmit, 
-  isSubmitting,
+  onSubmit,
   initialValues = {}
 }) => {
-  const { form, handleSubmit } = useVehicleForm(onSubmit);
+  const { form, handleSubmit, isSubmitting, submitError } = useVehicleForm({
+    defaultValues: initialValues,
+    onSubmitSuccess: onSubmit
+  });
+  
   const ownershipStatus = form.watch('ownership_status');
   
   return (
@@ -54,10 +55,21 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
         {/* Notes */}
         <NotesSection form={form} />
         
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Add Vehicle'}
-          </Button>
+        <div className="flex flex-col gap-4">
+          {submitError && (
+            <div className="text-red-500 text-sm">
+              {submitError}
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="min-w-[120px]"
+            >
+              {isSubmitting ? 'Saving...' : 'Add Vehicle'}
+            </Button>
+          </div>
         </div>
       </form>
     </Form>
