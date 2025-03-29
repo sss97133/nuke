@@ -129,7 +129,8 @@ export const getSupabaseClient = () => {
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Missing Supabase credentials');
     }
-    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    // Use safeSupabaseUrl to ensure no trailing slash
+    supabaseInstance = createClient<Database>(safeSupabaseUrl, safeSupabaseAnonKey, {
       auth: {
         persistSession: true,
         storageKey: 'nuke.auth.token',
@@ -467,13 +468,30 @@ export const getPublicUrl = (bucketName: string, filePath: string): string | nul
 };
 
 // Add error handling for database operations
-export const handleDatabaseError = (error: any) => {
+export const handleDatabaseError = (error: unknown): string => {
   console.error('Database operation error:', error);
-  if (error.code === '23505') { // Unique violation
-    return 'This record already exists.';
+  
+  // Check if error is an object with expected properties
+  if (typeof error === 'object' && error !== null) {
+    const code = (error as { code?: string }).code; // Safe access with assertion
+    const message = (error as { message?: string }).message; // Safe access with assertion
+
+    if (code === '23505') { // Unique violation
+      return 'This record already exists.';
+    }
+    if (code === '23503') { // Foreign key violation
+      return 'Related record not found.';
+    }
+    
+    // Use the message if available, otherwise a generic error
+    return message || 'An unexpected database error occurred.';
   }
-  if (error.code === '23503') { // Foreign key violation
-    return 'Related record not found.';
+  
+  // Handle non-object errors (e.g., strings, primitive types)
+  if (error instanceof Error) {
+    return error.message || 'An unexpected error occurred.';
   }
-  return error.message || 'An unexpected error occurred.';
+  
+  // Default fallback for truly unknown error types
+  return 'An unexpected error occurred.';
 };

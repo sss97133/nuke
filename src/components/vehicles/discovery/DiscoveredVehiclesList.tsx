@@ -1,8 +1,9 @@
-import type { Database } from '../types';
-import React, { useState } from "react";
+import type { Database } from '@/types/database';
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { 
   Card, 
   CardContent, 
@@ -45,58 +46,84 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-type DiscoveredVehicle = {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  price?: string;
-  vin?: string;
-  source: string;
-  source_url?: string;
-  notes?: string;
-  location?: string;
-  status: 'verified' | 'unverified';
-  created_at: string;
-  updated_at: string;
-};
+type Vehicle = Database['public']['Tables']['vehicles']['Row'];
+type NewVehicle = Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>;
 
 export const DiscoveredVehiclesList = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newVehicle, setNewVehicle] = useState({
-    make: "",
-    model: "",
-    year: new Date().getFullYear(),
-    price: "",
-    vin: "",
-    source: "",
-    source_url: "",
-    notes: "",
-    location: ""
+  
+  // Initialize vehicle state from URL parameters
+  const [newVehicle, setNewVehicle] = useState<NewVehicle>({
+    make: searchParams.get('make') || "",
+    model: searchParams.get('model') || "",
+    year: parseInt(searchParams.get('year') || String(new Date().getFullYear())),
+    vin: searchParams.get('vin') || "",
+    notes: searchParams.get('notes') || "",
+    current_value: parseInt(searchParams.get('purchase_price') || "0"),
+    status: "discovered",
+    trim: searchParams.get('trim') || undefined,
+    color: searchParams.get('color') || undefined,
+    mileage: parseInt(searchParams.get('mileage') || "0") || undefined,
+    engine_type: searchParams.get('engine_type') || undefined,
+    purchase_date: searchParams.get('purchase_date') || undefined,
+    purchase_location: searchParams.get('purchase_location') || undefined,
+    doors: parseInt(searchParams.get('doors') || "0") || undefined,
+    seats: parseInt(searchParams.get('seats') || "0") || undefined,
+    weight: parseInt(searchParams.get('weight') || "0") || undefined,
+    top_speed: parseInt(searchParams.get('top_speed') || "0") || undefined,
+    tags: searchParams.get('tags')?.split(',').filter(Boolean) || undefined
   });
+
+  // Open dialog if URL parameters are present
+  useEffect(() => {
+    if (searchParams.toString()) {
+      setIsAddDialogOpen(true);
+      // Clear URL parameters after reading them
+      navigate('/discovered-vehicles', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const { data: vehicles, isLoading, error } = useQuery({
     queryKey: ['discovered-vehicles'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('discovered_vehicles')
-        .select('*')
+        .from('vehicles')
+        .select(`
+          id,
+          make,
+          model,
+          year,
+          vin,
+          notes,
+          current_value,
+          status,
+          user_id,
+          created_at,
+          updated_at
+        `)
+        .eq('status', 'discovered')
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error("Error fetching discovered vehicles:", error);
+        console.error("Error fetching vehicles:", error);
         throw error;
       }
       
-      return data as DiscoveredVehicle[];
-    }
+      return data as Vehicle[];
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 30000
   });
 
   const addVehicleMutation = useMutation({
-    mutationFn: async (vehicleData: Omit<DiscoveredVehicle, 'id' | 'created_at' | 'updated_at' | 'status'> & { user_id: string }) => {
+    mutationFn: async (vehicleData: Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>) => {
       const { data, error } = await supabase
+        .from('vehicles')
         .insert([vehicleData])
         .select()
         .single();
@@ -104,24 +131,35 @@ export const DiscoveredVehiclesList = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['discovered-vehicles'] });
       setIsAddDialogOpen(false);
       setNewVehicle({
         make: "",
         model: "",
         year: new Date().getFullYear(),
-        price: "",
         vin: "",
-        source: "",
-        source_url: "",
         notes: "",
-        location: ""
+        current_value: 0,
+        status: "discovered",
+        trim: undefined,
+        color: undefined,
+        mileage: undefined,
+        engine_type: undefined,
+        purchase_date: undefined,
+        purchase_location: undefined,
+        doors: undefined,
+        seats: undefined,
+        weight: undefined,
+        top_speed: undefined,
+        tags: undefined
       });
       toast({
         title: "Vehicle Added",
         description: "The vehicle has been added to your discoveries.",
       });
+      // Navigate to the vehicle profile page
+      navigate(`/vehicles/${data.id}`);
     },
     onError: (error) => {
       console.error("Error adding vehicle:", error);
@@ -136,6 +174,7 @@ export const DiscoveredVehiclesList = () => {
   const deleteVehicleMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
+        .from('vehicles')
         .delete()
         .eq('id', id);
       
@@ -172,8 +211,6 @@ export const DiscoveredVehiclesList = () => {
     
     try {
       const { data: userData } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
-      
       if (!userData?.user) {
         throw new Error("User not authenticated");
       }
@@ -181,7 +218,14 @@ export const DiscoveredVehiclesList = () => {
       const vehicleData = {
         ...newVehicle,
         user_id: userData.user.id,
-        status: 'unverified' as const
+        status: 'discovered' as const,
+        // Add additional fields from URL parameters if needed
+        trim: searchParams.get('trim') || undefined,
+        color: searchParams.get('color') || undefined,
+        mileage: parseInt(searchParams.get('mileage') || "0") || undefined,
+        engine_type: searchParams.get('engine_type') || undefined,
+        purchase_date: searchParams.get('purchase_date') || undefined,
+        purchase_location: searchParams.get('purchase_location') || undefined
       };
       
       addVehicleMutation.mutate(vehicleData);
@@ -200,7 +244,7 @@ export const DiscoveredVehiclesList = () => {
       <Card className="w-full">
         <CardHeader>
           <CardTitle>Discovered Vehicles</CardTitle>
-          <CardDescription>Vehicles you've discovered online or in the real world</CardDescription>
+          <CardDescription>Vehicles you&apos;ve discovered online or in the real world</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center p-6 text-muted-foreground">
@@ -218,21 +262,21 @@ export const DiscoveredVehiclesList = () => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-2xl">Discovered Vehicles</CardTitle>
-              <CardDescription>Vehicles you've discovered online or in the real world</CardDescription>
+              <CardDescription>Vehicles you&apos;ve discovered and added to your collection</CardDescription>
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="flex items-center gap-2">
                   <Plus size={16} />
-                  <span>Add Discovery</span>
+                  <span>Add Vehicle</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <form onSubmit={handleSubmit}>
                   <DialogHeader>
-                    <DialogTitle>Add Discovered Vehicle</DialogTitle>
+                    <DialogTitle>Add New Vehicle</DialogTitle>
                     <DialogDescription>
-                      Enter details about the vehicle you've discovered.
+                      Enter details about the vehicle you want to add.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
@@ -269,84 +313,158 @@ export const DiscoveredVehiclesList = () => {
                         />
                       </div>
                     </div>
-
-                    <div>
-                      <Label htmlFor="price">Price (if listed)</Label>
-                      <Input
-                        id="price"
-                        name="price"
-                        value={newVehicle.price}
-                        onChange={handleInputChange}
-                        placeholder="e.g. $5,000"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-1">
+                        <Label htmlFor="trim">Trim</Label>
+                        <Input
+                          id="trim"
+                          name="trim"
+                          value={newVehicle.trim || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Label htmlFor="color">Color</Label>
+                        <Input
+                          id="color"
+                          name="color"
+                          value={newVehicle.color || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
                     </div>
-
-                    <div>
-                      <Label htmlFor="vin">VIN (if available)</Label>
-                      <Input
-                        id="vin"
-                        name="vin"
-                        value={newVehicle.vin}
-                        onChange={handleInputChange}
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-1">
+                        <Label htmlFor="vin">VIN</Label>
+                        <Input
+                          id="vin"
+                          name="vin"
+                          value={newVehicle.vin}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Label htmlFor="current_value">Value</Label>
+                        <Input
+                          id="current_value"
+                          name="current_value"
+                          type="number"
+                          value={newVehicle.current_value}
+                          onChange={handleInputChange}
+                        />
+                      </div>
                     </div>
-
-                    <div>
-                      <Label htmlFor="source">Source</Label>
-                      <Input
-                        id="source"
-                        name="source"
-                        value={newVehicle.source}
-                        onChange={handleInputChange}
-                        placeholder="e.g. Craigslist, Facebook Marketplace, In-person"
-                        required
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-1">
+                        <Label htmlFor="mileage">Mileage</Label>
+                        <Input
+                          id="mileage"
+                          name="mileage"
+                          type="number"
+                          value={newVehicle.mileage || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Label htmlFor="engine_type">Engine Type</Label>
+                        <Input
+                          id="engine_type"
+                          name="engine_type"
+                          value={newVehicle.engine_type || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
                     </div>
-
-                    <div>
-                      <Label htmlFor="source_url">Source URL</Label>
-                      <Input
-                        id="source_url"
-                        name="source_url"
-                        value={newVehicle.source_url}
-                        onChange={handleInputChange}
-                        placeholder="https://"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-1">
+                        <Label htmlFor="purchase_date">Purchase Date</Label>
+                        <Input
+                          id="purchase_date"
+                          name="purchase_date"
+                          type="date"
+                          value={newVehicle.purchase_date || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Label htmlFor="purchase_location">Purchase Location</Label>
+                        <Input
+                          id="purchase_location"
+                          name="purchase_location"
+                          value={newVehicle.purchase_location || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
                     </div>
-
-                    <div>
-                      <Label htmlFor="location">Location</Label>
-                      <Input
-                        id="location"
-                        name="location"
-                        value={newVehicle.location}
-                        onChange={handleInputChange}
-                        placeholder="e.g. Seattle, WA"
-                      />
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-1">
+                        <Label htmlFor="doors">Doors</Label>
+                        <Input
+                          id="doors"
+                          name="doors"
+                          type="number"
+                          value={newVehicle.doors || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Label htmlFor="seats">Seats</Label>
+                        <Input
+                          id="seats"
+                          name="seats"
+                          type="number"
+                          value={newVehicle.seats || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Label htmlFor="weight">Weight (lbs)</Label>
+                        <Input
+                          id="weight"
+                          name="weight"
+                          type="number"
+                          value={newVehicle.weight || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
                     </div>
-
-                    <div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-1">
+                        <Label htmlFor="top_speed">Top Speed (mph)</Label>
+                        <Input
+                          id="top_speed"
+                          name="top_speed"
+                          type="number"
+                          value={newVehicle.top_speed || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Label htmlFor="tags">Tags</Label>
+                        <Input
+                          id="tags"
+                          name="tags"
+                          value={Array.isArray(newVehicle.tags) ? newVehicle.tags.join(', ') : ''}
+                          onChange={(e) => setNewVehicle(prev => ({
+                            ...prev,
+                            tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
+                          }))}
+                          placeholder="Comma-separated tags"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1">
                       <Label htmlFor="notes">Notes</Label>
                       <Textarea
                         id="notes"
                         name="notes"
                         value={newVehicle.notes}
                         onChange={handleInputChange}
-                        rows={3}
                       />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button 
-                      variant="outline" 
-                      type="button" 
-                      onClick={() => setIsAddDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={addVehicleMutation.isPending}>
-                      {addVehicleMutation.isPending ? "Adding..." : "Add Vehicle"}
-                    </Button>
+                    <Button type="submit">Add Vehicle</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -355,112 +473,62 @@ export const DiscoveredVehiclesList = () => {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+            <div className="flex items-center justify-center p-6">
+              <p>Loading vehicles...</p>
             </div>
-          ) : vehicles && vehicles.length > 0 ? (
+          ) : error ? (
+            <div className="flex items-center justify-center p-6 text-destructive">
+              <p>Error loading vehicles. Please try again later.</p>
+            </div>
+          ) : !vehicles?.length ? (
+            <div className="flex items-center justify-center p-6 text-muted-foreground">
+              <p>No vehicles discovered yet. Add your first vehicle to get started.</p>
+            </div>
+          ) : (
             <Table>
-              <TableCaption>Your discovered vehicles</TableCaption>
               <TableHeader>
                 <TableRow>
                   <TableHead>Vehicle</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead>Year</TableHead>
+                  <TableHead>VIN</TableHead>
+                  <TableHead>Value</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Discovered</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {vehicles.map((vehicle) => (
                   <TableRow key={vehicle.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>{vehicle.year} {vehicle.make} {vehicle.model}</span>
-                        {vehicle.vin && <span className="text-xs text-muted-foreground">VIN: {vehicle.vin}</span>}
-                      </div>
+                    <TableCell>{vehicle.make} {vehicle.model}</TableCell>
+                    <TableCell>{vehicle.year}</TableCell>
+                    <TableCell>{vehicle.vin || 'N/A'}</TableCell>
+                    <TableCell>
+                      {vehicle.current_value 
+                        ? new Intl.NumberFormat('en-US', { 
+                            style: 'currency', 
+                            currency: 'USD' 
+                          }).format(vehicle.current_value)
+                        : 'N/A'
+                      }
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span>{vehicle.source}</span>
-                        {vehicle.source_url && (
-                          <a
-                            href={vehicle.source_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-500 hover:underline flex items-center gap-1"
-                          >
-                            <LinkIcon size={12} />
-                            <span>View listing</span>
-                          </a>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{vehicle.price || "Not listed"}</TableCell>
-                    <TableCell>
-                      {vehicle.location ? (
-                        <div className="flex items-center gap-1">
-                          <MapPin size={14} />
-                          <span>{vehicle.location}</span>
-                        </div>
-                      ) : (
-                        "Unknown"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={vehicle.status === 'verified' ? 'default' : 'secondary'}
-                      >
-                        {vehicle.status === 'verified' ? 'Verified' : 'Unverified'}
+                      <Badge variant={vehicle.status === 'discovered' ? 'secondary' : 'default'}>
+                        {vehicle.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Clock size={14} />
-                        {new Date(vehicle.created_at).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {vehicle.notes && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            title="View notes"
-                          >
-                            <FileText size={16} />
-                          </Button>
-                        )}
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          title="Delete"
-                          onClick={() => {
-                            if (confirm("Are you sure you want to delete this vehicle?")) {
-                              deleteVehicleMutation.mutate(vehicle.id);
-                            }
-                          }}
-                        >
-                          <Trash2 size={16} className="text-destructive" />
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteVehicleMutation.mutate(vehicle.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-12 text-center">
-              <Car size={48} className="text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No discovered vehicles yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Start tracking interesting vehicles you find online or in the wild.
-              </p>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                Add Your First Discovery
-              </Button>
-            </div>
           )}
         </CardContent>
       </Card>

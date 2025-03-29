@@ -97,7 +97,7 @@ function AddVehicle() {
 
           // Update the vehicle_images table
           const { error: imageError } = await supabase
-            .from('car_images')
+            .from('vehicle_images')
             .update({ car_id: vehicle.id })
             .eq('image_url', primaryImageUrl);
 
@@ -189,7 +189,7 @@ function AddVehicle() {
           <CardTitle>Add New Vehicle</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
             Fill out the details below to add a new vehicle to your collection.
-            After adding, you'll be able to view it in your vehicles list or go to the detail page to add more information.
+            After adding, you&apos;ll be able to view it in your vehicles list or go to the detail page to add more information.
           </p>
         </CardHeader>
         <CardContent>
@@ -218,7 +218,7 @@ function AddVehicle() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelNavigation}>Don't Save</AlertDialogCancel>
+            <AlertDialogCancel onClick={cancelNavigation}>Don&apos;t Save</AlertDialogCancel>
             <AlertDialogAction onClick={saveAndNavigate}>Save & Leave</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

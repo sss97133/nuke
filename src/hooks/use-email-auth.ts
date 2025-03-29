@@ -1,5 +1,4 @@
-
-import type { Database } from '../types';
+import type { Database } from '@/types/database'; 
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,6 +56,11 @@ export const useEmailAuth = () => {
           });
         }
       } else {
+        console.log('[useEmailAuth] Supabase client config:', JSON.stringify(supabase.auth)); 
+        console.log('[useEmailAuth] Re-checking env vars:', {
+          url: import.meta.env?.VITE_SUPABASE_URL,
+          key: import.meta.env?.VITE_SUPABASE_ANON_KEY,
+        });
         const { data, error } = await supabase.auth.signInWithPassword({
         email,
           password,

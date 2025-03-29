@@ -227,6 +227,17 @@ export interface Database {
           user_id?: string;
           created_at: string;
           updated_at: string;
+          trim?: string;
+          color?: string;
+          mileage?: number;
+          engine_type?: string;
+          purchase_date?: string;
+          purchase_location?: string;
+          doors?: number;
+          seats?: number;
+          weight?: number;
+          top_speed?: number;
+          tags?: string[];
         };
         Insert: {
           id?: string;
@@ -240,6 +251,17 @@ export interface Database {
           user_id?: string;
           created_at?: string;
           updated_at?: string;
+          trim?: string;
+          color?: string;
+          mileage?: number;
+          engine_type?: string;
+          purchase_date?: string;
+          purchase_location?: string;
+          doors?: number;
+          seats?: number;
+          weight?: number;
+          top_speed?: number;
+          tags?: string[];
         };
         Update: {
           id?: string;
@@ -253,6 +275,17 @@ export interface Database {
           user_id?: string;
           created_at?: string;
           updated_at?: string;
+          trim?: string;
+          color?: string;
+          mileage?: number;
+          engine_type?: string;
+          purchase_date?: string;
+          purchase_location?: string;
+          doors?: number;
+          seats?: number;
+          weight?: number;
+          top_speed?: number;
+          tags?: string[];
         };
       };
       vehicle_collections: {
@@ -324,7 +357,7 @@ export interface Database {
           is_primary: boolean;
           source: 'upload' | 'craigslist' | 'icloud';
           created_at: string;
-          metadata?: Record<string, any>;
+          metadata?: Record<string, unknown>;
         };
         Insert: {
           id?: string;
@@ -333,7 +366,7 @@ export interface Database {
           is_primary?: boolean;
           source: 'upload' | 'craigslist' | 'icloud';
           created_at?: string;
-          metadata?: Record<string, any>;
+          metadata?: Record<string, unknown>;
         };
         Update: {
           id?: string;
@@ -342,7 +375,7 @@ export interface Database {
           is_primary?: boolean;
           source?: 'upload' | 'craigslist' | 'icloud';
           created_at?: string;
-          metadata?: Record<string, any>;
+          metadata?: Record<string, unknown>;
         };
       };
       tokens: {
@@ -351,7 +384,7 @@ export interface Database {
           name: string;
           symbol: string;
           total_supply: number;
-          metadata: Record<string, any>;
+          metadata: Record<string, unknown>;
           contract_address: string;
           created_at: string;
           decimals: number;
@@ -368,7 +401,7 @@ export interface Database {
           name: string;
           symbol: string;
           total_supply: number;
-          metadata: Record<string, any>;
+          metadata: Record<string, unknown>;
           contract_address: string;
           created_at?: string;
           decimals: number;
@@ -385,7 +418,7 @@ export interface Database {
           name?: string;
           symbol?: string;
           total_supply?: number;
-          metadata?: Record<string, any>;
+          metadata?: Record<string, unknown>;
           contract_address?: string;
           created_at?: string;
           decimals?: number;

@@ -9,8 +9,7 @@ import { useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { atom, useAtom } from 'jotai';
-import { createClient } from '@supabase/supabase-js';
-import { SupabaseError } from './supabase-helpers';
+import { supabase } from '@/integrations/supabase/client'; // Import shared client
 
 // Button implementation status tracking
 interface ButtonMetadata {
@@ -26,22 +25,23 @@ interface ButtonMetadata {
 // Global state to track button metadata
 const buttonRegistryAtom = atom<Record<string, ButtonMetadata>>({});
 
-// Environment-aware Supabase client instantiation
-export const getSupabaseClient = () => {
-  // Following the established fallback mechanism pattern
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 
-                     (typeof window !== 'undefined' && window.__env?.VITE_SUPABASE_URL) || 
-                     process.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 
-                         (typeof window !== 'undefined' && window.__env?.VITE_SUPABASE_ANON_KEY) || 
-                         process.env.VITE_SUPABASE_ANON_KEY;
-                         
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new SupabaseError('Missing Supabase credentials');
-  }
-  
-  return createClient(supabaseUrl, supabaseAnonKey);
-};
+// Placeholder type for timeline events - refine if a specific type exists
+interface EventType {
+  event_type: string;
+  timestamp: string | Date; // Allow both string and Date
+  metadata?: Record<string, unknown>; // Use unknown instead of any
+  confidence_score?: number;
+  source_id?: string;
+  // Add other relevant fields if known
+}
+
+// Placeholder type for ownership history event structure
+interface OwnershipHistoryEvent {
+  date: string | Date;
+  owner: string;
+  source?: string;
+  confidence?: number;
+}
 
 // Component domains for standardized button actions
 export type ComponentDomain = 
@@ -61,8 +61,7 @@ export type ComponentDomain =
 export function useButtonActions() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [buttonRegistry, setButtonRegistry] = useAtom(buttonRegistryAtom);
-  const supabase = getSupabaseClient();
+  const [, setButtonRegistry] = useAtom(buttonRegistryAtom);
   
   /**
    * Register a button in the global registry
@@ -280,13 +279,12 @@ export function useVehicleTimelineActions() {
       description: string;
       sourceId: string;
       confidence: number;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>; // Replaced any with unknown
     }
   ) => {
     return executeDbAction(
       'Update Timeline',
       async () => {
-        const supabase = getSupabaseClient();
         return supabase
           .from('vehicle_timeline_events')
           .insert({
@@ -311,8 +309,6 @@ export function useVehicleTimelineActions() {
     return executeDbAction(
       'Aggregate Vehicle Data',
       async () => {
-        const supabase = getSupabaseClient();
-        
         // First, get all timeline events for this vehicle
         const { data: events, error: eventsError } = await supabase
           .from('timeline_events')
@@ -357,38 +353,45 @@ export function useVehicleTimelineActions() {
 }
 
 // Helper functions for data processing
-function calculateLatestValue(events: any[]): number {
+function calculateLatestValue(events: EventType[]): number {
   // Find the most recent valuation event with highest confidence
   const valuationEvents = events
     .filter(e => e.event_type === 'valuation')
     .sort((a, b) => {
-      // Sort by timestamp (most recent first)
-      const timeComparison = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      // Handle potential Date object or string representation
+      const timeA = typeof a.timestamp === 'string' ? new Date(a.timestamp) : a.timestamp;
+      const timeB = typeof b.timestamp === 'string' ? new Date(b.timestamp) : b.timestamp;
+      const timeComparison = timeB.getTime() - timeA.getTime();
       if (timeComparison !== 0) return timeComparison;
       
-      // If same timestamp, use confidence as tiebreaker
-      return b.confidence_score - a.confidence_score;
+      // If same timestamp, use confidence as tiebreaker (default to 0 if undefined)
+      return (b.confidence_score ?? 0) - (a.confidence_score ?? 0);
     });
     
   return valuationEvents.length > 0 
-    ? (valuationEvents[0].metadata?.value || 0) 
+    ? Number(valuationEvents[0].metadata?.value || 0) // Ensure result is a number
     : 0;
 }
 
-function extractOwnershipHistory(events: any[]): any[] {
+function extractOwnershipHistory(events: EventType[]): OwnershipHistoryEvent[] {
   // Extract ownership changes from timeline
   return events
     .filter(e => e.event_type === 'ownership_change')
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    // Handle potential Date object or string representation
+    .sort((a, b) => {
+      const timeA = typeof a.timestamp === 'string' ? new Date(a.timestamp) : a.timestamp;
+      const timeB = typeof b.timestamp === 'string' ? new Date(b.timestamp) : b.timestamp;
+      return timeA.getTime() - timeB.getTime();
+    })
     .map(e => ({
       date: e.timestamp,
-      owner: e.metadata?.owner || 'Unknown',
+      owner: String(e.metadata?.owner || 'Unknown'), // Ensure owner is a string
       source: e.source_id,
       confidence: e.confidence_score
     }));
 }
 
-function computeMaintenanceStatus(events: any[]): {
+function computeMaintenanceStatus(events: EventType[]): {
   status: 'good' | 'due' | 'overdue' | 'unknown';
   lastService?: Date;
   nextRecommended?: Date;

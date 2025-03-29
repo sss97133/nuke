@@ -24,11 +24,14 @@ const RED = '\x1b[31m';
 const CYAN = '\x1b[36m';
 const RESET = '\x1b[0m';
 
-// Hard-coded values for running the script
-// IMPORTANT: These are temporary and will be removed after running the script
-const SUPABASE_URL = 'https://rdzccnycihtyxgcqvcqh.supabase.co';
-// Use anon key for this specific operation since we'll be using RPC functions
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkemNjbnljaWh0eXhnY3F2Y3FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzQ4NzI2MDMsImV4cCI6MTk5MDQ0ODYwM30.CaWg-4k5mhn2qhJG6URdH4LYQJDJtX2l8JLcJpzqMYM';
+// Use environment variables for Supabase configuration
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_KEY) {
+  console.error(`${RED}✗ Missing required environment variable: VITE_SUPABASE_SERVICE_KEY${RESET}`);
+  process.exit(1);
+}
 
 /**
  * Prompt for user input

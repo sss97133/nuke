@@ -5,7 +5,7 @@ import App from './App.tsx'
 import './index.css'
 import './styles/global-css-fixes.css'
 import './styles/component-classes.css'
-import './dev-styles.css' // Development-only styles
+// import './dev-styles.css' // Development-only styles - Merged into index.css
 
 // Import additional styles to ensure proper bundling
 import './fixes/style-importer.js'

@@ -77,6 +77,22 @@
     @apply font-system tracking-tight text-foreground;
   }
 
+  h1 {
+    @apply text-2xl font-bold mb-4;
+  }
+  h2 {
+    @apply text-xl font-bold mb-3;
+  }
+  h3 {
+    @apply text-lg font-bold mb-2;
+  }
+  a {
+    @apply text-blue-500 hover:text-blue-600 underline;
+  }
+  p {
+    @apply mb-4;
+  }
+
   button, input, select, textarea {
     @apply shadow-classic active:shadow-classic-pressed transition-none text-foreground;
   }

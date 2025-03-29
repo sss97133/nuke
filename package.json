@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm install @rollup/rollup-linux-x64-gnu @esbuild/linux-x64 && tsc && vite build",
-    "build:ci": "npm install @rollup/rollup-linux-x64-gnu @esbuild/linux-x64 && vite build --mode production",
+    "build": "tsc && vite build",
+    "build:ci": "vite build --mode production",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -18,7 +18,8 @@
     "start": "node serve.js",
     "deploy:static": "npm run build && vercel ./dist --prod",
     "figma:dev": "node figma-dev-connect.cjs",
-    "figma:export": "node figma/export-to-figma.js"
+    "figma:export": "node figma/export-to-figma.js",
+    "validate:queries": "supabase db lint"
   },
   "dependencies": {
     "@ethersproject/units": "^5.7.0",
@@ -102,8 +103,11 @@
     "terser": "^5.39.0",
     "typescript": "^5.2.2",
     "vite": "^6.2.3",
-    "vitest": "^3.0.9",
-    "@rollup/rollup-linux-x64-gnu": "^4.9.6",
-    "@esbuild/linux-x64": "^0.20.1"
+    "vitest": "^3.0.9"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
   }
 }

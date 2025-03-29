@@ -5,30 +5,11 @@
  * while following the established environment variable patterns for production.
  */
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client'; // Import shared client
 
 // Import the timeline component, actions and styles
 import './VehicleTimeline.css';
 import { useTimelineActions } from './useTimelineActions';
-
-// Environment variable handling per established pattern
-const getEnvVar = (name: string): string | undefined => {
-  return import.meta.env?.[name] || 
-         process.env?.[name] || 
-         window?.__env?.[name];
-};
-
-// Create Supabase client using the fallback mechanism
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') as string;
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') as string;
-const supabaseServiceKey = getEnvVar('VITE_SUPABASE_SERVICE_KEY') as string;
-
-// Initialize Supabase client
-const supabase = createClient(
-  supabaseUrl,
-  // Use service key for admin operations, fallback to anon key
-  supabaseServiceKey || supabaseAnonKey
-);
 
 // Component types
 export interface VehicleTimelineProps {
@@ -240,19 +221,19 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
           // Attempt to get data from database first
           if (vin) {
             query = supabase
-              .from('vehicles')
+              .from('vehicles') // Added .from()
               .select('*')
               .eq('vin', vin)
               .single();
           } else if (vehicleId) {
             query = supabase
-              
+              .from('vehicles') // Added .from()
               .select('*')
               .eq('id', vehicleId)
               .single();
           } else if (make && model) {
             query = supabase
-              
+              .from('vehicles') // Added .from()
               .select('*')
               .eq('make', make)
               .eq('model', model);
@@ -502,7 +483,6 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
                 eventSource: typedCurrentEvent.eventSource || 'user',
                 eventDate: typedCurrentEvent.eventDate || new Date().toISOString(),
                 title: typedCurrentEvent.title || '',
-                description: typedCurrentEvent.description || '',
                 confidenceScore: typedCurrentEvent.confidenceScore || 100,
                 metadata: typedCurrentEvent.metadata || {},
                 sourceUrl: typedCurrentEvent.sourceUrl,
@@ -688,7 +668,7 @@ const VehicleTimeline: React.FC<VehicleTimelineProps> = ({
             <div className="timeline-actions">
               <button 
                 className="timeline-action-button"
-                onClick={() => vehicle && enrichTimelineData(vehicle.vin, vehicle.id)}
+                onClick={() => enrichTimelineData()} // Call without arguments
                 title="Fetch additional data from external sources"
               >
                 Enrich Data
