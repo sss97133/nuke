@@ -1,52 +1,46 @@
 import { supabase } from '../supabase';
+import { UserRole } from '../auth/roles';
 
-export const checkAndUpdateAdminStatus = async () => {
+export const checkAdminStatus = async () => {
   try {
-    // First, sign in with the test user
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: 'skylar@nukemannerheim.com',
-      password: '1bigCowboy'
-    });
-
-    if (authError) {
-      console.error('Authentication failed:', authError);
-      return;
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('No authenticated user found');
+      return { 
+        isAdmin: false, 
+        error: 'Authentication required'
+      };
     }
 
-    console.log('Successfully authenticated as:', authData.user?.email);
-
-    // Check current user metadata
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log('Current user metadata:', user?.user_metadata);
-
-    // Update user metadata to include admin flag
-    const { data: updateData, error: updateError } = await supabase.auth.updateUser({
-      data: { is_admin: true }
-    });
-
-    if (updateError) {
-      console.error('Error updating user metadata:', updateError);
-      return;
-    }
-
-    console.log('Updated user metadata:', updateData.user?.user_metadata);
-
-    // Also update the profile
+    // Check if user is the system owner
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .update({ user_type: 'professional' })
-      .eq('id', user?.id)
-      .select()
+      .select('is_system_owner')
+      .eq('id', user.id)
       .single();
-
+    
     if (profileError) {
-      console.error('Error updating profile:', profileError);
-      return;
+      console.error('Error fetching profile:', profileError.message);
+      return { 
+        isAdmin: false, 
+        error: 'Profile check failed'
+      };
     }
 
-    console.log('Updated profile:', profile);
+    const isSystemOwner = profile?.is_system_owner === true;
+
+    return { 
+      isAdmin: isSystemOwner,
+      error: isSystemOwner ? undefined : 'System owner access required'
+    };
 
   } catch (error) {
-    console.error('Error during admin check/update:', error);
+    console.error('Error checking admin status:', error);
+    return { 
+      isAdmin: false, 
+      error: 'Check failed'
+    };
   }
 }; 

@@ -11,102 +11,39 @@ CREATE EXTENSION IF NOT EXISTS "postgis";  -- For geospatial data (optional)
 -- CORE TABLES
 -- =============================================
 
--- Vehicles table - central hub for all vehicle data
+-- Vehicles table - core vehicle data
 CREATE TABLE IF NOT EXISTS vehicles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  vin TEXT UNIQUE NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id),
   make TEXT NOT NULL,
   model TEXT NOT NULL,
   year INTEGER NOT NULL,
-  trim TEXT,
-  color TEXT,
-  mileage INTEGER,
-  fuel_type TEXT,
-  engine_size TEXT,
-  transmission_type TEXT,
-  drivetrain_type TEXT,
-  body_style TEXT,
+  vin TEXT,
   license_plate TEXT,
-  registration_state TEXT,
-  last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  data_source TEXT,
-  confidence REAL DEFAULT 1.0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  -- Extensible fields stored as JSONB for future expansion
-  additional_details JSONB DEFAULT '{}'::jsonb,
-  
-  -- Full text search vector
-  search_vector tsvector GENERATED ALWAYS AS (
-    setweight(to_tsvector('english', coalesce(make, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(model, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(vin, '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(trim, '')), 'C') ||
-    setweight(to_tsvector('english', coalesce(color, '')), 'D')
-  ) STORED
-);
-
--- Service history records
-CREATE TABLE IF NOT EXISTS service_records (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
-  service_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  color TEXT,
+  trim TEXT,
+  body_style TEXT,
+  transmission TEXT,
+  engine TEXT,
+  fuel_type TEXT,
   mileage INTEGER,
-  service_type TEXT,
-  description TEXT,
-  cost DECIMAL(10, 2),
-  provider TEXT,
-  data_source TEXT,
-  confidence REAL DEFAULT 1.0,
-  additional_details JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Parts used in service
-CREATE TABLE IF NOT EXISTS parts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  service_record_id UUID REFERENCES service_records(id) ON DELETE CASCADE,
-  part_number TEXT,
-  name TEXT NOT NULL,
-  quantity INTEGER NOT NULL DEFAULT 1,
-  unit_cost DECIMAL(10, 2),
-  condition TEXT CHECK (condition IN ('new', 'used', 'refurbished', 'unknown')),
-  additional_details JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Ownership records
-CREATE TABLE IF NOT EXISTS ownership_records (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
-  start_date TIMESTAMP WITH TIME ZONE NOT NULL,
-  end_date TIMESTAMP WITH TIME ZONE,
-  owner_type TEXT CHECK (owner_type IN ('individual', 'business', 'government', 'unknown')),
-  owner_name TEXT,
-  address TEXT,
-  city TEXT,
-  state TEXT,
-  country TEXT,
-  postal_code TEXT,
-  latitude REAL,
-  longitude REAL,
-  data_source TEXT,
-  confidence REAL DEFAULT 1.0,
-  additional_details JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Vehicle sensor data
-CREATE TABLE IF NOT EXISTS vehicle_sensor_data (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
-  timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
-  sensor_type TEXT NOT NULL,
-  value JSONB NOT NULL,
-  unit TEXT,
-  confidence REAL DEFAULT 1.0,
-  additional_details JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  condition TEXT,
+  category TEXT,
+  rarity TEXT,
+  significance TEXT,
+  tags TEXT[],
+  private_notes TEXT,
+  public_notes TEXT,
+  ownership_status TEXT CHECK (ownership_status IN ('owned', 'claimed', 'discovered')),
+  purchase_date DATE,
+  purchase_price DECIMAL(10, 2),
+  purchase_location TEXT,
+  claim_justification TEXT,
+  discovery_date DATE,
+  discovery_location TEXT,
+  discovery_notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Vehicle images
@@ -114,12 +51,7 @@ CREATE TABLE IF NOT EXISTS vehicle_images (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
   url TEXT NOT NULL,
-  timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
-  image_type TEXT CHECK (image_type IN ('exterior', 'interior', 'damage', 'part', 'other')),
-  angle TEXT,
-  confidence REAL DEFAULT 1.0,
-  labels JSONB, -- AI-generated labels
-  additional_details JSONB DEFAULT '{}'::jsonb,
+  is_primary BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -223,14 +155,8 @@ CREATE TABLE IF NOT EXISTS data_collection_permissions (
 -- =============================================
 
 -- Indexes for primary lookup fields
-CREATE INDEX IF NOT EXISTS idx_vehicles_vin ON vehicles(vin);
+CREATE INDEX IF NOT EXISTS idx_vehicles_user_id ON vehicles(user_id);
 CREATE INDEX IF NOT EXISTS idx_vehicles_make_model_year ON vehicles(make, model, year);
-CREATE INDEX IF NOT EXISTS idx_service_records_vehicle_id ON service_records(vehicle_id);
-CREATE INDEX IF NOT EXISTS idx_service_records_date ON service_records(service_date);
-CREATE INDEX IF NOT EXISTS idx_ownership_records_vehicle_id ON ownership_records(vehicle_id);
-CREATE INDEX IF NOT EXISTS idx_ownership_records_dates ON ownership_records(start_date, end_date);
-CREATE INDEX IF NOT EXISTS idx_vehicle_sensor_data_vehicle_id ON vehicle_sensor_data(vehicle_id);
-CREATE INDEX IF NOT EXISTS idx_vehicle_sensor_data_timestamp ON vehicle_sensor_data(timestamp);
 CREATE INDEX IF NOT EXISTS idx_vehicle_images_vehicle_id ON vehicle_images(vehicle_id);
 
 -- Full text search index
@@ -325,10 +251,6 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Enable RLS on all tables
 ALTER TABLE vehicles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE service_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE parts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ownership_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE vehicle_sensor_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vehicle_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;

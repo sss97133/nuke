@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useVehicle } from '@/hooks/useVehicle';
 import { ImageUpload } from '@/components/shared/ImageUpload';
-import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { uploadImage, generateUniqueFilename } from '@/lib/upload/image-upload';
@@ -91,8 +90,13 @@ export const VehicleDetail: React.FC = () => {
             maxFiles={10}
             maxSize={10 * 1024 * 1024} // 10MB
             onUploadComplete={handleImageUpload}
-            onError={(error) => {
-              console.error('Image upload error:', error);
+            onError={(errorMessage: string) => {
+              console.error('Image upload error:', errorMessage);
+              toast({
+                title: 'Upload Error',
+                description: errorMessage || 'Failed to upload image',
+                variant: 'destructive',
+              });
             }}
           />
         </div>

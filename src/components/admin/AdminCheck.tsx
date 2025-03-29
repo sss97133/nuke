@@ -1,54 +1,80 @@
-import React, { useState } from 'react';
-import { checkAndUpdateAdminStatus } from '../../lib/tests/check-admin';
+import React, { useState, useEffect } from 'react';
+import { checkAdminStatus } from '../../lib/tests/check-admin';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, Shield, UserCog } from 'lucide-react';
 
 export const AdminCheck: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
-  const [result, setResult] = useState<string>('');
+  const [adminStatus, setAdminStatus] = useState<{
+    isAdmin: boolean;
+    error?: string;
+    userType?: string;
+  } | null>(null);
 
-  const handleCheck = async () => {
+  useEffect(() => {
+    checkStatus();
+  }, []);
+
+  const checkStatus = async () => {
     setIsRunning(true);
-    setResult('Starting admin check...');
-
     try {
-      // Capture console output
-      const originalConsoleLog = console.log;
-      const originalConsoleError = console.error;
-      let output = '';
-
-      console.log = (...args) => {
-        output += args.join(' ') + '\n';
-        originalConsoleLog.apply(console, args);
-      };
-
-      console.error = (...args) => {
-        output += 'ERROR: ' + args.join(' ') + '\n';
-        originalConsoleError.apply(console, args);
-      };
-
-      await checkAndUpdateAdminStatus();
-      setResult(output);
+      const status = await checkAdminStatus();
+      setAdminStatus(status);
     } catch (error) {
-      setResult(`Check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAdminStatus({ 
+        isAdmin: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
     } finally {
       setIsRunning(false);
     }
   };
 
+  if (isRunning) {
+    return (
+      <div className="p-4">
+        <div className="animate-pulse flex space-x-4">
+          <div className="flex-1 space-y-4 py-1">
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded"></div>
+              <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Admin Status Check</h2>
-      <button
-        onClick={handleCheck}
-        disabled={isRunning}
-        className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
-      >
-        {isRunning ? 'Checking Admin Status...' : 'Check Admin Status'}
-      </button>
-      {result && (
-        <div className="mt-4 p-4 bg-gray-100 rounded">
-          <pre className="whitespace-pre-wrap">{result}</pre>
-        </div>
+      <div className="flex items-center space-x-2 mb-4">
+        <Shield className="h-5 w-5 text-blue-500" />
+        <h2 className="text-xl font-bold">Admin Access Status</h2>
+      </div>
+
+      {adminStatus?.isAdmin ? (
+        <Alert className="bg-green-50 border-green-200">
+          <UserCog className="h-4 w-4 text-green-500" />
+          <AlertTitle>Admin Access Granted</AlertTitle>
+          <AlertDescription>
+            You have administrative privileges. Your user type is: {adminStatus.userType || 'professional'}
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Access Restricted</AlertTitle>
+          <AlertDescription>
+            {adminStatus?.error || 'You do not have administrative privileges.'}
+          </AlertDescription>
+        </Alert>
       )}
+
+      <div className="mt-4 text-sm text-gray-600">
+        <p>This page is protected and requires administrative privileges to access.</p>
+        <p className="mt-2">If you believe you should have access, please contact your system administrator.</p>
+      </div>
     </div>
   );
 }; 

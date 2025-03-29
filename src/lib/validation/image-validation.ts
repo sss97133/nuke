@@ -25,7 +25,7 @@ export const validateImageFile = async (
   if (!options.allowedTypes?.includes(file.type)) {
     return { 
       valid: false, 
-      error: `Invalid file type. Allowed types: ${options.allowedTypes.join(', ')}` 
+      error: `Invalid file type. Allowed types: ${options.allowedTypes?.join(', ')}` 
     };
   }
 
@@ -79,4 +79,25 @@ const getImageDimensions = (file: File): Promise<ImageDimensions> => {
     img.onerror = () => reject(new Error('Failed to load image'));
     img.src = URL.createObjectURL(file);
   });
+};
+
+// Test the upload flow
+const testUpload = async () => {
+  const vehicleData = {
+    make: "Toyota",
+    model: "Camry",
+    year: 2020,
+    vin: "1HGCM82633A123456",
+    user_id: "current-user-id"
+  };
+  
+  const { data, error } = await supabase
+    .from('vehicles')
+    .insert([vehicleData]);
+  
+  if (error) {
+    console.error('Upload failed:', error);
+  } else {
+    console.log('Upload successful:', data);
+  }
 }; 
