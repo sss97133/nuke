@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { formatAuthError } from "@/utils/supabase-helpers";
 
 export const useEmailForm = (
   showForgotPassword: boolean, 
@@ -12,11 +13,13 @@ export const useEmailForm = (
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const { handleEmailLogin, handleForgotPassword } = useAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     
     try {
       console.log(`[useEmailForm] Attempting ${isSignUp ? 'signup' : 'login'} for email:`, email);
@@ -35,23 +38,8 @@ export const useEmailForm = (
     } catch (error: any) {
       console.error("[useEmailForm] Auth error:", error);
       
-      let errorMessage = "An unexpected error occurred. Please try again.";
-      
-      if (error.message && typeof error.message === 'string') {
-        if (error.message.includes("Email not confirmed")) {
-          errorMessage = "Please check your email to confirm your account.";
-        } else if (error.message.includes("Invalid login credentials")) {
-          errorMessage = "Invalid email or password.";
-        } else if (error.message.includes("User already registered")) {
-          errorMessage = "This email is already registered. Please try logging in instead.";
-        } else if (error.message.includes("Password should be")) {
-          errorMessage = error.message; // Use Supabase's password requirement message
-        } else if (error.message.includes("Email not confirmed")) {
-          errorMessage = "Please check your email to confirm your account before logging in.";
-        } else {
-          errorMessage = error.message; // Use the original error message
-        }
-      }
+      const errorMessage = formatAuthError(error);
+      setFormError(errorMessage);
       
       toast({
         variant: "destructive",
@@ -75,6 +63,8 @@ export const useEmailForm = (
     setRememberMe,
     avatarUrl,
     setAvatarUrl,
+    formError,
+    setFormError,
     handleSubmit
   };
 };

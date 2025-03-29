@@ -10,7 +10,8 @@ import { AuthFooter } from "./AuthFooter";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { PasswordResetForm } from "./password-reset/PasswordResetForm";
 import { EmailLoginForm } from "./email-form/EmailLoginForm";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export const AuthForm = () => {
   const { isLoading, handlePhoneLogin, verifyOtp, handleSocialLogin, session } = useAuth();
@@ -26,7 +27,7 @@ export const AuthForm = () => {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Debug logging to verify the component is rendering
-  console.log("Rendering AuthForm component", { session, isLoading });
+  console.log("Rendering AuthForm component", { session, isLoading, authError });
 
   // If the user is already logged in, redirect to dashboard
   useEffect(() => {
@@ -110,9 +111,11 @@ export const AuthForm = () => {
             )}
             
             {authError && (
-              <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-md text-sm">
-                {authError}
-              </div>
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Authentication Error</AlertTitle>
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
             )}
 
             <EmailLoginForm

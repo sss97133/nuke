@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useEmailForm } from "./useEmailForm";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 
 interface EmailLoginFormProps {
   isLoading: boolean;
@@ -33,14 +35,26 @@ export const EmailLoginForm = ({
     setRememberMe,
     avatarUrl,
     setAvatarUrl,
-    handleSubmit
+    handleSubmit,
+    formError
   } = useEmailForm(showForgotPassword, isSignUp, onError);
 
   // Debug logging
-  console.log("Rendering EmailLoginForm, showForgotPassword:", showForgotPassword, "isSignUp:", isSignUp);
+  console.log("Rendering EmailLoginForm", { 
+    showForgotPassword, 
+    isSignUp, 
+    hasError: !!formError 
+  });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {formError && (
+        <Alert variant="destructive" className="py-2">
+          <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
+          <AlertDescription>{formError}</AlertDescription>
+        </Alert>
+      )}
+      
       <div className="space-y-2">
         <Input
           id="email"
@@ -53,6 +67,7 @@ export const EmailLoginForm = ({
           disabled={isLoading}
         />
       </div>
+      
       {!showForgotPassword && (
         <div className="space-y-2">
           <Input
@@ -67,6 +82,7 @@ export const EmailLoginForm = ({
           />
         </div>
       )}
+      
       {isSignUp && (
         <div className="space-y-2">
           <Input
@@ -80,6 +96,7 @@ export const EmailLoginForm = ({
           />
         </div>
       )}
+      
       {!showForgotPassword && (
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -93,6 +110,7 @@ export const EmailLoginForm = ({
           </div>
         </div>
       )}
+      
       <Button 
         type="submit" 
         className="classic-button w-full font-system bg-secondary hover:bg-accent hover:text-accent-foreground" 

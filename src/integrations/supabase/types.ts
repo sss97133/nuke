@@ -785,27 +785,33 @@ export type Database = {
       }
       engagement_metrics: {
         Row: {
+          content_id: string
+          content_type: string | null
           created_at: string | null
-          feed_item_id: string
           id: string
+          interaction_time: string | null
           interaction_type: string
           interaction_weight: number | null
           user_id: string
           view_duration_seconds: number | null
         }
         Insert: {
+          content_id: string
+          content_type?: string | null
           created_at?: string | null
-          feed_item_id: string
           id?: string
+          interaction_time?: string | null
           interaction_type: string
           interaction_weight?: number | null
           user_id: string
           view_duration_seconds?: number | null
         }
         Update: {
+          content_id?: string
+          content_type?: string | null
           created_at?: string | null
-          feed_item_id?: string
           id?: string
+          interaction_time?: string | null
           interaction_type?: string
           interaction_weight?: number | null
           user_id?: string
@@ -814,7 +820,7 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "engagement_metrics_feed_item_id_fkey"
-            columns: ["feed_item_id"]
+            columns: ["content_id"]
             isOneToOne: false
             referencedRelation: "feed_items"
             referencedColumns: ["id"]
@@ -1408,6 +1414,7 @@ export type Database = {
       profiles: {
         Row: {
           active_garage_id: string | null
+          ai_analysis: Json | null
           avatar_url: string | null
           bio: string | null
           created_at: string
@@ -1430,6 +1437,7 @@ export type Database = {
         }
         Insert: {
           active_garage_id?: string | null
+          ai_analysis?: Json | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -1452,6 +1460,7 @@ export type Database = {
         }
         Update: {
           active_garage_id?: string | null
+          ai_analysis?: Json | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -2590,22 +2599,34 @@ export type Database = {
         Row: {
           achievement_data: Json | null
           achievement_type: string
+          category: string | null
+          created_at: string | null
           earned_at: string
           id: string
+          skills: string[] | null
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
           achievement_data?: Json | null
           achievement_type: string
+          category?: string | null
+          created_at?: string | null
           earned_at?: string
           id?: string
+          skills?: string[] | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           achievement_data?: Json | null
           achievement_type?: string
+          category?: string | null
+          created_at?: string | null
           earned_at?: string
           id?: string
+          skills?: string[] | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -3655,6 +3676,14 @@ export type Database = {
         }
         Returns: number
       }
+      column_exists: {
+        Args: {
+          schema_name: string
+          table_name: string
+          column_name: string
+        }
+        Returns: boolean
+      }
       cube:
         | {
             Args: {
@@ -3759,6 +3788,34 @@ export type Database = {
           "": unknown
         }
         Returns: number
+      }
+      safely_add_column: {
+        Args: {
+          schema_name: string
+          table_name: string
+          column_name: string
+          column_type: string
+          default_value?: string
+          nullable?: boolean
+        }
+        Returns: undefined
+      }
+      safely_create_enum_type: {
+        Args: {
+          type_name: string
+          enum_values: string[]
+        }
+        Returns: undefined
+      }
+      safely_update_column_values: {
+        Args: {
+          schema_name: string
+          table_name: string
+          column_name: string
+          new_value: string
+          condition?: string
+        }
+        Returns: undefined
       }
       sec_to_gc: {
         Args: {
