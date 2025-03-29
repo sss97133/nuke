@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "build:ci": "vite build --mode production",
+    "build": "npm install @rollup/rollup-linux-x64-gnu && tsc && vite build",
+    "build:ci": "npm install @rollup/rollup-linux-x64-gnu && vite build --mode production",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -102,6 +102,7 @@
     "terser": "^5.39.0",
     "typescript": "^5.2.2",
     "vite": "^6.2.3",
-    "vitest": "^3.0.9"
+    "vitest": "^3.0.9",
+    "@rollup/rollup-linux-x64-gnu": "^4.9.6"
   }
 }
