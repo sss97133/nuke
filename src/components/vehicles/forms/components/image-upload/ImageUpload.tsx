@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { UseFormReturn } from 'react-hook-form';
@@ -45,8 +44,8 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   return (
     <FormField
       control={form.control}
-      name={name as any}
-      render={({ field }) => (
+      name={name}
+      render={() => (
         <FormItem>
           <FormLabel>{label}</FormLabel>
           <FormControl>
@@ -61,7 +60,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
               {/* Upload Controls */}
               <DropZone onDrop={processFiles} isUploading={isUploading}>
                 <FileInput 
-                  name={name as string}
+                  name={name}
                   multiple={multiple} 
                   isUploading={isUploading} 
                   onFileChange={handleFileChange} 

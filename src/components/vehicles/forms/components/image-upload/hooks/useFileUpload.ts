@@ -13,6 +13,8 @@ interface UseFileUploadProps {
   maxFiles?: number;
 }
 
+type FormValue = string | string[];
+
 export const useFileUpload = ({
   form,
   name,
@@ -62,7 +64,7 @@ export const useFileUpload = ({
     
     try {
       // Create preview URLs for the files
-      const newPreviews = createPreviews(files, multiple);
+      createPreviews(files, multiple);
       
       // Convert files to data URLs for form values
       const promises = Array.from(files).map(file => 
@@ -77,19 +79,19 @@ export const useFileUpload = ({
       Promise.all(promises)
         .then(dataUrls => {
           // Update form value based on whether multiple is allowed
-          const currentValues = form.getValues(name as any);
+          const currentValues = form.getValues(name) as FormValue;
           
           if (multiple) {
             // If form value is already an array, append to it
             if (Array.isArray(currentValues)) {
-              form.setValue(name as any, [...currentValues, ...dataUrls]);
+              form.setValue(name, [...currentValues, ...dataUrls]);
             } else {
               // Otherwise, create a new array
-              form.setValue(name as any, dataUrls);
+              form.setValue(name, dataUrls);
             }
           } else {
             // For single file uploads, just set the first data URL
-            form.setValue(name as any, dataUrls[0]);
+            form.setValue(name, dataUrls[0]);
           }
           
           toast({
@@ -125,21 +127,21 @@ export const useFileUpload = ({
     removePreview(index);
     
     // Also update the form value
-    const currentValues = form.getValues(name as any);
+    const currentValues = form.getValues(name) as FormValue;
     if (Array.isArray(currentValues)) {
       const newValues = [...currentValues];
       newValues.splice(index, 1);
-      form.setValue(name as any, newValues);
+      form.setValue(name, newValues);
     } else if (index === 0) {
       // If it's the only image (index 0) and not an array
-      form.setValue(name as any, '');
+      form.setValue(name, '');
     }
   };
   
   // Clear all images
   const clearAllImages = () => {
     clearPreviews();
-    form.setValue(name as any, multiple ? [] : '');
+    form.setValue(name, multiple ? [] : '');
   };
   
   return {
