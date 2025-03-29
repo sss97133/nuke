@@ -1,37 +1,46 @@
-import type { Database } from '../types';
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { AuctionComments } from "./AuctionComments";
-import { BidHistory } from "./BidHistory";
-import { useState, useEffect } from "react";
-import { AuctionCard } from "./AuctionCard";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Filter, Globe } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Loader2, Clock, CreditCard, RefreshCw } from 'lucide-react';
+import { formatDistanceToNow, isPast } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+
+interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+}
 
 interface Auction {
   id: string;
   vehicle_id: string;
+  seller_id: string;
   starting_price: number;
-  current_price: number;
-  reserve_price: number | null;
+  reserve_price?: number;
+  current_price?: number;
+  start_time: string;
   end_time: string;
   status: string;
-  vehicle: {
-    make: string;
-    model: string;
-    year: number;
-  };
-  _count: {
+  vehicle?: Vehicle;
+  _count?: {
     auction_bids: number;
     auction_comments: number;
+  };
+}
+
+interface AuctionBid {
+  id: string;
+  auction_id: string;
+  bidder_id: string;
+  amount: number;
+  created_at: string;
+  bidder?: {
+    username?: string;
+    avatar_url?: string;
   };
 }
 
@@ -46,301 +55,444 @@ interface ExternalAuction {
   imageUrl?: string;
 }
 
-export const AuctionList = () => {
-  const { toast } = useToast();
+export const AuctionList: React.FC = () => {
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedAuction, setSelectedAuction] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<string>("ending-soon");
-  const queryClient = useQueryClient();
-
-  const { data: auctions, isLoading, error } = useQuery({
-    queryKey: ['auctions', sortBy],
-    queryFn: async () => {
-      console.log('🔍 Fetching auctions with sort:', sortBy);
+  const [bidAmount, setBidAmount] = useState<number>(0);
+  const [bidLoading, setBidLoading] = useState(false);
+  const [bids, setBids] = useState<{[key: string]: AuctionBid[]}>({});
+  const [sortBy, setSortBy] = useState<string>("ending-soon"); 
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    fetchAuctions();
+    
+    // Set up real-time subscription for auctions
+    const subscription = supabase
+      .channel('auctions-channel')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'auctions' 
+      }, (payload) => {
+        console.log('Auction changed:', payload);
+        fetchAuctions();
+      })
+      .subscribe();
+    
+    // Set up real-time subscription for bids
+    const bidsSubscription = supabase
+      .channel('bids-channel')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'auction_bids' 
+      }, (payload) => {
+        console.log('Bid placed:', payload);
+        fetchAuctions();
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(subscription);
+      supabase.removeChannel(bidsSubscription);
+    };
+  }, []);
+  
+  // Set default bid amount when selecting an auction
+  useEffect(() => {
+    if (!selectedAuction) return;
+    
+    const auction = auctions.find(a => a.id === selectedAuction);
+    if (auction) {
+      const minimumBid = auction.current_price 
+        ? auction.current_price + 100 
+        : auction.starting_price;
+      setBidAmount(minimumBid);
+    }
+  }, [selectedAuction, auctions]);
+  
+  const fetchAuctions = async () => {
+    try {
+      setLoading(true);
+      
       let query = supabase
         .from('auctions')
         .select(`
           *,
-          vehicles (
-            id,
-            make,
-            model,
-            year
+          vehicle:vehicle_id (
+            id, make, model, year
           ),
-          auction_bids(count),
-          auction_comments(count)
-        `)
-        .eq('status', 'active')
-        .gt('end_time', new Date().toISOString());
-
-      switch (sortBy) {
-        case "ending-soon":
-          query = query.order('end_time', { ascending: true });
-          break;
-        case "newest":
-          query = query.order('created_at', { ascending: false });
-          break;
-        case "most-bids":
-          query = query.order('current_price', { ascending: false });
-          break;
-      }
-
-      const { data: response, error: queryError } = await query;
-
-      if (queryError) {
-        console.error('❌ Error fetching auctions:', queryError);
-        throw queryError;
-      }
-
-      console.log('✅ Received auctions data:', response);
-      
-      const formattedData = response?.map((auction: any) => ({
-        ...auction,
-        vehicle: auction.vehicles,
-        _count: {
-          auction_bids: auction.auction_bids?.[0]?.count ?? 0,
-          auction_comments: auction.auction_comments?.[0]?.count ?? 0
-        }
-      })) || [];
-
-      console.log('🔄 Formatted auction data:', formattedData);
-      return formattedData;
-    }
-  });
-
-  useEffect(() => {
-    console.log('🔌 Setting up real-time subscriptions...');
-    
-    const auctionChannel = supabase
-      .channel('auction_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'auctions'
-        },
-        (payload) => {
-          console.log('📢 Received auction update:', payload);
-          queryClient.invalidateQueries({ queryKey: ['auctions'] });
-          
-          if (payload.eventType === 'UPDATE') {
-            toast({
-              title: "Auction Updated",
-              description: "New bid or update received",
-              variant: "default",
-            });
+          _count {
+            auction_bids,
+            auction_comments
           }
-        }
-      )
-      .subscribe();
-
-    const bidChannel = supabase
-      .channel('bid_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'auction_bids'
-        },
-        (payload) => {
-          console.log('💰 Received new bid:', payload);
-          queryClient.invalidateQueries({ queryKey: ['auctions'] });
-          toast({
-            title: "New Bid",
-            description: "A new bid has been placed",
-            variant: "default",
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log('🔌 Cleaning up subscriptions...');
-      supabase.removeChannel(auctionChannel);
-      supabase.removeChannel(bidChannel);
-    };
-  }, [queryClient, toast]);
-
-  const { data: externalAuctions, isLoading: isLoadingExternal } = useQuery({
-    queryKey: ['external-auctions'],
-    queryFn: async () => {
-      console.log('🔍 Fetching external auctions...');
-      const { data, error } = await supabase.functions.invoke('fetch-market-auctions');
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
-  if (error) console.error("Database query error:", error);
+        `);
+      
+      // Apply sort
+      if (sortBy === "ending-soon") {
+        query = query.order('end_time', { ascending: true });
+      } else if (sortBy === "newest") {
+        query = query.order('created_at', { ascending: false });
+      } else if (sortBy === "highest-bid") {
+        query = query.order('current_price', { ascending: false, nullsFirst: false });
+      }
+      
+      const { data, error } = await query;
       
       if (error) {
-        console.error('❌ Error fetching external auctions:', error);
-        throw error;
+        console.error("Database query error:", error);
+        setError(error.message);
+        return;
       }
-
-      console.log('✅ Received external auctions:', data);
-      return data.data as ExternalAuction[];
-    },
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-  });
-
-  const handleBidSubmit = async (auctionId: string, amount: number) => {
-    console.log('💸 Submitting bid:', { auctionId, amount });
-    const { error } = await supabase
-        if (error) console.error("Database query error:", error);
-  .insert([{
-        auction_id: auctionId,
-        amount: amount,
-        bidder_id: (await supabase.auth.getUser()).data.user?.id
-      }]);
-
-    if (error) {
-      console.error('❌ Error placing bid:', error);
+      
+      setAuctions(data || []);
+      
+      // Fetch bids for each auction
+      const auctionIds = (data || []).map(a => a.id);
+      await fetchBidsForAuctions(auctionIds);
+      
+    } catch (err) {
+      console.error('Error fetching auctions:', err);
+      setError('Failed to load auctions');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const fetchBidsForAuctions = async (auctionIds: string[]) => {
+    if (auctionIds.length === 0) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('auction_bids')
+        .select(`
+          *,
+          bidder:bidder_id (
+            username, avatar_url
+          )
+        `)
+        .in('auction_id', auctionIds)
+        .order('amount', { ascending: false });
+      
+      if (error) {
+        console.error("Database query error:", error);
+        return;
+      }
+      
+      // Group bids by auction_id
+      const groupedBids = (data || []).reduce((acc: Record<string, AuctionBid[]>, bid) => {
+        if (!acc[bid.auction_id]) {
+          acc[bid.auction_id] = [];
+        }
+        acc[bid.auction_id].push(bid);
+        return acc;
+      }, {});
+      
+      setBids(groupedBids);
+      
+    } catch (err) {
+      console.error('Error fetching bids:', err);
+    }
+  };
+  
+  const placeBid = async (auctionId: string) => {
+    if (!bidAmount) {
       toast({
-        title: "Error placing bid",
-        description: error.message,
+        title: "Invalid Bid",
+        description: "Please enter a valid bid amount",
         variant: "destructive"
       });
       return;
     }
-
-    console.log('✅ Bid placed successfully');
-    toast({
-      title: "Bid placed successfully",
-      description: `Your bid of $${amount.toLocaleString()} has been placed.`
-    });
+    
+    const auction = auctions.find(a => a.id === auctionId);
+    if (!auction) return;
+    
+    const minBid = auction.current_price 
+      ? auction.current_price + 100 
+      : auction.starting_price;
+    
+    if (bidAmount < minBid) {
+      toast({
+        title: "Bid Too Low",
+        description: `Minimum bid is $${minBid}`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (isPast(new Date(auction.end_time))) {
+      toast({
+        title: "Auction Ended",
+        description: "This auction has already ended",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setBidLoading(true);
+      
+      // Get current user
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (!userData.user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please login to place a bid",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Insert bid
+      const { error: bidError } = await supabase
+        .from('auction_bids')
+        .insert({
+          auction_id: auctionId,
+          bidder_id: userData.user.id,
+          amount: bidAmount
+        });
+      
+      if (bidError) {
+        console.error("Database query error:", bidError);
+        toast({
+          title: "Error",
+          description: bidError.message,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Update auction's current price
+      const { error: updateError } = await supabase
+        .from('auctions')
+        .update({ current_price: bidAmount })
+        .eq('id', auctionId);
+      
+      if (updateError) {
+        console.error("Database update error:", updateError);
+      }
+      
+      toast({
+        title: "Bid Placed",
+        description: `Your bid of $${bidAmount} has been placed!`
+      });
+      
+      // Refresh auctions to get updated data
+      fetchAuctions();
+      setSelectedAuction(null);
+      
+    } catch (err) {
+      console.error('Error placing bid:', err);
+      toast({
+        title: "Error",
+        description: "Failed to place bid",
+        variant: "destructive"
+      });
+    } finally {
+      setBidLoading(false);
+    }
+  };
+  
+  const isAuctionEnded = (endTime: string) => {
+    return isPast(new Date(endTime));
+  };
+  
+  const formatTimeRemaining = (endTime: string) => {
+    if (isAuctionEnded(endTime)) {
+      return 'Ended';
+    }
+    return formatDistanceToNow(new Date(endTime), { addSuffix: true });
   };
 
-  const handleToggleDetails = (auctionId: string) => {
-    console.log('🔄 Toggling details for auction:', auctionId);
-    setSelectedAuction(selectedAuction === auctionId ? null : auctionId);
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <div className="animate-pulse text-gray-400">Loading auctions...</div>
+      <div className="flex justify-center items-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (error) {
-    console.error('❌ Error in auction list:', error);
     return (
-      <div className="flex items-center justify-center min-h-[200px] text-red-500">
-        Error loading auctions. Please try again.
-      </div>
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="pt-6">
+          <div className="text-center text-red-500">
+            <h3 className="text-lg font-medium">Failed to load auctions</h3>
+            <p className="text-sm mt-2">{error}</p>
+            <Button 
+              variant="outline" 
+              onClick={fetchAuctions} 
+              className="mt-4"
+            >
+              Retry
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (auctions.length === 0) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-muted-foreground">
+            <h3 className="text-lg font-medium">No Active Auctions</h3>
+            <p className="text-sm mt-2">Check back later for new auctions</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Live Auctions</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Vehicle Auctions</h2>
         <div className="flex items-center gap-4">
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Sort by..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ending-soon">Ending Soon</SelectItem>
-              <SelectItem value="newest">Newest Listings</SelectItem>
-              <SelectItem value="most-bids">Most Bids</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex border rounded-md overflow-hidden">
+            <Button 
+              variant={sortBy === "ending-soon" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSortBy("ending-soon")}
+              className="rounded-none border-0"
+            >
+              Ending Soon
+            </Button>
+            <Button 
+              variant={sortBy === "highest-bid" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSortBy("highest-bid")}
+              className="rounded-none border-0 border-l"
+            >
+              Highest Bid
+            </Button>
+            <Button 
+              variant={sortBy === "newest" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSortBy("newest")}
+              className="rounded-none border-0 border-l"
+            >
+              Newest
+            </Button>
+          </div>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={fetchAuctions}
+            title="Refresh auctions"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
       </div>
-
-      <Tabs defaultValue="local" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="local">Local Auctions</TabsTrigger>
-          <TabsTrigger value="external">
-            <Globe className="w-4 h-4 mr-2" />
-            External Auctions
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="local">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {auctions?.map((auction) => (
-              <div key={auction.id} className="space-y-6">
-                <AuctionCard
-                  auction={auction}
-                  onBidSubmit={handleBidSubmit}
-                  onToggleDetails={handleToggleDetails}
-                  selectedAuction={selectedAuction}
-                />
-                
-                {selectedAuction === auction.id && (
-                  <div className="space-y-6 animate-fade-in">
-                    <div className="grid gap-6">
-                      <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C]">
-                        <BidHistory auctionId={auction.id} />
-                      </div>
-                      <div className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C]">
-                        <AuctionComments auctionId={auction.id} />
-                      </div>
-                    </div>
-                  </div>
+      
+      {auctions.map((auction) => (
+        <Card key={auction.id} className="overflow-hidden">
+          <CardHeader className="bg-muted pb-2">
+            <div className="flex justify-between items-start">
+              <CardTitle>
+                {auction.vehicle?.year} {auction.vehicle?.make} {auction.vehicle?.model}
+              </CardTitle>
+              <Badge 
+                variant={isAuctionEnded(auction.end_time) ? "secondary" : "default"}
+                className="uppercase text-xs"
+              >
+                {isAuctionEnded(auction.end_time) ? 'Ended' : 'Active'}
+              </Badge>
+            </div>
+            <div className="flex items-center text-sm text-muted-foreground mt-1">
+              <Clock className="h-4 w-4 mr-1" />
+              {formatTimeRemaining(auction.end_time)}
+            </div>
+          </CardHeader>
+          
+          <CardContent className="pt-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Current Bid</p>
+                <p className="text-2xl font-bold">
+                  ${auction.current_price || auction.starting_price}
+                </p>
+                {auction._count && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {auction._count.auction_bids} bid{auction._count.auction_bids !== 1 ? 's' : ''}
+                  </p>
                 )}
               </div>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="external">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {isLoadingExternal ? (
-              <div className="col-span-full text-center text-muted-foreground">
-                Loading external auctions...
-              </div>
-            ) : externalAuctions && externalAuctions.length > 0 ? (
-              externalAuctions.map((auction, index) => (
-                <div key={`${auction.source}-${index}`} className="bg-[#2A2F3C] rounded-lg border border-[#3A3F4C] overflow-hidden">
-                  {auction.imageUrl && (
-                    <div className="aspect-video relative">
-                      <img 
-                        src={auction.imageUrl} 
-                        alt={`${auction.year} ${auction.make} ${auction.model}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+              
+              {!isAuctionEnded(auction.end_time) && (
+                <Button
+                  onClick={() => setSelectedAuction(
+                    selectedAuction === auction.id ? null : auction.id
                   )}
-                  <div className="p-4">
-                    <h3 className="text-xl font-semibold">
-                      {auction.year} {auction.make} {auction.model}
-                    </h3>
-                    <div className="mt-2 text-sm text-muted-foreground">
-                      Source: {auction.source}
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-2xl font-bold">
-                        ${auction.price.toLocaleString()}
-                      </span>
-                      {auction.endTime && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          Ends: {new Date(auction.endTime).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
-                    <a
-                      href={auction.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-4 block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-                    >
-                      View Auction
-                    </a>
-                  </div>
+                  variant={selectedAuction === auction.id ? "secondary" : "default"}
+                >
+                  Place Bid
+                </Button>
+              )}
+            </div>
+            
+            {selectedAuction === auction.id && (
+              <div className="bg-muted p-3 rounded-md mt-2">
+                <div className="flex space-x-2 items-center">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm">Minimum bid: ${auction.current_price ? auction.current_price + 100 : auction.starting_price}</p>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center text-muted-foreground">
-                No external auctions found
+                
+                <div className="flex mt-2 space-x-2">
+                  <Input
+                    type="number"
+                    value={bidAmount}
+                    onChange={(e) => setBidAmount(parseInt(e.target.value) || 0)}
+                    className="flex-grow"
+                    placeholder="Enter bid amount"
+                    min={auction.current_price ? auction.current_price + 100 : auction.starting_price}
+                    step="100"
+                  />
+                  <Button 
+                    onClick={() => placeBid(auction.id)}
+                    disabled={bidLoading}
+                  >
+                    {bidLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Bid'}
+                  </Button>
+                </div>
               </div>
             )}
-          </div>
-        </TabsContent>
-      </Tabs>
+            
+            {/* Show top bids if there are any */}
+            {bids[auction.id] && bids[auction.id].length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium mb-2">Recent Bids</h4>
+                <div className="space-y-2">
+                  {bids[auction.id].slice(0, 3).map((bid) => (
+                    <div key={bid.id} className="flex justify-between text-sm">
+                      <div className="flex items-center">
+                        {bid.bidder?.avatar_url && (
+                          <div className="h-5 w-5 rounded-full overflow-hidden mr-2">
+                            <img 
+                              src={bid.bidder.avatar_url} 
+                              alt="bidder" 
+                              className="h-full w-full object-cover" 
+                            />
+                          </div>
+                        )}
+                        <span>{bid.bidder?.username || 'Anonymous'}</span>
+                      </div>
+                      <span className="font-medium">${bid.amount}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 };

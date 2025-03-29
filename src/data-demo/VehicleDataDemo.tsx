@@ -50,19 +50,18 @@ export default function VehicleDataDemo() {
         }
         
         // Test the connection
-        const { data, error } = await supabase.from('test_connection').select('*').limit(1);
-        
-        if (error) {
-          console.error('Supabase connection error:', error);
-          setError(`Supabase connection error: ${error.message}`);
-          setSupabaseStatus('error');
-        } else {
-          console.log('Supabase connected successfully');
-          setSupabaseStatus('connected');
+        // const { data, error } = await supabase.from('test_connection').select('*').limit(1);
+        // if (error) {
+        //   console.error('Supabase connection error:', error);
+        //   setError(`Supabase connection error: ${error.message}`);
+        //   setSupabaseStatus('error');
+        // } else {
+        //   console.log('Supabase connected successfully');
+        //   setSupabaseStatus('connected');
           // Load real data
           fetchVehicles();
           fetchConnectedSources();
-        }
+        // }
       } catch (err) {
         console.error('Connection check error:', err);
         setError(`Unexpected error checking connection: ${err instanceof Error ? err.message : String(err)}`);

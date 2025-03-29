@@ -88,7 +88,7 @@ export const useAuthState = () => {
       clearTimeout(timeoutId);
       if (data) data.subscription.unsubscribe();
     };
-  }, [fetchSession, loading, toast]);
+  }, [fetchSession, toast]);
 
   return { session, loading, error };
 };

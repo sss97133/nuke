@@ -30,17 +30,17 @@ export function SimpleAdaptivePanel() {
     const loadPreferences = async () => {
       try {
         // Check Supabase connection
-        const { data: connectionTest, error: connectionError } = await supabase
-          .from('test_connection')
-          .select('*')
-          .limit(1);
+        // const { data: connectionTest, error: connectionError } = await supabase
+        //   .from('test_connection')
+        //   .select('*')
+        //   .limit(1);
         
-        if (connectionError) {
-          console.error('Supabase connection test failed:', connectionError);
-          setConnectionStatus('error');
-        } else {
-          console.log('Supabase connection successful');
-          setConnectionStatus('connected');
+        // if (connectionError) {
+        //   console.error('Supabase connection test failed:', connectionError);
+        //   setConnectionStatus('error');
+        // } else {
+        //   console.log('Supabase connection successful');
+        //   setConnectionStatus('connected');
           
           // Try to load user preferences
           const { data, error } = await supabase
@@ -54,7 +54,7 @@ export function SimpleAdaptivePanel() {
             console.log('Loaded preferences:', data[0]);
             setPreferences(data[0].preferences || defaultPreferences);
           }
-        }
+        // }
       } catch (err) {
         console.error('Error in preferences loading:', err);
       } finally {

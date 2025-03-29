@@ -62,8 +62,9 @@ declare global {
   }
 }
 
-const supabaseUrl = getEnvValue('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
+// Prefer environment variables but fallback to local development values if needed
+const supabaseUrl = getEnvValue('VITE_SUPABASE_URL') || 'http://127.0.0.1:54321';
+const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 // Get current environment
 const environment = typeof process !== 'undefined' && process.env && process.env.NODE_ENV 
