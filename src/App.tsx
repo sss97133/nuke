@@ -13,6 +13,9 @@ import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
 import { WebSocketManager } from './integrations/supabase/WebSocketManager';
 import { WebSocketDiagnostics } from './integrations/utils/WebSocketDiagnostics';
 
+// Import environment fix to ensure proper Supabase connectivity
+import './fix-env';
+
 // Import enhanced component styles
 import './styles/component-classes.css';
 

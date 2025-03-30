@@ -34,11 +34,23 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   }, [toast]);
   
+  // Use useRef to store mutable values that won't cause rerenders
+  const statusRef = React.useRef(status);
+  const lastActivityRef = React.useRef(lastActivity);
+  
+  // Update refs when state changes
+  React.useEffect(() => {
+    statusRef.current = status;
+    lastActivityRef.current = lastActivity;
+  }, [status, lastActivity]);
+  
   const setupConnection = useCallback(() => {
+    console.log('Setting up WebSocket connection...');
     const channel = supabase.channel('system');
     
     channel
-      .on('system', (event) => {
+      .on('broadcast', { event: 'system' }, (payload) => {
+        const event = payload.payload;
         console.log(`WebSocket system event: ${event}`);
         
         if (event === 'connected') {
@@ -46,7 +58,7 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
           setLastActivity(new Date());
           
           // Only show toast if previously disconnected
-          if (status === 'disconnected') {
+          if (statusRef.current === 'disconnected') {
             toast({
               title: "Connected",
               description: "Real-time connection established"
@@ -76,13 +88,15 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
       // If we think we're connected but haven't had activity in 2 minutes,
       // try to reconnect
       if (
-        status === 'connected' && 
-        lastActivity && 
-        (new Date().getTime() - lastActivity.getTime() > 120000)
+        statusRef.current === 'connected' && 
+        lastActivityRef.current && 
+        (new Date().getTime() - lastActivityRef.current.getTime() > 120000)
       ) {
         console.log('No recent WebSocket activity, reconnecting...');
         supabase.removeChannel(channel);
-        setupConnection();
+        // Don't call setupConnection directly to avoid infinite recursion
+        // Instead use the reconnect function which will be stable
+        reconnect();
       }
     }, 60000); // Check every minute
     
@@ -90,15 +104,23 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
       clearInterval(heartbeatInterval);
       supabase.removeChannel(channel);
     };
-  }, [status, lastActivity, toast]);
+  }, [toast, reconnect]); // Remove status and lastActivity from dependencies
   
+  // The reconnect function needs to be defined before setupConnection,
+  // so we need to resolve this circular dependency
+  const reconnectRef = React.useRef(reconnect);
+  React.useEffect(() => {
+    reconnectRef.current = reconnect;
+  }, [reconnect]);
+  
+  // Only run the effect once when the component mounts
   useEffect(() => {
     const cleanup = setupConnection();
     
     // Setup listener for online/offline browser events
     const handleOnline = () => {
       console.log('Browser went online, reconnecting WebSocket...');
-      reconnect();
+      reconnectRef.current();
     };
     
     const handleOffline = () => {
@@ -114,7 +136,7 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [setupConnection, reconnect]);
+  }, []); // Empty dependency array - only run once
   
   const contextValue = {
     status,

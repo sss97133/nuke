@@ -1,9 +1,18 @@
 // Direct patch to fix Supabase environment variables
 // Import and use this at the top of your main.tsx file
 
-// Get the correct values from your local development
-export const CORRECT_SUPABASE_URL = 'http://127.0.0.1:54321';
-export const CORRECT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+// Check for GitHub Actions environment variables first
+// If they're not available, fall back to local development values
+export const CORRECT_SUPABASE_URL = 
+  process?.env?.SUPABASE_URL ||
+  import.meta?.env?.VITE_SUPABASE_URL ||
+  'http://127.0.0.1:54321';
+
+export const CORRECT_SUPABASE_ANON_KEY = 
+  process?.env?.SUPABASE_ANON_KEY ||
+  import.meta?.env?.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+
 export const POSTGRES_CONNECTION = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 export const SUPABASE_STUDIO_URL = 'http://127.0.0.1:54323';
 
