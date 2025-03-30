@@ -1,19 +1,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Database } from '@/types/supabase';
-import { Vehicle } from '@/types/vehicle';
+import { Vehicle } from '@/components/vehicles/discovery/types';
 import { adaptVehicleFromDB } from './utils';
-import { Session } from '@supabase/supabase-js';
+import { Session, PostgrestError } from '@supabase/supabase-js';
+import { SortDirection, SortField } from '@/components/vehicles/discovery/types';
+
+type DbVehicle = Database['public']['Tables']['vehicles']['Row'];
 
 export function useVehiclesFetcher(
   vehicleStatus: 'discovered' | 'owned', 
   session: Session | null,
-  sortField: string,
-  sortDirection: string
+  sortField: SortField,
+  sortDirection: SortDirection
 ) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<PostgrestError | null>(null);
 
   const fetchVehicles = useCallback(async () => {
     try {
@@ -51,19 +54,39 @@ export function useVehiclesFetcher(
         const { data, error: fetchError } = await query;
         
         if (fetchError) {
-          throw fetchError;
+          setError(fetchError);
+          console.error(`Error fetching ${vehicleStatus} vehicles:`, fetchError);
+          setVehicles([]);
+          return;
         }
         
-        const adaptedVehicles = data.map(adaptVehicleFromDB);
+        if (!data) {
+          setVehicles([]);
+          return;
+        }
+
+        const adaptedVehicles = data.map((vehicle: DbVehicle) => adaptVehicleFromDB(vehicle));
         setVehicles(adaptedVehicles);
       } catch (err) {
-        console.error(`Error fetching ${vehicleStatus} vehicles:`, err);
-        setError(err instanceof Error ? err : new Error(`Failed to fetch ${vehicleStatus} vehicles`));
+        const error = err as Error;
+        console.error(`Error fetching ${vehicleStatus} vehicles:`, error);
+        setError(new PostgrestError({
+          message: error.message,
+          details: '',
+          hint: '',
+          code: 'PGRST116'
+        }));
         setVehicles([]);
       }
-    } catch (err: unknown) {
-      console.error(`Error in fetchVehicles:`, err);
-      setError(err instanceof Error ? err : new Error(`Failed to fetch ${vehicleStatus} vehicles`));
+    } catch (err) {
+      const error = err as Error;
+      console.error(`Error in fetchVehicles:`, error);
+      setError(new PostgrestError({
+        message: error.message,
+        details: '',
+        hint: '',
+        code: 'PGRST116'
+      }));
       setVehicles([]);
     } finally {
       setIsLoading(false);
@@ -80,3 +103,22 @@ export function useVehiclesFetcher(
     error
   };
 }
+
+// Helper to determine the "era" based on year
+const determineEra = (year: number): string => {
+  if (!year) return '';
+  
+  if (year < 1920) return 'pre-war';
+  if (year < 1930) return '20s';
+  if (year < 1940) return '30s';
+  if (year < 1950) return '40s';
+  if (year < 1960) return '50s';
+  if (year < 1970) return '60s';
+  if (year < 1980) return '70s';
+  if (year < 1990) return '80s';
+  if (year < 2000) return '90s';
+  if (year < 2010) return '00s';
+  if (year < 2020) return '10s';
+  
+  return 'modern';
+};

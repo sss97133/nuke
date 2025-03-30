@@ -1,4 +1,3 @@
-
 export interface WorkspaceDimensions {
   width: number;
   height: number;
@@ -18,15 +17,88 @@ export interface PTZTrack {
   coneAngle: number;
 }
 
+export interface WallConfiguration {
+  position: PTZTrackPosition;
+  dimensions: {
+    width: number;
+    height: number;
+  };
+  material?: string;
+  color?: string;
+}
+
+export interface CeilingConfiguration {
+  height: number;
+  material?: string;
+  color?: string;
+  fixtures?: Array<{
+    position: PTZTrackPosition;
+    type: string;
+    dimensions?: {
+      width: number;
+      height: number;
+    };
+  }>;
+}
+
 export interface PTZPlanes {
-  walls: any[];
-  ceiling: Record<string, any>;
+  walls: WallConfiguration[];
+  ceiling: CeilingConfiguration;
+}
+
+export interface RoboticArm {
+  position: PTZTrackPosition;
+  reach: number;
+  joints: number;
+  payload: number;
+  speed: number;
+  model?: string;
 }
 
 export interface PTZConfigurations {
   tracks: PTZTrack[];
   planes: PTZPlanes;
-  roboticArms: any[];
+  roboticArms: RoboticArm[];
+}
+
+export interface CameraConfig {
+  resolution: string;
+  frameRate: number;
+  iso?: number;
+  aperture?: number;
+  focusMode?: 'auto' | 'manual';
+  whiteBalance?: 'auto' | 'manual' | number;
+  [key: string]: string | number | undefined;
+}
+
+export interface AudioConfig {
+  sampleRate: number;
+  channels: number;
+  bitDepth: number;
+  format?: string;
+  noiseReduction?: boolean;
+  [key: string]: string | number | boolean | undefined;
+}
+
+export interface LightingConfig {
+  brightness: number;
+  temperature: number;
+  mode?: 'auto' | 'manual';
+  presets?: Record<string, {
+    brightness: number;
+    temperature: number;
+  }>;
+  [key: string]: string | number | boolean | Record<string, unknown> | undefined;
+}
+
+export interface FixedCameraPosition {
+  position: PTZTrackPosition;
+  orientation: {
+    pitch: number;
+    yaw: number;
+    roll: number;
+  };
+  config?: CameraConfig;
 }
 
 export interface StudioConfiguration {
@@ -34,11 +106,11 @@ export interface StudioConfiguration {
   name: string;
   workspace_dimensions?: WorkspaceDimensions;
   ptz_configurations?: PTZConfigurations;
-  camera_config?: Record<string, any>;
-  audio_config?: Record<string, any>;
-  lighting_config?: Record<string, any>;
+  camera_config?: CameraConfig;
+  audio_config?: AudioConfig;
+  lighting_config?: LightingConfig;
   fixed_cameras?: {
-    positions: any[];
+    positions: FixedCameraPosition[];
   };
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { PostgrestError } from '@supabase/supabase-js';
 
 export interface Vehicle {
   id: string;
@@ -22,13 +23,6 @@ export interface NewVehicle {
   mileage?: number;
 }
 
-interface SupabaseError {
-  message: string;
-  details: string;
-  hint: string;
-  code: string;
-}
-
 // Handle null values from the database
 const nullToUndefined = <T>(value: T | null): T | undefined => {
   return value === null ? undefined : value;
@@ -37,7 +31,7 @@ const nullToUndefined = <T>(value: T | null): T | undefined => {
 export const useVehicles = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<SupabaseError | null>(null);
+  const [error, setError] = useState<PostgrestError | null>(null);
 
   // Fetch all vehicles
   const fetchVehicles = async () => {
@@ -70,7 +64,8 @@ export const useVehicles = () => {
         setVehicles(typedVehicles);
       }
     } catch (err) {
-      console.error("Error in fetchVehicles:", err);
+      const error = err as Error;
+      console.error("Error in fetchVehicles:", error);
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +114,8 @@ export const useVehicles = () => {
         return typedVehicle;
       }
     } catch (err) {
-      console.error("Error in addVehicle:", err);
+      const error = err as Error;
+      console.error("Error in addVehicle:", error);
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +156,8 @@ export const useVehicles = () => {
         return data[0];
       }
     } catch (err) {
-      console.error("Error in updateVehicle:", err);
+      const error = err as Error;
+      console.error("Error in updateVehicle:", error);
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +183,8 @@ export const useVehicles = () => {
       setVehicles(prev => prev.filter(vehicle => vehicle.id !== id));
       return true;
     } catch (err) {
-      console.error("Error in deleteVehicle:", err);
+      const error = err as Error;
+      console.error("Error in deleteVehicle:", error);
       return false;
     } finally {
       setIsLoading(false);

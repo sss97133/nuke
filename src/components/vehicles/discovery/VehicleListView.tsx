@@ -1,20 +1,19 @@
-
 import React from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Edit, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import { Vehicle, VehicleActionHandlers } from './types';
+import { Vehicle, VehicleActionHandlers, SortField } from './types';
 
 interface VehicleListViewProps extends VehicleActionHandlers {
   vehicles: Vehicle[];
   selectedVehicles: number[];
   toggleVehicleSelection: (id: number) => void;
-  sortField?: string;
+  sortField?: SortField;
   sortDirection?: 'asc' | 'desc';
 }
 
-const VehicleListView = ({ 
+const VehicleListView: React.FC<VehicleListViewProps> = ({ 
   vehicles, 
   selectedVehicles, 
   toggleVehicleSelection,
@@ -23,9 +22,9 @@ const VehicleListView = ({
   onRemove,
   sortField,
   sortDirection
-}: VehicleListViewProps) => {
+}) => {
   // Helper function to render sort icon
-  const renderSortIcon = (field: string) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField === field) {
       return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
     }
@@ -101,7 +100,7 @@ const VehicleListView = ({
             <div className="col-span-11 md:col-span-2 flex md:block">
               <div className="aspect-video w-16 h-16 md:w-full md:h-16 rounded-md bg-muted overflow-hidden relative">
                 <div className="absolute bottom-1 left-1">
-                  {vehicle.tags.slice(0, 1).map((tag, i) => (
+                  {vehicle.tags?.slice(0, 1).map((tag, i) => (
                     <Badge key={i} variant="secondary" className="text-[10px]">
                       {tag}
                     </Badge>
@@ -116,7 +115,7 @@ const VehicleListView = ({
               <div className="ml-2 md:ml-0 md:hidden">
                 <div className="font-medium text-xs">{vehicle.make} {vehicle.model} ({vehicle.year})</div>
                 <div className="text-[10px] text-muted-foreground">{vehicle.location}</div>
-                <div className="font-semibold text-xs">${vehicle.price.toLocaleString()}</div>
+                <div className="font-semibold text-xs">${vehicle.price?.toLocaleString() ?? 'N/A'}</div>
               </div>
             </div>
             <div className="col-span-2 hidden md:block">
@@ -124,7 +123,7 @@ const VehicleListView = ({
               <div className="text-[10px] text-muted-foreground">{vehicle.location}</div>
             </div>
             <div className="col-span-1 text-xs hidden md:block">{vehicle.year}</div>
-            <div className="col-span-2 font-semibold text-xs hidden md:block">${vehicle.price.toLocaleString()}</div>
+            <div className="col-span-2 font-semibold text-xs hidden md:block">${vehicle.price?.toLocaleString() ?? 'N/A'}</div>
             <div className="col-span-1 text-xs hidden md:block">{formatMileage(vehicle.mileage)}</div>
             <div className="col-span-1 text-xs hidden md:block">{extractDays(vehicle.added)}</div>
             <div className="col-span-12 md:col-span-2 flex justify-end gap-1 mt-2 md:mt-0">
@@ -149,5 +148,7 @@ const VehicleListView = ({
     </div>
   );
 };
+
+VehicleListView.displayName = 'VehicleListView';
 
 export default VehicleListView;

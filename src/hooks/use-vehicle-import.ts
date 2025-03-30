@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import Papa from 'papaparse';
 import type { Database } from '@/types/database';
+import { PostgrestError } from '@supabase/supabase-js';
 
 type Vehicle = Database['public']['Tables']['vehicles']['Row'];
 type VehicleCollection = Database['public']['Tables']['vehicle_collections']['Row'];
@@ -12,7 +13,7 @@ interface ImportOptions {
   isDiscovered?: boolean;
   source?: string;
   sourceUrl?: string;
-  sourceData?: Record<string, any>;
+  sourceData?: Record<string, unknown>;
 }
 
 export const useVehicleImport = () => {
@@ -39,7 +40,8 @@ export const useVehicleImport = () => {
 
       if (error) throw error;
       return data;
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error;
       console.error('Error creating collection:', error);
       toast({
         title: 'Error',
@@ -59,11 +61,11 @@ export const useVehicleImport = () => {
       if (!user) throw new Error('User not authenticated');
 
       // Parse CSV
-      const results = await new Promise<any[]>((resolve, reject) => {
+      const results = await new Promise<Record<string, string>[]>((resolve, reject) => {
         Papa.parse(file, {
           header: true,
           skipEmptyLines: true,
-          complete: (results) => resolve(results.data),
+          complete: (results) => resolve(results.data as Record<string, string>[]),
           error: (error) => reject(error)
         });
       });
@@ -106,7 +108,8 @@ export const useVehicleImport = () => {
       });
 
       return data;
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error;
       console.error('Error importing vehicles:', error);
       toast({
         title: 'Error',
@@ -166,7 +169,8 @@ export const useVehicleImport = () => {
       });
 
       return data;
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error;
       console.error('Error importing from Craigslist:', error);
       toast({
         title: 'Error',

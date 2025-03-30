@@ -1,4 +1,3 @@
-
 import { SortDirection, SortField } from '../../components/vehicles/discovery/types';
 import { Vehicle } from '../../components/vehicles/discovery/types';
 
@@ -12,19 +11,19 @@ export interface UseVehiclesDataResult {
   setSelectedVehicles: React.Dispatch<React.SetStateAction<number[]>>;
   bulkActionOpen: boolean;
   setBulkActionOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  viewMode: string;
-  setViewMode: React.Dispatch<React.SetStateAction<string>>;
+  viewMode: 'grid' | 'list';
+  setViewMode: React.Dispatch<React.SetStateAction<'grid' | 'list'>>;
   sortField: SortField;
   setSortField: React.Dispatch<React.SetStateAction<SortField>>;
   sortDirection: SortDirection;
   setSortDirection: React.Dispatch<React.SetStateAction<SortDirection>>;
-  handleVerify: (id: number) => void;
-  handleEdit: (id: number) => void;
-  handleRemove: (id: number) => void;
+  handleVerify: (id: number) => Promise<void>;
+  handleEdit: (id: number) => Promise<void>;
+  handleRemove: (id: number) => Promise<void>;
   toggleVehicleSelection: (id: number) => void;
-  handleBulkVerify: () => void;
-  handleBulkAddToGarage: () => void;
-  handleBulkRemove: () => void;
+  handleBulkVerify: () => Promise<void>;
+  handleBulkAddToGarage: () => Promise<void>;
+  handleBulkRemove: () => Promise<void>;
   vehicleStatus: 'discovered' | 'owned';
 }
 

@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { Provider } from "@supabase/supabase-js";
+import { Provider, AuthError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -55,11 +54,12 @@ export const useSocialAuth = () => {
       window.location.href = data.url;
       
     } catch (error) {
-      console.error("[useSocialAuth] Unexpected error:", error);
+      const authError = error as AuthError;
+      console.error("[useSocialAuth] Unexpected error:", authError);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to sign in. Please try again."
+        description: authError.message || "Failed to sign in. Please try again."
       });
     } finally {
       setIsLoading(false);

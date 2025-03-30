@@ -1,8 +1,7 @@
-
-import type { Database } from '../types';
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from '@/hooks/use-toast';
+import { PostgrestError } from '@supabase/supabase-js';
 
 export const useAuthNavigation = () => {
   const navigate = useNavigate();
@@ -40,10 +39,11 @@ export const useAuthNavigation = () => {
         navigate('/dashboard');
       }
     } catch (error) {
-      console.error("[useAuthNavigation] Unexpected error:", error);
+      const pgError = error as PostgrestError;
+      console.error("[useAuthNavigation] Unexpected error:", pgError);
       toast({
         title: "Navigation Error",
-        description: "An unexpected error occurred. Redirecting to dashboard.",
+        description: pgError.message || "An unexpected error occurred. Redirecting to dashboard.",
         variant: "destructive",
       });
       // Fallback to dashboard in case of any unexpected errors

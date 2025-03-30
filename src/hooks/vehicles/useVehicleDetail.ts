@@ -1,15 +1,24 @@
-
-import type { Database } from '../types';
+import type { Database } from '@/types/database';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Vehicle } from '@/components/vehicles/discovery/types';
 import { getStoredVehicleById, getRelationshipsForVehicle } from './mockVehicleStorage';
+import { PostgrestError } from '@supabase/supabase-js';
+
+interface VehicleRelationship {
+  id: string;
+  vehicle_id: string;
+  related_vehicle_id: string;
+  relationship_type: string;
+  created_at: string;
+  metadata?: Record<string, unknown>;
+}
 
 export const useVehicleDetail = (id: string) => {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [relationships, setRelationships] = useState<any[]>([]);
+  const [relationships, setRelationships] = useState<VehicleRelationship[]>([]);
 
   useEffect(() => {
     const fetchVehicleDetail = async () => {
@@ -17,7 +26,7 @@ export const useVehicleDetail = (id: string) => {
       try {
         // First try to fetch from real data in Supabase
         const { data: vehicleData, error: vehicleError } = await supabase
-        .from('vehicles')
+          .from('vehicles')
           .select('*')
           .eq('id', id)
           .single();
@@ -27,7 +36,8 @@ export const useVehicleDetail = (id: string) => {
           
           // Get relationships for this vehicle if they exist
           const { data: relationshipsData, error: relationshipsError } = await supabase
-        .select('*')
+            .from('vehicle_relationships')
+            .select('*')
             .eq('vehicle_id', id);
           
           if (!relationshipsError) {
@@ -49,7 +59,7 @@ export const useVehicleDetail = (id: string) => {
             console.log('Vehicle found in mock storage:', mockVehicle);
             const mockRelationships = getRelationshipsForVehicle(numericId);
             setVehicle(mockVehicle);
-            setRelationships(mockRelationships);
+            setRelationships(mockRelationships as unknown as VehicleRelationship[]);
             setError(null);
             return;
           }
@@ -59,8 +69,9 @@ export const useVehicleDetail = (id: string) => {
         throw new Error('Vehicle not found');
         
       } catch (err) {
-        console.error('Error fetching vehicle details:', err);
-        setError(err.message || 'Failed to load vehicle details');
+        const error = err as Error;
+        console.error('Error fetching vehicle details:', error);
+        setError(error.message || 'Failed to load vehicle details');
         setVehicle(null);
       } finally {
         setLoading(false);
@@ -76,35 +87,44 @@ export const useVehicleDetail = (id: string) => {
 };
 
 // Helper function to adapt database vehicle format to our app's Vehicle type
-const adaptVehicleFromDB = (dbVehicle: any): Vehicle => {
-  // Use default values for fields that may not exist in the database
+const adaptVehicleFromDB = (dbVehicle: Database['public']['Tables']['vehicles']['Row']): Vehicle => {
   return {
-    id: dbVehicle.id,
-    make: dbVehicle.make || '',
-    model: dbVehicle.model || '',
-    year: dbVehicle.year || 0,
-    trim: dbVehicle.trim || '',
-    price: dbVehicle.price || 0,
-    market_value: dbVehicle.market_value || 0,
-    price_trend: dbVehicle.price_trend || 'stable',
+    id: Number(dbVehicle.id),
+    make: dbVehicle.make,
+    model: dbVehicle.model,
+    year: dbVehicle.year,
     mileage: dbVehicle.mileage || 0,
-    image: dbVehicle.image_url || null,
-    location: dbVehicle.location || '',
-    added: formatAddedDate(dbVehicle.created_at),
+    image: '', // We'll need to fetch this from vehicle_images table
+    location: dbVehicle.purchase_location || '',
+    added: dbVehicle.created_at,
+    condition_rating: 5, // Default value
+    vehicle_type: 'car', // Default value
+    price: dbVehicle.current_value,
+    market_value: dbVehicle.current_value,
+    price_trend: 'stable' as const,
     tags: dbVehicle.tags || [],
-    condition_rating: dbVehicle.condition_rating || 0,
-    vehicle_type: dbVehicle.vehicle_type || 'car',
-    body_type: dbVehicle.body_type || '',
-    transmission: dbVehicle.transmission || '',
-    drivetrain: dbVehicle.drivetrain || '',
-    rarity_score: dbVehicle.rarity_score || 0,
-    era: determineEra(dbVehicle.year),
-    restoration_status: dbVehicle.restoration_status || 'unknown',
-    special_edition: dbVehicle.special_edition || false,
-    color: dbVehicle.color || '',
-    vin: dbVehicle.vin || '',
+    body_type: '', // Not in DB
     engine_type: dbVehicle.engine_type || '',
-    historical_data: dbVehicle.historical_data || null,
+    transmission: '', // Not in DB
+    drivetrain: '', // Not in DB
+    condition_description: dbVehicle.notes || '',
+    restoration_status: 'original' as const,
+    notable_issues: [],
+    ownership_count: 0,
+    accident_history: false,
+    service_history: false,
+    last_service_date: undefined,
+    era: determineEra(dbVehicle.year),
+    special_edition: false,
+    rarity_score: 0,
+    market_trends: undefined,
+    relevance_score: undefined,
+    views_count: undefined,
+    saves_count: undefined,
+    interested_users: undefined,
+    status: (dbVehicle.status || 'discovered') as 'owned' | 'claimed' | 'discovered' | 'verified' | 'unverified',
+    source: 'database',
+    source_url: ''
   };
 };
 

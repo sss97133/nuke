@@ -50,6 +50,10 @@ export interface TeamMember {
   updated_at?: string;
 }
 
+interface JsonObject {
+  [key: string]: string | number | boolean | null | JsonObject | JsonObject[];
+}
+
 // Helper functions to safely convert Json to our types
 export const toSocialLinks = (json: Json | null): SocialLinks => {
   const defaultLinks: SocialLinks = {
@@ -64,12 +68,13 @@ export const toSocialLinks = (json: Json | null): SocialLinks => {
     return defaultLinks;
   }
 
+  const obj = json as JsonObject;
   return {
-    twitter: (json as any).twitter || '',
-    instagram: (json as any).instagram || '',
-    facebook: (json as any).facebook || '',
-    linkedin: (json as any).linkedin || '',
-    website: (json as any).website || ''
+    twitter: typeof obj.twitter === 'string' ? obj.twitter : '',
+    instagram: typeof obj.instagram === 'string' ? obj.instagram : '',
+    facebook: typeof obj.facebook === 'string' ? obj.facebook : '',
+    linkedin: typeof obj.linkedin === 'string' ? obj.linkedin : '',
+    website: typeof obj.website === 'string' ? obj.website : ''
   };
 };
 
@@ -77,6 +82,7 @@ export const toStreamingLinks = (json: Json | null): StreamingLinks => {
   const defaultLinks: StreamingLinks = {
     twitch: '',
     youtube: '',
+    instagram: '',
     tiktok: ''
   };
   
@@ -84,10 +90,12 @@ export const toStreamingLinks = (json: Json | null): StreamingLinks => {
     return defaultLinks;
   }
 
+  const obj = json as JsonObject;
   return {
-    twitch: (json as any).twitch || '',
-    youtube: (json as any).youtube || '',
-    tiktok: (json as any).tiktok || ''
+    twitch: typeof obj.twitch === 'string' ? obj.twitch : '',
+    youtube: typeof obj.youtube === 'string' ? obj.youtube : '',
+    instagram: typeof obj.instagram === 'string' ? obj.instagram : '',
+    tiktok: typeof obj.tiktok === 'string' ? obj.tiktok : ''
   };
 };
 

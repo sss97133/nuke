@@ -51,7 +51,7 @@ describe('Vehicle Data Management', () => {
       vin: testVehicle.vin,
       color: testVehicle.color,
       mileage: testVehicle.mileage,
-      description: testVehicle.description,
+      notes: testVehicle.description, // Changed 'description' to 'notes' to match the database schema
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

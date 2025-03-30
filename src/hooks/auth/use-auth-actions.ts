@@ -1,12 +1,9 @@
-
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Provider } from "@supabase/supabase-js";
+import { Provider, AuthError } from "@supabase/supabase-js";
 
 export const useAuthActions = () => {
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const handleSocialLogin = async (provider: Provider) => {
     try {
@@ -34,12 +31,13 @@ export const useAuthActions = () => {
       }
       
       return data;
-    } catch (error: any) {
-      console.error("[useAuthActions] Social login error:", error);
+    } catch (error) {
+      const authError = error as AuthError;
+      console.error("[useAuthActions] Social login error:", authError);
       toast({
         variant: "destructive",
         title: "Login Error",
-        description: "Could not complete social login. Please try again."
+        description: authError.message || "Could not complete social login. Please try again."
       });
     }
   };
@@ -47,7 +45,6 @@ export const useAuthActions = () => {
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-  if (error) console.error("Database query error:", error);
       if (error) throw error;
       
       toast({
@@ -55,13 +52,14 @@ export const useAuthActions = () => {
         description: "You have been successfully logged out."
       });
       
-      navigate('/login');
-    } catch (error: any) {
-      console.error("[useAuthActions] Logout error:", error);
+      window.location.href = '/login';
+    } catch (error) {
+      const authError = error as AuthError;
+      console.error("[useAuthActions] Logout error:", authError);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to log out. Please try again."
+        description: authError.message || "Failed to log out. Please try again."
       });
     }
   };

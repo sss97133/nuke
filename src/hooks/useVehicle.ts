@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { PostgrestError } from '@supabase/supabase-js';
 
 export interface Vehicle {
   id: string;
@@ -15,7 +16,7 @@ export interface Vehicle {
 export const useVehicle = (id: string | undefined) => {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<PostgrestError | null>(null);
 
   useEffect(() => {
     const fetchVehicle = async () => {
@@ -32,12 +33,21 @@ export const useVehicle = (id: string | undefined) => {
           .single();
 
         if (error) {
-          throw error;
+          setError(error);
+          console.error('Error fetching vehicle:', error);
+          return;
         }
 
         setVehicle(data);
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch vehicle'));
+        const error = err as Error;
+        console.error('Unexpected error fetching vehicle:', error);
+        setError(new PostgrestError({
+          message: error.message,
+          details: '',
+          hint: '',
+          code: 'PGRST116'
+        }));
       } finally {
         setLoading(false);
       }

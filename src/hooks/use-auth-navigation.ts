@@ -1,7 +1,7 @@
-
-import type { Database } from '../types';
+import type { Database } from '@/types/database';
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { PostgrestError } from '@supabase/supabase-js';
 
 export const useAuthNavigation = () => {
   const navigate = useNavigate();
@@ -17,7 +17,8 @@ export const useAuthNavigation = () => {
         .single();
 
       if (error) {
-        console.error("[useAuthNavigation] Error fetching profile:", error);
+        const pgError = error as PostgrestError;
+        console.error("[useAuthNavigation] Error fetching profile:", pgError);
         // If there's an error fetching the profile, we'll still navigate to dashboard
         // This prevents getting stuck on loading
         navigate('/dashboard');
@@ -33,7 +34,8 @@ export const useAuthNavigation = () => {
         console.log("[useAuthNavigation] Redirecting to dashboard");
         navigate('/dashboard');
       }
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error;
       console.error("[useAuthNavigation] Unexpected error:", error);
       // Fallback to dashboard in case of any unexpected errors
       navigate('/dashboard');

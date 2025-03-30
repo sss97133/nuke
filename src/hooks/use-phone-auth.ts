@@ -1,9 +1,8 @@
-
-import type { Database } from '../types';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { AuthError } from '@supabase/supabase-js';
 
 export const usePhoneAuth = () => {
   const { toast } = useToast();
@@ -33,11 +32,12 @@ export const usePhoneAuth = () => {
         return true;
       }
     } catch (error) {
-      console.error("Phone auth error:", error);
+      const authError = error as AuthError;
+      console.error("Phone auth error:", authError);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to send verification code. Please try again.",
+        description: authError.message || "Failed to send verification code. Please try again.",
       });
       return false;
     } finally {
@@ -68,7 +68,7 @@ export const usePhoneAuth = () => {
         
         if (userId) {
           const { data: profile } = await supabase
-        .from('profiles')
+            .from('profiles')
             .select('username')
             .eq('id', userId)
             .single();
@@ -94,11 +94,12 @@ export const usePhoneAuth = () => {
         return true;
       }
     } catch (error) {
-      console.error("OTP verification error:", error);
+      const authError = error as AuthError;
+      console.error("OTP verification error:", authError);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to verify code. Please try again.",
+        description: authError.message || "Failed to verify code. Please try again.",
       });
       return false;
     } finally {

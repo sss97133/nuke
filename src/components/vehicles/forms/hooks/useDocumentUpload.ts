@@ -36,9 +36,10 @@ export const useDocumentUpload = ({
   onValidationError,
   onSuccess
 }: UseDocumentUploadProps) => {
-  const [documents, setDocuments] = useState<File[]>(
-    form.getValues(field as any) || []
-  );
+  const [documents, setDocuments] = useState<File[]>(() => {
+    const value = form.getValues(field);
+    return Array.isArray(value) && value.every(item => item instanceof File) ? value : [];
+  });
 
   /**
    * Format file size to a human-readable string
@@ -78,7 +79,7 @@ export const useDocumentUpload = ({
         if (availableSlots > 0) {
           const filesToAdd = validFiles.slice(0, availableSlots);
           setDocuments(prev => [...prev, ...filesToAdd]);
-          form.setValue(field as any, [...documents, ...filesToAdd]);
+          form.setValue(field, [...documents, ...filesToAdd] as VehicleFormValues[typeof field]);
           
           if (onSuccess) {
             onSuccess(filesToAdd.length);
@@ -87,7 +88,7 @@ export const useDocumentUpload = ({
       } else if (validFiles.length > 0) {
         // Add all valid files
         setDocuments(prev => [...prev, ...validFiles]);
-        form.setValue(field as any, [...documents, ...validFiles]);
+        form.setValue(field, [...documents, ...validFiles] as VehicleFormValues[typeof field]);
         
         if (onSuccess) {
           onSuccess(validFiles.length);
@@ -111,7 +112,7 @@ export const useDocumentUpload = ({
    */
   const clearDocuments = useCallback(() => {
     setDocuments([]);
-    form.setValue(field as any, []);
+    form.setValue(field, [] as VehicleFormValues[typeof field]);
   }, [form, field]);
   
   /**
@@ -119,7 +120,7 @@ export const useDocumentUpload = ({
    */
   const updateDocuments = useCallback((files: File[]) => {
     setDocuments(files);
-    form.setValue(field as any, files);
+    form.setValue(field, files as VehicleFormValues[typeof field]);
   }, [form, field]);
 
   return {

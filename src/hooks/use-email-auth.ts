@@ -1,8 +1,8 @@
-import type { Database } from '@/types/database'; 
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { AuthError, PostgrestError } from '@supabase/supabase-js';
 
 export const useEmailAuth = () => {
   const { toast } = useToast();
@@ -39,8 +39,9 @@ export const useEmailAuth = () => {
 
       return true;
     } catch (error) {
-      console.error("[useEmailAuth] Profile creation failed:", error);
-      throw error;
+      const pgError = error as PostgrestError;
+      console.error("[useEmailAuth] Profile creation failed:", pgError);
+      throw pgError;
     }
   };
 
@@ -142,12 +143,13 @@ export const useEmailAuth = () => {
           navigate('/dashboard');
         }
       }
-    } catch (error: any) {
-      console.error("[useEmailAuth] Unexpected error:", error);
+    } catch (error) {
+      const authError = error as AuthError;
+      console.error("[useEmailAuth] Unexpected error:", authError);
       toast({
         variant: "destructive",
         title: "Authentication Error",
-        description: "An unexpected error occurred. Please try again."
+        description: authError.message || "An unexpected error occurred. Please try again."
       });
     } finally {
       setIsLoading(false);
@@ -158,7 +160,6 @@ export const useEmailAuth = () => {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        
         redirectTo: `${window.location.origin}/login?reset=true`,
       });
 
@@ -177,11 +178,12 @@ export const useEmailAuth = () => {
         description: "Please check your email for password reset instructions"
       });
     } catch (error) {
-      console.error("[useEmailAuth] Unexpected password reset error:", error);
+      const authError = error as AuthError;
+      console.error("[useEmailAuth] Unexpected password reset error:", authError);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to send password reset email. Please try again."
+        description: authError.message || "Failed to send password reset email. Please try again."
       });
     } finally {
       setIsLoading(false);
