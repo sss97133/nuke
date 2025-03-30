@@ -5,9 +5,12 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { corsHeaders } from '../_shared/cors.ts'
-import { Cheerio, cheerio } from 'https://deno.land/x/cheerio@1.0.7/mod.ts';
+import { serve, cheerioLoad, Request, Response, type Element } from "../deps.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 console.log('Initializing scrape-craigslist function');
 
@@ -39,7 +42,7 @@ async function fetchAndScrape(url: string): Promise<ScrapedData> {
 
     const html = await response.text();
     console.log('Successfully fetched HTML, attempting to parse...');
-    const $ = cheerio.load(html);
+    const $ = cheerioLoad(html);
 
     // --- Scraping Logic (highly dependent on Craigslist structure) ---
 
@@ -55,8 +58,8 @@ async function fetchAndScrape(url: string): Promise<ScrapedData> {
     description = description.replace(/^QR Code Link to This Post\s*/, '').trim();
 
     const images: string[] = [];
-    $('#thumbs a').each((_, element) => {
-      const imgUrl = $(element).attr('href');
+    $('#thumbs a').each((_: number, element: Element) => {
+      const imgUrl = element.getAttribute('href');
       if (imgUrl) {
         images.push(imgUrl);
       }
@@ -84,7 +87,7 @@ async function fetchAndScrape(url: string): Promise<ScrapedData> {
   }
 }
 
-serve(async (req: Request) => {
+serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log('Handling OPTIONS request');
@@ -112,7 +115,7 @@ serve(async (req: Request) => {
     });
   } catch (error) {
     console.error('General error handling request:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'An unknown error occurred' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });

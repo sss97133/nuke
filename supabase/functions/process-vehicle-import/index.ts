@@ -1,6 +1,11 @@
-import type { Database } from '../types';
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+// Follow this setup guide to integrate the Deno language server with your editor:
+// https://deno.land/manual/getting_started/setup_your_environment
+// This enables autocomplete, go to definition, etc.
+
+// Setup type definitions for built-in Supabase Runtime APIs
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+
+import { serve, createClient, Request, Response } from "../deps.ts";
 
 // Define types
 interface VehicleImport {
@@ -22,6 +27,22 @@ interface VehicleImport {
   icloud_folder_id?: string;
 }
 
+interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+interface ImportError {
+  vehicle: VehicleImport;
+  error: string;
+}
+
+interface ImportResult {
+  vehicle: VehicleImport;
+  id: string;
+  success: boolean;
+}
+
 // CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,7 +50,7 @@ const corsHeaders = {
 };
 
 // Helper function to validate a vehicle record
-function validateVehicle(vehicle: any): { isValid: boolean; errors: string[] } {
+function validateVehicle(vehicle: Partial<VehicleImport>): ValidationResult {
   const errors: string[] = [];
   
   // Required fields
@@ -70,7 +91,7 @@ function generateUUID(): string {
   });
 }
 
-serve(async (req) => {
+serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders, status: 204 });
@@ -125,7 +146,7 @@ serve(async (req) => {
     // Parse the request body
     const body = await req.json();
     
-    let vehicles: any[] = [];
+    let vehicles: Partial<VehicleImport>[] = [];
     
     // Handle file upload
     if (body.data && body.fileType) {
@@ -136,9 +157,9 @@ serve(async (req) => {
           const headers = rows[0];
           
           vehicles = rows.slice(1).map((row: string[]) => {
-            const vehicle: any = {};
+            const vehicle: Partial<VehicleImport> = {};
             headers.forEach((header: string, index: number) => {
-              vehicle[header.trim()] = row[index]?.trim();
+              vehicle[header.trim() as keyof VehicleImport] = row[index]?.trim();
             });
             return vehicle;
           });
@@ -158,7 +179,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: `Error processing file: ${error.message}` 
+            error: error instanceof Error ? error.message : 'An unknown error occurred processing file'
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -195,8 +216,8 @@ serve(async (req) => {
     }
     
     // Process each vehicle
-    const results = [];
-    const errors = [];
+    const results: ImportResult[] = [];
+    const errors: ImportError[] = [];
     
     for (const vehicle of vehicles) {
       // Validate vehicle data
@@ -204,14 +225,14 @@ serve(async (req) => {
       
       if (!validation.isValid) {
         errors.push({
-          vehicle,
-          errors: validation.errors
+          vehicle: vehicle as VehicleImport,
+          error: validation.errors.join(', ')
         });
         continue;
       }
       
       // Process iCloud link information
-      const processedVehicle = processICloudLink(vehicle);
+      const processedVehicle = processICloudLink(vehicle as VehicleImport);
       
       // Add user_id to the vehicle
       const vehicleWithUser = {
@@ -234,59 +255,33 @@ serve(async (req) => {
         continue;
       }
       
-      const vehicleId = data.id;
-      
-      // Process iCloud images if link is provided
-      if (processedVehicle.icloud_album_link) {
-        // In a production environment, you might:
-        // 1. Fetch the shared album data
-        // 2. Process the images
-        // 3. Store references in the car_images table
-        
-        // For now, we'll just log that we would process the iCloud album
-        console.log(`Processing iCloud album for vehicle ${vehicleId}: ${processedVehicle.icloud_album_link}`);
-        
-        // Add a record in the car_images table to indicate iCloud source
-        await supabase
-          .insert({
-            car_id: vehicleId,
-            file_path: processedVehicle.icloud_album_link,
-            file_name: 'icloud_album',
-            source: 'icloud',
-            user_id: user.id
-          });
-      }
-      
       results.push({
-        id: vehicleId,
-        make: processedVehicle.make,
-        model: processedVehicle.model,
-        year: processedVehicle.year
+        vehicle: processedVehicle,
+        id: data.id,
+        success: true
       });
     }
     
+    // Return results
     return new Response(
       JSON.stringify({
-        success: true,
-        imported: results.length,
+        success: errors.length === 0,
         results,
-        errors: errors.length > 0 ? errors : undefined
+        errors
       }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: errors.length > 0 ? 207 : 200 // Use 207 Multi-Status if there are partial failures
       }
     );
-    
   } catch (error) {
+    console.error('Error processing vehicle import:', error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : 'An unknown error occurred'
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
