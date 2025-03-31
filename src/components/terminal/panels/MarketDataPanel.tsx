@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useEffect, useState } from 'react';
-import { shouldAllowUIPlaceholderData } from '@/utils/environment';
+import { shouldAllowMockData } from '@/utils/environment';
 
 // UI placeholder data for design elements - not vehicle data
 // This is just for UI rendering, not representing real vehicles

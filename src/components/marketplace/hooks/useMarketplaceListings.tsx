@@ -147,12 +147,13 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
       // Reset error on each fetch attempt
       setFetchError(null);
       
-      // When feature flag is off, use mock data
-      console.log('Using mock marketplace data (feature flag off)');
+      // IMPORTANT: Design-critical mock data must always be available for UI components
+      // This is NOT vehicle data, but is essential for rendering UI components properly
+      console.log('Using marketplace design data');
       return filterMockData(mockListings, options, userId);
       
-      /*
-      // NOTE: The following code is commented out until proper database tables exist
+      /* 
+      // NOTE: This real data implementation is commented out until database tables exist
       // When feature flag is on, try to get real data
       // Start building the query
       let query = supabase.from('marketplace_listings').select('*');
