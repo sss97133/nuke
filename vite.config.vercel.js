@@ -29,18 +29,23 @@ export default defineConfig({
     sourcemap: false,
     minify: 'terser',
     outDir: 'dist',
-    target: 'es2020',
+    target: 'es2015', // More compatible target
     assetsInlineLimit: 4096,
     cssCodeSplit: true,
     chunkSizeWarningLimit: 1500,
+    manifest: true, // Generate a proper manifest
+    modulePreload: {
+      polyfill: true, // Add module preload polyfill
+    },
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
       },
       output: {
-        entryFileNames: 'assets/[name].[hash].js',
-        chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[hash].[ext]',
+        format: 'es', // Ensure ES modules format
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-ui': [
