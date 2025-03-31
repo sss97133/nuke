@@ -1,5 +1,5 @@
-import type { Database } from '../types';
-import { useState } from 'react';
+import type { Database } from '@/types/database';
+import { useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { ProfileAnalysisService } from '@/components/profile/services/ProfileAnalysisService';
+import { DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 export function SignUpForm() {
   const [email, setEmail] = useState('');
@@ -20,6 +21,31 @@ export function SignUpForm() {
     setIsLoading(true);
 
     try {
+      // Check if email already exists before attempting signup
+      const { data: emailCheck } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (emailCheck) {
+        // Email already exists, handle this case specifically
+        throw new Error('EMAIL_EXISTS');
+      }
+
+      // Validate password strength
+      if (password.length < 8) {
+        throw new Error('PASSWORD_TOO_SHORT');
+      }
+
+      // Contains at least one number and one special character
+      const hasNumber = /\d/.test(password);
+      const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+      if (!hasNumber || !hasSpecial) {
+        throw new Error('PASSWORD_REQUIREMENTS');
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -43,7 +69,8 @@ export function SignUpForm() {
         // Trigger initial profile analysis
         try {
           const { data: profile } = await supabase
-        .select('*')
+            .from('profiles')
+            .select('*')
             .eq('id', data.user.id)
             .single();
 
@@ -69,9 +96,50 @@ export function SignUpForm() {
       }
     } catch (error) {
       console.error('Signup error:', error);
+      let errorTitle = 'Signup Error';
+      let errorMessage = 'Failed to create account';
+      let errorAction: React.ReactNode = null;
+
+      if (error instanceof Error) {
+        // Handle specific error cases
+        if (error.message === 'EMAIL_EXISTS') {
+          errorTitle = 'Email Already Registered';
+          errorMessage = 'An account with this email already exists';
+          errorAction = (
+            <Button variant="outline" className="mt-2" onClick={() => navigate('/login')}>
+              Go to Login
+            </Button>
+          );
+        } else if (error.message === 'PASSWORD_TOO_SHORT') {
+          errorTitle = 'Password Too Short';
+          errorMessage = 'Password must be at least 8 characters long';
+        } else if (error.message === 'PASSWORD_REQUIREMENTS') {
+          errorTitle = 'Password Requirements';
+          errorMessage = 'Password must contain at least one number and one special character';
+        } else if (error.message.includes('already registered')) {
+          errorTitle = 'Account Already Exists';
+          errorMessage = 'An account with this email already exists';
+          errorAction = (
+            <Button variant="outline" className="mt-2" onClick={() => navigate('/login')}>
+              Go to Login
+            </Button>
+          );
+        } else if (error.message.includes('weak password')) {
+          errorTitle = 'Weak Password';
+          errorMessage = 'Please choose a stronger password with at least 8 characters, numbers, and special characters';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create account',
+        title: errorTitle,
+        description: (
+          <div className="space-y-2">
+            <p>{errorMessage}</p>
+            {errorAction}
+          </div>
+        ) as ReactNode,
         variant: 'destructive',
       });
     } finally {

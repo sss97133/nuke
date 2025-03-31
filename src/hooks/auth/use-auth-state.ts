@@ -23,7 +23,17 @@ export const useAuthState = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[useAuthState] Auth state changed:', event);
+      // Only log in development and avoid excessive logging
+      if (process.env.NODE_ENV === 'development' && event !== 'INITIAL_SESSION') {
+        console.log('[useAuthState] Auth state changed:', event);
+      }
+      
+      // Prevent unnecessary state updates
+      if (event === 'INITIAL_SESSION' && session?.user?.id === user?.id) {
+        // Skip duplicate initialization events
+        return;
+      }
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

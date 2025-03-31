@@ -9,14 +9,32 @@ interface ClassicWindowProps {
 export const ClassicWindow = ({ title, children }: ClassicWindowProps) => {
   const [angle, setAngle] = useState(0);
   
-  // Debug log to verify component rendering
-  console.log("Rendering ClassicWindow with title:", title);
-
+  // Only log initial mount in development
   useEffect(() => {
-    const interval = setInterval(() => {
-      setAngle(prev => prev + 2);
-    }, 50);
-    return () => clearInterval(interval);
+    if (process.env.NODE_ENV === 'development') {
+      console.log("ClassicWindow mounted with title:", title);
+    }
+  }, [title]);
+
+  // Animation effect with requestAnimationFrame for better performance
+  useEffect(() => {
+    let animationFrameId: number;
+    let lastTimestamp = 0;
+    
+    const animate = (timestamp: number) => {
+      // Update approximately every 50ms but without causing excessive rerenders
+      if (timestamp - lastTimestamp >= 50) {
+        setAngle(prev => (prev + 2) % 360); // Limit to 0-359 to prevent large numbers
+        lastTimestamp = timestamp;
+      }
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
   }, []);
 
   return (

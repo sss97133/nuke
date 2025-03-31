@@ -1,3 +1,4 @@
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +15,7 @@ interface EmailLoginFormProps {
   onContinueWithoutLogin: () => void;
 }
 
-export const EmailLoginForm = ({
+export const EmailLoginForm = React.memo(({ 
   isLoading,
   showForgotPassword,
   setShowForgotPassword,
@@ -22,6 +23,8 @@ export const EmailLoginForm = ({
   setIsSignUp,
   onContinueWithoutLogin
 }: EmailLoginFormProps) => {
+  // Using memo to prevent unnecessary re-renders
+  
   const {
     email,
     setEmail,
@@ -150,4 +153,9 @@ export const EmailLoginForm = ({
       )}
     </form>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison to prevent unnecessary re-renders
+  return prevProps.isLoading === nextProps.isLoading && 
+         prevProps.showForgotPassword === nextProps.showForgotPassword &&
+         prevProps.isSignUp === nextProps.isSignUp;
+});

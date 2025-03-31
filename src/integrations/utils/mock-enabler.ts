@@ -6,7 +6,7 @@
  */
 
 // Flag to control whether to use mock implementations
-const USE_MOCKS = true;
+const USE_MOCKS = true; // Re-enabled to prevent network issues
 
 // Disable WebSocket connections to prevent errors
 if (typeof window !== 'undefined' && USE_MOCKS) {
@@ -39,11 +39,14 @@ if (typeof window !== 'undefined' && USE_MOCKS) {
     return new originalWebSocket(url, protocols);
   } as any;
   
-  // Copy over static properties
-  window.WebSocket.CONNECTING = originalWebSocket.CONNECTING;
-  window.WebSocket.OPEN = originalWebSocket.OPEN;
-  window.WebSocket.CLOSING = originalWebSocket.CLOSING;
-  window.WebSocket.CLOSED = originalWebSocket.CLOSED;
+  // Define the MockWebSocket class with static properties
+  // This avoids assigning to read-only properties
+  Object.defineProperties(window.WebSocket, {
+    'CONNECTING': { value: originalWebSocket.CONNECTING },
+    'OPEN': { value: originalWebSocket.OPEN },
+    'CLOSING': { value: originalWebSocket.CLOSING },
+    'CLOSED': { value: originalWebSocket.CLOSED }
+  });
   
   console.log('[MOCK] WebSocket connections to Supabase will be intercepted');
 }

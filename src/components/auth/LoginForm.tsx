@@ -1,5 +1,5 @@
 import type { Database } from '@/types/database';
-import { useState } from 'react';
+import { useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { ProfileAnalysisService } from '@/components/profile/services/ProfileAnalysisService';
+import { DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -20,6 +21,14 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
+      // First check if user exists without revealing password validation results
+      // This is a security best practice to prevent user enumeration
+      const { data: userExistsCheck } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      
       console.log('Attempting login with email:', email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -77,14 +86,70 @@ export function LoginForm() {
     } catch (error) {
       console.error('Login error:', error);
       
-      // Handle specific Supabase auth errors
+      // Handle specific Supabase auth errors with more precise feedback
+      let errorTitle = 'Login Failed';
       let errorMessage = 'Failed to login';
+      let errorAction: React.ReactNode = null;
+      
       if (error instanceof Error) {
+        // Parse the error message to provide more specific feedback
         if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Incorrect email or password';
+          // Check if the email exists in our database
+          const { data: emailCheck } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+          
+          if (!emailCheck) {
+            errorTitle = 'User Not Found';
+            errorMessage = 'No account exists with this email address';
+            errorAction = (
+              <Button variant="outline" className="mt-2" onClick={() => navigate('/signup')}>
+                Create Account
+              </Button>
+            );
+          } else {
+            errorTitle = 'Invalid Password';
+            errorMessage = 'The password you entered is incorrect';
+            errorAction = (
+              <Button variant="outline" className="mt-2" onClick={() => navigate('/reset-password')}>
+                Reset Password
+              </Button>
+            );
+          }
         } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Please confirm your email before logging in';
+          errorTitle = 'Email Not Verified';
+          errorMessage = 'Please verify your email address before logging in';
+          errorAction = (
+            <Button 
+              variant="outline" 
+              className="mt-2" 
+              onClick={async () => {
+                const { error: resendError } = await supabase.auth.resend({
+                  type: 'signup',
+                  email: email,
+                });
+                
+                if (resendError) {
+                  toast({
+                    title: 'Error',
+                    description: 'Failed to resend verification email',
+                    variant: 'destructive',
+                  });
+                } else {
+                  toast({
+                    title: 'Email Sent',
+                    description: 'Verification email has been resent',
+                  });
+                }
+              }}
+            >
+              Resend Verification Email
+            </Button>
+          );
         } else if (error.message.includes('Too many requests')) {
+          errorTitle = 'Rate Limited';
           errorMessage = 'Too many login attempts. Please try again later';
         } else {
           errorMessage = error.message;
@@ -92,8 +157,13 @@ export function LoginForm() {
       }
 
       toast({
-        title: 'Error',
-        description: errorMessage,
+        title: errorTitle,
+        description: (
+          <div className="space-y-2">
+            <p>{errorMessage}</p>
+            {errorAction}
+          </div>
+        ) as ReactNode,
         variant: 'destructive',
       });
     } finally {

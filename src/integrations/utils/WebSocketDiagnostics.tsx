@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import USE_MOCKS from '../utils/mock-enabler';
 
 interface WebSocketState {
   status: 'connected' | 'disconnected' | 'connecting' | 'error';
@@ -10,23 +11,42 @@ interface WebSocketState {
 }
 
 export const WebSocketDiagnostics = () => {
+  // Skip diagnostics if mocks are enabled
+  if (USE_MOCKS) {
+    return null;
+  }
+  
   const [wsState, setWsState] = useState<WebSocketState>({
     status: 'connecting',
     reconnectAttempts: 0
   });
   const { toast } = useToast();
   
-  useEffect(() => {
-    const channel = supabase.channel('system_diagnostics');
-    let pingInterval: ReturnType<typeof setInterval>;
-    let reconnectTimeout: ReturnType<typeof setTimeout>;
+  // Use refs to store mutable values that shouldn't trigger re-renders
+  const channelRef = useRef<any>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  
+  // Create a stable connect function with useCallback
+  const connect = useCallback(() => {
+    console.log('WebSocket: Attempting to connect...');
+    setWsState(prev => ({ ...prev, status: 'connecting' }));
     
-    const connect = () => {
-      console.log('WebSocket: Attempting to connect...');
-      setWsState(prev => ({ ...prev, status: 'connecting' }));
+    try {
+      // Clean up existing channel if it exists
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+      
+      const channel = supabase.channel('system_diagnostics');
+      channelRef.current = channel;
       
       channel
-        .on('system', (event) => {
+        .on('broadcast', { event: 'system' }, (payload) => {
+          const event = payload.payload;
+          console.log(`WebSocket system event: ${event}`);
+          
           if (event === 'connected') {
             console.log('WebSocket: Connected successfully');
             setWsState(prev => ({ 
@@ -43,15 +63,26 @@ export const WebSocketDiagnostics = () => {
             }));
             
             // Clear ping interval when disconnected
-            if (pingInterval) clearInterval(pingInterval);
+            if (pingIntervalRef.current) {
+              clearInterval(pingIntervalRef.current);
+              pingIntervalRef.current = null;
+            }
             
             // Attempt reconnection
-            reconnectTimeout = setTimeout(() => {
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+            
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectAttemptsRef.current += 1;
               setWsState(prev => ({ 
                 ...prev, 
-                reconnectAttempts: prev.reconnectAttempts + 1 
+                reconnectAttempts: reconnectAttemptsRef.current
               }));
-              channel.subscribe();
+              
+              if (channelRef.current) {
+                channelRef.current.subscribe();
+              }
             }, 5000); // Try to reconnect after 5 seconds
           }
         })
@@ -67,7 +98,7 @@ export const WebSocketDiagnostics = () => {
             }));
             
             // Notify the user about connection issues
-            if (wsState.reconnectAttempts > 2) {
+            if (reconnectAttemptsRef.current > 2) {
               toast({
                 title: "Connection Issues",
                 description: "Having trouble maintaining a stable connection. Some real-time features may not work.",
@@ -78,22 +109,45 @@ export const WebSocketDiagnostics = () => {
         });
         
       // Set up a ping to keep the connection alive
-      pingInterval = setInterval(() => {
-        if (channel.state === 'joined') {
+      pingIntervalRef.current = setInterval(() => {
+        if (channelRef.current && channelRef.current.state === 'joined') {
           setWsState(prev => ({ ...prev, lastPing: new Date() }));
         }
       }, 30000); // Every 30 seconds
-    };
-    
+    } catch (error) {
+      console.error('WebSocket setup error:', error);
+      setWsState(prev => ({
+        ...prev,
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error)
+      }));
+    }
+  }, [toast]);
+  
+  // Set up the initial connection and cleanup on unmount
+  useEffect(() => {
+    // Connect only once on mount
     connect();
     
+    // Cleanup function to run on unmount
     return () => {
       console.log('WebSocket: Cleaning up connection');
-      if (pingInterval) clearInterval(pingInterval);
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      supabase.removeChannel(channel);
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [toast]);
+  }, [connect]); // Only depend on the stable connect function
   
   return null; // This is a non-visual component
 };
