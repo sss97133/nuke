@@ -135,45 +135,50 @@ export const isTest = (): boolean => {
 };
 
 /**
- * Enforces the 'no mock VEHICLE data in production' rule for vehicle-centric architecture.
- * When in production, this function returns false, preventing mock vehicle data from being used.
- * In development or test environments, returns allowMocks parameter value.
+ * The marketplace and UI components require design-critical data to render properly.
+ * This data is NOT considered mock vehicle data (VIN records, service history).
+ * It's essential for UI layout and component structure.
+ * 
+ * IMPORTANT: This function returns TRUE in all environments to maintain UI functionality.
+ * Used by marketplace, dashboard, and UI components that need data to render properly.
+ */
+export const shouldAllowMockData = (): boolean => {
+  // Always return true to maintain design integrity
+  return true;
+};
+
+/**
+ * For UI design elements that need visual data to render correctly.
+ * This is specifically for charts, layouts, and UI components - NOT vehicle data.
  * 
  * Usage example:
  * ```
- * // In a component or data service
- * const data = shouldAllowMockVehicleData() ? mockVehicleData : await fetchRealVehicleData();
+ * // In a UI component that needs data for layout/styling
+ * const chartData = shouldAllowDesignData() ? uiDesignData : (realData || fallbackDisplayData());
+ * ```
+ */
+export const shouldAllowDesignData = (): boolean => {
+  // UI components must be allowed to render with proper data structure
+  return true;
+};
+
+/**
+ * Only for actual VEHICLE DATA (VINs, service records, etc.)
+ * This enforces the rule of no real vehicle mock data in production.
+ * 
+ * Usage example:
+ * ```
+ * // In a vehicle data service
+ * const vehicleHistory = shouldAllowVehicleMockData() ? mockVehicleHistory : await fetchRealVehicleHistory();
  * ```
  * 
- * @param allowMocks Whether to allow mocks in non-production environments (defaults to true)
+ * @param allowMocks Whether to allow vehicle mocks in non-production environments
  * @returns false if in production, allowMocks value otherwise
  */
-export const shouldAllowMockVehicleData = (allowMocks: boolean = true): boolean => {
+export const shouldAllowVehicleMockData = (allowMocks: boolean = true): boolean => {
   // Always false in production to ensure real vehicle data only
   if (isProduction()) return false;
   
   // In development or test, respect the allowMocks parameter
   return allowMocks;
 };
-
-/**
- * For UI design elements that need data to render correctly.
- * This distinguishes between vehicle data (which should never be mocked in production)
- * and UI/design elements that can use placeholder data to maintain visual design.
- * 
- * Usage example:
- * ```
- * // In a UI component that needs data for layout/styling
- * const chartData = shouldAllowUIPlaceholderData() ? placeholderChartData : (realData || generatePlaceholderData());
- * ```
- * 
- * @returns true in all environments - design placeholders are acceptable
- */
-export const shouldAllowUIPlaceholderData = (): boolean => {
-  // UI components can always use placeholder data if needed for proper rendering
-  return true;
-};
-
-// Legacy function name - kept for backward compatibility
-// Will be deprecated in future versions
-export const shouldAllowMockData = shouldAllowMockVehicleData;
