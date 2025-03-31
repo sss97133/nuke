@@ -4,7 +4,24 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "installCommand": "npm install",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  "routes": [
+    {
+      "src": "/assets/(.*)",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "continue": true
+    },
+    {
+      "src": "/(.+\\.[a-zA-Z0-9]+)$",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "continue": true
+    },
+    { 
+      "src": "/.*", 
+      "dest": "/index.html",
+      "headers": { "cache-control": "public, max-age=0, must-revalidate" }
+    }
+  ],
+  "github": {
+    "silent": true
+  }
 }

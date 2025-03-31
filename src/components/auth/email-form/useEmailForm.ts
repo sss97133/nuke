@@ -179,7 +179,7 @@ export const useEmailForm = (
         document.body.appendChild(navIndicator);
       }
       
-      // Use a hybrid approach: Try normal auth but also setup fallback redirects
+      // Use a more SPA-friendly approach that works with client-side routing
       try {
         // Normal authentication process
         console.log('[useEmailForm] Calling handleEmailLogin with:', { email, hasPassword: !!password, isSignUp, hasAvatar: !!avatarUrl });
@@ -189,17 +189,32 @@ export const useEmailForm = (
         if (typeof window !== 'undefined') {
           console.log('[useEmailForm] Setting up redirect safety nets');
           
+          // Setup proper SPA navigation using History API
+          const navigateToExplore = () => {
+            // Using History API for SPA-friendly navigation
+            const baseUrl = window.location.origin;
+            const exploreUrl = `${baseUrl}/explore`;
+            
+            console.log('[useEmailForm] Navigating to:', exploreUrl);
+            
+            // First try history.pushState for a clean SPA navigation
+            try {
+              window.history.pushState({}, '', '/explore');
+              // Dispatch a popstate event to trigger router updates
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            } catch (e) {
+              console.error('[useEmailForm] History API failed, falling back to direct navigation');
+              // Fallback to direct navigation if History API fails
+              window.location.href = exploreUrl;
+            }
+          };
+          
           // Immediate redirect for development mode
           const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
           if (isDev) {
             setTimeout(() => {
               console.log('[useEmailForm] DEV MODE - DIRECT NAVIGATION');
-              if (typeof document !== 'undefined') {
-                const el = document.getElementById('auth-debug-indicator') || document.createElement('div');
-                el.innerText = 'Dev mode redirect activated';
-                if (!document.getElementById('auth-debug-indicator')) document.body.appendChild(el);
-              }
-              window.location.href = '/explore';
+              navigateToExplore();
             }, 800); // Shorter timeout for development
           }
           
@@ -218,14 +233,12 @@ export const useEmailForm = (
               indicator.style.zIndex = '10000';
               indicator.innerText = 'Login timed out. Click to continue.';
               indicator.style.cursor = 'pointer';
-              indicator.onclick = () => window.location.href = '/explore';
+              indicator.onclick = navigateToExplore;
               document.body.appendChild(indicator);
             }
             
             // Final redirect after a longer timeout
-            setTimeout(() => {
-              window.location.href = '/explore';
-            }, 2000); 
+            setTimeout(navigateToExplore, 2000); 
           }, 5000); // 5 second timeout as a final fallback
         }
         
@@ -249,7 +262,21 @@ export const useEmailForm = (
             title: "Login Successful",
             description: "Taking you to the explore page..."
           });
-          window.location.href = '/explore';
+          
+          // Use SPA-friendly navigation
+          const baseUrl = window.location.origin;
+          const exploreUrl = `${baseUrl}/explore`;
+          
+          // Try the History API first (best for SPAs)
+          try {
+            window.history.pushState({}, '', '/explore');
+            // Trigger router update
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          } catch (e) {
+            console.warn('[useEmailForm] History API failed, using direct navigation');
+            // Fall back to direct navigation
+            window.location.href = exploreUrl;
+          }
         }
       } catch (loginError) {
         console.error('[useEmailForm] Error during login/signup:', loginError);
@@ -258,7 +285,14 @@ export const useEmailForm = (
             (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
           console.log('[useEmailForm] DEV MODE - Redirecting despite error');
           setTimeout(() => {
-            window.location.href = '/explore';
+            // Use SPA-friendly navigation
+            try {
+              window.history.pushState({}, '', '/explore');
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            } catch (e) {
+              // Fall back to direct navigation if needed
+              window.location.href = `${window.location.origin}/explore`;
+            }
           }, 1000);
         }
         // Error is already handled in the catch block below
