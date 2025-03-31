@@ -210,6 +210,8 @@ const ThreeJsTimeline: React.FC<ThreeJsTimelineProps> = ({
     let startDate = manufactureDate || new Date();
     let endDate = new Date();
     
+    if (!timelineGroupRef.current) return;
+    
     if (events.length > 0) {
       const eventDates = events.map(e => new Date(e.eventDate));
       const earliestEventDate = new Date(Math.min(...eventDates.map(d => d.getTime())));
@@ -244,6 +246,8 @@ const ThreeJsTimeline: React.FC<ThreeJsTimelineProps> = ({
     // Add major tick marks for years
     const startYear = startDate.getFullYear();
     const endYear = endDate.getFullYear() + 1; // Include the current year
+    
+    if (!timelineGroupRef.current) return;
     
     for (let year = startYear; year <= endYear; year++) {
       const yearDate = new Date(year, 0, 1);
@@ -290,6 +294,8 @@ const ThreeJsTimeline: React.FC<ThreeJsTimelineProps> = ({
     }
     
     // Add events to timeline
+    if (!timelineGroupRef.current) return;
+    
     events.forEach((event, index) => {
       const eventDate = new Date(event.eventDate);
       const position = getPositionOnTimeline(eventDate, startDate, endDate, timelineLength);
@@ -337,7 +343,9 @@ const ThreeJsTimeline: React.FC<ThreeJsTimelineProps> = ({
       marker.castShadow = true;
       marker.receiveShadow = true;
       marker.userData.eventId = event.id;
-      timelineGroupRef.current.add(marker);
+      if (timelineGroupRef.current) {
+        timelineGroupRef.current.add(marker);
+      }
       
       // Store reference to marker for raycasting
       eventMarkersRef.current.set(event.id, marker);
@@ -348,7 +356,9 @@ const ThreeJsTimeline: React.FC<ThreeJsTimelineProps> = ({
       const lineMaterial = new THREE.MeshStandardMaterial({ color: markerColor, transparent: true, opacity: 0.6 });
       const line = new THREE.Mesh(lineGeometry, lineMaterial);
       line.position.set(position - timelineLength / 2, lineHeight / 2, 0);
-      timelineGroupRef.current.add(line);
+      if (timelineGroupRef.current) {
+        timelineGroupRef.current.add(line);
+      }
       
       // If we have an image for this event, create a floating panel
       if (event.imageUrls && event.imageUrls.length > 0) {
@@ -362,7 +372,9 @@ const ThreeJsTimeline: React.FC<ThreeJsTimelineProps> = ({
         const panel = new THREE.Mesh(panelGeometry, panelMaterial);
         panel.position.set(position - timelineLength / 2, lineHeight + 0.5, 0);
         panel.userData.eventId = event.id;
-        timelineGroupRef.current.add(panel);
+        if (timelineGroupRef.current) {
+          timelineGroupRef.current.add(panel);
+        }
         
         // Add to our tracked objects for raycasting
         eventMarkersRef.current.set(event.id + '_panel', panel);
@@ -418,7 +430,7 @@ const ThreeJsTimeline: React.FC<ThreeJsTimelineProps> = ({
       <div className={`three-timeline ${className || ''}`}>
         <div className="empty-container">
           <p>No timeline events found for this vehicle.</p>
-          <p>Events will appear here as they are added to the vehicle's history.</p>
+          <p>Events will appear here as they are added to the vehicle&apos;s history.</p>
         </div>
       </div>
     );

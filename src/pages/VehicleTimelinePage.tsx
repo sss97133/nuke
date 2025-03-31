@@ -161,7 +161,7 @@ const VehicleTimelinePage: React.FC = () => {
             <div className="feature-grid">
               <div className="feature-card">
                 <h3>Comprehensive Timeline</h3>
-                <p>View a vehicle's complete digital lifecycle from manufacturer to present day</p>
+                <p>View a vehicle&apos;s complete digital lifecycle from manufacturer to present day</p>
               </div>
               <div className="feature-card">
                 <h3>Multiple Data Sources</h3>
