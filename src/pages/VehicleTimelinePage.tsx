@@ -7,7 +7,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 
 // Import the VehicleTimeline component
-import VehicleTimeline, { TimelineEvent } from '../components/VehicleTimeline';
+import VehicleTimeline from '../components/VehicleTimeline/VehicleTimeline';
+import { TimelineEvent } from '../components/VehicleTimeline/types';
 
 // Page styles
 import './VehicleTimelinePage.css';
