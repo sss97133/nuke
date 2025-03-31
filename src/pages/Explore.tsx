@@ -2,12 +2,16 @@
 import React, { useEffect } from 'react';
 import { ExploreFeed } from '@/components/explore/ExploreFeed';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles } from "lucide-react";
+import { Sparkles, LogIn, Car } from "lucide-react";
 import { useAuthState } from '@/hooks/auth/use-auth-state';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from 'react-router-dom';
 
 const Explore = () => {
-  const { loading } = useAuthState();
+  const { loading, session } = useAuthState();
+  const navigate = useNavigate();
+  const isAuthenticated = !!session;
   
   // Add error handling
   const [hasError, setHasError] = React.useState(false);
@@ -39,6 +43,26 @@ const Explore = () => {
             Discover personalized content based on your interests and activities
           </p>
         </div>
+        
+        {!isAuthenticated && (
+          <div className="flex flex-col items-end gap-2">
+            <Button 
+              onClick={() => navigate('/login')} 
+              className="flex items-center gap-2"
+              size="lg"
+              variant="default"
+            >
+              <LogIn className="h-4 w-4" />
+              Sign In
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Car className="h-3 w-3" />
+                <span>Sign in to access your vehicle digital identity</span>
+              </span>
+            </p>
+          </div>
+        )}
       </div>
       
       {hasError && (
