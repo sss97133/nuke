@@ -1,4 +1,4 @@
-import type { Database } from '../types';
+import type { Database } from '@/integrations/supabase/types';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -119,7 +119,7 @@ export default function SimpleImport() {
             addLog(`CSV parsed: ${results.data.length} rows found`);
             
             // Validate rows
-            const validVehicles = results.data.filter((row: any) => {
+            const validVehicles = results.data.filter((row: Record<string, string | number | undefined>) => {
               return row.make && row.model && row.year;
             }) as VehicleImport[];
 
@@ -261,16 +261,14 @@ export default function SimpleImport() {
             });
           }
         });
-      } catch (error: any) {
-        setStatus('error');
-        setErrorMessage(error.message);
-        setIsImporting(false);
-        addLog(`Unexpected error: ${error.message}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "An error occurred during import";
         toast({
-          title: 'Import error',
-          description: error.message,
-          variant: 'destructive',
+          title: "Import error",
+          description: errorMessage,
+          variant: "destructive",
         });
+        setIsImporting(false);
       }
     };
 

@@ -1,12 +1,15 @@
-
 import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from './__mocks__/use-toast';
 import { PartItem } from '../../types';
-import { FormState } from '../types';
+import { FormState, FormStateValue } from '../types';
+
+interface UsePartsManagementProps {
+  updateFormState: (field: keyof FormState, value: FormStateValue) => void;
+}
 
 export const usePartsManagement = (
   formState: FormState,
-  updateFormState: (field: keyof FormState, value: any) => void
+  updateFormState: (field: keyof FormState, value: FormStateValue) => void
 ) => {
   const { toast } = useToast();
   
@@ -33,7 +36,8 @@ export const usePartsManagement = (
       return;
     }
 
-    updateFormState('parts', [...formState.parts, {...newPart}]);
+    const currentParts = Array.isArray(formState.parts) ? formState.parts : [];
+    updateFormState('parts', [...currentParts, {...newPart}]);
 
     // Reset the new part form
     setNewPart({
@@ -44,6 +48,10 @@ export const usePartsManagement = (
   };
 
   const removePart = (index: number) => {
+    if (!formState.parts || !Array.isArray(formState.parts)) {
+      return;
+    }
+    
     updateFormState(
       'parts', 
       formState.parts.filter((_, i) => i !== index)

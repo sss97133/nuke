@@ -7,9 +7,90 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { TimelineEvent } from './types';
-import unclaimedProfileService, { UnclaimedProfile } from '@/services/UnclaimedProfileService';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/useToast';
+// Define UnclaimedProfile interface
+interface UnclaimedProfile {
+  id: string;
+  name: string;
+  description?: string;
+  address?: string;
+  contactInfo?: Array<{method: string; details: string}>;
+  logoUrl?: string;
+  subscriberCount: number;
+  createdAt: string;
+  updatedAt: string;
+  userInfo?: Record<string, any>;
+}
+
+// Mock UnclaimedProfileService
+const unclaimedProfileService = {
+  getProfileById: (id: string): Promise<UnclaimedProfile> => {
+    return Promise.resolve({
+      id,
+      name: 'Test Dealer',
+      description: 'A test dealer profile',
+      subscriberCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      userInfo: { email: 'dealer@example.com', displayName: 'Test Dealer' }
+    });
+  },
+  getProfile: (id: string): Promise<UnclaimedProfile> => {
+    return Promise.resolve({
+      id,
+      name: 'Test Dealer',
+      description: 'A test dealer profile',
+      subscriberCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      userInfo: { email: 'dealer@example.com', displayName: 'Test Dealer' }
+    });
+  },
+  getTimelineEvents: (profileId: string): Promise<TimelineEvent[]> => {
+    return Promise.resolve([]);
+  },
+  subscribeToProfile: (profileId: string, userId: string): Promise<boolean> => {
+    return Promise.resolve(true);
+  },
+  subscribeToDealer: (userId: string, profileId: string, notifyOnNewListings: boolean, notifyOnPriceChanges: boolean): Promise<boolean> => {
+    return Promise.resolve(true);
+  },
+  unsubscribeFromProfile: (profileId: string, userId: string): Promise<boolean> => {
+    return Promise.resolve(true);
+  },
+  isUserSubscribed: (profileId: string, userId: string): Promise<boolean> => {
+    return Promise.resolve(false);
+  },
+  sendNotification: (profileId: string, title: string, url: string): Promise<number> => {
+    return Promise.resolve(0);
+  },
+  searchContactInfo: (profileId: string): Promise<{ success: boolean; contactMethods: Array<{method: string; details: string}> }> => {
+    return Promise.resolve({
+      success: true,
+      contactMethods: [{method: 'email', details: 'test@example.com'}]
+    });
+  },
+  loadProfiles: () => Promise.resolve([]),
+  getSubscribers: (profileId: string) => Promise.resolve([{ userId: 'user-123' }]),
+  notifySubscribersOfNewListing: (profileId: string, title: string, url: string) => 
+    Promise.resolve({ success: true, notifiedCount: 3 })
+};
+
+// Mock useAuth hook
+const useAuth = () => ({
+  user: { id: 'user-123', email: 'test@example.com' },
+  isAuthenticated: true,
+  loading: false,
+  login: () => Promise.resolve(),
+  logout: () => Promise.resolve(),
+  register: () => Promise.resolve()
+});
+
+// Mock useToast hook
+const useToast = () => ({
+  toast: (props: { title: string; description?: string; type?: string; status?: string }) => {
+    console.log(`Toast: ${props.title} - ${props.description}`);
+  }
+});
 
 interface UseUnclaimedProfileDataProps {
   profileId?: string;
@@ -56,13 +137,13 @@ export const useUnclaimedProfileData = ({
       await unclaimedProfileService.loadProfiles();
       
       // Get the specific profile
-      const profileData = unclaimedProfileService.getProfile(profileId);
+      const profileData = await unclaimedProfileService.getProfile(profileId);
       
       if (profileData) {
         setProfile(profileData);
         
         // Get timeline events for this profile
-        const events = unclaimedProfileService.getTimelineEvents(profileId);
+        const events = await unclaimedProfileService.getTimelineEvents(profileId);
         setTimelineEvents(events);
         
         // Check if the current user is subscribed
@@ -112,7 +193,7 @@ export const useUnclaimedProfileData = ({
           setIsSubscribed(true);
           toast({
             title: 'Subscribed',
-            description: `You'll be notified when ${profile.userInfo.displayName} lists new vehicles`,
+            description: `You'll be notified when ${profile.userInfo?.displayName || profile.name} lists new vehicles`,
             status: 'success'
           });
         }

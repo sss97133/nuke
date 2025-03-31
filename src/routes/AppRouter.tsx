@@ -8,6 +8,9 @@ import { allRoutes, RouteType, isPublicPath } from './routeConfig';
 import { toast } from '@/components/ui/use-toast';
 // Fix the import to use the default export
 import StreamViewer from '@/pages/StreamViewer';
+// Import new auth callback components
+import AuthCallback from '@/pages/auth/AuthCallback';
+import ResetPassword from '@/pages/auth/ResetPassword';
 
 const AppRouterContent: React.FC = () => {
   const { loading, session } = useAuthState();
@@ -28,13 +31,18 @@ const AppRouterContent: React.FC = () => {
     });
   }, [currentPath, isAuthenticated, loading, isAuthCallbackPath]);
 
-  // Handle successful auth callback
+  // Handle hash-based auth callbacks (#access_token, etc.)
   useEffect(() => {
-    if (isAuthCallbackPath && !loading && isAuthenticated) {
-      console.log("Auth callback successful, redirecting to dashboard");
-      navigate('/dashboard', { replace: true });
+    // Detect if we have a hash in the URL that looks like an auth token
+    const hasAuthToken = location.hash && 
+      (location.hash.includes('access_token') || 
+       location.hash.includes('error_description'));
+       
+    if (hasAuthToken) {
+      // Let the AuthCallback component handle the token processing
+      navigate('/auth/callback', { replace: true });
     }
-  }, [isAuthCallbackPath, loading, isAuthenticated, navigate]);
+  }, [location.hash, navigate]);
 
   useEffect(() => {
     if (loading) return;
@@ -80,16 +88,7 @@ const AppRouterContent: React.FC = () => {
     return <LoadingScreen />;
   }
 
-  if (isAuthCallbackPath) {
-    console.log("Auth callback path detected");
-    return (
-      <Routes>
-        <Route path="/auth/callback" element={
-          <LoadingScreen message="Completing authentication..." />
-        } />
-      </Routes>
-    );
-  }
+  // Auth callback handling now moved to the AuthCallback component
 
   const getRouteElement = (route: typeof allRoutes[0]) => {
     if (route.redirectTo) {
@@ -113,6 +112,10 @@ const AppRouterContent: React.FC = () => {
 
   return (
     <Routes>
+      {/* Special auth callback routes with direct component mapping */}
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      
       <Route 
         path="/" 
         element={

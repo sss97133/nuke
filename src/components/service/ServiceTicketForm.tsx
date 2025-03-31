@@ -42,8 +42,9 @@ export const ServiceTicketForm = () => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user?.id) throw new Error('User not authenticated');
       
       const serviceTicket: Database['public']['Tables']['service_tickets']['Insert'] = {
         vehicle_id: selectedVehicle.id,
@@ -52,14 +53,14 @@ export const ServiceTicketForm = () => {
         parts_used: parts as unknown as Database['public']['Tables']['service_tickets']['Insert']['parts_used'],
         status: 'pending',
         priority: 'medium',
-        user_id: user?.id
+        user_id: user.id
       };
 
-      const { error } = await supabase
+      const { error: dbError } = await supabase
         .from('service_tickets')
         .insert(serviceTicket);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
 
       toast({
         title: "Success",
@@ -73,7 +74,8 @@ export const ServiceTicketForm = () => {
       setSelectedDepartment("");
       setParts([]);
       setCurrentStep(0);
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to create service ticket');
       toast({
         title: "Error",
         description: error.message,

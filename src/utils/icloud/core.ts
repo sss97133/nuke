@@ -5,7 +5,6 @@
  * with fallback to Supabase stored images.
  */
 
-import type { Database } from '../types';
 import { ICloudAlbumData, ICloudImage } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { mockFetchICloudImages } from './mock';
@@ -80,7 +79,7 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
           createdAt: new Date().toISOString(),
           itemCount: 3
         },
-        images: mockFetchICloudImages(sharedLink)
+        images: await mockFetchICloudImages(sharedLink)
       };
     }
     
@@ -92,7 +91,7 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
         createdAt: new Date().toISOString(),
         itemCount: 3
       },
-      images: mockFetchICloudImages(sharedLink)
+      images: await mockFetchICloudImages(sharedLink)
     };
     
     /*
@@ -222,7 +221,7 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
           createdAt: new Date().toISOString(),
           itemCount: 3
         },
-        images: mockFetchICloudImages(sharedLink)
+        images: await mockFetchICloudImages(sharedLink)
       };
     }
     */
@@ -237,39 +236,54 @@ export async function fetchICloudSharedAlbum(sharedLink: string): Promise<ICloud
         createdAt: new Date().toISOString(),
         itemCount: 3
       },
-      images: mockFetchICloudImages(sharedLink)
+      images: await mockFetchICloudImages(sharedLink)
     };
   }
 }
 
+interface ICloudAlbumResponse {
+  title?: string;
+  description?: string;
+  items?: Array<{
+    id: string;
+    caption?: string;
+    filename?: string;
+    url?: string;
+    thumbnailUrl?: string;
+    createdAt?: string;
+    width?: number;
+    height?: number;
+    fileSize?: number;
+    fileType?: string;
+  }>;
+}
+
 // Process iCloud album data into a standard format
-export function processICloudAlbumData(albumData: any): ICloudAlbumData {
+export function processICloudAlbumData(albumData: ICloudAlbumResponse): ICloudAlbumData {
   // Extract basic album info
   const albumInfo = {
     title: albumData.title || 'Shared Album',
     description: albumData.description || '',
-    createdAt: albumData.creationDate || new Date().toISOString(),
+    createdAt: new Date().toISOString(),
     itemCount: albumData.items?.length || 0
   };
-  
-  // Process image items
-  const images: ICloudImage[] = (albumData.items || []).map((item: any) => {
-    return {
-      id: item.id || `image_${Math.random().toString(36).substr(2, 9)}`,
-      caption: item.caption || '',
-      filename: item.filename || 'image.jpg',
-      url: item.url || item.derivatives?.url || '',
-      thumbnailUrl: item.thumbnailUrl || item.derivatives?.thumbnailUrl || '',
-      createdAt: item.creationDate || new Date().toISOString(),
-      width: item.width || 0,
-      height: item.height || 0,
-      fileSize: item.fileSize || 0,
-      fileType: item.fileType || 'image/jpeg'
-    };
-  });
-  
+
+  // Process images
+  const images: ICloudImage[] = (albumData.items || []).map(item => ({
+    id: item.id,
+    caption: item.caption || '',
+    filename: item.filename || 'image.jpg',
+    url: item.url || '',
+    thumbnailUrl: item.thumbnailUrl || item.url || '',
+    createdAt: item.createdAt || new Date().toISOString(),
+    width: item.width || 0,
+    height: item.height || 0,
+    fileSize: item.fileSize || 0,
+    fileType: item.fileType || 'image/jpeg'
+  }));
+
   return {
     album: albumInfo,
-    images: images
+    images
   };
 }

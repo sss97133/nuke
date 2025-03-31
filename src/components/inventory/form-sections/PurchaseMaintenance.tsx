@@ -2,6 +2,21 @@ import { ReceiptScanner } from "./purchase-maintenance/ReceiptScanner";
 import { DateFields } from "./purchase-maintenance/DateFields";
 import { PriceField } from "./purchase-maintenance/PriceField";
 
+interface ReceiptData {
+  id: string;
+  date: string;
+  total: number;
+  items: Array<{
+    description: string;
+    quantity: number;
+    price: number;
+    total: number;
+  }>;
+  vendor: string;
+  location: string;
+  metadata: Record<string, unknown>;
+}
+
 interface PurchaseMaintenanceProps {
   purchaseDate: string;
   purchasePrice: string;
@@ -27,12 +42,12 @@ export const PurchaseMaintenance = ({
   onLastMaintenanceDateChange,
   onNextMaintenanceDateChange,
 }: PurchaseMaintenanceProps) => {
-  const handleScanComplete = (data: any) => {
+  const handleScanComplete = (data: ReceiptData) => {
     if (data?.purchaseDate) {
       onPurchaseDateChange(data.purchaseDate);
     }
     if (data?.purchasePrice) {
-      onPurchasePriceChange(data.purchasePrice);
+      onPurchasePriceChange(data.purchasePrice.toString());
     }
   };
 

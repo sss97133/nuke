@@ -2,14 +2,24 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrainCircuit, Users, Lightbulb, BarChart3, Zap, FileSearch } from "lucide-react";
+
+interface HistoricalDataPoint {
+  date: string;
+  price: number;
+  volume?: number;
+  market_share?: number;
+  sentiment_score?: number;
+}
+
 export interface MarketAnalysisProps {
   vehicleData?: {
     make: string;
     model: string;
     year: number;
-    historical_data?: any;
+    historical_data?: HistoricalDataPoint[];
   };
 }
+
 export const MarketAnalysis = ({
   vehicleData
 }: MarketAnalysisProps) => {

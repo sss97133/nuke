@@ -128,7 +128,8 @@ export const BidForm = ({
                 title: "Bid Placed Successfully",
                 description: `Your bid of $${parseFloat(bidAmount).toLocaleString()} has been placed.`
               });
-            } catch (error: any) {
+            } catch (err) {
+              const error = err instanceof Error ? err : new Error('Unknown error occurred');
               toast({
                 title: "Error Placing Bid",
                 description: error.message,

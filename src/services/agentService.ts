@@ -1,5 +1,20 @@
 import { AgentService as CoreAgentService } from '@/agents';
 
+interface DocumentProcessingResult {
+  success: boolean;
+  data: {
+    text: string;
+    metadata: Record<string, unknown>;
+    confidence: number;
+    entities: Array<{
+      type: string;
+      value: string;
+      confidence: number;
+    }>;
+  } | null;
+  error: Error | null;
+}
+
 /**
  * Service for interacting with the agent system
  */
@@ -31,7 +46,7 @@ class AgentService {
    * @param documentId Document ID to process
    * @param vehicleId Optional vehicle ID
    */
-  async processDocument(documentId: string, vehicleId?: string): Promise<any> {
+  async processDocument(documentId: string, vehicleId?: string): Promise<DocumentProcessingResult> {
     return this.coreService.processDocument(documentId, vehicleId);
   }
 }

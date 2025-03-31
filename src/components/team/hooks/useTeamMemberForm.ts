@@ -1,4 +1,3 @@
-
 import type { Database } from '../types';
 import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
@@ -59,7 +58,6 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       console.log("Getting current user session");
       // Get the current user to use their auth session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (error) console.error("Database query error:", error);
       
       if (sessionError) {
         console.error("Session error:", sessionError);
@@ -92,7 +90,8 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
         if (createError.code === '23505' || createError.message.includes('duplicate key')) {
           console.log("Profile with this email might already exist, checking...");
           const { data: existingProfile, error: fetchError } = await supabase
-        .select('id')
+            .from('profiles')
+            .select('id')
             .eq('email', formData.email)
             .maybeSingle();
 
@@ -127,6 +126,7 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       // Now create the team member with reference to profile
       console.log("Creating team member with profile ID:", profileId);
       const { data: teamMember, error: teamMemberError } = await supabase
+        .from('team_members')
         .insert({
           profile_id: profileId,
           position: formData.position,
@@ -164,11 +164,12 @@ export const useTeamMemberForm = (onOpenChange: (open: boolean) => void, onSucce
       console.log("Closing dialog");
       onOpenChange(false);
       
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to add team member');
       console.error('Error adding team member:', error);
       toast({
         title: "Failed to add team member",
-        description: error.message || "An error occurred while adding the team member.",
+        description: error.message,
         variant: "destructive",
       });
       

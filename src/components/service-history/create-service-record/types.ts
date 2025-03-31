@@ -1,6 +1,8 @@
 
 import { PartItem } from '../types';
 
+export type FormStateValue = string | number | boolean | Date | null | undefined | any[];
+
 export interface Vehicle {
   id: string;
   make: string;
@@ -21,7 +23,7 @@ export interface FormState {
 
 export interface ServiceRecordHookReturn {
   formState: FormState;
-  updateFormState: (field: keyof FormState, value: any) => void;
+  updateFormState: (field: keyof FormState, value: FormStateValue) => void;
   vehicles: Vehicle[];
   vehiclesLoading: boolean;
   newPart: PartItem;

@@ -1,4 +1,3 @@
-
 /**
  * Types for iCloud shared album data
  */

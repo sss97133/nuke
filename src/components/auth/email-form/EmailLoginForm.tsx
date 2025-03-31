@@ -1,4 +1,5 @@
 
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,7 +18,7 @@ interface EmailLoginFormProps {
   onError?: (error: string) => void;
 }
 
-export const EmailLoginForm = ({
+export const EmailLoginForm = React.memo(({
   isLoading,
   showForgotPassword,
   setShowForgotPassword,
@@ -36,23 +37,39 @@ export const EmailLoginForm = ({
     avatarUrl,
     setAvatarUrl,
     handleSubmit,
-    formError
+    formError,
+    isSubmitting
   } = useEmailForm(showForgotPassword, isSignUp, onError);
 
-  // Debug logging
-  console.log("Rendering EmailLoginForm", { 
-    showForgotPassword, 
-    isSignUp, 
-    hasError: !!formError 
-  });
+  // Debug logging only in development and only on mount
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log("EmailLoginForm mounted", { 
+        showForgotPassword, 
+        isSignUp, 
+        hasError: !!formError 
+      });
+    }
+  }, []);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4" data-submitting={isSubmitting ? "true" : "false"}>
       {formError && (
         <Alert variant="destructive" className="py-2">
           <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
+      )}
+      
+      {/* Show loading indicator */}
+      {isSubmitting && (
+        <div className="flex items-center justify-center p-2 bg-blue-50 text-blue-700 rounded-md">
+          <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Processing...</span>
+        </div>
       )}
       
       <div className="space-y-2">
@@ -114,9 +131,18 @@ export const EmailLoginForm = ({
       <Button 
         type="submit" 
         className="classic-button w-full font-system bg-secondary hover:bg-accent hover:text-accent-foreground" 
-        disabled={isLoading}
+        disabled={isLoading || isSubmitting}
       >
-        {showForgotPassword ? 'Send Reset Link' : (isSignUp ? 'Sign Up' : 'Login')}
+        {isSubmitting 
+          ? <span className="flex items-center justify-center">
+              <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {showForgotPassword ? 'Sending...' : (isSignUp ? 'Creating Account...' : 'Logging In...')}
+            </span>
+          : (showForgotPassword ? 'Send Reset Link' : (isSignUp ? 'Sign Up' : 'Login'))
+        }
       </Button>
       
       <Button 
@@ -162,4 +188,9 @@ export const EmailLoginForm = ({
       )}
     </form>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison to prevent unnecessary re-renders
+  return prevProps.isLoading === nextProps.isLoading && 
+         prevProps.showForgotPassword === nextProps.showForgotPassword &&
+         prevProps.isSignUp === nextProps.isSignUp;
+});

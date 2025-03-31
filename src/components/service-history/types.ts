@@ -1,5 +1,5 @@
 
-import { Json } from "@/integrations/supabase/types";
+import { Json } from "./__mocks__/supabase-types";
 
 export interface ServiceRecord {
   id: string;

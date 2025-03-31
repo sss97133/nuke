@@ -76,4 +76,6 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
   );
 };
 
+VehicleForm.displayName = 'VehicleForm';
+
 export default VehicleForm;

@@ -34,3 +34,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     />
   );
 };
+
+ImageUpload.displayName = 'ImageUpload';
+
+export default ImageUpload;

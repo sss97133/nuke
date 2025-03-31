@@ -93,12 +93,13 @@ export const useICloudUpload = ({ vehicleId, vehicleInfo, onConnect }: UseICloud
       }
       
       return uploadedPaths;
-    } catch (err: any) {
-      setError(`Upload error: ${err.message || 'Unknown error'}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Upload error: ${errorMessage}`);
       toast({
         variant: "destructive",
         title: "Upload Error",
-        description: err.message || 'Unknown error occurred during upload',
+        description: errorMessage,
       });
       return uploadedPaths;
     } finally {

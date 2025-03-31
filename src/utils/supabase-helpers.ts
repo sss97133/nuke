@@ -1,3 +1,5 @@
+import { ToastProps } from '@/components/ui/toast/toast';
+import { AuthError } from '@supabase/supabase-js';
 
 /**
  * Custom error class for Supabase-related errors
@@ -75,7 +77,7 @@ export const formatAuthError = (error: any): string => {
  * @param toast - The toast function to display errors
  * @returns Formatted error message
  */
-export const handleAuthError = (error: any, toast?: any): string => {
+export const handleAuthError = (error: AuthError, toast?: (props: ToastProps) => void): string => {
   const errorMessage = formatAuthError(error);
   
   if (toast) {

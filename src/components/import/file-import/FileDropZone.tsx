@@ -1,4 +1,3 @@
-
 import React, { useCallback, useRef, useState } from 'react';
 import { parseCarCsv, importCarsToSupabase, connectICloudImages, saveCarImages } from '@/utils/vehicle';
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +7,19 @@ import { ICloudImageModal } from './ICloudImageModal';
 import { DropZone } from './components/DropZone';
 import { FilePreview } from './components/FilePreview';
 import { ImportedCarsList } from './components/ImportedCarsList';
+
+interface ImportedCar {
+  id?: string;
+  make: string;
+  model: string;
+  year: number | string;
+  color?: string;
+  mileage?: number | string;
+  vin?: string;
+  icloud_album_link?: string;
+  icloud_folder_id?: string;
+  [key: string]: string | number | undefined;
+}
 
 interface FileDropZoneProps {
   selectedFile: File | null;
@@ -24,8 +36,8 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isICloudModalOpen, setIsICloudModalOpen] = useState(false);
-  const [importedCars, setImportedCars] = useState<any[]>([]);
-  const [selectedCar, setSelectedCar] = useState<any>(null);
+  const [importedCars, setImportedCars] = useState<ImportedCar[]>([]);
+  const [selectedCar, setSelectedCar] = useState<ImportedCar | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isConnectingImages, setIsConnectingImages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,10 +104,11 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         });
         setIsProcessing(false);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred during import";
       toast({
         title: "Import error",
-        description: error.message || "An error occurred during import",
+        description: errorMessage,
         variant: "destructive",
       });
       setIsProcessing(false);
@@ -110,7 +123,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
     setIsProcessing(false);
   };
 
-  const handleConnectImages = (car: any) => {
+  const handleConnectImages = (car: ImportedCar) => {
     setSelectedCar(car);
     setIsICloudModalOpen(true);
   };
@@ -147,10 +160,11 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           description: `Successfully uploaded ${data.uploadedImages.length} images`,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred connecting images";
       toast({
         title: "Connection error",
-        description: error.message || "An error occurred connecting images",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

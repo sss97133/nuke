@@ -5,10 +5,19 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/lib/supabase';
 
+interface ScrapedData {
+  title?: string;
+  price?: number;
+  description?: string;
+  images?: string[];
+  location?: string;
+  [key: string]: string | number | string[] | undefined;
+}
+
 interface UrlInputProps {
   url: string;
   setUrl: (url: string) => void;
-  onDataScraped?: (data: any) => void;
+  onDataScraped?: (data: ScrapedData) => void;
 }
 
 export const UrlInput: React.FC<UrlInputProps> = ({ url, setUrl, onDataScraped }) => {

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -22,7 +21,7 @@ export const DiscoveryDetailsSection: React.FC<DiscoveryDetailsSectionProps> = (
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Discovery Details</h3>
           <p className="text-sm text-muted-foreground">
-            Provide information about where and how you discovered this vehicle.
+            Enter the vehicle&apos;s discovery details and location information.
             This helps with tracking and verifying the vehicle's existence.
           </p>
           

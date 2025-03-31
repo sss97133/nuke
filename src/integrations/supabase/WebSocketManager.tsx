@@ -1,7 +1,8 @@
 
-import React, { useEffect, useContext, createContext, useState, useCallback } from 'react';
+import React, { useEffect, useContext, createContext, useState, useCallback, useRef } from 'react';
 import { supabase } from './client';
 import { useToast } from '@/hooks/use-toast';
+import USE_MOCKS from '../utils/mock-enabler';
 
 interface WebSocketContextValue {
   status: 'connected' | 'disconnected' | 'connecting';
@@ -18,6 +19,18 @@ const WebSocketContext = createContext<WebSocketContextValue>({
 export const useWebSocketStatus = () => useContext(WebSocketContext);
 
 export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Skip WebSocket connection if using mock data
+  if (USE_MOCKS) {
+    return (
+      <WebSocketContext.Provider value={{
+        status: 'connected', // Pretend we're connected when mocks are enabled
+        lastActivity: new Date(),
+        reconnect: () => {}
+      }}>
+        {children}
+      </WebSocketContext.Provider>
+    );
+  }
   const [status, setStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const [lastActivity, setLastActivity] = useState<Date | null>(null);
   const { toast } = useToast();
@@ -35,8 +48,9 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [toast]);
   
   // Use useRef to store mutable values that won't cause rerenders
-  const statusRef = React.useRef(status);
-  const lastActivityRef = React.useRef(lastActivity);
+  const statusRef = useRef(status);
+  const lastActivityRef = useRef(lastActivity);
+  const channelRef = useRef<any>(null);
   
   // Update refs when state changes
   React.useEffect(() => {
@@ -46,44 +60,49 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
   
   const setupConnection = useCallback(() => {
     console.log('Setting up WebSocket connection...');
-    const channel = supabase.channel('system');
-    
-    channel
-      .on('broadcast', { event: 'system' }, (payload) => {
-        const event = payload.payload;
-        console.log(`WebSocket system event: ${event}`);
-        
-        if (event === 'connected') {
-          setStatus('connected');
-          setLastActivity(new Date());
+    try {
+      // Check if we already have a channel and clean it up
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+      
+      const channel = supabase.channel('system');
+      
+      channel
+        .on('broadcast', { event: 'system' }, (payload) => {
+          const event = payload.payload;
+          console.log(`WebSocket system event: ${event}`);
           
-          // Only show toast if previously disconnected
-          if (statusRef.current === 'disconnected') {
+          if (event === 'connected') {
+            setStatus('connected');
+            setLastActivity(new Date());
+            
+            // Only show toast if previously disconnected
+            if (statusRef.current === 'disconnected') {
+              toast({
+                title: "Connected",
+                description: "Real-time connection established"
+              });
+            }
+          } else if (event === 'disconnected') {
+            setStatus('disconnected');
+            
             toast({
-              title: "Connected",
-              description: "Real-time connection established"
+              title: "Disconnected",
+              description: "Real-time connection lost. Some features may be unavailable.",
+              variant: "destructive"
             });
           }
-        } else if (event === 'disconnected') {
-          setStatus('disconnected');
-          
-          toast({
-            title: "Disconnected",
-            description: "Real-time connection lost. Some features may be unavailable.",
-            variant: "destructive"
-          });
-        }
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('WebSocket manager subscription confirmed');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('WebSocket manager subscription error');
-          setStatus('disconnected');
-        }
-      });
-      
-    // Setup heartbeat to detect stale connections
+        })
+        .subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('WebSocket manager subscription confirmed');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('WebSocket manager subscription error', err);
+            setStatus('disconnected');
+          }
+        });
+      // Setup heartbeat to detect stale connections
     const heartbeatInterval = setInterval(() => {
       // If we think we're connected but haven't had activity in 2 minutes,
       // try to reconnect
@@ -100,16 +119,34 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }, 60000); // Check every minute
     
+    // Store channel reference for cleanup
+    channelRef.current = channel;
+    
     return () => {
       clearInterval(heartbeatInterval);
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [toast, reconnect]); // Remove status and lastActivity from dependencies
+  } catch (error) {
+    console.error('Error setting up WebSocket connection:', error);
+    setStatus('disconnected');
+    toast({
+      title: "Connection Error",
+      description: "Failed to establish real-time connection",
+      variant: "destructive"
+    });
+    
+    // Return a no-op cleanup function
+    return () => {};
+  }
+  }, [toast]); // Remove reconnect, status and lastActivity from dependencies
   
   // The reconnect function needs to be defined before setupConnection,
   // so we need to resolve this circular dependency
-  const reconnectRef = React.useRef(reconnect);
-  React.useEffect(() => {
+  const reconnectRef = useRef(reconnect);
+  useEffect(() => {
     reconnectRef.current = reconnect;
   }, [reconnect]);
   

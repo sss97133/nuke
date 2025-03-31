@@ -40,6 +40,7 @@ import AdminPanel from '@/pages/AdminPanel'; // Import the AdminPanel component
 import VehicleTimelinePage from '@/pages/VehicleTimelinePage'; // Import the VehicleTimeline page
 import DesignSystem from '@/components/ui/design-system'; // Import the Design System documentation
 import TestVehicleInput from '@/test-vehicle-input'; // Import the TestVehicleInput component
+import { AuthTestPage } from '@/components/auth-test/AuthTestPage'; // Import the Auth Test Page
 
 // Route type definitions
 export enum RouteType {
@@ -74,6 +75,8 @@ export const publicRoutes: RouteConfig[] = [
   { path: '/documentation', element: <Documentation />, type: RouteType.PUBLIC },
   { path: '/sitemap', element: <Sitemap />, type: RouteType.PUBLIC },
   { path: '/test-supabase', element: <TestSupabase />, type: RouteType.PUBLIC },
+  // Auth test page for verifying user authentication and data input
+  { path: '/auth-test', element: <AuthTestPage />, type: RouteType.PUBLIC },
   // Ensure the crypto route has proper redirectTo property
   { path: '/crypto', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC, redirectTo: '/explore' },
 ];

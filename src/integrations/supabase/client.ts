@@ -62,9 +62,12 @@ declare global {
   }
 }
 
+// Import the fixed environment variables
+import { CORRECT_SUPABASE_URL, CORRECT_SUPABASE_ANON_KEY } from '@/fix-env';
+
 // Prefer environment variables but fallback to local development values if needed
-const supabaseUrl = getEnvValue('VITE_SUPABASE_URL') || 'http://127.0.0.1:54321';
-const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const supabaseUrl = CORRECT_SUPABASE_URL || getEnvValue('VITE_SUPABASE_URL') || 'http://127.0.0.1:54321';
+const supabaseAnonKey = CORRECT_SUPABASE_ANON_KEY || getEnvValue('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 // Get current environment
 const environment = typeof process !== 'undefined' && process.env && process.env.NODE_ENV 

@@ -6,8 +6,21 @@ import { ProcessingStatus } from "./vin-capture/ProcessingStatus";
 import { ConfidenceDisplay } from "./vin-capture/ConfidenceDisplay";
 import { useVinCapture } from "./vin-capture/useVinCapture";
 
+interface VinData {
+  vin: string;
+  make: string;
+  model: string;
+  year: number;
+  trim: string;
+  engine: string;
+  transmission: string;
+  bodyStyle: string;
+  color: string;
+  metadata: Record<string, unknown>;
+}
+
 interface VinCaptureProps {
-  onVinData: (data: any) => void;
+  onVinData: (data: VinData) => void;
 }
 
 export const VinCapture = ({ onVinData }: VinCaptureProps) => {

@@ -78,8 +78,11 @@ export const useDocumentUpload = ({
         const availableSlots = maxFiles - documents.length;
         if (availableSlots > 0) {
           const filesToAdd = validFiles.slice(0, availableSlots);
-          setDocuments(prev => [...prev, ...filesToAdd]);
-          form.setValue(field, [...documents, ...filesToAdd] as VehicleFormValues[typeof field]);
+          setDocuments(prev => {
+            const newFiles = [...prev, ...filesToAdd];
+            form.setValue(field, newFiles as VehicleFormValues[typeof field]);
+            return newFiles;
+          });
           
           if (onSuccess) {
             onSuccess(filesToAdd.length);
@@ -87,8 +90,11 @@ export const useDocumentUpload = ({
         }
       } else if (validFiles.length > 0) {
         // Add all valid files
-        setDocuments(prev => [...prev, ...validFiles]);
-        form.setValue(field, [...documents, ...validFiles] as VehicleFormValues[typeof field]);
+        setDocuments(prev => {
+          const newFiles = [...prev, ...validFiles];
+          form.setValue(field, newFiles as VehicleFormValues[typeof field]);
+          return newFiles;
+        });
         
         if (onSuccess) {
           onSuccess(validFiles.length);
@@ -114,18 +120,18 @@ export const useDocumentUpload = ({
     setDocuments([]);
     form.setValue(field, [] as VehicleFormValues[typeof field]);
   }, [form, field]);
-  
-  /**
-   * Set documents and update the form
-   */
-  const updateDocuments = useCallback((files: File[]) => {
-    setDocuments(files);
-    form.setValue(field, files as VehicleFormValues[typeof field]);
-  }, [form, field]);
 
   return {
     documents,
-    setDocuments: updateDocuments,
+    setDocuments: (filesOrUpdater: File[] | ((prev: File[]) => File[])) => {
+      setDocuments(prev => {
+        const newFiles = typeof filesOrUpdater === 'function' 
+          ? filesOrUpdater(prev)
+          : filesOrUpdater;
+        form.setValue(field, newFiles as VehicleFormValues[typeof field]);
+        return newFiles;
+      });
+    },
     handleDocumentsSelected,
     clearDocuments,
     isAtMaxCapacity: documents.length >= maxFiles

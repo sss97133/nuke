@@ -6,6 +6,18 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
+interface MarketData {
+  id: string;
+  timestamp: string;
+  price: number;
+  condition: string;
+  mileage: number;
+  location: string;
+  source: string;
+  url: string;
+  metadata: Record<string, unknown>;
+}
+
 interface CrawlResult {
   success: boolean;
   status?: string;
@@ -14,6 +26,12 @@ interface CrawlResult {
   creditsUsed?: number;
   expiresAt?: string;
   data?: any[];
+}
+
+interface MarketDataCollectorProps {
+  data?: MarketData[];
+  onDataUpdate: (data: MarketData[]) => void;
+  // ... rest of the props
 }
 
 export const MarketDataCollector = () => {

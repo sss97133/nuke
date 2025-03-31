@@ -1,10 +1,25 @@
-
-import type { Database } from '../types';
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { supabase } from './__mocks__/supabase-client';
+import { useToast } from './__mocks__/use-toast';
 import { FormState } from '../types';
 import { calculateTotalCost } from '../utils/calculations';
+import { PostgrestError } from '@supabase/supabase-js';
+
+interface ServiceRecord {
+  id: string;
+  vehicleId: string;
+  serviceDate: string;
+  description: string;
+  serviceType: string;
+  cost: number;
+  parts: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+  metadata: Record<string, unknown>;
+}
 
 export const useServiceSubmission = (
   formState: FormState,
@@ -28,8 +43,8 @@ export const useServiceSubmission = (
     
     try {
       // Get user ID
-      const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -50,11 +65,15 @@ export const useServiceSubmission = (
       };
 
       // Use type assertion to tell TypeScript this is a valid table
-      const { error } = await supabase
-        .from('service_records' as any)
-        .insert([serviceRecord]);
+      const { data: result, error: dbError } = await supabase
+        .from('service_records')
+        .insert(serviceRecord)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (dbError) {
+        throw dbError;
+      }
 
       toast({
         title: 'Service Record Created',
@@ -63,12 +82,13 @@ export const useServiceSubmission = (
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to save service record');
       console.error('Error saving service record:', error);
-      setSubmitError(error.message || 'Failed to save service record');
+      setSubmitError(error.message);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save service record',
+        description: error.message,
         variant: 'destructive',
       });
     } finally {

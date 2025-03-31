@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
@@ -7,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface VehicleData {
+  year: number;
+  make: string;
+  model: string;
+}
+
 interface ModificationData {
   name: string;
   impact: 'positive' | 'negative' | 'neutral';
@@ -14,7 +19,13 @@ interface ModificationData {
   description: string;
 }
 
-serve(async (req) => {
+interface RequestEvent {
+  request: Request;
+  method: string;
+  json(): Promise<{ imageUrl: string; vehicleData: VehicleData }>;
+}
+
+serve(async (req: RequestEvent) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -61,12 +72,13 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error analyzing modifications:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: errorMessage 
       }),
       { 
         status: 500,
@@ -118,7 +130,7 @@ async function analyzeImageWithHuggingFace(imageUrl: string, token: string): Pro
 
 async function enrichWithMarketData(
   detectedParts: string[], 
-  vehicleData: any, 
+  vehicleData: VehicleData, 
   apiKey: string
 ): Promise<ModificationData[]> {
   if (detectedParts.length === 0) {

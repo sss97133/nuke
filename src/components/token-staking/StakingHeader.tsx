@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Info } from "lucide-react";
@@ -41,6 +40,9 @@ const StakingHeader = () => {
             </CardContent>
           </Card>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Don&apos;t have any tokens to stake? Visit the marketplace to acquire some.
+        </p>
       </CardContent>
     </Card>
   );

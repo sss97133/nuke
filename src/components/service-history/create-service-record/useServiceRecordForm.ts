@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { FormState, ServiceRecordHookReturn } from './types';
+import { FormState, FormStateValue, ServiceRecordHookReturn } from './types';
 import { useVehiclesData } from './hooks/useVehiclesData';
 import { usePartsManagement } from './hooks/usePartsManagement';
 import { useServiceSubmission } from './hooks/useServiceSubmission';
@@ -21,7 +20,7 @@ export const useServiceRecordForm = (
     parts: []
   });
 
-  const updateFormState = (field: keyof FormState, value: any) => {
+  const updateFormState = (field: keyof FormState, value: FormStateValue) => {
     setFormState(prev => ({
       ...prev,
       [field]: value

@@ -56,11 +56,28 @@ async function getICloudToken(): Promise<string> {
   throw new Error('iCloud authentication not implemented');
 }
 
+interface ICloudPhotoResponse {
+  id: string;
+  caption?: string;
+  filename: string;
+  url: string;
+  thumbnailUrl: string;
+  createdAt: string;
+  width: number;
+  height: number;
+  fileSize: number;
+  fileType: string;
+}
+
+interface ICloudApiResponse {
+  photos: ICloudPhotoResponse[];
+}
+
 /**
  * Transforms the iCloud API response into our ICloudImage format
  */
-function transformICloudResponse(data: any): ICloudImage[] {
-  return data.photos.map((photo: any) => ({
+function transformICloudResponse(data: ICloudApiResponse): ICloudImage[] {
+  return data.photos.map(photo => ({
     id: photo.id,
     caption: photo.caption || '',
     filename: photo.filename,
@@ -77,8 +94,32 @@ function transformICloudResponse(data: any): ICloudImage[] {
 /**
  * Mock function for fetching iCloud images during development
  */
-export const mockFetchICloudImages = async (albumLink: string, folderId?: string) => {
-  // Mock implementation that returns an empty array
-  // This is a placeholder until real iCloud integration is implemented
-  return [];
+export const mockFetchICloudImages = async (albumLink: string, folderId?: string): Promise<ICloudImage[]> => {
+  // Mock implementation that returns sample data
+  return [
+    {
+      id: 'mock_1',
+      caption: 'Sample Image 1',
+      filename: 'sample1.jpg',
+      url: 'https://example.com/sample1.jpg',
+      thumbnailUrl: 'https://example.com/sample1_thumb.jpg',
+      createdAt: new Date().toISOString(),
+      width: 1920,
+      height: 1080,
+      fileSize: 1024 * 1024,
+      fileType: 'image/jpeg'
+    },
+    {
+      id: 'mock_2',
+      caption: 'Sample Image 2',
+      filename: 'sample2.jpg',
+      url: 'https://example.com/sample2.jpg',
+      thumbnailUrl: 'https://example.com/sample2_thumb.jpg',
+      createdAt: new Date().toISOString(),
+      width: 1920,
+      height: 1080,
+      fileSize: 1024 * 1024,
+      fileType: 'image/jpeg'
+    }
+  ];
 };

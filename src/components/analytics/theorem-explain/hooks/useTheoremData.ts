@@ -1,6 +1,15 @@
-
 import { useState, useEffect } from 'react';
 import { TheoremData } from '../types';
+
+interface HuggingFaceRow {
+  row_idx: number;
+  row: {
+    theorem_name?: string;
+    theorem_statement?: string;
+    explanation?: string;
+    category?: string;
+  };
+}
 
 /**
  * Custom hook to fetch and manage theorem data from the Hugging Face dataset
@@ -48,7 +57,7 @@ export const useTheoremData = () => {
           
           // Transform the data into our format
           if (data && data.rows) {
-            const transformedData: TheoremData[] = data.rows.map((row: any) => ({
+            const transformedData: TheoremData[] = data.rows.map((row: HuggingFaceRow) => ({
               id: row.row_idx.toString(),
               name: row.row.theorem_name || "Unnamed Theorem",
               definition: row.row.theorem_statement || "No definition available",
@@ -81,7 +90,7 @@ export const useTheoremData = () => {
           }
         } catch (fetchError) {
           console.error("Network error fetching theorem data:", fetchError);
-          setError(fetchError as Error);
+          setError(fetchError instanceof Error ? fetchError : new Error(String(fetchError)));
           
           // Provide fallback data if network fails
           const fallbackData: TheoremData[] = [{
@@ -97,7 +106,7 @@ export const useTheoremData = () => {
         }
       } catch (hookError) {
         console.error("Error in useTheoremData hook:", hookError);
-        setError(hookError as Error);
+        setError(hookError instanceof Error ? hookError : new Error(String(hookError)));
       } finally {
         setFetchingData(false);
       }

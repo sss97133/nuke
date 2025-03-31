@@ -2,8 +2,23 @@ import { Button } from "@/components/ui/button";
 import { Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+interface ReceiptData {
+  id: string;
+  date: string;
+  total: number;
+  items: Array<{
+    description: string;
+    quantity: number;
+    price: number;
+    total: number;
+  }>;
+  vendor: string;
+  location: string;
+  metadata: Record<string, unknown>;
+}
+
 interface ReceiptScannerProps {
-  onScanComplete: (data: any) => void;
+  onScanComplete: (data: ReceiptData) => void;
 }
 
 export const ReceiptScanner = ({ onScanComplete }: ReceiptScannerProps) => {

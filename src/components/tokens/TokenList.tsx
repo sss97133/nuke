@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,7 +59,9 @@ export const TokenList = ({ tokens, isLoading, searchQuery, handleTokenClick }: 
         {searchQuery ? (
           <p className="text-muted-foreground">No tokens found matching "{searchQuery}"</p>
         ) : (
-          <p className="text-muted-foreground">No tokens found</p>
+          <div className="text-sm text-muted-foreground">
+            Click &quot;Create Token&quot; to get started
+          </div>
         )}
       </Card>
     );

@@ -61,7 +61,7 @@ export class WorkspaceProcessor {
     }
   }
 
-  async analyzeWorkspace(workspaceData: any): Promise<WorkspaceAnalysis> {
+  async analyzeWorkspace(workspaceData: ProcessedWorkspace): Promise<WorkspaceAnalysis> {
     if (!this.isInitialized) {
       throw new Error('WorkspaceProcessor not initialized');
     }
@@ -80,7 +80,7 @@ export class WorkspaceProcessor {
   }
 
   async optimizePositions(
-    workspaceData: any,
+    workspaceData: ProcessedWorkspace,
     targetCoverage: number
   ): Promise<WorkspaceAnalysis> {
     if (!this.isInitialized) {

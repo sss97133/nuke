@@ -1,4 +1,3 @@
-
 import { toast } from '@/hooks/use-toast';
 
 // Fallback value (empty string) - the API key should always be provided via environment
@@ -65,7 +64,8 @@ class VercelApiClient {
       }
       
       return await response.json();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Unknown error occurred');
       this.handleApiError(error);
       throw error;
     }
@@ -74,10 +74,10 @@ class VercelApiClient {
   /**
    * Handle API errors with toast notifications
    */
-  private handleApiError(error: any, defaultMessage = "An error occurred"): null {
+  private handleApiError(error: Error, defaultMessage = "An error occurred"): null {
     console.error("Vercel API error:", error);
     
-    const message = error?.message || defaultMessage;
+    const message = error.message || defaultMessage;
     
     // Only show toast if we haven't shown this error recently
     if (!recentApiErrors.has(message)) {

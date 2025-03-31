@@ -7,17 +7,26 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 
 // Import the VehicleTimeline component
-import VehicleTimeline from '../components/VehicleTimeline';
+import VehicleTimeline, { TimelineEvent } from '../components/VehicleTimeline';
 
 // Page styles
 import './VehicleTimelinePage.css';
+
+interface SearchResult {
+  id: string;
+  year: number;
+  make: string;
+  model: string;
+  vin?: string;
+  image_url?: string;
+}
 
 const VehicleTimelinePage: React.FC = () => {
   const { vin } = useParams<{ vin: string }>();
   const navigate = useNavigate();
   const [isSearching, setIsSearching] = useState(false);
   const [searchInput, setSearchInput] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   // Handle VIN search
@@ -53,9 +62,9 @@ const VehicleTimelinePage: React.FC = () => {
       if (data.results?.length === 0) {
         setSearchError('No vehicles found. Try another search term.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Search error:', err);
-      setSearchError(err.message || 'Failed to search vehicles');
+      setSearchError(err instanceof Error ? err.message : 'Failed to search vehicles');
     } finally {
       setIsSearching(false);
     }
@@ -67,7 +76,7 @@ const VehicleTimelinePage: React.FC = () => {
   };
 
   // Handle timeline event click
-  const handleEventClick = (event: any) => {
+  const handleEventClick = (event: TimelineEvent) => {
     console.log('Event clicked:', event);
     // You could open a modal or navigate to a detail page
   };
@@ -103,7 +112,7 @@ const VehicleTimelinePage: React.FC = () => {
           <div className="search-results-section">
             <h2>Search Results</h2>
             <div className="search-results-grid">
-              {searchResults.map((vehicle: any) => (
+              {searchResults.map((vehicle: SearchResult) => (
                 <div 
                   key={vehicle.id} 
                   className="vehicle-result-card"

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,8 @@ export const WebsiteImport = ({ onNormalizedData }: WebsiteImportProps) => {
       checkQueryError(error);
       
       onNormalizedData(data.vehicles);
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Unknown error occurred');
       toast({
         title: "Import Error",
         description: error.message,

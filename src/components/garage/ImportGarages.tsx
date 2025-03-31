@@ -44,7 +44,8 @@ export const ImportGarages = () => {
         description: `Found and imported ${data?.garages?.length || 0} garages`,
       });
 
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Unknown error occurred');
       console.error('Import error:', error);
       toast({
         title: "Error",

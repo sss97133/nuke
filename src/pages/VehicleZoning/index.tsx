@@ -17,7 +17,7 @@ import { useAuthState } from '@/hooks/auth/use-auth-state';
 const VehicleZoningPage: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const [loading, setLoading] = useState(true);
-  const [vehicle, setVehicle] = useState<any>(null);
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [userProfile, setUserProfile] = useState<{ name: string; avatarUrl?: string }>({
     name: 'Guest User'
   });
@@ -95,8 +95,8 @@ const VehicleZoningPage: React.FC = () => {
             
           if (!profileError && profileData) {
             setUserProfile({
-              name: (profileData as any).full_name || user.email?.split('@')[0] || 'User',
-              avatarUrl: (profileData as any).avatar_url
+              name: (profileData as ProfileData).full_name || user.email?.split('@')[0] || 'User',
+              avatarUrl: (profileData as ProfileData).avatar_url
             });
           }
         }
@@ -142,5 +142,22 @@ const VehicleZoningPage: React.FC = () => {
     />
   );
 };
+
+interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin: string;
+  status: string;
+  metadata: Record<string, unknown>;
+}
+
+interface ProfileData {
+  full_name: string;
+  avatar_url: string;
+  email: string;
+  id: string;
+}
 
 export default VehicleZoningPage;

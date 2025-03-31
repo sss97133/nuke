@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,7 +34,10 @@ export const TokenSearch = ({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Select value={sortField} onValueChange={(value: any) => setSortField(value)}>
+        <Select 
+          value={sortField} 
+          onValueChange={(value: "name" | "symbol" | "total_supply" | "created_at") => setSortField(value)}
+        >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>

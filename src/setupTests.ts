@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 import React from 'react';
+import { Session } from '@supabase/supabase-js';
 
 // Mock browser APIs
 if (typeof global.TextEncoder === 'undefined') {
@@ -20,20 +21,59 @@ class ResizeObserver {
 window.ResizeObserver = ResizeObserver;
 
 // Mock Supabase client
+interface SupabaseAuthCallback {
+  (event: 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED', session: Session | null): void;
+}
+
+interface SupabaseQueryOptions {
+  eq?: (column: string, value: unknown) => {
+    eq?: (column: string, value: unknown) => {
+      single: () => Promise<{ data: unknown | null; error: Error | null }>;
+      execute: () => Promise<{ data: unknown[]; count: number; error: Error | null }>;
+    };
+    single: () => Promise<{ data: unknown | null; error: Error | null }>;
+    execute: () => Promise<{ data: unknown[]; count: number; error: Error | null }>;
+  };
+}
+
+interface SupabaseTable {
+  select: (columns: string, options?: SupabaseQueryOptions) => {
+    eq: (column: string, value: unknown) => {
+      eq: (column: string, value: unknown) => {
+        single: () => Promise<{ data: unknown | null; error: Error | null }>;
+        execute: () => Promise<{ data: unknown[]; count: number; error: Error | null }>;
+      };
+      single: () => Promise<{ data: unknown | null; error: Error | null }>;
+      execute: () => Promise<{ data: unknown[]; count: number; error: Error | null }>;
+    };
+    single: () => Promise<{ data: unknown | null; error: Error | null }>;
+    execute: () => Promise<{ data: unknown[]; count: number; error: Error | null }>;
+  };
+  insert: (data: Record<string, unknown>) => {
+    select: () => Promise<{ data: unknown | null; error: Error | null }>;
+  };
+  update: (data: Record<string, unknown>) => {
+    eq: () => Promise<{ data: unknown | null; error: Error | null }>;
+  };
+  delete: () => {
+    eq: () => Promise<{ data: unknown | null; error: Error | null }>;
+  };
+}
+
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      onAuthStateChange: (callback: any) => {
+      onAuthStateChange: (callback: SupabaseAuthCallback) => {
         callback('SIGNED_OUT', null);
         return { data: { subscription: { unsubscribe: () => {} } } };
       },
       signOut: () => Promise.resolve({ error: null })
     },
-    from: (table: string) => ({
-      select: (columns: string, options?: any) => ({
-        eq: (column: string, value: any) => ({
-          eq: (column: string, value: any) => ({
+    from: (table: string): SupabaseTable => ({
+      select: (columns: string, options?: SupabaseQueryOptions) => ({
+        eq: (column: string, value: unknown) => ({
+          eq: (column: string, value: unknown) => ({
             single: () => Promise.resolve({ data: null, error: null }),
             execute: () => Promise.resolve({ data: [], count: 0, error: null })
           }),
@@ -43,10 +83,10 @@ vi.mock('@supabase/supabase-js', () => ({
         single: () => Promise.resolve({ data: null, error: null }),
         execute: () => Promise.resolve({ data: [], count: 0, error: null })
       }),
-      insert: (data: any) => ({
+      insert: (data: Record<string, unknown>) => ({
         select: () => Promise.resolve({ data: null, error: null })
       }),
-      update: (data: any) => ({
+      update: (data: Record<string, unknown>) => ({
         eq: () => Promise.resolve({ data: null, error: null })
       }),
       delete: () => ({

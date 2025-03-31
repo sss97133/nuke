@@ -12,6 +12,8 @@ import { useDocumentUpload } from '../hooks/useDocumentUpload';
 import { useToast } from '@/components/ui/toast/toast-context';
 import { FileText, Car, AlertCircle } from 'lucide-react';
 
+type OwnershipStatus = 'owned' | 'claimed' | 'discovered';
+
 export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValues> }) => {
   const ownershipStatus = form.watch('ownership_status');
   const { toast } = useToast();
@@ -73,21 +75,14 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
     }
   };
 
-  const handleStatusChange = (newStatus: string) => {
-    // If there are already documents uploaded and user is changing status,
-    // confirm with user that this will clear their documents
-    if (documents.length > 0 && newStatus !== ownershipStatus) {
-      if (window.confirm(
-        'Changing ownership status will clear your uploaded documents. Do you want to continue?'
-      )) {
-        // Clear documents and set new status
+  const handleStatusChange = (newStatus: OwnershipStatus) => {
+    if (documents.length > 0) {
+      if (window.confirm('Changing the ownership status will clear any uploaded documents. Continue?')) {
         setDocuments([]);
-        form.setValue('ownership_documents', []);
-        form.setValue('ownership_status', newStatus as 'owned' | 'claimed' | 'discovered');
+        form.setValue('ownership_status', newStatus);
       }
     } else {
-      // Just update the status
-      form.setValue('ownership_status', newStatus as 'owned' | 'claimed' | 'discovered');
+      form.setValue('ownership_status', newStatus);
     }
   };
 
@@ -135,7 +130,7 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                         className="font-normal cursor-pointer"
                         onClick={() => handleStatusChange('claimed')}
                       >
-                        I'm claiming this vehicle
+                        I&apos;m claiming this vehicle
                       </FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-3 space-y-0">
@@ -236,7 +231,7 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
                     <FormLabel>Claim Justification</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Explain why you're claiming this vehicle"
+                        placeholder="Explain why you&apos;re claiming this vehicle"
                         className="min-h-[100px]"
                         {...field}
                         value={field.value || ''}
@@ -312,7 +307,7 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
             <FormLabel>{getDocumentLabel()}</FormLabel>
             <FileUploader
               selectedFiles={documents}
-              setSelectedFiles={(files) => setDocuments(files)}
+              setSelectedFiles={setDocuments}
               onFilesSelected={handleDocumentsSelected}
               acceptedFileTypes={['image/*', 'application/pdf']}
               maxFiles={5}
@@ -328,3 +323,7 @@ export const OwnershipSection = ({ form }: { form: UseFormReturn<VehicleFormValu
     </Card>
   );
 };
+
+OwnershipSection.displayName = 'OwnershipSection';
+
+export default OwnershipSection;

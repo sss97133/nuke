@@ -13,9 +13,9 @@ export { uploadVehicleImage, getPublicUrl };
  * @param body Request body to send to the function
  * @returns Object containing data and error properties
  */
-export async function invokeFunction<T = any>(
+export async function invokeFunction<T = unknown>(
   functionName: string,
-  body: any
+  body: Record<string, unknown>
 ): Promise<{ data: T | null; error: Error | null }> {
   try {
     const { data, error } = await supabase.functions.invoke(functionName, { body });

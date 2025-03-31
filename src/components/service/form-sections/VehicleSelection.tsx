@@ -78,7 +78,8 @@ export const VehicleSelection = ({
         }));
 
         setVehicles(transformedData);
-      } catch (error: any) {
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Unknown error occurred');
         toast({
           title: "Error",
           description: error.message,

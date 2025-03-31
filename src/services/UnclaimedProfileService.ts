@@ -14,6 +14,20 @@ import { TimelineEvent } from '@/components/VehicleTimeline/types';
 import { readLocalFile, writeLocalFile } from '@/utils/fileUtil';
 import { VehicleSource } from '@/types/vehicle';
 
+interface Listing {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  userId: string;
+  vehicleId: string;
+  images: string[];
+  metadata: Record<string, unknown>;
+}
+
 // Types for unclaimed profile data
 export interface UnclaimedProfile {
   profileId: string;
@@ -39,7 +53,7 @@ export interface UnclaimedProfile {
     avgPrice: number;
     verifiedListings: number;
     statisticallyModeledListings: number;
-    mostRecentListing?: any;
+    mostRecentListing?: Listing;
   };
   inventory: {
     byMake: Array<{
@@ -54,7 +68,7 @@ export interface UnclaimedProfile {
       percentage: number;
     }>;
   };
-  verifiedListings: any[];
+  verifiedListings: Listing[];
   communicationProfile: {
     style: string;
     tone: string;

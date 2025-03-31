@@ -5,10 +5,17 @@ import { vehicleFormSchema, VehicleFormValues } from '../schema';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+interface FormErrors {
+  [key: string]: {
+    message: string;
+    type: string;
+  };
+}
+
 interface UseVehicleFormProps {
   defaultValues?: Partial<VehicleFormValues>;
   onSubmitSuccess?: (data: VehicleFormValues) => void;
-  onSubmitError?: (errors: any) => void;
+  onSubmitError?: (errors: FormErrors) => void;
 }
 
 /**
@@ -178,7 +185,7 @@ export const useVehicleForm = ({
       
       // Call the user's error handler if provided
       if (onSubmitError) {
-        onSubmitError(error);
+        onSubmitError({});
       }
     } finally {
       setIsSubmitting(false);
@@ -202,7 +209,7 @@ export const useVehicleForm = ({
     
     // Call the user's error handler if provided
     if (onSubmitError) {
-      onSubmitError(errors);
+      onSubmitError({});
     }
   }, [onSubmitError, toast]);
   

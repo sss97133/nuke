@@ -3,6 +3,17 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+interface AIClassification {
+  category: string;
+  confidence: number;
+  metadata: Record<string, unknown>;
+  suggestions: Array<{
+    field: string;
+    value: string;
+    confidence: number;
+  }>;
+}
+
 export interface InventoryFormData {
   name: string;
   partNumber: string;
@@ -27,7 +38,7 @@ export interface InventoryFormData {
   shelf?: string;
   bin?: string;
   photoUrl?: string;
-  aiClassification?: any;
+  aiClassification?: AIClassification;
 }
 
 const initialFormData: InventoryFormData = {

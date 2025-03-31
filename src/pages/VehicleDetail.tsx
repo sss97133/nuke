@@ -18,6 +18,13 @@ import { Check, Clock, AlertTriangle, Car, FileText, Image, History, ArrowLeft }
 import VehicleImageGallery from '@/components/vehicle-images/VehicleImageGallery';
 import { Link } from 'react-router-dom';
 
+interface HistoricalData {
+  timestamp: string;
+  value: number;
+  source: string;
+  confidence: number;
+}
+
 interface Vehicle {
   id: string;
   make: string;
@@ -27,7 +34,7 @@ interface Vehicle {
   notes: string;
   status: string;
   user_id: string;
-  historical_data?: any;
+  historical_data?: HistoricalData[];
   // Add other fields as needed
 }
 

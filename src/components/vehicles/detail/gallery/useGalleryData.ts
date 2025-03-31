@@ -13,7 +13,17 @@ interface GalleryImage {
   caption?: string;
 }
 
-export const useGalleryData = (vehicle: any) => {
+interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin: string;
+  images: string[];
+  metadata: Record<string, unknown>;
+}
+
+export const useGalleryData = (vehicle: Vehicle) => {
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);

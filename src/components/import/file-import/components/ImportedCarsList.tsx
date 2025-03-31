@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Check, Cloud } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ interface ImportedCar {
   model: string;
   year: number | string;
   icloud_album_link?: string;
-  [key: string]: any;
+  [key: string]: string | number | undefined;
 }
 
 interface ImportedCarsListProps {

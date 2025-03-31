@@ -56,8 +56,41 @@ const mockListings = [
   }
 ];
 
+interface MarketplaceListing {
+  id: string;
+  title: string;
+  price: number;
+  condition: string;
+  imageUrl: string;
+  location: {
+    city: string;
+    state: string;
+  };
+  created_at: string;
+  views_count: number;
+  commentCount: number;
+  is_featured: boolean;
+  user_id: string;
+}
+
+interface DatabaseListing {
+  id: string;
+  title: string;
+  price: number;
+  condition: string;
+  image_url?: string;
+  imageUrl?: string;
+  location?: string | { city: string; state: string };
+  created_at: string;
+  views_count: number;
+  comment_count?: number;
+  commentCount?: number;
+  is_featured: boolean;
+  user_id: string;
+}
+
 // Helper function to adapt DB results to the expected format
-function adaptMarketplaceListings(dbListings: any[]) {
+function adaptMarketplaceListings(dbListings: DatabaseListing[]): MarketplaceListing[] {
   return dbListings.map(listing => {
     // Parse the location field if it exists
     let locationObj = { city: '', state: '' };
@@ -206,7 +239,11 @@ export const useMarketplaceListings = (options: MarketplaceListingOptions = {}) 
   };
   
   // Helper function to filter mock data based on options
-  const filterMockData = (listings: any[], options: MarketplaceListingOptions, userId?: string) => {
+  const filterMockData = (
+    listings: MarketplaceListing[], 
+    options: MarketplaceListingOptions, 
+    userId?: string
+  ): MarketplaceListing[] => {
     let filteredListings = [...listings];
     
     if (options.isFeatured) {

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,11 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
   const [isImporting, setIsImporting] = useState(false);
   const { toast } = useToast();
 
-  const handleVehicleChange = (index: number, field: keyof Vehicle, value: any) => {
+  const handleVehicleChange = (
+    index: number, 
+    field: keyof Vehicle, 
+    value: Vehicle[keyof Vehicle]
+  ) => {
     const updated = [...editedVehicles];
     updated[index] = { ...updated[index], [field]: value };
     setEditedVehicles(updated);
@@ -55,10 +58,11 @@ export const ImportPreview = ({ vehicles, onBack, onComplete }: ImportPreviewPro
       });
       
       onComplete();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       toast({
         title: "Import Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {

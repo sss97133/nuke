@@ -1,11 +1,23 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { checkQueryError } from "@/utils/supabase-helpers";
 
+interface VinData {
+  vin: string;
+  make: string;
+  model: string;
+  year: number;
+  trim: string;
+  engine: string;
+  transmission: string;
+  bodyStyle: string;
+  color: string;
+  metadata: Record<string, unknown>;
+}
+
 interface VinCaptureProps {
-  onVinCaptured: (data: any) => void;
+  onVinCaptured: (data: VinData) => void;
 }
 
 export const useVinCapture = ({ onVinCaptured }: VinCaptureProps) => {

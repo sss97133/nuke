@@ -36,8 +36,16 @@ interface VehicleFormProps {
   onSuccess?: () => void;
 }
 
+interface VehicleFormData {
+  make: string;
+  model: string;
+  year: string;
+  vin?: string;
+  notes?: string;
+}
+
 export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit, formState: { errors } } = useForm<VehicleFormData>();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState("");
@@ -47,7 +55,7 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
     brand.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: VehicleFormData) => {
     try {
       const { error } = await supabase
         .from('vehicles')

@@ -1,4 +1,3 @@
-
 export type UserRole = 'admin' | 'supervisor' | 'manager' | 'employee';
 
 export interface User {
@@ -9,6 +8,33 @@ export interface User {
   firstName: string;
   lastName: string;
   createdAt: string;
+}
+
+export interface AIClassification {
+  category?: string;
+  confidence?: number;
+  tags?: string[];
+  description?: string;
+  attributes?: Record<string, string | number | boolean>;
+  lastUpdated?: string;
+}
+
+export interface ContactInfo {
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  website?: string;
+  notes?: string;
+}
+
+export interface APICredentials {
+  apiKey?: string;
+  apiSecret?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  scope?: string[];
 }
 
 export interface Asset {
@@ -37,7 +63,7 @@ export interface Asset {
   shelf?: string;
   bin?: string;
   photoUrl?: string;
-  aiClassification?: any;
+  aiClassification?: AIClassification;
   createdBy: string;
   updatedBy: string;
   createdAt: string;
@@ -85,7 +111,7 @@ export interface InventoryItem {
   lastOrderedAt?: string;
   integrationSource?: string;
   integrationId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -106,10 +132,38 @@ export interface ServiceTicket {
 export interface Supplier {
   id: string;
   name: string;
-  contactInfo?: Record<string, any>;
-  apiCredentials?: Record<string, any>;
+  contactInfo?: ContactInfo;
+  apiCredentials?: APICredentials;
   integrationType?: string;
   status?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface VehicleInventoryItem {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  price: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface InventorySearchParams {
+  make?: string;
+  model?: string;
+  year?: number;
+  priceRange?: { min: number; max: number };
+  metadata?: Record<string, unknown>;
+}
+
+export interface InventoryUpdatePayload {
+  price?: number;
+  metadata?: Record<string, unknown>;
+  status?: string;
+}
+
+export interface InventoryBulkUpdatePayload {
+  ids: string[];
+  updates: Record<string, unknown>;
 }

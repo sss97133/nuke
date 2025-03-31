@@ -1,4 +1,4 @@
-import type { Database } from '../types';
+import type { Database } from '@/integrations/supabase/types';
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,7 @@ interface ImportedVehicle {
   mileage?: number | string;
   vin?: string;
   ownership_status?: 'owned' | 'claimed' | 'discovered';
-  [key: string]: any;
+  [key: string]: string | number | undefined;
 }
 
 export default function BulkImport() {
@@ -93,8 +93,9 @@ export default function BulkImport() {
 
     try {
       // Get the current user
-      const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) console.error("Database query error:", error);
       
       if (!user) {
         throw new Error('User not authenticated');
@@ -106,7 +107,7 @@ export default function BulkImport() {
         skipEmptyLines: true,
         dynamicTyping: true,
         complete: async (results) => {
-          const vehicles = results.data.filter((vehicle: any) => {
+          const vehicles = results.data.filter((vehicle: Record<string, string | number | undefined>) => {
             return vehicle.make && vehicle.model && vehicle.year;
           }) as ImportedVehicle[];
 
@@ -182,12 +183,13 @@ export default function BulkImport() {
           setIsUploading(false);
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       setImportStatus('error');
-      setErrorMessage(error.message);
+      setErrorMessage(errorMessage);
       toast({
         title: 'Import error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive',
       });
       setIsUploading(false);

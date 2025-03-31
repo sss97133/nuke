@@ -85,9 +85,10 @@ export const useEscrow = (userAddress?: string) => {
         title: "Deposit Successful",
         description: `Successfully deposited ${amount} ETH to escrow`,
       });
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to deposit funds');
       console.error('Error depositing:', error);
-      throw new Error(error.message);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -108,9 +109,10 @@ export const useEscrow = (userAddress?: string) => {
         title: "Withdrawal Successful",
         description: `Successfully withdrew ${amount} ETH from escrow`,
       });
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to withdraw funds');
       console.error('Error withdrawing:', error);
-      throw new Error(error.message);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -132,9 +134,10 @@ export const useEscrow = (userAddress?: string) => {
       // Update pending bids
       setPendingBids(prev => [...prev, { auctionId, amount, vehicleInfo }]);
       await fetchBalance();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to lock bid');
       console.error('Error locking bid:', error);
-      throw new Error(error.message);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -156,9 +159,10 @@ export const useEscrow = (userAddress?: string) => {
       // Remove from pending bids
       setPendingBids(prev => prev.filter(bid => bid.auctionId !== auctionId));
       await fetchBalance();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to release bid');
       console.error('Error releasing bid:', error);
-      throw new Error(error.message);
+      throw error;
     } finally {
       setIsLoading(false);
     }

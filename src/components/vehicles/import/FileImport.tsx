@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -47,7 +46,8 @@ export const FileImport = ({ onNormalizedData }: FileImportProps) => {
       } else {
         reader.readAsText(file);
       }
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Unknown error occurred');
       toast({
         title: "Import Error",
         description: error.message,

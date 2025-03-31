@@ -1,7 +1,7 @@
-
 /// <reference types="chrome" />
 
 import { supabase } from '@/integrations/supabase/client';
+import { Session } from '@supabase/supabase-js';
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {
@@ -12,7 +12,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 interface AuthMessage {
   type: 'AUTH_STATE_CHANGE';
-  payload: any;
+  payload: Session | null;
 }
 
 // Listen for messages from the content script with improved error handling
@@ -31,7 +31,7 @@ chrome.runtime.onMessage.addListener((message: AuthMessage, sender, sendResponse
 });
 
 // Handle authentication state changes with improved WebSocket reliability
-const handleAuthStateChange = async (session: any) => {
+const handleAuthStateChange = async (session: Session | null) => {
   try {
     if (session) {
       // User is signed in
