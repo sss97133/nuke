@@ -50,21 +50,23 @@ export const AuthForm = () => {
     setAuthError(null);
     setHasDbIssue(false);
     
-    // Perform a quick health check on Supabase when the component loads
-    const checkSupabaseHealth = async () => {
-      try {
-        const response = await fetch(`${import.meta.env?.VITE_SUPABASE_URL || 'http://127.0.0.1:54321'}/auth/v1/health`);
-        if (!response.ok) {
-          console.error('Supabase health check failed:', response.status);
+    // Only perform Supabase health checks in development environment
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      const checkSupabaseHealth = async () => {
+        try {
+          const response = await fetch(`${import.meta.env?.VITE_SUPABASE_URL || 'http://127.0.0.1:54321'}/auth/v1/health`);
+          if (!response.ok) {
+            console.error('Supabase health check failed:', response.status);
+            setHasDbIssue(true);
+          }
+        } catch (error) {
+          console.error('Supabase health check error:', error);
           setHasDbIssue(true);
         }
-      } catch (error) {
-        console.error('Supabase health check error:', error);
-        setHasDbIssue(true);
-      }
-    };
-    
-    checkSupabaseHealth();
+      };
+      
+      checkSupabaseHealth();
+    }
   }, [searchParams]);
 
   const formatPhoneNumber = (phone: string) => {
@@ -157,7 +159,8 @@ export const AuthForm = () => {
               </Alert>
             )}
             
-            {hasDbIssue && (
+            {/* Only show Supabase connection issues in development environment */}
+            {hasDbIssue && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
               <Alert className="mb-4 bg-yellow-50 border border-yellow-200">
                 <Info className="h-4 w-4" />
                 <AlertTitle>Local Supabase Connection Issue Detected</AlertTitle>
