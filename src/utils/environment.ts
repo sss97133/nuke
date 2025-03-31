@@ -78,7 +78,17 @@ export const hasSupabaseCredentials = (): boolean => {
  * @returns The current environment
  */
 export const getEnvironment = (): string => {
-  return getEnv('NODE_ENV', 'development');
+  const nodeEnv = getEnv('NODE_ENV', 'development');
+  
+  // For Vercel deployments, ensure production is properly detected
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname.includes('vercel.app') || 
+        window.location.hostname.includes('nuke-app.com')) {
+      return 'production';
+    }
+  }
+  
+  return nodeEnv;
 };
 
 /**
@@ -86,7 +96,17 @@ export const getEnvironment = (): string => {
  * @returns true if in production environment, false otherwise
  */
 export const isProduction = (): boolean => {
-  return getEnvironment() === 'production';
+  // Multiple checks to ensure proper environment detection
+  const env = getEnvironment() === 'production';
+  
+  // Check URL for production indicators (vercel deployments)
+  const isProductionUrl = typeof window !== 'undefined' && 
+    !window.location.hostname.includes('localhost') && 
+    !window.location.hostname.includes('127.0.0.1') &&
+    (window.location.hostname.includes('vercel.app') || 
+     window.location.hostname.includes('nuke-app.com'));
+  
+  return env || isProductionUrl;
 };
 
 /**
@@ -94,7 +114,16 @@ export const isProduction = (): boolean => {
  * @returns true if in development environment, false otherwise
  */
 export const isDevelopment = (): boolean => {
-  return getEnvironment() === 'development';
+  if (isProduction()) return false;
+  
+  const env = getEnvironment() === 'development';
+  
+  // Check URL for development indicators
+  const isDevUrl = typeof window !== 'undefined' && 
+    (window.location.hostname.includes('localhost') || 
+     window.location.hostname.includes('127.0.0.1'));
+  
+  return env || isDevUrl;
 };
 
 /**
@@ -103,4 +132,26 @@ export const isDevelopment = (): boolean => {
  */
 export const isTest = (): boolean => {
   return getEnvironment() === 'test';
+};
+
+/**
+ * Enforces the 'no mock data in production' rule for vehicle-centric architecture.
+ * When in production, this function returns false, preventing mock data from being used.
+ * In development or test environments, returns allowMocks parameter value.
+ * 
+ * Usage example:
+ * ```
+ * // In a component or data service
+ * const data = shouldAllowMockData() ? mockVehicleData : await fetchRealVehicleData();
+ * ```
+ * 
+ * @param allowMocks Whether to allow mocks in non-production environments (defaults to true)
+ * @returns false if in production, allowMocks value otherwise
+ */
+export const shouldAllowMockData = (allowMocks: boolean = true): boolean => {
+  // Always false in production to ensure real vehicle data only
+  if (isProduction()) return false;
+  
+  // In development or test, respect the allowMocks parameter
+  return allowMocks;
 };
