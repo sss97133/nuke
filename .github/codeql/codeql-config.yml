@@ -31,6 +31,9 @@ paths-ignore:
   - '**/dist/**'
   - '**/build/**'
   - '**/coverage/**'
+  # Ignore package lock files which may contain complex dependency syntax
+  - '**/package-lock.json'
+  - '**/yarn.lock'
 
 # Query filters to disable specific checks that cause false positives
 query-filters:

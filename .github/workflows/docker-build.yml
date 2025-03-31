@@ -49,6 +49,7 @@ jobs:
           # Set environment variables for native module builds
           export NUKE_SKIP_CANVAS=true
           export npm_config_python=/usr/bin/python
+          export NODE_OPTIONS="--max-old-space-size=6144"
           
           # Skip optional dependencies to reduce build complexity
           echo "Installing dependencies with --no-optional to avoid canvas issues..."

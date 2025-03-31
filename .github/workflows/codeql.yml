@@ -68,6 +68,8 @@ jobs:
         languages: ${{ matrix.language }}
         queries: security-extended
         config-file: ./.github/codeql/codeql-config.yml
+        # Add more graceful error handling
+        debug: true
 
     # Create a CodeQL database manually to ensure better compatibility
     - name: Build CodeQL database
