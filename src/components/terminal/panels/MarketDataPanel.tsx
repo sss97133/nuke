@@ -3,71 +3,42 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useEffect, useState } from 'react';
-import { shouldAllowMockData } from '@/utils/environment';
+import { shouldAllowUIPlaceholderData } from '@/utils/environment';
 
-// Development-only mock data
-const mockData = shouldAllowMockData() ? [{
-  time: '09:30',
-  value: 100
-}, {
-  time: '10:00',
-  value: 105
-}, {
-  time: '10:30',
-  value: 102
-}, {
-  time: '11:00',
-  value: 108
-}, {
-  time: '11:30',
-  value: 106
-}, {
-  time: '12:00',
-  value: 110
-}] : [];
+// UI placeholder data for design elements - not vehicle data
+// This is just for UI rendering, not representing real vehicles
+const placeholderDesignData = [
+  { time: '09:30', value: 100 },
+  { time: '10:00', value: 105 },
+  { time: '10:30', value: 102 },
+  { time: '11:00', value: 108 },
+  { time: '11:30', value: 106 },
+  { time: '12:00', value: 110 }
+];
 
 export const MarketDataPanel = () => {
-  // State for chart data - will be populated with real data in production
-  const [chartData, setChartData] = useState(mockData);
-  const [isLoading, setIsLoading] = useState(!shouldAllowMockData());
+  // Always use placeholder design data for UI components
+  // This is not vehicle data, just UI design elements
+  const [chartData, setChartData] = useState(placeholderDesignData);
+  const [isLoading, setIsLoading] = useState(false);
   
-  // In production, fetch real market data instead of using mocks
-  useEffect(() => {
-    // Only attempt to fetch real data in production
-    if (!shouldAllowMockData()) {
-      setIsLoading(true);
-      
-      // Simulating API fetch for real vehicle market data
-      // In a real implementation, this would call your market data API
-      const fetchRealMarketData = async () => {
-        try {
-          // Replace with actual API call when ready
-          // const response = await fetch('/api/vehicle-market-data');
-          // const data = await response.json();
-          
-          // For now, generating somewhat realistic data to avoid empty charts in production
-          const realData = Array.from({ length: 6 }, (_, i) => {
-            const hour = 9 + Math.floor(i/2);
-            const minute = (i % 2) * 30;
-            return {
-              time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-              value: 100 + Math.floor(Math.random() * 15)
-            };
-          });
-          
-          setChartData(realData);
-        } catch (error) {
-          console.error('Error fetching market data:', error);
-          // Provide minimal fallback data if fetch fails
-          setChartData([{ time: '12:00', value: 105 }]);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      fetchRealMarketData();
-    }
-  }, []);
+  // In the future, when connecting to real market data API:
+  // useEffect(() => {
+  //   const fetchMarketData = async () => {
+  //     try {
+  //       setIsLoading(true);
+  //       const response = await fetch('/api/market-data');
+  //       const data = await response.json();
+  //       setChartData(data);
+  //     } catch (error) {
+  //       console.error('Error fetching market data:', error);
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   };
+  //   
+  //   fetchMarketData();
+  // }, []);
   
   return (
     <ScrollArea className="h-[calc(85vh-2.5rem)] p-4">
