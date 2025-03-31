@@ -6,6 +6,7 @@
  */
 import { useState, useEffect } from 'react';
 import { RawTimelineEvent, TimelineEvent } from './types';
+import { getTimelineClient } from './useSupabaseClient';
 
 // Mock Supabase client for tests and development
 const supabase = {
@@ -225,6 +226,9 @@ export function useVehicleTimelineData({
       setLoading(true);
       setError(null);
 
+      // Get the appropriate Supabase client (auth-aware or fallback)
+      const timelineSupabase = getTimelineClient();
+
       // Add a timeout to prevent indefinite loading
       const DATABASE_TIMEOUT_MS = 3000;
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -243,19 +247,19 @@ export function useVehicleTimelineData({
       try {
         // Attempt to get data from database first
         if (vin) {
-          query = supabase
+          query = timelineSupabase
             .from('vehicles')
             .select('*')
             .eq('vin', vin)
             .single();
         } else if (vehicleId) {
-          query = supabase
+          query = timelineSupabase
             .from('vehicles')
             .select('*')
             .eq('id', vehicleId)
             .single();
         } else if (make && model) {
-          query = supabase
+          query = timelineSupabase
             .from('vehicles')
             .select('*')
             .eq('make', make)
@@ -311,7 +315,7 @@ export function useVehicleTimelineData({
       
       try {
         // Try to get timeline events from database first
-        const timelineQuery = supabase
+        const timelineQuery = timelineSupabase
           .from('vehicle_timeline_events')
           .select('*')
           .eq('vehicle_id', vehicleData?.id || 'f3ccd282-2143-4492-bbd6-b34538a5f538')
