@@ -59,7 +59,8 @@ export const TestUserManager: React.FC = () => {
         
       if (profilesError) throw profilesError;
       setUsers(profiles || []);
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error('Failed to fetch users');
       console.error('Error fetching users:', error.message);
       toast({
         title: 'Error fetching users',
@@ -138,11 +139,12 @@ export const TestUserManager: React.FC = () => {
 
       // Refresh user list
       fetchUsers();
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error('Failed to create user');
       console.error('Error creating user:', error);
       toast({
         title: 'Error creating user',
-        description: error.message || 'An unexpected error occurred',
+        description: error.message,
         variant: 'destructive',
       });
     } finally {
@@ -169,7 +171,8 @@ export const TestUserManager: React.FC = () => {
         } else {
           console.error('Admin delete failed:', adminError.message);
         }
-      } catch (adminError: any) {
+      } catch (adminErr: unknown) {
+        const adminError = adminErr instanceof Error ? adminErr : new Error('Admin API error');
         console.error('Admin API not available:', adminError.message);
       }
       
@@ -187,7 +190,8 @@ export const TestUserManager: React.FC = () => {
             throw profileError;
           }
         }
-      } catch (profileError: any) {
+      } catch (profileErr: unknown) {
+        const profileError = profileErr instanceof Error ? profileErr : new Error('Profile delete error');
         console.error('Profile delete error:', profileError.message);
         // Only throw if auth delete also failed
         if (!authDeleted) {
@@ -203,7 +207,8 @@ export const TestUserManager: React.FC = () => {
 
       // Refresh user list
       fetchUsers();
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error('Failed to delete user');
       console.error('Error deleting user:', error.message);
       toast({
         title: 'Error deleting user',

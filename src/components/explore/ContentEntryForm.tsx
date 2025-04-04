@@ -1,5 +1,3 @@
-
-import type { Database } from '../types';
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,11 +105,12 @@ export const ContentEntryForm = () => {
         location: '',
         relevanceScore: 90
       });
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error('Failed to add content');
       console.error('Error adding content:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to add content',
+        description: error.message,
         variant: 'destructive'
       });
     } finally {

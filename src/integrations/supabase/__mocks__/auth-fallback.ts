@@ -38,13 +38,20 @@ export const createFallbackClient = () => {
 };
 
 // Function to determine if an error is an authentication error
-export const isAuthError = (error: any): boolean => {
+export const isAuthError = (error: unknown): boolean => {
+  // Check if error is an object and has relevant properties
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  
+  // Type assertion to allow property access (use carefully)
+  const potentialAuthError = error as Record<string, any>;
+  
   return (
-    error &&
-    (error.__isAuthError === true ||
-     error.name === 'AuthSessionMissingError' ||
-     error.message?.includes('auth') ||
-     error.code === 401)
+    potentialAuthError.__isAuthError === true ||
+    potentialAuthError.name === 'AuthSessionMissingError' ||
+    (typeof potentialAuthError.message === 'string' && potentialAuthError.message.includes('auth')) ||
+    potentialAuthError.code === 401
   );
 };
 

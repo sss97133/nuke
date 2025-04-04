@@ -58,7 +58,8 @@ const ResetPassword: React.FC = () => {
 
       // Redirect to dashboard or home
       navigate('/dashboard', { replace: true });
-    } catch (error: any) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Unknown password reset error');
       console.error('Password reset error:', error);
       toast({
         title: 'Password Reset Failed',

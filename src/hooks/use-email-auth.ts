@@ -117,8 +117,27 @@ export const useEmailAuth = () => {
         // This ensures login works even when there are Supabase port conflicts
         const isDevelopment = typeof window !== 'undefined' && window.location.href.includes('localhost');
         let forceMockMode = isDevelopment && (window.localStorage.getItem('force_mock_auth') === 'true');
-        let data: any = null;
-        let error: any = null;
+        
+        // Define types for data and error
+        type SupabaseAuthData = Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data'];
+        type MockAuthData = {
+          user: { 
+            id: string;
+            email: string | undefined;
+            app_metadata: Record<string, any>;
+            // Add other required User fields if necessary, or keep minimal
+          };
+          session: { 
+            access_token: string;
+            refresh_token: string;
+            // Add other required Session fields if necessary, or keep minimal
+          };
+        };
+        type AuthData = SupabaseAuthData | MockAuthData | null;
+        type AuthOrMockError = AuthError | { message: string } | null;
+
+        let data: AuthData = null;
+        let error: AuthOrMockError = null;
         
         // Only call Supabase if we're not in development mode with mock override
         if (!forceMockMode) {
