@@ -1,10 +1,10 @@
-# Nuke
+# N_O
 
 A revolutionary vehicle management platform that serves as the digital identity for vehicles and transforms automotive ownership, investment, and data validation.
 
 ## Vision
 
-Nuke is not just a vehicle management system—it's a comprehensive platform that creates a digital mirror for every vehicle. We're building the ultimate repository of automotive data, where vehicles themselves become digital entities with their own histories, specifications, and economic potential.
+N_0 is not just a vehicle management system—it's a comprehensive platform that creates a digital mirror for every vehicle. We're building the ultimate repository of automotive data, where vehicles themselves become digital entities with their own histories, specifications, and economic potential.
 
 ### Core Purpose
 
