@@ -153,209 +153,58 @@ export const useEmailForm = (
         return;
       }
 
-      // UNIVERSAL SOLUTION: Use a more direct approach that works in both dev and production
-      console.log('[useEmailForm] SIMPLIFIED AUTHENTICATION FLOW');
-      
-      // Show success toast right away to provide immediate feedback
-      toast({
-        title: "Authentication in progress",
-        description: "Please wait while we log you in..."
-      });
-      
-      // Add visual indicator for both dev and production
-      if (typeof document !== 'undefined') {
-        const navIndicator = document.createElement('div');
-        navIndicator.style.position = 'fixed';
-        navIndicator.style.top = '0';
-        navIndicator.style.left = '0';
-        navIndicator.style.width = '100%';
-        navIndicator.style.padding = '10px';
-        navIndicator.style.backgroundColor = 'green';
-        navIndicator.style.color = 'white';
-        navIndicator.style.zIndex = '9999';
-        navIndicator.style.textAlign = 'center';
-        navIndicator.style.fontSize = '16px';
-        navIndicator.innerText = 'Authentication in progress...';
-        document.body.appendChild(navIndicator);
-      }
-      
-      // Use a more SPA-friendly approach that works with client-side routing
+      // Simplified Login/Signup Flow
       try {
-        // Normal authentication process
         console.log('[useEmailForm] Calling handleEmailLogin with:', { email, hasPassword: !!password, isSignUp, hasAvatar: !!avatarUrl });
         
-        // Start the redirect timer before authentication
-        // This ensures redirection even if auth is slow or times out
-        if (typeof window !== 'undefined') {
-          console.log('[useEmailForm] Setting up redirect safety nets');
-          
-          // Setup proper SPA navigation using History API
-          const navigateToExplore = () => {
-            // Using History API for SPA-friendly navigation
-            const baseUrl = window.location.origin;
-            const exploreUrl = `${baseUrl}/explore`;
-            
-            console.log('[useEmailForm] Navigating to:', exploreUrl);
-            
-            // First try history.pushState for a clean SPA navigation
-            try {
-              window.history.pushState({}, '', '/explore');
-              // Dispatch a popstate event to trigger router updates
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            } catch (e) {
-              console.error('[useEmailForm] History API failed, falling back to direct navigation');
-              // Fallback to direct navigation if History API fails
-              window.location.href = exploreUrl;
-            }
-          };
-          
-          // Immediate redirect for development mode
-          const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-          if (isDev) {
-            setTimeout(() => {
-              console.log('[useEmailForm] DEV MODE - DIRECT NAVIGATION');
-              navigateToExplore();
-            }, 800); // Shorter timeout for development
-          }
-          
-          // Backup redirect timer for all environments
-          setTimeout(() => {
-            console.log('[useEmailForm] BACKUP REDIRECT ACTIVATED');
-            if (typeof document !== 'undefined') {
-              const indicator = document.createElement('div');
-              indicator.style.position = 'fixed';
-              indicator.style.bottom = '20px';
-              indicator.style.right = '20px';
-              indicator.style.backgroundColor = '#4444FF';
-              indicator.style.color = 'white';
-              indicator.style.padding = '10px';
-              indicator.style.borderRadius = '5px';
-              indicator.style.zIndex = '10000';
-              indicator.innerText = 'Login timed out. Click to continue.';
-              indicator.style.cursor = 'pointer';
-              indicator.onclick = navigateToExplore;
-              document.body.appendChild(indicator);
-            }
-            
-            // Final redirect after a longer timeout
-            setTimeout(navigateToExplore, 2000); 
-          }, 5000); // 5 second timeout as a final fallback
-        }
-        
-        // Proceed with standard authentication 
+        // Call the login/signup handler from useAuth
         await handleEmailLogin(email, password, isSignUp, avatarUrl);
-        console.log('[useEmailForm] Login/signup successful');
         
-        // Update success indicator
-        if (typeof document !== 'undefined') {
-          const indicators = document.querySelectorAll('div[style*="position: fixed"][style*="backgroundColor: green"]');
-          indicators.forEach(ind => {
-            if (ind instanceof HTMLElement) {
-              ind.innerText = 'Authentication successful! Redirecting to explore page...';
-            }
-          });
-        }
+        // IMPORTANT: No longer handle redirects here!
+        // Rely on the AuthProvider's onAuthStateChange to update the state,
+        // and the AppRouter to redirect based on the updated auth state.
+        console.log('[useEmailForm] Login/signup call successful. Auth state update pending...');
         
-        // Standard redirect that should work in most cases
-        if (typeof window !== 'undefined') {
-          toast({
-            title: "Login Successful",
-            description: "Taking you to the explore page..."
-          });
-          
-          // Use SPA-friendly navigation
-          const baseUrl = window.location.origin;
-          const exploreUrl = `${baseUrl}/explore`;
-          
-          // Try the History API first (best for SPAs)
-          try {
-            window.history.pushState({}, '', '/explore');
-            // Trigger router update
-            window.dispatchEvent(new PopStateEvent('popstate'));
-          } catch (e) {
-            console.warn('[useEmailForm] History API failed, using direct navigation');
-            // Fall back to direct navigation
-            window.location.href = exploreUrl;
-          }
-        }
-      } catch (loginError) {
-        console.error('[useEmailForm] Error during login/signup:', loginError);
-        // Even on error, we'll still redirect in development mode
-        if (typeof window !== 'undefined' && 
-            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-          console.log('[useEmailForm] DEV MODE - Redirecting despite error');
-          setTimeout(() => {
-            // Use SPA-friendly navigation
-            try {
-              window.history.pushState({}, '', '/explore');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            } catch (e) {
-              // Fall back to direct navigation if needed
-              window.location.href = `${window.location.origin}/explore`;
-            }
-          }, 1000);
-        }
-        // Error is already handled in the catch block below
-        throw loginError; // Re-throw to be caught by the outer catch
+        // Optionally show a generic success message, but avoid premature redirects
+        toast({
+          title: isSignUp ? "Signup Successful" : "Login Successful",
+          description: "Processing authentication..."
+        });
+
+      } catch (loginError: any) {
+        // Error handled by the outer catch block
+        console.error('[useEmailForm] Error during login/signup call:', loginError);
+        throw loginError; // Re-throw to be caught below
       }
       
     } catch (error: any) {
+      // Outer catch block handles errors from network check or handleEmailLogin
       console.error("[useEmailForm] Auth error:", error);
-      
-      // In development mode, just navigate to /explore anyway
-      // This makes sure the user isn't stuck on the login page
-      if (typeof window !== 'undefined' && window.location.href.includes('localhost')) {
-        console.log('[useEmailForm] Error occurred but in DEV mode - redirecting anyway');
-        
-        toast({
-          title: "Development Mode",
-          description: "Error occurred but redirecting to explore page anyway"
-        });
-        
-        setTimeout(() => {
-          window.location.href = '/explore';
-        }, 1000);
-        
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Regular error handling for production
-      // Check for WebSocket-related errors
-      const isWebSocketError = error.message?.includes('websocket') || 
-                              error.message?.includes('socket') ||
-                              error.message?.includes('connection');
-                              
-      // Check for network-related errors
-      const isNetworkError = error.message?.includes('network') || 
-                            error.message?.includes('connection') ||
-                            error.message?.includes('offline');
-      
-      const errorMessage = formatAuthError(error);
+      const errorMessage = formatAuthError(error); // Use the helper from useAuth.tsx
       setFormError(errorMessage);
       
-      let toastTitle = "Authentication Error";
-      let toastDesc = errorMessage;
-      
-      if (isWebSocketError) {
-        toastTitle = "Connection Error";
-        toastDesc = "There was a problem with the real-time connection. Please try again.";
-      } else if (isNetworkError) {
-        toastTitle = "Network Error";
-        toastDesc = "There was a problem connecting to the server. Please check your internet connection and try again.";
-      }
-      
+      // Simplified toast logic
       toast({
         variant: "destructive",
-        title: toastTitle,
-        description: toastDesc
+        title: "Authentication Failed",
+        description: errorMessage
       });
       
-      // Pass the error to the parent component if callback provided
       if (onError) {
         onError(errorMessage);
       }
     } finally {
+      // Remove any temporary debug indicators if they exist
+      if (typeof document !== 'undefined') {
+        const debugIndicator = document.getElementById('auth-debug-indicator');
+        if (debugIndicator) document.body.removeChild(debugIndicator);
+        // Remove the green banner if it exists
+        const navIndicators = document.querySelectorAll('div[style*="position: fixed"][style*="backgroundColor: green"]');
+        navIndicators.forEach(ind => ind.remove());
+        // Remove the blue banner if it exists
+        const blueIndicators = document.querySelectorAll('div[style*="position: fixed"][style*="backgroundColor: #4444FF"]');
+        blueIndicators.forEach(ind => ind.remove());
+      }
       setIsSubmitting(false);
     }
   };

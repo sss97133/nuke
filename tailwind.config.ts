@@ -1,9 +1,7 @@
 import type { Config } from "tailwindcss";
-import animate from "tailwindcss-animate";
 import { fontFamily } from "tailwindcss/defaultTheme";
-import plugin from "tailwindcss/plugin";
 
-export default {
+const config = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
@@ -15,74 +13,45 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "0.5rem",
+      padding: "2rem",
       screens: {
         "2xl": "1400px",
       },
     },
     extend: {
       colors: {
-        border: {
-          DEFAULT: "hsl(var(--border))",
-          dark: "#555555",
-        },
-        input: {
-          DEFAULT: "hsl(var(--input))",
-          dark: "#333333",
-        },
-        ring: {
-          DEFAULT: "hsl(var(--ring))",
-          dark: "#8E9196",
-        },
-        background: {
-          DEFAULT: "#FFFFFF",
-          dark: "#1A1F2C",
-        },
-        foreground: {
-          DEFAULT: "#222222",
-          dark: "#FFFFFF",
-        },
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#333333",
-          foreground: "#FFFFFF",
-          dark: "#F1F1F1",
-          "dark-foreground": "#222222",
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
-          DEFAULT: "#C8C8C9",
-          foreground: "#222222",
-          dark: "#2A2A2A",
-          "dark-foreground": "#FFFFFF",
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
         },
         destructive: {
-          DEFAULT: "#991B1B",
-          foreground: "#FFFFFF",
-          dark: "#7F1D1D",
-          "dark-foreground": "#FFFFFF",
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
-          DEFAULT: "#F1F1F1",
-          foreground: "#666666",
-          dark: "#333333",
-          "dark-foreground": "#E5E5E5",
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: "#D4D4D4",
-          foreground: "#222222",
-          dark: "#404040",
-          "dark-foreground": "#FFFFFF",
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
-          DEFAULT: "#FFFFFF",
-          foreground: "#222222",
-          dark: "#1A1F2C",
-          "dark-foreground": "#FFFFFF",
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
         card: {
-          DEFAULT: "#FFFFFF",
-          foreground: "#222222",
-          dark: "#1A1F2C",
-          "dark-foreground": "#FFFFFF",
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
       },
       fontSize: {
@@ -91,12 +60,12 @@ export default {
         doc: ["0.8125rem", "1.25rem"],
       },
       fontFamily: {
-        system: ["Monaco", "Consolas", "monospace"],
+        sans: ["var(--font-sans)", ...fontFamily.sans],
       },
       borderRadius: {
-        lg: "0px",
-        md: "0px",
-        sm: "0px",
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
         classic: "inset 1px 1px 0px #FFFFFF, inset -1px -1px 0px #8E9196",
@@ -123,5 +92,7 @@ export default {
       },
     },
   },
-  plugins: [animate],
+  plugins: [require("tailwindcss-animate")],
 } satisfies Config;
+
+export default config;

@@ -55,14 +55,14 @@ if (typeof window !== 'undefined') {
       
       console.log(`REST API: ${apiCheck.ok ? '✅ OK' : '❌ Failed'} (Status: ${apiCheck.status})`);
       
-      // Check Studio (port 54323)
-      const studioCheck = await fetch(SUPABASE_STUDIO_URL, { method: 'GET' })
+      // Check Storage (requires bucket name)
+      const storageCheck = await fetch(`${CORRECT_SUPABASE_URL}/storage/v1/health`, { method: 'GET' })
         .then(res => ({ status: res.status, ok: res.ok }))
         .catch(() => ({ status: 0, ok: false }));
       
-      results.studio = studioCheck.ok;
-      console.log(`Studio: ${studioCheck.ok ? '✅ OK' : '❌ Failed'} (Status: ${studioCheck.status})`);
-      if (!studioCheck.ok) results.portsInUse.push(54323);
+      results.storage = storageCheck.ok;
+      console.log(`Storage: ${storageCheck.ok ? '✅ OK' : '❌ Failed'} (Status: ${storageCheck.status})`);
+      if (!storageCheck.ok) results.portsInUse.push(54321);
       
       // Determine if we have port conflicts
       if (results.portsInUse.length > 0) {

@@ -1,19 +1,10 @@
 /** @type {import('tailwindcss').Config} */
-import typography from "@tailwindcss/typography";
-import animate from "tailwindcss-animate";
-
-const config = {
+module.exports = {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   darkMode: ["class"],
-  safelist: [
-    'bg-white/5',
-    'bg-black/40',
-    'border-white/10',
-    'backdrop-blur-xl'
-  ],
   theme: {
     extend: {
       colors: {
@@ -90,9 +81,7 @@ const config = {
     },
   },
   plugins: [
-    typography,
-    animate,
+    require('@tailwindcss/typography'),
+    require('tailwindcss-animate'),
   ],
 }
-
-export default config;

@@ -7,6 +7,10 @@
 import { useState, useEffect } from 'react';
 import { RawTimelineEvent, TimelineEvent } from './types';
 import { getTimelineClient } from './useSupabaseClient';
+// Import only necessary Supabase types
+import { PostgrestSingleResponse, PostgrestResponse, SupabaseClient } from '@supabase/supabase-js'; 
+import { Database } from '@/types/database'; // Assuming Database type is defined here
+import { queryWithRetry } from '@/lib/supabase'; // Import the retry utility
 
 // Mock Supabase client for tests and development
 const supabase = {
@@ -225,132 +229,119 @@ export function useVehicleTimelineData({
     try {
       setLoading(true);
       setError(null);
+      const timelineSupabase: any = getTimelineClient(); 
+      const DATABASE_TIMEOUT_MS = 10000;
+      // Timeout promise now only used if queryWithRetry is bypassed or fails internally
+      const timeoutPromise = <T = never>(ms: number): Promise<T> => 
+        new Promise<T>((_, reject) => {
+          setTimeout(() => reject(new Error('Database connection timed out')), ms);
+        });
 
-      // Get the appropriate Supabase client (auth-aware or fallback)
-      const timelineSupabase = getTimelineClient();
-
-      // Add a timeout to prevent indefinite loading
-      const DATABASE_TIMEOUT_MS = 3000;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        const timeoutId = setTimeout(
-          () => reject(new Error('Database connection timed out')),
-          DATABASE_TIMEOUT_MS
-        );
-        return () => clearTimeout(timeoutId);
-      });
-      
-      // Determine which vehicle to load
-      let query;
+      // --- Fetch Vehicle Data ---
       let vehicleData: VehicleData | null = null;
       let vehicleError: Error | null = null;
-      
+
       try {
-        // Attempt to get data from database first
+        let queryBuilder: any = null;
+        let baseQuery: any = timelineSupabase.from('vehicles').select('*');
+
         if (vin) {
-          query = timelineSupabase
-            .from('vehicles')
-            .select('*')
-            .eq('vin', vin)
-            .single();
+          queryBuilder = baseQuery.eq('vin', vin).single();
         } else if (vehicleId) {
-          query = timelineSupabase
-            .from('vehicles')
-            .select('*')
-            .eq('id', vehicleId)
-            .single();
+          queryBuilder = baseQuery.eq('id', vehicleId).single();
         } else if (make && model) {
-          query = timelineSupabase
-            .from('vehicles')
-            .select('*')
-            .eq('make', make)
-            .eq('model', model);
-            
+          let builder: any = baseQuery.eq('make', make).eq('model', model);
           if (year) {
-            query = query.eq('year', year);
+            builder = builder.eq('year', year);
           }
-          
-          query = query.order('created_at', { ascending: false }).limit(1);
+          queryBuilder = builder.order('created_at', { ascending: false }).limit(1);
         } else {
-          // Fallback to the 1988 GMC Suburban
-          throw new Error('Using fallback vehicle data');
+          throw new Error('Using fallback vehicle data: No valid identifiers provided');
+        }
+
+        // Wrap the query execution with retry logic
+        // The query builder itself is the awaitable function
+        const result: PostgrestSingleResponse<VehicleData> | PostgrestResponse<VehicleData> = await queryWithRetry(
+          () => queryBuilder, // Pass the awaitable query builder directly
+          3, // maxRetries
+          1000 // baseDelay
+        );
+        
+        if (result) {
+          vehicleData = Array.isArray(result.data) ? result.data[0] || null : result.data;
+          vehicleError = result.error ? new Error(result.error.message) : null;
+        } else {
+          vehicleError = new Error('Query resolution failed unexpectedly after retries');
         }
         
-        // Race against timeout
-        const result = await Promise.race([query, timeoutPromise]);
-        vehicleData = result.data;
-        vehicleError = result.error;
       } catch (err: unknown) {
-        console.warn('Falling back to hardcoded vehicle data:', err);
-        // Fallback to the BaT example vehicle
-        vehicleData = {
-          id: 'f3ccd282-2143-4492-bbd6-b34538a5f538',
-          make: 'GMC',
-          model: 'Suburban',
-          year: 1988,
-          vin: '1GKEV16K4JF504317',
-          status: 'active',
-          user_id: '00000000-0000-0000-0000-000000000000'
-        };
-      }
-      
-      if (vehicleError) {
-        console.warn('Vehicle error, using fallback:', vehicleError);
-        // Fallback to the BaT example vehicle
-        vehicleData = {
-          id: 'f3ccd282-2143-4492-bbd6-b34538a5f538',
-          make: 'GMC',
-          model: 'Suburban',
-          year: 1988,
-          vin: '1GKEV16K4JF504317',
-          status: 'active',
-          user_id: '00000000-0000-0000-0000-000000000000'
-        };
+        console.warn('Vehicle data query failed after retries, falling back to hardcoded:', err);
+        vehicleData = { id: 'f3ccd282-2143-4492-bbd6-b34538a5f538', make: 'GMC', model: 'Suburban', year: 1988, vin: '1GKEV16K4JF504317', status: 'active', user_id: '00000000-0000-0000-0000-000000000000' };
+        vehicleError = err instanceof Error ? err : new Error(String(err));
       }
 
-      setVehicle(vehicleData);
-      
-      // Attempt to fetch timeline events or use fallback data
-      let timelineData: RawTimelineEvent[] | null = null;
-      let timelineError: Error | null = null;
-      
-      try {
-        // Try to get timeline events from database first
-        const timelineQuery = timelineSupabase
-          .from('vehicle_timeline_events')
-          .select('*')
-          .eq('vehicle_id', vehicleData?.id || 'f3ccd282-2143-4492-bbd6-b34538a5f538')
-          .order('event_date', { ascending: true });
-          
-        const result = await Promise.race([timelineQuery, timeoutPromise]);
-        timelineData = result.data;
-        timelineError = result.error;
-        
-      } catch (err: unknown) {
-        console.warn('Timeline fetch error, using fallback data:', err);
-        timelineData = getBatFallbackData(vehicleData?.id || 'f3ccd282-2143-4492-bbd6-b34538a5f538');
+      if (vehicleError && !vehicleData) {
+        console.warn('Vehicle error, using fallback:', vehicleError);
+        vehicleData = { id: 'f3ccd282-2143-4492-bbd6-b34538a5f538', make: 'GMC', model: 'Suburban', year: 1988, vin: '1GKEV16K4JF504317', status: 'active', user_id: '00000000-0000-0000-0000-000000000000' };
       }
       
-      if (timelineError) {
+      setVehicle(vehicleData);
+
+      // --- Fetch Timeline Events ---
+      let timelineData: RawTimelineEvent[] | null = null;
+      let timelineError: Error | null = null;
+      const vehicleLookupId = vehicleData?.id || 'f3ccd282-2143-4492-bbd6-b34538a5f538';
+
+      try {
+        const timelineQueryBuilder: any = timelineSupabase
+          .from('vehicle_timeline_events') 
+          .select('*')
+          .eq('vehicle_id', vehicleLookupId)
+          .order('event_date', { ascending: true });
+
+        // Wrap the timeline query execution with retry logic
+        const result: PostgrestResponse<RawTimelineEvent> = await queryWithRetry(
+          () => timelineQueryBuilder, // Pass the awaitable query builder
+          3, 
+          1000
+        );
+        
+        if (result) {
+          timelineData = result.data;
+          timelineError = result.error ? new Error(result.error.message) : null;
+        } else {
+          timelineError = new Error('Timeline query resolution failed unexpectedly after retries');
+        }
+        
+      } catch (err: unknown) {
+        console.warn('Timeline query failed after retries, using fallback data:', err);
+        timelineData = getBatFallbackData(vehicleLookupId);
+        timelineError = err instanceof Error ? err : new Error(String(err)); // Keep track of the error
+      }
+
+      if (timelineError && !timelineData) {
         console.warn('Timeline error, using fallback data:', timelineError);
-        timelineData = getBatFallbackData(vehicleData?.id || 'f3ccd282-2143-4492-bbd6-b34538a5f538');
+        timelineData = getBatFallbackData(vehicleLookupId);
       }
       
       if (!timelineData || timelineData.length === 0) {
         console.log('No timeline data found, using fallback data');
-        timelineData = getBatFallbackData(vehicleData?.id || 'f3ccd282-2143-4492-bbd6-b34538a5f538');
+        timelineData = getBatFallbackData(vehicleLookupId);
       }
-      
-      // Convert to our timeline event format
+
       const formattedEvents = formatEvents(timelineData);
-      
       setEvents(formattedEvents);
-      
-      // Extract unique sources and event types
       extractMetadata(formattedEvents);
-      
+
     } catch (err: unknown) {
-      console.error('Error fetching vehicle data:', err);
+      // This catch block now handles errors from the retry utility or identifier issues
+      console.error('Error in fetchData after retries or during setup:', err);
       setError(err instanceof Error ? err.message : 'Failed to load vehicle data');
+      // Optionally clear existing data on failure
+      setVehicle(null);
+      setEvents([]);
+      setSources([]);
+      setEventTypes([]);
     } finally {
       setLoading(false);
     }
