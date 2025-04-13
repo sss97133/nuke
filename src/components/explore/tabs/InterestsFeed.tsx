@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { useExploreFeed, ContentItem } from '../hooks/useExploreFeed';
+import { useExploreFeed } from '../hooks/useExploreFeed';
 import { ContentCard } from '../content/ContentCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MessageCircle } from 'lucide-react';
@@ -20,10 +19,7 @@ export const InterestsFeed: React.FC<InterestsFeedProps> = ({ filter, searchTerm
     isLoading,
     isError,
     error,
-    trackContentView,
-    likeContent,
-    shareContent,
-    saveContent
+    handleInteraction
   } = useExploreFeed({ 
     filter,
     includeStreams: true,
@@ -67,8 +63,8 @@ export const InterestsFeed: React.FC<InterestsFeedProps> = ({ filter, searchTerm
     );
   }
 
-  // Transform the feed items to the format expected by ContentCard
-  const contentCards = feedItems.map(item => ({
+  // Map feedItems to ContentCard props (assuming feedItems are now correctly typed or any[])
+  const contentCards = feedItems.map((item: any) => ({
     id: item.id,
     type: item.type,
     title: item.title,
@@ -97,10 +93,10 @@ export const InterestsFeed: React.FC<InterestsFeedProps> = ({ filter, searchTerm
           <ContentCard 
             key={item.id}
             item={item}
-            onView={(id, type) => trackContentView(id, type)}
-            onLike={(id, type) => likeContent(id, type)}
-            onShare={(id, type) => shareContent(id, type)}
-            onSave={(id, type) => saveContent(id, type)}
+            onView={(id, type) => handleInteraction(id, type, 'view')}
+            onLike={(id, type) => handleInteraction(id, type, 'like')}
+            onShare={(id, type) => handleInteraction(id, type, 'share')}
+            onSave={(id, type) => handleInteraction(id, type, 'save')}
           />
         ))}
       </div>

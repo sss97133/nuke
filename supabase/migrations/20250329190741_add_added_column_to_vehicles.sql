@@ -55,7 +55,15 @@ CREATE INDEX IF NOT EXISTS vehicles_owner_id_idx ON public.vehicles (owner_id);
 CREATE OR REPLACE FUNCTION public.set_vehicle_owner()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.owner_id = auth.uid();
+  -- Check if auth.uid() is available
+  IF auth.uid() IS NOT NULL THEN
+    NEW.owner_id = auth.uid();
+  ELSE
+    -- Log the issue and use a default value or raise an exception
+    -- We choose to raise an exception as it's safer for production
+    -- If logging is desired, a separate logging table (e.g., auth_errors) would need to be created.
+    RAISE EXCEPTION 'Authentication required to add vehicles. auth.uid() was null.';
+  END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -3,19 +3,22 @@ import { ContentItem, FeedOptions } from './types';
 import { fetchContentByType } from './contentTypeFetcher';
 import { fetchLiveTwitchStreams } from './twitchStreamsFetcher';
 
+// Also export ContentItem directly if needed elsewhere
+// export type { ContentItem };
+
 export async function fetchFeedContent(
   pageParam: number,
   { filter = 'all', limit = 10, includeStreams = false, searchTerm = '' }: FeedOptions
-): Promise<ContentItem[]> {
+): Promise<any[]> {
   console.log('Fetching explore feed:', { filter, pageParam, limit, includeStreams, searchTerm });
   
   try {
     // Handle fallback for empty content
-    const mockContent: ContentItem[] = [];
+    const mockContent: any[] = [];
     
     // Each content type has its own table, so we need to fetch from multiple sources
     // and combine the results based on the filter
-    let allContent: ContentItem[] = [];
+    let allContent: any[] = [];
     
     // Get current user for personalization
     const { data: userData, error: authError } = await supabase.auth.getUser();
@@ -58,6 +61,7 @@ export async function fetchFeedContent(
       }
       
       if (sourceData && sourceData.length > 0) {
+        // Revert: Simply spread the data without assertion
         allContent = [...allContent, ...sourceData];
       }
     }
@@ -69,7 +73,7 @@ export async function fetchFeedContent(
         
         if (twitchStreams && twitchStreams.length > 0) {
           // Convert Twitch streams to ContentItem format
-          const formattedStreams: ContentItem[] = twitchStreams.map(stream => ({
+          const formattedStreams: any[] = twitchStreams.map(stream => ({
             id: stream.id,
             type: 'stream',
             title: stream.title,
@@ -143,8 +147,8 @@ export async function fetchFeedContent(
 }
 
 // Helper function to generate fallback content
-function generateFallbackContent(): ContentItem[] {
-  const fallbackContent: ContentItem[] = [];
+function generateFallbackContent(): any[] {
+  const fallbackContent: any[] = [];
   
   for (let i = 1; i <= 6; i++) {
     fallbackContent.push({

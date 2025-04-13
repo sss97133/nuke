@@ -6,13 +6,23 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   plugins: [
-    react(),
+    react({
+      // Optional: Explicitly set JSX runtime if needed, though usually automatic
+      // jsxRuntime: 'automatic' 
+    }),
     mode === 'development' && componentTagger(),
   ].filter(Boolean),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  esbuild: {
+    jsxFactory: 'React.createElement',
+    jsxFragment: 'React.Fragment',
+    loader: 'tsx',
+    include: /\.(ts|tsx|js|jsx)$/,
+    exclude: []
   },
   build: {
     outDir: 'dist',
@@ -30,8 +40,8 @@ export default defineConfig(({ mode }) => ({
   },
   base: '/',
   server: {
-    port: 8080,
-    host: "::"
+    port: 5173,
+    strictPort: true
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(mode)
@@ -42,6 +52,12 @@ export default defineConfig(({ mode }) => ({
     }
   },
   optimizeDeps: {
+    esbuildOptions: {
+      loader: {
+        '.js': 'jsx',
+        '.ts': 'tsx'
+      },
+    },
     include: ['@supabase/supabase-js']
   }
 }));

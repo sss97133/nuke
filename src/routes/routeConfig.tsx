@@ -56,10 +56,18 @@ export interface RouteConfig {
   redirectTo?: string;
 }
 
-// Auth routes
+// Auth routes - using modernized authentication UI
+import NewLoginPage from '@/pages/auth/NewLoginPage';
+import NewSignUpPage from '@/pages/auth/NewSignUpPage';
+import NewResetPasswordPage from '@/pages/auth/NewResetPasswordPage';
+import VerifyEmailPage from '@/components/auth/VerifyEmailPage';
+
 export const authRoutes: RouteConfig[] = [
-  { path: '/login', element: <AuthForm />, type: RouteType.AUTH },
-  { path: '/register', element: <AuthForm />, type: RouteType.AUTH },
+  { path: '/login', element: <NewLoginPage />, type: RouteType.AUTH },
+  { path: '/signup', element: <NewSignUpPage />, type: RouteType.AUTH },
+  { path: '/register', element: <Navigate to="/signup" replace />, type: RouteType.AUTH },
+  { path: '/reset-password', element: <NewResetPasswordPage />, type: RouteType.AUTH },
+  { path: '/verify-email', element: <VerifyEmailPage />, type: RouteType.AUTH },
 ];
 
 // Public routes configuration

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -40,9 +39,9 @@ export const DesktopNavSidebar = ({ isCollapsed, toggleCollapse }: DesktopNavSid
       
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
-          {navItems.map((item) => (
+          {navItems.map((item, index) => (
             <NavItem
-              key={item.to}
+              key={item.to && item.to !== '#' ? item.to : `${item.label}-${index}`}
               to={item.to}
               icon={item.icon}
               label={item.label}

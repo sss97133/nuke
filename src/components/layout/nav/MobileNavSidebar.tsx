@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
@@ -37,9 +36,9 @@ export const MobileNavSidebar = ({ isOpen, setIsOpen }: MobileNavSidebarProps) =
           </div>
           <ScrollArea className="h-[calc(100vh-57px-4rem)]">
             <div className="p-2 space-y-1">
-              {navItems.map((item) => (
+              {navItems.map((item, index) => (
                 <NavItem
-                  key={item.to}
+                  key={item.to && item.to !== '#' ? item.to : `${item.label?.trim() || 'item'}-${index}`}
                   to={item.to}
                   icon={item.icon}
                   label={item.label}

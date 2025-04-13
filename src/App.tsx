@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { AppRouter } from './routes/AppRouter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,6 +11,7 @@ import { SimpleAdaptivePanel } from './components/ui/SimpleAdaptivePanel';
 import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
 import { WebSocketManager } from './integrations/supabase/WebSocketManager';
 import { WebSocketDiagnostics } from './integrations/utils/WebSocketDiagnostics';
+import { TestButton } from "./components/TestButton"
 
 // Import environment fix to ensure proper Supabase connectivity
 import './fix-env';
@@ -73,6 +73,7 @@ function App() {
               <Toaster />
             </WebSocketManager>
           </TooltipProvider>
+          <TestButton />
         </QueryClientProvider>
       </HelmetProvider>
     </ErrorBoundary>

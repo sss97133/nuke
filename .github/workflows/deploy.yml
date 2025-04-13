@@ -34,7 +34,6 @@ jobs:
           # Supabase configuration
           VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SUPABASE_SERVICE_KEY=${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
           
           # Application configuration
           VITE_APP_NAME=Nuke
@@ -44,23 +43,12 @@ jobs:
           VITE_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           EOF
           
-          # Create other environment files needed by the build process
-          cp .env .env.production
-          
-          # Verify environment variables and set output variable
-          if grep -q "VITE_SUPABASE_URL=" .env && grep -q "VITE_SUPABASE_ANON_KEY=" .env; then
-            echo "ENV_VALID=true" >> $GITHUB_OUTPUT
-            echo "✅ Environment variables are properly set"
-          else
-            echo "ENV_VALID=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Some required environment variables are missing!"
-            
-            # Output diagnostics (without revealing values)
-            echo "Environment variables availability:"
-            grep -q "VITE_SUPABASE_URL=" .env && echo "- VITE_SUPABASE_URL: Available" || echo "- VITE_SUPABASE_URL: Missing"
-            grep -q "VITE_SUPABASE_ANON_KEY=" .env && echo "- VITE_SUPABASE_ANON_KEY: Available" || echo "- VITE_SUPABASE_ANON_KEY: Missing"
-            grep -q "VITE_SUPABASE_SERVICE_KEY=" .env && echo "- VITE_SUPABASE_SERVICE_KEY: Available" || echo "- VITE_SUPABASE_SERVICE_KEY: Missing"
+          # Verify environment variables
+          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ] || [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "::error::Missing required Supabase environment variables"
+            exit 1
           fi
+          echo "✅ Environment variables verified."
           
       # Bypass linting but still report errors (non-blocking)
       - name: Check for linting issues
@@ -76,71 +64,55 @@ jobs:
       - name: Build project
         id: build
         run: |
-          echo "Building project..."
+          echo "Building project using npm run build..."
           
-          # Attempt build with npm scripts first
-          if grep -q '"build:prod"' package.json; then
-            echo "Running npm run build:prod..."
-            npm run build:prod && {
-              echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
-              echo "✅ Build completed successfully with build:prod script"
-            } || echo "⚠️ build:prod script failed, trying alternatives"
-          elif grep -q '"build"' package.json; then
-            echo "Running npm run build..."
-            npm run build && {
-              echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
-              echo "✅ Build completed successfully with build script"
-            } || echo "⚠️ build script failed, trying direct build"
-          else
-            echo "⚠️ No build script found in package.json"
-          fi
+          # Ensure node_modules is properly installed (redundant check, already done by npm ci)
+          # npm ci 
           
-          # If npm scripts failed, try direct build commands
-          if [ -z "$BUILD_SUCCESS" ]; then
-            echo "Attempting direct build commands..."
-            
-            # Try TypeScript compilation first (optional)
-            npx tsc || echo "⚠️ TypeScript compilation failed, proceeding to Vite build"
-            
-            # Then try Vite build
-            npx vite build && {
-              echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
-              echo "✅ Build completed successfully with direct vite build"
-            } || {
-              echo "⚠️ Direct vite build failed, trying ESM build"
-              
-              # Try ESM build as last resort
-              if [ -f "build.mjs" ]; then
-                node build.mjs && {
-                  echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
-                  echo "✅ Build completed successfully with ESM build"
-                } || echo "⚠️ All build methods failed"
-              else
-                echo "⚠️ No ESM build script found, all build methods failed"
-                
-                # Create minimal dist directory for deployment to continue
-                mkdir -p dist
-                echo '<!DOCTYPE html><html><head><title>Nuke - Build Failed</title></head><body><h1>Build Failed</h1><p>See GitHub Actions logs for details</p></body></html>' > dist/index.html
-              fi
-            }
-          fi
+          # Run the build with proper environment variables inline
+          # Note: The .env file created earlier might still be used by Vite internally
+          VITE_SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}" \
+          VITE_SUPABASE_ANON_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+          VITE_ENV="production" \
+          npm run build
           
-          # Check if build was successful
+          # Verify build output after successful build command
           if [ -d "dist" ] && [ "$(find dist -type f | wc -l)" -gt 0 ]; then
-            echo "BUILD_OUTPUT_EXISTS=true" >> $GITHUB_OUTPUT
-            echo "✅ Build output exists in dist/ directory"
-            find dist -type f | wc -l | xargs -I {} echo "Found {} files in dist/"
+            echo "BUILD_SUCCESS=true" >> $GITHUB_OUTPUT
+            echo "✅ Build completed successfully and output verified"
           else
-            echo "BUILD_OUTPUT_EXISTS=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No build output found in dist/ directory"
+            echo "BUILD_SUCCESS=false" >> $GITHUB_OUTPUT
+            echo "❌ Build failed - no output files found in dist/ directory after build command"
+            exit 1 # Fail the step if output is missing
           fi
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SUPABASE_SERVICE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_KEY }}
           CI: "true"
-        continue-on-error: true
+      
+      # Add Build Verification Step
+      - name: Verify build output
+        if: steps.build.outputs.BUILD_SUCCESS == 'true'
+        run: |
+          echo "Verifying build output..."
+          
+          # Check for critical files
+          if [ ! -f "dist/index.html" ]; then
+            echo "❌ Missing index.html in build output"
+            exit 1
+          fi
+          
+          # Check for JS and CSS files
+          JS_COUNT=$(find dist -name "*.js" | wc -l)
+          CSS_COUNT=$(find dist -name "*.css" | wc -l)
+          
+          echo "Found $JS_COUNT JavaScript files and $CSS_COUNT CSS files"
+          
+          if [ "$JS_COUNT" -eq 0 ]; then
+            echo "❌ No JavaScript files found in build output"
+            exit 1
+          fi
+          
+          echo "✅ Build verification passed"
       
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -221,7 +193,6 @@ jobs:
         run: |
           echo "Deployment Status Summary:"
           echo "-------------------------"
-          echo "Environment Variables: $(if [ "${{ steps.setup_env.outputs.ENV_VALID }}" == "true" ]; then echo "✅ Valid"; else echo "⚠️ Invalid"; fi)"
           echo "Build Output: $(if [ "${{ steps.build.outputs.BUILD_OUTPUT_EXISTS }}" == "true" ]; then echo "✅ Found"; else echo "⚠️ Missing"; fi)"
           echo "Runtime Env Vars: $(if [ "${{ steps.check_runtime_vars.outputs.RUNTIME_ENV_VARS }}" == "true" ]; then echo "✅ Found"; else echo "⚠️ Injected"; fi)"
           echo "Deployment: $(if [ "${{ steps.deploy.outputs.DEPLOY_SUCCESS }}" == "true" ]; then echo "✅ Successful"; else echo "⚠️ Failed"; fi)"

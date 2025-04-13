@@ -1,5 +1,4 @@
-
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useEmailForm } from "./useEmailForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { z } from "zod";
 
 interface EmailLoginFormProps {
   isLoading: boolean;

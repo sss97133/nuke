@@ -1,4 +1,3 @@
-
 import type { Database } from '../types';
 import React, { useState, useEffect } from 'react';
 import { Car, Wrench, Users, TrendingUp } from "lucide-react";
@@ -26,8 +25,19 @@ const StatsOverview = () => {
         setFetchError(false);
         
         // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-  if (error) console.error("Database query error:", error);
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error) {
+          console.error("Error fetching user:", error);
+          toast({
+            title: "Authentication error",
+            description: "Could not retrieve user information. Please try signing in again.",
+            variant: "destructive",
+          });
+          setFetchError(true);
+          setIsLoading(false); // Stop loading if user fetch fails
+          return;
+        }
         
         if (!user) {
           toast({
@@ -49,14 +59,14 @@ const StatsOverview = () => {
             
           // Fetch active services  
           supabase
-            
+            .from('services')
             .select('id')
             .eq('user_id', user.id)
             .in('status', ['pending', 'in_progress']),
             
           // Fetch active team members with status filter
           supabase
-            
+            .from('team_members')
             .select('id')
             .eq('status', 'active')
         ]);
