@@ -18,7 +18,6 @@ import { fileURLToPath } from 'url';
 
 // Support ES module __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // File patterns to focus on
 const VEHICLE_DATA_PATTERNS = [
@@ -46,12 +45,12 @@ const SUPABASE_ERROR_PATTERNS = [
         const bucketMatch = matched.match(/\.from\(["']([\w-]+)["']\)/);
         
         if (declarationMatch && bucketMatch) {
-          const [_, declarationType, variables, awaitKeyword] = declarationMatch;
+          const [_, variables, awaitKeyword] = declarationMatch;
           const bucket = bucketMatch[1];
           
           // Build proper chain structure with vehicle-centric error handling
           return `try {
-            ${declarationType || 'const'} {${variables}} = ${awaitKeyword || ''}supabase.storage
+            const {${variables}} = ${awaitKeyword || ''}supabase.storage
               .from("${bucket}")
               .upload(fileName, file, { cacheControl: "3600", upsert: false });
             
@@ -221,7 +220,7 @@ const SUPABASE_ERROR_PATTERNS = [
           // Extract the variable declaration if it exists
           const declarationMatch = matched.match(/(const|let|var)?\s*(\w+)\s*=\s*(await\s+)?\w+\.from/);
           if (declarationMatch) {
-            const [_, declarationType, variableName, awaitKeyword] = declarationMatch;
+            const variableName = declarationMatch[2];
             
             return `try {
               ${matched}
