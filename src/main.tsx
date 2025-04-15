@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { getEnvironment } from './lib/environment'; // Import the environment utility
 import { AuthProvider } from '@/hooks/useAuth'; // Import AuthProvider
+import ErrorBoundary from './components/error/ErrorBoundary'; // Import ErrorBoundary
 
 // Import styles in the correct order (global first, then components)
 import './index.css'
@@ -33,11 +34,13 @@ if (rootElement) {
       </div>
     `;
   } else {
-    // Wrap App with AuthProvider
+    // Wrap App with AuthProvider and ErrorBoundary
     createRoot(rootElement).render(
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ErrorBoundary>
     );
   }
 } else {

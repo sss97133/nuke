@@ -12,6 +12,7 @@ import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
 import { WebSocketManager } from './integrations/supabase/WebSocketManager';
 import { WebSocketDiagnostics } from './integrations/utils/WebSocketDiagnostics';
 import { TestButton } from "./components/TestButton"
+import AuthDebug from './components/debug/AuthDebug';
 
 // Import environment fix to ensure proper Supabase connectivity
 import './fix-env';
@@ -71,6 +72,8 @@ function App() {
               {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
               <AppRouter />
               <Toaster />
+              {/* Add AuthDebug component for dev environment */}
+              <AuthDebug />
             </WebSocketManager>
           </TooltipProvider>
           <TestButton />
