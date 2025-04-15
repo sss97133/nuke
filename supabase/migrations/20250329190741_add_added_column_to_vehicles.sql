@@ -1,5 +1,6 @@
 -- Add all missing columns needed by the vehicle form
 ALTER TABLE public.vehicles
+ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
 ADD COLUMN IF NOT EXISTS added TIMESTAMP WITH TIME ZONE DEFAULT now(),
 ADD COLUMN IF NOT EXISTS ownership_status TEXT DEFAULT 'owned',
 ADD COLUMN IF NOT EXISTS purchase_date TIMESTAMP WITH TIME ZONE,
@@ -73,10 +74,6 @@ CREATE TRIGGER set_vehicle_owner_trigger
   BEFORE INSERT ON public.vehicles
   FOR EACH ROW
   EXECUTE FUNCTION public.set_vehicle_owner();
-
--- Add owner_id column if it doesn't exist (consistent with our RLS policies)
-ALTER TABLE public.vehicles
-ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- Create index on owner_id for performance
 CREATE INDEX IF NOT EXISTS idx_vehicles_owner_id ON public.vehicles(owner_id);

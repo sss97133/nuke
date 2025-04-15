@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import tailwindcss from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
@@ -17,6 +19,21 @@ export default defineConfig(({ mode }) => ({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  css: {
+    postcss: {
+      plugins: [
+        tailwindcss(),
+        autoprefixer(),
+      ],
+    },
+    modules: {
+      localsConvention: 'camelCase'
+    },
+    // Force CSS extraction to ensure styles are included in the build
+    // Note: Vite typically handles CSS splitting/extraction well by default.
+    // Explicit extraction might not be needed unless default behavior is insufficient.
+    // extract: true, // Uncomment if needed
+  },
   esbuild: {
     jsxFactory: 'React.createElement',
     jsxFragment: 'React.Fragment',
@@ -27,6 +44,8 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: 'dist',
     minify: 'terser',
+    sourcemap: true,
+    cssCodeSplit: true, // Default is true, explicitly setting for clarity
     rollupOptions: {
       output: {
         assetFileNames: (assetInfo) => {
@@ -45,11 +64,6 @@ export default defineConfig(({ mode }) => ({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(mode)
-  },
-  css: {
-    modules: {
-      localsConvention: 'camelCase'
-    }
   },
   optimizeDeps: {
     esbuildOptions: {
