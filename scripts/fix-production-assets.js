@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+ 
 /**
  * Script to fix production CSS and asset loading issues
  * This ensures all CSS files are properly included in the build

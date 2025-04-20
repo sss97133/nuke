@@ -10,8 +10,11 @@ import StyleFix from './fixes/ensure-styles';
 import { SimpleAdaptivePanel } from './components/ui/SimpleAdaptivePanel';
 import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
 
-// Import our mock enabler to prevent WebSocket connection errors
-import './integrations/utils/mock-enabler';
+// Conditionally import mock enabler ONLY in development
+if (import.meta.env.DEV) {
+  console.log('Development mode: Importing mock enabler...');
+  import('./integrations/utils/mock-enabler');
+}
 
 // Import enhanced component styles
 import './styles/component-classes.css';
@@ -43,31 +46,28 @@ function ToastInitializer() {
 }
 
 function App() {
-  // Create a persistent helmet context
-  const helmetContext = {};
+  // Check required environment variables on app load
+  useEffect(() => {
+    const requiredVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
+    if (!checkRequiredEnvVars(requiredVars)) {
+      console.error("Missing critical environment variables!", requiredVars);
+      // You might want to render a dedicated error component here
+    }
+  }, []);
 
   return (
     <ErrorBoundary>
-      <HelmetProvider context={helmetContext}>
+      <HelmetProvider>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            {/* Initialize toast functions for global use */}
             <ToastInitializer />
-            
-            {/* Main application router */}
-            <AppRouter />
-            
-            {/* Global toast container */}
-            <Toaster />
-            
-            {/* Onboarding check component */}
-            <OnboardingCheck />
-            
-            {/* Style fixes for consistent appearance */}
             <StyleFix />
-            
-            {/* Adaptive panel for responsive UI */}
-            <SimpleAdaptivePanel />
+            <SimpleAdaptivePanel>
+              <OnboardingCheck>
+                <AppRouter />
+              </OnboardingCheck>
+            </SimpleAdaptivePanel>
+            <Toaster />
           </TooltipProvider>
         </QueryClientProvider>
       </HelmetProvider>
