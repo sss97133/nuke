@@ -6,16 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Wrench, Clock, Calendar, FileText, Plus, Car, Settings } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ServiceManagement } from "@/components/service/ServiceManagement";
+import { ServiceTicketForm } from "@/components/service/ServiceTicketForm";
 
 const Service = () => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  const handleCreateTicket = () => {
+    setShowCreateForm(true);
+    setActiveTab("tickets"); // Automatically switch to tickets tab when creating
+  };
 
   return (
     <ScrollArea className="h-[calc(100vh-4rem)] p-4">
       <div className="container mx-auto py-4 md:py-6 max-w-5xl">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Service Management</h1>
-          <Button className="w-full sm:w-auto flex gap-1 justify-center">
+          <Button 
+            className="w-full sm:w-auto flex gap-1 justify-center"
+            onClick={handleCreateTicket}
+          >
             <Plus className="h-4 w-4" />
             Create Service Ticket
           </Button>
