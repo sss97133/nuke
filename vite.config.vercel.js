@@ -11,6 +11,7 @@ import postcssNesting from 'postcss-nesting';
 export default defineConfig({
   plugins: [
     react({
+      jsxImportSource: '@emotion/react', // Add this to properly handle @emotion/react
       babel: {
         plugins: [
           ['transform-remove-console', { exclude: ['error', 'warn'] }]
