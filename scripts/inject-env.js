@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+ 
 /**
  * Script to inject environment variables into index.html for production builds
  * This enables environment variables in static deployed environments like Vercel

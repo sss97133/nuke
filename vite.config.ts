@@ -9,8 +9,22 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   plugins: [
     react({
-      // Optional: Explicitly set JSX runtime if needed, though usually automatic
-      // jsxRuntime: 'automatic' 
+      // Force Babel compilation for TSX files, hoping it handles generics better
+      // in the Vercel build environment than ESBuild seems to be doing.
+      jsxImportSource: '@emotion/react', // Keep if using Emotion, else remove
+      babel: {
+        plugins: [
+          // Add any necessary Babel plugins here if needed
+          // e.g., ['@babel/plugin-proposal-decorators', { legacy: true }]
+        ],
+        // Ensure TSX files are processed by Babel
+        parserOpts: {
+          plugins: ['jsx', 'typescript'],
+        },
+      },
+      // Ensure esbuild is NOT used for TSX transforms by the react plugin
+      // Fast Refresh should be handled by Babel config/plugins if needed
+      // esbuild: { include: /\.(ts|jsx)$/, exclude: /\.tsx$/ }
     }),
     mode === 'development' && componentTagger(),
   ].filter(Boolean),
@@ -35,11 +49,9 @@ export default defineConfig(({ mode }) => ({
     // extract: true, // Uncomment if needed
   },
   esbuild: {
-    jsxFactory: 'React.createElement',
-    jsxFragment: 'React.Fragment',
     loader: 'tsx',
     include: /\.(ts|tsx|js|jsx)$/,
-    exclude: []
+    exclude: [],
   },
   build: {
     outDir: 'dist',

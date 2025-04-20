@@ -72,6 +72,7 @@
     "react-router-dom": "^7.4.1",
     "react-syntax-highlighter": "^15.6.1",
     "recharts": "^2.12.0",
+    "replicate": "^1.0.1",
     "shiki": "^3.2.1",
     "sonner": "^2.0.2",
     "tailwind-merge": "^3.1.0",

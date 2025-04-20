@@ -243,7 +243,7 @@ export function useVehicleTimelineData({
 
       try {
         let queryBuilder: any = null;
-        let baseQuery: any = timelineSupabase.from('vehicles').select('*');
+        const baseQuery: any = timelineSupabase.from('vehicles').select('*');
 
         if (vin) {
           queryBuilder = baseQuery.eq('vin', vin).single();

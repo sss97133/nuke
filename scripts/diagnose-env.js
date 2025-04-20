@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+ 
 /**
  * Environment variables diagnostic script
  * Run this to check if your environment is properly configured for development and production

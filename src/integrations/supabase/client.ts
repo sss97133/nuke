@@ -62,67 +62,26 @@ declare global {
   }
 }
 
-// Import the fixed environment variables
-import { CORRECT_SUPABASE_URL, CORRECT_SUPABASE_ANON_KEY } from '@/fix-env';
+// Remove the import from @/fix-env - it's for local debugging only
+// import { CORRECT_SUPABASE_URL, CORRECT_SUPABASE_ANON_KEY } from '@/fix-env';
 
-// Prefer environment variables but fallback to local development values if needed
-const supabaseUrl = CORRECT_SUPABASE_URL || getEnvValue('VITE_SUPABASE_URL') || 'http://127.0.0.1:54321';
-const supabaseAnonKey = CORRECT_SUPABASE_ANON_KEY || getEnvValue('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+// Get environment variables directly using the helper function
+const supabaseUrl = getEnvValue('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
 
-// Get current environment
-const environment = typeof process !== 'undefined' && process.env && process.env.NODE_ENV 
-  ? process.env.NODE_ENV 
-  : (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE) 
-    ? import.meta.env.MODE 
-    : 'production';
+// Get current environment more reliably
+const environment = import.meta.env.MODE || process.env.NODE_ENV || 'production';
 
-// More resilient handling of missing credentials
+// Simplified check for missing credentials
 if (!supabaseUrl || !supabaseAnonKey) {
-  // Log warning but don't crash the app immediately
-  console.warn(`⚠️ Missing Supabase credentials for environment ${environment}`);
-  console.warn('VITE_SUPABASE_URL present:', !!supabaseUrl);
-  console.warn('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
-  console.warn('Environment:', environment);
-  console.warn('import.meta.env available:', typeof import.meta !== 'undefined');
-  console.warn('process.env available:', typeof process !== 'undefined');
+  console.error(`⚠️ Missing Supabase credentials for environment ${environment}. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.`);
   
-  // In browser environments, add a hidden error state
-  // but let the app attempt to load
-  if (typeof document !== 'undefined' && typeof window !== 'undefined') {
-    // Create a global reconnection function
-    window.__reconnectSupabase = () => {
-      try {
-        // Try to get values again (may be set by async scripts)
-        const retryUrl = getEnvValue('VITE_SUPABASE_URL');
-        const retryKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
-        
-        if (retryUrl && retryKey) {
-          console.log('Found Supabase credentials, reconnecting...');
-          window.location.reload();
-          return true;
-        }
-      } catch (e) {
-        console.error('Reconnection failed:', e);
-      }
-      return false;
-    };
-    
-    // Try reconnection after a delay (env vars might be set async)
-    setTimeout(() => {
-      if (window.__reconnectSupabase) {
-        window.__reconnectSupabase();
-      }
-    }, 1000);
-  }
-  
-  // In non-browser environments or development, throw error
-  if (environment !== 'production' || typeof document === 'undefined') {
-    throw new Error(`Invalid Supabase configuration: missing credentials for environment ${environment}`);
-  }
+  // Optionally throw an error or display UI error, 
+  // but avoid complex reconnection logic tied to local fallbacks here.
+  // The createClient call will fail if credentials are truly missing.
 }
 
-// Ensure we have non-empty strings for Supabase client initialization
-// Remove potential trailing slash from the URL
+// Use the retrieved values directly, or provide clear error placeholders if missing
 const safeSupabaseUrl = (supabaseUrl || 'https://missing-url-error').replace(/\/$/, '');
 const safeSupabaseAnonKey = supabaseAnonKey || 'missing-key-error';
 
@@ -130,35 +89,52 @@ let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
 
 export const getSupabaseClient = () => {
   if (!supabaseInstance) {
+    // Check again right before creation
     if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Missing Supabase credentials');
+      console.error('Supabase client initialization failed: Missing credentials.');
+      // Return null or throw, depending on how you want consuming code to handle it
+      // Returning null might lead to downstream errors. Throwing might be safer.
+      throw new Error('Missing Supabase credentials during client initialization');
     }
-    // Use safeSupabaseUrl to ensure no trailing slash
-    supabaseInstance = createClient<Database>(safeSupabaseUrl, safeSupabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        storageKey: 'nuke.auth.token',
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-        detectSessionInUrl: true,
-        flowType: 'pkce'
-      }
-    });
+
+    try {
+      console.log(`Initializing Supabase client for URL: ${safeSupabaseUrl.substring(0, 20)}...`); // Log safely
+      supabaseInstance = createClient<Database>(safeSupabaseUrl, safeSupabaseAnonKey, {
+        auth: {
+          persistSession: true,
+          storageKey: 'nuke.auth.token',
+          // Use localStorage directly if in browser, otherwise undefined (safer for SSR/build)
+          storage: typeof window !== 'undefined' ? window.localStorage : undefined, 
+          detectSessionInUrl: true,
+          flowType: 'pkce'
+        }
+      });
+      console.log('Supabase client initialized successfully.');
+    } catch (error) {
+      console.error('Supabase createClient error:', error);
+      supabaseInstance = null; // Ensure instance is null on error
+      throw error; // Re-throw the error
+    }
   }
   return supabaseInstance;
 };
 
-// Export a default client for backward compatibility
+// Export a default client using the getter
 export const supabase = getSupabaseClient();
 
-// Add error event listener for auth state changes
-supabase.auth.onAuthStateChange((event, session) => {
-  console.log('Auth state changed:', event, session?.user?.email);
-  if (event === 'SIGNED_IN') {
-    console.log('User signed in:', session?.user?.email);
-  } else if (event === 'SIGNED_OUT') {
-    console.log('User signed out');
-  }
-});
+// Ensure the listener is attached only if the client initialized successfully
+if (supabase) {
+  supabase.auth.onAuthStateChange((event, session) => {
+    console.log('Auth state changed:', event, session?.user?.email);
+    if (event === 'SIGNED_IN') {
+      console.log('User signed in:', session?.user?.email);
+    } else if (event === 'SIGNED_OUT') {
+      console.log('User signed out');
+    }
+  });
+} else {
+  console.error('Could not attach Supabase auth listener: client not initialized.')
+}
 
 export type SupabaseError = {
   message: string;
