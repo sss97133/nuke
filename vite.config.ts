@@ -35,11 +35,9 @@ export default defineConfig(({ mode }) => ({
     // extract: true, // Uncomment if needed
   },
   esbuild: {
-    jsxFactory: 'React.createElement',
-    jsxFragment: 'React.Fragment',
     loader: 'tsx',
     include: /\.(ts|tsx|js|jsx)$/,
-    exclude: []
+    exclude: [],
   },
   build: {
     outDir: 'dist',
