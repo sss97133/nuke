@@ -85,55 +85,98 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const safeSupabaseUrl = (supabaseUrl || 'https://missing-url-error').replace(/\/$/, '');
 const safeSupabaseAnonKey = supabaseAnonKey || 'missing-key-error';
 
+// Define the client singleton
 let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
 
+/**
+ * Returns a singleton instance of the Supabase client.
+ * This prevents multiple GoTrueClient instances from being created.
+ */
 export const getSupabaseClient = () => {
   if (!supabaseInstance) {
     // Check again right before creation
     if (!supabaseUrl || !supabaseAnonKey) {
       console.error('Supabase client initialization failed: Missing credentials.');
-      // Return null or throw, depending on how you want consuming code to handle it
-      // Returning null might lead to downstream errors. Throwing might be safer.
-      throw new Error('Missing Supabase credentials during client initialization');
-    }
-
-    try {
-      console.log(`Initializing Supabase client for URL: ${safeSupabaseUrl.substring(0, 20)}...`); // Log safely
-      supabaseInstance = createClient<Database>(safeSupabaseUrl, safeSupabaseAnonKey, {
-        auth: {
-          persistSession: true,
-          storageKey: 'nuke.auth.token',
-          // Use localStorage directly if in browser, otherwise undefined (safer for SSR/build)
-          storage: typeof window !== 'undefined' ? window.localStorage : undefined, 
-          detectSessionInUrl: true,
-          flowType: 'pkce'
+      // Instead of throwing immediately, try to recover with a placeholder client
+      // that will fail gracefully on actual API operations but won't crash the app
+      if (environment === 'development' || environment === 'test') {
+        console.warn('Creating a placeholder client for development - authentication will fail');
+        // Create a client that will work for unauthenticated operations
+        try {
+          supabaseInstance = createClient<Database>(safeSupabaseUrl, safeSupabaseAnonKey, {
+            auth: {
+              persistSession: false, // Don't try to persist sessions
+              storageKey: 'nuke.auth.token',
+              storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+              detectSessionInUrl: false, // Disable auto session detection
+              flowType: 'pkce',
+              autoRefreshToken: false // Disable auto refresh
+            }
+          });
+        } catch (e) {
+          console.error('Even placeholder client failed:', e);
+          // Return null here instead of throwing to prevent app crashes
+          return null;
         }
-      });
-      console.log('Supabase client initialized successfully.');
-    } catch (error) {
-      console.error('Supabase createClient error:', error);
-      supabaseInstance = null; // Ensure instance is null on error
-      throw error; // Re-throw the error
+      } else {
+        // In production, it's better to fail fast than to introduce unpredictable behavior
+        return null;
+      }
+    } else {
+      try {
+        console.log(`Initializing Supabase client for URL: ${safeSupabaseUrl.substring(0, 20)}...`); // Log safely
+        supabaseInstance = createClient<Database>(safeSupabaseUrl, safeSupabaseAnonKey, {
+          auth: {
+            persistSession: true,
+            storageKey: 'nuke.auth.token',
+            // Use localStorage directly if in browser, otherwise undefined (safer for SSR/build)
+            storage: typeof window !== 'undefined' ? window.localStorage : undefined, 
+            detectSessionInUrl: true,
+            flowType: 'pkce',
+            autoRefreshToken: true
+            // Remove cookieOptions as it's not supported in this version of Supabase
+          }
+        });
+        console.log('Supabase client initialized successfully.');
+      } catch (error) {
+        console.error('Supabase createClient error:', error);
+        supabaseInstance = null; // Ensure instance is null on error
+        return null; // Return null instead of throwing to prevent app crashes
+      }
     }
   }
   return supabaseInstance;
 };
 
-// Export a default client using the getter
+// Export both the getter function and a singleton instance for convenience
 export const supabase = getSupabaseClient();
 
-// Ensure the listener is attached only if the client initialized successfully
-if (supabase) {
-  supabase.auth.onAuthStateChange((event, session) => {
-    console.log('Auth state changed:', event, session?.user?.email);
-    if (event === 'SIGNED_IN') {
-      console.log('User signed in:', session?.user?.email);
-    } else if (event === 'SIGNED_OUT') {
-      console.log('User signed out');
-    }
-  });
-} else {
-  console.error('Could not attach Supabase auth listener: client not initialized.')
+// Set up auth state change listener - but only once during the module initialization
+// This setup is inside a try-catch to ensure errors here don't break the entire app
+try {
+  const client = getSupabaseClient();
+  if (client) {
+    client.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      if (event === 'SIGNED_IN') {
+        console.log('User signed in:', session?.user?.email);
+        // Dispatch an event that authentication has succeeded
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('nuke:auth:signed-in', { detail: { session } }));
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('User signed out');
+        // Dispatch an event that can be used to refresh the UI
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('nuke:auth:signed-out'));
+        }
+      }
+    });
+  } else {
+    console.error('Could not attach Supabase auth listener: client not initialized.');
+  }
+} catch (error) {
+  console.error('Error setting up auth state change listener:', error);
 }
 
 export type SupabaseError = {

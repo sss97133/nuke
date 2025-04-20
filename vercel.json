@@ -2,6 +2,27 @@
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
+      "source": "/assets/manifest-(.*)\\.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, no-cache"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "X-Auth-Required",
+          "value": "false"
+        }
+      ]
+    },
+    {
       "source": "/assets/(.*)",
       "headers": [
         {

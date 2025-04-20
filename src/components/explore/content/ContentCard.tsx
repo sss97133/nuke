@@ -45,10 +45,15 @@ export const ContentCard: React.FC<ContentCardProps> = ({
   
   // Track view when card is rendered - with error handling
   useEffect(() => {
-    if (onView && id && !viewTracked.current) {
+    if (id && !viewTracked.current) {
       try {
-        onView(id, type);
-        viewTracked.current = true;
+        // Check that onView is a function before calling it
+        if (typeof onView === 'function') {
+          onView(id, type);
+          viewTracked.current = true;
+        } else {
+          console.warn('View tracking callback is not a function');
+        }
       } catch (error) {
         console.warn('Error tracking view:', error);
         // Continue rendering even if tracking fails
