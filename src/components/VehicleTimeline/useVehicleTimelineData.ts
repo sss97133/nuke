@@ -6,147 +6,102 @@
  */
 import { useState, useEffect } from 'react';
 import { RawTimelineEvent, TimelineEvent } from './types';
-import { getTimelineClient } from './useSupabaseClient';
 // Import only necessary Supabase types
 import { PostgrestSingleResponse, PostgrestResponse, SupabaseClient } from '@supabase/supabase-js'; 
 import { Database } from '@/types/database'; // Assuming Database type is defined here
 import { queryWithRetry } from '@/lib/supabase'; // Import the retry utility
 
-// Mock Supabase client for tests and development
-const supabase = {
-  from: (table: string) => {
-    // Create a query builder object that can be chained
-    const queryBuilder = {
-      _data: [],
-      _error: null,
-      
-      // Select operations with chaining
-      select: (columns?: string) => {
-        return {
-          ...queryBuilder,
-          eq: (field: string, value: any) => ({
-            ...queryBuilder,
-            single: () => Promise.resolve({ data: null, error: null }),
-            order: (column: string, options: any) => queryBuilder,
-            limit: (count: number) => Promise.resolve({ data: [], error: null })
-          }),
-          order: (column: string, options: any) => ({
-            ...queryBuilder,
-            limit: (count: number) => Promise.resolve({ data: [], error: null })
-          })
-        };
-      },
-      
-      // Insert, update, delete operations
-      insert: (data: any) => Promise.resolve({ data, error: null }),
-      update: (data: any) => ({
-        eq: (field: string, value: any) => Promise.resolve({ data, error: null })
-      }),
-      delete: () => ({
-        eq: (field: string, value: any) => Promise.resolve({ data: {}, error: null })
-      }),
-      
-      // Execution methods
-      then: (callback: (result: { data: any; error: null }) => any) => 
-        Promise.resolve({ data: [], error: null }).then(callback),
-      eq: (field: string, value: any) => ({
-        ...queryBuilder,
-        single: () => Promise.resolve({ data: null, error: null })
-      })
-    };
-    
-    return queryBuilder;
-  },
-  auth: {
-    getUser: () => Promise.resolve({ data: { user: null }, error: null })
-  }
-};
+// Import the getTimelineClient function - this handles getting a properly initialized client
+import { getTimelineClient } from './useSupabaseClient';
 
-// Fallback data when database access fails
-const getBatFallbackData = (vehicleId: string): RawTimelineEvent[] => {
-  return [
-    {
-      id: "d0c18271-fa5c-43ea-b545-6db5e54ebcf1",
-      vehicle_id: vehicleId,
-      event_type: "manufacture",
-      source: "vin_database",
-      event_date: "1988-01-01T00:00:00Z",
-      title: "Vehicle Manufactured",
-      description: "1988 GMC Suburban manufactured",
-      confidence_score: 95,
-      metadata: {
-        year: 1988,
-        make: "GMC",
-        model: "Suburban",
-        vin: "1GKEV16K4JF504317"
-      },
-      source_url: "https://vpic.nhtsa.dot.gov/decoder/Decoder/DecodeVin/",
-      image_urls: [
-        "https://bringatrailer.com/wp-content/uploads/2021/10/1988_gmc_suburban_16342987895dfc0156da11B3C98C6E-9F70-4DE5-8D2D-500ABBA3C399-scaled.jpeg?w=620&resize=620%2C465"
-      ],
-      created_at: "2023-03-14T06:28:02.207Z",
-      updated_at: "2023-03-14T06:28:02.207Z"
-    },
-    {
-      id: "ebad072a-713f-44c8-a4d5-d2a1e1aac5d8",
-      vehicle_id: vehicleId,
-      event_type: "listing",
-      source: "bat_auction",
-      event_date: "2023-10-15T12:00:00Z",
-      title: "Listed on Bring a Trailer",
-      description: "1988 GMC Suburban 1500 Sierra Classic 4×4 listed on Bring a Trailer auction",
-      confidence_score: 98,
-      metadata: {
-        auction_id: "123456",
-        sold_price: null,
-        seller: "BaTSeller123",
-        specs: {
-          engine: "5.7L V8",
-          transmission: "4-Speed Automatic",
-          drivetrain: "4WD",
-          mileage: 89000,
-          exterior_color: "Blue and White",
-          interior_color: "Blue"
-        },
-        title: "1988 GMC Suburban 1500 Sierra Classic 4×4",
-        mileage: {
-          value: 89000,
-          unit: "mi"
-        }
-      },
-      source_url: "https://bringatrailer.com/listing/1988-gmc-suburban-1500-sierra-classic-4x4",
-      image_urls: [
-        "https://bringatrailer.com/wp-content/uploads/2021/10/1988_gmc_suburban_16342987895dfc0156da11B3C98C6E-9F70-4DE5-8D2D-500ABBA3C399-scaled.jpeg?w=620&resize=620%2C465",
-        "https://bringatrailer.com/wp-content/uploads/2021/10/1988_gmc_suburban_1634298778e08255b11ebIMG_2524-scaled.jpeg?w=620&resize=620%2C465"
-      ],
-      created_at: "2023-03-14T06:28:02.207Z",
-      updated_at: "2023-03-14T06:28:02.207Z"
-    },
-    {
-      id: "f8c12d45-a19b-4a23-9c5e-3b785f11e90a",
-      vehicle_id: vehicleId,
-      event_type: "sale",
-      source: "bat_auction",
-      event_date: "2023-10-22T19:30:00Z",
-      title: "Sold on Bring a Trailer",
-      description: "1988 GMC Suburban 1500 Sierra Classic 4×4 sold for $24,500 on Bring a Trailer",
-      confidence_score: 98,
-      metadata: {
-        auction_id: "123456",
-        sold_price: 24500,
-        seller: "BaTSeller123",
-        buyer: "ClassicTruckFan",
-        comments: 73,
-        watchers: 945
-      },
-      source_url: "https://bringatrailer.com/listing/1988-gmc-suburban-1500-sierra-classic-4x4",
-      image_urls: [
-        "https://bringatrailer.com/wp-content/uploads/2021/10/1988_gmc_suburban_16342987895dfc0156da11B3C98C6E-9F70-4DE5-8D2D-500ABBA3C399-scaled.jpeg?w=620&resize=620%2C465"
-      ],
-      created_at: "2023-03-14T06:28:02.207Z",
-      updated_at: "2023-03-14T06:28:02.207Z"
+// Database constants
+const DATABASE_TIMEOUT_MS = 10000;
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 1000;
+
+// Generate a minimal timeline from vehicle data when no timeline events exist
+const generateMinimalTimeline = async (vehicleId: string, vehicleData?: any): Promise<RawTimelineEvent[]> => {
+  // If we don't have a vehicle ID, we can't generate a timeline
+  if (!vehicleId) return [];
+  
+  let vehicle = vehicleData;
+  
+  // If we don't have vehicle data, try to fetch it
+  if (!vehicle) {
+    try {
+      const client = getTimelineClient();
+      if (!client) {
+        console.error('Failed to get Supabase client for minimal timeline');
+        return [];
+      }
+      
+      const { data, error } = await client
+        .from('vehicles')
+        .select('*')
+        .eq('id', vehicleId)
+        .single();
+        
+      if (error) throw error;
+      vehicle = data;
+    } catch (err) {
+      console.error('Failed to fetch vehicle data for minimal timeline:', err);
+      return [];
     }
-  ];
+  }
+  
+  // If we still don't have vehicle data, return empty timeline
+  if (!vehicle) return [];
+  
+  const now = new Date();
+  const createdDate = vehicle.created_at ? new Date(vehicle.created_at) : now;
+  
+  // Generate a manufacture event from the vehicle's year or creation date
+  const manufactureEvent: RawTimelineEvent = {
+    id: `generated-manufacture-${vehicleId}`,
+    vehicle_id: vehicleId,
+    event_type: 'manufacture',
+    source: 'vehicle_record',
+    event_date: vehicle.year ? `${vehicle.year}-01-01T00:00:00Z` : createdDate.toISOString(),
+    title: 'Vehicle Manufactured',
+    description: vehicle.year ? 
+      `${vehicle.year} ${vehicle.make} ${vehicle.model} manufactured` : 
+      `${vehicle.make} ${vehicle.model} added to records`,
+    confidence_score: vehicle.year ? 85 : 60,
+    metadata: {
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      vin: vehicle.vin
+    },
+    source_url: '',
+    image_urls: vehicle.image_url ? [vehicle.image_url] : [],
+    created_at: now.toISOString(),
+    updated_at: now.toISOString()
+  };
+  
+  // Generate a system record event for when the vehicle was added to the platform
+  const recordEvent: RawTimelineEvent = {
+    id: `generated-record-${vehicleId}`,
+    vehicle_id: vehicleId,
+    event_type: 'record',
+    source: 'system',
+    event_date: vehicle.created_at || now.toISOString(),
+    title: 'Vehicle Added to Nuke Platform',
+    description: `${vehicle.make} ${vehicle.model} added to the Nuke vehicle database`,
+    confidence_score: 100,
+    metadata: {
+      platform: 'Nuke',
+      record_id: vehicleId,
+      status: vehicle.status || 'active'
+    },
+    source_url: '',
+    image_urls: [],
+    created_at: now.toISOString(),
+    updated_at: now.toISOString()
+  };
+  
+  // Return the minimal timeline with manufactured and recorded events
+  return [manufactureEvent, recordEvent];
 };
 
 // Vehicle data interface
@@ -293,6 +248,7 @@ export function useVehicleTimelineData({
       const vehicleLookupId = vehicleData?.id || 'f3ccd282-2143-4492-bbd6-b34538a5f538';
 
       try {
+        // First, try to fetch real timeline events from the database
         const timelineQueryBuilder: any = timelineSupabase
           .from('vehicle_timeline_events') 
           .select('*')
@@ -302,42 +258,56 @@ export function useVehicleTimelineData({
         // Wrap the timeline query execution with retry logic
         const result: PostgrestResponse<RawTimelineEvent> = await queryWithRetry(
           () => timelineQueryBuilder, // Pass the awaitable query builder
-          3, 
-          1000
+          MAX_RETRIES, 
+          BASE_RETRY_DELAY_MS
         );
         
         if (result) {
-          timelineData = result.data;
+          timelineData = result.data || [];
           timelineError = result.error ? new Error(result.error.message) : null;
         } else {
           timelineError = new Error('Timeline query resolution failed unexpectedly after retries');
         }
         
       } catch (err: unknown) {
-        console.warn('Timeline query failed after retries, using fallback data:', err);
-        timelineData = getBatFallbackData(vehicleLookupId);
-        timelineError = err instanceof Error ? err : new Error(String(err)); // Keep track of the error
+        console.warn('Timeline query failed after retries:', err);
+        timelineError = err instanceof Error ? err : new Error(String(err));
+        timelineData = [];
       }
 
-      if (timelineError && !timelineData) {
-        console.warn('Timeline error, using fallback data:', timelineError);
-        timelineData = getBatFallbackData(vehicleLookupId);
-      }
-      
+      // If we don't have timeline data or we have an error, generate a minimal timeline
       if (!timelineData || timelineData.length === 0) {
-        console.log('No timeline data found, using fallback data');
-        timelineData = getBatFallbackData(vehicleLookupId);
+        console.log('No timeline data found, generating minimal timeline');
+        try {
+          timelineData = await generateMinimalTimeline(vehicleLookupId, vehicleData);
+        } catch (genErr) {
+          console.error('Failed to generate minimal timeline:', genErr);
+          timelineData = [];
+        }
       }
 
-      const formattedEvents = formatEvents(timelineData);
-      setEvents(formattedEvents);
-      extractMetadata(formattedEvents);
+      // Only process events if we have them
+      if (timelineData && timelineData.length > 0) {
+        const formattedEvents = formatEvents(timelineData);
+        setEvents(formattedEvents);
+        extractMetadata(formattedEvents);
+      } else {
+        // Empty state - no events found
+        setEvents([]);
+        setSources([]);
+        setEventTypes([]);
+        
+        // Only set this error if we don't have a more specific error already
+        if (!error) {
+          setError('No timeline events found for this vehicle');
+        }
+      }
 
     } catch (err: unknown) {
-      // This catch block now handles errors from the retry utility or identifier issues
-      console.error('Error in fetchData after retries or during setup:', err);
+      // This catch block handles any uncaught errors in the overall process
+      console.error('Error in fetchData:', err);
       setError(err instanceof Error ? err.message : 'Failed to load vehicle data');
-      // Optionally clear existing data on failure
+      // Clear existing data on failure
       setVehicle(null);
       setEvents([]);
       setSources([]);
@@ -347,14 +317,41 @@ export function useVehicleTimelineData({
     }
   };
 
-  // Initial data load
+  // Initial data load with retry logic for network issues
   useEffect(() => {
-    if (vin || vehicleId || (make && model)) {
-      fetchData();
-    } else {
-      setError('Please provide a VIN, vehicle ID, or make and model');
-      setLoading(false);
-    }
+    let isMounted = true;
+    
+    const loadWithRetry = async (retryCount = 0) => {
+      try {
+        if (vin || vehicleId || (make && model)) {
+          if (isMounted) setLoading(true);
+          await fetchData();
+        } else {
+          if (isMounted) {
+            setError('Please provide a VIN, vehicle ID, or make and model');
+            setLoading(false);
+          }
+        }
+      } catch (err) {
+        // Network/general error handling with retry logic
+        console.error(`Data load attempt ${retryCount + 1} failed:`, err);
+        
+        if (retryCount < 2 && isMounted) { // Max 3 attempts (0, 1, 2)
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+          console.log(`Retrying in ${delay}ms...`);
+          setTimeout(() => loadWithRetry(retryCount + 1), delay);
+        } else if (isMounted) {
+          setError('Failed to load timeline data after multiple attempts');
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadWithRetry();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [vin, vehicleId, make, model, year]);
 
   // Function to update events after adding/editing/deleting
