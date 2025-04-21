@@ -6,7 +6,7 @@ import { VehicleSelection } from "./form-sections/VehicleSelection";
 import { ServiceDetails } from "./form-sections/ServiceDetails";
 import { ServiceParts } from "./form-sections/ServiceParts";
 import { VehicleForm } from "../vehicles/VehicleForm";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+// Removed unused Dialog imports
 import type { Vehicle } from "@/types/inventory";
 import type { Database } from "@/integrations/supabase/types";
 

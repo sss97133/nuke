@@ -34,7 +34,7 @@ const carBrands = [
 
 interface VehicleFormProps {
   onSuccess?: () => void;
-  onSave?: (vehicle: any) => void;
+  onSave?: (vehicle: Record<string, unknown>) => void;
   onCancel?: () => void;
 }
 
@@ -46,7 +46,7 @@ interface VehicleFormData {
   notes?: string;
 }
 
-export const VehicleForm = ({ onSuccess, onSave, onCancel }: VehicleFormProps = {}) => {
+export const VehicleForm = ({ onSuccess, onSave }: VehicleFormProps = {}) => {
   const { register, handleSubmit, formState: { errors } } = useForm<VehicleFormData>();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -91,7 +91,7 @@ export const VehicleForm = ({ onSuccess, onSave, onCancel }: VehicleFormProps = 
       } else if (onSuccess) {
         onSuccess();
       }
-    } catch (err) {
+    } catch (error) {
       toast({
         title: "Error",
         description: "Failed to add vehicle",
