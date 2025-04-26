@@ -83,6 +83,7 @@
   },
   "devDependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@tailwindcss/postcss": "^4.1.4",
     "@tailwindcss/typography": "^0.5.16",
     "@types/axios": "^0.9.36",
     "@types/d3-interpolate": "^3.0.0",
