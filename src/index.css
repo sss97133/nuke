@@ -85,17 +85,28 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    @apply font-bold tracking-tight text-foreground;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: hsl(var(--foreground));
   }
 
   h1 {
-    @apply text-2xl font-bold mb-4;
+    @apply text-2xl mb-4;
   }
   h2 {
-    @apply text-xl font-bold mb-3;
+    @apply text-xl mb-3;
   }
   h3 {
-    @apply text-lg font-bold mb-2;
+    @apply text-lg mb-2;
+  }
+  h4 {
+    @apply text-base mb-1;
+  }
+  h5 {
+    @apply text-sm mb-1;
+  }
+  h6 {
+    @apply text-xs mb-1;
   }
   a {
     @apply text-blue-500 hover:text-blue-600 underline;
