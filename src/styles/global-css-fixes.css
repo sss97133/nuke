@@ -133,7 +133,7 @@
 /* Custom utility classes */
 @layer utilities {
   .text-balance {
-    text-wrap: balance;
+    text-wrap: balance; /* modern browser support */
   }
   
   .text-pretty {
@@ -150,16 +150,28 @@
   }
   
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900;
+    outline: none;
+    box-shadow: 0 0 0 2px #3b82f6; /* ring-blue-500 */
+    /* For dark mode, we can offset ring more clearly */
+    /* We use prefers-color-scheme: dark media query to approximate Tailwind's dark variant */
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark .focus-ring {
+      box-shadow: 0 0 0 2px #3b82f6, 0 0 0 4px var(--bg-primary);
+    }
   }
   
   .animated-transition {
-    @apply transition-all duration-200 ease-in-out;
+    transition-property: all;
+    transition-duration: 200ms;
+    transition-timing-function: ease-in-out;
   }
   
   /* Gradient text */
   .text-gradient {
-    @apply bg-clip-text text-transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
     background-image: linear-gradient(to right, var(--accent-color), #8b5cf6);
   }
 }
