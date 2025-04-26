@@ -5,9 +5,10 @@
  * It provides consistent styling and better defaults across the application.
  */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* REMOVED @tailwind directives - they should only be in index.css */
+/* @tailwind base; */
+/* @tailwind components; */
+/* @tailwind utilities; */
 
 /* Base styles */
 @layer base {
@@ -32,8 +33,8 @@
     --space-12: 3rem;
     --space-16: 4rem;
     
-    /* Typography variables */
-    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* REMOVED Typography variable --font-sans (Handled by Tailwind config) */
+    /* --font-sans: ui-sans-serif, system-ui, ... ; */
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     
     /* Animation speeds */
@@ -55,7 +56,9 @@
   }
   
   html {
-    @apply font-sans antialiased;
+    /* Apply font stack directly instead of using @apply */
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    @apply antialiased; /* Keep antialiased if desired */
   }
   
   body {
