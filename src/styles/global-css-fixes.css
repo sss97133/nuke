@@ -56,62 +56,82 @@
   }
   
   html {
-    /* Apply font stack directly instead of using @apply */
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    @apply antialiased; /* Keep antialiased if desired */
+    /* Remove @apply scroll-smooth */
+    scroll-behavior: smooth;
   }
   
   body {
-    @apply bg-white text-gray-900 transition-colors duration-200 dark:bg-gray-900 dark:text-gray-100;
+    /* Remove @apply bg-white text-gray-900 transition-colors duration-200 dark:bg-gray-900 dark:text-gray-100 */
     background-color: var(--bg-primary);
     color: var(--text-primary);
+    transition: background-color 200ms, color 200ms;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-bold tracking-tight;
+    /* Remove @apply font-bold tracking-tight */
+    font-weight: 700;
+    letter-spacing: -0.015em;
     color: var(--text-primary);
   }
   
   h1 {
-    @apply text-3xl md:text-4xl;
+    /* Remove @apply text-3xl md:text-4xl */
+    font-size: 1.875rem; /* 30px */
+    line-height: 2.25rem; /* 36px */
+  }
+  
+  @media (min-width: 768px) {
+    h1 { font-size: 2.25rem; line-height: 2.5rem; }
   }
   
   h2 {
-    @apply text-2xl md:text-3xl;
+    font-size: 1.5rem; line-height: 2rem;
+  }
+  @media (min-width: 768px) {
+    h2 { font-size: 1.875rem; line-height: 2.25rem; }
   }
   
   h3 {
-    @apply text-xl md:text-2xl;
+    font-size: 1.25rem; line-height: 1.75rem;
+  }
+  @media (min-width: 768px) {
+    h3 { font-size: 1.5rem; line-height: 2rem; }
   }
   
   h4 {
-    @apply text-lg md:text-xl;
+    font-size: 1.125rem; line-height: 1.75rem;
+  }
+  @media (min-width: 768px) {
+    h4 { font-size: 1.25rem; line-height: 1.75rem; }
   }
   
   a {
-    @apply transition-colors;
+    /* Remove @apply transition-colors */
     color: var(--accent-color);
+    transition: color 200ms;
   }
   
   a:hover {
-    @apply underline;
+    /* Remove @apply underline */
+    text-decoration: underline;
   }
   
-  /* Hide focus outlines for mouse users, but keep them for keyboard users */
   :focus:not(:focus-visible) {
-    @apply outline-none;
+    /* Remove @apply outline-none */
+    outline: none;
   }
   
-  /* but ensure focus is visible for keyboard users */
   :focus-visible {
-    @apply outline-none ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900;
+    /* Remove @apply outline-none ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 */
+    outline: none;
+    box-shadow: 0 0 0 2px #3b82f6;
   }
 }
 
 /* Custom utility classes */
 @layer utilities {
   .text-balance {
-    text-wrap: balance;
+    text-wrap: balance; /* modern browser support */
   }
   
   .text-pretty {
@@ -128,16 +148,28 @@
   }
   
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900;
+    outline: none;
+    box-shadow: 0 0 0 2px #3b82f6; /* ring-blue-500 */
+    /* For dark mode, we can offset ring more clearly */
+    /* We use prefers-color-scheme: dark media query to approximate Tailwind's dark variant */
+  }
+  @media (prefers-color-scheme: dark) {
+    .dark .focus-ring {
+      box-shadow: 0 0 0 2px #3b82f6, 0 0 0 4px var(--bg-primary);
+    }
   }
   
   .animated-transition {
-    @apply transition-all duration-200 ease-in-out;
+    transition-property: all;
+    transition-duration: 200ms;
+    transition-timing-function: ease-in-out;
   }
   
   /* Gradient text */
   .text-gradient {
-    @apply bg-clip-text text-transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
     background-image: linear-gradient(to right, var(--accent-color), #8b5cf6);
   }
 }

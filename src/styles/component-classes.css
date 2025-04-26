@@ -5,123 +5,125 @@
  * These provide consistent styling for common UI elements.
  */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Ensure Tailwind utilities are available for @apply */
+@reference "tailwindcss";
 
-@layer components {
-  /* Button variants */
-  .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium 
-           rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 
-           focus:ring-offset-2 focus:ring-blue-500;
-  }
-  
-  .btn-primary {
-    @apply btn bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600;
-  }
-  
-  .btn-secondary {
-    @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 
-           dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700;
-  }
-  
-  .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700;
-  }
-  
-  .btn-outline {
-    @apply btn border border-gray-300 bg-transparent hover:bg-gray-50 
-           dark:border-gray-700 dark:hover:bg-gray-800;
-  }
-  
-  .btn-ghost {
-    @apply btn bg-transparent shadow-none hover:bg-gray-100 dark:hover:bg-gray-800;
-  }
+/* REMOVED @tailwind directives - they should only be in index.css */
+/* @tailwind base; */
+/* @tailwind components; */
+/* @tailwind utilities; */
 
-  /* Card components */
-  .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg border border-gray-200 
-           dark:border-gray-700 shadow-sm overflow-hidden;
-  }
-  
-  .card-header {
-    @apply px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 
-           dark:bg-gray-800/50;
-  }
-  
-  .card-body {
-    @apply p-4;
-  }
-  
-  .card-footer {
-    @apply px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 
-           dark:bg-gray-800/50;
-  }
+/* Button variants */
+.btn {
+  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium 
+         rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 
+         focus:ring-offset-2 focus:ring-blue-500;
+}
 
-  /* Form elements */
-  .form-input {
-    @apply block w-full rounded-md border-gray-300 shadow-sm 
-           focus:border-blue-500 focus:ring-blue-500 
-           dark:bg-gray-800 dark:border-gray-700 dark:text-white;
-  }
-  
-  .form-select {
-    @apply block w-full rounded-md border-gray-300 shadow-sm 
-           focus:border-blue-500 focus:ring-blue-500 
-           dark:bg-gray-800 dark:border-gray-700 dark:text-white;
-  }
-  
-  .form-checkbox {
-    @apply rounded border-gray-300 text-blue-600 shadow-sm 
-           focus:ring-blue-500 focus:ring-offset-1 
-           dark:border-gray-700 dark:bg-gray-800;
-  }
-  
-  .form-label {
-    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
-  }
-  
-  .form-helper {
-    @apply mt-1 text-sm text-gray-500 dark:text-gray-400;
-  }
-  
-  .form-error {
-    @apply mt-1 text-sm text-red-600 dark:text-red-400;
-  }
+.btn-primary {
+  @apply btn bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600;
+}
 
-  /* Navigation */
-  .nav-link {
-    @apply px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 
-           dark:text-gray-200 dark:hover:bg-gray-800 transition-colors;
-  }
-  
-  .nav-link-active {
-    @apply bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white;
-  }
+.btn-secondary {
+  @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 
+         dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700;
+}
 
-  /* Badge variants */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-  
-  .badge-gray {
-    @apply badge bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200;
-  }
-  
-  .badge-blue {
-    @apply badge bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300;
-  }
-  
-  .badge-green {
-    @apply badge bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300;
-  }
-  
-  .badge-red {
-    @apply badge bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-300;
-  }
-  
-  .badge-yellow {
-    @apply badge bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300;
-  }
+.btn-danger {
+  @apply btn bg-red-600 text-white hover:bg-red-700;
+}
+
+.btn-outline {
+  @apply btn border border-gray-300 bg-transparent hover:bg-gray-50 
+         dark:border-gray-700 dark:hover:bg-gray-800;
+}
+
+.btn-ghost {
+  @apply btn bg-transparent shadow-none hover:bg-gray-100 dark:hover:bg-gray-800;
+}
+
+/* Card components */
+.card {
+  @apply bg-white dark:bg-gray-800 rounded-lg border border-gray-200 
+         dark:border-gray-700 shadow-sm overflow-hidden;
+}
+
+.card-header {
+  @apply px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 
+         dark:bg-gray-800/50;
+}
+
+.card-body {
+  @apply p-4;
+}
+
+.card-footer {
+  @apply px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 
+         dark:bg-gray-800/50;
+}
+
+/* Form elements */
+.form-input {
+  @apply block w-full rounded-md border-gray-300 shadow-sm 
+         focus:border-blue-500 focus:ring-blue-500 
+         dark:bg-gray-800 dark:border-gray-700 dark:text-white;
+}
+
+.form-select {
+  @apply block w-full rounded-md border-gray-300 shadow-sm 
+         focus:border-blue-500 focus:ring-blue-500 
+         dark:bg-gray-800 dark:border-gray-700 dark:text-white;
+}
+
+.form-checkbox {
+  @apply rounded border-gray-300 text-blue-600 shadow-sm 
+         focus:ring-blue-500 focus:ring-offset-1 
+         dark:border-gray-700 dark:bg-gray-800;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
+}
+
+.form-helper {
+  @apply mt-1 text-sm text-gray-500 dark:text-gray-400;
+}
+
+.form-error {
+  @apply mt-1 text-sm text-red-600 dark:text-red-400;
+}
+
+/* Navigation */
+.nav-link {
+  @apply px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 
+         dark:text-gray-200 dark:hover:bg-gray-800 transition-colors;
+}
+
+.nav-link-active {
+  @apply bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white;
+}
+
+/* Badge variants */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-gray {
+  @apply badge bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200;
+}
+
+.badge-blue {
+  @apply badge bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300;
+}
+
+.badge-green {
+  @apply badge bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300;
+}
+
+.badge-red {
+  @apply badge bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-300;
+}
+
+.badge-yellow {
+  @apply badge bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300;
 }
