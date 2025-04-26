@@ -9,7 +9,10 @@
     <meta name="description" content="Modern React application with TypeScript and shadcn/ui components" />
     <meta name="theme-color" content="#000000" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+    <!-- Preload critical CSS files to prevent FOUC (Flash of Unstyled Content) -->
+    <link rel="preload" href="/assets/index.css" as="style" />
+    <link rel="preload" href="/assets/app.css" as="style" />
     <style>
       html, body {
         min-height: 100dvh;
@@ -21,6 +24,21 @@
         min-height: 100dvh;
         display: flex;
         flex-direction: column;
+      }
+      /* Critical button styles to prevent unstyled buttons during loading */
+      button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.375rem;
+        font-weight: 500;
+        border: 1px solid transparent;
+        padding: 0.5rem 1rem;
+        transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+      }
+      button:disabled {
+        opacity: 0.5;
+        pointer-events: none;
       }
     </style>
   </head>

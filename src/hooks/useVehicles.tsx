@@ -24,7 +24,8 @@ export interface NewVehicle {
 }
 
 // Handle null values from the database
-const nullToUndefined = <T>(value: T | null): T | undefined => {
+// Adding a comma after T to disambiguate from JSX tags
+const nullToUndefined = <T,>(value: T | null): T | undefined => {
   return value === null ? undefined : value;
 };
 

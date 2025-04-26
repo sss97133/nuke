@@ -6,6 +6,7 @@ import ErrorBoundary from './components/error/ErrorBoundary'; // Import ErrorBou
 
 // Import styles in the correct order (global first, then components)
 import './index.css'
+import './styles/button-fix.css'
 import './styles/global-css-fixes.css'
 import './styles/component-classes.css'
 // import './dev-styles.css' // Development-only styles - Merged into index.css

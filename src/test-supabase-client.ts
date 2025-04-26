@@ -1,17 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+// Import the singleton Supabase client to avoid multiple GoTrueClient instances
+import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/types/database';
 
-// Create a direct client using the keys from `supabase status`
-const supabaseUrl = 'http://127.0.0.1:54321';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+// Re-export the main client to avoid creating multiple instances
+export const testSupabase = supabase;
 
-// Create and export the supabase client for our test page
-export const testSupabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
-
-// Test database connection
+// Test database connection using the singleton client
 export const testConnection = async () => {
   try {
-    const { data, error } = await testSupabase.from('vehicles').select('count(*)');
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return { success: false, error: new Error('Supabase client not initialized') };
+    }
+    
+    const { data, error } = await supabase.from('vehicles').select('count(*)');
     if (error) {
       console.error('Error testing connection:', error);
       return { success: false, error };

@@ -11,7 +11,7 @@ import { SimpleAdaptivePanel } from './components/ui/SimpleAdaptivePanel';
 import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
 import { WebSocketManager } from './integrations/supabase/WebSocketManager';
 import { WebSocketDiagnostics } from './integrations/utils/WebSocketDiagnostics';
-import { TestButton } from "./components/TestButton"
+// Production imports only - no test components
 import AuthDebug from './components/debug/AuthDebug';
 
 // Import environment fix to ensure proper Supabase connectivity
@@ -76,7 +76,7 @@ function App() {
               <AuthDebug />
             </WebSocketManager>
           </TooltipProvider>
-          <TestButton />
+          {/* No test components in production */}
         </QueryClientProvider>
       </HelmetProvider>
     </ErrorBoundary>
