@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 import { VehicleSelection } from "./form-sections/VehicleSelection";
 import { ServiceDetails } from "./form-sections/ServiceDetails";
 import { ServiceParts } from "./form-sections/ServiceParts";
 import { VehicleForm } from "../vehicles/VehicleForm";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+// Removed unused Dialog imports
 import type { Vehicle } from "@/types/inventory";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -21,7 +21,12 @@ const steps = [
   { id: "parts", title: "Parts Required" },
 ];
 
-export const ServiceTicketForm = () => {
+interface ServiceTicketFormProps {
+  onComplete?: () => void;
+  onCancel?: () => void;
+}
+
+export const ServiceTicketForm = ({ onComplete, onCancel }: ServiceTicketFormProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [showNewVehicle, setShowNewVehicle] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -42,6 +47,11 @@ export const ServiceTicketForm = () => {
     }
 
     try {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        throw new Error('Database connection unavailable');
+      }
+      
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user?.id) throw new Error('User not authenticated');
@@ -74,6 +84,9 @@ export const ServiceTicketForm = () => {
       setSelectedDepartment("");
       setParts([]);
       setCurrentStep(0);
+      
+      // Call onComplete callback if provided
+      if (onComplete) onComplete();
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to create service ticket');
       toast({
@@ -125,57 +138,44 @@ export const ServiceTicketForm = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          {steps.map((step, index) => (
-            <div
-              key={step.id}
-              className={`flex-1 text-center ${
-                index === currentStep
-                  ? "text-primary font-semibold"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {step.title}
-            </div>
-          ))}
-        </div>
-        <div className="h-2 bg-secondary rounded-full">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-300"
-            style={{
-              width: `${((currentStep + 1) / steps.length) * 100}%`,
+    <div className="space-y-4">
+      {showNewVehicle ? (
+        <div className="space-y-4">
+          <VehicleForm
+            onCancel={() => setShowNewVehicle(false)}
+            onSave={(vehicle) => {
+              setSelectedVehicle(vehicle);
+              setShowNewVehicle(false);
             }}
           />
         </div>
-      </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="space-y-1">
+            <h2 className="text-lg font-medium">{steps[currentStep].title}</h2>
+            <p className="text-sm text-muted-foreground">Step {currentStep + 1} of {steps.length}</p>
+          </div>
 
-      <div className="bg-card border rounded-lg p-6 shadow-sm">
-        <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
           {renderStep()}
 
-          <div className="flex justify-between pt-6 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleBack}
-              disabled={currentStep === 0}
-            >
-              Back
-            </Button>
+          <div className="flex justify-between pt-4">
+            {currentStep === 0 && onCancel ? (
+              <Button variant="outline" onClick={onCancel}>Cancel</Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={handleBack}
+                disabled={currentStep === 0}
+              >
+                Back
+              </Button>
+            )}
             <Button onClick={handleNext}>
               {currentStep === steps.length - 1 ? "Submit" : "Next"}
             </Button>
           </div>
-        </form>
-      </div>
-
-      <Dialog open={showNewVehicle} onOpenChange={setShowNewVehicle}>
-        <DialogContent className="max-w-2xl">
-          <VehicleForm onSuccess={() => setShowNewVehicle(false)} />
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 };

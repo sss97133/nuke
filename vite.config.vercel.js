@@ -11,6 +11,7 @@ import postcssNesting from 'postcss-nesting';
 export default defineConfig({
   plugins: [
     react({
+      jsxImportSource: '@emotion/react', // Add this to properly handle @emotion/react
       babel: {
         plugins: [
           ['transform-remove-console', { exclude: ['error', 'warn'] }]
@@ -104,9 +105,13 @@ export default defineConfig({
   },
   css: {
     devSourcemap: false,
+    // Ensure CSS is properly extracted and not inlined
+    extract: true,
+    // Improve CSS modules naming for better debugging
     modules: {
-      generateScopedName: '[hash:base64:8]',
+      generateScopedName: '[name]__[local]__[hash:base64:5]',
     },
+    // Configure PostCSS with required plugins
     postcss: {
       plugins: [
         autoprefixer,

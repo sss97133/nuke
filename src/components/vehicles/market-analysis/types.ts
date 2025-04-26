@@ -53,6 +53,17 @@ export interface MarketAnalysisProps {
         date: string;
         description: string;
       }>;
+      token_data?: {
+        current_price?: number;
+        volume_24h?: number;
+        market_cap?: number;
+        circulating_supply?: number;
+        derivatives?: Array<{
+          type: string;
+          price: number;
+          expirationDate: string;
+        }>;
+      };
     };
   };
 }

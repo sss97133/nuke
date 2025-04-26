@@ -41,6 +41,7 @@ import VehicleTimelinePage from '@/pages/VehicleTimelinePage'; // Import the Veh
 import DesignSystem from '@/components/ui/design-system'; // Import the Design System documentation
 import TestVehicleInput from '@/test-vehicle-input'; // Import the TestVehicleInput component
 import { AuthTestPage } from '@/components/auth-test/AuthTestPage'; // Import the Auth Test Page
+import CaptureIntegration from '@/pages/CaptureIntegration'; // Import the Capture Integration page
 
 // Route type definitions
 export enum RouteType {
@@ -122,6 +123,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/test-vehicle-input', element: <TestVehicleInput />, type: RouteType.PROTECTED },
   { path: '/admin', element: <AdminPanel />, type: RouteType.PROTECTED },
   { path: '/design-system', element: <DesignSystem />, type: RouteType.PROTECTED },
+  { path: '/capture-integration', element: <CaptureIntegration />, type: RouteType.PROTECTED },
 ];
 
 // Special routes

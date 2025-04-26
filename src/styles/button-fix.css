@@ -1,0 +1,28 @@
+/* Button contrast fixes for the Nuke platform */
+
+/* Ensure text contrast on primary buttons regardless of theme */
+.bg-primary {
+  color: hsl(210 40% 98%) !important; /* Ensure light text on dark backgrounds */
+}
+
+/* Fix for outline buttons to ensure visible text */
+button[class*="variant-outline"],
+.variant-outline {
+  color: hsl(222.2 47.4% 11.2%) !important; /* Darker text for outlined buttons */
+}
+
+/* Fix for ghost buttons to ensure proper contrast */
+button[class*="variant-ghost"],
+.variant-ghost {
+  color: hsl(222.2 47.4% 11.2%) !important;
+}
+
+/* Fix for white text on white secondary buttons */
+.bg-secondary {
+  color: hsl(222.2 47.4% 11.2%) !important; /* Ensure dark text on light backgrounds */
+}
+
+/* Ensure action buttons stand out better for vehicle service operations */
+.bg-primary:hover {
+  background-color: hsl(222.2 47.4% 9%) !important; /* Slightly darker on hover */
+}

@@ -1,11 +1,11 @@
-import type { Database } from '../types';
+import type { Database } from '@/integrations/supabase/types';
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 import {
   Command,
   CommandEmpty,
@@ -34,6 +34,8 @@ const carBrands = [
 
 interface VehicleFormProps {
   onSuccess?: () => void;
+  onSave?: (vehicle: Record<string, unknown>) => void;
+  onCancel?: () => void;
 }
 
 interface VehicleFormData {
@@ -44,7 +46,7 @@ interface VehicleFormData {
   notes?: string;
 }
 
-export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
+export const VehicleForm = ({ onSuccess, onSave }: VehicleFormProps = {}) => {
   const { register, handleSubmit, formState: { errors } } = useForm<VehicleFormData>();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -57,7 +59,12 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
 
   const onSubmit = async (data: VehicleFormData) => {
     try {
-      const { error } = await supabase
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        throw new Error('Database connection unavailable');
+      }
+
+      const { data: vehicleData, error } = await supabase
         .from('vehicles')
         .insert([
           {
@@ -68,16 +75,22 @@ export const VehicleForm = ({ onSuccess }: VehicleFormProps = {}) => {
             notes: data.notes,
             user_id: (await supabase.auth.getUser()).data.user?.id
           }
-        ]);
+        ])
+        .select().single();
 
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Vehicle added successfully",
+        title: "Vehicle Added",
+        description: `${data.year} ${selectedBrand || data.make} ${data.model} has been added to your inventory.`,
       });
 
-      onSuccess?.();
+      // Call the appropriate callback
+      if (onSave && vehicleData) {
+        onSave(vehicleData);
+      } else if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
       toast({
         title: "Error",
