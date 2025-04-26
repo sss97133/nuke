@@ -69,14 +69,14 @@
     right: 0;
     bottom: 0;
     left: 0;
-    background-color: theme('colors.white / 5%');
+    background-color: rgba(255, 255, 255, 0.05);
     content: "";
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
 
   .dark .glass-effect::before {
-    background-color: theme('colors.black / 40%');
+    background-color: rgba(0, 0, 0, 0.4);
   }
 
   .glass-effect > * {
@@ -205,14 +205,14 @@
     right: 0;
     bottom: 0;
     left: 0;
-    background-color: theme('colors.white / 5%');
+    background-color: rgba(255, 255, 255, 0.05);
     content: "";
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
 
   .dark .glass-effect::before {
-    background-color: theme('colors.black / 40%');
+    background-color: rgba(0, 0, 0, 0.4);
   }
 
   .glass-effect > * {
