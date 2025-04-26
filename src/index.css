@@ -60,19 +60,17 @@
   }
 
   .glass-effect {
-    @apply relative overflow-hidden;
+    position: relative;
+    overflow: hidden;
   }
 
   .glass-effect::before {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    background-color: rgba(255, 255, 255, 0.05);
+    inset: 0px;
     content: "";
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+    background-color: rgba(255, 255, 255, 0.05);
   }
 
   .dark .glass-effect::before {
@@ -80,7 +78,8 @@
   }
 
   .glass-effect > * {
-    @apply relative z-10;
+    position: relative;
+    z-index: 10;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -91,28 +90,62 @@
   }
 
   h1 {
-    @apply text-2xl mb-4;
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    margin-bottom: 1rem;
   }
   h2 {
-    @apply text-xl mb-3;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    margin-bottom: 0.75rem;
   }
   h3 {
-    @apply text-lg mb-2;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    margin-bottom: 0.5rem;
   }
   h4 {
-    @apply text-base mb-1;
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
   }
   h5 {
-    @apply text-sm mb-1;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
   }
   h6 {
-    @apply text-xs mb-1;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
   }
   a {
-    @apply text-blue-500 hover:text-blue-600 underline;
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+    color: var(--accent-color);
   }
-  p {
-    @apply mb-4;
+  a:hover {
+    text-decoration-line: underline;
+  }
+  :focus:not(:focus-visible) {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+  :focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+    --tw-ring-color: rgb(59 130 246 / 0.5);
+    --tw-ring-offset-width: 2px;
+  }
+  .dark :focus-visible {
+    --tw-ring-offset-color: #121212;
   }
 
   button, input, select, textarea {
@@ -170,7 +203,14 @@
 
 /* Classic MacOS window styling */
 .classic-window {
-  @apply bg-background border border-border shadow-classic p-6;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+  padding: 1.5rem;
+}
+
+.dark .classic-window {
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.4);
 }
 
 .classic-button {
