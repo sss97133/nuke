@@ -149,25 +149,33 @@
   }
 
   button, input, select, textarea {
-    @apply shadow-classic active:shadow-classic-pressed transition-none text-foreground;
+    color: hsl(var(--foreground));
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
   }
 
   label {
-    @apply text-foreground;
+    color: hsl(var(--foreground));
   }
 }
 
 /* Classic MacOS scrollbar styling */
 ::-webkit-scrollbar {
-  @apply w-4;
+  width: 1rem;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-secondary border border-border;
+  background-color: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-accent border border-border shadow-classic hover:bg-accent/90;
+  background-color: hsl(var(--accent));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsla(var(--accent) / 0.9);
 }
 
 /* Animation utilities */
