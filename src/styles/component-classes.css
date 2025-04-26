@@ -5,9 +5,10 @@
  * These provide consistent styling for common UI elements.
  */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* REMOVED @tailwind directives - they should only be in index.css */
+/* @tailwind base; */
+/* @tailwind components; */
+/* @tailwind utilities; */
 
 @layer components {
   /* Button variants */
