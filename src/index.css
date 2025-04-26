@@ -64,10 +64,19 @@
   }
 
   .glass-effect::before {
-    @apply absolute inset-0 bg-white/5 dark:bg-black/40;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: theme('colors.white / 5%');
     content: "";
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+  }
+
+  .dark .glass-effect::before {
+    background-color: theme('colors.black / 40%');
   }
 
   .glass-effect > * {
@@ -191,10 +200,19 @@
   }
 
   .glass-effect::before {
-    @apply absolute inset-0 bg-white/5 dark:bg-black/40;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: theme('colors.white / 5%');
     content: "";
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+  }
+
+  .dark .glass-effect::before {
+    background-color: theme('colors.black / 40%');
   }
 
   .glass-effect > * {
