@@ -5,6 +5,9 @@
  * These provide consistent styling for common UI elements.
  */
 
+/* Ensure Tailwind utilities are available for @apply */
+@reference "tailwindcss";
+
 /* REMOVED @tailwind directives - they should only be in index.css */
 /* @tailwind base; */
 /* @tailwind components; */
