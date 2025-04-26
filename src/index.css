@@ -84,7 +84,8 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-system tracking-tight text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    @apply font-bold tracking-tight text-foreground;
   }
 
   h1 {
@@ -162,15 +163,17 @@
 }
 
 .classic-button {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   @apply bg-secondary border border-border shadow-classic 
          hover:bg-accent active:shadow-classic-pressed
-         px-4 py-1.5 text-sm font-system text-foreground;
+         px-4 py-1.5 text-sm text-foreground;
 }
 
 .classic-input {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   @apply bg-white border border-border shadow-classic 
          focus:shadow-classic-pressed focus:outline-none
-         px-3 py-1.5 text-sm font-system text-foreground;
+         px-3 py-1.5 text-sm text-foreground;
 }
 
 /* Add shadow-classic utility classes that were possibly missing */
