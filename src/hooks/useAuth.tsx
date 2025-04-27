@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
-import { Session, User, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
+import { Session, User, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
 // Using relative path as a temporary fix for potential alias resolution issues
 import { supabase } from '../integrations/supabase/client';
 
@@ -24,8 +25,8 @@ interface AuthContextType {
 }
 
 const defaultAuthContextValue: AuthContextType = {
-  session: null,
-  user: null,
+  session: null, 
+  user: null, 
   loading: true,
   handleEmailLogin: async () => { console.warn("AuthProvider not ready"); },
   handleForgotPassword: async () => { console.warn("AuthProvider not ready"); },
@@ -77,9 +78,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
 
     // --- Cleanup --- 
-    return () => { 
+    return () => {
       isMounted = false;
-      subscription?.unsubscribe(); 
+      subscription?.unsubscribe();
     };
   }, []); // Run only once on mount
 

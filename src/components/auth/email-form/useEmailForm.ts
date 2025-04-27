@@ -166,21 +166,21 @@ export const useEmailForm = (
         console.log('[useEmailForm] Login/signup call successful. Auth state update pending...');
         
         // Optionally show a generic success message, but avoid premature redirects
-        toast({
+          toast({
           title: isSignUp ? "Signup Successful" : "Login Successful",
           description: "Processing authentication..."
         });
 
-      } catch (loginError: any) {
+      } catch (loginError: unknown) {
         // Error handled by the outer catch block
         console.error('[useEmailForm] Error during login/signup call:', loginError);
-        throw loginError; // Re-throw to be caught below
+        throw loginError as Error; // Re-throw to be caught below
       }
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Outer catch block handles errors from network check or handleEmailLogin
       console.error("[useEmailForm] Auth error:", error);
-      const errorMessage = formatAuthError(error); // Use the helper from useAuth.tsx
+      const errorMessage = formatAuthError(error);
       setFormError(errorMessage);
       
       // Simplified toast logic

@@ -65,8 +65,8 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
           // Cast the result of connectionState() to our defined type
           const currentState = clientRef.current.connectionState() as ConnectionStatus;
           setStatus(currentState);
-          setLastActivity(new Date());
-
+            setLastActivity(new Date());
+            
           if (currentState === 'open') {
             setReconnectAttempt(0);
           } else if (currentState === 'closed') {
@@ -100,7 +100,7 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     connectRealtimeClient();
-
+    
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (statusUpdateIntervalRef.current) clearInterval(statusUpdateIntervalRef.current);
@@ -118,7 +118,7 @@ export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ chil
     client: clientRef.current,
     reconnect: connectRealtimeClient,
   };
-
+  
   return (
     <WebSocketContext.Provider value={contextValue}>
       {children}
