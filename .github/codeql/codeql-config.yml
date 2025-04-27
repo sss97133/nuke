@@ -1,8 +1,6 @@
 name: "Custom CodeQL Configuration"
 
-# Custom queries to include - focusing on security but less strict
-queries:
-  - uses: security-extended
+# Use default queries; custom pack removed to avoid version mismatch
 
 # Specify paths to analyze
 paths:
