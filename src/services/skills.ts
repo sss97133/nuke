@@ -1,4 +1,3 @@
-import type { Database } from '../types';
 import { supabase } from '@/lib/supabase';
 import type { 
   Skill, 
@@ -9,10 +8,13 @@ import type {
   SkillLevel 
 } from '@/types/skills';
 
+// Non-null assertion once; our app guarantees supabase is initialized
+const db = supabase!;
+
 export const skillsService = {
   // Skills
   async getSkills(): Promise<Skill[]> {
-    const { data, error } = await supabase
+    const { data, error } = await db
         .from('skills')
       .select('*')
       .order('name');
@@ -22,7 +24,8 @@ export const skillsService = {
   },
 
   async getSkillById(id: string): Promise<Skill> {
-    const { data, error } = await supabase
+    const { data, error } = await db
+        .from('skills')
         .select('*')
       .eq('id', id)
       .single();
@@ -32,7 +35,8 @@ export const skillsService = {
   },
 
   async createSkill(skill: Omit<Skill, 'id' | 'created_at' | 'updated_at'>): Promise<Skill> {
-    const { data, error } = await supabase
+    const { data, error } = await db
+        .from('skills')
         .insert([skill])
       .select()
       .single();
@@ -43,7 +47,8 @@ export const skillsService = {
 
   // Contributions
   async getContributions(): Promise<Contribution[]> {
-    const { data, error } = await supabase
+    const { data, error } = await db
+        .from('contributions')
         .select(`
         *,
         vehicle_contributions(vehicle_id),
@@ -62,7 +67,7 @@ export const skillsService = {
   },
 
   async getContributionsByVehicle(vehicleId: string): Promise<Contribution[]> {
-    const { data, error } = await supabase
+    const { data, error } = await db
         .from('contributions')
       .select(`
         *,
@@ -83,8 +88,7 @@ export const skillsService = {
     const { vehicles, projects, skills, ...contributionData } = contribution;
 
     // Start a transaction
-    const { data, error } = await supabase.rpc('create_contribution', {
-  if (error) console.error("Database query error:", error);
+    const { data, error } = await db.rpc('create_contribution', {
       contribution_data: contributionData,
       vehicle_ids: vehicles || [],
       project_ids: projects || [],
@@ -97,8 +101,7 @@ export const skillsService = {
 
   // Skill Progress
   async getSkillProgress(skillId: string): Promise<SkillProgress> {
-    const { data, error } = await supabase.rpc('get_skill_progress', {
-  if (error) console.error("Database query error:", error);
+    const { data, error } = await db.rpc('get_skill_progress', {
       skill_id: skillId
     });
 
@@ -107,8 +110,7 @@ export const skillsService = {
   },
 
   async getUserSkillProgress(userId: string): Promise<SkillProgress[]> {
-    const { data, error } = await supabase.rpc('get_user_skill_progress', {
-  if (error) console.error("Database query error:", error);
+    const { data, error } = await db.rpc('get_user_skill_progress', {
       user_id: userId
     });
 
