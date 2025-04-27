@@ -8,7 +8,7 @@ interface RuntimeEnvironment {
 }
 
 // Access window.__env dynamically and perform type checks
-const runtimeEnv = (window as any).__env;
+const runtimeEnv = (window as unknown as { [key: string]: unknown }).__env ?? {};
 
 export const getEnvironment = (): RuntimeEnvironment => {
   let env: RuntimeEnvironment;
@@ -16,21 +16,21 @@ export const getEnvironment = (): RuntimeEnvironment => {
   if (runtimeEnv && typeof runtimeEnv === 'object') {
     // Use properties from window.__env if they exist and have the correct type
     env = {
-      VITE_SUPABASE_URL: typeof runtimeEnv.VITE_SUPABASE_URL === 'string' 
-        ? runtimeEnv.VITE_SUPABASE_URL 
+      VITE_SUPABASE_URL: typeof (runtimeEnv as Record<string, unknown>)["VITE_SUPABASE_URL"] === 'string' 
+        ? (runtimeEnv as Record<string, unknown>)["VITE_SUPABASE_URL"] as string
         : import.meta.env.VITE_SUPABASE_URL || '',
-      VITE_SUPABASE_ANON_KEY: typeof runtimeEnv.VITE_SUPABASE_ANON_KEY === 'string' 
-        ? runtimeEnv.VITE_SUPABASE_ANON_KEY 
+      VITE_SUPABASE_ANON_KEY: typeof (runtimeEnv as Record<string, unknown>)["VITE_SUPABASE_ANON_KEY"] === 'string' 
+        ? (runtimeEnv as Record<string, unknown>)["VITE_SUPABASE_ANON_KEY"] as string
         : import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-      VITE_ENV: typeof runtimeEnv.VITE_ENV === 'string' 
-        ? runtimeEnv.VITE_ENV 
+      VITE_ENV: typeof (runtimeEnv as Record<string, unknown>)["VITE_ENV"] === 'string' 
+        ? (runtimeEnv as Record<string, unknown>)["VITE_ENV"] as string
         : import.meta.env.VITE_ENV || 'production',
       // Handle boolean or string 'true' for debug flag
-      VITE_ENABLE_DEBUG: runtimeEnv.VITE_ENABLE_DEBUG === true || runtimeEnv.VITE_ENABLE_DEBUG === 'true' 
+      VITE_ENABLE_DEBUG: (runtimeEnv as Record<string, unknown>)["VITE_ENABLE_DEBUG"] === true || (runtimeEnv as Record<string, unknown>)["VITE_ENABLE_DEBUG"] === 'true' 
         ? true 
         : import.meta.env.VITE_ENABLE_DEBUG === 'true',
-      VITE_BUILD_TIME: typeof runtimeEnv.VITE_BUILD_TIME === 'string' 
-        ? runtimeEnv.VITE_BUILD_TIME 
+      VITE_BUILD_TIME: typeof (runtimeEnv as Record<string, unknown>)["VITE_BUILD_TIME"] === 'string' 
+        ? (runtimeEnv as Record<string, unknown>)["VITE_BUILD_TIME"] as string 
         : import.meta.env.VITE_BUILD_TIME || new Date().toISOString(),
     };
   } else {

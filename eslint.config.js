@@ -17,7 +17,14 @@ const compat = new FlatCompat({
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**"]
+    ignores: [
+      "dist/**",
+      "build/**",
+      "vehidex-extension/dist/**",
+      "supabase/functions/**",
+      "node_modules/**",
+      "src/scripts/**"
+    ]
   },
   ...compat.extends(
     "plugin:@typescript-eslint/recommended",
@@ -48,7 +55,13 @@ export default [
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "warn",
       "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off"
+      "react/prop-types": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-require-imports": "off",
+      "react/no-unescaped-entities": "warn",
+      "react/no-unknown-property": "warn",
+      "@typescript-eslint/no-empty-interface": "warn",
+      "@typescript-eslint/ban-ts-comment": "warn"
     }
   }
 ];
