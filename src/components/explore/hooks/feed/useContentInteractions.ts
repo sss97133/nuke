@@ -7,7 +7,7 @@ interface InteractionInput {
   contentId: string;
   contentType: string;
   interactionType: 'view' | 'like' | 'share' | 'save' | 'comment';
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 type InteractionResponse = void | { message?: string };
@@ -69,7 +69,7 @@ export const useContentInteractions = () => {
     mutation.mutate(interactionData);
   };
 
-  return { 
+  return {
     trackInteraction, 
     isPending: mutation.isPending, 
     error: mutation.error 

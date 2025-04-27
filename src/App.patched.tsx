@@ -64,7 +64,7 @@ function App() {
             <StyleFix />
             <SimpleAdaptivePanel>
               <OnboardingCheck>
-                <AppRouter />
+            <AppRouter />
               </OnboardingCheck>
             </SimpleAdaptivePanel>
             <Toaster />

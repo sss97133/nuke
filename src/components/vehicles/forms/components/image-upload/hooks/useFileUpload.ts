@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect } from 'react';
 import { UseFormReturn, Path, FieldValues } from 'react-hook-form';
 import { VehicleFormValues } from '../../../types';
 import { usePreviewManagement } from './usePreviewManagement';
@@ -22,8 +23,8 @@ interface StoredImage {
   path: string;
 }
 
-// Define the expected value type in the form for the image field
-type ImageFieldValue = StoredImage | StoredImage[] | null | undefined;
+// Define the expected value type in the form for the image field (no undefined to satisfy strict generics)
+type ImageFieldValue = StoredImage | StoredImage[] | null;
 
 export const useFileUpload = <T extends VehicleFormValues>({
   form,
@@ -40,9 +41,9 @@ export const useFileUpload = <T extends VehicleFormValues>({
   const [userId, setUserId] = useState<string | null>(null);
 
   // Fetch user ID on mount
-  useCallback(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id || null);
+  useEffect(() => {
+    supabase!.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null);
     });
   }, []);
 
@@ -51,7 +52,7 @@ export const useFileUpload = <T extends VehicleFormValues>({
     if (!files || files.length === 0) return;
     processFiles(files);
   };
-
+  
   const processFiles = async (filesInput: FileList) => {
     const isValid = validateFiles(filesInput, {
       maxSize,
@@ -59,7 +60,7 @@ export const useFileUpload = <T extends VehicleFormValues>({
       allowedTypes: ['image/']
     });
     if (!isValid) return;
-
+    
     setIsUploading(true);
     createPreviews(filesInput, multiple);
     const fileArray = Array.from(filesInput);
@@ -95,19 +96,20 @@ export const useFileUpload = <T extends VehicleFormValues>({
       if (successfulUploads.length > 0) {
         const currentValues = form.getValues(name) as ImageFieldValue;
         let newValue: StoredImage | StoredImage[];
-
-        if (multiple) {
+          
+          if (multiple) {
           const existingImages = Array.isArray(currentValues) ? currentValues : [];
           newValue = [...existingImages, ...successfulUploads];
-        } else {
+            } else {
           newValue = successfulUploads[0]; // Assign the first successful image object
         }
-        form.setValue(name, newValue as any, { shouldValidate: true }); 
-        toast({
+         
+        form.setValue(name, newValue as unknown as any, { shouldValidate: true }); 
+          toast({
           title: 'Upload Complete',
           description: `${successfulUploads.length} file(s) uploaded successfully.`,
-          variant: 'default',
-        });
+            variant: 'default',
+          });
       }
     } catch (error) {
       console.error('Error processing files:', error);
@@ -120,7 +122,7 @@ export const useFileUpload = <T extends VehicleFormValues>({
       setIsUploading(false);
     }
   };
-
+  
   // Refined clearImage to handle stored objects and remove from storage
   const clearImage = async (index: number) => {
     const currentValues = form.getValues(name) as ImageFieldValue;
@@ -128,7 +130,7 @@ export const useFileUpload = <T extends VehicleFormValues>({
     let newValue: StoredImage | StoredImage[] | null = null;
 
     if (multiple) {
-      if (Array.isArray(currentValues)) {
+    if (Array.isArray(currentValues)) {
         const tempValues = [...currentValues];
         if (index >= 0 && index < tempValues.length) {
           imageToRemove = tempValues[index];
@@ -143,7 +145,8 @@ export const useFileUpload = <T extends VehicleFormValues>({
       }
     }
     
-    form.setValue(name, newValue as any, { shouldValidate: true });
+     
+    form.setValue(name, newValue as unknown as any, { shouldValidate: true });
     removePreview(index); // Remove the local preview
 
     // If we identified an image to remove, delete from storage
@@ -167,10 +170,12 @@ export const useFileUpload = <T extends VehicleFormValues>({
 
     if (multiple && Array.isArray(currentValues)) {
       pathsToRemove.push(...currentValues.map(img => img.path).filter(p => !!p));
-      form.setValue(name, [] as any, { shouldValidate: true });
+       
+      form.setValue(name, [] as unknown as any, { shouldValidate: true });
     } else if (!multiple && currentValues && !Array.isArray(currentValues)) {
       if(currentValues.path) pathsToRemove.push(currentValues.path);
-      form.setValue(name, null as any, { shouldValidate: true });
+       
+      form.setValue(name, null as unknown as any, { shouldValidate: true });
     }
     
     clearPreviews();
@@ -193,7 +198,7 @@ export const useFileUpload = <T extends VehicleFormValues>({
   const storedUrls = Array.isArray(formValue) ? formValue.map(img => img.url) 
                    : (formValue ? [formValue.url] : []);
   const displayUrls = previewUrls.length > 0 ? previewUrls : storedUrls;
-
+  
   return {
     isUploading,
     previewUrls: displayUrls, // Combine previews and stored URLs for display

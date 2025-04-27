@@ -42,7 +42,7 @@ const WebSocketDiagnostics: React.FC = () => {
 
     console.log('Connecting diagnostic WebSocket...', wsUrl.substring(0, 30) + '...');
     setWsState(prev => ({ ...prev, status: 'connecting' }));
-
+    
     try {
       wsRef.current = new WebSocket(wsUrl);
 

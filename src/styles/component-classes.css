@@ -13,33 +13,33 @@
 /* @tailwind components; */
 /* @tailwind utilities; */
 
-/* Button variants */
-.btn {
-  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium 
-         rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 
+/* Button base utility */
+@utility btn {
+  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium \
+         rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 \
          focus:ring-offset-2 focus:ring-blue-500;
 }
 
 .btn-primary {
-  @apply btn bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600;
+  @apply bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600;
 }
 
 .btn-secondary {
-  @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 
+  @apply bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 
          dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700;
 }
 
 .btn-danger {
-  @apply btn bg-red-600 text-white hover:bg-red-700;
+  @apply bg-red-600 text-white hover:bg-red-700;
 }
 
 .btn-outline {
-  @apply btn border border-gray-300 bg-transparent hover:bg-gray-50 
+  @apply border border-gray-300 bg-transparent hover:bg-gray-50 
          dark:border-gray-700 dark:hover:bg-gray-800;
 }
 
 .btn-ghost {
-  @apply btn bg-transparent shadow-none hover:bg-gray-100 dark:hover:bg-gray-800;
+  @apply bg-transparent shadow-none hover:bg-gray-100 dark:hover:bg-gray-800;
 }
 
 /* Card components */
@@ -103,27 +103,36 @@
   @apply bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white;
 }
 
-/* Badge variants */
-.badge {
+/* Badge base utility */
+@utility badge {
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
 
 .badge-gray {
-  @apply badge bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200;
+  @apply bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200;
 }
 
 .badge-blue {
-  @apply badge bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300;
+  @apply bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300;
 }
 
 .badge-green {
-  @apply badge bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300;
+  @apply bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300;
 }
 
 .badge-red {
-  @apply badge bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-300;
+  @apply bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-300;
 }
 
 .badge-yellow {
-  @apply badge bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300;
+  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-300;
+}
+
+html {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* equivalent of `@apply antialiased` without relying on Tailwind */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
