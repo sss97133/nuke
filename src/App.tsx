@@ -10,7 +10,7 @@ import StyleFix from './fixes/ensure-styles';
 import { SimpleAdaptivePanel } from './components/ui/SimpleAdaptivePanel';
 import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
 import { WebSocketManager } from './integrations/supabase/WebSocketManager';
-import { WebSocketDiagnostics } from './integrations/utils/WebSocketDiagnostics';
+import WebSocketDiagnostics from './integrations/utils/WebSocketDiagnostics';
 // Production imports only - no test components
 import AuthDebug from './components/debug/AuthDebug';
 
