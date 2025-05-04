@@ -84,4 +84,7 @@ module.exports = {
     require('@tailwindcss/typography'),
     require('tailwindcss-animate'),
   ],
+  safelist: [],
+  // Ensure ANSI terminal color codes aren't processed as Tailwind classes
+  blocklist: [/\[31m/],
 }

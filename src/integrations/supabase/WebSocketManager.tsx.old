@@ -1,0 +1,274 @@
+import React, { useEffect, useContext, createContext, useState, useCallback, useRef } from 'react';
+import { supabase } from './client';
+import { useToast } from '@/hooks/use-toast';
+import { RealtimeClient } from '@supabase/realtime-js';
+import { createClient } from '@supabase/supabase-js';
+
+/**
+ * WebSocketManager for Supabase Realtime Connections
+ * Implements a singleton pattern to prevent connection cycling during component remounts
+ */
+
+// Global singleton variables to persist across component lifecycles
+let globalRealtimeClient: RealtimeClient | null = null;
+let isConnecting = false;
+let disconnectTimeout: NodeJS.Timeout | null = null;
+// Track active instances with a proper counter to prevent disconnect/reconnect cycles
+let mountCount = 0;
+// Track if this is the first instance being created during this page load
+let isInitialized = false;
+// Last connection attempt timestamp to prevent too frequent reconnection attempts
+let lastConnectionAttempt = 0;
+
+// Connection state type based on Supabase Realtime documentation
+type ConnectionStatus = 'connecting' | 'open' | 'closing' | 'closed';
+
+// Context value interface
+interface WebSocketContextValue {
+  status: ConnectionStatus;
+  lastActivity: Date | null;
+  client: RealtimeClient | null;
+  reconnect: () => void;
+}
+
+// Create context with undefined default
+const WebSocketContext = createContext<WebSocketContextValue | undefined>(undefined);
+
+// Hook to access WebSocket context
+export const useWebSocket = () => {
+  const context = useContext(WebSocketContext);
+  if (context === undefined) {
+    throw new Error('useWebSocket must be used within a WebSocketManager');
+  }
+  return context;
+};
+
+// WebSocketManager component
+export const WebSocketManager: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Component state
+  const [status, setStatus] = useState<ConnectionStatus>('closed');
+  const [lastActivity, setLastActivity] = useState<Date | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  
+  // References
+  const clientRef = useRef<RealtimeClient | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const statusUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const mountIdRef = useRef<number>(++mountCount);
+  
+  // Hooks
+  const { toast } = useToast();
+
+  // Connect to the Realtime client
+  const connectRealtimeClient = useCallback(() => {
+    // Prevent multiple simultaneous connection attempts
+    if (isConnecting) {
+      console.log('[WebSocketManager] Connection attempt already in progress, skipping');
+      return;
+    }
+    
+    // Throttle connection attempts to no more than once every 5 seconds
+    const now = Date.now();
+    if (now - lastConnectionAttempt < 5000 && globalRealtimeClient) {
+      console.log('[WebSocketManager] Connection attempt throttled (too frequent)');
+      isConnecting = false;
+      return;
+    }
+    
+    lastConnectionAttempt = now;
+    isConnecting = true;
+
+    if (import.meta.env.DEV) {
+      console.log(`[WebSocketManager:${mountIdRef.current}] Connection attempt starting`);
+    }
+
+    if (!supabase) {
+      console.error('[WebSocketManager] Supabase client not initialized. Cannot connect Realtime client.');
+      setStatus('closed');
+      isConnecting = false;
+      return;
+    }
+
+    // If we have a disconnectTimeout pending, clear it
+    if (disconnectTimeout) {
+      clearTimeout(disconnectTimeout);
+      disconnectTimeout = null;
+    }
+
+    // Use the global client if it exists and check its connection state
+    if (globalRealtimeClient) {
+      console.log('[WebSocketManager] Using existing global Realtime client');
+      clientRef.current = globalRealtimeClient;
+      
+      // Check if it's already connected
+      const currentState = clientRef.current.connectionState() as ConnectionStatus;
+      if (currentState === 'open') {
+        console.log('[WebSocketManager] Global client already connected');
+        setStatus('open');
+        setLastActivity(new Date());
+        isConnecting = false;
+        return;
+      }
+    } else {
+      console.log('Setting up new Realtime client connection...');
+      setStatus('connecting');
+      setLastActivity(new Date());
+
+      try {
+        // Get the environment variables
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+        
+        if (!supabaseUrl || !supabaseKey) {
+          throw new Error('Missing Supabase URL or API key in environment variables');
+        }
+        
+        console.log(`Connecting to Supabase URL: ${supabaseUrl}`);
+        console.log(`Using API key starting with: ${supabaseKey.substring(0, 10)}...`);
+        
+        // Use the existing Supabase client's realtime instance
+        clientRef.current = supabase.realtime;
+        
+        if (!clientRef.current) {
+          throw new Error('Supabase realtime client is not available.');
+        }
+        
+        // Store as global reference
+        globalRealtimeClient = clientRef.current;
+        
+        // Important: Make sure we're using the correct Supabase anon key
+        // This is the key from supabase status command
+        const correctAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+        
+        // Log connection details
+        console.log(`[WebSocketManager] Initializing connection with verified API key`);
+        
+        // Always make a fresh connection when creating a new client
+        if (clientRef.current.connectionState() === 'closed') {
+          console.log('Explicitly connecting Realtime client...');
+          clientRef.current.connect();
+        }
+      } catch (error) {
+        console.error('Failed to setup Realtime client connection:', error);
+        setStatus('closed');
+        toast({ title: 'Realtime Setup Failed', description: String(error), variant: 'destructive' });
+        clientRef.current = null;
+        globalRealtimeClient = null;
+        isConnecting = false;
+        attemptReconnect();
+        return;
+      }
+    }
+
+    if (statusUpdateIntervalRef.current) clearInterval(statusUpdateIntervalRef.current);
+    statusUpdateIntervalRef.current = setInterval(() => {
+      if (clientRef.current) {
+        // Cast the result of connectionState() to our defined type
+        const currentState = clientRef.current.connectionState() as ConnectionStatus;
+        const prevStatus = status;
+        setStatus(currentState);
+        setLastActivity(new Date());
+          
+        // Log state changes for better debugging
+        if (prevStatus !== currentState) {
+          console.log(`[WebSocketManager] Connection state changed: ${prevStatus} -> ${currentState}`);
+        }
+          
+        if (currentState === 'open') {
+          setReconnectAttempt(0);
+          console.log(`[WebSocketManager] ✅ WebSocket connection ESTABLISHED (${new Date().toLocaleTimeString()})`);
+        } else if (currentState === 'closed') {
+          console.warn('[WebSocketManager] Realtime client detected CLOSED state.');
+          attemptReconnect();
+        } else if (currentState === 'connecting') {
+          console.log(`[WebSocketManager] Connecting to Supabase... (${new Date().toLocaleTimeString()})`);
+        }
+      }
+    }, 5000);
+    
+    isConnecting = false;
+  }, [toast]);
+
+  // Attempt to reconnect with exponential backoff
+  const attemptReconnect = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (status === 'connecting' || status === 'open') return;
+
+    const delay = Math.min(30000, (2 ** reconnectAttempt) * 1000);
+    console.log(`Attempting Realtime client reconnection in ${delay / 1000}s (Attempt ${reconnectAttempt + 1})`);
+
+    timerRef.current = setTimeout(() => {
+      setReconnectAttempt(prev => prev + 1);
+      connectRealtimeClient();
+    }, delay);
+  }, [reconnectAttempt, status, connectRealtimeClient]);
+
+  // Connect on mount, handle cleanup on unmount
+  useEffect(() => {
+    // Increment mount count first thing to track correctly
+    mountCount++;
+    
+    // Set initialized flag only once per page load
+    if (!isInitialized) {
+      console.log('[WebSocketManager] Initializing for the first time');
+      isInitialized = true;
+    } else {
+      console.log(`[WebSocketManager] Mounting instance ${mountCount} (strict mode/remounting)`);
+    }
+    
+    // Connect the realtime client if needed
+    connectRealtimeClient();
+    
+    // Cleanup function
+    return () => {
+      // Save current mount ID for logging
+      const currentMountId = mountIdRef.current;
+      
+      // Clear any timers
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (statusUpdateIntervalRef.current) clearInterval(statusUpdateIntervalRef.current);
+      
+      // Calculate remaining mounts
+      mountCount = Math.max(0, mountCount - 1);
+      
+      console.log(`[WebSocketManager:${currentMountId}] Component unmounting, ${mountCount} instances remain`);
+      
+      // Only disconnect if this is truly the last instance
+      if (mountCount === 0 && clientRef.current) {
+        // Add a longer delay before disconnecting to allow for component remounting
+        // This is particularly important with React Strict Mode or route changes
+        console.log('[WebSocketManager] Last instance unmounted, scheduling disconnect');
+        
+        if (disconnectTimeout) {
+          clearTimeout(disconnectTimeout);
+        }
+        
+        disconnectTimeout = setTimeout(() => {
+          // Double-check mount count hasn't increased during timeout
+          if (mountCount === 0 && globalRealtimeClient) {
+            console.log('[WebSocketManager] Disconnecting global Realtime client after timeout');
+            globalRealtimeClient.disconnect();
+            globalRealtimeClient = null;
+          } else {
+            console.log(`[WebSocketManager] Disconnect canceled, ${mountCount} instances now active`);
+          }
+          clientRef.current = null;
+        }, 3000); // 3 second grace period for remounting (increased from 1s)
+      }
+    };
+  }, [connectRealtimeClient]);
+
+  // Provide context to children
+  const contextValue: WebSocketContextValue = {
+    status,
+    lastActivity,
+    client: clientRef.current,
+    reconnect: connectRealtimeClient,
+  };
+  
+  return (
+    <WebSocketContext.Provider value={contextValue}>
+      {children}
+    </WebSocketContext.Provider>
+  );
+};

@@ -9,7 +9,7 @@ import { HelmetProvider } from '@/components/providers/HelmetProvider';
 import StyleFix from './fixes/ensure-styles';
 import { SimpleAdaptivePanel } from './components/ui/SimpleAdaptivePanel';
 import { getEnvValue, checkRequiredEnvVars } from './utils/env-utils';
-import { WebSocketManager } from './integrations/supabase/WebSocketManager';
+import { SupabaseRealtimeProvider } from "@/integrations/supabase/SupabaseRealtimeProvider";
 import WebSocketDiagnostics from './integrations/utils/WebSocketDiagnostics';
 // Production imports only - no test components
 import AuthDebug from './components/debug/AuthDebug';
@@ -58,8 +58,8 @@ function App() {
             {/* Initialize global toast functions */}
             <ToastInitializer />
             
-            {/* Add WebSocket Manager for connection management */}
-            <WebSocketManager>
+            {/* Add Supabase Realtime Provider for WebSocket connection management */}
+            <SupabaseRealtimeProvider debug={true}>
               {/* Add WebSocket diagnostics for debugging */}
               <WebSocketDiagnostics />
               
@@ -69,12 +69,13 @@ function App() {
               {/* Adaptive UI Panel that learns from user behavior */}
               <SimpleAdaptivePanel />
               
-              {/* The AppRouter now contains the BrowserRouter, so OnboardingCheck will work correctly */}
-              <AppRouter />
+              <main className="flex-1 overflow-auto relative">
+                <AppRouter />
+              </main>
               <Toaster />
               {/* Add AuthDebug component for dev environment */}
               <AuthDebug />
-            </WebSocketManager>
+            </SupabaseRealtimeProvider>
           </TooltipProvider>
           {/* No test components in production */}
         </QueryClientProvider>

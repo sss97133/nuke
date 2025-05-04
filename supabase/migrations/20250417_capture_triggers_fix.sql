@@ -57,10 +57,10 @@ BEGIN
     SELECT COUNT(*) INTO capture_count
     FROM public.captures 
     WHERE id NOT IN (
-        SELECT COALESCE(capture_id, '00000000-0000-0000-0000-000000000000') 
+        SELECT COALESCE(data->>'capture_id', '00000000-0000-0000-0000-000000000000') 
         FROM public.vehicle_timeline_events 
         WHERE event_type = 'capture_processed'
-        AND capture_id IS NOT NULL
+        AND data->>'capture_id' IS NOT NULL
     );
     
     RAISE NOTICE 'Processing % unprocessed captures', capture_count;
@@ -70,10 +70,10 @@ BEGIN
         SELECT id, meta, images, user_id, url, captured_at
         FROM public.captures 
         WHERE id NOT IN (
-            SELECT COALESCE(capture_id, '00000000-0000-0000-0000-000000000000') 
+            SELECT COALESCE(data->>'capture_id', '00000000-0000-0000-0000-000000000000') 
             FROM public.vehicle_timeline_events 
             WHERE event_type = 'capture_processed'
-            AND capture_id IS NOT NULL
+            AND data->>'capture_id' IS NOT NULL
         )
         ORDER BY captured_at
     LOOP
@@ -204,7 +204,10 @@ BEGIN
                 event_date,
                 source,
                 data,
-                capture_id,
+                title,
+                description,
+                confidence_score,
+                source_url,
                 user_id
             ) VALUES (
                 vehicle_id,
@@ -215,9 +218,13 @@ BEGIN
                     'url', capture_record.url,
                     'source', meta_data->>'source_site',
                     'captured_data', meta_data,
-                    'images', image_urls
+                    'images', image_urls,
+                    'capture_id', capture_record.id
                 ),
-                capture_record.id,
+                'Capture Processed',
+                'Vehicle data captured and processed',
+                80,
+                capture_record.url,
                 capture_record.user_id
             );
             
