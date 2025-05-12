@@ -18,7 +18,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 // Create a hook to use the auth context
-export const useAuth = () => {
+const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -32,7 +32,7 @@ interface AuthProviderProps {
 }
 
 // Create the AuthProvider component
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+const AuthProviderComponent: React.FC<AuthProviderProps> = ({ children }) => {
   // Get state and actions from the user store
   const { isLoading, isAuthenticated, getCurrentUser, setLoading, setAuthenticated } = useUserStore();
   
@@ -125,4 +125,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
-export default AuthProvider;
+// Export the component and hook separately
+export { AuthProviderComponent as AuthProvider };
+export { useAuth };
+
+// Default export for convenience
+export default AuthProviderComponent;
