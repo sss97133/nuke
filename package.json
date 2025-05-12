@@ -79,7 +79,8 @@
     "sonner": "^2.0.2",
     "tailwind-merge": "^3.1.0",
     "three": "^0.176.0",
-    "zod": "^3.24.3"
+    "zod": "^3.24.3",
+    "zustand": "^5.0.4"
   },
   "devDependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",

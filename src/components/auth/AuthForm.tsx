@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/providers/AuthProvider";
 import { ClassicWindow } from "./ClassicWindow";
 import { PhoneInput } from "./PhoneInput";
 import { OtpInput } from "./OtpInput";
@@ -14,9 +14,15 @@ import { Loader2, AlertTriangle, Info, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { formatAuthError, handleAuthError, isSchemaError } from "@/utils/supabase-helpers";
+import { supabase } from "@/lib/supabase-client";
+import { useUserStore } from "@/stores/userStore";
 
 export const AuthForm = () => {
-  const { isLoading, handlePhoneLogin, verifyOtp, handleSocialLogin, session } = useAuth();
+  // Get authentication state from our new auth provider
+  const { session, isLoading, isAuthenticated } = useAuth();
+  
+  // Get user store methods
+  const { getCurrentUser, signOut } = useUserStore();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -85,11 +91,17 @@ export const AuthForm = () => {
       setAuthError(null);
       const formattedPhone = formatPhoneNumber(phoneNumber);
       console.log("Sending OTP to", formattedPhone);
-      const success = await handlePhoneLogin(formattedPhone);
-      setShowOtpInput(success);
-      if (!success) {
-        setAuthError("Failed to send verification code. Please check your phone number and try again.");
+      
+      // Use Supabase client directly to send OTP
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: formattedPhone
+      });
+      
+      if (error) {
+        throw error;
       }
+      
+      setShowOtpInput(true);
     } catch (error: any) {
       console.error("Error sending OTP:", error);
       const errorMessage = handleAuthError(error);
@@ -106,8 +118,20 @@ export const AuthForm = () => {
     try {
       setAuthError(null);
       const formattedPhone = formatPhoneNumber(phoneNumber);
-      console.log("Verifying OTP for", formattedPhone);
-      await verifyOtp(formattedPhone, otp);
+      
+      // Use Supabase client directly to verify OTP
+      const { error, data } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: otp,
+        type: 'sms'
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // If successful, refresh the user data
+      await getCurrentUser();
     } catch (error: any) {
       console.error("Error verifying OTP:", error);
       const errorMessage = handleAuthError(error);
@@ -122,6 +146,34 @@ export const AuthForm = () => {
 
   const handleContinueWithoutLogin = () => {
     navigate('/dashboard');
+  };
+  
+  // Implement social login with direct Supabase authentication
+  const handleSocialLogin = async (provider: any) => {
+    try {
+      setAuthError(null);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // If successful but no redirect URL, something went wrong
+      if (!data.url) {
+        throw new Error('No redirect URL returned from OAuth provider');
+      }
+      
+      // Redirect to the OAuth provider
+      window.location.href = data.url;
+    } catch (error: any) {
+      handleSocialLoginError(error);
+    }
   };
 
   const handleSocialLoginError = (error: any) => {

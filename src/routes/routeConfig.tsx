@@ -42,6 +42,7 @@ import DesignSystem from '@/components/ui/design-system'; // Import the Design S
 import TestVehicleInput from '@/test-vehicle-input'; // Import the TestVehicleInput component
 import { AuthTestPage } from '@/components/auth-test/AuthTestPage'; // Import the Auth Test Page
 import CaptureIntegration from '@/pages/CaptureIntegration'; // Import the Capture Integration page
+import AuthTest from '@/pages/AuthTest'; // Import our new authentication test page
 
 // Route type definitions
 export enum RouteType {
@@ -81,11 +82,11 @@ export const publicRoutes: RouteConfig[] = [
   { path: '/marketplace', element: <Marketplace />, type: RouteType.PUBLIC },
   { path: '/marketplace/listing/:id', element: <MarketplaceListingDetail />, type: RouteType.PUBLIC },
   { path: '/glossary', element: <Glossary />, type: RouteType.PUBLIC },
-  { path: '/documentation', element: <Documentation />, type: RouteType.PUBLIC },
   { path: '/sitemap', element: <Sitemap />, type: RouteType.PUBLIC },
+  { path: '/documentation', element: <Documentation />, type: RouteType.PUBLIC },
   { path: '/test-supabase', element: <TestSupabase />, type: RouteType.PUBLIC },
-  // Auth test page for verifying user authentication and data input
-  { path: '/auth-test', element: <AuthTestPage />, type: RouteType.PUBLIC },
+  // Authentication test page (protected by internal route guard)
+  { path: '/auth-test', element: <AuthTest />, type: RouteType.PUBLIC },
   // Ensure the crypto route has proper redirectTo property
   { path: '/crypto', element: <Navigate to="/explore" replace />, type: RouteType.PUBLIC, redirectTo: '/explore' },
 ];

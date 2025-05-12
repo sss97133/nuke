@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { getEnvironment } from './lib/environment'; // Import the environment utility
-import { AuthProvider } from '@/hooks/useAuth'; // Import AuthProvider
+import { AuthProvider } from '@/providers/AuthProvider'; // Import our new AuthProvider
 import ErrorBoundary from './components/error/ErrorBoundary'; // Import ErrorBoundary
 
 // Import styles in the correct order (global first, then components)

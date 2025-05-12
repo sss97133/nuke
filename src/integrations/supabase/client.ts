@@ -1,60 +1,25 @@
-import { createClient } from "@supabase/supabase-js";
+/**
+ * AUTHENTICATION SYSTEM CONSOLIDATION
+ * 
+ * This file now serves as a compatibility layer that redirects all references
+ * to the old Supabase client to our single source of truth implementation.
+ * 
+ * DO NOT MODIFY THIS FILE OR ADD NEW FUNCTIONALITY HERE.
+ * Instead, add new functionality to the main Supabase client at @/lib/supabase-client.ts
+ */
+
+import { supabase as newSupabaseClient } from "@/lib/supabase-client";
 import type { Database } from "@/types/database";
 import { useToast } from "@/components/ui/use-toast";
 
-// Get environment variables based on the current environment
+// This function now only exists for backward compatibility
+// All environment logic is now centralized in the new client
 const getEnvValue = (key: string): string => {
-  let value = '';
-  let source = '';
-  
-  // For Vite builds
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-    value = import.meta.env[key];
-    source = 'import.meta.env';
-  }
-  
-  // For production builds where import.meta might not be available
-  if (!value && typeof process !== 'undefined' && process.env && process.env[key]) {
-    value = process.env[key];
-    source = 'process.env';
-  }
-  
-  // For browser environments where window.__env might be set
-  if (!value && typeof window !== 'undefined' && window.__env && window.__env[key]) {
-    value = window.__env[key];
-    source = 'window.__env';
-  }
-  
-  // Hard-coded emergency fallback values for critical production deployments
-  // If we couldn't find the value through normal channels, use safer fallback approach
-  if (!value) {
-    const criticalKeys = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY', 'VITE_SUPABASE_SERVICE_KEY'];
-    
-    if (criticalKeys.includes(key)) {
-      console.warn(`Missing critical environment variable: ${key}`);
-      
-      // Instead of hardcoding credentials, handle the missing variable gracefully
-      if (typeof window !== 'undefined') {
-        // Show a user-friendly error in the UI if in browser context
-        const errorEvent = new CustomEvent('env-error', { detail: { key } });
-        window.dispatchEvent(errorEvent);
-      }
-      
-      // Return an empty string - the app's error boundaries will handle the failure
-      // when Supabase client initialization fails
-    }
-  }
-  
-  if (value) {
-    console.log(`Environment variable ${key} found in ${source}`);
-    return value;
-  }
-  
-  console.error(`Environment variable ${key} not found in any source`);
+  console.warn('getEnvValue is deprecated - using centralized env management');
   return '';
 };
 
-// Add type definition for window.__env and reconnection function
+// Type definitions preserved for backward compatibility
 declare global {
   interface Window {
     __env?: Record<string, string>;
@@ -62,94 +27,26 @@ declare global {
   }
 }
 
-// Remove the import from @/fix-env - it's for local debugging only
-// import { CORRECT_SUPABASE_URL, CORRECT_SUPABASE_ANON_KEY } from '@/fix-env';
+// The environment variables are now managed by the centralized client
+// This code is kept for backward compatibility but doesn't actually do anything
 
-// Get environment variables directly using the helper function
-const supabaseUrl = getEnvValue('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnvValue('VITE_SUPABASE_ANON_KEY');
+// We'll use a type that matches the old supabaseInstance type for compatibility
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-// Get current environment more reliably
-const environment = import.meta.env.MODE || process.env.NODE_ENV || 'production';
-
-// Simplified check for missing credentials
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(`⚠️ Missing Supabase credentials for environment ${environment}. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.`);
-  
-  // Optionally throw an error or display UI error, 
-  // but avoid complex reconnection logic tied to local fallbacks here.
-  // The createClient call will fail if credentials are truly missing.
-}
-
-// Use the retrieved values directly, or provide clear error placeholders if missing
-const safeSupabaseUrl = (supabaseUrl || 'https://missing-url-error').replace(/\/$/, '');
-const safeSupabaseAnonKey = supabaseAnonKey || 'missing-key-error';
-
-// Define the client singleton
-let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
+// Reference to our new singleton client
+let supabaseInstance: SupabaseClient | null = newSupabaseClient;
 
 /**
- * Returns a singleton instance of the Supabase client.
- * This prevents multiple GoTrueClient instances from being created.
+ * Returns the consolidated Supabase client.
+ * This now just returns a reference to our new implementation.
  */
 export const getSupabaseClient = () => {
-  if (!supabaseInstance) {
-    // Check again right before creation
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Supabase client initialization failed: Missing credentials.');
-      // Instead of throwing immediately, try to recover with a placeholder client
-      // that will fail gracefully on actual API operations but won't crash the app
-      if (environment === 'development' || environment === 'test') {
-        console.warn('Creating a placeholder client for development - authentication will fail');
-        // Create a client that will work for unauthenticated operations
-        try {
-          supabaseInstance = createClient<Database>(safeSupabaseUrl, safeSupabaseAnonKey, {
-            auth: {
-              persistSession: false, // Don't try to persist sessions
-              storageKey: 'nuke.auth.token',
-              storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-              detectSessionInUrl: false, // Disable auto session detection
-              flowType: 'pkce',
-              autoRefreshToken: false // Disable auto refresh
-            }
-          });
-        } catch (e) {
-          console.error('Even placeholder client failed:', e);
-          // Return null here instead of throwing to prevent app crashes
-          return null;
-        }
-      } else {
-        // In production, it's better to fail fast than to introduce unpredictable behavior
-        return null;
-      }
-    } else {
-      try {
-        console.log(`Initializing Supabase client for URL: ${safeSupabaseUrl.substring(0, 20)}...`); // Log safely
-        supabaseInstance = createClient<Database>(safeSupabaseUrl, safeSupabaseAnonKey, {
-          auth: {
-            persistSession: true,
-            storageKey: 'nuke.auth.token',
-            // Use localStorage directly if in browser, otherwise undefined (safer for SSR/build)
-            storage: typeof window !== 'undefined' ? window.localStorage : undefined, 
-            detectSessionInUrl: true,
-            flowType: 'pkce',
-            autoRefreshToken: true
-            // Remove cookieOptions as it's not supported in this version of Supabase
-          }
-        });
-        console.log('Supabase client initialized successfully.');
-      } catch (error) {
-        console.error('Supabase createClient error:', error);
-        supabaseInstance = null; // Ensure instance is null on error
-        return null; // Return null instead of throwing to prevent app crashes
-      }
-    }
-  }
-  return supabaseInstance;
+  console.warn('Using deprecated getSupabaseClient - switch to importing from @/lib/supabase-client');
+  return newSupabaseClient;
 };
 
-// Export both the getter function and a singleton instance for convenience
-export const supabase = getSupabaseClient();
+// Export the new Supabase client for backward compatibility
+export const supabase = newSupabaseClient;
 
 // Set up auth state change listener - but only once during the module initialization
 // This setup is inside a try-catch to ensure errors here don't break the entire app

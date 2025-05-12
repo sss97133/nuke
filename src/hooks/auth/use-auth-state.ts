@@ -1,121 +1,30 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
+/**
+ * AUTHENTICATION SYSTEM CONSOLIDATION
+ * 
+ * This is a compatibility layer for the useAuthState hook.
+ * It redirects to our new consolidated authentication system
+ * while maintaining the same API surface for backward compatibility.
+ */
+
+import { useAuth } from '@/providers/AuthProvider';
+import { useUserStore } from '@/stores/userStore';
 import type { User, Session } from '@supabase/supabase-js';
 
+/**
+ * This hook provides the same API as the original useAuthState hook
+ * but redirects to the new consolidated auth system.
+ */
 export const useAuthState = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only log in development and avoid excessive logging
-      if (process.env.NODE_ENV === 'development' && event !== 'INITIAL_SESSION') {
-        console.log('[useAuthState] Auth state changed:', event);
-      }
-      
-      // Prevent unnecessary state updates
-      if (event === 'INITIAL_SESSION' && session?.user?.id === user?.id) {
-        // Skip duplicate initialization events
-        return;
-      }
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-
-      if (event === 'SIGNED_IN') {
-        // Check if profile exists
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', session?.user.id)
-          .single();
-
-        if (profileError && profileError.code === 'PGRST116') {
-          // Profile doesn't exist, create it
-          const { error: createError } = await supabase
-            .from('profiles')
-            .insert([
-              {
-                id: session?.user.id,
-                email: session?.user.email,
-                username: session?.user.email?.split('@')[0],
-                full_name: '',
-                user_type: 'viewer',
-                onboarding_completed: false,
-                onboarding_step: 0,
-                bio: '',
-                social_links: {},
-                streaming_links: {},
-                home_location: { lat: 40.7128, lng: -74.0060 },
-                skills: [],
-                ai_analysis: {}
-              }
-            ]);
-
-          if (createError) {
-            console.error('[useAuthState] Profile creation error:', createError);
-            toast({
-              variant: 'destructive',
-              title: 'Profile Creation Failed',
-              description: 'Unable to create your profile. Please try again.'
-            });
-          }
-        }
-
-        toast({
-          title: 'Welcome Back!',
-          description: 'Successfully logged in'
-        });
-        navigate('/dashboard');
-      } else if (event === 'SIGNED_OUT') {
-        toast({
-          title: 'Signed Out',
-          description: 'You have been successfully signed out'
-        });
-        navigate('/');
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log('[useAuthState] Session refreshed');
-      }
-    });
-
-    // Set up session refresh interval
-    const refreshInterval = setInterval(async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      if (currentSession) {
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          console.error('[useAuthState] Session refresh error:', refreshError);
-          // If refresh fails, sign out the user
-          await supabase.auth.signOut();
-        }
-      }
-    }, 1000 * 60 * 30); // Refresh every 30 minutes
-
-    return () => {
-      subscription.unsubscribe();
-      clearInterval(refreshInterval);
-    };
-  }, [navigate, toast]);
-
+  // Get authentication state from our new provider
+  const { session, isLoading } = useAuth();
+  
+  // Get user data from our store
+  const { user } = useUserStore();
+  
+  // Return the same interface as the original hook
   return {
-    user,
-    session,
-    loading,
+    user: user, // This is our new user object from the store
+    session, // This is from our new auth provider
+    loading: isLoading // Renamed to match original property name
   };
 };
