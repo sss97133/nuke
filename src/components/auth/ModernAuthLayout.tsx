@@ -1,8 +1,7 @@
 import React from 'react';
 import { Logo } from '@/components/common/Logo';
-import { tokens } from '@/styles/design-tokens';
 import { cn } from '@/lib/utils';
-import { Shield, Key, Fingerprint, CheckCircle2, LockKeyhole } from 'lucide-react';
+import { Shield, Gauge, Database, Car, CheckCircle } from 'lucide-react';
 
 interface ModernAuthLayoutProps {
   children: React.ReactNode;
@@ -11,40 +10,8 @@ interface ModernAuthLayoutProps {
   className?: string;
 }
 
-type TrustIndicatorProps = {
-  level: 'blockchain' | 'professional' | 'physical' | 'smart';
-  title: string;
-  description: string;
-};
-
-const TrustIndicator: React.FC<TrustIndicatorProps> = ({ level, title, description }) => {
-  const getIcon = () => {
-    switch (level) {
-      case 'blockchain':
-        return <Shield className="h-6 w-6 text-emerald-500" />;
-      case 'professional':
-        return <CheckCircle2 className="h-6 w-6 text-blue-500" />;
-      case 'physical':
-        return <Fingerprint className="h-6 w-6 text-purple-500" />;
-      case 'smart':
-        return <Key className="h-6 w-6 text-amber-500" />;
-      default:
-        return <LockKeyhole className="h-6 w-6 text-gray-500" />;
-    }
-  };
-
-  return (
-    <div className="flex items-start space-x-3 mb-4">
-      <div className="mt-0.5 bg-white/10 p-2 rounded-full">
-        {getIcon()}
-      </div>
-      <div>
-        <h3 className="font-medium text-white">{title}</h3>
-        <p className="text-sm text-neutral-300">{description}</p>
-      </div>
-    </div>
-  );
-};
+// We don't need the TrustIndicator component anymore as we've inline the trust mechanisms
+// directly in our new vehicle-centric layout
 
 export const ModernAuthLayout: React.FC<ModernAuthLayoutProps> = ({
   children,
@@ -53,98 +20,73 @@ export const ModernAuthLayout: React.FC<ModernAuthLayoutProps> = ({
   className,
 }) => {
   return (
-    <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5">
-      {/* Vehicle Trust Mechanisms section */}
-      <div className="hidden md:block md:col-span-1 lg:col-span-2 bg-gradient-to-b from-neutral-900 to-neutral-800 text-white p-8 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-20">
-          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="100" height="100" fill="url(#grid)" />
-          </svg>
-        </div>
-        
-        <div className="flex flex-col h-full relative z-10">
-          <div>
-            <Logo variant="light" />
-          </div>
+    <div className="flex min-h-screen flex-col md:flex-row">
+      {/* Vehicle Identity Branding Panel */}
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-8 flex flex-col justify-center items-center md:w-2/5">
+        <div className="max-w-md mx-auto text-center">
+          <div className="mb-6 text-4xl font-bold">NUKE</div>
+          <h1 className="text-3xl font-bold mb-6">
+            Vehicle-Centric Digital Identity Platform
+          </h1>
+          <p className="text-xl mb-8">
+            Creating persistent digital identities for vehicles throughout their lifecycle.
+          </p>
           
-          <div className="my-12">
-            <div className="inline-block px-4 py-2 rounded-full bg-white/10 text-white text-sm font-medium mb-4">
-              Vehicle-Centric Trust System
+          {/* Vehicle identity trust mechanisms */}
+          <div className="mt-10 text-left space-y-6">
+            <div className="flex items-start space-x-3">
+              <div className="mt-0.5 bg-white/10 p-2 rounded-full">
+                <Shield className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-medium">Trust Verification</h3>
+                <p className="text-sm opacity-80">Multi-layer verification with blockchain validation</p>
+              </div>
             </div>
             
-            <h2 className="text-2xl font-bold mb-8">
-              Digital Vehicle Identity with <span className="text-emerald-400">Multi-Layer Verification</span>
-            </h2>
+            <div className="flex items-start space-x-3">
+              <div className="mt-0.5 bg-white/10 p-2 rounded-full">
+                <Gauge className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-medium">Confidence Scoring</h3>
+                <p className="text-sm opacity-80">Advanced reliability metrics for all vehicle data</p>
+              </div>
+            </div>
             
-            <div className="mt-8 space-y-6">
-              <TrustIndicator 
-                level="blockchain"
-                title="Immutable Record-Keeping"
-                description="Blockchain-verified history ensures tamper-proof vehicle records"
-              />
-              
-              <TrustIndicator 
-                level="professional"
-                title="Professional Verification"
-                description="Certified mechanics and specialists validate vehicle information"
-              />
-              
-              <TrustIndicator 
-                level="physical"
-                title="Physical Validation"
-                description="PTZ centers verify physical attributes and condition"
-              />
-              
-              <TrustIndicator 
-                level="smart"
-                title="Smart Ownership Management"
-                description="Secure transfer and fractional ownership capabilities"
-              />
+            <div className="flex items-start space-x-3">
+              <div className="mt-0.5 bg-white/10 p-2 rounded-full">
+                <Database className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-medium">Immutable History</h3>
+                <p className="text-sm opacity-80">Complete timeline of verified vehicle events</p>
+              </div>
             </div>
           </div>
           
-          <div className="mt-auto mb-8">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-              <p className="text-sm text-neutral-300">
-                Secure authentication is the gateway to your vehicle's digital identity
-              </p>
-            </div>
+          <div className="text-sm opacity-80 mt-10">
+            Trusted by 12,000+ vehicle owners & professionals
           </div>
         </div>
       </div>
-      
-      {/* Form section */}
-      <div className={cn("flex flex-col justify-center p-4 md:p-8 lg:p-12 col-span-1 md:col-span-1 lg:col-span-3", className)}>
-        <div className="md:hidden mb-8">
-          <Logo variant="dark" />
-          <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
-            <h3 className="text-sm font-medium">Vehicle-Centric Platform</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-              Secure authentication for your vehicle's digital identity management
-            </p>
-          </div>
-        </div>
-        
-        <div className="w-full max-w-md mx-auto space-y-6">
-          <div className="space-y-2 text-center md:text-left">
+
+      {/* Auth Form Panel */}
+      <div className="flex-1 flex justify-center items-center p-4 sm:p-8 bg-background">
+        <div className="w-full max-w-md">
+          <div className="space-y-2 mb-6">
             <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-            {subtitle && <p className="text-neutral-500 dark:text-neutral-400">{subtitle}</p>}
+            {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
           </div>
           
           {children}
           
-          <div className="mt-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+          <div className="mt-8 text-center text-sm text-muted-foreground">
             <p>
               By continuing, you agree to Nuke's{' '}
-              <a href="#" className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 hover:underline">Terms of Service</a>{' '}
+              <a href="/terms" className="text-primary hover:underline">Terms of Service</a>{' '}
               and{' '}
-              <a href="#" className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 hover:underline">Privacy Policy</a>.
+              <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>.
             </p>
           </div>
         </div>
