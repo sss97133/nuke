@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase-client';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
 import { ClassicWindow } from '@/components/auth/ClassicWindow';
 import { toast } from '@/hooks/use-toast';
+import { useUserStore } from '@/stores/userStore';
 
 /**
  * AuthCallback component handles auth redirects from Supabase
@@ -14,6 +15,7 @@ const AuthCallback: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { getCurrentUser } = useUserStore();
 
   useEffect(() => {
     const processAuthRedirect = async () => {
@@ -81,7 +83,16 @@ const AuthCallback: React.FC = () => {
             throw new Error('Could not get authentication data from URL or session');
           }
           
-          // We have a valid session somehow, go to dashboard
+          // We have a valid session, update user state
+          try {
+            await getCurrentUser();
+            console.log('User state successfully updated from session');
+          } catch (userError) {
+            console.error('Error updating user state:', userError);
+            // Continue anyway as we have a valid session
+          }
+          
+          // We have a valid session, go to dashboard
           toast({
             title: 'Authentication Successful',
             description: 'You have been authenticated',

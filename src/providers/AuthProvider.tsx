@@ -44,6 +44,41 @@ const AuthProviderComponent: React.FC<AuthProviderProps> = ({ children }) => {
     // Track component mount state to avoid updating state after unmount
     let isMounted = true;
     
+    // Process email verification tokens if present in URL
+    const processEmailVerification = async () => {
+      try {
+        // Check URL for token_hash and type parameters
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token_hash');
+        const type = params.get('type');
+        
+        if (token && (type === 'email_change' || type === 'signup')) {
+          console.log(`Processing ${type} verification with token_hash`);
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: token,
+            type: type === 'signup' ? 'signup' : 'email_change'
+          });
+          
+          if (error) {
+            console.error('Email verification error:', error);
+          } else {
+            console.log('Email verification successful');
+            // Clear the URL parameters to avoid processing the token multiple times
+            if (window.history && window.history.replaceState) {
+              const newUrl = window.location.pathname + 
+                (window.location.search ? window.location.search.replace(/[?&]token_hash=[^&]+/, '').replace(/[?&]type=[^&]+/, '') : '');
+              window.history.replaceState({}, document.title, newUrl);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error processing verification token:', err);
+      }
+    };
+    
+    // Process any verification tokens in the URL
+    processEmailVerification();
+    
     // Function to initialize the auth state
     const initializeAuth = async () => {
       try {
