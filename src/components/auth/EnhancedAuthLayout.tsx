@@ -1,27 +1,19 @@
-import React from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { ReactNode } from "react";
 import { Logo } from "@/components/common/Logo";
 
-
-interface NewAuthLayoutProps {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-  showBranding?: boolean;
+interface EnhancedAuthLayoutProps {
+  children: ReactNode;
+  title?: string;
   subtitle?: string;
+  showBranding?: boolean;
 }
 
-export function NewAuthLayout({ 
-  title, 
-  description, 
-  children, 
-  footer,
+export const EnhancedAuthLayout: React.FC<EnhancedAuthLayoutProps> = ({
+  children,
+  title = "The Complete Vehicle Management Platform",
+  subtitle = "Everything you need to manage your vehicle in one place.",
   showBranding = true,
-  subtitle = "Everything you need to manage your vehicle in one place."
-}: NewAuthLayoutProps) {
-  const navigate = useNavigate();
-  
+}) => {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       {/* Branding Panel */}
@@ -52,15 +44,11 @@ export function NewAuthLayout({
       {/* Auth Form Panel */}
       <div className="flex-1 flex justify-center items-center p-4 sm:p-8 bg-background">
         <div className="w-full max-w-md">
-          {description && (
-            <h2 className="text-2xl font-semibold mb-4 text-center">{description}</h2>
-          )}
           {children}
-          {footer && <div className="mt-6">{footer}</div>}
         </div>
       </div>
     </div>
   );
-}
+};
 
-export default NewAuthLayout;
+export default EnhancedAuthLayout;

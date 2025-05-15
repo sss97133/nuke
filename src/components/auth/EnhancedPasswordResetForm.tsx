@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, ArrowLeft, CheckCircle, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { AlertCircle, Loader2, CheckCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase-client";
-import { cn } from "@/lib/utils";
 
-export function PasswordResetForm() {
+export const EnhancedPasswordResetForm: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [mode, setMode] = useState<"request" | "reset">("request");
-  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -34,7 +34,7 @@ export function PasswordResetForm() {
     }
   }, [location]);
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email) {
@@ -107,15 +107,6 @@ export function PasswordResetForm() {
     }
   };
 
-  const passwordStrength = (): { strength: string; color: string } => {
-    if (!password) return { strength: "No password", color: "text-gray-400" };
-    if (password.length < 8) return { strength: "Weak", color: "text-red-500" };
-    if (password.length < 12) return { strength: "Medium", color: "text-yellow-500" };
-    return { strength: "Strong", color: "text-green-500" };
-  };
-
-  const { strength, color } = passwordStrength();
-  
   return (
     <div className="w-full max-w-md mx-auto">
       <Link 
@@ -124,14 +115,14 @@ export function PasswordResetForm() {
       >
         <ArrowLeft size={16} className="mr-1" /> Back to sign in
       </Link>
-        
+
       {error && (
         <Alert variant="destructive" className="mb-6 border-2 border-red-200 bg-red-50">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="font-medium">{error}</AlertDescription>
         </Alert>
       )}
-      
+
       {mode === "request" ? (
         isSuccess ? (
           <div className="text-center py-8">
@@ -143,21 +134,19 @@ export function PasswordResetForm() {
               We've sent a password reset link to <strong>{email}</strong>. 
               Please check your inbox (and spam folder) for instructions.
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setEmail("");
-                  setIsSuccess(false);
-                }}
-                className="sm:mr-4"
-              >
-                Try a different email
-              </Button>
-              <Button onClick={() => navigate('/login')}>
-                Return to sign in
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setEmail("");
+                setIsSuccess(false);
+              }}
+              className="mr-4"
+            >
+              Try a different email
+            </Button>
+            <Link to="/login">
+              <Button>Return to sign in</Button>
+            </Link>
           </div>
         ) : (
           <>
@@ -166,8 +155,8 @@ export function PasswordResetForm() {
               No problem. Enter your email and we'll send you a reset link.
             </p>
 
-            <form onSubmit={handleResetPassword} className="space-y-6">
-              <div className="space-y-2.5">
+            <form onSubmit={handleResetRequest} className="space-y-6">
+              <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
                 <Input 
                   id="email"
@@ -210,7 +199,7 @@ export function PasswordResetForm() {
           </p>
 
           <form onSubmit={handleSetNewPassword} className="space-y-6">
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-medium">New Password</Label>
               <div className="relative">
                 <Input
@@ -231,13 +220,9 @@ export function PasswordResetForm() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              
-              <div className={`text-sm ${color} mt-1`}>
-                Password strength: {strength}
-              </div>
             </div>
             
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
               <div className="relative">
                 <Input
@@ -264,7 +249,7 @@ export function PasswordResetForm() {
                   Processing...
                 </span>
               ) : (
-                <span className="flex items-center justify-center">
+                <span className="flex items-center">
                   Set New Password
                   <ArrowRight className="ml-2" size={18} />
                 </span>
@@ -275,6 +260,6 @@ export function PasswordResetForm() {
       )}
     </div>
   );
-}
+};
 
-export default PasswordResetForm;
+export default EnhancedPasswordResetForm;

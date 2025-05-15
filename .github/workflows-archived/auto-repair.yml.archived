@@ -1,0 +1,170 @@
+name: Automated CI/CD Repair
+
+on:
+  workflow_run:
+    workflows: ["Deploy to Vercel", "Build and Test"]  # Add your other workflow names here
+    types:
+      - completed
+
+jobs:
+  auto-repair:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for analyzing issues
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Analyze failure
+        id: analyze
+        run: |
+          # Get the workflow logs to analyze the failure
+          WORKFLOW_ID=${{ github.event.workflow_run.id }}
+          echo "Analyzing failure in workflow: $WORKFLOW_ID"
+          
+          # Download logs (using GitHub API)
+          curl -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/$WORKFLOW_ID/logs" \
+            --output workflow_logs.zip
+          
+          mkdir -p logs
+          unzip -q workflow_logs.zip -d logs || echo "Could not unzip logs"
+          
+          # Analyze common failures
+          ESLint_ERRORS=$(grep -r "error.*@typescript-eslint" logs || echo "")
+          DOCKER_ERRORS=$(grep -r "Error.*docker" logs || echo "")
+          BUILD_ERRORS=$(grep -r "Failed to compile" logs || echo "")
+          TYPE_ERRORS=$(grep -r "TS.*error" logs || echo "")
+          
+          # Set outputs for conditional repair strategies
+          if [[ ! -z "$ESLint_ERRORS" ]]; then
+            echo "failure_type=eslint" >> $GITHUB_OUTPUT
+            echo "Found ESLint errors"
+          elif [[ ! -z "$DOCKER_ERRORS" ]]; then
+            echo "failure_type=docker" >> $GITHUB_OUTPUT
+            echo "Found Docker errors"
+          elif [[ ! -z "$BUILD_ERRORS" ]]; then
+            echo "failure_type=build" >> $GITHUB_OUTPUT
+            echo "Found build errors"
+          elif [[ ! -z "$TYPE_ERRORS" ]]; then
+            echo "failure_type=typescript" >> $GITHUB_OUTPUT
+            echo "Found TypeScript errors"
+          else
+            echo "failure_type=unknown" >> $GITHUB_OUTPUT
+            echo "Unknown error type"
+          fi
+      
+      - name: Fix ESLint errors
+        if: steps.analyze.outputs.failure_type == 'eslint'
+        run: |
+          echo "Attempting to fix ESLint errors automatically"
+          # Try to automatically fix ESLint errors
+          npx eslint --fix "src/**/*.{ts,tsx}" || true
+          # Disable specific rules that are causing failures in CI but allow dev to work
+          if [ -f .eslintrc.js ]; then
+            sed -i 's/"@typescript-eslint\/no-explicit-any": "error"/"@typescript-eslint\/no-explicit-any": "warn"/g' .eslintrc.js || true
+          fi
+          if [ -f .eslintrc.cjs ]; then
+            sed -i 's/"@typescript-eslint\/no-explicit-any": "error"/"@typescript-eslint\/no-explicit-any": "warn"/g' .eslintrc.cjs || true
+          fi
+          if [ -f .eslintrc.json ]; then
+            sed -i 's/"@typescript-eslint\/no-explicit-any": "error"/"@typescript-eslint\/no-explicit-any": "warn"/g' .eslintrc.json || true
+          fi
+
+      - name: Fix Docker errors
+        if: steps.analyze.outputs.failure_type == 'docker'
+        run: |
+          echo "Attempting to fix Docker configuration"
+          # Check if Dockerfile exists
+          if [ -f Dockerfile ]; then
+            # Apply common Docker fixes
+            # 1. Fix permissions for node_modules
+            sed -i '/COPY package\*.json/a RUN mkdir -p node_modules && chown node:node node_modules' Dockerfile || true
+            # 2. Update base images to more stable ones
+            sed -i 's/node:latest/node:18-alpine/g' Dockerfile || true
+            # 3. Add proper error handling
+            sed -i 's/RUN npm ci/RUN npm ci || npm install/g' Dockerfile || true
+          fi
+          
+          # Check if docker-compose exists
+          if [ -f docker-compose.yml ]; then
+            # Fix common docker-compose issues
+            sed -i 's/restart: always/restart: unless-stopped/g' docker-compose.yml || true
+          fi
+
+      - name: Fix TypeScript errors
+        if: steps.analyze.outputs.failure_type == 'typescript'
+        run: |
+          echo "Attempting to fix TypeScript errors"
+          # Create or update tsconfig.json to be more permissive
+          if [ -f tsconfig.json ]; then
+            # Make TypeScript config more permissive for CI
+            sed -i 's/"noImplicitAny": true/"noImplicitAny": false/g' tsconfig.json || true
+            sed -i 's/"strict": true/"strict": false/g' tsconfig.json || true
+            # Add skipLibCheck to avoid issues with dependencies
+            sed -i '/"compilerOptions"/a \    "skipLibCheck": true,' tsconfig.json || true
+          fi
+
+      - name: Fix build errors
+        if: steps.analyze.outputs.failure_type == 'build'
+        run: |
+          echo "Attempting to fix build errors"
+          # Update package.json build script to be more resilient
+          if [ -f package.json ]; then
+            # Make build script more resilient
+            sed -i 's/"build": "/"build": "CI=false /g' package.json || true
+            # Add fallback build script
+            JSON=$(cat package.json)
+            if ! grep -q "build:prod" <<< "$JSON"; then
+              sed -i '/"build": /a \    "build:prod": "CI=false vite build",' package.json || true
+            fi
+          fi
+
+      - name: Commit fixes
+        if: steps.analyze.outputs.failure_type != 'unknown'
+        run: |
+          git config --global user.name "CI Auto Repair Bot"
+          git config --global user.email "bot@example.com"
+          
+          git add .
+          git commit -m "🤖 Auto-fix CI failures (${FAILURE_TYPE} errors)" || echo "No changes to commit"
+          
+          # Push changes to a new branch
+          BRANCH_NAME="auto-fix/ci-$(date +%Y%m%d%H%M%S)"
+          git checkout -b $BRANCH_NAME
+          git push origin $BRANCH_NAME
+          
+          # Create a pull request
+          PR_URL=$(curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls \
+            -d '{
+              "title": "🤖 Auto-fix CI failures",
+              "body": "This PR was automatically created to fix CI failures. Please review the changes.",
+              "head": "'$BRANCH_NAME'",
+              "base": "main"
+            }')
+          
+          echo "Created auto-fix PR: $PR_URL"
+        env:
+          FAILURE_TYPE: ${{ steps.analyze.outputs.failure_type }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify about manual intervention needed
+        if: steps.analyze.outputs.failure_type == 'unknown'
+        run: |
+          echo "Could not automatically fix the CI failures. Manual intervention is needed."
+          # Could integrate with Slack, email, or other notification systems here

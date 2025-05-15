@@ -1,0 +1,66 @@
+name: Simple CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'vite.config.js'
+      - 'vite.config.ts'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+      
+      - name: Remove node_modules and package-lock.json
+        run: |
+          rm -rf node_modules
+          rm -f package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci || npm install
+      
+      - name: Set up minimal Vite config
+        run: |
+          cat > vite.config.js << 'EOL'
+          import { defineConfig } from 'vite';
+          import react from '@vitejs/plugin-react';
+          import path from 'path';
+
+          export default defineConfig({
+            plugins: [react()],
+            resolve: {
+              alias: {
+                "@": path.resolve(__dirname, "./src"),
+              },
+            },
+            build: {
+              outDir: 'dist',
+              minify: 'terser',
+            }
+          });
+          EOL
+      
+      - name: Build
+        run: |
+          # Direct npx calls
+          npx tsc --noEmit && npx vite build
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

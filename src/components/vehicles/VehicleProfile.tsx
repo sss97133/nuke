@@ -1,8 +1,7 @@
-import type { Database } from '../types';
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase-client";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Vehicle, VehicleHistoricalData } from "@/types/inventory";
 import { VehicleHistory } from "./VehicleHistory";
@@ -64,14 +63,16 @@ export const VehicleProfile = () => {
     try {
       console.log('Searching vehicle history for vehicle:', vehicle.id);
       const { error } = await supabase.functions.invoke('search-vehicle-history', {
-  if (error) console.error("Database query error:", error);
         body: { vehicleId: vehicle.id }
       });
+      
+      if (error) console.error("Database query error:", error);
 
       if (error) throw error;
 
       // Refresh vehicle data to get updated historical_data
       const { data: updatedVehicle, error: fetchError } = await supabase
+        .from("vehicles")
         .select("*")
         .eq("id", vehicle.id)
         .single();

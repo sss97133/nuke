@@ -159,3 +159,6 @@ export const EmailLoginForm = React.memo(({
          prevProps.showForgotPassword === nextProps.showForgotPassword &&
          prevProps.isSignUp === nextProps.isSignUp;
 });
+
+// Add display name for ESLint
+EmailLoginForm.displayName = 'EmailLoginForm';

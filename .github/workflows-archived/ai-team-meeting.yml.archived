@@ -1,0 +1,150 @@
+name: AI Dev Team Meeting
+
+on:
+  workflow_dispatch:
+    inputs:
+      team:
+        description: 'Which team do you want to meet with?'
+        required: true
+        type: choice
+        options:
+          - 'leadership-cto'
+          - 'leadership-product'
+          - 'leadership-devops'
+          - 'team-frontend'
+          - 'team-backend'
+          - 'team-qa'
+          - 'team-security'
+      meeting_topic:
+        description: 'What would you like to discuss in this meeting?'
+        required: true
+        type: string
+      meeting_type:
+        description: 'Type of meeting'
+        required: true
+        type: choice
+        options:
+          - 'strategy-session'
+          - 'technical-review'
+          - 'sprint-planning'
+          - 'retrospective'
+      priority:
+        description: 'Issue priority'
+        required: true
+        type: choice
+        options:
+          - 'critical'
+          - 'high'
+          - 'medium'
+          - 'low'
+
+jobs:
+  prepare-meeting:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup meeting context
+        id: context
+        run: |
+          echo "MEETING_ID=$(date +%s)" >> $GITHUB_ENV
+          echo "MEETING_DATE=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
+          mkdir -p .github/ai-team/meetings
+          
+          # Create directory structure for meeting artifacts
+          mkdir -p .github/ai-team/meetings/${MEETING_DATE}_${{ github.event.inputs.team }}_${{ github.event.inputs.meeting_type }}
+
+      - name: Analyze repository for meeting
+        id: analyze
+        run: |
+          # This would be where we would run analysis tools
+          # For now we'll create a placeholder
+          
+          # Analyze different aspects based on team
+          case "${{ github.event.inputs.team }}" in
+            leadership-cto)
+              echo "Analyzing architectural patterns and technical debt..."
+              find . -type f -name "*.tsx" -o -name "*.ts" | grep -v "node_modules" | wc -l > .github/ai-team/meetings/${MEETING_DATE}_${{ github.event.inputs.team }}_${{ github.event.inputs.meeting_type }}/code_metrics.txt
+              ;;
+            team-frontend)
+              echo "Analyzing UI components and patterns..."
+              find ./src -type f -name "*.tsx" | grep -v "node_modules" | wc -l > .github/ai-team/meetings/${MEETING_DATE}_${{ github.event.inputs.team }}_${{ github.event.inputs.meeting_type }}/component_count.txt
+              ;;
+            team-backend)
+              echo "Analyzing data models and API endpoints..."
+              grep -r "supabase" --include="*.ts" --include="*.tsx" . | wc -l > .github/ai-team/meetings/${MEETING_DATE}_${{ github.event.inputs.team }}_${{ github.event.inputs.meeting_type }}/api_usage.txt
+              ;;
+            *)
+              echo "Performing general codebase analysis..."
+              ;;
+          esac
+
+      - name: Create meeting agenda
+        run: |
+          cat > .github/ai-team/meetings/${MEETING_DATE}_${{ github.event.inputs.team }}_${{ github.event.inputs.meeting_type }}/agenda.md << EOL
+          # Meeting Agenda: ${{ github.event.inputs.team }} - ${{ github.event.inputs.meeting_type }}
+          
+          **Date:** ${MEETING_DATE}
+          **Priority:** ${{ github.event.inputs.priority }}
+          **Topic:** ${{ github.event.inputs.meeting_topic }}
+          
+          ## Objectives
+          
+          - Discuss current status of ${{ github.event.inputs.meeting_topic }}
+          - Gather founder input on key decisions
+          - Determine next actions
+          
+          ## Discussion Points
+          
+          1. Current implementation analysis
+          2. Technical challenges and opportunities
+          3. Strategic alignment check
+          4. Resource requirements
+          5. Timeline considerations
+          
+          ## Preparation Questions
+          
+          Please consider these questions for our discussion:
+          
+          1. What are your key goals for ${{ github.event.inputs.meeting_topic }}?
+          2. Are there specific user experiences you're prioritizing?
+          3. What constraints should the team be aware of?
+          4. How does this fit into the broader product vision?
+          EOL
+
+      - name: Create GitHub Discussion
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: 1
+          body: |
+            ## 🤝 AI Dev Team Meeting Scheduled
+            
+            **Team:** ${{ github.event.inputs.team }}
+            **Topic:** ${{ github.event.inputs.meeting_topic }}
+            **Type:** ${{ github.event.inputs.meeting_type }}
+            **Priority:** ${{ github.event.inputs.priority }}
+            
+            ### Meeting Context
+            
+            The AI development team has analyzed the codebase and prepared for your meeting.
+            
+            ### Next Steps
+            
+            1. Review the meeting agenda: `.github/ai-team/meetings/${MEETING_DATE}_${{ github.event.inputs.team }}_${{ github.event.inputs.meeting_type }}/agenda.md`
+            2. Respond to the questions in the agenda
+            3. The team will create an implementation plan based on your input
+            
+            ---
+            
+            _This meeting was automatically generated by the AI Dev Team system._
+        
+      - name: Commit meeting artifacts
+        run: |
+          git config --local user.email "ai-team@example.com"
+          git config --local user.name "AI Development Team"
+          git add .github/ai-team/meetings/
+          git commit -m "AI Team Meeting: ${{ github.event.inputs.team }} - ${{ github.event.inputs.meeting_topic }}"
+          git push

@@ -58,18 +58,27 @@ export interface RouteConfig {
   redirectTo?: string;
 }
 
-// Auth routes - using modernized authentication UI
+// Auth routes - using modernized and enhanced authentication UI
 import NewLoginPage from '@/pages/auth/NewLoginPage';
 import NewSignUpPage from '@/pages/auth/NewSignUpPage';
 import NewResetPasswordPage from '@/pages/auth/NewResetPasswordPage';
 import VerifyEmailPage from '@/components/auth/VerifyEmailPage';
 
+// Import enhanced authentication components
+import EnhancedLoginPage from '@/pages/auth/EnhancedLoginPage';
+import EnhancedResetPasswordPage from '@/pages/auth/EnhancedResetPasswordPage';
+
 export const authRoutes: RouteConfig[] = [
-  { path: '/login', element: <NewLoginPage />, type: RouteType.AUTH },
+  // Enhanced authentication routes (primary)
+  { path: '/login', element: <EnhancedLoginPage />, type: RouteType.AUTH },
+  { path: '/reset-password', element: <EnhancedResetPasswordPage />, type: RouteType.AUTH },
   { path: '/signup', element: <NewSignUpPage />, type: RouteType.AUTH },
   { path: '/register', element: <Navigate to="/signup" replace />, type: RouteType.AUTH },
-  { path: '/reset-password', element: <NewResetPasswordPage />, type: RouteType.AUTH },
   { path: '/verify-email', element: <VerifyEmailPage />, type: RouteType.AUTH },
+  
+  // Legacy routes for backward compatibility
+  { path: '/login/legacy', element: <NewLoginPage />, type: RouteType.AUTH },
+  { path: '/reset-password/legacy', element: <NewResetPasswordPage />, type: RouteType.AUTH },
 ];
 
 // Public routes configuration

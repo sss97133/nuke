@@ -5,15 +5,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, Github, Mail } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { AlertCircle, Loader2, Github, Mail, ArrowRight, Check, User, Eye, EyeOff } from "lucide-react";
+import { supabase } from "@/lib/supabase-client";
+import { cn } from "@/lib/utils";
+import { AnonymousAuthButton } from "./AnonymousAuthButton";
+
+type AuthMode = "signin" | "signup";
 
 export function NewSignInForm() {
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
+  
+  const handleAnonymousSignIn = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Sign in anonymously
+      const { data, error } = await supabase.auth.signInAnonymously();
+      
+      if (error) throw error;
+      
+      console.log('Anonymous login successful', data);
+      
+      // Let the auth provider handle the redirect
+    } catch (err: any) {
+      console.error("Anonymous sign in error:", err);
+      setError(err.message || "Failed to sign in anonymously. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +55,10 @@ export function NewSignInForm() {
       setIsLoading(true);
       setError(null);
       
+      // For testing purposes, provide a specific test user
+      // You can use these credentials for testing: dev@example.com / developer123
+      console.log('Attempting login with:', { email });
+      
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -36,11 +68,11 @@ export function NewSignInForm() {
         throw signInError;
       }
       
-      // Successfully signed in
-      navigate('/dashboard');
+      console.log('Login successful');
+      // Let the auth provider handle the redirect
     } catch (err: any) {
       console.error("Sign in error:", err);
-      setError(err.message || "Failed to sign in. Please check your credentials.");
+      setError("Invalid login credentials. Try using dev@example.com / developer123 for testing.");
     } finally {
       setIsLoading(false);
     }
@@ -176,18 +208,106 @@ export function NewSignInForm() {
     }
   };
 
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !password) {
+      setError("Please fill in all fields");
+      return;
+    }
+    
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (signUpError) {
+        throw signUpError;
+      }
+      
+      setSuccess("Account created successfully! Please check your email for verification instructions.");
+      // Keep on signup screen with success message
+    } catch (err: any) {
+      console.error("Sign up error:", err);
+      setError(err.message || "Failed to create account. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleMode = () => {
+    setMode(mode === "signin" ? "signup" : "signin");
+    setEmail("");
+    setPassword("");
+    setError(null);
+    setSuccess(null);
+  };
+
+  const passwordStrength = (): { strength: string; color: string } => {
+    if (!password) return { strength: "No password", color: "text-gray-400" };
+    if (password.length < 8) return { strength: "Weak", color: "text-red-500" };
+    if (password.length < 12) return { strength: "Medium", color: "text-yellow-500" };
+    return { strength: "Strong", color: "text-green-500" };
+  };
+
+  const { strength, color } = passwordStrength();
+  
   return (
-    <div className="space-y-6">
+    <div className="w-full">
+      {/* Mode Switcher */}
+      <div className="flex mb-8 border-b">
+        <button
+          type="button"
+          onClick={() => setMode("signin")}
+          className={`pb-2 px-4 text-lg font-medium ${
+            mode === "signin"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted-foreground"
+          }`}
+        >
+          Sign In
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("signup")}
+          className={`pb-2 px-4 text-lg font-medium ${
+            mode === "signup"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted-foreground"
+          }`}
+        >
+          Create Account
+        </button>
+      </div>
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="mb-6 border-2 border-red-200 bg-red-50">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="font-medium">{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="mb-6 border-2 border-green-200 bg-green-50">
+          <Check className="h-4 w-4 text-green-500" />
+          <AlertDescription className="font-medium text-green-800">{success}</AlertDescription>
         </Alert>
       )}
       
-      <form onSubmit={handleSignIn} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+      <form onSubmit={mode === "signin" ? handleSignIn : handleSignUp} className="space-y-5">
+        <div className="space-y-2.5">
+          <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
           <Input
             id="email"
             type="email"
@@ -196,56 +316,84 @@ export function NewSignInForm() {
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
             required
+            className="py-5 px-4 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
           />
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link 
-              to="/reset-password"
-              className="text-sm text-primary hover:underline"
-            >
-              Forgot password?
-            </Link>
+            <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+            {mode === "signin" && (
+              <Link 
+                to="/reset-password"
+                className="text-sm text-primary hover:underline font-medium"
+              >
+                Forgot password?
+              </Link>
+            )}
           </div>
-          <Input
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-            required
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-12 py-5 px-4 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500 pr-10"
+              disabled={isLoading}
+              required
+            />
+            <button 
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          
+          {mode === "signup" && (
+            <div className={`text-sm ${color} mt-1`}>
+              Password strength: {strength}
+            </div>
+          )}
         </div>
         
         <Button 
           type="submit" 
-          className="w-full"
+          className="w-full py-6 mt-2 text-base font-medium shadow-md hover:shadow-lg transition-all"
+          size="lg"
           disabled={isLoading}
         >
-          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Sign in
+          {isLoading ? (
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          ) : (
+            <ArrowRight className="mr-2 h-5 w-5" />
+          )}
+          {mode === "signin" ? "Sign in" : "Create account"}
         </Button>
       </form>
       
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between my-6">
         <div className="flex-grow h-px bg-border"></div>
-        <span className="px-2 text-xs text-muted-foreground">OR</span>
+        <span className="px-4 text-sm font-medium text-muted-foreground">OR CONTINUE WITH</span>
         <div className="flex-grow h-px bg-border"></div>
       </div>
       
-      <div className="flex flex-col space-y-2">
+      <div className="flex flex-col space-y-3">
         <Button 
           type="button" 
           variant="outline" 
           onClick={handleGithubSignIn}
           disabled={isLoading}
-          className="w-full"
+          className={cn(
+            "w-full py-5 text-base border-2 hover:bg-gray-50",
+            "transition-all duration-200 ease-in-out"
+          )}
+          size="lg"
         >
-          <Github className="mr-2 h-4 w-4" />
-          Continue with GitHub
+          <Github className="mr-3 h-5 w-5" />
+          <span className="font-medium">Continue with GitHub</span>
         </Button>
         
         <Button 
@@ -253,21 +401,44 @@ export function NewSignInForm() {
           variant="outline" 
           onClick={handleMagicLink}
           disabled={isLoading}
-          className="w-full"
+          className={cn(
+            "w-full py-5 text-base border-2 hover:bg-gray-50",
+            "transition-all duration-200 ease-in-out"
+          )}
+          size="lg"
         >
-          <Mail className="mr-2 h-4 w-4" />
-          Continue with Magic Link
+          <Mail className="mr-3 h-5 w-5" />
+          <span className="font-medium">Continue with Magic Link</span>
         </Button>
       </div>
       
-      <div className="text-center text-sm">
-        Don't have an account?{" "}
-        <Link 
-          to="/signup" 
-          className="text-primary font-medium hover:underline"
-        >
-          Sign up
-        </Link>
+      <div className="text-center text-sm mt-7 py-4 border-t border-gray-100">
+        <p className="text-gray-600 mb-2">
+          {mode === "signin" ? "Don't have an account?" : "Already have an account?"}
+        </p>
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="text-primary font-medium hover:underline inline-flex items-center justify-center"
+          >
+            {mode === "signin" ? "Create an account" : "Sign in"} 
+            <ArrowRight className="ml-1 h-3.5 w-3.5" />
+          </button>
+          
+          <div className="- my-1">or</div>
+          
+          <Button 
+            type="button" 
+            variant="secondary" 
+            onClick={handleAnonymousSignIn}
+            disabled={isLoading}
+            className="mx-auto px-4 py-2 text-sm font-medium"
+          >
+            <User className="mr-2 h-4 w-4" />
+            Continue as guest
+          </Button>
+        </div>
       </div>
     </div>
   );

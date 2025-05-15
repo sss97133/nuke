@@ -17,15 +17,15 @@ const envPath = path.join(__dirname, '.env');
 const questions = [
   {
     name: 'VITE_SUPABASE_URL',
-    message: https://qkgaybvrernstplzjaam.supabase.co
+    message: 'Enter your Supabase URL (e.g. https://qkgaybvrernstplzjaam.supabase.co):'
   },
   {
     name: 'VITE_SUPABASE_ANON_KEY',
-    message: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk
+    message: 'Enter your Supabase Anon Key:'
   },
   {
     name: 'VITE_SUPABASE_SERVICE_KEY',
-    message: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODM2OTAyMSwiZXhwIjoyMDUzOTQ1MDIxfQ.NEbqSnSamR5f7Fqon25ierv5yJgdDy_o2nrixOej_Xg
+    message: 'Enter your Supabase Service Key (optional):',
     optional: true
   }
 ];

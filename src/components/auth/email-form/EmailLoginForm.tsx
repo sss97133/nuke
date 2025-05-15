@@ -50,7 +50,7 @@ export const EmailLoginForm = React.memo(({
         hasError: !!formError 
       });
     }
-  }, []);
+  }, [showForgotPassword, isSignUp, formError]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" data-submitting={isSubmitting ? "true" : "false"}>
@@ -198,3 +198,6 @@ export const EmailLoginForm = React.memo(({
          prevProps.showForgotPassword === nextProps.showForgotPassword &&
          prevProps.isSignUp === nextProps.isSignUp;
 });
+
+// Add display name for ESLint
+EmailLoginForm.displayName = 'EmailLoginForm';
