@@ -1,11 +1,21 @@
 /**
- * Adaptive UI System
+ * Vehicle-Centric Adaptive UI System
  * 
- * This module provides utilities for creating an AI-manipulated UI that adapts
- * to user behavior and preferences over time.
+ * This module provides a modern, vehicle-centric UI system that emphasizes
+ * the digital identity of vehicles throughout their lifecycle, following the
+ * CEO's vision of vehicles as first-class digital entities.
+ * 
+ * Design principles:
+ * 1. Vehicle-centric: All UI elements revolve around vehicle identity
+ * 2. Timeline-based: History visualization is core to the experience
+ * 3. Trust mechanisms: Visual indicators for data verification levels
+ * 4. Immutable record-keeping: Clear distinction between verified/unverified data
+ * 5. Accessibility: Modern, responsive design with comprehensive a11y support
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase-client';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useUserStore } from '@/stores/userStore';
 
 // Types for user interaction tracking
 export interface UserInteraction {

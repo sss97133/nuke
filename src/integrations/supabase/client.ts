@@ -34,7 +34,7 @@ declare global {
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Reference to our new singleton client
-let supabaseInstance: SupabaseClient | null = newSupabaseClient;
+const supabaseInstance: SupabaseClient | null = newSupabaseClient;
 
 /**
  * Returns the consolidated Supabase client.

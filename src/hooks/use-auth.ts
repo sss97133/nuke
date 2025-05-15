@@ -1,12 +1,16 @@
 /**
- * AUTHENTICATION SYSTEM CONSOLIDATION
+ * VEHICLE-CENTRIC AUTHENTICATION SYSTEM
  * 
- * This is a compatibility layer that provides the same API surface
- * as the old authentication system, but redirects to our new
- * consolidated implementation.
+ * This hook provides authentication capabilities integrated with the
+ * vehicle-centric architecture of the platform. It ensures that authentication
+ * flows are compatible with vehicle identity verification and trust mechanisms.
+ * 
+ * It serves as a compatibility layer that provides the same API surface
+ * as the old authentication system, but redirects to our consolidated implementation.
  */
 
 import { useAuth as useNewAuth } from "@/providers/AuthProvider";
+import { useVehicleIdentity } from "@/providers/VehicleIdentityProvider";
 import { useUserStore } from "@/stores/userStore";
 import { supabase } from "@/lib/supabase-client";
 import { useState } from "react";
@@ -14,6 +18,9 @@ import { useState } from "react";
 export const useAuth = () => {
   // Get authentication state from our new provider
   const { session, isLoading: authLoading, isAuthenticated } = useNewAuth();
+  
+  // Get vehicle identity context for trust integration
+  const { verificationLevel, trustScore } = useVehicleIdentity();
   
   // Get user store methods
   const { user, getCurrentUser, signOut } = useUserStore();
@@ -218,6 +225,9 @@ export const useAuth = () => {
     isLoading: authLoading || isEmailLoading || isPhoneLoading || isSocialLoading,
     user,
     session,
+    isAuthenticated,
+    verificationLevel,  // Provide vehicle verification level to consumers
+    trustScore,        // Provide trust score for vehicle-centric interfaces
     handleSocialLogin,
     handleLogout,
     handlePhoneLogin,

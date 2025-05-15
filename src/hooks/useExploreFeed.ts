@@ -1,6 +1,6 @@
 import { useInfiniteQuery, QueryKey, InfiniteData } from '@tanstack/react-query';
 import { fetchFeedContent } from '@/components/explore/hooks/feed/contentFetcher'; 
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth with correct path
 // Import the new interaction hook
 import { useContentInteractions } from '@/components/explore/hooks/feed/useContentInteractions';
 
@@ -30,7 +30,7 @@ export const useExploreFeed = ({
   includeStreams = true, 
   searchTerm = ''
 }: UseExploreFeedProps): UseExploreFeedResult => {
-  const { user, loading: authLoading } = useAuth(); // Get auth state
+  const { user, isLoading: authLoading } = useAuth(); // Get auth state with correct property name
   // Use the new interaction hook
   const { trackInteraction, isPending: isTrackingInteraction } = useContentInteractions(); 
 
@@ -61,8 +61,15 @@ export const useExploreFeed = ({
     contentType: string, 
     interactionType: 'view' | 'like' | 'share' | 'save' | 'comment'
   ) => {
-    // Call the trackInteraction function from the useContentInteractions hook
-    trackInteraction({ contentId, contentType, interactionType });
+    // Check if trackInteraction is a function before calling it
+    if (typeof trackInteraction === 'function') {
+      // Call the trackInteraction function from the useContentInteractions hook
+      trackInteraction({ contentId, contentType, interactionType });
+    } else {
+      console.warn('trackInteraction is not available or not a function');
+      // Fallback behavior - log the interaction for debugging
+      console.log('Interaction tracked locally:', { contentId, contentType, interactionType });
+    }
   };
 
   return {

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, QueryKey } from '@tanstack/react-query';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth } from '@/hooks/use-auth';
 import { invokeFunction } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 

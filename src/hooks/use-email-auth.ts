@@ -130,7 +130,7 @@ export const useEmailAuth = () => {
         // Development mode with fallback handling for Supabase connection issues
         // This ensures login works even when there are Supabase port conflicts
         const isDevelopment = typeof window !== 'undefined' && window.location.href.includes('localhost');
-        let forceMockMode = isDevelopment && (window.localStorage.getItem('force_mock_auth') === 'true');
+        const forceMockMode = isDevelopment && (window.localStorage.getItem('force_mock_auth') === 'true');
         
         // Define types for data and error
         type SupabaseAuthData = Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data'];

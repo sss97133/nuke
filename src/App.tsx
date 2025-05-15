@@ -13,6 +13,7 @@ import { SupabaseRealtimeProvider } from "@/integrations/supabase/SupabaseRealti
 import WebSocketDiagnostics from './integrations/utils/WebSocketDiagnostics';
 // Production imports only - no test components
 import AuthDebug from './components/debug/AuthDebug';
+import { VehicleIdentityProvider } from '@/providers/VehicleIdentityProvider';
 
 // Import environment fix to ensure proper Supabase connectivity
 import './fix-env';
@@ -58,24 +59,27 @@ function App() {
             {/* Initialize global toast functions */}
             <ToastInitializer />
             
-            {/* Add Supabase Realtime Provider for WebSocket connection management */}
-            <SupabaseRealtimeProvider debug={true}>
-              {/* Add WebSocket diagnostics for debugging */}
-              <WebSocketDiagnostics />
-              
-              {/* Ensure styles are loaded properly in production */}
-              <StyleFix />
-              
-              {/* Adaptive UI Panel that learns from user behavior */}
-              <SimpleAdaptivePanel />
-              
-              <main className="flex-1 overflow-auto relative">
-                <AppRouter />
-              </main>
-              <Toaster />
-              {/* Add AuthDebug component for dev environment */}
-              <AuthDebug />
-            </SupabaseRealtimeProvider>
+            {/* Provide vehicle identity context to the entire application */}
+            <VehicleIdentityProvider>
+              {/* Add Supabase Realtime Provider for WebSocket connection management */}
+              <SupabaseRealtimeProvider debug={true}>
+                {/* Add WebSocket diagnostics for debugging */}
+                <WebSocketDiagnostics />
+                
+                {/* Ensure styles are loaded properly in production */}
+                <StyleFix />
+                
+                {/* Adaptive UI Panel that learns from user behavior */}
+                <SimpleAdaptivePanel />
+                
+                <main className="flex-1 overflow-auto relative">
+                  <AppRouter />
+                </main>
+                <Toaster />
+                {/* Add AuthDebug component for dev environment */}
+                <AuthDebug />
+              </SupabaseRealtimeProvider>
+            </VehicleIdentityProvider>
           </TooltipProvider>
           {/* No test components in production */}
         </QueryClientProvider>
