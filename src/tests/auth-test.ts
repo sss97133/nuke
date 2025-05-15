@@ -3,9 +3,11 @@
  * 
  * This utility helps test user authentication flows and Row-Level Security (RLS)
  * in the context of the vehicle-centric architecture.
+ * 
+ * Using real Supabase client following our best practices of no mock data.
  */
 
-import { supabase } from '../components/service-history/create-service-record/hooks/__mocks__/supabase-client';
+import { supabase } from '@/lib/supabase-client';
 
 interface TestUser {
   email: string;

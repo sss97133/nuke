@@ -7,12 +7,14 @@
 import { useState, useEffect } from 'react';
 import { RawTimelineEvent, TimelineEvent } from './types';
 // Import only necessary Supabase types
-import { PostgrestSingleResponse, PostgrestResponse, SupabaseClient } from '@supabase/supabase-js'; 
-import { Database } from '@/types/database'; // Assuming Database type is defined here
-import { queryWithRetry } from '@/lib/supabase'; // Import the retry utility
+import { PostgrestSingleResponse, PostgrestResponse } from '@supabase/supabase-js'; 
+import { Database } from '@/types/database';
+import { queryWithRetry } from '@/lib/supabase';
 
-// Import the getTimelineClient function - this handles getting a properly initialized client
-import { getTimelineClient } from './useSupabaseClient';
+// Import the centralized Supabase client and auth hook following best practices
+import { supabase } from '@/lib/supabase-client';
+import { useTimelineAuth } from './useSupabaseClient';
+import { useAuth } from '@/providers/AuthProvider';
 
 // Database constants
 const DATABASE_TIMEOUT_MS = 10000;
@@ -29,13 +31,8 @@ const generateMinimalTimeline = async (vehicleId: string, vehicleData?: any): Pr
   // If we don't have vehicle data, try to fetch it
   if (!vehicle) {
     try {
-      const client = getTimelineClient();
-      if (!client) {
-        console.error('Failed to get Supabase client for minimal timeline');
-        return [];
-      }
-      
-      const { data, error } = await client
+      // Use centralized Supabase client
+      const { data, error } = await supabase
         .from('vehicles')
         .select('*')
         .eq('id', vehicleId)
@@ -184,7 +181,8 @@ export function useVehicleTimelineData({
     try {
       setLoading(true);
       setError(null);
-      const timelineSupabase: any = getTimelineClient(); 
+      // Use the centralized Supabase client per best practices
+      const timelineSupabase = supabase; 
       const DATABASE_TIMEOUT_MS = 10000;
       // Timeout promise now only used if queryWithRetry is bypassed or fails internally
       const timeoutPromise = <T = never>(ms: number): Promise<T> => 

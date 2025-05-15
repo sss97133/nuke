@@ -2,20 +2,31 @@
  * Vehicle Timeline Supabase Client
  * 
  * This module provides a Supabase client that can be used by the vehicle timeline
- * even when authentication is missing, using fallbacks when necessary.
+ * component to access vehicle data with appropriate permissions.
  */
 
-import { supabase as realSupabase } from '@/integrations/supabase/client';
-import { getUsableClient } from '@/integrations/supabase/__mocks__/auth-fallback';
+import { supabase } from '@/lib/supabase-client';
+import { useAuth } from '@/providers/AuthProvider';
 
-// Export a function that gets a usable client regardless of auth state
+/**
+ * Returns the Supabase client configured for vehicle timeline usage
+ * with appropriate error handling for authentication state.
+ */
 export const getTimelineClient = () => {
-  try {
-    // Try to use the real client first
-    return realSupabase;
-  } catch (error) {
-    console.warn('Authentication error in timeline component, using fallback client:', error);
-    // Use our fallback mechanism
-    return getUsableClient();
-  }
+  // Always use the centralized Supabase client
+  return supabase;
+};
+
+/**
+ * Hook to use within React components that need to know if
+ * the timeline is in an authenticated context.
+ */
+export const useTimelineAuth = () => {
+  const { isAuthenticated } = useAuth();
+  
+  return {
+    isAuthenticated,
+    canModifyTimeline: isAuthenticated,
+    canViewTimeline: true // Public viewing is allowed, modifications require auth
+  };
 };

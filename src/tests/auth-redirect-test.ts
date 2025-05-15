@@ -3,9 +3,11 @@
  * 
  * This test utility verifies the authentication redirect functionality
  * within the vehicle-centric architecture of Nuke.
+ * 
+ * Using real Supabase client following our best practices of no mock data.
  */
 
-import { supabase } from '../components/service-history/create-service-record/hooks/__mocks__/supabase-client';
+import { supabase } from '@/lib/supabase-client';
 
 /**
  * Mock window location for testing redirects

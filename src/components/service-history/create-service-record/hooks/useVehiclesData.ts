@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from './__mocks__/supabase-client';
-import { useToast } from './__mocks__/use-toast';
+import { supabase } from '@/lib/supabase-client';
+import { useToast } from '@/components/ui/use-toast';
 import { Vehicle } from '../types';
 import { PostgrestError } from '@supabase/supabase-js';
+import { useAuth } from '@/providers/AuthProvider';
 
 export const useVehiclesData = () => {
   const { toast } = useToast();

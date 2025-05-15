@@ -1,5 +1,5 @@
-
-import { Json } from "./__mocks__/supabase-types";
+// Use the centralized type definitions instead of mocks
+import { Json } from "@/lib/supabase-client";
 
 export interface ServiceRecord {
   id: string;
