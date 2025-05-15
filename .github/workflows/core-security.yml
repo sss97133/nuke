@@ -1,0 +1,56 @@
+name: Core Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 1'  # Run weekly (Monday at midnight)
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, typescript
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build project (for CodeQL analysis)
+        run: npm run build || echo "Build failed but continuing with analysis"
+        continue-on-error: true
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      - name: Check for secrets in code
+        run: |
+          # Simple grep for common secret patterns
+          ! grep -r -E "(API_KEY|api_key|apikey|api-key|password|secret|token)=\"[A-Za-z0-9/\+]{8,}\"" --include="*.{js,ts,tsx,jsx}" src/
+          
+      - name: Verify environment variables
+        run: |
+          # Check if critical secrets are available (without exposing values)
+          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ] || [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "⚠️ Missing required Supabase environment variables"
+            exit 1
+          fi
