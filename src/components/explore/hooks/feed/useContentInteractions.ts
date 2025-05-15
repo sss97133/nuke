@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, QueryKey } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProvider';
 import { invokeFunction } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,8 +14,11 @@ type InteractionResponse = void | { message?: string };
 
 export const useContentInteractions = () => {
   const queryClient = useQueryClient();
-  const { user, loading: authLoading } = useAuth();
+  const { session, isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  
+  // Get user from session if authenticated
+  const user = session?.user || null;
 
   const mutation = useMutation<InteractionResponse, Error, InteractionInput>(
     {
