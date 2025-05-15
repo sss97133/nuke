@@ -16,24 +16,31 @@ export const ClassicWindow = ({ title, children }: ClassicWindowProps) => {
     }
   }, [title]);
 
-  // Animation effect with requestAnimationFrame for better performance
+  // Use CSS animation instead of JavaScript for better performance
+  const electronOneStyle = {
+    animation: 'spin 4s linear infinite',
+  };
+  
+  const electronTwoStyle = {
+    animation: 'spin 6s linear infinite reverse',
+  };
+  
+  // Add animation keyframes style to head once
   useEffect(() => {
-    let animationFrameId: number;
-    let lastTimestamp = 0;
-    
-    const animate = (timestamp: number) => {
-      // Update approximately every 50ms but without causing excessive rerenders
-      if (timestamp - lastTimestamp >= 50) {
-        setAngle(prev => (prev + 2) % 360); // Limit to 0-359 to prevent large numbers
-        lastTimestamp = timestamp;
-      }
-      animationFrameId = requestAnimationFrame(animate);
-    };
-    
-    animationFrameId = requestAnimationFrame(animate);
+    if (!document.getElementById('electron-animation-style')) {
+      const style = document.createElement('style');
+      style.id = 'electron-animation-style';
+      style.innerHTML = `
+        @keyframes spin {
+          0% { transform: translate(-50%, -50%) rotate(0deg); }
+          100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
     
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      // Clean up is optional since it's a global style that may be used elsewhere
     };
   }, []);
 
@@ -47,9 +54,7 @@ export const ClassicWindow = ({ title, children }: ClassicWindowProps) => {
           {/* First electron orbit - Blue with glow */}
           <div 
             className="absolute left-1/2 top-1/2 w-3 h-3"
-            style={{
-              transform: `translate(-50%, -50%) rotate(${angle}deg)`,
-            }}
+            style={electronOneStyle}
           >
             <div className="absolute -left-1 -top-1 w-2 h-2 bg-[#0FA0CE] rounded-full shadow-[0_0_10px_#0FA0CE]" />
           </div>
@@ -57,9 +62,7 @@ export const ClassicWindow = ({ title, children }: ClassicWindowProps) => {
           {/* Second electron orbit - Yellow with glow */}
           <div 
             className="absolute left-1/2 top-1/2 w-4 h-4"
-            style={{
-              transform: `translate(-50%, -50%) rotate(${-angle * 1.5}deg)`,
-            }}
+            style={electronTwoStyle}
           >
             <div className="absolute -left-1 -top-1 w-2 h-2 bg-[#F97316] rounded-full shadow-[0_0_10px_#F97316]" />
           </div>

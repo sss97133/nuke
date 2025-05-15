@@ -192,10 +192,10 @@ export const AuthForm = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden bg-background">
-      <div className="w-full max-w-[400px]">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 md:p-8 overflow-hidden bg-background bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="w-full max-w-[420px] mx-auto shadow-lg rounded-xl overflow-hidden">
         <ClassicWindow title="Welcome">
-          <div className="space-y-6 max-h-[calc(100vh-8rem)] overflow-y-auto px-1 py-2">
+          <div className="space-y-6 max-h-[calc(100vh-8rem)] overflow-y-auto px-3 py-4">
             {isLoading && (
               <div className="flex justify-center items-center py-4">
                 <Loader2 className="animate-spin w-6 h-6 text-primary" />

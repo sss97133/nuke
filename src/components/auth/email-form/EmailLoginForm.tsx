@@ -73,20 +73,22 @@ export const EmailLoginForm = React.memo(({
       )}
       
       <div className="space-y-2">
+        <Label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email</Label>
         <Input
           id="email"
           type="email"
-          placeholder="Enter your email"
+          placeholder="Enter your email address"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="classic-input"
+          className="h-10 px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary w-full"
           disabled={isLoading}
         />
       </div>
       
       {!showForgotPassword && (
         <div className="space-y-2">
+          <Label htmlFor="password" className="text-sm font-medium mb-1.5 block">Password</Label>
           <Input
             id="password"
             type="password"
@@ -94,7 +96,7 @@ export const EmailLoginForm = React.memo(({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="classic-input"
+            className="h-10 px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary w-full"
             disabled={isLoading}
           />
         </div>
@@ -130,7 +132,7 @@ export const EmailLoginForm = React.memo(({
       
       <Button 
         type="submit" 
-        className="classic-button w-full font-system bg-secondary hover:bg-accent hover:text-accent-foreground" 
+        className="w-full py-3 font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" 
         disabled={isLoading || isSubmitting}
       >
         {isSubmitting 
@@ -145,10 +147,12 @@ export const EmailLoginForm = React.memo(({
         }
       </Button>
       
+      <div className="mt-4"></div>
+      
       <Button 
         type="button" 
         variant="outline" 
-        className="classic-button w-full border border-border bg-transparent hover:bg-accent/50" 
+        className="w-full py-2.5 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 rounded-md transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2" 
         onClick={onContinueWithoutLogin}
         disabled={isLoading}
       >
