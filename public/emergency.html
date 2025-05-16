@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuke - Emergency Access</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #6e8efb, #a777e3);
+      color: white;
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+    }
+    .container {
+      background-color: rgba(0,0,0,0.2);
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 800px;
+      width: 100%;
+    }
+    .login-form {
+      background-color: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 8px;
+      margin: 15px 0;
+      text-align: left;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 4px;
+      border: none;
+      background-color: rgba(255,255,255,0.8);
+      color: #333;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 20px 0;
+    }
+    .btn {
+      background-color: white;
+      color: #6e8efb;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    .btn-secondary {
+      background-color: rgba(255,255,255,0.2);
+      color: white;
+    }
+    .btn-danger {
+      background-color: rgba(255,0,0,0.6);
+      color: white;
+    }
+    #status {
+      margin-top: 20px;
+      background-color: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 6px;
+      font-family: monospace;
+      text-align: left;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    .section-title {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+      opacity: 0.9;
+    }
+    .status-panel {
+      display: flex;
+      justify-content: space-between;
+      background-color: rgba(255,255,255,0.1);
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+    .status-panel .label {
+      font-weight: 500;
+    }
+    .success { color: #4ade80; }
+    .warning { color: #fbbf24; }
+    .error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Nuke Emergency Access</h1>
+    <p>This tool helps bypass the loading screen and establish vehicle data essential for the application to work.</p>
+    
+    <div id="login-section" class="section">
+      <h2 class="section-title">Login</h2>
+      <form id="login-form" class="login-form">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="your@email.com" required />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Your password" required />
+        </div>
+        <button type="submit" class="btn">Sign In</button>
+      </form>
+    </div>
+    
+    <div class="section">
+      <h2 class="section-title">Current Status</h2>
+      <div class="status-panel">
+        <span class="label">Authentication:</span>
+        <span id="auth-status" class="warning">Checking...</span>
+      </div>
+      <div class="status-panel">
+        <span class="label">User Profile:</span>
+        <span id="profile-status" class="warning">Checking...</span>
+      </div>
+      <div class="status-panel">
+        <span class="label">Vehicles:</span>
+        <span id="vehicle-status" class="warning">Checking...</span>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2 class="section-title">Direct Access</h2>
+      <div class="buttons">
+        <a href="/vehicle-setup" class="btn">Vehicle Setup</a>
+        <a href="/debug" class="btn">Debug Page</a>
+        <a href="/dashboard" class="btn">Dashboard</a>
+        <a href="/onboarding" class="btn">Onboarding</a>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2 class="section-title">Emergency Actions</h2>
+      <div class="buttons">
+        <button id="btn-create-profile" class="btn btn-secondary">Create Profile</button>
+        <button id="btn-add-vehicle" class="btn btn-secondary">Add Test Vehicle</button>
+        <button id="btn-clear-auth" class="btn btn-danger">Clear Auth Data</button>
+      </div>
+    </div>
+    
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // Initialize Supabase client from environment variables
+    const supabaseUrl = 'http://127.0.0.1:54321';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+    
+    // Elements
+    const authStatus = document.getElementById('auth-status');
+    const profileStatus = document.getElementById('profile-status');
+    const vehicleStatus = document.getElementById('vehicle-status');
+    const statusBox = document.getElementById('status');
+    const btnCreateProfile = document.getElementById('btn-create-profile');
+    const btnAddVehicle = document.getElementById('btn-add-vehicle');
+    const btnClearAuth = document.getElementById('btn-clear-auth');
+    
+    let user = null;
+    
+    // Log function
+    function log(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      statusBox.innerHTML += `[${timestamp}] ${message}\n`;
+      statusBox.scrollTop = statusBox.scrollHeight;
+    }
+    
+    // Check auth status
+    async function checkStatus() {
+      // Fetch the user's session from localStorage
+      const storedSession = localStorage.getItem('sb-local-auth-token');
+      
+      if (!storedSession) {
+        authStatus.textContent = 'Not signed in';
+        authStatus.className = 'error';
+        profileStatus.textContent = 'N/A';
+        profileStatus.className = 'error';
+        vehicleStatus.textContent = 'N/A';
+        vehicleStatus.className = 'error';
+        log('No authentication found. Please sign in first.');
+        return;
+      }
+      
+      try {
+        // Make a fetch request to get the user
+        const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+          headers: {
+            'Authorization': `Bearer ${JSON.parse(storedSession).access_token}`,
+            'apikey': supabaseKey
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Authentication failed');
+        }
+        
+        const userData = await response.json();
+        user = userData;
+        
+        authStatus.textContent = `Signed in as ${userData.email}`;
+        authStatus.className = 'success';
+        log(`Successfully authenticated as ${userData.email}`);
+        
+        // Check profile
+        await checkProfile(userData.id);
+        
+        // Check vehicles
+        await checkVehicles(userData.id);
+      } catch (error) {
+        authStatus.textContent = 'Error checking auth';
+        authStatus.className = 'error';
+        log(`Error: ${error.message}`);
+      }
+    }
+    
+    // Check profile
+    async function checkProfile(userId) {
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=*`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+        
+        const profiles = await response.json();
+        
+        if (profiles.length === 0) {
+          profileStatus.textContent = 'Missing';
+          profileStatus.className = 'error';
+          log('No profile found. Use "Create Profile" to fix.');
+        } else {
+          profileStatus.textContent = `Found (Onboarding: ${profiles[0].onboarding_completed ? 'Completed' : 'Not completed'})`;
+          profileStatus.className = 'success';
+          log('Profile exists');
+        }
+      } catch (error) {
+        profileStatus.textContent = 'Error checking';
+        profileStatus.className = 'error';
+        log(`Error checking profile: ${error.message}`);
+      }
+    }
+    
+    // Check vehicles
+    async function checkVehicles(userId) {
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/vehicles?user_id=eq.${userId}&select=*`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch vehicles');
+        }
+        
+        const vehicles = await response.json();
+        
+        if (vehicles.length === 0) {
+          vehicleStatus.textContent = 'None found';
+          vehicleStatus.className = 'warning';
+          log('No vehicles found. Use "Add Test Vehicle" to create one.');
+        } else {
+          vehicleStatus.textContent = `${vehicles.length} vehicle(s) found`;
+          vehicleStatus.className = 'success';
+          log(`Found ${vehicles.length} vehicle(s)`);
+          vehicles.forEach(v => {
+            log(`- ${v.year} ${v.make} ${v.model}`);
+          });
+        }
+      } catch (error) {
+        vehicleStatus.textContent = 'Error checking';
+        vehicleStatus.className = 'error';
+        log(`Error checking vehicles: ${error.message}`);
+      }
+    }
+    
+    // Create Profile
+    async function createProfile() {
+      if (!user) {
+        log('Please sign in first');
+        return;
+      }
+      
+      log('Creating profile...');
+      btnCreateProfile.disabled = true;
+      
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/profiles`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            id: user.id,
+            onboarding_completed: false,
+            onboarding_step: 0
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to create profile');
+        }
+        
+        log('Profile created successfully!');
+        await checkProfile(user.id);
+      } catch (error) {
+        log(`Error creating profile: ${error.message}`);
+      } finally {
+        btnCreateProfile.disabled = false;
+      }
+    }
+    
+    // Add Vehicle
+    async function addVehicle() {
+      if (!user) {
+        log('Please sign in first');
+        return;
+      }
+      
+      log('Adding vehicle...');
+      btnAddVehicle.disabled = true;
+      
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/vehicles`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            user_id: user.id,
+            make: 'Emergency',
+            model: 'Bypass Vehicle',
+            year: new Date().getFullYear(),
+            trust_score: 50,
+            verification_level: 1
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to add vehicle');
+        }
+        
+        log('Vehicle added successfully!');
+        await checkVehicles(user.id);
+      } catch (error) {
+        log(`Error adding vehicle: ${error.message}`);
+      } finally {
+        btnAddVehicle.disabled = false;
+      }
+    }
+    
+    // Clear Auth Data
+    function clearAuth() {
+      log('Clearing authentication data...');
+      localStorage.clear();
+      sessionStorage.clear();
+      log('Authentication data cleared. Redirecting to login...');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 1500);
+    }
+    
+    // Login form handling
+    const loginForm = document.getElementById('login-form');
+    const loginSection = document.getElementById('login-section');
+    
+    // Handle login submission
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      log(`Attempting to log in as ${email}...`);
+      
+      try {
+        const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error_description || data.error || 'Unknown error');
+        }
+        
+        // Store the session in localStorage
+        localStorage.setItem('sb-local-auth-token', JSON.stringify(data));
+        
+        log('Login successful!');
+        loginSection.style.display = 'none';
+        
+        user = data.user;
+        authStatus.textContent = `Signed in as ${email}`;
+        authStatus.className = 'success';
+        
+        // Check everything else
+        await checkProfile(data.user.id);
+        await checkVehicles(data.user.id);
+        
+      } catch (error) {
+        log(`Login failed: ${error.message}`);
+      }
+    });
+
+    // Event listeners
+    btnCreateProfile.addEventListener('click', createProfile);
+    btnAddVehicle.addEventListener('click', addVehicle);
+    btnClearAuth.addEventListener('click', clearAuth);
+    
+    // Initial check
+    log('Emergency tool loaded. Checking status...');
+    checkStatus();
+    
+    // If user is already logged in, hide login form
+    if (localStorage.getItem('sb-local-auth-token')) {
+      loginSection.style.display = 'none';
+    }
+  </script>
+</body>
+</html>

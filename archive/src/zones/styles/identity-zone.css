@@ -1,0 +1,231 @@
+/**
+ * Identity Zone Styling - iOS 18/Desktop App Aesthetic
+ */
+
+.identity-zone {
+  --identity-primary: var(--ios-blue);
+  --identity-secondary: var(--ios-purple);
+}
+
+.identity-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.identity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.identity-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.identity-trim {
+  font-weight: 500;
+  opacity: 0.7;
+  margin-left: 6px;
+}
+
+.identity-confidence {
+  min-width: 100px;
+  margin-left: auto;
+}
+
+.confidence-indicator {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 42px;
+  background: conic-gradient(
+    var(--identity-primary) 0%, 
+    var(--identity-primary) var(--confidence), 
+    rgba(200, 200, 210, 0.3) var(--confidence), 
+    rgba(200, 200, 210, 0.3) 100%
+  );
+  padding: 4px;
+}
+
+.confidence-indicator::after {
+  content: '';
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  border-radius: 34px;
+  background: var(--zone-bg);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.confidence-label {
+  position: relative;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
+  z-index: 1;
+}
+
+.confidence-value {
+  position: relative;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  z-index: 1;
+}
+
+.identity-image-container {
+  position: relative;
+  width: 100%;
+  border-radius: var(--zone-radius);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.identity-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.identity-image:hover {
+  transform: scale(1.02);
+}
+
+.identity-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.identity-image-verified {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+}
+
+.verified-badge {
+  display: flex;
+  align-items: center;
+  background: var(--ios-green);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.verified-badge::before {
+  content: '✓';
+  margin-right: 4px;
+  font-weight: 700;
+}
+
+.identity-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.identity-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.detail-value {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.identity-loading,
+.identity-error,
+.identity-not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.identity-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(0, 122, 255, 0.2);
+  border-radius: 50%;
+  border-top-color: var(--ios-blue);
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .identity-image-placeholder {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  .confidence-indicator {
+    background: conic-gradient(
+      var(--identity-primary) 0%, 
+      var(--identity-primary) var(--confidence), 
+      rgba(70, 70, 90, 0.3) var(--confidence), 
+      rgba(70, 70, 90, 0.3) 100%
+    );
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .identity-title {
+    font-size: 24px;
+  }
+  
+  .identity-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .identity-confidence {
+    align-self: flex-end;
+  }
+  
+  .identity-details {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

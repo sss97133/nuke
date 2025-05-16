@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VEHICLE DIGITAL IDENTITY REGISTRY</title>
+  <style>
+    /* System Monospaced Font Stack */
+    @font-face {
+      font-family: 'System';
+      src: local('Courier'), local('Courier New');
+      font-weight: normal;
+      font-style: normal;
+    }
+    
+    :root {
+      /* DMV/Government Color Palette */
+      --primary: #000080; /* Navy blue */
+      --secondary: #003366; /* Dark blue */
+      --background: #f2f2f2; /* Light gray */
+      --form-bg: #ffffff; /* White */
+      --text-primary: #000000; /* Black */
+      --text-secondary: #333333; /* Dark gray */
+      --border: #000000; /* Black */
+      --success: #006600; /* Dark green */
+      --warning: #cc6600; /* Dark orange */
+      --error: #990000; /* Dark red */
+      --highlight: #ffffcc; /* Light yellow */
+      --header-bg: #000080; /* Navy blue */
+      --header-text: #ffffff; /* White */
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'System', 'Courier New', monospace;
+    }
+    
+    body {
+      background-color: var(--background);
+      color: var(--text-primary);
+      line-height: 1.4;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 1024px;
+      margin: 0 auto;
+      padding: 0;
+    }
+    
+    /* Header Styling */
+    .header {
+      background-color: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-bottom: 3px solid #000;
+    }
+    
+    .title-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    
+    .document-id {
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+    }
+    
+    .sub-header {
+      text-align: center;
+      padding: 0.5rem;
+      background-color: var(--form-bg);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    
+    /* Form/Section Styling */
+    .form-section {
+      background-color: var(--form-bg);
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    
+    .section-header {
+      background-color: var(--primary);
+      color: var(--header-text);
+      padding: 0.5rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    
+    .section-content {
+      padding: 1rem;
+    }
+    
+    /* Data Table Styling */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    
+    .data-table th {
+      background-color: var(--secondary);
+      color: var(--header-text);
+      text-align: left;
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+    }
+    
+    .data-table td {
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+    
+    .data-table tr:nth-child(even) {
+      background-color: #e6e6e6;
+    }
+    
+    /* Field Styling */
+    .field-row {
+      display: flex;
+      margin-bottom: 0.5rem;
+    }
+    
+    .field-label {
+      width: 150px;
+      font-weight: bold;
+      padding-right: 1rem;
+    }
+    
+    .field-value {
+      flex: 1;
+    }
+    
+    /* Timeline Styling */
+    .timeline-event {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .timeline-event:last-child {
+      border-bottom: none;
+    }
+    
+    .event-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+    
+    .event-title {
+      font-weight: bold;
+    }
+    
+    .event-date {
+      color: var(--text-secondary);
+    }
+    
+    .event-description {
+      margin-bottom: 0.25rem;
+    }
+    
+    .event-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.7rem;
+    }
+    
+    .event-source {
+      padding: 0.125rem 0.25rem;
+      background-color: var(--highlight);
+      border: 1px solid var(--border);
+    }
+    
+    .event-confidence {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    
+    .confidence-indicator {
+      width: 8px;
+      height: 8px;
+      border: 1px solid var(--border);
+    }
+    
+    .high-confidence {
+      background-color: var(--success);
+    }
+    
+    .medium-confidence {
+      background-color: var(--warning);
+    }
+    
+    .low-confidence {
+      background-color: var(--error);
+    }
+    
+    /* Button Styling */
+    .button {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      background-color: var(--primary);
+      color: var(--header-text);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      text-decoration: none;
+      text-align: center;
+    }
+    
+    .button:hover {
+      background-color: var(--secondary);
+    }
+    
+    /* Footer Styling */
+    .footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.7rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+    
+    /* Print Markers */
+    .corner-marks {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    
+    .corner-mark {
+      position: absolute;
+      width: 15px;
+      height: 15px;
+      border: 1px solid var(--border);
+    }
+    
+    .top-left {
+      top: 5px;
+      left: 5px;
+      border-right: none;
+      border-bottom: none;
+    }
+    
+    .top-right {
+      top: 5px;
+      right: 5px;
+      border-left: none;
+      border-bottom: none;
+    }
+    
+    .bottom-left {
+      bottom: 5px;
+      left: 5px;
+      border-right: none;
+      border-top: none;
+    }
+    
+    .bottom-right {
+      bottom: 5px;
+      right: 5px;
+      border-left: none;
+      border-top: none;
+    }
+    
+    /* Connector Cards */
+    .connector-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    
+    .connector-card {
+      border: 1px solid var(--border);
+      padding: 0.5rem;
+    }
+    
+    .connector-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+    }
+    
+    .connector-status {
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border: 1px solid var(--border);
+    }
+    
+    .status-active {
+      background-color: var(--success);
+    }
+    
+    .status-pending {
+      background-color: var(--warning);
+    }
+    
+    /* Verification Section */
+    .verification-item {
+      border: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+    }
+    
+    .verification-header {
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+    }
+    
+    .verification-details {
+      font-size: 0.8rem;
+    }
+    
+    /* Investment Section */
+    .investment-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    
+    .investment-card {
+      border: 1px solid var(--border);
+      padding: 0.5rem;
+    }
+    
+    .investment-header {
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.25rem;
+    }
+    
+    .investment-value {
+      font-size: 1.2rem;
+      margin: 0.5rem 0;
+    }
+    
+    .investment-trend {
+      font-size: 0.8rem;
+      color: var(--success);
+    }
+
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 4rem;
+      color: rgba(0, 0, 0, 0.05);
+      pointer-events: none;
+      z-index: -1;
+      white-space: nowrap;
+    }
+
+    /* 90s Terminal-style Design Elements */
+    .terminal-box {
+      border: 2px solid var(--border);
+      padding: 0.5rem;
+      background-color: #000;
+      color: #0f0;
+      font-family: 'Courier New', monospace;
+      margin-bottom: 1rem;
+    }
+
+    .terminal-header {
+      border-bottom: 1px solid #0f0;
+      padding-bottom: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .terminal-content {
+      font-size: 0.8rem;
+    }
+
+    .terminal-line {
+      margin-bottom: 0.25rem;
+    }
+
+    .terminal-prompt::before {
+      content: "> ";
+    }
+
+    .barcode {
+      font-family: 'Libre Barcode 39', cursive;
+      font-size: 2rem;
+      letter-spacing: -1px;
+      text-align: center;
+      margin: 1rem 0;
+    }
+
+    .stamp {
+      display: inline-block;
+      padding: 0.5rem;
+      border: 2px solid var(--error);
+      color: var(--error);
+      font-weight: bold;
+      transform: rotate(-15deg);
+      position: absolute;
+      top: 70px;
+      right: 40px;
+      font-size: 1rem;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="corner-marks">
+    <div class="corner-mark top-left"></div>
+    <div class="corner-mark top-right"></div>
+    <div class="corner-mark bottom-left"></div>
+    <div class="corner-mark bottom-right"></div>
+  </div>
+  
+  <div class="watermark">OFFICIAL VEHICLE RECORD</div>
+  
+  <div class="container">
+    <header class="header">
+      <div class="title-container">
+        <div class="title">NATIONAL VEHICLE DIGITAL IDENTITY REGISTRY</div>
+        <div class="document-id">DOC-ID: VH-10935-77J</div>
+      </div>
+    </header>
+    
+    <div class="sub-header">
+      OFFICIAL VEHICLE RECORD - CONFIDENTIAL - AUTHORIZED ACCESS ONLY
+    </div>
+    
+    <div class="form-section">
+      <div class="section-header">VEHICLE IDENTIFICATION</div>
+      <div class="section-content">
+        <div class="field-row">
+          <div class="field-label">VEHICLE:</div>
+          <div class="field-value">1992 Honda NSX</div>
+        </div>
+        <div class="field-row">
+          <div class="field-label">VIN:</div>
+          <div class="field-value">JH4NA1157NT000268</div>
+        </div>
+        <div class="field-row">
+          <div class="field-label">OWNER:</div>
+          <div class="field-value">Michael Roberts</div>
+        </div>
+        <div class="field-row">
+          <div class="field-label">LAST VERIFIED:</div>
+          <div class="field-value">2025-03-10 (CALIFORNIA PTZ CENTER #42)</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="form-section">
+      <div class="section-header">VEHICLE EVENT TIMELINE</div>
+      <div class="section-content">
+        <div class="terminal-box">
+          <div class="terminal-header">TIMELINE DATA VERIFICATION</div>
+          <div class="terminal-content">
+            <div class="terminal-line terminal-prompt">Timeline integrity check: PASSED</div>
+            <div class="terminal-line terminal-prompt">Multi-source validation: COMPLETE</div>
+            <div class="terminal-line terminal-prompt">Confidence threshold: 85% or higher</div>
+            <div class="terminal-line terminal-prompt">Registry sync status: CURRENT</div>
+          </div>
+        </div>
+        
+        <div class="timeline-event">
+          <div class="event-header">
+            <div class="event-title">ENGINE MAINTENANCE: TIMING BELT REPLACEMENT</div>
+            <div class="event-date">2025-03-02</div>
+          </div>
+          <div class="event-description">
+            Preventative maintenance performed at 78,345 miles. OEM Honda parts used for timing belt, water pump, and tensioner replacement. Service performed by certified technician Jason Wong (ID: HT-9386).
+          </div>
+          <div class="event-meta">
+            <div class="event-source">SERVICE RECORDS</div>
+            <div class="event-confidence">
+              <div class="confidence-indicator high-confidence"></div>
+              HIGH CONFIDENCE
+            </div>
+          </div>
+        </div>
+        
+        <div class="timeline-event">
+          <div class="event-header">
+            <div class="event-title">OWNERSHIP TRANSFER</div>
+            <div class="event-date">2024-11-15</div>
+          </div>
+          <div class="event-description">
+            Title transfer from previous owner Richard Chen to current owner Michael Roberts. Transaction recorded by California DMV. Odometer reading: 76,288 miles.
+          </div>
+          <div class="event-meta">
+            <div class="event-source">CA DMV RECORDS</div>
+            <div class="event-confidence">
+              <div class="confidence-indicator high-confidence"></div>
+              HIGH CONFIDENCE
+            </div>
+          </div>
+        </div>
+        
+        <div class="timeline-event">
+          <div class="event-header">
+            <div class="event-title">BRING A TRAILER AUCTION SALE</div>
+            <div class="event-date">2024-11-08</div>
+          </div>
+          <div class="event-description">
+            Vehicle sold at online auction for $132,500. Auction included 122 photographs and extensive documentation of service history and original condition.
+          </div>
+          <div class="event-meta">
+            <div class="event-source">BRING A TRAILER</div>
+            <div class="event-confidence">
+              <div class="confidence-indicator high-confidence"></div>
+              HIGH CONFIDENCE
+            </div>
+          </div>
+        </div>
+        
+        <div class="timeline-event">
+          <div class="event-header">
+            <div class="event-title">ANNUAL INSPECTION</div>
+            <div class="event-date">2024-07-22</div>
+          </div>
+          <div class="event-description">
+            Annual California smog check and safety inspection. All systems within specification. No modifications noted from factory configuration. Emissions: HC: 0.2ppm, CO: 0.4%, NOx: 0.1ppm.
+          </div>
+          <div class="event-meta">
+            <div class="event-source">CA INSPECTION STATION #45A</div>
+            <div class="event-confidence">
+              <div class="confidence-indicator medium-confidence"></div>
+              MEDIUM CONFIDENCE
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="form-section">
+      <div class="section-header">DATA SOURCE CONNECTORS</div>
+      <div class="section-content">
+        <div class="stamp">VERIFIED</div>
+        <div class="connector-grid">
+          <div class="connector-card">
+            <div class="connector-header">
+              <div>BRING A TRAILER</div>
+              <div class="connector-status">
+                <div class="status-indicator status-active"></div>
+                ACTIVE
+              </div>
+            </div>
+            <div>Online auction history and listing details. Data integration active since 2024-06-15.</div>
+          </div>
+          
+          <div class="connector-card">
+            <div class="connector-header">
+              <div>NHTSA VIN DATABASE</div>
+              <div class="connector-status">
+                <div class="status-indicator status-active"></div>
+                ACTIVE
+              </div>
+            </div>
+            <div>National Highway Traffic Safety Administration vehicle identification and recall data.</div>
+          </div>
+          
+          <div class="connector-card">
+            <div class="connector-header">
+              <div>CALIFORNIA DMV</div>
+              <div class="connector-status">
+                <div class="status-indicator status-active"></div>
+                ACTIVE
+              </div>
+            </div>
+            <div>Registration, title, and ownership records for vehicles registered in California.</div>
+          </div>
+          
+          <div class="connector-card">
+            <div class="connector-header">
+              <div>MECUM AUCTIONS</div>
+              <div class="connector-status">
+                <div class="status-indicator status-pending"></div>
+                PENDING
+              </div>
+            </div>
+            <div>Integration for auction listings and sales data pending authorization.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="form-section">
+      <div class="section-header">PHYSICAL VERIFICATION</div>
+      <div class="section-content">
+        <div class="verification-item">
+          <div class="verification-header">FULL VEHICLE INSPECTION #VR-8844</div>
+          <div class="verification-details">
+            <div>Date: 2025-03-10</div>
+            <div>Location: California PTZ Center #42 (San Francisco)</div>
+            <div>Inspector: Sarah Johnson (ID: PTZ-4455-J)</div>
+            <div>Verification Record: Multi-angle HD documentation completed using PTZ camera system, engine bay inspection, undercarriage scan, and VIN verification all completed.</div>
+          </div>
+        </div>
+        
+        <div class="verification-item">
+          <div class="verification-header">COMPONENT VERIFICATION #VR-8711</div>
+          <div class="verification-details">
+            <div>Date: 2024-12-05</div>
+            <div>Location: California PTZ Center #42 (San Francisco)</div>
+            <div>Inspector: Daniel Park (ID: PTZ-6721-P)</div>
+            <div>Verification Record: Engine number verification, transmission verification, and matching numbers confirmation completed. All original Honda NSX components verified present and correct.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="form-section">
+      <div class="section-header">MARKET VALUATION</div>
+      <div class="section-content">
+        <div class="investment-grid">
+          <div class="investment-card">
+            <div class="investment-header">CURRENT MARKET VALUATION</div>
+            <div class="investment-value">$138,750</div>
+            <div class="investment-trend">+4.7% since acquisition</div>
+          </div>
+          
+          <div class="investment-card">
+            <div class="investment-header">FRACTIONAL OWNERSHIP</div>
+            <div class="investment-value">PRIMARY OWNER: 92.4%</div>
+            <div class="investment-trend">12 fractional investors</div>
+          </div>
+          
+          <div class="investment-card">
+            <div class="investment-header">COMPARABLE SALES (90 DAYS)</div>
+            <div>1991 NSX: $128,000 (BaT)</div>
+            <div>1993 NSX: $145,000 (RM Sotheby's)</div>
+            <div>1992 NSX: $137,500 (Mecum)</div>
+          </div>
+          
+          <div class="investment-card">
+            <div class="investment-header">PROJECTED VALUE (12 MO)</div>
+            <div class="investment-value">$152,000</div>
+            <div class="investment-trend">Based on collectible Japanese market trends</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="barcode">*JH4NA1157NT000268*</div>
+    
+    <footer class="footer">
+      NATIONAL VEHICLE DIGITAL IDENTITY REGISTRY | DOCUMENT GENERATED: 2025-03-14 | PAGE 1 OF 1<br>
+      THIS IS AN OFFICIAL GOVERNMENT RECORD. UNAUTHORIZED REPRODUCTION OR FALSIFICATION IS PUNISHABLE BY LAW.
+    </footer>
+  </div>
+</body>
+</html>
