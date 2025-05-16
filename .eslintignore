@@ -1,5 +1,0 @@
-dist/**
-build/**
-vehidex-extension/dist/**
-supabase/functions/**
-src/scripts/** 

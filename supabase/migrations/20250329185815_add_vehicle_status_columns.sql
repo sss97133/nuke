@@ -1,3 +1,0 @@
-ALTER TABLE public.vehicles
-ADD COLUMN IF NOT EXISTS ownership_status TEXT,
-ADD COLUMN IF NOT EXISTS public_vehicle BOOLEAN DEFAULT FALSE;
