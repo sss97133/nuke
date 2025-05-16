@@ -43,6 +43,8 @@ import TestVehicleInput from '@/test-vehicle-input'; // Import the TestVehicleIn
 import { AuthTestPage } from '@/components/auth-test/AuthTestPage'; // Import the Auth Test Page
 import CaptureIntegration from '@/pages/CaptureIntegration'; // Import the Capture Integration page
 import AuthTest from '@/pages/AuthTest'; // Import our new authentication test page
+import DebugFixed from '@/pages/DebugFixed'; // Import our fixed debug page
+import VehicleSetup from '@/pages/VehicleSetup'; // Import vehicle setup page
 
 // Route type definitions
 export enum RouteType {
@@ -83,6 +85,9 @@ export const authRoutes: RouteConfig[] = [
 
 // Public routes configuration
 export const publicRoutes: RouteConfig[] = [
+  // Debug page (always accessible)
+  { path: '/debug', element: <DebugFixed />, type: RouteType.PUBLIC },
+  { path: '/vehicle-setup', element: <VehicleSetup />, type: RouteType.PUBLIC },
   { path: '/vehicle/:vin', element: <VehicleTimelinePage />, type: RouteType.PUBLIC },
   { path: '/vehicle/id/:id', element: <VehicleTimelinePage />, type: RouteType.PUBLIC },
   { path: '/vehicle-timeline', element: <VehicleTimelinePage />, type: RouteType.PUBLIC },
@@ -134,6 +139,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: '/admin', element: <AdminPanel />, type: RouteType.PROTECTED },
   { path: '/design-system', element: <DesignSystem />, type: RouteType.PROTECTED },
   { path: '/capture-integration', element: <CaptureIntegration />, type: RouteType.PROTECTED },
+  { path: '/vehicle-setup', element: <VehicleSetup />, type: RouteType.PROTECTED },
 ];
 
 // Special routes
