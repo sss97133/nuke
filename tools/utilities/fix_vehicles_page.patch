@@ -1,0 +1,69 @@
+// Simple fixes for Vehicles page:
+// 1. Make entire vehicle card clickable
+// 2. Remove redundant "View" button
+// 3. Keep Edit/Delete for owned vehicles only
+
+// In the vehicle card rendering section, wrap the card in a clickable div:
+
+// BEFORE:
+<div key={vehicle.id} className="vehicle-card">
+
+// AFTER:
+<div 
+  key={vehicle.id} 
+  className="vehicle-card"
+  onClick={() => navigate(`/vehicle/${vehicle.id}`)}
+  style={{ cursor: 'pointer' }}
+>
+
+// BEFORE (Action Buttons):
+<div className="vehicle-actions">
+  <Link 
+    to={`/vehicle/${vehicle.id}`}
+    className="button button-primary button-small"
+    style={{ textDecoration: 'none', display: 'inline-block' }}
+  >
+    View
+  </Link>
+  {relationship.relationshipType === 'owned' && (
+    <>
+      <button 
+        className="button button-secondary button-small"
+        onClick={() => navigate(`/vehicles/${vehicle.id}`)}
+      >
+        Edit
+      </button>
+      <button 
+        className="button button-danger button-small"
+        onClick={() => handleDeleteVehicle(vehicle.id)}
+      >
+        Delete
+      </button>
+    </>
+  )}
+</div>
+
+// AFTER (Action Buttons - Remove View, keep Edit/Delete for owned):
+{relationship.relationshipType === 'owned' && (
+  <div className="vehicle-actions" style={{ marginTop: '6px' }}>
+    <button 
+      className="button button-secondary button-small"
+      onClick={(e) => {
+        e.stopPropagation(); // Prevent card click
+        navigate(`/vehicles/${vehicle.id}`);
+      }}
+      style={{ marginRight: '4px' }}
+    >
+      Edit
+    </button>
+    <button 
+      className="button button-danger button-small"
+      onClick={(e) => {
+        e.stopPropagation(); // Prevent card click
+        handleDeleteVehicle(vehicle.id);
+      }}
+    >
+      Delete
+    </button>
+  </div>
+)}
