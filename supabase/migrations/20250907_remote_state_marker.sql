@@ -1,0 +1,3 @@
+-- Remote-applied migration marker for version 20250907
+-- This file exists to align local migration history with remote state.
+-- No-op content.

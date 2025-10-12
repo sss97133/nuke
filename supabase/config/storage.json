@@ -1,0 +1,102 @@
+{
+  "buckets": [
+    {
+      "name": "vehicle-data",
+      "public": true,
+      "file_size_limit": 52428800,
+      "allowed_mime_types": [
+        "image/jpeg", 
+        "image/png", 
+        "image/webp", 
+        "image/gif", 
+        "image/heic", 
+        "application/pdf", 
+        "application/json"
+      ],
+      "cors_rules": [
+        {
+          "origin": "*",
+          "methods": ["GET"]
+        },
+        {
+          "origin": "https://*.vercel.app",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        }
+      ]
+    },
+    {
+      "name": "vehicle-images",
+      "public": true,
+      "file_size_limit": 52428800,
+      "allowed_mime_types": [
+        "image/jpeg", 
+        "image/png", 
+        "image/webp", 
+        "image/gif", 
+        "image/heic"
+      ],
+      "cors_rules": [
+        {
+          "origin": "*",
+          "methods": ["GET"]
+        },
+        {
+          "origin": "http://localhost:5173",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        },
+        {
+          "origin": "http://localhost:5174",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        },
+        {
+          "origin": "http://localhost:5175",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        }
+      ]
+    },
+    {
+      "name": "receipts",
+      "public": true,
+      "file_size_limit": 52428800,
+      "allowed_mime_types": [
+        "image/jpeg", 
+        "image/png", 
+        "image/webp", 
+        "image/gif", 
+        "image/heic",
+        "application/pdf",
+        "text/plain"
+      ],
+      "cors_rules": [
+        {
+          "origin": "*",
+          "methods": ["GET"]
+        },
+        {
+          "origin": "http://localhost:5173",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        },
+        {
+          "origin": "http://localhost:5174",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        },
+        {
+          "origin": "http://localhost:5175",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        },
+        {
+          "origin": "https://*.vercel.app",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        }
+      ]
+    }
+  ]
+}

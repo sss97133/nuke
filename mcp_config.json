@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "anthropic-mcp": {
+      "command": "node",
+      "args": [
+        "./mcp/anthropic-mcp/index.js"
+      ]
+    },
+    "claude-direct": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-claude"
+      ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.supabase.com/mcp?project_ref=qkgaybvrernstplzjaam"
+      ]
+    }
+  }
+}

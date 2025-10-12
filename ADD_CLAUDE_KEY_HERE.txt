@@ -1,0 +1,16 @@
+##############################################
+# PASTE YOUR CLAUDE API KEY BELOW THIS LINE
+##############################################
+
+Get your key from: https://console.anthropic.com/
+
+Then add this line to /Users/skylar/nuke/nuke_api/.env:
+
+CLAUDE_API_KEY=sk-ant-YOUR-KEY-HERE
+
+##############################################
+# After adding the key, restart the backend:
+##############################################
+
+cd /Users/skylar/nuke/nuke_api
+mix phx.server

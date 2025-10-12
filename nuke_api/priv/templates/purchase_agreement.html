@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Vehicle Purchase Order and Federal Disclosure Statement</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'MS Sans Serif', 'Microsoft Sans Serif', sans-serif;
+            background: #d0d0d0;
+            padding: 0;
+            line-height: 1.2;
+            font-size: 8pt;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #e0e0e0;
+            padding: 2px;
+            border: 2px solid;
+            border-color: #f0f0f0 #909090 #909090 #f0f0f0;
+            box-shadow: none;
+        }
+
+        .header {
+            text-align: center;
+            background: #a0a0a0;
+            color: #202020;
+            padding: 2px;
+            margin-bottom: 2px;
+            border: 1px solid;
+            border-color: #909090 #f0f0f0 #f0f0f0 #909090;
+        }
+
+        .header h1 {
+            color: #202020;
+            font-size: 10pt;
+            margin-bottom: 2px;
+            font-weight: bold;
+        }
+
+        .header h2 {
+            color: #303030;
+            font-size: 8pt;
+            font-weight: normal;
+        }
+
+        .section {
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            background: #a0a0a0;
+            color: #202020;
+            padding: 2px 4px;
+            font-size: 8pt;
+            font-weight: bold;
+            margin-bottom: 4px;
+            border: 1px solid;
+            border-color: #909090 #f0f0f0 #f0f0f0 #909090;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .field-group {
+            margin-bottom: 4px;
+        }
+
+        .field-label {
+            display: block;
+            font-size: 8pt;
+            color: #303030;
+            margin-bottom: 1px;
+            font-weight: normal;
+        }
+
+        .field-value {
+            width: 100%;
+            padding: 2px;
+            border: 2px solid;
+            border-color: #a0a0a0 #f0f0f0 #f0f0f0 #a0a0a0;
+            background: #f8f8f8;
+            font-size: 8pt;
+            font-family: 'MS Sans Serif', 'Microsoft Sans Serif', sans-serif;
+            min-height: 16px;
+        }
+
+        .info-box {
+            background: #e8e8e8;
+            padding: 4px;
+            border: 2px solid;
+            border-color: #a0a0a0 #f0f0f0 #f0f0f0 #a0a0a0;
+            margin-bottom: 4px;
+        }
+
+        .warning-box {
+            background: #d8d8d8;
+            border: 2px solid;
+            border-color: #909090 #f0f0f0 #f0f0f0 #909090;
+            padding: 4px;
+            margin: 4px 0;
+        }
+
+        .price-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+            background: #f8f8f8;
+            border: 2px solid;
+            border-color: #a0a0a0 #f0f0f0 #f0f0f0 #a0a0a0;
+        }
+
+        .price-table tr {
+            border-bottom: 1px solid #b0b0b0;
+        }
+
+        .price-table td {
+            padding: 2px 4px;
+            font-size: 8pt;
+        }
+
+        .price-table td:first-child {
+            font-weight: normal;
+            color: #303030;
+        }
+
+        .price-table td:last-child {
+            text-align: right;
+            font-weight: normal;
+        }
+
+        .price-table .total-row {
+            background: #a0a0a0;
+            color: #202020;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+
+        .terms-section {
+            background: #e8e8e8;
+            padding: 4px;
+            border: 2px solid;
+            border-color: #a0a0a0 #f0f0f0 #f0f0f0 #a0a0a0;
+            font-size: 8pt;
+            line-height: 1.3;
+            margin-top: 4px;
+        }
+
+        .terms-section h3 {
+            color: #202020;
+            margin-bottom: 4px;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+
+        .terms-section p {
+            margin-bottom: 4px;
+            text-align: justify;
+        }
+
+        .signature-area {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #909090;
+        }
+
+        .signature-box {
+            text-align: center;
+        }
+
+        .signature-line {
+            border-bottom: 1px solid #606060;
+            margin-bottom: 2px;
+            height: 30px;
+            position: relative;
+        }
+
+        .signature-image {
+            max-height: 25px;
+            max-width: 100%;
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .signature-label {
+            font-weight: bold;
+            color: #303030;
+            font-size: 8pt;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin: 2px 0;
+        }
+
+        .notice-box {
+            background: #e8e8e8;
+            border: 2px solid;
+            border-color: #f0f0f0 #909090 #909090 #f0f0f0;
+            padding: 4px;
+            margin: 4px 0;
+        }
+
+        .notice-box h4 {
+            color: #202020;
+            margin-bottom: 2px;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                border: 1px solid black;
+                padding: 4px;
+            }
+        }
+
+        h3 {
+            font-size: 8pt;
+            font-weight: bold;
+        }
+
+        ol, ul {
+            font-size: 8pt;
+        }
+
+        strong {
+            font-weight: bold;
+        }
+
+        .checked {
+            font-weight: bold;
+        }
+
+        .checked::before {
+            content: "✓ ";
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MOTOR VEHICLE PURCHASE ORDER</h1>
+            <h2>and Federal Disclosure Statement - Bill of Sale</h2>
+        </div>
+
+        <!-- Parties Information -->
+        <div class="section">
+            <div class="section-title">Parties Information</div>
+            <div class="grid">
+                <div>
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">SELLER</h3>
+                    <div class="field-group">
+                        <label class="field-label">Name</label>
+                        <div class="field-value">{{seller_name}}</div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Address</label>
+                        <div class="field-value">{{seller_address}}</div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="field-group">
+                            <label class="field-label">City</label>
+                            <div class="field-value">{{seller_city}}</div>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">State</label>
+                            <div class="field-value">{{seller_state}}</div>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">ZIP</label>
+                            <div class="field-value">{{seller_zip}}</div>
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="field-group">
+                            <label class="field-label">Phone</label>
+                            <div class="field-value">{{seller_phone}}</div>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Fax</label>
+                            <div class="field-value">{{seller_fax}}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">PURCHASER</h3>
+                    <div class="field-group">
+                        <label class="field-label">Name</label>
+                        <div class="field-value">{{buyer_name}}</div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Address</label>
+                        <div class="field-value">{{buyer_address}}</div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="field-group">
+                            <label class="field-label">City</label>
+                            <div class="field-value">{{buyer_city}}</div>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">State</label>
+                            <div class="field-value">{{buyer_state}}</div>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">ZIP</label>
+                            <div class="field-value">{{buyer_zip}}</div>
+                        </div>
+                    </div>
+                    <div class="grid">
+                        <div class="field-group">
+                            <label class="field-label">Phone</label>
+                            <div class="field-value">{{buyer_phone}}</div>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label">Cell</label>
+                            <div class="field-value">{{buyer_cell}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vehicle Information -->
+        <div class="section">
+            <div class="section-title">Vehicle Information</div>
+            <div class="grid-4">
+                <div class="field-group">
+                    <label class="field-label">Stock #</label>
+                    <div class="field-value">{{vehicle_stock_number}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Source</label>
+                    <div class="field-value">{{vehicle_source}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Salesman</label>
+                    <div class="field-value">{{salesman_name}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Date</label>
+                    <div class="field-value">{{agreement_date}}</div>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="checkbox-group">
+                    <span class="{{#if_new}}checked{{/if_new}}">NEW</span>
+                    <span class="{{#if_used}}checked{{/if_used}}">USED</span>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Approx. Delivery Date</label>
+                    <div class="field-value">{{delivery_date}}</div>
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <div class="field-group">
+                    <label class="field-label">Year</label>
+                    <div class="field-value">{{vehicle_year}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Make</label>
+                    <div class="field-value">{{vehicle_make}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Model</label>
+                    <div class="field-value">{{vehicle_model}}</div>
+                </div>
+            </div>
+
+            <div class="grid-4">
+                <div class="field-group">
+                    <label class="field-label">Style</label>
+                    <div class="field-value">{{vehicle_style}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Color</label>
+                    <div class="field-value">{{vehicle_color}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Trim</label>
+                    <div class="field-value">{{vehicle_trim}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Cylinders</label>
+                    <div class="field-value">{{vehicle_cylinders}}</div>
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <div class="field-group">
+                    <label class="field-label">VIN</label>
+                    <div class="field-value">{{vehicle_vin}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">License #</label>
+                    <div class="field-value">{{vehicle_license}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Odometer</label>
+                    <div class="field-value">{{vehicle_odometer}}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trade-In Information -->
+        <div class="section">
+            <div class="section-title">Trade-In Vehicle (If Applicable)</div>
+            <div class="grid-3">
+                <div class="field-group">
+                    <label class="field-label">Year</label>
+                    <div class="field-value">{{tradein_year}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Make</label>
+                    <div class="field-value">{{tradein_make}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Model</label>
+                    <div class="field-value">{{tradein_model}}</div>
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <div class="field-group">
+                    <label class="field-label">VIN</label>
+                    <div class="field-value">{{tradein_vin}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">License #</label>
+                    <div class="field-value">{{tradein_license}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Odometer</label>
+                    <div class="field-value">{{tradein_odometer}}</div>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="field-group">
+                    <label class="field-label">Balance Owed To</label>
+                    <div class="field-value">{{tradein_balance_owed_to}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Payoff Amount ($)</label>
+                    <div class="field-value">{{tradein_payoff_amount}}</div>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label class="field-label">Lender Address</label>
+                <div class="field-value">{{tradein_lender_address}}</div>
+            </div>
+        </div>
+
+        <!-- Warranty Information -->
+        <div class="section">
+            <div class="section-title">Warranty & Service Contract</div>
+            <div class="warning-box">
+                <strong>THIS CAR SOLD AS-IS</strong><br>
+                UNLESS WRITTEN GUARANTEE IS GIVEN AT TIME OF SALE
+            </div>
+
+            <div class="grid-4">
+                <div class="field-group">
+                    <label class="field-label">Warranty Provider</label>
+                    <div class="field-value">{{warranty_provider}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Contract #</label>
+                    <div class="field-value">{{warranty_contract_number}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Term</label>
+                    <div class="field-value">{{warranty_term}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Deductible</label>
+                    <div class="field-value">{{warranty_deductible}}</div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <div class="checkbox-group">
+                    <span class="{{#if warranty_declined}}checked{{/if}}">I, the undersigned purchaser, hereby <strong>decline to purchase</strong> an Extended Warranty Service contract for this vehicle.</span>
+                </div>
+                <div class="grid" style="margin-top: 15px;">
+                    <div class="field-group">
+                        <label class="field-label">Purchaser Signature</label>
+                        <div class="field-value"></div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Date</label>
+                        <div class="field-value">{{agreement_date}}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Price Breakdown -->
+        <div class="section">
+            <div class="section-title">Price Breakdown</div>
+            <table class="price-table">
+                <tr>
+                    <td>1. Accessories</td>
+                    <td>{{accessories_price}}</td>
+                </tr>
+                <tr>
+                    <td>2. Vehicle Sales Price</td>
+                    <td>{{vehicle_sales_price}}</td>
+                </tr>
+                <tr>
+                    <td>3. Document Fee</td>
+                    <td>{{document_fee}}</td>
+                </tr>
+                <tr>
+                    <td>4. Dealer Handling Fee</td>
+                    <td>{{dealer_handling_fee}}</td>
+                </tr>
+                <tr>
+                    <td>5. Warranty Contract</td>
+                    <td>{{warranty_contract_price}}</td>
+                </tr>
+                <tr>
+                    <td>6. Smog Fee</td>
+                    <td>{{smog_fee}}</td>
+                </tr>
+                <tr class="total-row">
+                    <td>7. Taxable Sales Proceeds</td>
+                    <td>{{taxable_proceeds}}</td>
+                </tr>
+                <tr>
+                    <td>8. Sales Tax ({{sales_tax_rate_percent}}%)</td>
+                    <td>{{sales_tax_amount}}</td>
+                </tr>
+                <tr>
+                    <td>9. Trade-In Credit Value</td>
+                    <td>{{tradein_credit_value}}</td>
+                </tr>
+                <tr>
+                    <td>10. Less Payoff</td>
+                    <td>{{tradein_payoff_amount_actual}}</td>
+                </tr>
+                <tr>
+                    <td>11. Trade-In (net after payoff)</td>
+                    <td>{{tradein_net_value}}</td>
+                </tr>
+                <tr>
+                    <td>12. Sales Tax Credit on Trade ({{sales_tax_credit_rate_percent}}%)</td>
+                    <td>{{sales_tax_credit_amount}}</td>
+                </tr>
+                <tr>
+                    <td>13. Title Fee</td>
+                    <td>{{title_fee}}</td>
+                </tr>
+                <tr>
+                    <td>14. Drive Permit</td>
+                    <td>{{drive_permit_fee}}</td>
+                </tr>
+                <tr>
+                    <td>15. Shipping Contract / Service Labor</td>
+                    <td>{{shipping_service_fee}}</td>
+                </tr>
+                <tr class="total-row">
+                    <td>16. TOTAL GROSS SALES PROCEEDS</td>
+                    <td>{{total_gross_proceeds}}</td>
+                </tr>
+                <tr>
+                    <td>17. Partial Payment Received (Date: {{partial_payment_date}})</td>
+                    <td>{{partial_payment_amount}}</td>
+                </tr>
+                <tr class="total-row">
+                    <td>18. BALANCE DUE (Date: {{balance_due_date}})</td>
+                    <td>{{balance_due}}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Financing Terms -->
+        <div class="section">
+            <div class="section-title">Financing Terms</div>
+            <div class="grid">
+                <div class="field-group">
+                    <label class="field-label">Proceeds of Loan - From</label>
+                    <div class="field-value">{{loan_from}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Amount of Loan ($)</label>
+                    <div class="field-value">{{loan_amount}}</div>
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <div class="field-group">
+                    <label class="field-label">Finance Charge ($)</label>
+                    <div class="field-value">{{finance_charge}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Total Amount of Loan ($)</label>
+                    <div class="field-value">{{total_loan_amount}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Annual Percentage Rate (%)</label>
+                    <div class="field-value">{{annual_percentage_rate}}</div>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="field-group">
+                    <label class="field-label">Payable in Installments of ($)</label>
+                    <div class="field-value">{{installment_amount}}</div>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Total of Payments ($)</label>
+                    <div class="field-value">{{total_of_payments}}</div>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label class="field-label">Deferred Cash Downpayment Due ($)</label>
+                <div class="field-value">{{deferred_down_payment}}</div>
+            </div>
+
+            <div class="field-group">
+                <label class="field-label">{{payment_frequency_text}} Payments of ({{installment_amount}}) - Each Beginning {{first_payment_date}}</label>
+                <div class="field-value"></div>
+            </div>
+
+            <div class="notice-box">
+                <h4>NOTICE TO BUYER</h4>
+                <p><strong>Balloon Payment Notice:</strong> If any payment is more than twice the amount of a regular equal payment, identify by writing "BALLOON PAYMENT." "BALLOON PAYMENT" will not be refinanced.</p>
+            </div>
+        </div>
+
+        <!-- Important Notices -->
+        <div class="section">
+            <div class="section-title">Important Legal Notices</div>
+
+            <div class="notice-box">
+                <h4>SECURITY INTEREST</h4>
+                <p>This Purchase Order is a security agreement covering the above described motor vehicle. Title to said property shall not pass to Purchaser until all sums payable and other amounts due or to become due are fully paid.</p>
+            </div>
+
+            <div class="notice-box">
+                <h4>PREPAYMENT</h4>
+                <p>In the event of prepayment in full, Purchaser is entitled to a partial refund of the unearned finance charge computed on the rule of 78. Where the finance charge, after computing the refund, amounts to less than $25.00, any unpaid delinquency charges may be deducted from such refund. No refunds less than $1.00.</p>
+            </div>
+
+            <div class="notice-box">
+                <h4>DEFAULT AND ACCELERATION</h4>
+                <p>If Purchaser defaults in the performance of obligations hereunder, Seller at their option may accelerate the payment of the unpaid balance and (1) sue for such balance or (2) repossess said property.</p>
+            </div>
+
+            <div class="notice-box">
+                <h4>LATE CHARGES</h4>
+                <p>A late charge of 5% is payable on any payment past due 10 days.</p>
+            </div>
+
+            <div class="warning-box">
+                <h4>⚠️ NOTICE TO BUYER</h4>
+                <ol style="padding-left: 20px; margin-top: 10px;">
+                    <li>Do not sign this agreement before you read it or if it contains any blank spaces to be filled in.</li>
+                    <li>You are entitled to a completely filled-in copy of this agreement.</li>
+                    <li>Under the law you have the right to pay off in advance the full amount due and under certain conditions to obtain a partial refund of the finance charge.</li>
+                    <li>If you default in the performance of your obligation under this agreement the vehicle may be repossessed and you may be subject to suit and liability for the unpaid indebtedness evidenced by this agreement.</li>
+                </ol>
+            </div>
+
+            <div class="info-box">
+                <p><strong>Federal Regulation Notice:</strong> If you are buying a used vehicle with this contract, federal regulation may require a special buyers guide to be displayed on the window. THE INFORMATION YOU SEE ON THE WINDOW FORM FOR THIS VEHICLE IS PART OF THIS CONTRACT. INFORMATION ON THE WINDOW FORM OVERRIDES ANY CONTRARY PROVISIONS IN THE CONTRACT OF SALE.</p>
+            </div>
+        </div>
+
+        <!-- Additional Terms -->
+        <div class="terms-section">
+            <h3>Additional Terms and Conditions</h3>
+
+            <p><strong>A. CREDIT APPROVAL:</strong> Upon signature by seller's authorized representative, the agreement shall be conditionally accepted by seller subject to approval of purchaser's credit. In the event purchaser's credit is not approved, purchaser shall return the vehicle delivered to seller's place of business within 48 hours after receipt of seller's notice of disapproval of credit. Purchaser agrees to reimburse seller for all costs of repair of any damage to the vehicle, excepting only ordinary wear from normal usage.</p>
+
+            <p><strong>B. VERBAL PROMISES:</strong> Verbal promises made by the salesman are not valid. Any promise or understanding not herein specified in writing is hereby expressly waived.</p>
+
+            <p><strong>C. TRANSFERABILITY:</strong> This agreement is not transferable without seller's consent.</p>
+
+            <p><strong>D. TITLE TRANSFER:</strong> Title to the vehicle shall not pass to purchaser until payment in full is made in cash. Should any check, note or draft given by purchaser be dishonored in whole or in part, seller may immediately retake possession of the vehicle without prior notice or demand.</p>
+
+            <p><strong>E. DELAYS AND PRICE CHANGES:</strong> Seller is not to be held responsible for delay in delivery or non-compliance with the terms of this order caused by strikes, riots, wars, shutdowns at the factories, inability to obtain the vehicle ordered or any other condition beyond seller's control. The price quoted in this agreement is for immediate delivery, but if the price of the vehicle, accessories or taxes are changed by the manufacturer or the government before the vehicle has been delivered to seller, then this agreement shall be construed as if the changed price was originally inserted herein.</p>
+
+            <p><strong>F. FINANCING:</strong> In the event that the transaction referred to in this order is not a cash transaction, purchaser shall before or at the time of delivery of the vehicle and in accordance with the terms and conditions indicated in this agreement execute a security agreement.</p>
+
+            <p><strong>G. TRADE-IN TERMS:</strong> In the event a vehicle is to be traded in as part payment of the vehicle purchased, the following terms and conditions shall govern:</p>
+            <ul style="padding-left: 20px; margin-top: 5px;">
+                <li>Purchaser agrees to convey to seller the trade-in vehicle. Trade-in when received by seller must be in the same condition, including all equipment and accessories, as when appraised; if not in the same condition, trade-in shall be reappraised.</li>
+                <li>Purchaser warrants that they are the lawful owner of the same and that the vehicle is free and clear of all encumbrances except the "payoff" shown on the reverse hereof.</li>
+                <li>The trade-in allowance shown is the amount that seller agrees to allow provided that purchaser accepts delivery and completes the sale on the terms and conditions of this agreement.</li>
+            </ul>
+
+            <p><strong>H. WARRANTIES:</strong> YOU AGREE THAT THERE ARE NO WARRANTIES, EXPRESS OR IMPLIED, REPRESENTATIONS, PROMISES OR STATEMENTS, AS TO THE CONDITION, FITNESS OR MERCHANTABILITY OF THE VEHICLE THAT HAVE BEEN MADE BY SELLER UNLESS THEY ARE STATED IN THIS CONTRACT. ANY STATEMENT AS TO THE YEAR, MODEL OF THE VEHICLE IS FOR IDENTIFICATION ONLY AND IS NOT A REPRESENTATION OR WARRANTY BY SELLER.</p>
+        </div>
+
+        <!-- Federal Notice -->
+        <div class="notice-box" style="margin-top: 30px;">
+            <h4>FEDERAL TRADE COMMISSION NOTICE</h4>
+            <p>ANY HOLDER OF THE CONSUMER CREDIT CONTRACT IS SUBJECT TO ALL CLAIMS AND DEFENSES WHICH THE DEBTOR COULD ASSERT AGAINST THE SELLER OF GOODS OR SERVICES OBTAINED PURSUANT HERETO OR WITH THE PROCEEDS HEREOF. RECOVERY HEREUNDER BY THE DEBTOR SHALL NOT EXCEED AMOUNTS PAID BY THE DEBTOR HEREUNDER.</p>
+        </div>
+
+        <!-- Acknowledgment -->
+        <div class="info-box" style="margin-top: 20px;">
+            <p><strong>Buyer acknowledges that:</strong></p>
+            <ol style="padding-left: 20px; margin-top: 10px;">
+                <li>Before signing this agreement Buyer read both sides of this agreement and received a legible, completely filled-in copy of this agreement; and</li>
+                <li>Buyer has received a copy of every other document that Buyer signed during the contract negotiation.</li>
+            </ol>
+        </div>
+
+        <!-- Signatures -->
+        <div class="signature-area">
+            <div class="signature-box">
+                <div class="signature-line">
+                    {{#if buyer_signature_data}}<img src="{{buyer_signature_data.image}}" class="signature-image" alt="Buyer Signature">{{/if}}
+                </div>
+                <div class="signature-label">Buyer Signature</div>
+                <div style="margin-top: 20px;">Date: {{buyer_signature_date}}</div>
+            </div>
+
+            <div class="signature-box">
+                <div class="signature-line">
+                    {{#if co_buyer_signature_data}}<img src="{{co_buyer_signature_data.image}}" class="signature-image" alt="Co-Buyer Signature">{{/if}}
+                </div>
+                <div class="signature-label">Co-Buyer Signature (if applicable)</div>
+                <div style="margin-top: 20px;">Date: {{co_buyer_signature_date}}</div>
+            </div>
+        </div>
+
+        <div class="signature-area" style="margin-top: 20px;">
+            <div class="signature-box">
+                <div class="signature-line">
+                    {{#if seller_signature_data}}<img src="{{seller_signature_data.image}}" class="signature-image" alt="Seller Signature">{{/if}}
+                </div>
+                <div class="signature-label">Seller / Authorized Representative</div>
+                <div style="margin-top: 20px;">Date: {{seller_signature_date}}</div>
+            </div>
+
+            <div></div>
+        </div>
+    </div>
+</body>
+</html>

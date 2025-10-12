@@ -1,0 +1,21 @@
+Last login: Fri Mar 28 20:41:47 on console
+skylar@sssss-MacBook-Pro ~ % cd /Users/skylar/nuke
+supabase db push
+Forgot your password? Reset it from the Dashboard: https://supabase.com/dashboard/project/qkgaybvrernstplzjaam/settings/database
+Enter your database password: 
+Connecting to remote database...
+failed to connect to postgres: failed to connect to `host=aws-0-us-west-1.pooler.supabase.com user=postgres.qkgaybvrernstplzjaam database=postgres`: failed SASL auth (invalid SCRAM server-final-message received from server)
+Try rerunning the command with --debug to troubleshoot the error.
+skylar@sssss-MacBook-Pro nuke % 5bDBY!iAnZtvpwx
+zsh: event not found: iAnZtvpwx
+skylar@sssss-MacBook-Pro nuke % 
+skylar@sssss-MacBook-Pro nuke % YsifJAJ45pdFlLQu
+
+
+
+
+
+
+
+
+

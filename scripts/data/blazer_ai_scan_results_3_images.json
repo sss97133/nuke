@@ -1,0 +1,23 @@
+[
+  {
+    "image_id": "16149292-ade0-4da1-85f3-309ffad554e7",
+    "image_url": "/var/folders/bw/wrz6r9tx0m14b1ct9w2w9v_w0000gn/T/tmp_g0hr2px/1758472168539_njfrm5.jpeg",
+    "detections": [],
+    "scan_timestamp": "2025-09-29 19:07:02",
+    "total_components_found": 0
+  },
+  {
+    "image_id": "32891c7f-6763-4a9e-80ff-36f7938747f0",
+    "image_url": "/var/folders/bw/wrz6r9tx0m14b1ct9w2w9v_w0000gn/T/tmp_g0hr2px/1758472162335_73qejd.jpeg",
+    "detections": [],
+    "scan_timestamp": "2025-09-29 19:07:10",
+    "total_components_found": 0
+  },
+  {
+    "image_id": "6eaaa411-1030-40c4-a4dc-96d6d23f326a",
+    "image_url": "/var/folders/bw/wrz6r9tx0m14b1ct9w2w9v_w0000gn/T/tmp_g0hr2px/1758472156725_vmyyv8.jpeg",
+    "detections": [],
+    "scan_timestamp": "2025-09-29 19:07:18",
+    "total_components_found": 0
+  }
+]
