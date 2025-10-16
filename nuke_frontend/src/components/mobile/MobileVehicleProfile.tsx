@@ -212,21 +212,45 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     setImages(data || []);
   };
 
+  const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
+  const [savedImages, setSavedImages] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    loadUserInteractions();
+  }, [session]);
+
+  const loadUserInteractions = async () => {
+    if (session?.user) {
+      const prefs = await UserInteractionService.getUserPreferences(session.user.id);
+      setSavedImages(new Set(prefs.saved_images));
+    }
+  };
+
   const handleLike = async (imageId: string) => {
     if (session?.user) {
       await UserInteractionService.likeImage(session.user.id, imageId, vehicleId);
+      setLikedImages(prev => new Set([...prev, imageId]));
     }
   };
 
   const handleSave = async (imageId: string) => {
     if (session?.user) {
-      await UserInteractionService.saveImage(session.user.id, imageId, vehicleId);
+      const success = await UserInteractionService.saveImage(session.user.id, imageId, vehicleId);
+      if (success) {
+        setSavedImages(prev => new Set([...prev, imageId]));
+      }
     }
   };
 
   const handleDislike = async (imageId: string) => {
     if (session?.user) {
       await UserInteractionService.dislikeImage(session.user.id, imageId, vehicleId);
+      // Remove from liked if it was liked
+      setLikedImages(prev => {
+        const updated = new Set(prev);
+        updated.delete(imageId);
+        return updated;
+      });
     }
   };
 
@@ -260,8 +284,13 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
             const idx = images.findIndex(i => i.id === selectedImage.id);
             if (idx > 0) setSelectedImage(images[idx - 1]);
           }}
+          onSwipeUp={() => handleSave(selectedImage.id)}
           onSwipeDown={() => setSelectedImage(null)}
           onDoubleTap={() => handleLike(selectedImage.id)}
+          onLongPress={() => {
+            // Show options menu
+            console.log('Long press - show options');
+          }}
         >
           <div style={styles.fullscreenImage}>
             <img
@@ -269,7 +298,50 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
               alt=""
               style={styles.fullImage}
             />
-            
+
+            {/* Image counter */}
+            <div style={styles.imageCounter}>
+              {images.findIndex(i => i.id === selectedImage.id) + 1} / {images.length}
+            </div>
+
+            {/* Floating action buttons */}
+            <div style={styles.floatingActions}>
+              <button
+                onClick={() => handleLike(selectedImage.id)}
+                style={{
+                  ...styles.actionButton,
+                  background: likedImages.has(selectedImage.id) ? '#008000' : '#c0c0c0',
+                  color: likedImages.has(selectedImage.id) ? '#ffffff' : '#000000'
+                }}
+              >
+                ♥
+              </button>
+              <button
+                onClick={() => handleSave(selectedImage.id)}
+                style={{
+                  ...styles.actionButton,
+                  background: savedImages.has(selectedImage.id) ? '#000080' : '#c0c0c0',
+                  color: savedImages.has(selectedImage.id) ? '#ffffff' : '#000000'
+                }}
+              >
+                ★
+              </button>
+              <button
+                onClick={() => handleDislike(selectedImage.id)}
+                style={{
+                  ...styles.actionButton,
+                  background: '#c0c0c0'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Gesture hints */}
+            <div style={styles.gestureHints}>
+              <div style={styles.hintText}>Double tap = Like • Swipe up = Save • Swipe down = Close</div>
+            </div>
+
             {/* Close button */}
             <button
               onClick={() => setSelectedImage(null)}
@@ -473,6 +545,50 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '20px',
     cursor: 'pointer',
     fontFamily: '"MS Sans Serif", sans-serif'
+  },
+  imageCounter: {
+    position: 'absolute',
+    top: '12px',
+    left: '12px',
+    background: 'rgba(0, 0, 0, 0.7)',
+    color: '#ffffff',
+    padding: '4px 8px',
+    fontSize: '12px',
+    fontFamily: '"MS Sans Serif", sans-serif',
+    borderRadius: '2px'
+  },
+  floatingActions: {
+    position: 'absolute',
+    bottom: '80px',
+    right: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    zIndex: 10001
+  },
+  actionButton: {
+    width: '48px',
+    height: '48px',
+    border: '2px outset #ffffff',
+    fontSize: '20px',
+    cursor: 'pointer',
+    fontFamily: '"MS Sans Serif", sans-serif',
+    transition: 'all 0.1s ease'
+  },
+  gestureHints: {
+    position: 'absolute',
+    bottom: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: 'rgba(0, 0, 0, 0.8)',
+    padding: '8px 12px',
+    borderRadius: '4px'
+  },
+  hintText: {
+    color: '#ffffff',
+    fontSize: '11px',
+    fontFamily: '"MS Sans Serif", sans-serif',
+    textAlign: 'center'
   }
 };
 

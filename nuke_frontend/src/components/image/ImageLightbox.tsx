@@ -187,47 +187,51 @@ const ImageLightbox = ({
   };
 
   const createTag = async () => {
-    if (!currentSelection || !tagName.trim() || !session?.user) return;
+    if (!currentSelection || !tagName.trim() || !session?.user || !imageId || !vehicleId) return;
 
     try {
       const tagData = {
-        image_id: imageId,
-        timeline_event_id: timelineEventId,
-        vehicle_id: vehicleId,
-        image_url: imageUrl,
         tag_name: tagName.trim(),
         tag_type: tagType,
         x_position: currentSelection.x,
         y_position: currentSelection.y,
         width: currentSelection.width,
-        height: currentSelection.height,
-        confidence: 100,
-        created_by: session.user.id
+        height: currentSelection.height
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('image_tags')
-        .insert([tagData]);
-
-      if (!error) {
-        // Add to local state immediately
-        const newTag: ImageTag = {
-          id: crypto.randomUUID(),
-          ...tagData,
+        .insert([{
+          image_id: imageId,
+          vehicle_id: vehicleId,
+          timeline_event_id: timelineEventId,
+          tag_name: tagData.tag_name,
+          tag_type: tagData.tag_type,
+          x_position: tagData.x_position,
+          y_position: tagData.y_position,
+          width: tagData.width,
+          height: tagData.height,
+          source_type: 'manual',
+          confidence: 100,
           verified: true,
-          created_at: new Date().toISOString()
-        };
-        setTags(prev => [...prev, newTag]);
+          created_by: session.user.id,
+          metadata: {}
+        }])
+        .select()
+        .single();
 
+      if (!error && data) {
+        // Reload tags to show new one
+        const { tags: refreshedTags } = await import('../../hooks/useImageTags');
+        
         // Reset form
         setTagName('');
         setShowTagInput(false);
         setCurrentSelection(null);
-        setIsTagging(false);
-
-        // Update timeline event tags if applicable
-        if (timelineEventId) {
-          await updateTimelineEventTags(timelineEventId);
+        
+        // Show success feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(20);
         }
       } else {
         console.error('Error creating tag:', error);
@@ -509,43 +513,200 @@ const ImageLightbox = ({
         )}
       </div>
 
-      {/* Tags Sidebar - Windows 95 Style */}
-      {tags.length > 0 && (
+      {/* Tags Sidebar - Windows 95 Style - ALWAYS SHOW */}
+      <div style={{
+        position: 'absolute',
+        right: '20px',
+        top: '80px',
+        width: '300px',
+        background: '#c0c0c0',
+        border: '2px outset #ffffff',
+        borderRight: '2px solid #808080',
+        borderBottom: '2px solid #808080',
+        padding: '2px',
+        zIndex: 10002,
+        maxHeight: 'calc(100vh - 160px)',
+        fontFamily: '"MS Sans Serif", sans-serif'
+      }}>
+        {/* Title Bar */}
         <div style={{
-          position: 'absolute',
-          right: '20px',
-          top: '80px',
-          width: '300px',
-          background: '#c0c0c0',
-          border: '2px outset #ffffff',
-          borderRight: '2px solid #808080',
-          borderBottom: '2px solid #808080',
-          padding: '2px',
-          zIndex: 10002,
-          maxHeight: 'calc(100vh - 160px)',
-          fontFamily: '"MS Sans Serif", sans-serif'
+          background: '#000080',
+          color: '#ffffff',
+          padding: '2px 4px',
+          fontSize: '11px',
+          fontWeight: 'bold',
+          marginBottom: '2px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          {/* Title Bar */}
+          <span>Tags ({tags.length})</span>
+          {canEdit && session && (
+            <button
+              onClick={() => setIsTagging(!isTagging)}
+              style={{
+                background: isTagging ? '#ffffff' : 'transparent',
+                color: isTagging ? '#000000' : '#ffffff',
+                border: 'none',
+                padding: '1px 4px',
+                fontSize: '10px',
+                cursor: 'pointer',
+                fontFamily: '"MS Sans Serif", sans-serif'
+              }}
+            >
+              {isTagging ? 'STOP' : 'ADD'}
+            </button>
+          )}
+        </div>
+        
+        {/* Manual Tagging Instructions */}
+        {isTagging && (
           <div style={{
-            background: '#000080',
-            color: '#ffffff',
-            padding: '2px 4px',
-            fontSize: '11px',
-            fontWeight: 'bold',
+            background: '#ffffe1',
+            border: '1px solid #000000',
+            padding: '4px',
+            fontSize: '10px',
+            color: '#000000',
             marginBottom: '2px'
           }}>
-            Tags ({tags.length})
+            Click and drag on image to tag a region
           </div>
-          
-          {/* Tags List */}
-          <div style={{ 
+        )}
+        
+        {/* Current Selection Input */}
+        {showTagInput && currentSelection && (
+          <div style={{
             background: '#ffffff',
             border: '1px inset #808080',
             padding: '4px',
-            maxHeight: 'calc(100vh - 220px)',
-            overflowY: 'auto'
+            marginBottom: '2px'
           }}>
-            {tags.map(tag => (
+            <div style={{ fontSize: '10px', marginBottom: '2px', fontWeight: 'bold' }}>
+              New Tag:
+            </div>
+            <input
+              type="text"
+              value={tagName}
+              onChange={(e) => setTagName(e.target.value)}
+              placeholder="Enter tag name..."
+              autoFocus
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') createTag();
+                if (e.key === 'Escape') {
+                  setShowTagInput(false);
+                  setCurrentSelection(null);
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '2px',
+                border: '1px inset #808080',
+                fontSize: '11px',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                marginBottom: '2px'
+              }}
+            />
+            <select
+              value={tagType}
+              onChange={(e) => setTagType(e.target.value as any)}
+              style={{
+                width: '100%',
+                padding: '2px',
+                border: '1px inset #808080',
+                fontSize: '11px',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                marginBottom: '2px'
+              }}
+            >
+              <option value="part">Part</option>
+              <option value="tool">Tool</option>
+              <option value="brand">Brand</option>
+              <option value="process">Process</option>
+              <option value="issue">Damage</option>
+              <option value="custom">Custom</option>
+            </select>
+            <div style={{ display: 'flex', gap: '2px' }}>
+              <button
+                onClick={() => {
+                  setShowTagInput(false);
+                  setCurrentSelection(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '2px 4px',
+                  background: '#c0c0c0',
+                  border: '1px outset #ffffff',
+                  fontSize: '10px',
+                  cursor: 'pointer',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createTag}
+                disabled={!tagName.trim()}
+                style={{
+                  flex: 1,
+                  padding: '2px 4px',
+                  background: tagName.trim() ? '#c0c0c0' : '#808080',
+                  border: tagName.trim() ? '1px outset #ffffff' : '1px inset #808080',
+                  fontSize: '10px',
+                  cursor: tagName.trim() ? 'pointer' : 'not-allowed',
+                  fontFamily: '"MS Sans Serif", sans-serif',
+                  color: tagName.trim() ? '#000000' : '#c0c0c0'
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+          
+        {/* AI Analyze Button */}
+        {canEdit && session && !tagsLoading && tags.length === 0 && (
+          <div style={{ padding: '4px', marginBottom: '2px' }}>
+            <button
+              onClick={handleAIAnalysis}
+              disabled={analyzing}
+              style={{
+                width: '100%',
+                padding: '6px',
+                background: analyzing ? '#808080' : '#c0c0c0',
+                border: analyzing ? '1px inset #808080' : '1px outset #ffffff',
+                fontSize: '11px',
+                cursor: analyzing ? 'not-allowed' : 'pointer',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                color: '#000000',
+                fontWeight: 'bold'
+              }}
+            >
+              {analyzing ? 'Analyzing...' : 'AI Analyze'}
+            </button>
+          </div>
+        )}
+          
+        {/* Tags List */}
+        <div style={{ 
+          background: '#ffffff',
+          border: '1px inset #808080',
+          padding: '4px',
+          maxHeight: 'calc(100vh - 280px)',
+          overflowY: 'auto'
+        }}>
+          {tags.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              color: '#808080',
+              fontSize: '10px',
+              padding: '12px',
+              fontFamily: '"MS Sans Serif", sans-serif'
+            }}>
+              No tags yet.
+              {canEdit && session && <><br/>Click ADD to create tags<br/>or AI Analyze to detect parts.</>}
+            </div>
+          ) : (
+            tags.map(tag => (
               <div key={tag.id} style={{
                 background: tag.verified ? '#c0c0c0' : '#ffffff',
                 border: '1px solid #808080',
