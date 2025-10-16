@@ -2,16 +2,16 @@ import { supabase } from '../lib/supabase';
 import exifr from 'exifr';
 
 export interface ImageVariants {
-  thumbnail: string;  // 150px - for grid views
-  medium: string;     // 400px - for cards
-  large: string;      // 800px - for lightbox
-  full: string;       // Original
+  full: string;
+  thumbnail: Blob | null;
+  medium: Blob | null;
+  large: Blob | null;
 }
 
 export interface ImageVariantBlobs {
-  thumbnail: Blob;
-  medium: Blob;
-  large: Blob;
+  thumbnail: Blob | null;
+  medium: Blob | null;
+  large: Blob | null;
 }
 
 export interface OptimizationResult {
@@ -34,6 +34,19 @@ class ImageOptimizationService {
    */
   async generateVariantBlobs(file: File): Promise<OptimizationResult> {
     try {
+      // Check if file is HEIC format - not supported for optimization
+      if (file.name.toLowerCase().includes('.heic') || file.type.includes('heic')) {
+        console.log('HEIC format detected, skipping optimization');
+        return {
+          success: true,
+          variantBlobs: {
+            thumbnail: null,
+            medium: null,
+            large: null
+          }
+        };
+      }
+
       const variantBlobs: Partial<ImageVariantBlobs> = {};
 
       // Create image element
@@ -101,10 +114,16 @@ class ImageOptimizationService {
         variantBlobs: variantBlobs as ImageVariantBlobs
       };
     } catch (error) {
-      console.error('Image optimization failed:', error);
+      console.warn('Image optimization failed, skipping optimization:', error);
+      // Return success but with no variants to allow upload to continue
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error,
+        variantBlobs: {
+          thumbnail: null,
+          medium: null,
+          large: null
+        }
       };
     }
   }
@@ -115,8 +134,23 @@ class ImageOptimizationService {
    */
   async generateVariants(file: File): Promise<OptimizationResult> {
     try {
+      // Check if file is HEIC format - not supported for optimization
+      if (file.name.toLowerCase().includes('.heic') || file.type.includes('heic')) {
+        console.log('HEIC format detected, skipping optimization');
+        return {
+          success: false,
+          error: 'HEIC format not supported for optimization',
+          variants: {
+            full: '',
+            thumbnail: null,
+            medium: null,
+            large: null
+          }
+        };
+      }
+
       const variants: Partial<ImageVariants> = {};
-      
+
       // Create image element
       const img = new Image();
       const objectUrl = URL.createObjectURL(file);
