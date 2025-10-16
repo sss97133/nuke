@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import MobileVehicleProfile from '../components/mobile/MobileVehicleProfile';
 import { TimelineEventService } from '../services/timelineEventService';
 import AddEventWizard from '../components/AddEventWizard';
 import EventMap from '../components/EventMap';
@@ -38,6 +39,23 @@ import '../design-system.css';
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
+  
+  // Detect mobile device
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  // If mobile, use mobile-optimized version
+  if (isMobile && vehicleId) {
+    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
+  }
+  
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [session, setSession] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
@@ -1232,7 +1250,7 @@ const VehicleProfile: React.FC = () => {
                   <div className="card-header">Purchase Agreements</div>
                   <div className="card-body">
                     <PurchaseAgreementManager
-                      vehicle={vehicle}
+                      vehicle={vehicle as any}
                       userProfile={userProfile}
                       canCreateAgreement={Boolean(contributorRole === 'consigner' || isRowOwner || isVerifiedOwner)}
                     />

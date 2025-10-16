@@ -6,6 +6,7 @@ import TimelineEventComments from './TimelineEventComments';
 import TimelineEventEditor from './TimelineEventEditor';
 import { TechnicianWorkTimeline } from './TechnicianWorkTimeline';
 import { TimelineEventService } from '../services/timelineEventService';
+import EventDetailModal from './EventDetailModal';
 
 // Types
 type EventType = 'maintenance' | 'repair' | 'modification' | 'inspection' | 'purchase' | 'sale' | 'accident' | 'registration' | 'insurance' | 'transport' | 'evaluation' | 'general' | 'custom' | 'life';
@@ -58,6 +59,7 @@ const VehicleTimeline: React.FC<{
   const [selectedDayEvents, setSelectedDayEvents] = useState<TimelineEvent[]>([]);
   const [showDayPopup, setShowDayPopup] = useState(false);
   const [popupImageUrl, setPopupImageUrl] = useState<string | null>(null);
+  const [selectedEventForDetail, setSelectedEventForDetail] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [eventFiles, setEventFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -942,7 +944,7 @@ const VehicleTimeline: React.FC<{
                   const isEditing = editingEvent === ev.id;
                   
                   return (
-                    <div key={ev.id} className="alert alert-default" style={{ cursor: 'pointer' }} onClick={() => toggleComments(ev.id)}>
+                    <div key={ev.id} className="alert alert-default" style={{ cursor: 'pointer' }} onClick={() => setSelectedEventForDetail(ev.id)}>
                       <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
                         {shown.length > 0 && (
                           <img
@@ -1120,6 +1122,14 @@ const VehicleTimeline: React.FC<{
               />
             </div>
           </div>
+        )}
+
+        {/* Event Detail Modal */}
+        {selectedEventForDetail && (
+          <EventDetailModal
+            eventId={selectedEventForDetail}
+            onClose={() => setSelectedEventForDetail(null)}
+          />
         )}
       </div>
     </div>

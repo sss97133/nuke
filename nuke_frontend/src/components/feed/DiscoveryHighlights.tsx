@@ -82,6 +82,84 @@ const getDelta = (v: RecentVehicle) => {
   return { amount: change, percent, isPositive: change >= 0 } as const;
 };
 
+// Vehicle card with image
+const RareVehicleCard = ({ vehicle, onClick }: { vehicle: RecentVehicle; onClick: () => void }) => {
+  const [imageUrl, setImageUrl] = useState<string>('');
+
+  useEffect(() => {
+    supabase
+      .from('vehicle_images')
+      .select('image_url')
+      .eq('vehicle_id', vehicle.id)
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data?.image_url) setImageUrl(data.image_url);
+      });
+  }, [vehicle.id]);
+
+  return (
+    <div onClick={onClick} style={{ cursor: 'pointer', border: '1px solid #ddd', overflow: 'hidden' }}>
+      <div style={{ aspectRatio: '16/9', background: '#000', overflow: 'hidden' }}>
+        {imageUrl ? (
+          <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '32px' }}>🚗</div>
+        )}
+      </div>
+      <div style={{ padding: '8px', background: '#fff' }}>
+        <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+          {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: string; title: string; events: number; onClick: () => void }) => {
+  const [imageUrl, setImageUrl] = useState<string>('');
+
+  useEffect(() => {
+    supabase
+      .from('vehicle_images')
+      .select('image_url')
+      .eq('vehicle_id', vehicleId)
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data?.image_url) setImageUrl(data.image_url);
+      });
+  }, [vehicleId]);
+
+  return (
+    <div onClick={onClick} style={{ cursor: 'pointer', border: '1px solid #ddd', overflow: 'hidden' }}>
+      <div style={{ aspectRatio: '16/9', background: '#000', position: 'relative' }}>
+        {imageUrl ? (
+          <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '32px' }}>🚗</div>
+        )}
+        <div style={{
+          position: 'absolute',
+          top: '6px',
+          right: '6px',
+          background: 'rgba(255,0,0,0.9)',
+          color: '#fff',
+          padding: '3px 8px',
+          fontSize: '9px',
+          fontWeight: 'bold',
+          borderRadius: '2px'
+        }}>
+          {events} UPDATES
+        </div>
+      </div>
+      <div style={{ padding: '8px', background: '#fff' }}>
+        <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{title}</div>
+      </div>
+    </div>
+  );
+};
+
 const DiscoveryHighlights = () => {
   const [images, setImages] = useState<RecentImage[]>([]);
   const [vehicles, setVehicles] = useState<RecentVehicle[]>([]);
@@ -263,34 +341,34 @@ const DiscoveryHighlights = () => {
         </div>
       )}
 
-      {/* Rare Finds */}
+      {/* Rare Finds - WITH IMAGES */}
       {rareVehicles.length > 0 && (
         <div className="card" style={{ border: '1px solid #c0c0c0' }}>
-          <div className="card-header" style={cardHeaderStyle}>Rare Finds (low-frequency models)</div>
+          <div className="card-header" style={cardHeaderStyle}>Rare Finds</div>
           <div className="card-body" style={cardBodyStyle}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px' }}>
-              {rareVehicles.slice(0, 8).map(v => (
-                <div key={v.id} className="text" style={{ ...boxStyle, padding: '6px' }} onClick={() => go(`/vehicle/${v.id}`)}>
-                  <div className="text text-bold" style={to8pt}> {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle'} </div>
-                  <div className="text text-muted" style={to8pt}>Added {new Date(v.created_at).toLocaleDateString()}</div>
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+              {rareVehicles.slice(0, 6).map(v => (
+                <RareVehicleCard key={v.id} vehicle={v} onClick={() => go(`/vehicle/${v.id}`)} />
               ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* Hot Right Now */}
+      {/* Hot Right Now - WITH IMAGES */}
       {hotVehicles.length > 0 && (
         <div className="card" style={{ border: '1px solid #c0c0c0' }}>
-          <div className="card-header" style={cardHeaderStyle}>Hot Right Now (last 7 days)</div>
+          <div className="card-header" style={cardHeaderStyle}>Hot Right Now</div>
           <div className="card-body" style={cardBodyStyle}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
               {hotVehicles.map(h => (
-                <div key={h.vehicle_id} className="text" style={{ ...boxStyle, padding: '6px' }} onClick={() => go(`/vehicle/${h.vehicle_id}`)}>
-                  <div className="text text-bold" style={to8pt}>{h.title}</div>
-                  <span style={{ ...chipStyle }}>{h.events} updates</span>
-                </div>
+                <HotVehicleCard 
+                  key={h.vehicle_id} 
+                  vehicleId={h.vehicle_id}
+                  title={h.title}
+                  events={h.events}
+                  onClick={() => go(`/vehicle/${h.vehicle_id}`)}
+                />
               ))}
             </div>
           </div>

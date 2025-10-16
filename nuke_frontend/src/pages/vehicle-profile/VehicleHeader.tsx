@@ -378,6 +378,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         {/* Actions */}
         <button className="button button-small" onClick={() => setHistoryOpen(true)}>History</button>
         <button className="button button-small" onClick={() => setAnalysisOpen(true)}>Analysis</button>
+        <button 
+          className="button button-small button-primary" 
+          onClick={() => window.location.href = `/vehicle/${vehicle.id}/verify-tags`}
+          title="Review AI-detected tags"
+        >
+          Review Tags
+        </button>
       </div>
       {/* Price History Modal */}
       {vehicle?.id && (
