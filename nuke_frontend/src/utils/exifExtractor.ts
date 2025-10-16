@@ -1,5 +1,5 @@
 // EXIF data extraction utilities
-import piexifjs from 'piexifjs';
+// import piexifjs from 'piexifjs'; // Lazy loaded to prevent build issues
 
 interface GPSCoordinates {
   latitude: number | null;
@@ -29,6 +29,7 @@ export class ExifExtractor {
   // Extract GPS coordinates from EXIF data
   static async extractGPS(file: File): Promise<GPSCoordinates> {
     try {
+      const piexifjs = (await import('piexifjs')).default;
       const dataUrl = await this.fileToDataUrl(file);
       const exifData = piexifjs.load(dataUrl);
       
@@ -63,6 +64,7 @@ export class ExifExtractor {
   // Extract all EXIF data
   static async extractAll(file: File): Promise<ExifData> {
     try {
+      const piexifjs = (await import('piexifjs')).default;
       const dataUrl = await this.fileToDataUrl(file);
       const exifData = piexifjs.load(dataUrl);
       

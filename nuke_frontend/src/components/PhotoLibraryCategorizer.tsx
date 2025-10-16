@@ -4,7 +4,7 @@ import type { visionAPI } from '../api/visionAPI';
 import type { DropboxService } from '../services/dropboxService';
 import type { VehicleImportPipeline } from '../services/vehicleImportPipeline';
 import type { Camera, MapPin, Calendar, Car, Upload, Check, X, Plus, Eye, Trash2, FolderPlus, Cloud } from 'lucide-react';
-import * as exifr from 'exifr';
+// import * as exifr from 'exifr'; // Lazy loaded below to prevent build issues
 
 // Simple auth hook to work with existing session-based auth
 const useAuth = () => {
