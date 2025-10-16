@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "../nuke_frontend/dist",
-  "installCommand": "npm run install",
+  "installCommand": "npm install",
   "rewrites": [
     {
       "source": "/api/(.*)",
