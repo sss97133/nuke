@@ -27,7 +27,6 @@
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
-    "@sparticuz/chromium": "^138.0.2",
     "@supabase/supabase-js": "^2.75.0",
     "axios": "^1.9.0",
     "class-variance-authority": "^0.7.1",
@@ -45,7 +44,6 @@
     "pdfjs-dist": "^5.4.149",
     "phoenix": "^1.8.1",
     "piexifjs": "^1.0.6",
-    "puppeteer": "^24.22.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.56.3",
@@ -74,6 +72,8 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
-    "vitest": "^2.1.4"
+    "vitest": "^2.1.4",
+    "@sparticuz/chromium": "^138.0.2",
+    "puppeteer": "^24.22.3"
   }
 }
