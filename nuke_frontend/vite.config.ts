@@ -11,26 +11,16 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 300,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) return 'vendor';
-            if (id.includes('supabase')) return 'supabase';
-            if (id.includes('headlessui') || id.includes('heroicons') || id.includes('lucide')) return 'ui';
-            if (id.includes('hook-form') || id.includes('zod')) return 'forms';
-            if (id.includes('pdfjs') || id.includes('pdf')) return 'pdf';
-            if (id.includes('exif') || id.includes('piexif') || id.includes('tesseract')) return 'image-processing';
-            if (id.includes('axios') || id.includes('dropbox')) return 'networking';
-            return 'vendor-misc';
-          }
-
-          // Split app code by feature
-          if (id.includes('/pages/')) return 'pages';
-          if (id.includes('/components/')) return 'components';
-          if (id.includes('/services/')) return 'services';
-          if (id.includes('/hooks/')) return 'hooks';
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          supabase: ['@supabase/supabase-js'],
+          ui: ['@headlessui/react', '@heroicons/react', 'lucide-react'],
+          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+          pdf: ['pdfjs-dist'],
+          exif: ['exifr', 'piexifjs', 'exif-js', 'exifreader'],
         }
       }
     }
