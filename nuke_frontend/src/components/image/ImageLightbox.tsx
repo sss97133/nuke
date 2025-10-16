@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useImageAnalysis } from '../../hooks/useImageAnalysis';
+import { useImageTags } from '../../hooks/useImageTags';
+import type { Tag } from '../../services/tagService';
+import { MobileImageControls, MobileFloatingActions } from './MobileImageControls';
 import '../../design-system.css';
 
 interface ImageTag {
   id: string;
   tag_name: string;
+  text?: string;
   x_position: number;
   y_position: number;
   width: number;
@@ -14,7 +17,30 @@ interface ImageTag {
   confidence: number;
   created_by: string;
   verified: boolean;
-  created_at: string;
+  inserted_at: string;
+  ai_detection_data?: any;
+  metadata?: {
+    ai_supervised?: boolean;
+    part_number?: string;
+    brand?: string;
+    size_spec?: string;
+    category?: string;
+    estimated_cost?: number;
+    work_session?: string;
+    user_notes?: string;
+    confidence_score?: number;
+    connected_receipt_id?: string;
+    receipt_vendor?: string;
+    receipt_amount?: number;
+    match_score?: number;
+    vendor_links?: Array<{
+      vendor: string;
+      url: string;
+      price?: number;
+    }>;
+  };
+  source_type?: 'manual' | 'ai';
+  sellable?: boolean;
 }
 
 interface ImageLightboxProps {
@@ -44,110 +70,53 @@ const ImageLightbox = ({
   title,
   description
 }: ImageLightboxProps) => {
-  const [tags, setTags] = useState<ImageTag[]>([]);
-  const [isTagging, setIsTagging] = useState(false);
-  const [tagType, setTagType] = useState<'part' | 'tool' | 'brand' | 'process' | 'issue' | 'custom'>('part');
-  const [tagName, setTagName] = useState('');
-  const [showTagInput, setShowTagInput] = useState(false);
-  const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
-  const [currentSelection, setCurrentSelection] = useState<{x: number, y: number, width: number, height: number} | null>(null);
+  // Use unified tag system
+  const {
+    tags,
+    loading: tagsLoading,
+    verifyTag: verifyTagFn,
+    rejectTag: rejectTagFn,
+    triggerAIAnalysis: triggerAIAnalysisFn,
+    canEdit: userCanEdit
+  } = useImageTags(imageId);
+
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [session, setSession] = useState<any>(null);
-  const [showAITags, setShowAITags] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [isTagging, setIsTagging] = useState(false);
   const [tagView, setTagView] = useState<'off' | 'ai' | 'manual' | 'all'>('all');
+  const [session, setSession] = useState<any>(null);
+  const [showTagInput, setShowTagInput] = useState(false);
+  const [currentSelection, setCurrentSelection] = useState<{x: number, y: number, width: number, height: number} | null>(null);
+  const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
+  const [tagName, setTagName] = useState('');
+  const [tagType, setTagType] = useState<'part' | 'tool' | 'brand' | 'process' | 'issue' | 'custom'>('part');
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const {
-    analyzing,
-    analysisProgress,
-    analyzeImage,
-    getSuggestedTags,
-    verifyAITag,
-    rejectAITag
-  } = useImageAnalysis();
-
+  // Get session for manual tagging
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
   }, []);
 
-  useEffect(() => {
-    if (isOpen && (imageId || timelineEventId)) {
-      loadImageTags();
-    }
-  }, [isOpen, imageId, timelineEventId, imageUrl]);
-
-  const loadImageTags = async () => {
-    try {
-      let query = supabase
-        .from('image_tags')
-        .select(`
-          id,
-          tag_name,
-          x_position,
-          y_position,
-          width,
-          height,
-          tag_type,
-          confidence,
-          created_by,
-          verified,
-          created_at,
-          ai_detection_data
-        `);
-
-      if (imageId) {
-        query = query.eq('image_id', imageId);
-      } else if (timelineEventId) {
-        query = query.eq('timeline_event_id', timelineEventId);
-      } else {
-        query = query.eq('image_url', imageUrl);
-      }
-
-      const { data: imageTags, error } = await query.order('created_at', { ascending: false });
-
-      if (!error && imageTags) {
-        setTags(imageTags);
-      }
-    } catch (error) {
-      console.error('Error loading image tags:', error);
-    }
-  };
-
-  const handleAIAnalysis = async () => {
-    if (!imageUrl) return;
-
-    try {
-      const result = await analyzeImage(imageUrl, timelineEventId, vehicleId);
-
-      if (result.success) {
-        // Reload tags to show new AI-generated ones
-        await loadImageTags();
-        setShowAITags(true);
-      } else {
-        alert(`AI analysis failed: ${result.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('AI analysis error:', error);
-      alert('Failed to analyze image. Please try again.');
-    }
-  };
-
+  // Simplified handlers using unified service
   const handleVerifyTag = async (tagId: string) => {
-    if (!session?.user) return;
-
-    const success = await verifyAITag(tagId, session.user.id);
-    if (success) {
-      await loadImageTags(); // Reload to show updated verification status
-    }
+    await verifyTagFn(tagId);
   };
 
   const handleRejectTag = async (tagId: string) => {
-    const success = await rejectAITag(tagId);
-    if (success) {
-      await loadImageTags(); // Reload to remove rejected tag
+    await rejectTagFn(tagId);
+  };
+
+  const handleAIAnalysis = async () => {
+    if (!imageUrl || !vehicleId) return;
+    setAnalyzing(true);
+    const result = await triggerAIAnalysisFn(imageUrl, vehicleId);
+    setAnalyzing(false);
+    if (!result.success) {
+      alert(`AI analysis failed: ${result.error || 'Unknown error'}`);
     }
   };
 
@@ -488,54 +457,39 @@ const ImageLightbox = ({
           }}
         />
 
-        {/* Existing Tags */}
-        {imageLoaded && visibleTags.map(tag => (
+        {/* Tag Overlays on Image - Windows 95 Style */}
+        {imageLoaded && visibleTags.filter(tag => tag.x_position != null && tag.y_position != null).map(tag => (
           <div
             key={tag.id}
             style={{
               position: 'absolute',
               left: `${tag.x_position}%`,
               top: `${tag.y_position}%`,
-              width: `${tag.width}%`,
-              height: `${tag.height}%`,
-              border: `2px ${tag.verified ? 'solid' : 'dashed'} ${getTagColor(tag.tag_type)}`,
-              background: `${getTagColor(tag.tag_type)}20`,
-              pointerEvents: 'auto'
+              width: `${tag.width || 15}%`,
+              height: `${tag.height || 15}%`,
+              border: tag.verified ? '2px solid #ffff00' : '2px dashed #ff0000',
+              background: tag.verified ? 'rgba(255,255,0,0.1)' : 'rgba(255,0,0,0.1)',
+              pointerEvents: 'auto',
+              cursor: 'pointer'
             }}
           >
-            {/* Tag Label */}
+            {/* Tag Label - Windows 95 Tooltip Style */}
             <div style={{
               position: 'absolute',
-              top: '-24px',
+              top: '-22px',
               left: '0',
-              background: getTagColor(tag.tag_type),
-              color: 'white',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 'bold',
+              background: '#ffffe1',
+              color: '#000000',
+              padding: '2px 4px',
+              border: '1px solid #000000',
+              fontSize: '11px',
+              fontWeight: 'normal',
               whiteSpace: 'nowrap',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
+              fontFamily: '"MS Sans Serif", sans-serif',
+              boxShadow: '1px 1px 0 #808080'
             }}>
               {tag.tag_name}
-              {canEdit && tag.created_by === session?.user?.id && (
-                <button
-                  onClick={() => deleteTag(tag.id)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '10px',
-                    padding: '0',
-                    marginLeft: '4px'
-                  }}
-                >
-                  ✕
-                </button>
-              )}
+              {tag.metadata?.part_number && ` (${tag.metadata.part_number})`}
             </div>
           </div>
         ))}
@@ -555,177 +509,149 @@ const ImageLightbox = ({
         )}
       </div>
 
-      {/* Tag Input Modal */}
-      {showTagInput && currentSelection && (
+      {/* Tags Sidebar - Windows 95 Style */}
+      {tags.length > 0 && (
         <div style={{
           position: 'absolute',
           right: '20px',
-          top: '60px',
-          width: '280px',
-          background: '#f8f9fa',
-          borderRadius: '0px',
-          border: '1px solid #bdbdbd',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-          padding: '8px',
+          top: '80px',
+          width: '300px',
+          background: '#c0c0c0',
+          border: '2px outset #ffffff',
+          borderRight: '2px solid #808080',
+          borderBottom: '2px solid #808080',
+          padding: '2px',
           zIndex: 10002,
-          fontFamily: 'Arial, sans-serif'
+          maxHeight: 'calc(100vh - 160px)',
+          fontFamily: '"MS Sans Serif", sans-serif'
         }}>
-          <h4 style={{
-            margin: '0 0 6px 0',
-            fontSize: '8pt',
-            fontWeight: '600',
-            color: '#424242'
-          }}>Image Tagging</h4>
-
-          <button style={{
-            width: '100%',
-            background: '#424242',
-            color: 'white',
-            border: 'none',
-            padding: '4px 6px',
-            borderRadius: '0px',
-            fontSize: '8pt',
-            fontWeight: '600',
-            cursor: 'pointer',
-            marginBottom: '6px'
-          }}>
-            ✓ Tagging Mode ON
-          </button>
-
+          {/* Title Bar */}
           <div style={{
-            padding: '6px',
-            background: '#e7f3ff',
-            borderRadius: '0px',
-            border: '1px solid #b8daff',
-            marginBottom: '6px'
+            background: '#000080',
+            color: '#ffffff',
+            padding: '2px 4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            marginBottom: '2px'
           }}>
-            <label style={{
-              display: 'block',
-              fontSize: '8pt',
-              fontWeight: '600',
-              color: '#424242',
-              marginBottom: '3px'
-            }}>
-              TAG TYPE
-            </label>
-            <select
-              value={tagType}
-              onChange={(e) => setTagType(e.target.value as any)}
-              style={{
-                width: '100%',
-                padding: '3px 4px',
-                border: '1px solid #bdbdbd',
-                borderRadius: '0px',
-                fontSize: '8pt',
-                marginBottom: '4px'
-              }}
-            >
-              <option value="part">Part</option>
-              <option value="tool">Tool</option>
-              <option value="brand">Brand</option>
-              <option value="process">Process</option>
-              <option value="issue">Damage</option>
-              <option value="custom">Modification</option>
-            </select>
-            <div style={{
-              fontSize: '8pt',
-              color: '#6c757d',
-              fontStyle: 'italic'
-            }}>
-              Click on the image to place a tag
-            </div>
+            Tags ({tags.length})
           </div>
-
-          <div>
-            <h5 style={{
-              margin: '0 0 4px 0',
-              fontSize: '8pt',
-              fontWeight: '600',
-              color: '#424242'
-            }}>Tagged Parts ({tags.length})</h5>
-            <div style={{
-              padding: '6px',
-              textAlign: 'center',
-              color: '#6c757d',
-              fontSize: '8pt'
-            }}>
-              {tags.length === 0 ? (
-                <>No tags yet.<br/>Enable tagging and click on the image.</>
-              ) : (
-                tags.map(tag => (
-                  <div key={tag.id} style={{
-                    background: '#f5f5f5',
-                    border: '1px solid #e0e0e0',
-                    padding: '2px 4px',
-                    marginBottom: '2px',
-                    fontSize: '8pt'
-                  }}>
+          
+          {/* Tags List */}
+          <div style={{ 
+            background: '#ffffff',
+            border: '1px inset #808080',
+            padding: '4px',
+            maxHeight: 'calc(100vh - 220px)',
+            overflowY: 'auto'
+          }}>
+            {tags.map(tag => (
+              <div key={tag.id} style={{
+                background: tag.verified ? '#c0c0c0' : '#ffffff',
+                border: '1px solid #808080',
+                padding: '4px',
+                marginBottom: '4px',
+                fontSize: '11px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    width: '10px',
+                    height: '10px',
+                    background: tag.source_type === 'ai' ? '#000080' : '#008080',
+                    border: '1px solid #000000'
+                  }} />
+                  <span style={{ fontWeight: 'bold', color: '#000000' }}>
                     {tag.tag_name}
+                  </span>
+                  {tag.verified && (
+                    <span style={{ 
+                      background: '#008000',
+                      color: '#ffffff',
+                      padding: '0 3px',
+                      fontSize: '9px',
+                      fontWeight: 'bold'
+                    }}>OK</span>
+                  )}
+                </div>
+                    
+                {/* Part Details */}
+                {(tag.metadata?.part_number || tag.metadata?.brand) && (
+                  <div style={{ color: '#000000', fontSize: '10px', marginBottom: '2px' }}>
+                    {tag.metadata?.part_number && `Part#: ${tag.metadata.part_number}`}
+                    {tag.metadata?.part_number && tag.metadata?.brand && ' | '}
+                    {tag.metadata?.brand}
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div style={{ marginTop: '6px' }}>
-            <input
-              type="text"
-              value={tagName}
-              onChange={(e) => setTagName(e.target.value)}
-              placeholder="Enter tag name..."
-              style={{
-                width: '100%',
-                padding: '2px 4px',
-                border: '1px solid #bdbdbd',
-                borderRadius: '0px',
-                fontSize: '8pt',
-                marginBottom: '4px'
-              }}
-              autoFocus
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') createTag();
-                if (e.key === 'Escape') {
-                  setShowTagInput(false);
-                  setCurrentSelection(null);
-                }
-              }}
-            />
-
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button
-                onClick={() => {
-                  setShowTagInput(false);
-                  setCurrentSelection(null);
-                }}
-                style={{
-                  flex: 1,
-                  padding: '2px 4px',
-                  border: '1px solid #bdbdbd',
-                  background: '#f5f5f5',
-                  borderRadius: '0px',
-                  fontSize: '8pt',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={createTag}
-                disabled={!tagName.trim()}
-                style={{
-                  flex: 1,
-                  padding: '2px 4px',
-                  border: '1px solid #bdbdbd',
-                  background: tagName.trim() ? '#424242' : '#e0e0e0',
-                  color: tagName.trim() ? 'white' : '#9e9e9e',
-                  borderRadius: '0px',
-                  fontSize: '8pt',
-                  cursor: tagName.trim() ? 'pointer' : 'not-allowed'
-                }}
-              >
-                Add Tag
-              </button>
-            </div>
+                )}
+                
+                {/* Cost */}
+                {tag.metadata?.estimated_cost && (
+                  <div style={{ color: '#008000', fontSize: '10px', fontWeight: 'bold' }}>
+                    ${tag.metadata.estimated_cost}
+                  </div>
+                )}
+                
+                {/* Vendor Links */}
+                {tag.metadata?.vendor_links && tag.metadata.vendor_links.length > 0 && (
+                  <div style={{ marginTop: '4px', display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+                    {tag.metadata.vendor_links.map((link: any, idx: number) => (
+                      <a
+                        key={idx}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          padding: '1px 4px',
+                          background: '#c0c0c0',
+                          color: '#000000',
+                          textDecoration: 'none',
+                          fontSize: '9px',
+                          border: '1px outset #ffffff',
+                          fontFamily: '"MS Sans Serif", sans-serif'
+                        }}
+                      >
+                        {link.vendor}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Verify/Reject Buttons - AI tags only */}
+                {!tag.verified && tag.source_type === 'ai' && tag.metadata?.ai_supervised === true && (
+                  <div style={{ marginTop: '4px', display: 'flex', gap: '2px' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleVerifyTag(tag.id); }}
+                      style={{
+                        padding: '2px 6px',
+                        background: '#c0c0c0',
+                        color: '#000000',
+                        border: '1px outset #ffffff',
+                        fontSize: '10px',
+                        cursor: 'pointer',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    >
+                      Verify
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRejectTag(tag.id); }}
+                      style={{
+                        padding: '2px 6px',
+                        background: '#c0c0c0',
+                        color: '#000000',
+                        border: '1px outset #ffffff',
+                        fontSize: '10px',
+                        cursor: 'pointer',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -5,7 +5,7 @@ import ContentCard from './ContentCard';
 import type { FeedItem, DiscoveryFeedProps, SearchFilters } from './types';
 import '../../design-system.css';
 
-const DiscoveryFeed = ({ initialLocation }: DiscoveryFeedProps) => {
+const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocation }: DiscoveryFeedProps) => {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -296,8 +296,11 @@ const DiscoveryFeed = ({ initialLocation }: DiscoveryFeedProps) => {
 
           <div className="feed-grid" style={{
             display: 'grid',
-            gap: '8px',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: viewMode === 'compact' ? '4px' : '8px',
+            gridTemplateColumns: 
+              viewMode === 'gallery' ? 'repeat(auto-fill, minmax(280px, 1fr))' :
+              viewMode === 'compact' ? 'repeat(auto-fill, minmax(200px, 1fr))' :
+              '1fr', // technical = full width list
             marginTop: '8px'
           }}>
             {items.map((item, index) => (
@@ -305,7 +308,7 @@ const DiscoveryFeed = ({ initialLocation }: DiscoveryFeedProps) => {
                 key={item.id}
                 ref={index === items.length - 1 ? lastItemRef : null}
               >
-                <ContentCard item={item} />
+                <ContentCard item={item} viewMode={viewMode} denseMode={denseMode} />
               </div>
             ))}
           </div>

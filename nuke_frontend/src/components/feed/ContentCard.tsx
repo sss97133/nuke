@@ -7,9 +7,11 @@ import { computePrimaryPrice, computeDelta, formatCurrency } from '../../service
 
 interface ContentCardProps {
   item: FeedItem;
+  viewMode?: 'gallery' | 'compact' | 'technical';
+  denseMode?: boolean;
 }
 
-const ContentCard = ({ item }: ContentCardProps) => {
+const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentCardProps) => {
   const [imageError, setImageError] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const { trackView, trackInteraction } = useActivityTracking();
@@ -145,7 +147,9 @@ const ContentCard = ({ item }: ContentCardProps) => {
         <div style={{
           position: 'relative',
           width: '100%',
-          height: '180px',
+          height: viewMode === 'gallery' ? '200px' : 
+                 viewMode === 'compact' ? '120px' : 
+                 '60px', // technical mode: small image
           overflow: 'hidden'
         }}>
           <img

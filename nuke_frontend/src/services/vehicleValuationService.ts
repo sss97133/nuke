@@ -48,12 +48,57 @@ export class VehicleValuationService {
   /**
    * Get comprehensive vehicle valuation from all data sources
    * This is the SINGLE SOURCE OF TRUTH for vehicle value
+   * 
+   * Uses AI-powered valuation function that considers:
+   * - AI-detected parts and systems
+   * - Documented labor hours
+   * - Documentation quality
+   * - Condition assessment from AI tags
    */
   static async getValuation(vehicleId: string): Promise<VehicleValuation> {
     // Check cache
     const cached = this.cache.get(vehicleId);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
       return cached.data;
+    }
+
+    try {
+      // Try AI-powered valuation first (most accurate)
+      const { data: aiValuation, error: aiError } = await supabase
+        .rpc('calculate_ai_vehicle_valuation', { p_vehicle_id: vehicleId });
+
+      if (!aiError && aiValuation && aiValuation.length > 0) {
+        const av = aiValuation[0];
+        const valuation: VehicleValuation = {
+          totalInvested: parseFloat(av.base_value) + parseFloat(av.parts_value) + parseFloat(av.labor_value),
+          buildBudget: 0,
+          estimatedValue: parseFloat(av.estimated_value),
+          marketLow: parseFloat(av.estimated_value) * 0.85,
+          marketHigh: parseFloat(av.estimated_value) * 1.15,
+          confidence: parseFloat(av.confidence_score),
+          dataSources: av.data_sources || [],
+          partsInvestment: parseFloat(av.parts_value),
+          laborHours: av.breakdown?.labor_hours || 0,
+          installedParts: av.breakdown?.parts_detected || 0,
+          pendingParts: 0,
+          topParts: [],
+          lastUpdated: new Date().toISOString(),
+          hasRealData: true
+        };
+
+        // Cache and return
+        this.cache.set(vehicleId, {
+          data: valuation,
+          timestamp: Date.now()
+        });
+
+        return valuation;
+      }
+
+      // Fallback to legacy method if AI valuation fails
+      console.warn('AI valuation failed, using legacy method');
+    } catch (error) {
+      console.error('AI valuation error:', error);
     }
 
     try {
