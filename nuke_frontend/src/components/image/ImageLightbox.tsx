@@ -812,10 +812,10 @@ const ImageLightbox = ({
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            ))
+          )}
         </div>
-      )}
+      </div>
 
       {/* Image Info */}
       {(title || description) && (
