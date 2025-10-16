@@ -1,16 +1,5 @@
 {
-  "version": 2,
-  "buildCommand": "npm ci && npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "functions": {
-    "src/api/**/*.ts": {
-      "runtime": "nodejs18.x"
-    }
-  },
-  "env": {
-    "NODE_VERSION": "18"
-  },
+  "buildCommand": "npm run vercel-build",
   "rewrites": [
     {
       "source": "/api/:path*",
