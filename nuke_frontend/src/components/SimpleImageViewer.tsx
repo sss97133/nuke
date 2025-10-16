@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import LazyImage from './LazyImage';
 import { imageOptimizationService } from '../services/imageOptimizationService';
-import exifr from 'exifr';
+// import exifr from 'exifr'; // Lazy loaded to prevent build issues
 
 interface ImageData {
   id: string;
