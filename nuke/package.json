@@ -1,0 +1,11 @@
+{
+  "name": "nuke-deployment-proxy",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd ../nuke_frontend && npm install && npm run build",
+    "dev": "cd ../nuke_frontend && npm run dev",
+    "install": "cd ../nuke_frontend && npm install"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
