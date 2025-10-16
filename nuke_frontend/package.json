@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "vercel-build": "npm install && vite build",
+    "vercel-build": "vite build",
     "build-with-tsc": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
