@@ -13,16 +13,6 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
 
-  const contentTypeOptions = [
-    { value: 'all', label: 'All Content' },
-    { value: 'timeline_event', label: 'Events & Actions' },
-    { value: 'vehicle', label: 'Vehicles' },
-    { value: 'image', label: 'Images' },
-    { value: 'shop', label: 'Shops' },
-    { value: 'auction', label: 'Auctions' },
-    { value: 'user_activity', label: 'User Activity' }
-  ];
-
   const dateRangeOptions = [
     { value: 'today', label: 'Today' },
     { value: 'week', label: 'This Week' },
@@ -35,26 +25,6 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
     { value: 'popular', label: 'Most Popular' },
     { value: 'nearby', label: 'Nearby' }
   ];
-
-  const handleContentTypeToggle = (type: string) => {
-    if (type === 'all') {
-      onFiltersChange({
-        ...filters,
-        contentTypes: ['all']
-      });
-    } else {
-      const newTypes = filters.contentTypes.includes('all')
-        ? [type]
-        : filters.contentTypes.includes(type)
-          ? filters.contentTypes.filter(t => t !== type)
-          : [...filters.contentTypes, type];
-
-      onFiltersChange({
-        ...filters,
-        contentTypes: newTypes.length === 0 ? ['all'] : newTypes
-      });
-    }
-  };
 
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -84,7 +54,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
           <input
             type="text"
             className="input"
-            placeholder="Search..."
+            placeholder="Search vehicles by year, make, model, color..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             style={{
@@ -108,37 +78,6 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
           >
             {showAdvancedFilters ? 'Less' : 'Filters'}
           </button>
-        </div>
-      </div>
-
-      {/* Quick Content Type Filters */}
-      <div className="content-type-filters" style={{ marginBottom: '8px' }}>
-        <div style={{
-          display: 'flex',
-          gap: '6px',
-          flexWrap: 'wrap',
-          alignItems: 'center'
-        }}>
-          {contentTypeOptions.map(option => (
-            <button
-              key={option.value}
-              onClick={() => handleContentTypeToggle(option.value)}
-              className={`button ${
-                filters.contentTypes.includes(option.value) ||
-                (option.value === 'all' && filters.contentTypes.includes('all'))
-                  ? 'button-primary'
-                  : 'button-secondary'
-              }`}
-              style={{
-                padding: '4px 6px',
-                fontSize: '8pt',
-                border: filters.contentTypes.includes(option.value) ? '2px solid #3b82f6' : '1px solid #c0c0c0',
-                borderRadius: '2px'
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -254,19 +193,6 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
           <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #c0c0c0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span className="text text-bold" style={{ fontSize: '8pt' }}>Active Filters:</span>
-
-              {filters.contentTypes.length > 0 && !filters.contentTypes.includes('all') && (
-                <span className="badge" style={{
-                  background: '#f3f4f6',
-                  color: '#374151',
-                  padding: '1px 4px',
-                  borderRadius: '2px',
-                  fontSize: '8pt',
-                  border: '1px solid #c0c0c0'
-                }}>
-                  {filters.contentTypes.length} content types
-                </span>
-              )}
 
               {filters.location && (
                 <span className="badge" style={{
