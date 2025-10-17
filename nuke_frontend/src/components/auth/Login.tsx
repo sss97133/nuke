@@ -133,16 +133,14 @@ const Login = () => {
       setError(null);
       setLoading(true);
       
-      // For remote Supabase, let it handle the redirect automatically
-      // For local development, specify the local callback
-      const isLocalSupabase = import.meta.env.VITE_SUPABASE_URL?.includes('localhost');
-      const options = isLocalSupabase 
-        ? { redirectTo: `${window.location.origin}/auth/callback` }
-        : {}; // Let Supabase handle the redirect for remote instances
-      
+      // REMOTE-ONLY: Always let Supabase handle OAuth redirects
+      // Supabase will redirect to the configured Site URL after authentication
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
-        options
+        options: {
+          // Supabase handles redirects via dashboard configuration
+          // No localhost dependencies
+        }
       });
       
       if (error) throw error;
