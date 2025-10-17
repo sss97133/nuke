@@ -275,7 +275,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   value={displayMode}
                   onChange={(e) => persistDisplayMode(e.target.value as any)}
                   title="Select display price"
-                  style={{ fontSize: '10px', padding: '2px 4px', border: '1px solid #d0d0d0', background: '#fff' }}
+                  className="form-select"
+                  style={{ fontSize: '10px' }}
                 >
                   <option value="auto">Auto</option>
                   <option value="estimate">Estimate</option>
@@ -337,7 +338,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
         {/* Sale badge */}
         {vehicle.is_for_sale && (
-          <div style={{ background: '#166534', color: 'white', padding: '2px 6px', fontSize: '7pt', fontWeight: 'bold', border: '1px solid #bdbdbd' }}>
+          <div className="badge badge-success" style={{ background: '#166534', color: 'white', fontWeight: 'bold' }}>
             FOR SALE
           </div>
         )}
@@ -345,7 +346,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         {/* Responsible badge + owner controls */}
         {responsibleName && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ background: '#e7e7e7', color: '#333', padding: '2px 6px', fontSize: '10px', border: '1px solid #d0d0d0' }}>
+            <div className="badge badge-primary">
               {computeResponsibleLabel()}: {responsibleName}
             </div>
             {isOwnerLike && (
@@ -354,7 +355,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   value={responsibleMode}
                   onChange={(e) => persistResponsibleSettings(e.target.value as any)}
                   title="Select responsible label"
-                  style={{ fontSize: '10px', padding: '2px 4px', border: '1px solid #d0d0d0', background: '#fff' }}
+                  className="form-select"
+                  style={{ fontSize: '10px' }}
                 >
                   <option value="auto">Auto</option>
                   <option value="owner">Owner</option>
@@ -368,7 +370,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     value={responsibleCustom}
                     onChange={(e) => persistResponsibleSettings('custom', e.target.value)}
                     placeholder="Label"
-                    style={{ fontSize: '10px', padding: '2px 4px', border: '1px solid #d0d0d0' }}
+                    className="form-input"
+                    style={{ fontSize: '10px' }}
                   />
                 )}
               </>
