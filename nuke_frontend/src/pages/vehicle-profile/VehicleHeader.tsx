@@ -397,7 +397,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </button>
         <button
           className="button button-small button-primary"
-          onClick={() => window.location.href = `/vehicle/${vehicle.id}/verify-tags`}
+          onClick={() => {
+            // Navigate to the image tagging section
+            const currentPath = window.location.pathname;
+            const targetPath = `/vehicle/${vehicle.id}`;
+            if (currentPath === targetPath) {
+              // If already on the page, scroll to the tagging section
+              document.getElementById('image-tagging')?.scrollIntoView({ behavior: 'smooth' });
+            } else {
+              // Navigate to the page with the anchor
+              window.location.href = `${targetPath}#image-tagging`;
+            }
+          }}
           title="Review AI-detected tags"
           style={{ cursor: 'pointer' }}
         >
