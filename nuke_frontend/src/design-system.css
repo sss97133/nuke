@@ -247,7 +247,7 @@ body {
   border-color: var(--border-dark);
 }
 
-/* Buttons - Classic Windows 95 Style */
+/* Enhanced Buttons - Fun & Engaging Windows 95 Style */
 .button {
   display: inline-flex;
   align-items: center;
@@ -264,20 +264,40 @@ body {
   background: var(--grey-200);
   color: var(--text);
   box-shadow: var(--shadow-inset);
+  position: relative;
+  transition: all 0.1s ease-out;
+  user-select: none;
+}
+
+.button:hover {
+  background: var(--grey-300);
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
 }
 
 .button:active {
   border-style: inset;
   box-shadow: var(--shadow-inset);
+  transform: translateY(1px);
+  background: var(--grey-100);
 }
 
 .button:focus {
   outline: 1px dotted var(--text);
+  outline-offset: 2px;
 }
 
 .button-primary {
-  background: var(--grey-300);
+  background: linear-gradient(135deg, var(--grey-300) 0%, var(--grey-200) 100%);
   border-color: var(--border-medium);
+  font-weight: 600;
+}
+
+.button-primary:hover {
+  background: linear-gradient(135deg, var(--grey-400) 0%, var(--grey-300) 100%);
+  border-color: var(--border-dark);
+  animation: button-glow 0.3s ease-out;
 }
 
 .button-secondary {
@@ -285,9 +305,85 @@ body {
   border-color: var(--border-light);
 }
 
+.button-secondary:hover {
+  background: var(--grey-200);
+}
+
 .button-small {
   padding: var(--space-1) var(--space-3);
   font-size: var(--font-size);
+}
+
+/* Fun Button Animations */
+@keyframes button-glow {
+  0% { box-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+  50% { box-shadow: 2px 2px 8px rgba(0,100,200,0.3); }
+  100% { box-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+}
+
+@keyframes button-success-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); background: #28a745; }
+  100% { transform: scale(1); }
+}
+
+/* Special Button Types */
+.button-success {
+  background: linear-gradient(135deg, #32d74b 0%, #28a745 100%);
+  color: white;
+  border-color: #1e7e34;
+  font-weight: 600;
+}
+
+.button-success:hover {
+  background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+  animation: button-success-pulse 0.6s ease-out;
+}
+
+.button-danger {
+  background: linear-gradient(135deg, #ff4757 0%, #c44569 100%);
+  color: white;
+  border-color: #a71d31;
+  font-weight: 600;
+}
+
+.button-danger:hover {
+  background: linear-gradient(135deg, #c44569 0%, #a71d31 100%);
+  animation: button-glow 0.3s ease-out;
+}
+
+/* Interactive Button States */
+.button-loading {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.button-loading::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  margin-left: 8px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: button-spin 0.8s linear infinite;
+}
+
+@keyframes button-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Button Click Feedback */
+.button-clicked {
+  animation: button-click-feedback 0.4s ease-out;
+}
+
+@keyframes button-click-feedback {
+  0% { transform: scale(1); }
+  25% { transform: scale(0.95); }
+  50% { transform: scale(1.05); background: var(--grey-400); }
+  100% { transform: scale(1); }
 }
 
 /* Cards - Classic Style */
@@ -1517,7 +1613,7 @@ body {
 }
 
 .commentable::after {
-  content: '💬';
+  content: 'COMMENT';
   position: absolute;
   top: -2px;
   right: -2px;

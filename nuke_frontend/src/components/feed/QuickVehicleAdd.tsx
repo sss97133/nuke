@@ -58,7 +58,8 @@ const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
           make: formData.make,
           model: formData.model,
           color: formData.color,
-          description: formData.description,
+          // NOTE: DB uses 'notes' for freeform text; map UI description here
+          notes: formData.description || null,
           user_id: user.id,
           is_public: true,
           source: isContribution ? contributionSource : 'User Submission',

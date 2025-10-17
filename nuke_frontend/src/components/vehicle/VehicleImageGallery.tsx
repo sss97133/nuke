@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import ImageLightbox from '../image/ImageLightbox';
+import BlueGlowIcon from '../ui/BlueGlowIcon';
 import '../../design-system.css';
 
 interface VehicleImage {
@@ -151,7 +152,8 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
                 fontSize: '10px',
                 fontWeight: 'bold'
               }}>
-                🏷️ Tag
+                <BlueGlowIcon size={12} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} />
+                Tag
               </div>
             </div>
           ))}

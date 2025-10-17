@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import BlueGlowIcon from '../ui/BlueGlowIcon';
 import '../../design-system.css';
 
 interface RecentImage {
@@ -130,7 +131,9 @@ const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: stri
         {imageUrl ? (
           <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '32px' }}>🚗</div>
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+            <BlueGlowIcon size={32} />
+          </div>
         )}
         <div style={{
           position: 'absolute',
@@ -144,7 +147,8 @@ const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: stri
           borderRadius: '2px',
           border: '1px solid #fff'
         }}>
-          🔥 {events} UPDATES
+          <BlueGlowIcon size={12} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} />
+          {events} UPDATES
         </div>
         {recentActivity && (
           <div style={{
@@ -206,10 +210,10 @@ const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: stri
               cursor: 'pointer',
               fontWeight: 600
             }}
-            title="View Timeline"
-          >
-            📅
-          </button>
+          title="View Timeline"
+        >
+          <BlueGlowIcon size={12} />
+        </button>
         </div>
       </div>
     </div>

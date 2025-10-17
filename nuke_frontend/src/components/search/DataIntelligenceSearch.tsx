@@ -314,7 +314,7 @@ const DataIntelligenceSearch = ({ onResults }: DataIntelligenceSearchProps) => {
               minWidth: '50px'
             }}
           >
-            {isAnalyzing ? '📊' : '🔍'}
+            {isAnalyzing ? 'ANALYZING' : 'SEARCH'}
           </button>
         </div>
       </form>

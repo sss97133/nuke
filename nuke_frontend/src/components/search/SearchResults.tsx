@@ -42,11 +42,11 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'vehicle': return '🚗';
-      case 'shop': return '🏪';
-      case 'part': return '🔧';
-      case 'timeline_event': return '📅';
-      case 'user': return '👤';
+      case 'vehicle': return 'VEHICLE';
+      case 'shop': return 'SHOP';
+      case 'part': return 'PART';
+      case 'timeline_event': return 'EVENT';
+      case 'user': return 'USER';
       default: return '📄';
     }
   };
@@ -108,7 +108,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
         marginBottom: '20px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '18px' }}>🔍</span>
+          <span style={{ fontSize: '18px' }}>SEARCH</span>
           <h3 className="heading-3" style={{ margin: 0 }}>Search Results</h3>
         </div>
         <p className="text" style={{ margin: '0 0 12px 0', color: '#374151' }}>
@@ -170,7 +170,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                 textTransform: 'capitalize'
               }}
             >
-              {mode === 'cards' ? '🃏' : '📋'} {mode}
+              {mode === 'cards' ? 'CARDS' : 'LIST'} {mode}
             </button>
           ))}
         </div>
@@ -217,7 +217,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
           borderRadius: '12px',
           border: '2px dashed #d1d5db'
         }}>
-          <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🔍</span>
+          <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>SEARCH</span>
           <h3 className="heading-3">No Results Found</h3>
           <p className="text text-muted">
             Try adjusting your search terms or filters

@@ -218,14 +218,14 @@ const Dashboard: React.FC = () => {
                   style={buttonStyle(perspective === 'tech')}
                   title="Show vehicles with best documentation"
                 >
-                  🔧 Tech POV
+                  Tech POV
                 </button>
                 <button
                   onClick={() => setPerspective('hobbyist')}
                   style={buttonStyle(perspective === 'hobbyist')}
                   title="Show coolest/most desirable vehicles"
                 >
-                  🏁 Hobbyist POV
+                  Hobbyist POV
                 </button>
               </div>
             </div>

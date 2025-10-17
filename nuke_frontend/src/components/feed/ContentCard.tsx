@@ -3,6 +3,7 @@ import type { FeedItem } from './types';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import ImageLightbox from '../image/ImageLightbox';
 import VehicleQuickView from './VehicleQuickView';
+import BlueGlowIcon from '../ui/BlueGlowIcon';
 import '../../design-system.css';
 import { computePrimaryPrice, computeDelta, formatCurrency } from '../../services/priceSignalService';
 
@@ -161,14 +162,13 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
                  viewMode === 'compact' ? '140px' : 
                  '80px',
           background: '#f3f4f6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '48px',
-          color: '#d1d5db'
-        }}>
-          🚗
-        </div>
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#d1d5db'
+      }}>
+        <BlueGlowIcon size={48} />
+      </div>
       )}
 
       {/* Content */}

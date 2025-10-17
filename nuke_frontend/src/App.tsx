@@ -5,6 +5,7 @@ import './design-system.css';
 import { ToastProvider } from './hooks/useToast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
+import { ButtonEnhancer } from './utils/buttonEnhancer';
 
 // Database components
 import DatabaseAudit from './pages/DatabaseAudit';
@@ -84,6 +85,9 @@ function App() {
         }
       }
     );
+
+    // Initialize enhanced button interactions
+    ButtonEnhancer.init();
 
     return () => subscription.unsubscribe();
   }, []);

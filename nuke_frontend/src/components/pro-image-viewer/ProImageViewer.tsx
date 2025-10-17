@@ -1816,14 +1816,14 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                       lineHeight: '1.6'
                     }}>
                       <strong>How to add tags:</strong><br />
-                      1. Click image to zoom {showFullRes && '✅'}<br />
+                      1. Click image to zoom {showFullRes && 'VERIFIED'}<br />
                       2. Click anywhere to place tag<br />
                       3. Type description and save<br />
                     <br />
                     <strong>Status:</strong> {
-                      showTags && showFullRes ? <span style={{ color: 'var(--success)' }}>🟢 Tagging Active - Click to add tags!</span> :
-                      showTags && !showFullRes ? <span style={{ color: 'var(--warning)' }}>🟡 Click image to load full resolution</span> :
-                      <span style={{ color: 'var(--success)' }}>✅ Tag panel open - Ready to tag</span>
+                      showTags && showFullRes ? <span style={{ color: 'var(--success)' }}>GREEN Tagging Active - Click to add tags!</span> :
+                      showTags && !showFullRes ? <span style={{ color: 'var(--warning)' }}>YELLOW Click image to load full resolution</span> :
+                      <span style={{ color: 'var(--success)' }}>VERIFIED Tag panel open - Ready to tag</span>
                     }
                   </div>
                 )}

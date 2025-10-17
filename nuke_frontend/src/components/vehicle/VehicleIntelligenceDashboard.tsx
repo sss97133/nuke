@@ -288,7 +288,7 @@ const VehicleIntelligenceDashboard: React.FC<VehicleIntelligenceProps> = ({ vehi
               cursor: runningAnalysis || analyzing ? 'wait' : 'pointer'
             }}
           >
-            {runningAnalysis || analyzing ? '🔄 Analyzing Images...' : '🚀 Run Full Vehicle Analysis'}
+            {runningAnalysis || analyzing ? 'Analyzing Images...' : 'Run Full Vehicle Analysis'}
           </button>
         </div>
       ) : (
@@ -325,7 +325,7 @@ const VehicleIntelligenceDashboard: React.FC<VehicleIntelligenceProps> = ({ vehi
           {intelligenceData.insights.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
               <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '8px', color: '#0066cc' }}>
-                🎯 Key Insights
+                Key Insights
               </div>
               {intelligenceData.insights.map((insight, idx) => (
                 <div key={idx} style={{
@@ -354,7 +354,7 @@ const VehicleIntelligenceDashboard: React.FC<VehicleIntelligenceProps> = ({ vehi
           {intelligenceData.part_conditions.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
               <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '8px', color: '#0066cc' }}>
-                🔧 Component Analysis
+                Component Analysis
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
                 {intelligenceData.part_conditions.slice(0, 6).map((part, idx) => (
@@ -385,7 +385,7 @@ const VehicleIntelligenceDashboard: React.FC<VehicleIntelligenceProps> = ({ vehi
           {intelligenceData.repair_patterns.length > 0 && (
             <div>
               <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '8px', color: '#0066cc' }}>
-                📊 Repair Patterns & Predictions
+                Repair Patterns & Predictions
               </div>
               {intelligenceData.repair_patterns.map((pattern, idx) => (
                 <div key={idx} style={{
@@ -437,7 +437,7 @@ const VehicleIntelligenceDashboard: React.FC<VehicleIntelligenceProps> = ({ vehi
                 cursor: 'pointer'
               }}
             >
-              📋 Full Intelligence Report
+              Full Intelligence Report
             </button>
           </div>
 

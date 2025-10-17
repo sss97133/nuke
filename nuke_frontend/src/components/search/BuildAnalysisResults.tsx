@@ -46,11 +46,11 @@ const BuildAnalysisResults = ({ results, query, analysis, loading = false }: Bui
   };
 
   const getActivityStatusIcon = (result: BuildAnalysisResult) => {
-    if (result.stagnation_risk > 0.7) return '💀';
-    if (result.events_last_30_days === 0) return '😴';
-    if (result.events_last_30_days > 10) return '🔥';
-    if (result.events_last_30_days > 5) return '⚡';
-    return '📝';
+    if (result.stagnation_risk > 0.7) return 'STAGNANT';
+    if (result.events_last_30_days === 0) return 'INACTIVE';
+    if (result.events_last_30_days > 10) return 'HOT';
+    if (result.events_last_30_days > 5) return 'ACTIVE';
+    return 'ACTIVE';
   };
 
   const formatDaysAgo = (dateString?: string) => {
@@ -119,7 +119,7 @@ const BuildAnalysisResults = ({ results, query, analysis, loading = false }: Bui
         borderRadius: '12px',
         border: '2px dashed #d1d5db'
       }}>
-        <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📊</span>
+        <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>ANALYSIS</span>
         <h3 className="heading-3">No Build Data Found</h3>
         <p className="text text-muted">
           No builds match the specified activity criteria. Try adjusting the timeframe or model filter.
@@ -141,7 +141,7 @@ const BuildAnalysisResults = ({ results, query, analysis, loading = false }: Bui
         marginBottom: '20px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-          <span style={{ fontSize: '20px' }}>📊</span>
+          <span style={{ fontSize: '20px' }}>ANALYSIS</span>
           <h3 className="heading-3" style={{ margin: 0 }}>Build Intelligence Analysis</h3>
         </div>
 
