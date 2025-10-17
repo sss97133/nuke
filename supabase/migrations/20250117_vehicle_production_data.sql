@@ -57,28 +57,45 @@ CREATE POLICY "vehicle_production_data_read" ON vehicle_production_data
 CREATE POLICY "vehicle_production_data_write" ON vehicle_production_data
     FOR ALL USING (auth.role() = 'authenticated');
 
--- Insert some known production data for common vehicles
-INSERT INTO vehicle_production_data (make, model, year, total_produced, rarity_level, rarity_reason, data_source, msrp) VALUES
--- Common vehicles
-('Toyota', 'Camry', 2020, 294348, 'MASS_PRODUCTION', 'High volume production', 'manufacturer', 24425.00),
-('Honda', 'Civic', 2020, 261225, 'MASS_PRODUCTION', 'High volume production', 'manufacturer', 21020.00),
-('Ford', 'F-150', 2020, 787422, 'MASS_PRODUCTION', 'Best selling truck', 'manufacturer', 28490.00),
+-- Insert more detailed production data with breakdowns like Marti Reports
+INSERT INTO vehicle_production_data (make, model, year, body_style, trim_level, engine_option, total_produced, rarity_level, rarity_reason, data_source, msrp) VALUES
+-- Common vehicles with detailed breakdowns
+('Toyota', 'Camry', 2020, 'sedan', 'LE', '2.5L I4', 120000, 'MASS_PRODUCTION', 'High volume sedan production', 'manufacturer', 24425.00),
+('Toyota', 'Camry', 2020, 'sedan', 'XLE', '2.5L I4', 80000, 'MASS_PRODUCTION', 'High volume sedan production', 'manufacturer', 27400.00),
+('Toyota', 'Camry', 2020, 'sedan', 'XSE', '3.5L V6', 45000, 'COMMON', 'Sport trim with V6 option', 'manufacturer', 30400.00),
 
--- Uncommon vehicles
-('Porsche', '911', 2020, 35250, 'UNCOMMON', 'Luxury sports car', 'manufacturer', 101200.00),
-('Ferrari', '488', 2020, 1200, 'RARE', 'Limited production supercar', 'manufacturer', 250000.00),
+('Honda', 'Civic', 2020, 'sedan', 'LX', '2.0L I4', 100000, 'MASS_PRODUCTION', 'High volume compact sedan', 'manufacturer', 21020.00),
+('Honda', 'Civic', 2020, 'sedan', 'Sport', '1.5L Turbo', 60000, 'COMMON', 'Sport trim with turbo engine', 'manufacturer', 22520.00),
+('Honda', 'Civic', 2020, 'coupe', 'Si', '1.5L Turbo', 15000, 'UNCOMMON', 'Performance coupe variant', 'manufacturer', 25020.00),
 
--- Ultra rare vehicles
-('Ferrari', 'LaFerrari', 2014, 499, 'ULTRA_RARE', 'Limited edition hypercar', 'manufacturer', 1400000.00),
-('McLaren', 'P1', 2014, 375, 'ULTRA_RARE', 'Limited edition hypercar', 'manufacturer', 1150000.00),
+('Ford', 'F-150', 2020, 'truck', 'XL', '3.3L V6', 200000, 'MASS_PRODUCTION', 'Base work truck configuration', 'manufacturer', 28490.00),
+('Ford', 'F-150', 2020, 'truck', 'XLT', '2.7L EcoBoost', 180000, 'MASS_PRODUCTION', 'Popular mid-trim configuration', 'manufacturer', 32490.00),
+('Ford', 'F-150', 2020, 'truck', 'Raptor', '3.5L EcoBoost', 8000, 'RARE', 'High-performance off-road variant', 'manufacturer', 53990.00),
 
--- Classic examples
-('Chevrolet', 'Corvette', 1967, 22702, 'UNCOMMON', 'Classic sports car', 'registry', 4250.00),
-('Ford', 'Mustang', 1965, 559451, 'COMMON', 'High production pony car', 'registry', 2368.00),
+-- Classic examples with detailed breakdowns
+('Chevrolet', 'Corvette', 1967, 'coupe', 'base', '427 V8', 15000, 'UNCOMMON', 'Classic sports car with big block', 'registry', 4250.00),
+('Chevrolet', 'Corvette', 1967, 'coupe', 'L88', '427 V8', 20, 'ULTRA_RARE', 'Racing homologation special', 'registry', 6500.00),
 
--- Classic trucks
-('Chevrolet', 'K5 Blazer', 1977, 45000, 'UNCOMMON', 'Classic SUV', 'registry', 6500.00),
-('Ford', 'Bronco', 1977, 35000, 'UNCOMMON', 'Classic SUV', 'registry', 6200.00)
+('Ford', 'Mustang', 1965, 'coupe', 'base', '289 V8', 300000, 'MASS_PRODUCTION', 'High production pony car', 'registry', 2368.00),
+('Ford', 'Mustang', 1965, 'coupe', 'GT', '289 V8', 150000, 'COMMON', 'Performance variant', 'registry', 2568.00),
+('Ford', 'Mustang', 1965, 'convertible', 'GT', '289 V8', 75000, 'UNCOMMON', 'Convertible performance variant', 'registry', 2768.00),
+
+-- Classic trucks with detailed breakdowns
+('Chevrolet', 'K5 Blazer', 1977, 'SUV', 'base', '350 V8', 30000, 'UNCOMMON', 'Classic SUV with V8', 'registry', 6500.00),
+('Chevrolet', 'K5 Blazer', 1977, 'SUV', 'Silverado', '350 V8', 15000, 'RARE', 'Luxury trim SUV', 'registry', 7500.00),
+
+('Ford', 'Bronco', 1977, 'SUV', 'base', '302 V8', 25000, 'UNCOMMON', 'Classic SUV competitor', 'registry', 6200.00),
+('Ford', 'Bronco', 1977, 'SUV', 'Ranger', '351 V8', 10000, 'RARE', 'High-trim SUV variant', 'registry', 7200.00),
+
+-- Exotic examples
+('Porsche', '911', 2020, 'coupe', 'base', '3.0L H6', 20000, 'UNCOMMON', 'Luxury sports car', 'manufacturer', 101200.00),
+('Porsche', '911', 2020, 'coupe', 'Turbo S', '3.8L H6', 2000, 'RARE', 'High-performance variant', 'manufacturer', 203500.00),
+
+('Ferrari', '488', 2020, 'coupe', 'base', '3.9L V8', 1000, 'RARE', 'Limited production supercar', 'manufacturer', 250000.00),
+('Ferrari', '488', 2020, 'coupe', 'Pista', '3.9L V8', 200, 'ULTRA_RARE', 'Track-focused special edition', 'manufacturer', 350000.00),
+
+('Ferrari', 'LaFerrari', 2014, 'coupe', 'base', '6.3L V12 Hybrid', 499, 'ULTRA_RARE', 'Limited edition hypercar', 'manufacturer', 1400000.00),
+('McLaren', 'P1', 2014, 'coupe', 'base', '3.8L V8 Hybrid', 375, 'ULTRA_RARE', 'Limited edition hypercar', 'manufacturer', 1150000.00)
 
 ON CONFLICT (make, model, year, body_style, trim_level, engine_option) DO NOTHING;
 
