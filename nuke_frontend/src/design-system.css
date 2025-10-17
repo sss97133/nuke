@@ -172,6 +172,7 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 var(--space-8);
+  background: var(--white);
 }
 .container.compact { /* one-pager layout: 5px side padding */
   padding: 0 5px;
@@ -193,6 +194,7 @@ body {
 .main {
   flex: 1;
   padding: var(--space-8) 0;
+  background: var(--white);
 }
 
 .section {
