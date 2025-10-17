@@ -476,7 +476,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📷</div>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>+</div>
             <p className="text">Click to upload VIN tag photo</p>
             <p className="text-small text-muted">Supports JPG, PNG, HEIC (max 10MB)</p>
           </div>

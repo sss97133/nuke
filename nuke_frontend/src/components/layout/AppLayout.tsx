@@ -168,8 +168,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               <Link to="/inbox" className="nav-link">Inbox</Link>
               <Link to="/profile" className="profile-bubble">
                 {userProfile?.avatar_url ? (
-                  <img 
-                    src={userProfile.avatar_url} 
+                  <img
+                    src={userProfile.avatar_url}
                     className="profile-image"
                   />
                 ) : (
@@ -180,7 +180,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 Profile
               </Link>
               </>
-            ) : null}
+            ) : (
+              <Link to="/login" className="button button-primary">
+                Login
+              </Link>
+            )}
           </div>
         </div>
 
