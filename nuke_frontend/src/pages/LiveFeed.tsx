@@ -153,7 +153,7 @@ const LiveFeed: React.FC = () => {
   }
 
   return (
-    <AppLayout title="Nuke Live Feed">
+    <AppLayout title="Live Feed">
       <div className="fade-in">
         {/* Discovery Welcome for Non-Authenticated Users */}
         {!session && (
