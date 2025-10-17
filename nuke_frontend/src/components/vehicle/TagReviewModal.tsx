@@ -11,9 +11,10 @@ interface AITag {
   id: string;
   tag_name: string;
   confidence: number;
-  status: 'pending' | 'approved' | 'rejected';
-  image_url?: string;
-  created_at: string;
+  verified: boolean;
+  source_type: string;
+  image_id?: string;
+  created_at?: string;
 }
 
 const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicleId }) => {
@@ -29,27 +30,32 @@ const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicl
   const fetchAITags = async () => {
     setLoading(true);
     try {
-      // Try to fetch AI-detected tags that need review
-      // First check if the table exists and what columns are available
+      // Fetch AI-detected tags that need review (unverified AI tags)
       const { data, error } = await supabase
         .from('image_tags')
-        .select('id, tag_name, confidence, status, image_url, created_at')
+        .select('id, tag_name, confidence, verified, source_type, image_id, created_at')
         .eq('vehicle_id', vehicleId)
-        .eq('source', 'ai')
-        .eq('status', 'pending')
+        .eq('source_type', 'ai')
+        .eq('verified', false)
         .order('confidence', { ascending: false })
         .limit(20);
 
       if (error) {
-        // If table doesn't exist or has different structure, show placeholder
-        console.debug('Image tags table not available:', error);
-        setAITags([]);
+        console.debug('Error fetching AI tags:', error);
+        // Try to show any AI tags even if verified
+        const { data: fallbackData } = await supabase
+          .from('image_tags')
+          .select('id, tag_name, confidence, verified, source_type, image_id, created_at')
+          .eq('vehicle_id', vehicleId)
+          .eq('source_type', 'ai')
+          .order('confidence', { ascending: false })
+          .limit(10);
+        setAITags(fallbackData || []);
       } else {
         setAITags(data || []);
       }
     } catch (error) {
       console.debug('Error fetching AI tags:', error);
-      // Set placeholder data for demonstration
       setAITags([]);
     } finally {
       setLoading(false);
@@ -58,12 +64,21 @@ const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicl
 
   const handleTagAction = async (tagId: string, action: 'approve' | 'reject') => {
     try {
-      const { error } = await supabase
-        .from('image_tags')
-        .update({ status: action === 'approve' ? 'approved' : 'rejected' })
-        .eq('id', tagId);
-
-      if (error) throw error;
+      if (action === 'approve') {
+        // Mark as verified
+        const { error } = await supabase
+          .from('image_tags')
+          .update({ verified: true })
+          .eq('id', tagId);
+        if (error) throw error;
+      } else {
+        // Delete rejected tags
+        const { error } = await supabase
+          .from('image_tags')
+          .delete()
+          .eq('id', tagId);
+        if (error) throw error;
+      }
 
       // Update local state
       setAITags(prev => prev.filter(tag => tag.id !== tagId));
@@ -105,15 +120,13 @@ const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicl
                       <div className="tag-details">
                         <span className="tag-name">🤖 {tag.tag_name}</span>
                         <span className="confidence-score">
-                          {Math.round(tag.confidence * 100)}% confidence
+                          {Math.round(tag.confidence >= 1 ? tag.confidence : tag.confidence * 100)}% confidence
                         </span>
                       </div>
-                      {tag.image_url && (
-                        <img
-                          src={tag.image_url}
-                          alt="Tagged area"
-                          className="tag-preview-image"
-                        />
+                      {tag.image_id && (
+                        <div className="tag-image-info">
+                          <span className="text-small text-muted">Image: {tag.image_id.slice(-8)}</span>
+                        </div>
                       )}
                     </div>
 
@@ -185,12 +198,9 @@ const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicl
           color: var(--text-muted);
         }
 
-        .tag-preview-image {
-          width: 60px;
-          height: 60px;
-          object-fit: cover;
-          border-radius: 4px;
-          border: 1px solid var(--border-light);
+        .tag-image-info {
+          font-size: var(--font-size-small);
+          color: var(--text-muted);
         }
 
         .tag-actions {
