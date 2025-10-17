@@ -107,13 +107,18 @@ const AddVehicle: React.FC = () => {
 
       console.log('Scraping BAT URL:', url);
 
-      // Call Supabase Edge Function (scrape-vehicle)
-      const { data: result, error: fnError } = await (supabase as any).functions.invoke('scrape-vehicle', {
-        body: { url }
+      // Call backend API scraper
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+      const resp = await fetch(`${apiBase}/scrape-listing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
       });
-      if (fnError) {
-        throw new Error(`Scraping failed: ${fnError.message || fnError}`);
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`Scraping failed: ${resp.status} ${text}`);
       }
+      const result = await resp.json();
 
       if (result.success && result.data) {
         const scrapedData = result.data;
@@ -244,6 +249,23 @@ const AddVehicle: React.FC = () => {
 
       if (vehicle) {
         const vehicleId = vehicle.id;
+        // If discovery_url present, create a listing monitor for ongoing updates
+        if (vehicle.discovery_url) {
+          try {
+            const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+            await fetch(`${apiBase}/listing-monitors`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                vehicle_id: vehicleId,
+                source_url: vehicle.discovery_url,
+                source_platform: (vehicle.source || '').toLowerCase().replaceAll(' ', '_')
+              })
+            });
+          } catch (e) {
+            console.warn('Failed to create listing monitor:', e);
+          }
+        }
         
         // Create timeline event for vehicle creation
         try {

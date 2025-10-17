@@ -22,12 +22,16 @@ defmodule NukeApiWeb.Router do
     get "/test", DebugController, :test  # Alias for /ping
     get "/info", DebugController, :info
     post "/scrape-test", DebugController, :scrape_test
-    post "/scrape-listing", DebugController, :scrape_listing  # Disabled endpoint
+    post "/scrape-listing", ScraperController, :scrape_listing
     
     # Public vehicle routes
     get "/vehicles", VehicleController, :index
     get "/vehicles/:id", VehicleController, :show
     post "/vehicles", VehicleController, :create  # Temporarily public for testing
+    
+    # Listing monitor endpoints (limited public for dev/testing)
+    post "/listing-monitors", ListingMonitorController, :create
+    post "/listing-monitors/trigger-scan", ListingMonitorController, :trigger_scan
     
     # Public timeline routes
     get "/vehicles/:vehicle_id/timeline", TimelineController, :index

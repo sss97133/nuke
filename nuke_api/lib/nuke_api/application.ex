@@ -16,6 +16,8 @@ defmodule NukeApi.Application do
       {Finch, name: NukeApi.Finch},
       # Start AI-powered pricing analyst
       NukeApi.Pricing.AutomatedAnalyst,
+      # Listing monitor periodic worker
+      NukeApi.MarketData.ListingMonitorWorker,
       # Start to serve requests, typically the last entry
       NukeApiWeb.Endpoint
     ]

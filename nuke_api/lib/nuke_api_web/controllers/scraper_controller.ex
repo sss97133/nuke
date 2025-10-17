@@ -175,9 +175,35 @@ defmodule NukeApiWeb.ScraperController do
     |> Map.put(:scraped_at, DateTime.utc_now() |> DateTime.to_iso8601())
   end
 
-  defp store_listing_archive(_archive_data) do
-    # TODO: Implement real database storage
-    {:error, "Archive storage not implemented"}
+  defp store_listing_archive(archive_data) do
+    # Best-effort: insert archive snapshot into Supabase via direct DB connection
+    try do
+      source_platform = Map.get(archive_data, :listing_source)
+      source_url = Map.get(archive_data, :listing_url)
+      html_content = Map.get(archive_data, :html_content)
+      description_text = Map.get(archive_data, :description_text)
+      images = Map.get(archive_data, :image_urls, [])
+      metadata = Map.get(archive_data, :listing_metadata, %{})
+
+      # vehicle_id unknown at scrape time; store without it if not present
+      # Allow NULL vehicle_id in insert by temporarily using direct SQL (archive for provenance)
+      sql = """
+        INSERT INTO public.vehicle_listing_archives
+          (vehicle_id, source_platform, source_url, html_content, description_text, images, metadata, scraped_at)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, NOW())
+      """
+
+      vehicle_id = nil
+      images_json = Jason.encode!(images)
+      metadata_json = Jason.encode!(metadata)
+
+      case Ecto.Adapters.SQL.query(NukeApi.Repo, sql, [vehicle_id, source_platform, source_url, html_content, description_text, images_json, metadata_json]) do
+        {:ok, _} -> {:ok, :inserted}
+        {:error, reason} -> {:error, inspect(reason)}
+      end
+    rescue
+      error -> {:error, inspect(error)}
+    end
   end
 
   defp merge_vehicle_data(basic_data, ai_data) do
@@ -285,7 +311,7 @@ defmodule NukeApiWeb.ScraperController do
       ]
       
       body = Jason.encode!(%{
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         messages: [
           %{
             role: "system",
