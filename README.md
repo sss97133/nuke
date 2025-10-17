@@ -1,235 +1,201 @@
-# Nuke Platform
+# Nuke - Vehicle Intelligence Platform
 
-A comprehensive vehicle identity management system designed for automotive industry professionals, collectors, and verification services.
+**Production-grade vehicle data management with AI-powered quality assurance and real-time collaborative verification.**
 
 ## Overview
 
-Nuke provides a vehicle-centric digital platform that maintains complete historical records throughout a vehicle's lifecycle. The system aggregates data from multiple sources to create immutable timelines with professional verification and trust mechanisms.
+Nuke is a granular data authentication platform that combines multi-source aggregation, machine learning validation, and collaborative verification to create high-fidelity digital identities. The system emphasizes data quality over quantity, using custom algorithms to ensure every data point is properly sourced, validated, annotated and attributed.
 
-## Architecture
+## Core Intelligence Systems
 
-### System Components
+### 1. Multi-Source Data Validation
 
-- **Backend API**: Elixir/Phoenix application with PostgreSQL database
-- **Frontend Application**: React/TypeScript single-page application
-- **Database Layer**: Supabase integration with Row Level Security
-- **Timeline System**: Event aggregation with temporal data management
-- **Image Pipeline**: Multi-resolution optimization with EXIF metadata extraction
+Every data field is tracked with its source and confidence level. The system aggregates data from multiple contributors and uses consensus algorithms to determine ground truth:
 
-### Technical Stack
-
-**Backend:**
-- Elixir 1.15+ with Phoenix Framework
-- PostgreSQL 14+ with JSONB support
-- Supabase for authentication and real-time features
-
-**Frontend:**
-- React 18+ with TypeScript
-- Vite build system
-- Tailwind CSS for styling
-- Custom component library
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- Elixir 1.15+
-- PostgreSQL 14+
-- Supabase CLI (optional)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd nuke
-   ```
-
-2. **Install frontend dependencies**
-   ```bash
-   cd nuke_frontend
-   npm install
-   ```
-
-3. **Install backend dependencies**
-   ```bash
-   cd ../nuke_api
-   mix deps.get
-   ```
-
-4. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-### Development
-
-**Start the backend server:**
-```bash
-cd nuke_api
-mix phx.server
+```
+Data Quality = f(source_type, consensus_level, verification_count, temporal_consistency)
 ```
 
-**Start the frontend development server:**
+**Source Hierarchy:**
+- Professional Title Verification: 100% confidence weight
+- Expert Certification: 95% confidence weight  
+- Multi-User Consensus: 85% confidence weight
+- Single User Claim: 75% confidence weight
+- AI Detection: 30-60% confidence weight (context-dependent)
+
+### 2. Computer Vision Analysis
+
+Automated image analysis using custom trained  AWS Rekognition with confidence boosting:
+
+- **Part Detection**: Identifies automotive components with cross-image validation
+- **Damage Assessment**: Detects rust, dents, and wear patterns
+- **Modification Tracking**: Recognizes non-stock components and upgrades
+- **Cross-Validation**: Increases confidence when same component appears in multiple images from the same photo session
+
+**Production Results:**
+```
+Test Vehicle (1974 K5 Blazer, 92 images):
+├─ 114 quality detections (100% confidence, cross-validated)
+├─ 32 condition detections (100% confidence)
+├─ 4 parts detections (99% confidence, cross-validated)
+└─ 291 total AI tags with source attribution
+```
+
+### 3. Intelligent Document Processing
+
+Receipt and document parsing using LLM-based extraction with validation:
+
+- **Structured Extraction**: Vendor, dates, line items, totals
+- **Dual Validation**: Primary extraction + LLM validation pass
+- **Error Detection**: Identifies inconsistencies in OCR output
+- **Financial Tracking**: Links expenses to timeline events and modifications
+
+### 4. Price Intelligence Engine
+
+AI-assisted valuation combining arborial data sources:
+
+- Market data aggregation from auction and online platforms
+- Modification value assessment
+- Condition-based adjustments
+- Historical price tracking
+- Human oversight and override capabilities
+
+**Algorithm:**
+```
+Price = (Market_Base × 0.40) + (AI_Analysis × 0.30) + (Modifications × 0.20) + (Condition × 0.10)
+```
+
+### 5. Timeline Event Correlation
+
+Automated relationship detection between events, images, and documents:
+
+- **Temporal Clustering**: Groups related events by date proximity
+- **Evidence Linking**: Connects supporting documents to timeline claims
+- **Photo Session Detection**: Identifies images taken during same work session
+- **EXIF Analysis**: Extracts location, timestamp, and camera metadata
+
+## Data Quality Architecture
+
+### Duality Principle
+
+The system follows a fundamental architectural pattern: every event creates dual value for both vehicle history and user contributions. One record in `timeline_events` serves both purposes:
+
+- **Vehicle Timeline**: Filters by `vehicle_id` for complete history
+- **User Contributions**: Filters by `user_id` for credibility tracking
+
+Both views are automatically synchronized because they query the same underlying data source.
+
+### Confidence Scoring
+
+Every data point carries metadata about its provenance:
+
+```typescript
+interface FieldSource {
+  field_name: string;
+  value: any;
+  source_type: 'title' | 'professional' | 'human' | 'ai';
+  confidence_score: number;
+  verified_by: string[];
+  created_at: timestamp;
+}
+```
+
+### Verification Hierarchy
+
+Different contributor types have different field access and trust levels:
+
+- **Title Holders**: Full write access, highest trust
+- **Professional Services**: Scoped access to work performed
+- **Verified Contributors**: Limited field access, moderate trust
+- **Public Viewers**: Read-only with appropriate data visibility
+
+## Technical Architecture
+
+### Frontend
+- **React 18+** with TypeScript
+- **Vite** build system
+- **Tailwind CSS** for styling
+- Direct Supabase integration for real-time data
+
+### Backend
+- **Supabase** - PostgreSQL with Row Level Security
+- **Edge Functions** - Serverless TypeScript for AI/ML operations
+- **AWS Rekognition** - Computer vision processing
+- **Anthropic Claude / OpenAI** - Document parsing and validation
+
+### Data Layer
+- **PostgreSQL 14+** with JSONB for flexible schemas
+- **Real-time subscriptions** for live updates
+- **Optimistic locking** for concurrent edits
+- **Audit logging** for all data changes
+
+## Key Features
+
+### High-Fidelity Data Management
+- Source attribution for every field
+- Confidence scoring on all data points
+- Multi-party consensus validation
+- Temporal consistency checking
+
+### Professional Tools
+- Receipt parsing and expense tracking
+- Tool inventory management
+- Location-based work sessions
+- Shop integration and compliance
+
+### Collaborative Verification
+- Multiple users can contribute to same vehicle profile
+- Consensus-based truth determination
+- Verification reputation system
+- Expert certification workflows
+
+### Privacy & Security
+- Row-level security policies
+- Role-based access control
+- Granular data visibility rules
+- Secure document storage
+
+## Production Deployment
+
+The platform runs entirely on managed services:
+
+```
+Frontend → Vercel
+Database → Supabase (PostgreSQL + Auth + Storage)
+Edge Functions → Supabase (Deno runtime)
+Computer Vision → AWS Rekognition
+```
+
+**Deployment:**
 ```bash
 cd nuke_frontend
-npm run dev
+vercel --prod
 ```
 
-The application will be available at `http://localhost:5174`
+## Data Quality Guarantees
 
-## Core Features
-
-### Vehicle Management
-- Complete vehicle lifecycle tracking
-- Multi-source data aggregation
-- Professional verification workflow
-- Immutable historical records
-
-### Timeline System
-- Event-driven architecture
-- Temporal data management
-- Confidence scoring
-- Multi-participant records
-
-### Image Pipeline
-- Multi-resolution optimization
-- EXIF metadata extraction
-- Automatic variant generation
-- Performance-optimized delivery
-
-### User Management
-- Role-based access control
-- Professional verification
-- Contribution tracking
-- Activity monitoring
+1. **Source Transparency**: Every field shows its data source
+2. **Confidence Scoring**: All data points include confidence levels
+3. **Audit Trail**: Complete history of all changes
+4. **Consensus Validation**: Multiple contributors increase accuracy
+5. **Professional Verification**: Expert oversight for critical data
 
 ## API Documentation
 
-### Vehicle Endpoints
-
-```
-GET    /api/vehicles           # List vehicles
-POST   /api/vehicles           # Create vehicle
-GET    /api/vehicles/:id       # Get vehicle details
-PUT    /api/vehicles/:id       # Update vehicle
-DELETE /api/vehicles/:id       # Delete vehicle
-```
-
-### Timeline Endpoints
-
-```
-GET    /api/vehicles/:id/timeline      # Get vehicle timeline
-POST   /api/vehicles/:id/events        # Create timeline event
-PUT    /api/timeline-events/:id        # Update event
-DELETE /api/timeline-events/:id        # Delete event
-```
-
-### Image Endpoints
-
-```
-POST   /api/vehicles/:id/images        # Upload image
-GET    /api/vehicles/:id/images        # List images
-DELETE /api/images/:id                 # Delete image
-```
-
-## Database Schema
-
-### Core Tables
-
-- `vehicles`: Primary vehicle records
-- `timeline_events`: Historical event records
-- `vehicle_images`: Image storage and metadata
-- `profiles`: User profile management
-- `verifications`: Professional verification records
-
-See `docs/schema.md` for complete database documentation.
-
-## Performance
-
-### Optimization Features
-
-- **Image Pipeline**: 300x improvement in thumbnail loading (10KB vs 3MB)
-- **Component Architecture**: Modular design for optimal bundle splitting
-- **Database Indexing**: Optimized queries for timeline and search operations
-- **Caching**: Strategic caching for frequently accessed data
-
-### Monitoring
-
-- Application performance monitoring
-- Database query optimization
-- Error tracking and alerting
-- User experience metrics
-
-## Security
-
-### Authentication
-- Supabase Auth integration
-- JWT token management
-- Role-based access control
-
-### Data Protection
-- Row Level Security policies
-- Input validation and sanitization
-- Secure file upload handling
-- API rate limiting
-
-## Testing
-
-**Run frontend tests:**
-```bash
-cd nuke_frontend
-npm test
-```
-
-**Run backend tests:**
-```bash
-cd nuke_api
-mix test
-```
-
-## Deployment
-
-### Production Configuration
-
-1. Set production environment variables
-2. Build frontend assets: `npm run build`
-3. Run database migrations: `mix ecto.migrate`
-4. Start production server: `mix phx.server`
-
-### Environment Variables
-
-Required configuration:
-- `DATABASE_URL`: PostgreSQL connection string
-- `SECRET_KEY_BASE`: Phoenix secret key
-- `SUPABASE_URL`: Supabase project URL
-- `SUPABASE_ANON_KEY`: Supabase anonymous key
+See `/docs` directory for:
+- API endpoints and schemas
+- Data quality algorithms
+- Verification workflows
+- Integration guides
 
 ## Contributing
 
-### Development Workflow
-
-1. Create feature branch from `main`
-2. Implement changes with tests
-3. Ensure all tests pass
-4. Submit pull request with description
-
-### Code Standards
-
-- TypeScript for frontend development
-- Elixir/Phoenix conventions for backend
-- Comprehensive test coverage
-- Documentation for public APIs
-
-## Support
-
-For technical support and questions:
-- Review documentation in `docs/` directory
-- Check existing issues in the repository
-- Contact the development team
+This is a production system with high data quality standards. See `CONTRIBUTING.md` for guidelines on:
+- Data validation requirements
+- Testing procedures
+- Code quality standards
+- Documentation expectations
 
 ---
 
-**License**: Private - All rights reserved
+**Built for automotive professionals, collectors, and verification services who demand high-quality data.**
