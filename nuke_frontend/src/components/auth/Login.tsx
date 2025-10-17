@@ -133,12 +133,9 @@ const Login = () => {
       setError(null);
       setLoading(true);
       
-      // For remote Supabase, let it handle the redirect automatically
-      // For local development, specify the local callback
-      const isLocalSupabase = import.meta.env.VITE_SUPABASE_URL?.includes('localhost');
-      const options = isLocalSupabase 
-        ? { redirectTo: `${window.location.origin}/auth/callback` }
-        : {}; // Let Supabase handle the redirect for remote instances
+      // Always specify an explicit redirect so production deployments on Vercel
+      // return to the correct origin regardless of Supabase Site URL
+      const options = { redirectTo: `${window.location.origin}/auth/callback` };
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
