@@ -152,7 +152,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             <button 
               className="mobile-menu-button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ display: 'none' }}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav"
             >
               ☺
             </button>
@@ -186,7 +188,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
         {/* Mobile Navigation Menu */}
         {mobileMenuOpen && (
-          <nav className="mobile-nav">
+          <nav id="mobile-nav" className="mobile-nav">
             <Link 
               to="/dashboard" 
               className={`mobile-nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}

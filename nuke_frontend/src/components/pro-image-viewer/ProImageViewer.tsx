@@ -125,6 +125,13 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  // Touch gesture state
+  const lastTouchRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const swipeRef = useRef<{ startX: number; startY: number; moved: boolean } | null>(null);
+  const pinchRef = useRef<{ startDistance: number; startZoom: number } | null>(null);
+  const lastTapTimeRef = useRef<number>(0);
   
   // Comments state
   const [comments, setComments] = useState<ImageComment[]>([]);
@@ -141,6 +148,14 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
     loadImages();
     loadCurrentUser();
   }, [vehicleId]);
+
+  // Track viewport for mobile-specific layout tweaks
+  useEffect(() => {
+    const resize = () => setIsMobileViewport(window.innerWidth < 768);
+    resize();
+    window.addEventListener('resize', resize, { passive: true });
+    return () => window.removeEventListener('resize', resize);
+  }, []);
 
   // Debug: Log when images state changes
   useEffect(() => {
@@ -674,6 +689,110 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
     setIsDragging(false);
   };
 
+  // Helpers for touch gestures
+  const distanceBetweenTouches = (e: React.TouchEvent): number => {
+    const [t1, t2] = [e.touches[0], e.touches[1]];
+    const dx = t2.clientX - t1.clientX;
+    const dy = t2.clientY - t1.clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLImageElement>) => {
+    if (!showFullRes) return; // Only enable gestures when full-res is active
+    if (e.touches.length === 2) {
+      // Pinch start
+      const dist = distanceBetweenTouches(e as unknown as React.TouchEvent);
+      pinchRef.current = { startDistance: dist, startZoom: zoomLevel };
+      lastTouchRef.current = null;
+      swipeRef.current = null;
+    } else if (e.touches.length === 1) {
+      const t = e.touches[0];
+      lastTouchRef.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+      swipeRef.current = { startX: t.clientX, startY: t.clientY, moved: false };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLImageElement>) => {
+    if (!showFullRes) return;
+    if (e.touches.length === 2 && pinchRef.current) {
+      // Pinch to zoom
+      e.preventDefault();
+      const newDist = distanceBetweenTouches(e);
+      const scale = newDist / Math.max(1, pinchRef.current.startDistance);
+      const newZoom = Math.max(1, Math.min(4, pinchRef.current.startZoom * scale));
+      setZoomLevel(newZoom);
+    } else if (e.touches.length === 1 && lastTouchRef.current) {
+      const t = e.touches[0];
+      const dx = t.clientX - lastTouchRef.current.x;
+      const dy = t.clientY - lastTouchRef.current.y;
+      if (zoomLevel > 1) {
+        // Pan when zoomed
+        e.preventDefault();
+        setPanPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+        lastTouchRef.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+        if (swipeRef.current) swipeRef.current.moved = true;
+      } else {
+        // Track potential swipe for navigation when not zoomed
+        if (swipeRef.current) {
+          const deltaX = t.clientX - swipeRef.current.startX;
+          const deltaY = t.clientY - swipeRef.current.startY;
+          if (Math.hypot(deltaX, deltaY) > 10) swipeRef.current.moved = true;
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLImageElement>) => {
+    if (!showFullRes) return;
+    // End pinch
+    if (e.touches.length < 2) {
+      pinchRef.current = null;
+    }
+
+    // Single-finger gestures
+    const lt = lastTouchRef.current;
+    const swipe = swipeRef.current;
+    if (lt && (!e.touches || e.touches.length === 0)) {
+      const dt = Date.now() - lt.time;
+      const changed = (e.changedTouches && e.changedTouches[0]) || null;
+      const endX = changed ? changed.clientX : lt.x;
+      const endY = changed ? changed.clientY : lt.y;
+      const dx = endX - (swipe?.startX ?? lt.x);
+      const dy = endY - (swipe?.startY ?? lt.y);
+
+      // Swipe nav when not zoomed
+      if (zoomLevel === 1 && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) navigateImage('next');
+        else navigateImage('prev');
+        lastTouchRef.current = null;
+        swipeRef.current = null;
+        return;
+      }
+
+      // Double tap to toggle zoom
+      if (dt < 250 && Math.abs(dx) < 6 && Math.abs(dy) < 6) {
+        const now = Date.now();
+        if (now - lastTapTimeRef.current < 300) {
+          // Double tap detected
+          if (zoomLevel === 1) {
+            setZoomLevel(2);
+          } else if (zoomLevel === 2) {
+            setZoomLevel(4);
+          } else {
+            setZoomLevel(1);
+            setPanPosition({ x: 0, y: 0 });
+          }
+          lastTapTimeRef.current = 0;
+        } else {
+          lastTapTimeRef.current = now;
+        }
+      }
+    }
+
+    lastTouchRef.current = null;
+    swipeRef.current = null;
+  };
+
   const handleImageClickForTagging = (e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -946,7 +1065,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-3 m-4">
+            <div className="grid m-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
               {displayedImages.map((image: ImageData) => (
                 <div 
                   key={image.id} 
@@ -1091,13 +1210,18 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                   transition: showFullRes ? 'none' : 'max-width 0.3s ease',
                   cursor: !showFullRes ? 'zoom-in' : (showTags ? 'crosshair' : (zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in')),
                   transform: showFullRes ? `scale(${zoomLevel}) translate(${panPosition.x / zoomLevel}px, ${panPosition.y / zoomLevel}px)` : 'none',
-                  transformOrigin: 'center center'
+                  transformOrigin: 'center center',
+                  touchAction: showFullRes ? 'none' : 'manipulation',
+                  userSelect: 'none'
                 }}
                 onClick={handleImageClickForTagging}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 onLoad={() => {
                   if (!fullResLoaded) {
                     setFullResLoaded(true);
@@ -1445,7 +1569,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                   onClick={(e) => { e.stopPropagation(); navigateImage('next'); }}
                   style={{
                     position: 'absolute',
-                    right: showInfo || showComments ? '420px' : '20px',
+                    right: (showInfo || showComments || showTags) ? (isMobileViewport ? '20px' : '420px') : '20px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'rgba(0, 0, 0, 0.7)',
@@ -1555,12 +1679,17 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
             <div 
               className="card"
               style={{ 
-                width: '400px', 
+                width: isMobileViewport ? '100vw' : '400px', 
                 height: '100vh', 
                 borderLeft: '2px inset var(--border-medium)',
                 borderRadius: 0,
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                position: isMobileViewport ? 'absolute' : 'relative',
+                right: isMobileViewport ? 0 : undefined,
+                top: isMobileViewport ? 0 : undefined,
+                zIndex: 1002,
+                background: 'var(--grey-100)'
               }}
             >
               {/* Panel Header */}
