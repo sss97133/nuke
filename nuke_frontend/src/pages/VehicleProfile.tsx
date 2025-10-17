@@ -40,22 +40,7 @@ const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
   
-  // Detect mobile device
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
-  // If mobile, use mobile-optimized version
-  if (isMobile && vehicleId) {
-    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
-  }
-  
+  // All state hooks must be declared before any conditional returns
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [session, setSession] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
@@ -113,6 +98,22 @@ const VehicleProfile: React.FC = () => {
   const [bookmarklets, setBookmarklets] = useState<{ key: string; label: string; href: string }[]>([]);
   const [composeText, setComposeText] = useState<{ title: string; description: string; specs: string[] }>({ title: '', description: '', specs: [] });
   const [userProfile, setUserProfile] = useState<any>(null);
+  
+  // Detect mobile device
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  // If mobile, use mobile-optimized version - moved after all hooks
+  if (isMobile && vehicleId) {
+    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
+  }
 
   // Calculate true legal ownership - requires verified title + matching legal ID
   const isVerifiedOwner = React.useMemo(() => {
