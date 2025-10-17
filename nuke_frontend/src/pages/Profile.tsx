@@ -306,12 +306,15 @@ const Profile: React.FC = () => {
       <div className="container">
         <div className="main">
           {/* Minimal Profile Header */}
-          <div style={{ 
-            display: 'flex', 
+          <div style={{
+            display: 'flex',
             alignItems: 'center',
             gap: 'var(--space-3)',
             padding: 'var(--space-3)',
-            marginBottom: 'var(--space-4)'
+            marginBottom: 'var(--space-4)',
+            background: 'var(--white)',
+            borderRadius: '4px',
+            border: '1px solid var(--border-light)'
           }}>
             {/* Avatar - Circular */}
             <div style={{
