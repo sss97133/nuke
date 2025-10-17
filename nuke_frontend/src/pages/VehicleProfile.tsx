@@ -109,6 +109,15 @@ const VehicleProfile: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Handle anchor navigation on page load
+  useEffect(() => {
+    if (window.location.hash === '#image-tagging') {
+      setTimeout(() => {
+        document.getElementById('image-tagging')?.scrollIntoView({ behavior: 'smooth' });
+      }, 1000); // Wait for page to fully render
+    }
+  }, []);
   
   // If mobile, use mobile-optimized version - moved after all hooks
   if (isMobile && vehicleId) {
@@ -1205,7 +1214,7 @@ const VehicleProfile: React.FC = () => {
 
               {/* Enhanced Photo Tagging System */}
               {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
-                <div className="card">
+                <div id="image-tagging" className="card">
                   <div className="card-header">🏷️ Image Tagging & AI Validation</div>
                   <div className="card-body">
                     <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
