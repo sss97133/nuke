@@ -57,6 +57,7 @@ import Inbox from './pages/Inbox';
 // import type { BusinessManagement } from './pages/BusinessManagement';
 import BulkPriceEditor from './pages/admin/BulkPriceEditor';
 import PriceCsvImport from './pages/admin/PriceCsvImport';
+import GuidedCapture from './pages/GuidedCapture';
 
 
 // Auth components
@@ -226,6 +227,7 @@ function App() {
                 <PhotoLibraryCategorizer />
               </AppLayout>
             } />
+            <Route path="/guided-capture" element={<GuidedCapture />} />
             <Route path="/dropbox-import" element={<DropboxImport />} />
             <Route path="/dropbox-callback" element={<DropboxCallback />} />
             <Route path="/dropbox-ai-process" element={<DropboxAIProcess />} />

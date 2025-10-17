@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { TimelineEventService } from './timelineEventService';
 import { ExifExtractor } from '../utils/exifExtractor';
 import { WorkSessionService } from './workSessionService';
+import { TagService } from './tagService';
 
 interface UploadItem {
   id: string;
@@ -129,7 +130,7 @@ class GlobalUploadQueue {
         .getPublicUrl(filePath);
       
       // Save to database with GPS coordinates
-      const { error: dbError } = await supabase
+      const { data: inserted, error: dbError } = await supabase
         .from('vehicle_images')
         .insert({
           vehicle_id: item.vehicleId,
@@ -146,7 +147,9 @@ class GlobalUploadQueue {
             camera: exifData.camera,
             orientation: exifData.orientation
           }
-        });
+        })
+        .select('id, image_url')
+        .single();
       
       if (dbError) throw dbError;
       
@@ -164,6 +167,19 @@ class GlobalUploadQueue {
       
       item.status = 'completed';
       item.progress = 100;
+
+      // Trigger AI auto-analysis for this upload
+      try {
+        await supabase.functions.invoke('auto-analyze-upload', {
+          body: {
+            image_url: inserted?.image_url || publicUrl,
+            vehicle_id: item.vehicleId,
+            trigger_source: 'upload'
+          }
+        });
+      } catch (e) {
+        console.warn('Auto-analysis trigger failed:', (e as any)?.message || e);
+      }
       
       // Check if all uploads for this vehicle are complete
       const vehicleUploads = this.queue.filter(q => q.vehicleId === item.vehicleId);
