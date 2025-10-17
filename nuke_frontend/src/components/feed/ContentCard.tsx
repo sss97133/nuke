@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FeedItem } from './types';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import ImageLightbox from '../image/ImageLightbox';
+import VehicleQuickView from './VehicleQuickView';
 import '../../design-system.css';
 import { computePrimaryPrice, computeDelta, formatCurrency } from '../../services/priceSignalService';
 
@@ -14,6 +15,7 @@ interface ContentCardProps {
 const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentCardProps) => {
   const [imageError, setImageError] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [quickViewOpen, setQuickViewOpen] = useState(false);
   const { trackView, trackInteraction } = useActivityTracking();
 
   const getTypeLabel = (type: string) => type.replace('_', ' ');
@@ -87,29 +89,31 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
       location: item.location
     });
 
-    // Navigate to detailed view based on content type
-    const baseUrl = '/';
-    switch (item.type) {
-      case 'vehicle':
-        window.location.href = `${baseUrl}vehicle/${item.id}`;
-        break;
-      case 'image':
-        window.location.href = `${baseUrl}images/${item.id}`;
-        break;
-      case 'shop':
-        window.location.href = `${baseUrl}shops/${item.id}`;
-        break;
-      case 'timeline_event': {
-        const vid = (item as any)?.metadata?.vehicle_id;
-        if (vid) {
-          window.location.href = `${baseUrl}vehicle/${vid}?t=timeline&event=${item.id}`;
-        } else {
-          window.location.href = `${baseUrl}events/${item.id}`;
+    // Open quick view for vehicles, navigate for other types
+    if (item.type === 'vehicle') {
+      setQuickViewOpen(true);
+    } else {
+      // Navigate to detailed view for non-vehicle content
+      const baseUrl = '/';
+      switch (item.type) {
+        case 'image':
+          window.location.href = `${baseUrl}images/${item.id}`;
+          break;
+        case 'shop':
+          window.location.href = `${baseUrl}shops/${item.id}`;
+          break;
+        case 'timeline_event': {
+          const vid = (item as any)?.metadata?.vehicle_id;
+          if (vid) {
+            window.location.href = `${baseUrl}vehicle/${vid}?t=timeline&event=${item.id}`;
+          } else {
+            window.location.href = `${baseUrl}events/${item.id}`;
+          }
+          break;
         }
-        break;
+        default:
+          console.log('View item:', item);
       }
-      default:
-        console.log('View item:', item);
     }
   };
 
@@ -121,36 +125,21 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
         border: '1px solid #c0c0c0',
         borderRadius: '2px',
         overflow: 'hidden',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        position: 'relative'
       }}
       onClick={handleCardClick}
     >
-      {/* Content Type Badge */}
-      <div style={{
-        position: 'absolute',
-        top: '6px',
-        left: '6px',
-        zIndex: 10,
-        border: '1px solid #c0c0c0',
-        background: '#f3f4f6',
-        color: '#333',
-        padding: '2px 4px',
-        borderRadius: '2px',
-        fontSize: '8pt',
-        fontWeight: 600
-      }}>
-        {getTypeLabel(item.type)}
-      </div>
-
       {/* Image */}
-      {item.image_url && !imageError && (
+      {item.image_url && !imageError ? (
         <div style={{
           position: 'relative',
           width: '100%',
           height: viewMode === 'gallery' ? '200px' : 
-                 viewMode === 'compact' ? '120px' : 
-                 '60px', // technical mode: small image
-          overflow: 'hidden'
+                 viewMode === 'compact' ? '140px' : 
+                 '80px',
+          overflow: 'hidden',
+          background: '#000'
         }}>
           <img
             src={item.image_url}
@@ -164,139 +153,104 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
               cursor: 'pointer'
             }}
           />
-
-          {/* Location Badge */}
-          {null}
+        </div>
+      ) : (
+        <div style={{
+          width: '100%',
+          height: viewMode === 'gallery' ? '200px' : 
+                 viewMode === 'compact' ? '140px' : 
+                 '80px',
+          background: '#f3f4f6',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '48px',
+          color: '#d1d5db'
+        }}>
+          🚗
         </div>
       )}
 
       {/* Content */}
       <div style={{ padding: '8px' }}>
-        {/* User Info */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
-          <div style={{ flex: 1 }}>
-            <div className="text text-bold" style={{ fontSize: '8pt' }}>
-              {item.user_name || 'User'}
-            </div>
-            <div className="text text-muted" style={{ fontSize: '8pt' }}>
-              {formatDate(item.created_at)}
-            </div>
-          </div>
-        </div>
-
         {/* Title */}
         <h3 className="heading-3" style={{
-          margin: '0 0 4px 0',
+          margin: '0 0 6px 0',
           fontSize: '10pt',
-          lineHeight: 1.3
+          lineHeight: 1.2,
+          fontWeight: 600
         }}>
           {item.title}
         </h3>
 
-        {/* Description */}
-        {item.description && (
-          <p className="text" style={{
-            margin: '0 0 8px 0',
-            fontSize: '8pt',
-            lineHeight: 1.3,
-            color: '#555',
-            overflow: 'hidden',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical'
-          }}>
-            {item.description}
-          </p>
-        )}
+        {/* Price Information - Clean and Prominent */}
+        {item.type === 'vehicle' && item.metadata && (() => {
+          const sig: any = (item as any)?.metadata?.priceSignal;
+          const priceMeta = {
+            msrp: item.metadata?.msrp,
+            current_value: item.metadata?.current_value,
+            purchase_price: item.metadata?.purchase_price,
+            asking_price: item.metadata?.asking_price,
+            sale_price: item.metadata?.sale_price,
+            is_for_sale: item.metadata?.is_for_sale,
+          } as any;
+          const pi = sig && sig.primary_label && typeof sig.primary_value === 'number'
+            ? { label: sig.primary_label as any, amount: sig.primary_value as number }
+            : computePrimaryPrice(priceMeta);
+          const delta = sig && typeof sig.delta_pct === 'number' && typeof sig.delta_amount === 'number'
+            ? { amount: sig.delta_amount as number, percent: sig.delta_pct as number, isPositive: (sig.delta_amount as number) >= 0 }
+            : computeDelta(priceMeta);
 
-        {/* Metadata */}
-        {item.metadata && (
-          <div style={{ marginBottom: '12px' }}>
-            {item.type === 'vehicle' && item.metadata && (
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                {item.metadata.year && (
-                  <span className="badge" style={smallChipStyle}>{item.metadata.year}</span>
-                )}
-                {item.metadata.make && (
-                  <span className="badge" style={smallChipStyle}>{item.metadata.make}</span>
-                )}
-                {item.metadata.model && (
-                  <span className="badge" style={smallChipStyle}>{item.metadata.model}</span>
-                )}
-
-                {/* Price chips (prefer RPC priceSignal if available) */}
-                {(() => {
-                  const sig: any = (item as any)?.metadata?.priceSignal;
-                  const priceMeta = {
-                    msrp: item.metadata?.msrp,
-                    current_value: item.metadata?.current_value,
-                    purchase_price: item.metadata?.purchase_price,
-                    asking_price: item.metadata?.asking_price,
-                    sale_price: item.metadata?.sale_price,
-                    is_for_sale: item.metadata?.is_for_sale,
-                  } as any;
-                  const pi = sig && sig.primary_label && typeof sig.primary_value === 'number'
-                    ? { label: sig.primary_label as any, amount: sig.primary_value as number }
-                    : computePrimaryPrice(priceMeta);
-                  const delta = sig && typeof sig.delta_pct === 'number' && typeof sig.delta_amount === 'number'
-                    ? { amount: sig.delta_amount as number, percent: sig.delta_pct as number, isPositive: (sig.delta_amount as number) >= 0 }
-                    : computeDelta(priceMeta);
-
-                  // Market band chip (85%-100%-115% of current_value)
-                  const currentValue = sig?.anchor_value || priceMeta.current_value;
-                  const marketBand = currentValue ? {
-                    low: Math.round(currentValue * 0.85),
-                    mid: Math.round(currentValue),
-                    high: Math.round(currentValue * 1.15)
-                  } : null;
-
-                  return (
-                    <>
-                      {pi.label && typeof pi.amount === 'number' && (
-                        <span className="badge" style={smallChipStyle} title={Array.isArray(sig?.sources) ? `Sources: ${sig.sources.join(', ')}` : undefined}>
-                          {pi.label}: {formatCurrency(pi.amount)}
-                        </span>
-                      )}
-                      {delta && (
-                        <span className="badge" style={{ ...smallChipStyle, color: delta.isPositive ? '#006400' : '#800000' }} title={Array.isArray(sig?.sources) ? `Sources: ${sig.sources.join(', ')}` : undefined}>
-                          {delta.isPositive ? '↑' : '↓'} {Math.abs(delta.percent).toFixed(1)}%
-                        </span>
-                      )}
-                      {marketBand && (
-                        <span className="badge" style={smallChipStyle} title="Market band: 85%–100%–115% of current value">
-                          Band: {formatCurrency(marketBand.low)}–{formatCurrency(marketBand.mid)}–{formatCurrency(marketBand.high)}
-                        </span>
-                      )}
-                      {typeof sig?.confidence === 'number' && (
-                        <span className="badge" style={smallChipStyle} title="Signal confidence">
-                          conf {sig.confidence}
-                        </span>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-
-            {item.type === 'timeline_event' && item.metadata?.event_type && (
-              <span className="badge" style={smallChipStyle}>
-                {item.metadata.event_type.replace('_', ' ')}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Engagement Stats */}
-        {item.engagement && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid #e5e7eb' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {item.engagement.likes > 0 && (<span style={smallChipStyle}>{item.engagement.likes} likes</span>)}
-              {item.engagement.comments > 0 && (<span style={smallChipStyle}>{item.engagement.comments} comments</span>)}
-              {item.engagement.views > 0 && (<span style={smallChipStyle}>{item.engagement.views} views</span>)}
+          return (
+            <div style={{ marginTop: '8px' }}>
+              {/* Primary Price Display */}
+              {pi.label && typeof pi.amount === 'number' && (
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+                  <span style={{ 
+                    fontSize: '14pt', 
+                    fontWeight: 'bold', 
+                    color: '#000',
+                    fontFamily: 'monospace'
+                  }}>
+                    {formatCurrency(pi.amount)}
+                  </span>
+                  <span style={{ 
+                    fontSize: '8pt', 
+                    color: '#666',
+                    fontWeight: 600
+                  }}>
+                    {pi.label}
+                  </span>
+                  {delta && (
+                    <span style={{ 
+                      fontSize: '8pt',
+                      fontWeight: 600,
+                      color: delta.isPositive ? '#16a34a' : '#dc2626'
+                    }}>
+                      {delta.isPositive ? '↑' : '↓'} {Math.abs(delta.percent).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              {/* Secondary info chips */}
+              {(Array.isArray(sig?.sources) || typeof sig?.confidence === 'number') && (
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  {Array.isArray(sig?.sources) && sig.sources.length > 0 && (
+                    <span style={{ ...smallChipStyle, fontSize: '7pt' }} title={`Data sources: ${sig.sources.join(', ')}`}>
+                      {sig.sources.length} {sig.sources.length === 1 ? 'source' : 'sources'}
+                    </span>
+                  )}
+                  {typeof sig?.confidence === 'number' && sig.confidence > 0 && (
+                    <span style={{ ...smallChipStyle, fontSize: '7pt' }} title="Price signal confidence score">
+                      {sig.confidence}% confidence
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-            <div style={{ color: '#6b7280', fontSize: '8pt' }}>Open details</div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Image Lightbox */}
@@ -310,6 +264,15 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
           title={item.title}
           description={item.description}
           canEdit={true}
+        />
+      )}
+
+      {/* Vehicle Quick View Modal */}
+      {item.type === 'vehicle' && (
+        <VehicleQuickView
+          vehicleId={item.id}
+          isOpen={quickViewOpen}
+          onClose={() => setQuickViewOpen(false)}
         />
       )}
     </div>
