@@ -13,6 +13,7 @@
 
 ### **Production Frontend**
 - **URL**: `https://nukefrontend.vercel.app`
+- **Project**: `nuke_frontend` (only Vercel project)
 - **Auto-deploys**: On git push to main
 
 ### **GitHub OAuth App**
