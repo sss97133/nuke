@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Link } from 'react-router-dom';
-import VehicleThumbnail from '../VehicleThumbnail';
+import ShopVehicleCard from './ShopVehicleCard';
 import '../../design-system.css';
 
 interface VehiclesPanelProps {
@@ -33,6 +32,7 @@ const VehiclesPanel: React.FC<VehiclesPanelProps> = ({ orgId }) => {
   const [busy, setBusy] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
+  const [denseModeEnabled, setDenseModeEnabled] = useState(false);
   const [memberCount, setMemberCount] = useState(0);
   const [weeklyAdditions, setWeeklyAdditions] = useState(0);
 
@@ -97,7 +97,7 @@ const VehiclesPanel: React.FC<VehiclesPanelProps> = ({ orgId }) => {
       if (!q) { setResults([]); return; }
       const { data, error } = await supabase
         .from('vehicles')
-        .select('id, make, model, year, vin, created_at')
+        .select('id, make, model, year, vin, created_at, sale_price, current_value, is_for_sale, uploaded_by, profiles(username, full_name)')
         .or(`vin.ilike.%${q}%,make.ilike.%${q}%,model.ilike.%${q}%`)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -140,18 +140,12 @@ const VehiclesPanel: React.FC<VehiclesPanelProps> = ({ orgId }) => {
     }
   };
 
-  const getUserDisplay = (vehicle: VehicleRow) => {
-    if (vehicle.profiles?.full_name) return vehicle.profiles.full_name;
-    if (vehicle.profiles?.username) return vehicle.profiles.username;
-    return 'Unknown';
-  };
-
   if (loading) return <div className="text text-small text-muted">Loading vehicles…</div>;
   if (error) return <div className="text text-small" style={{ color: '#b91c1c' }}>{error}</div>;
   
   return (
     <div className="space-y-2">
-      {/* Stats Header Card */}
+      {/* Stats Header Card - Following Discovery page pattern */}
       <div className="card">
         <div className="card-body" style={{ padding: '6px 8px' }}>
           <div className="flex items-center justify-between">
@@ -161,27 +155,63 @@ const VehiclesPanel: React.FC<VehiclesPanelProps> = ({ orgId }) => {
             <div className="flex items-center" style={{ gap: '2px' }}>
               <button
                 className={`button ${viewMode === 'gallery' ? 'button-primary' : 'button-secondary'}`}
-                onClick={() => setViewMode('gallery')}
-                title="Gallery"
-                style={{ padding: '3px 6px', fontSize: '8pt', minWidth: '24px', height: '20px' }}
+                onClick={() => {
+                  if (viewMode === 'gallery') {
+                    setDenseModeEnabled(!denseModeEnabled);
+                  } else {
+                    setViewMode('gallery');
+                    setDenseModeEnabled(false);
+                  }
+                }}
+                style={{ 
+                  padding: '3px 6px',
+                  fontSize: '8pt',
+                  minWidth: '24px',
+                  height: '20px'
+                }}
+                title={viewMode === 'gallery' && denseModeEnabled ? "Gallery (Dense)" : "Gallery"}
               >
-                Gallery
+                {viewMode === 'gallery' ? (denseModeEnabled ? 'Gallery*' : 'Gallery') : 'Gallery'}
               </button>
               <button
                 className={`button ${viewMode === 'compact' ? 'button-primary' : 'button-secondary'}`}
-                onClick={() => setViewMode('compact')}
-                title="Compact"
-                style={{ padding: '3px 6px', fontSize: '8pt', minWidth: '24px', height: '20px' }}
+                onClick={() => {
+                  if (viewMode === 'compact') {
+                    setDenseModeEnabled(!denseModeEnabled);
+                  } else {
+                    setViewMode('compact');
+                    setDenseModeEnabled(false);
+                  }
+                }}
+                style={{ 
+                  padding: '3px 6px',
+                  fontSize: '8pt',
+                  minWidth: '24px',
+                  height: '20px'
+                }}
+                title={viewMode === 'compact' && denseModeEnabled ? "Compact (Dense)" : "Compact"}
               >
-                Compact
+                {viewMode === 'compact' ? (denseModeEnabled ? 'Compact*' : 'Compact') : 'Compact'}
               </button>
               <button
                 className={`button ${viewMode === 'technical' ? 'button-primary' : 'button-secondary'}`}
-                onClick={() => setViewMode('technical')}
-                title="Technical"
-                style={{ padding: '3px 6px', fontSize: '8pt', minWidth: '24px', height: '20px' }}
+                onClick={() => {
+                  if (viewMode === 'technical') {
+                    setDenseModeEnabled(!denseModeEnabled);
+                  } else {
+                    setViewMode('technical');
+                    setDenseModeEnabled(false);
+                  }
+                }}
+                style={{ 
+                  padding: '3px 6px',
+                  fontSize: '8pt',
+                  minWidth: '24px',
+                  height: '20px'
+                }}
+                title={viewMode === 'technical' && denseModeEnabled ? "Technical (Dense)" : "Technical"}
               >
-                Technical
+                {viewMode === 'technical' ? (denseModeEnabled ? 'Technical*' : 'Technical') : 'Technical'}
               </button>
             </div>
           </div>
@@ -220,90 +250,33 @@ const VehiclesPanel: React.FC<VehiclesPanelProps> = ({ orgId }) => {
         </div>
       )}
 
-      {/* Vehicles Display */}
+      {/* Vehicles Display - Following DiscoveryFeed pattern */}
       {vehicles.length === 0 ? (
         <div className="text text-small text-muted">No vehicles linked to this organization.</div>
       ) : (
-        <>
-          {/* Gallery View - Large thumbnails with minimal info */}
-          {viewMode === 'gallery' && (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:8 }}>
-              {vehicles.map(v => (
-                <Link key={v.id} to={`/vehicle/${v.id}`} className="card" style={{ textDecoration: 'none' }}>
-                  <VehicleThumbnail vehicleId={v.id} />
-                  <div className="card-body" style={{ padding: '6px 8px' }}>
-                    <div className="text text-small text-bold">
-                      {v.year} {v.make} {v.model}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {/* Compact View - Medium thumbnails with key info */}
-          {viewMode === 'compact' && (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8 }}>
-              {vehicles.map(v => (
-                <Link key={v.id} to={`/vehicle/${v.id}`} className="card" style={{ textDecoration: 'none' }}>
-                  <VehicleThumbnail vehicleId={v.id} />
-                  <div className="card-body" style={{ padding: '6px 8px' }}>
-                    <div className="text text-small text-bold">
-                      {v.year} {v.make} {v.model}
-                    </div>
-                    <div className="text text-small text-muted" style={{ marginTop: 2 }}>
-                      {getUserDisplay(v)}
-                    </div>
-                    {(v.sale_price || v.current_value) && (
-                      <div className="text text-small" style={{ marginTop: 2, color: 'var(--primary)' }}>
-                        ${(v.sale_price || v.current_value)?.toLocaleString()}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {/* Technical View - List with all details */}
-          {viewMode === 'technical' && (
-            <div className="space-y-2">
-              {vehicles.map(v => (
-                <div key={v.id} className="card">
-                  <div className="card-body" style={{ padding: '8px 12px' }}>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <div style={{ width: 120, flexShrink: 0 }}>
-                        <Link to={`/vehicle/${v.id}`}>
-                          <VehicleThumbnail vehicleId={v.id} />
-                        </Link>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <Link to={`/vehicle/${v.id}`} className="text text-bold" style={{ textDecoration: 'none' }}>
-                          {v.year} {v.make} {v.model}
-                        </Link>
-                        <div className="text text-small text-muted" style={{ marginTop: 4 }}>
-                          VIN: {v.vin || 'Not provided'}
-                        </div>
-                        <div className="text text-small text-muted" style={{ marginTop: 2 }}>
-                          Owner: {getUserDisplay(v)}
-                        </div>
-                        {(v.sale_price || v.current_value) && (
-                          <div className="text text-small" style={{ marginTop: 4, color: 'var(--primary)', fontWeight: 'bold' }}>
-                            ${(v.sale_price || v.current_value)?.toLocaleString()}
-                            {v.is_for_sale && <span className="text-muted"> • For Sale</span>}
-                          </div>
-                        )}
-                        <div className="text text-small text-muted" style={{ marginTop: 4 }}>
-                          Added: {v.created_at ? new Date(v.created_at).toLocaleDateString() : 'Unknown'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+        <div
+          className="feed-grid"
+          style={{
+            display: 'grid',
+            gap: viewMode === 'compact' ? (denseModeEnabled ? '4px' : '8px') : viewMode === 'gallery' ? '8px' : '4px',
+            gridTemplateColumns: 
+              viewMode === 'gallery' 
+                ? (denseModeEnabled ? 'repeat(auto-fill, minmax(200px, 1fr))' : 'repeat(auto-fill, minmax(280px, 1fr))') :
+              viewMode === 'compact' 
+                ? (denseModeEnabled ? 'repeat(auto-fill, minmax(180px, 1fr))' : 'repeat(auto-fill, minmax(220px, 1fr))') :
+              '1fr', // technical = full width list
+            marginTop: '8px'
+          }}
+        >
+          {vehicles.map((vehicle) => (
+            <ShopVehicleCard 
+              key={vehicle.id} 
+              vehicle={vehicle} 
+              viewMode={viewMode}
+              denseMode={denseModeEnabled}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
