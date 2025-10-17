@@ -373,12 +373,13 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
           <div style={{ padding: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
               <div style={{
-                background: getRarityColor(rarityData.rarity_level),
-                color: 'white',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
                 padding: '6px 12px',
                 borderRadius: '2px',
                 fontWeight: 'bold',
-                fontSize: '10pt'
+                fontSize: '10pt',
+                color: '#1e293b'
               }}>
                 {getRarityLabel(rarityData.rarity_level)}
               </div>
@@ -408,60 +409,77 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
               </div>
             </div>
 
-            {rarityData.rarity_level === 'ULTRA_RARE' && rarityData.total_produced && (
+            {/* Production Data Breakdown - Marti Reports Style */}
+            {rarityData.total_produced && (
               <div style={{
                 marginTop: '12px',
-                padding: '8px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
+                padding: '12px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
                 borderRadius: '2px',
-                display: 'flex',
-                alignItems: 'start',
-                gap: '8px',
                 fontSize: '8pt'
               }}>
-                <AlertCircle size={14} style={{ color: '#dc2626', flexShrink: 0, marginTop: '1px' }} />
-                <div style={{ color: '#7f1d1d' }}>
-                  <strong>Ultra Rare:</strong> Only {rarityData.total_produced.toLocaleString()} {vehicle.year} {vehicle.make} {vehicle.model}s were produced. {rarityData.rarity_reason}
+                <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1e293b' }}>
+                  Production Data
                 </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: '7pt' }}>Total Production</div>
+                    <div style={{ fontSize: '10pt', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                      {rarityData.total_produced.toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: '7pt' }}>Classification</div>
+                    <div style={{ fontSize: '9pt', fontWeight: 600, color: getRarityColor(rarityData.rarity_level) }}>
+                      {getRarityLabel(rarityData.rarity_level)}
+                    </div>
+                  </div>
+                </div>
+
+                {rarityData.rarity_reason && (
+                  <div style={{ 
+                    padding: '6px 8px', 
+                    background: '#f1f5f9', 
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '2px',
+                    fontSize: '7pt',
+                    color: '#475569'
+                  }}>
+                    {rarityData.rarity_reason}
+                  </div>
+                )}
               </div>
             )}
 
-            {rarityData.rarity_level === 'RARE' && rarityData.total_produced && (
+            {/* Database Context */}
+            {rarityData.total_in_database > 0 && (
               <div style={{
-                marginTop: '12px',
+                marginTop: '8px',
                 padding: '8px',
-                background: '#fff7ed',
-                border: '1px solid #fed7aa',
+                background: '#f1f5f9',
+                border: '1px solid #cbd5e1',
                 borderRadius: '2px',
-                display: 'flex',
-                alignItems: 'start',
-                gap: '8px',
-                fontSize: '8pt'
+                fontSize: '7pt',
+                color: '#64748b'
               }}>
-                <AlertCircle size={14} style={{ color: '#ea580c', flexShrink: 0, marginTop: '1px' }} />
-                <div style={{ color: '#9a3412' }}>
-                  <strong>Rare:</strong> Only {rarityData.total_produced.toLocaleString()} {vehicle.year} {vehicle.make} {vehicle.model}s were produced. {rarityData.rarity_reason}
-                </div>
+                Database Context: {rarityData.total_in_database} {rarityData.total_in_database === 1 ? 'vehicle' : 'vehicles'} in our records
               </div>
             )}
 
-            {rarityData.total_in_database === 1 && !rarityData.total_produced && (
+            {/* No Production Data Available */}
+            {!rarityData.total_produced && (
               <div style={{
                 marginTop: '12px',
                 padding: '8px',
-                background: '#f0f9ff',
-                border: '1px solid #bae6fd',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
                 borderRadius: '2px',
-                display: 'flex',
-                alignItems: 'start',
-                gap: '8px',
-                fontSize: '8pt'
+                fontSize: '7pt',
+                color: '#64748b'
               }}>
-                <AlertCircle size={14} style={{ color: '#0369a1', flexShrink: 0, marginTop: '1px' }} />
-                <div style={{ color: '#0c4a6e' }}>
-                  <strong>Limited Data:</strong> This is the only {vehicle.year} {vehicle.make} {vehicle.model} in our database. Production data not available for rarity assessment.
-                </div>
+                Production data not available for this vehicle configuration
               </div>
             )}
           </div>
