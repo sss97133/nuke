@@ -21,6 +21,10 @@ interface RecentVehicle {
   asking_price?: number | null;
   sale_price?: number | null;
   is_for_sale?: boolean | null;
+  vin?: string | null;
+  color?: string | null;
+  rarity_score?: number;
+  total_in_database?: number;
 }
 
 interface RecentEvent {
@@ -82,11 +86,15 @@ const getDelta = (v: RecentVehicle) => {
   return { amount: change, percent, isPositive: change >= 0 } as const;
 };
 
-// Vehicle card with image
+// Enhanced Rare Vehicle card with technical data and interactive elements
 const RareVehicleCard = ({ vehicle, onClick }: { vehicle: RecentVehicle; onClick: () => void }) => {
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [priceSignal, setPriceSignal] = useState<any>(null);
+  const [imageCount, setImageCount] = useState<number>(0);
+  const [eventCount, setEventCount] = useState<number>(0);
 
   useEffect(() => {
+    // Fetch image
     supabase
       .from('vehicle_images')
       .select('image_url')
@@ -96,20 +104,178 @@ const RareVehicleCard = ({ vehicle, onClick }: { vehicle: RecentVehicle; onClick
       .then(({ data }) => {
         if (data?.image_url) setImageUrl(data.image_url);
       });
+
+    // Fetch image count
+    supabase
+      .from('vehicle_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('vehicle_id', vehicle.id)
+      .then(({ count }) => setImageCount(count || 0));
+
+    // Fetch event count
+    supabase
+      .from('timeline_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('vehicle_id', vehicle.id)
+      .then(({ count }) => setEventCount(count || 0));
+
+    // Fetch price signal
+    supabase
+      .from('vehicle_price_signal_view')
+      .select('*')
+      .eq('vehicle_id', vehicle.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setPriceSignal(data);
+      })
+      .catch(() => {
+        // Fallback to RPC
+        supabase.rpc('vehicle_price_signal', { vehicle_ids: [vehicle.id] })
+          .then(({ data }) => {
+            if (data && data[0]) setPriceSignal(data[0]);
+          });
+      });
   }, [vehicle.id]);
 
+  const handleQuickStats = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Open quick stats modal or view
+    window.open(`/vehicle/${vehicle.id}?tab=stats`, '_blank');
+  };
+
+  const primaryPrice = priceSignal?.primary_value || vehicle.current_value || vehicle.asking_price || vehicle.msrp;
+  const priceLabel = priceSignal?.primary_label || 
+                    (vehicle.is_for_sale ? 'ASK' : 
+                     vehicle.current_value ? 'EST' : 
+                     vehicle.msrp ? 'MSRP' : null);
+
   return (
-    <div onClick={onClick} style={{ cursor: 'pointer', border: '1px solid #ddd', overflow: 'hidden' }}>
-      <div style={{ aspectRatio: '16/9', background: '#000', overflow: 'hidden' }}>
+    <div style={{ cursor: 'pointer', border: '1px solid #c0c0c0', overflow: 'hidden', position: 'relative' }}>
+      {/* Rarity Badge */}
+      {vehicle.total_in_database && vehicle.total_in_database <= 2 && (
+        <div style={{
+          position: 'absolute',
+          top: '6px',
+          right: '6px',
+          background: 'rgba(220, 38, 38, 0.95)',
+          color: 'white',
+          padding: '3px 8px',
+          fontSize: '8pt',
+          fontWeight: 'bold',
+          borderRadius: '2px',
+          zIndex: 10,
+          border: '1px solid #fff'
+        }}>
+          {vehicle.total_in_database === 1 ? 'ONLY 1' : `ONLY ${vehicle.total_in_database}`}
+        </div>
+      )}
+
+      {/* Image */}
+      <div onClick={onClick} style={{ aspectRatio: '16/9', background: '#000', overflow: 'hidden', position: 'relative' }}>
         {imageUrl ? (
           <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '32px' }}>🚗</div>
         )}
+        
+        {/* Activity indicator */}
+        {(imageCount > 0 || eventCount > 0) && (
+          <div style={{
+            position: 'absolute',
+            bottom: '6px',
+            left: '6px',
+            display: 'flex',
+            gap: '4px'
+          }}>
+            {imageCount > 0 && (
+              <div style={{ background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '2px 6px', fontSize: '8pt', borderRadius: '2px' }}>
+                📷 {imageCount}
+              </div>
+            )}
+            {eventCount > 0 && (
+              <div style={{ background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '2px 6px', fontSize: '8pt', borderRadius: '2px' }}>
+                📝 {eventCount}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Info Section */}
       <div style={{ padding: '8px', background: '#fff' }}>
-        <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+        {/* Title */}
+        <div onClick={onClick} style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '4px' }}>
           {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
+        </div>
+
+        {/* Technical Data */}
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+          {vehicle.color && (
+            <span style={{ ...chipStyle, fontSize: '7pt' }}>
+              {vehicle.color}
+            </span>
+          )}
+          {vehicle.vin && (
+            <span style={{ ...chipStyle, fontSize: '7pt', fontFamily: 'monospace' }} title={vehicle.vin}>
+              VIN: {vehicle.vin.slice(-6)}
+            </span>
+          )}
+        </div>
+
+        {/* Price Display */}
+        {primaryPrice && (
+          <div style={{ marginBottom: '6px' }}>
+            <div style={{ fontSize: '12pt', fontWeight: 'bold', fontFamily: 'monospace' }}>
+              {formatCurrency(primaryPrice)}
+              {priceLabel && (
+                <span style={{ fontSize: '7pt', color: '#666', marginLeft: '4px', fontWeight: 600 }}>
+                  {priceLabel}
+                </span>
+              )}
+            </div>
+            {priceSignal?.confidence && (
+              <div style={{ fontSize: '7pt', color: '#666' }}>
+                {priceSignal.confidence}% confidence
+                {priceSignal.sources && ` • ${priceSignal.sources.length} sources`}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Interactive Buttons */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={onClick}
+            style={{
+              flex: 1,
+              padding: '4px 8px',
+              fontSize: '8pt',
+              background: '#3b82f6',
+              color: '#fff',
+              border: '1px solid #2563eb',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+          >
+            View Details
+          </button>
+          <button
+            onClick={handleQuickStats}
+            style={{
+              padding: '4px 8px',
+              fontSize: '8pt',
+              background: '#fff',
+              color: '#333',
+              border: '1px solid #c0c0c0',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+            title="Quick Stats"
+          >
+            📊
+          </button>
         </div>
       </div>
     </div>
@@ -118,6 +284,8 @@ const RareVehicleCard = ({ vehicle, onClick }: { vehicle: RecentVehicle; onClick
 
 const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: string; title: string; events: number; onClick: () => void }) => {
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [priceSignal, setPriceSignal] = useState<any>(null);
+  const [recentActivity, setRecentActivity] = useState<string>('');
 
   useEffect(() => {
     supabase
@@ -129,11 +297,50 @@ const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: stri
       .then(({ data }) => {
         if (data?.image_url) setImageUrl(data.image_url);
       });
+
+    // Fetch price signal
+    supabase
+      .from('vehicle_price_signal_view')
+      .select('*')
+      .eq('vehicle_id', vehicleId)
+      .single()
+      .then(({ data }) => {
+        if (data) setPriceSignal(data);
+      })
+      .catch(() => {
+        supabase.rpc('vehicle_price_signal', { vehicle_ids: [vehicleId] })
+          .then(({ data }) => {
+            if (data && data[0]) setPriceSignal(data[0]);
+          });
+      });
+
+    // Get most recent activity
+    supabase
+      .from('timeline_events')
+      .select('event_type, created_at')
+      .eq('vehicle_id', vehicleId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          const hoursAgo = Math.floor((Date.now() - new Date(data.created_at).getTime()) / (1000 * 60 * 60));
+          setRecentActivity(hoursAgo < 1 ? 'Updated just now' : `Updated ${hoursAgo}h ago`);
+        }
+      });
   }, [vehicleId]);
 
+  const handleViewTimeline = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.open(`/vehicle/${vehicleId}?tab=timeline`, '_blank');
+  };
+
+  const primaryPrice = priceSignal?.primary_value;
+  const priceLabel = priceSignal?.primary_label;
+
   return (
-    <div onClick={onClick} style={{ cursor: 'pointer', border: '1px solid #ddd', overflow: 'hidden' }}>
-      <div style={{ aspectRatio: '16/9', background: '#000', position: 'relative' }}>
+    <div style={{ cursor: 'pointer', border: '1px solid #c0c0c0', overflow: 'hidden', position: 'relative' }}>
+      <div onClick={onClick} style={{ aspectRatio: '16/9', background: '#000', position: 'relative' }}>
         {imageUrl ? (
           <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
@@ -143,18 +350,81 @@ const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: stri
           position: 'absolute',
           top: '6px',
           right: '6px',
-          background: 'rgba(255,0,0,0.9)',
+          background: 'rgba(220, 38, 38, 0.95)',
           color: '#fff',
           padding: '3px 8px',
-          fontSize: '9px',
+          fontSize: '8pt',
           fontWeight: 'bold',
-          borderRadius: '2px'
+          borderRadius: '2px',
+          border: '1px solid #fff'
         }}>
-          {events} UPDATES
+          🔥 {events} UPDATES
         </div>
+        {recentActivity && (
+          <div style={{
+            position: 'absolute',
+            bottom: '6px',
+            left: '6px',
+            background: 'rgba(0,0,0,0.8)',
+            color: '#fff',
+            padding: '2px 6px',
+            fontSize: '8pt',
+            borderRadius: '2px'
+          }}>
+            {recentActivity}
+          </div>
+        )}
       </div>
       <div style={{ padding: '8px', background: '#fff' }}>
-        <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{title}</div>
+        <div onClick={onClick} style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '4px' }}>{title}</div>
+        
+        {primaryPrice && (
+          <div style={{ marginBottom: '6px' }}>
+            <div style={{ fontSize: '12pt', fontWeight: 'bold', fontFamily: 'monospace' }}>
+              {formatCurrency(primaryPrice)}
+              {priceLabel && (
+                <span style={{ fontSize: '7pt', color: '#666', marginLeft: '4px', fontWeight: 600 }}>
+                  {priceLabel}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={onClick}
+            style={{
+              flex: 1,
+              padding: '4px 8px',
+              fontSize: '8pt',
+              background: '#3b82f6',
+              color: '#fff',
+              border: '1px solid #2563eb',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+          >
+            View Build
+          </button>
+          <button
+            onClick={handleViewTimeline}
+            style={{
+              padding: '4px 8px',
+              fontSize: '8pt',
+              background: '#fff',
+              color: '#333',
+              border: '1px solid #c0c0c0',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+            title="View Timeline"
+          >
+            📅
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -179,7 +449,7 @@ const DiscoveryHighlights = () => {
         const [vehRes, evtRes, sessRes] = await Promise.all([
           supabase
             .from('vehicles')
-            .select('id, year, make, model, created_at')
+            .select('id, year, make, model, created_at, vin, color, msrp, current_value, purchase_price, asking_price, sale_price, is_for_sale')
             .order('created_at', { ascending: false })
             .limit(200),
           supabase
@@ -240,8 +510,12 @@ const DiscoveryHighlights = () => {
           const rareCombos = Object.entries(comboCounts)
             .filter(([, val]) => val.count <= 2) // rarity threshold
             .slice(0, 6)
-            .flatMap(([, val]) => val.sample);
-          setRareVehicles(rareCombos.map((v: any) => ({ id: v.id, year: v.year, make: v.make, model: v.model, created_at: v.created_at })));
+            .flatMap(([, val]) => val.sample.map((v: any) => ({
+              ...v,
+              total_in_database: val.count,
+              rarity_score: Math.round((1 / val.count) * 100)
+            })));
+          setRareVehicles(rareCombos);
         }
 
         // Compute Hot Vehicles: most events in last 7 days
