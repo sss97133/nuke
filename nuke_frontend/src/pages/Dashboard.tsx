@@ -157,14 +157,14 @@ const Dashboard: React.FC = () => {
   };
 
   const buttonStyle = (isActive: boolean): React.CSSProperties => ({
-    background: isActive ? '#2563eb' : '#f3f4f6',
-    color: isActive ? 'white' : '#374151',
-    border: '1px solid #c0c0c0',
-    padding: '4px 8px',
-    borderRadius: '2px',
-    fontSize: '8pt',
+    background: isActive ? '#e5e7eb' : '#ffffff',
+    color: '#000000',
+    border: isActive ? '2px inset #808080' : '1px solid #c0c0c0',
+    padding: '2px 6px',
+    borderRadius: '0',
+    fontSize: '7pt',
     cursor: 'pointer',
-    transition: 'all 0.15s'
+    fontWeight: isActive ? 'bold' : 'normal'
   });
 
   return (
@@ -178,26 +178,26 @@ const Dashboard: React.FC = () => {
         <div className="fade-in">
           {/* Header with Controls */}
           <div style={{ 
-            marginBottom: '16px',
-            padding: '12px',
-            background: 'white',
+            marginBottom: '8px',
+            padding: '6px',
+            background: '#f8f8f8',
             border: '1px solid #c0c0c0',
-            borderRadius: '2px'
+            borderRadius: '0'
           }}>
             {/* Title and Stats */}
-            <div style={{ marginBottom: '12px' }}>
-              <h1 className="heading-1" style={{ fontSize: '14pt', margin: '0 0 4px 0' }}>
-                Vehicle Explorer
+            <div style={{ marginBottom: '6px' }}>
+              <h1 className="heading-1" style={{ fontSize: '9pt', margin: '0 0 2px 0', fontWeight: 'bold' }}>
+                VEHICLE DATABASE
               </h1>
-              <div className="text-muted" style={{ fontSize: '8pt' }}>
-                {vehicles.length} vehicles · {getPerspectiveDescription()}
+              <div className="text-muted" style={{ fontSize: '7pt' }}>
+                {vehicles.length} records · {getPerspectiveDescription()}
               </div>
             </div>
 
             {/* Perspective Filter */}
-            <div style={{ marginBottom: '12px' }}>
-              <div className="text" style={{ fontSize: '8pt', marginBottom: '4px', fontWeight: 'bold' }}>
-                Perspective:
+            <div style={{ marginBottom: '6px' }}>
+              <div className="text" style={{ fontSize: '7pt', marginBottom: '2px', fontWeight: 'bold' }}>
+                FILTER:
               </div>
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 <button
@@ -211,7 +211,7 @@ const Dashboard: React.FC = () => {
                   style={buttonStyle(perspective === 'investor')}
                   title="Show vehicles with best ROI potential"
                 >
-                  💼 Investor POV
+                  Investor POV
                 </button>
                 <button
                   onClick={() => setPerspective('tech')}
@@ -233,12 +233,12 @@ const Dashboard: React.FC = () => {
             {/* View Mode Controls */}
             <div style={{ 
               display: 'flex', 
-              gap: '8px', 
+              gap: '4px', 
               alignItems: 'center',
               flexWrap: 'wrap'
             }}>
-              <div className="text" style={{ fontSize: '8pt', fontWeight: 'bold' }}>
-                View:
+              <div className="text" style={{ fontSize: '7pt', fontWeight: 'bold' }}>
+                VIEW:
               </div>
               <button
                 onClick={() => setViewMode('gallery')}

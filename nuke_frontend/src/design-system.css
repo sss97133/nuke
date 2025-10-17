@@ -39,13 +39,13 @@
   --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.1);
   
   /* Compact Spacing System - Minimal padding */
-  --space-1: 4px;
-  --space-2: 6px;
-  --space-3: 8px;
-  --space-4: 12px;
-  --space-5: 16px;
-  --space-6: 20px;
-  --space-8: 24px;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-8: 16px;
   --space-10: 32px;
   --space-12: 40px;
   
@@ -57,9 +57,9 @@
   --upload-red: #dc2626;
   --upload-red-light: #fef2f2;
   
-  /* Profile-specific colors */
-  --primary: #007bff;
-  --success: #28a745;
+  /* Profile-specific colors - Neutral */
+  --primary: #4b5563;
+  --success: #6b7280;
   
   /* Border Radius - Classic */
   --radius: 0px;
@@ -67,8 +67,8 @@
   
   /* Typography - Arial, 8pt text */
   --font-family: Arial, sans-serif;
-  --font-size-small: 8pt;
-  --font-size: 8pt;
+  --font-size-small: 7pt;
+  --font-size: 7pt;
 
   /* Line Heights - Tight */
   --leading-tight: 1.1;
@@ -365,7 +365,7 @@ body {
   margin-left: 8px;
   border: 2px solid transparent;
   border-top: 2px solid currentColor;
-  border-radius: 50%;
+  border-radius: 0;
   animation: button-spin 0.8s linear infinite;
 }
 
@@ -717,7 +717,7 @@ body {
 .status-dot {
   width: 4px;
   height: 4px;
-  border-radius: 50%;
+  border-radius: 0;
   border: 1px solid var(--border-light);
 }
 
@@ -933,7 +933,7 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--grey-200);
   border: 2px solid var(--grey-300);
   text-decoration: none;
@@ -956,7 +956,7 @@ body {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  border-radius: 50%;
+  border-radius: 0;
   display: block;
 }
 
@@ -1066,7 +1066,7 @@ body {
   height: 24px;
   border: 2px solid var(--border-light);
   border-top: 2px solid var(--text);
-  border-radius: 50%;
+  border-radius: 0;
   animation: spin 1s linear infinite;
 }
 
@@ -1181,7 +1181,7 @@ body {
   height: 20px;
   border: 2px solid var(--border-light);
   border-top: 2px solid var(--text);
-  border-radius: 50%;
+  border-radius: 0;
   animation: spin 1s linear infinite;
   margin: 0 auto;
 }
@@ -1622,7 +1622,7 @@ body {
   transition: opacity 0.2s ease;
   background: var(--white);
   border: 1px solid var(--border-light);
-  border-radius: 50%;
+  border-radius: 0;
   width: 16px;
   height: 16px;
   display: flex;
@@ -1733,7 +1733,7 @@ body {
   height: 20px;
   border: 2px solid var(--border-light);
   border-top: 2px solid var(--primary);
-  border-radius: 50%;
+  border-radius: 0;
   animation: spin 1s linear infinite;
 }
 
@@ -1789,7 +1789,7 @@ body {
 .comment-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 0;
   overflow: hidden;
   border: 1px solid var(--border-light);
 }
@@ -1867,7 +1867,7 @@ body {
 .pulse-indicator {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--grey-400);
 }
 
@@ -2266,7 +2266,7 @@ body {
 .profile-avatar {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
+  border-radius: 0;
   overflow: hidden;
   border: 2px solid var(--border-light);
   flex-shrink: 0;
@@ -2309,7 +2309,7 @@ body {
 .verified-badge {
   background: var(--success);
   color: white;
-  border-radius: 50%;
+  border-radius: 0;
   width: 20px;
   height: 20px;
   display: flex;
@@ -2477,7 +2477,7 @@ body {
   gap: 4px;
   background: #f5f5f5;
   padding: 4px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .tab-button {
@@ -2486,7 +2486,7 @@ body {
   font-family: Arial, sans-serif;
   background: transparent;
   border: none;
-  border-radius: 2px;
+  border-radius: 0;
   cursor: pointer;
   color: #424242;
   display: flex;
@@ -2509,7 +2509,7 @@ body {
   color: #000000;
   font-size: 8px;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: 0;
   font-weight: normal;
 }
 
@@ -2524,7 +2524,7 @@ body {
   padding: 12px;
   background: #ffffff;
   border: 1px solid #e0e0e0;
-  border-radius: 2px;
+  border-radius: 0;
   cursor: pointer;
   text-align: center;
   display: flex;
@@ -2582,7 +2582,7 @@ body {
 .session-card {
   background: #ffffff;
   border: 1px solid #e0e0e0;
-  border-radius: 2px;
+  border-radius: 0;
   padding: 12px;
 }
 
@@ -2609,13 +2609,13 @@ body {
 .avatar-img {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .avatar-placeholder {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 0;
   background: #e0e0e0;
   display: flex;
   align-items: center;
@@ -2649,7 +2649,7 @@ body {
   gap: 2px;
   padding: 2px 6px;
   background: #f5f5f5;
-  border-radius: 4px;
+  border-radius: 0;
   font-size: 9px;
   font-family: Arial, sans-serif;
   color: #424242;
@@ -2668,7 +2668,7 @@ body {
   margin-bottom: 8px;
   background: #fafafa;
   padding: 6px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .request-details,
@@ -2695,7 +2695,7 @@ body {
 .status-indicator {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 0;
   background: #bdbdbd;
 }
 
@@ -2737,7 +2737,7 @@ body {
 .live-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: 0;
   background: #ff4444;
   animation: pulse 2s infinite;
 }
@@ -2836,7 +2836,7 @@ body {
   cursor: pointer;
   font-size: 1.2rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 3px;
+  border-radius: 0;
   transition: background-color 0.2s, color 0.2s;
   z-index: 10;
 }
@@ -2856,7 +2856,7 @@ body {
   flex-direction: column;
   background: var(--white);
   border: 1px solid var(--border-light);
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
   transition: all 0.2s ease;
   cursor: pointer;
@@ -2881,7 +2881,7 @@ body {
   background: rgba(255, 0, 0, 0.9);
   color: white;
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: 0;
   font-size: 8px;
   font-weight: bold;
   display: flex;
@@ -2893,7 +2893,7 @@ body {
   width: 4px;
   height: 4px;
   background: white;
-  border-radius: 50%;
+  border-radius: 0;
   animation: pulse 1s infinite;
 }
 
@@ -2955,7 +2955,7 @@ body {
   flex: 1;
   height: 8px;
   background: var(--grey-200);
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
   margin-right: var(--space-1);
 }
@@ -2963,7 +2963,7 @@ body {
 .hype-bar {
   height: 100%;
   background: linear-gradient(90deg, #ffd700, #ff6b35, #ff0000);
-  border-radius: 4px;
+  border-radius: 0;
   transition: width 0.3s ease;
 }
 
@@ -2990,7 +2990,7 @@ body {
   font-size: 8px;
   width: 12px;
   height: 12px;
-  border-radius: 50%;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
