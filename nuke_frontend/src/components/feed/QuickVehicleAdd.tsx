@@ -37,7 +37,20 @@ const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
         return;
       }
 
-      // Create the vehicle record
+      // Create the vehicle record (align with DB schema)
+      const isContribution = formData.isContribution;
+      const contributionSource = (() => {
+        const url = formData.sourceUrl || '';
+        if (url.includes('craigslist.org')) return 'Craigslist';
+        if (url.includes('bringatrailer.com')) return 'Bring a Trailer';
+        if (url.includes('facebook.com/marketplace')) return 'Facebook Marketplace';
+        if (url.includes('autotrader.com')) return 'AutoTrader';
+        if (url.includes('cars.com')) return 'Cars.com';
+        if (url.includes('hagerty.com')) return 'Hagerty';
+        if (url.includes('classic.com')) return 'Classic.com';
+        return isContribution ? 'User Contribution' : 'User';
+      })();
+
       const { data: vehicle, error: vehicleError } = await supabase
         .from('vehicles')
         .insert({
@@ -46,10 +59,12 @@ const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
           model: formData.model,
           color: formData.color,
           description: formData.description,
-          uploaded_by: user.id,
+          user_id: user.id,
           is_public: true,
-          source: formData.isContribution ? 'user_contribution' : 'user_owned',
-          source_url: formData.sourceUrl || null
+          source: isContribution ? contributionSource : 'User Submission',
+          discovered_by: isContribution ? user.id : null,
+          discovery_source: isContribution ? contributionSource : null,
+          discovery_url: isContribution ? (formData.sourceUrl || null) : null
         })
         .select()
         .single();
@@ -79,24 +94,51 @@ const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
               .insert({
                 vehicle_id: vehicle.id,
                 image_url: urlData.publicUrl,
-                uploaded_by: user.id,
+                user_id: user.id,
                 is_primary: i === 0 // First image is primary
               });
           }
         }
       }
 
-      // Create timeline event for the addition
+      // Create timeline event for the addition/discovery
       await supabase
         .from('timeline_events')
         .insert({
           vehicle_id: vehicle.id,
           user_id: user.id,
-          event_type: formData.isContribution ? 'vehicle_contributed' : 'vehicle_added',
-          title: `${formData.isContribution ? 'Contributed' : 'Added'} ${formData.year} ${formData.make} ${formData.model}`,
-          description: formData.description || `${formData.color} ${formData.make} ${formData.model}`,
-          event_date: new Date().toISOString().split('T')[0]
+          event_type: isContribution ? 'discovery' : 'vehicle_added',
+          title: isContribution
+            ? `Discovered ${formData.year} ${formData.make} ${formData.model}`
+            : `Added ${formData.year} ${formData.make} ${formData.model}`,
+          description: isContribution
+            ? `Discovered via ${contributionSource}${formData.sourceUrl ? ` (${formData.sourceUrl})` : ''}`
+            : (formData.description || `${formData.color} ${formData.make} ${formData.model}`),
+          event_date: new Date().toISOString().split('T')[0],
+          source_type: 'external_listing',
+          confidence_score: 70
         });
+
+      // Link discovery relationship for contributors for ranking/credit
+      if (isContribution && vehicle) {
+        await supabase.from('discovered_vehicles').insert({
+          user_id: user.id,
+          vehicle_id: vehicle.id,
+          discovery_source: contributionSource,
+          discovery_context: 'quick_add'
+        });
+
+        // Archive listing metadata for provenance if URL provided
+        if (formData.sourceUrl) {
+          await supabase.from('vehicle_listing_archives').insert({
+            vehicle_id: vehicle.id,
+            source_platform: contributionSource.replace(/\s+/g, '_').toLowerCase(),
+            source_url: formData.sourceUrl,
+            description_text: formData.description || null,
+            listing_status: 'archived'
+          });
+        }
+      }
 
       // Reset form
       setFormData({
