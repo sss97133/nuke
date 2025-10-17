@@ -222,7 +222,10 @@ const AddVehicle: React.FC = () => {
       
       // Filter formData to only include valid columns
       const vehicleData: any = {
-        uploaded_by: user.id
+        user_id: user.id,
+        discovered_by: formData.import_url ? user.id : undefined,
+        discovery_source: formData.import_url ? (formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External URL') : undefined,
+        discovery_url: formData.import_url || undefined
       };
       
       validColumns.forEach(col => {
@@ -245,13 +248,25 @@ const AddVehicle: React.FC = () => {
       if (vehicle) {
         const vehicleId = vehicle.id;
         
-        // Create timeline event for vehicle creation
+        // Create timeline event for vehicle creation or discovery
         try {
           await TimelineEventService.createVehicleCreationEvent(
             vehicleId,
             vehicle,
             extractedImages.map(f => f.name)
           );
+          // Record discovery event when created from URL without EXIF time
+          if (formData.import_url) {
+            await supabase.from('timeline_events').insert({
+              vehicle_id: vehicleId,
+              user_id: user.id,
+              event_type: 'discovery',
+              event_date: new Date().toISOString().split('T')[0],
+              description: `Discovered on ${formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External site'}`,
+              source_type: 'external_listing',
+              confidence_score: 70
+            });
+          }
         } catch (error) {
           console.error('Failed to create vehicle creation timeline event:', error);
         }
