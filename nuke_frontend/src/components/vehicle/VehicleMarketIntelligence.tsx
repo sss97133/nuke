@@ -113,10 +113,22 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
       const totalCount = exactMatches.length;
       const rarityScore = Math.round((1 / Math.max(totalCount, 1)) * 100);
 
+      // Proper rarity calculation based on actual market data, not database count
       let rarityLevel: RarityData['rarity_level'] = 'COMMON';
-      if (totalCount === 1) rarityLevel = 'ULTRA_RARE';
-      else if (totalCount <= 3) rarityLevel = 'RARE';
-      else if (totalCount <= 10) rarityLevel = 'UNCOMMON';
+      
+      // Only consider rarity if we have sufficient data (at least 50 vehicles in database)
+      if (allVehicles.length >= 50) {
+        // Calculate rarity based on production numbers and market data
+        const rarityPercentage = (totalCount / allVehicles.length) * 100;
+        
+        if (rarityPercentage < 0.1) rarityLevel = 'ULTRA_RARE';  // Less than 0.1% of database
+        else if (rarityPercentage < 0.5) rarityLevel = 'RARE';   // Less than 0.5% of database  
+        else if (rarityPercentage < 2.0) rarityLevel = 'UNCOMMON'; // Less than 2% of database
+        else rarityLevel = 'COMMON';
+      } else {
+        // Insufficient data - default to common until we have more vehicles
+        rarityLevel = 'COMMON';
+      }
 
       setRarityData({
         total_in_database: totalCount,
@@ -361,7 +373,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
               </div>
             </div>
 
-            {rarityData.rarity_level === 'ULTRA_RARE' && (
+            {rarityData.rarity_level === 'ULTRA_RARE' && rarityData.total_in_database > 1 && (
               <div style={{
                 marginTop: '12px',
                 padding: '8px',
@@ -375,7 +387,26 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
               }}>
                 <AlertCircle size={14} style={{ color: '#dc2626', flexShrink: 0, marginTop: '1px' }} />
                 <div style={{ color: '#7f1d1d' }}>
-                  <strong>Extremely Rare:</strong> This is the only {vehicle.year} {vehicle.make} {vehicle.model} in our database. This vehicle may have exceptional collector value.
+                  <strong>Ultra Rare:</strong> This {vehicle.year} {vehicle.make} {vehicle.model} represents less than 0.1% of vehicles in our database, indicating exceptional rarity.
+                </div>
+              </div>
+            )}
+
+            {rarityData.total_in_database === 1 && (
+              <div style={{
+                marginTop: '12px',
+                padding: '8px',
+                background: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '2px',
+                display: 'flex',
+                alignItems: 'start',
+                gap: '8px',
+                fontSize: '8pt'
+              }}>
+                <AlertCircle size={14} style={{ color: '#0369a1', flexShrink: 0, marginTop: '1px' }} />
+                <div style={{ color: '#0c4a6e' }}>
+                  <strong>Limited Data:</strong> This is the only {vehicle.year} {vehicle.make} {vehicle.model} in our database. Rarity assessment requires more comprehensive market data.
                 </div>
               </div>
             )}
