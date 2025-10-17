@@ -19,7 +19,7 @@ const TestContributions: React.FC = () => {
   const loadContributions = async () => {
     try {
       setLoading(true);
-      console.log('🔍 TestContributions: Loading contribution data...');
+      console.log('TestContributions: Loading contribution data...');
 
       const userId = '0b9f107a-d124-49de-9ded-94698f63c1c4'; // skylar williams
 

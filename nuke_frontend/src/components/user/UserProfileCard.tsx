@@ -101,14 +101,14 @@ const UserProfileCard = ({ userId, userName, userAvatar, expanded = false }: Use
 
   const getContributionTypeIcon = (type: string) => {
     switch (type) {
-      case 'vehicle_add': return '🚗';
-      case 'image_upload': return '📸';
-      case 'timeline_event': return '📅';
-      case 'verification': return '✅';
-      case 'review': return '⭐';
-      case 'data_correction': return '🔧';
-      case 'shop_create': return '🏪';
-      default: return '📝';
+      case 'vehicle_add': return 'VEHICLE';
+      case 'image_upload': return 'IMAGE';
+      case 'timeline_event': return 'EVENT';
+      case 'verification': return 'VERIFIED';
+      case 'review': return 'REVIEW';
+      case 'data_correction': return 'CORRECTION';
+      case 'shop_create': return 'SHOP';
+      default: return 'CONTRIBUTION';
     }
   };
 
@@ -155,7 +155,7 @@ const UserProfileCard = ({ userId, userName, userAvatar, expanded = false }: Use
             justifyContent: 'center',
             fontSize: '14px'
           }}>
-            👤
+            USER
           </div>
         )}
         <div style={{ flex: 1 }}>
@@ -207,7 +207,7 @@ const UserProfileCard = ({ userId, userName, userAvatar, expanded = false }: Use
             margin: '0 auto 12px',
             border: '4px solid white'
           }}>
-            👤
+            USER
           </div>
         )}
 
@@ -328,7 +328,7 @@ const UserProfileCard = ({ userId, userName, userAvatar, expanded = false }: Use
                   </div>
                   <div className="text text-muted" style={{ fontSize: '10px' }}>
                     Quality: {contribution.quality_score}/100
-                    {contribution.verified && ' ✅'}
+                    {contribution.verified && ' VERIFIED'}
                   </div>
                 </div>
                 <div className="text text-muted" style={{ fontSize: '10px' }}>

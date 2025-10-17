@@ -319,17 +319,17 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const getStatusIcon = (status?: string) => {
     switch (status) {
       case 'high_confidence':
-        return <span className="text-green-500">✅</span>;
+        return <span className="text-green-500">VERIFIED</span>;
       case 'medium_confidence':
-        return <span className="text-yellow-500">⚠️</span>;
+        return <span className="text-yellow-500">WARNING</span>;
       case 'low_confidence':
-        return <span className="text-orange-500">❓</span>;
+        return <span className="text-orange-500">QUESTION</span>;
       case 'needs_review':
-        return <span className="text-red-500">🚨</span>;
+        return <span className="text-red-500">ALERT</span>;
       case 'analyzing':
-        return <span className="animate-spin text-blue-500">⚡</span>;
+        return <span className="animate-spin text-blue-500">ANALYZING</span>;
       default:
-        return <span className="text-gray-500">💰</span>;
+        return <span className="text-gray-500">PRICE</span>;
     }
   };
 
@@ -508,7 +508,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                             padding: '1px 2px',
                             textAlign: 'center'
                           }}>
-                            📷 {imgIdx + 1}
+                            IMAGE {imgIdx + 1}
                           </div>
                         </div>
                       ))}
@@ -781,7 +781,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             <div className="p-4 max-h-[calc(90vh-120px)] overflow-y-auto">
               {/* This would be the full PricingIntelligence component */}
               <div className="text-center py-8">
-                <div className="animate-spin text-4xl mb-4">⚡</div>
+                <div className="animate-spin text-4xl mb-4">ANALYZING</div>
                 <p className="text-gray-600">Loading comprehensive analysis...</p>
                 <p className="text-sm text-gray-500 mt-2">
                   AI is analyzing market data, modifications, and generating detailed report

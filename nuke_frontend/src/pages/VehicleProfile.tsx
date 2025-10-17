@@ -12,6 +12,7 @@ import VehicleDataEditor from '../components/vehicle/VehicleDataEditor';
 import VehicleStats from '../components/vehicle/VehicleStats';
 import VehicleMarketIntelligence from '../components/vehicle/VehicleMarketIntelligence';
 import VehicleDocumentManager from '../components/VehicleDocumentManager';
+import BlueGlowIcon from '../components/ui/BlueGlowIcon';
 import PurchaseAgreementManager from '../components/PurchaseAgreementManager';
 import ConsignerManagement from '../components/ConsignerManagement';
 import ReceiptManager from '../components/vehicle/ReceiptManager';
@@ -1241,10 +1242,13 @@ const VehicleProfile: React.FC = () => {
               {/* Enhanced Photo Tagging System */}
               {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
                 <div id="image-tagging" className="card">
-                  <div className="card-header">🏷️ Image Tagging & AI Validation</div>
+                  <div className="card-header">
+                    <BlueGlowIcon size={16} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
+                    Image Tagging & AI Validation
+                  </div>
                   <div className="card-body">
                     <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
-                      Tag vehicle components, damage, or features. AI tags show as 🤖 (validate them), manual tags as 👤.
+                      Tag vehicle components, damage, or features. AI tags show as AI (validate them), manual tags as USER.
                       Click and drag to create bounding boxes or click to place point tags.
                     </p>
                     <EnhancedImageTagger

@@ -594,7 +594,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
     <div className="vin-validator-step" style={{ textAlign: 'center' }}>
       {validationResult?.validation_status === 'approved' ? (
         <div>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>✅</div>
+          <div style={{ fontSize: '64px', marginBottom: '16px' }}>VERIFIED</div>
           <h3 className="text-large font-bold text-success" style={{ marginBottom: '16px' }}>
             Validation Approved!
           </h3>

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { computePrimaryPrice, computeDelta, formatCurrency } from '../../services/priceSignalService';
+import BlueGlowIcon from '../ui/BlueGlowIcon';
 import '../../design-system.css';
 
 interface VehicleQuickViewProps {

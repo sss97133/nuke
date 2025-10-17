@@ -76,6 +76,7 @@ const ImageLightbox = ({
     loading: tagsLoading,
     verifyTag: verifyTagFn,
     rejectTag: rejectTagFn,
+    createTag,
     triggerAIAnalysis: triggerAIAnalysisFn,
     canEdit: userCanEdit
   } = useImageTags(imageId);
@@ -312,6 +313,33 @@ const ImageLightbox = ({
     }
   };
 
+  const handleAddTag = async (tagName: string) => {
+    if (!tagName.trim() || !vehicleId || !imageId) return;
+
+    try {
+      const tagData = {
+        tag_name: tagName.trim(),
+        tag_type: tagType,
+        x_position: currentSelection?.x || 0,
+        y_position: currentSelection?.y || 0,
+        width: currentSelection?.width || 20,
+        height: currentSelection?.height || 20
+      };
+
+      const newTag = await createTag(vehicleId, tagData);
+      if (newTag) {
+        console.log('VERIFIED Manual tag created:', newTag);
+        // Reset tagging state
+        setIsTagging(false);
+        setShowTagInput(false);
+        setCurrentSelection(null);
+        setTagName('');
+      }
+    } catch (error) {
+      console.error('Error creating manual tag:', error);
+    }
+  };
+
   const getTagColor = (type: string) => {
     switch (type) {
       case 'part': return '#3b82f6';
@@ -456,7 +484,7 @@ const ImageLightbox = ({
             }}
             title="Set as primary image for this vehicle"
           >
-            ⭐ Set Primary
+            Set Primary
           </button>
         )}
 
@@ -969,7 +997,7 @@ const ImageLightbox = ({
           borderRadius: '8px',
           fontSize: '14px'
         }}>
-          📝 Click and drag to select an area to tag
+          Click and drag to select an area to tag
         </div>
       )}
     </div>
