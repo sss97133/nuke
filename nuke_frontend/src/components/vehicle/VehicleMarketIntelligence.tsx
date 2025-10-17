@@ -23,9 +23,11 @@ interface VehicleMarketIntelligenceProps {
 interface RarityData {
   total_in_database: number;
   rarity_score: number;
-  rarity_level: 'ULTRA_RARE' | 'RARE' | 'UNCOMMON' | 'COMMON';
+  rarity_level: 'ULTRA_RARE' | 'RARE' | 'UNCOMMON' | 'COMMON' | 'MASS_PRODUCTION';
   same_make_model: number;
   same_year: number;
+  total_produced?: number | null;
+  rarity_reason?: string;
 }
 
 interface RegionalMarketData {
@@ -86,7 +88,18 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
     if (!vehicle.year || !vehicle.make || !vehicle.model) return;
 
     try {
-      // Get all vehicles to compute rarity
+      // Get production data from our production database
+      const { data: productionData } = await supabase
+        .rpc('get_vehicle_rarity_data', {
+          p_make: vehicle.make,
+          p_model: vehicle.model,
+          p_year: vehicle.year,
+          p_body_style: vehicle.body_style || null,
+          p_trim_level: null,
+          p_engine_option: null
+        });
+
+      // Also get database counts for context
       const { data: allVehicles } = await supabase
         .from('vehicles')
         .select('id, year, make, model')
@@ -94,7 +107,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
 
       if (!allVehicles) return;
 
-      // Count exact matches
+      // Count exact matches in our database
       const exactMatches = allVehicles.filter(v =>
         v.year === vehicle.year &&
         v.make?.toLowerCase() === vehicle.make?.toLowerCase() &&
@@ -111,31 +124,46 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
       const yearMatches = allVehicles.filter(v => v.year === vehicle.year);
 
       const totalCount = exactMatches.length;
-      const rarityScore = Math.round((1 / Math.max(totalCount, 1)) * 100);
 
-      // Proper rarity calculation based on actual market data, not database count
+      // Use production data if available, otherwise fall back to database analysis
       let rarityLevel: RarityData['rarity_level'] = 'COMMON';
-      
-      // Only consider rarity if we have sufficient data (at least 50 vehicles in database)
-      if (allVehicles.length >= 50) {
-        // Calculate rarity based on production numbers and market data
-        const rarityPercentage = (totalCount / allVehicles.length) * 100;
-        
-        if (rarityPercentage < 0.1) rarityLevel = 'ULTRA_RARE';  // Less than 0.1% of database
-        else if (rarityPercentage < 0.5) rarityLevel = 'RARE';   // Less than 0.5% of database  
-        else if (rarityPercentage < 2.0) rarityLevel = 'UNCOMMON'; // Less than 2% of database
-        else rarityLevel = 'COMMON';
+      let rarityReason = 'Standard production vehicle';
+      let totalProduced = null;
+
+      if (productionData && productionData.length > 0) {
+        const prod = productionData[0];
+        rarityLevel = prod.rarity_level as RarityData['rarity_level'];
+        rarityReason = prod.rarity_reason || 'Based on production numbers';
+        totalProduced = prod.total_produced;
       } else {
-        // Insufficient data - default to common until we have more vehicles
-        rarityLevel = 'COMMON';
+        // Fallback: Use database analysis with better thresholds
+        if (allVehicles.length >= 100) {
+          const rarityPercentage = (totalCount / allVehicles.length) * 100;
+          
+          if (rarityPercentage < 0.05) rarityLevel = 'ULTRA_RARE';
+          else if (rarityPercentage < 0.2) rarityLevel = 'RARE';
+          else if (rarityPercentage < 1.0) rarityLevel = 'UNCOMMON';
+          else rarityLevel = 'COMMON';
+          
+          rarityReason = `Based on database analysis (${rarityPercentage.toFixed(2)}% of vehicles)`;
+        } else {
+          rarityLevel = 'COMMON';
+          rarityReason = 'Insufficient data for rarity assessment';
+        }
       }
+
+      const rarityScore = totalProduced 
+        ? Math.round((1 / Math.max(totalProduced, 1)) * 1000000) // Score based on production numbers
+        : Math.round((1 / Math.max(totalCount, 1)) * 100); // Fallback to database count
 
       setRarityData({
         total_in_database: totalCount,
         rarity_score: rarityScore,
         rarity_level: rarityLevel,
         same_make_model: makeModelMatches.length,
-        same_year: yearMatches.length
+        same_year: yearMatches.length,
+        total_produced: totalProduced,
+        rarity_reason: rarityReason
       });
     } catch (error) {
       console.error('Error computing rarity:', error);
@@ -300,6 +328,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
       case 'RARE': return '#ea580c';
       case 'UNCOMMON': return '#ca8a04';
       case 'COMMON': return '#65a30d';
+      case 'MASS_PRODUCTION': return '#6b7280';
       default: return '#6b7280';
     }
   };
@@ -310,6 +339,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
       case 'RARE': return 'Rare';
       case 'UNCOMMON': return 'Uncommon';
       case 'COMMON': return 'Common';
+      case 'MASS_PRODUCTION': return 'Mass Production';
       default: return 'Unknown';
     }
   };
@@ -354,11 +384,16 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '12pt', fontWeight: 'bold', fontFamily: 'monospace' }}>
-                  {rarityData.total_in_database} {rarityData.total_in_database === 1 ? 'vehicle' : 'vehicles'} in database
+                  {rarityData.total_produced ? `${rarityData.total_produced.toLocaleString()} produced` : `${rarityData.total_in_database} in database`}
                 </div>
                 <div style={{ fontSize: '8pt', color: '#666' }}>
-                  Rarity Score: {rarityData.rarity_score}/100
+                  {rarityData.rarity_reason || `Rarity Score: ${rarityData.rarity_score}`}
                 </div>
+                {rarityData.total_in_database > 0 && (
+                  <div style={{ fontSize: '8pt', color: '#999' }}>
+                    {rarityData.total_in_database} {rarityData.total_in_database === 1 ? 'vehicle' : 'vehicles'} in our database
+                  </div>
+                )}
               </div>
             </div>
             
@@ -373,7 +408,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
               </div>
             </div>
 
-            {rarityData.rarity_level === 'ULTRA_RARE' && rarityData.total_in_database > 1 && (
+            {rarityData.rarity_level === 'ULTRA_RARE' && rarityData.total_produced && (
               <div style={{
                 marginTop: '12px',
                 padding: '8px',
@@ -387,12 +422,31 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
               }}>
                 <AlertCircle size={14} style={{ color: '#dc2626', flexShrink: 0, marginTop: '1px' }} />
                 <div style={{ color: '#7f1d1d' }}>
-                  <strong>Ultra Rare:</strong> This {vehicle.year} {vehicle.make} {vehicle.model} represents less than 0.1% of vehicles in our database, indicating exceptional rarity.
+                  <strong>Ultra Rare:</strong> Only {rarityData.total_produced.toLocaleString()} {vehicle.year} {vehicle.make} {vehicle.model}s were produced. {rarityData.rarity_reason}
                 </div>
               </div>
             )}
 
-            {rarityData.total_in_database === 1 && (
+            {rarityData.rarity_level === 'RARE' && rarityData.total_produced && (
+              <div style={{
+                marginTop: '12px',
+                padding: '8px',
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
+                borderRadius: '2px',
+                display: 'flex',
+                alignItems: 'start',
+                gap: '8px',
+                fontSize: '8pt'
+              }}>
+                <AlertCircle size={14} style={{ color: '#ea580c', flexShrink: 0, marginTop: '1px' }} />
+                <div style={{ color: '#9a3412' }}>
+                  <strong>Rare:</strong> Only {rarityData.total_produced.toLocaleString()} {vehicle.year} {vehicle.make} {vehicle.model}s were produced. {rarityData.rarity_reason}
+                </div>
+              </div>
+            )}
+
+            {rarityData.total_in_database === 1 && !rarityData.total_produced && (
               <div style={{
                 marginTop: '12px',
                 padding: '8px',
@@ -406,7 +460,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
               }}>
                 <AlertCircle size={14} style={{ color: '#0369a1', flexShrink: 0, marginTop: '1px' }} />
                 <div style={{ color: '#0c4a6e' }}>
-                  <strong>Limited Data:</strong> This is the only {vehicle.year} {vehicle.make} {vehicle.model} in our database. Rarity assessment requires more comprehensive market data.
+                  <strong>Limited Data:</strong> This is the only {vehicle.year} {vehicle.make} {vehicle.model} in our database. Production data not available for rarity assessment.
                 </div>
               </div>
             )}
