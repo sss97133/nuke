@@ -187,7 +187,7 @@ const ImageLightbox = ({
     setDragStart(null);
   };
 
-  const createTag = async () => {
+  const createManualTag = async () => {
     if (!currentSelection || !tagName.trim() || !session?.user || !imageId || !vehicleId) return;
 
     try {
@@ -660,7 +660,7 @@ const ImageLightbox = ({
               placeholder="Enter tag name..."
               autoFocus
               onKeyPress={(e) => {
-                if (e.key === 'Enter') createTag();
+                if (e.key === 'Enter') createManualTag();
                 if (e.key === 'Escape') {
                   setShowTagInput(false);
                   setCurrentSelection(null);
@@ -713,7 +713,7 @@ const ImageLightbox = ({
                 Cancel
               </button>
               <button
-                onClick={createTag}
+                onClick={createManualTag}
                 disabled={!tagName.trim()}
                 style={{
                   flex: 1,
