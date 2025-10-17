@@ -4,6 +4,9 @@ import { useActivityTracking } from '../../hooks/useActivityTracking';
 import ImageLightbox from '../image/ImageLightbox';
 import '../../design-system.css';
 import { computePrimaryPrice, computeDelta, formatCurrency } from '../../services/priceSignalService';
+import SwipeableCard from './SwipeableCard';
+import ViewTrackingService from '../../services/viewTrackingService';
+import { supabase } from '../../lib/supabase';
 
 interface ContentCardProps {
   item: FeedItem;
@@ -113,7 +116,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
     }
   };
 
-  return (
+  const card = (
     <div
       className="content-card"
       style={{
@@ -314,6 +317,45 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
       )}
     </div>
   );
+  
+  // Mobile swipe wrapper: enable swipe to save/skip for vehicles and images
+  const isSwipeableType = item.type === 'vehicle' || item.type === 'image';
+  if (isSwipeableType) {
+    return (
+      <SwipeableCard
+        onSwipeLeft={async () => {
+          // Skip/unsave
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const vehicleId = item.type === 'vehicle' ? item.id : (item.metadata?.vehicle_id || '');
+            if (!vehicleId) return;
+            const saved = await ViewTrackingService.isVehicleSaved(vehicleId, user.id);
+            if (saved) {
+              await ViewTrackingService.toggleVehicleSave(vehicleId, user.id);
+            }
+          } catch {}
+        }}
+        onSwipeRight={async () => {
+          // Save/like
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const vehicleId = item.type === 'vehicle' ? item.id : (item.metadata?.vehicle_id || '');
+            if (!vehicleId) return;
+            const saved = await ViewTrackingService.isVehicleSaved(vehicleId, user.id);
+            if (!saved) {
+              await ViewTrackingService.toggleVehicleSave(vehicleId, user.id);
+            }
+          } catch {}
+        }}
+      >
+        {card}
+      </SwipeableCard>
+    );
+  }
+
+  return card;
 };
 
 export default ContentCard;

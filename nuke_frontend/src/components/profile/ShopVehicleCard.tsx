@@ -62,7 +62,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
       >
         {/* Image */}
         <div style={{ position: 'relative', width: '100%', height: denseMode ? '160px' : '200px', overflow: 'hidden' }}>
-          <VehicleThumbnail vehicleId={vehicle.id} />
+          <VehicleThumbnail vehicleId={vehicle.id} simple />
         </div>
         
         {/* Content */}
@@ -98,7 +98,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
       >
         {/* Image */}
         <div style={{ position: 'relative', width: '100%', height: denseMode ? '100px' : '120px', overflow: 'hidden' }}>
-          <VehicleThumbnail vehicleId={vehicle.id} />
+          <VehicleThumbnail vehicleId={vehicle.id} simple />
         </div>
         
         {/* Content */}
@@ -149,7 +149,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
       <div style={{ display: 'flex', gap: '12px', padding: '8px' }}>
         {/* Small Thumbnail */}
         <div style={{ width: denseMode ? '80px' : '120px', height: denseMode ? '60px' : '90px', flexShrink: 0, overflow: 'hidden' }}>
-          <VehicleThumbnail vehicleId={vehicle.id} />
+          <VehicleThumbnail vehicleId={vehicle.id} simple />
         </div>
         
         {/* Details */}
