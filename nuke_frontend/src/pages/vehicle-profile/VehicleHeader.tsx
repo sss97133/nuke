@@ -246,7 +246,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     <div
       className="vehicle-price-header"
       style={{
-        background: 'transparent',
+        background: 'var(--white)',
         border: 'none',
         padding: '12px 16px',
         margin: '0',
@@ -254,7 +254,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         position: 'sticky',
         top: 48,
         zIndex: 10,
-        borderBottom: '1px solid #e5e5e5'
+        borderBottom: '1px solid #e5e5e5',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
       }}
     >
       {/* Combined single-row layout (wraps on narrow screens) */}
@@ -380,12 +381,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         )}
 
         {/* Actions */}
-        <button className="button button-small" onClick={() => setHistoryOpen(true)}>History</button>
-        <button className="button button-small" onClick={() => setAnalysisOpen(true)}>Analysis</button>
-        <button 
-          className="button button-small button-primary" 
+        <button
+          className="button button-small"
+          onClick={() => setHistoryOpen(true)}
+          style={{ cursor: 'pointer' }}
+        >
+          History
+        </button>
+        <button
+          className="button button-small"
+          onClick={() => setAnalysisOpen(true)}
+          style={{ cursor: 'pointer' }}
+        >
+          Analysis
+        </button>
+        <button
+          className="button button-small button-primary"
           onClick={() => window.location.href = `/vehicle/${vehicle.id}/verify-tags`}
           title="Review AI-detected tags"
+          style={{ cursor: 'pointer' }}
         >
           Review Tags
         </button>
