@@ -75,7 +75,27 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
   };
 
   const handleImageClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
+    e.stopPropagation();
+    // Prefer navigating to the vehicle profile when possible
+    if (item.type === 'vehicle') {
+      window.location.href = `/vehicle/${item.id}`;
+      return;
+    }
+    if (item.type === 'image') {
+      const vid = (item as any)?.metadata?.vehicle_id;
+      if (vid) {
+        window.location.href = `/vehicle/${vid}`;
+        return;
+      }
+    }
+    if (item.type === 'timeline_event') {
+      const vid = (item as any)?.metadata?.vehicle_id;
+      if (vid) {
+        window.location.href = `/vehicle/${vid}?t=timeline&event=${item.id}`;
+        return;
+      }
+    }
+    // Fallback to lightbox if we can't infer a vehicle
     setLightboxOpen(true);
   };
 
@@ -88,23 +108,31 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
     });
 
     // Navigate to detailed view based on content type
-    const baseUrl = '/';
     switch (item.type) {
       case 'vehicle':
-        window.location.href = `${baseUrl}vehicle/${item.id}`;
+        window.location.href = `/vehicle/${item.id}`;
         break;
       case 'image':
-        window.location.href = `${baseUrl}images/${item.id}`;
+        {
+          const vid = (item as any)?.metadata?.vehicle_id;
+          if (vid) {
+            window.location.href = `/vehicle/${vid}`;
+          } else {
+            // If no vehicle association, open the image lightbox instead of 404
+            setLightboxOpen(true);
+          }
+        }
         break;
       case 'shop':
-        window.location.href = `${baseUrl}shops/${item.id}`;
+        window.location.href = `/shops/${item.id}`;
         break;
       case 'timeline_event': {
         const vid = (item as any)?.metadata?.vehicle_id;
         if (vid) {
-          window.location.href = `${baseUrl}vehicle/${vid}?t=timeline&event=${item.id}`;
+          window.location.href = `/vehicle/${vid}?t=timeline&event=${item.id}`;
         } else {
-          window.location.href = `${baseUrl}events/${item.id}`;
+          // No dedicated timeline event route; fall back to lightbox
+          setLightboxOpen(true);
         }
         break;
       }

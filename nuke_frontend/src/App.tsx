@@ -233,6 +233,7 @@ function App() {
             
             {/* Vehicle Management */}
             <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
+            {/* Alias route to ensure legacy /vehicles/:id works */}
             <Route path="/vehicle/:vehicleId/edit" element={<EditVehicle />} />
             {/* <Route path="/vehicle/:vehicleId/date-images" element={<VehicleDateImages />} /> */}
             <Route path="/vehicle-approval/:extractionId" element={<VehicleApproval />} />
@@ -259,7 +260,8 @@ function App() {
             <Route path="/vehicle/:vehicleId/moderate" element={<VehicleModerationDashboard />} />
             <Route path="/vehicle/:vehicleId/contribute" element={<VehicleContributionForm />} />
             <Route path="/vehicle-tasks/:vehicleId" element={<VehicleTasks />} />
-            <Route path="/vehicles/:id" element={<VehicleProfile />} />
+            {/* Additional alias: /vehicles/:id should resolve to VehicleProfile */}
+            <Route path="/vehicles/:vehicleId" element={<VehicleProfile />} />
             {/* <Route path="/public/:slug" element={<PublicVehicleProfile />} /> */}
             
             {/* Legacy redirects */}
