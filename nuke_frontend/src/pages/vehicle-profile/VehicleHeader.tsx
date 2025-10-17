@@ -4,6 +4,7 @@ import { computePrimaryPrice, computeDelta, formatCurrency } from '../../service
 import { supabase } from '../../lib/supabase';
 import PriceHistoryModal from '../../components/vehicle/PriceHistoryModal';
 import PriceAnalysisPanel from '../../components/vehicle/PriceAnalysisPanel';
+import TagReviewModal from '../../components/vehicle/TagReviewModal';
 
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
@@ -17,6 +18,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [trendPct30d, setTrendPct30d] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [tagReviewOpen, setTagReviewOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState<'auto'|'estimate'|'auction'|'asking'|'sale'|'purchase'|'msrp'>('auto');
   const [responsibleMode, setResponsibleMode] = useState<'auto'|'owner'|'consigner'|'uploader'|'listed_by'|'custom'>('auto');
   const [responsibleCustom, setResponsibleCustom] = useState<string>('');
@@ -397,18 +399,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </button>
         <button
           className="button button-small button-primary"
-          onClick={() => {
-            // Navigate to the image tagging section
-            const currentPath = window.location.pathname;
-            const targetPath = `/vehicle/${vehicle.id}`;
-            if (currentPath === targetPath) {
-              // If already on the page, scroll to the tagging section
-              document.getElementById('image-tagging')?.scrollIntoView({ behavior: 'smooth' });
-            } else {
-              // Navigate to the page with the anchor
-              window.location.href = `${targetPath}#image-tagging`;
-            }
-          }}
+          onClick={() => setTagReviewOpen(true)}
           title="Review AI-detected tags"
           style={{ cursor: 'pointer' }}
         >
@@ -421,6 +412,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       )}
       {vehicle?.id && (
         <PriceAnalysisPanel vehicleId={vehicle.id} isOpen={analysisOpen} onClose={() => setAnalysisOpen(false)} />
+      )}
+      {/* Tag Review Modal */}
+      {vehicle?.id && (
+        <TagReviewModal vehicleId={vehicle.id} isOpen={tagReviewOpen} onClose={() => setTagReviewOpen(false)} />
       )}
     </div>
   );

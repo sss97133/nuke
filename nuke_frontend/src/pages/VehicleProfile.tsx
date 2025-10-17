@@ -110,14 +110,6 @@ const VehicleProfile: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Handle anchor navigation on page load
-  useEffect(() => {
-    if (window.location.hash === '#image-tagging') {
-      setTimeout(() => {
-        document.getElementById('image-tagging')?.scrollIntoView({ behavior: 'smooth' });
-      }, 1000); // Wait for page to fully render
-    }
-  }, []);
   
   // If mobile, use mobile-optimized version - moved after all hooks
   if (isMobile && vehicleId) {
