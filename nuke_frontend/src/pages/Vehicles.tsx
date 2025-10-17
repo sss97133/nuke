@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import '../design-system.css';
 
@@ -495,7 +495,7 @@ const VehiclesInner: React.FC = () => {
 
 
   return (
-    <AppLayout>
+    <>
       {loading ? (
         <div className="loading-container">
           <div className="loading-spinner"></div>
@@ -750,7 +750,7 @@ const VehiclesInner: React.FC = () => {
           )}
         </div>
       )}
-    </AppLayout>
+    </>
   );
 };
 

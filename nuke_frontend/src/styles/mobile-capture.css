@@ -1,0 +1,322 @@
+/* Mobile-optimized styles for rapid camera capture */
+
+/* Base mobile optimizations */
+@media (max-width: 768px) {
+  /* Optimize touch targets */
+  button, .touchable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Remove hover effects on mobile */
+  button:hover {
+    background-color: inherit !important;
+  }
+
+  /* Optimize for thumb reach */
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Camera capture button - always accessible */
+.rapid-capture-button {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #424242;
+  color: white;
+  border: none;
+  font-size: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, background-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.rapid-capture-button:active {
+  transform: scale(0.95);
+  background: #616161;
+}
+
+.rapid-capture-button:disabled {
+  background: #757575;
+  cursor: not-allowed;
+}
+
+/* Capture count badge */
+.capture-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #f44336;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Context indicator */
+.context-indicator {
+  position: absolute;
+  bottom: 70px;
+  right: 0;
+  background: rgba(66, 66, 66, 0.95);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Recent captures preview */
+.recent-captures {
+  position: absolute;
+  bottom: 0;
+  right: 70px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.recent-capture-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.recent-capture-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Settings panel - mobile optimized */
+.capture-settings-panel {
+  position: absolute;
+  bottom: 70px;
+  right: 0;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  width: min(280px, calc(100vw - 40px));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 60vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.capture-settings-panel h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #424242;
+}
+
+/* Checkbox and radio styling for mobile */
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.settings-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.settings-checkbox label {
+  font-size: 14px;
+  color: #616161;
+  flex: 1;
+  cursor: pointer;
+}
+
+/* Select dropdown - mobile optimized */
+.settings-select {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: white;
+  margin-top: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 20px;
+  padding-right: 40px;
+}
+
+/* Loading and feedback states */
+.capture-feedback {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #4caf50;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 14px;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: slideInUp 0.3s ease-out;
+}
+
+.capture-feedback.error {
+  background: #f44336;
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Processing indicator */
+.processing-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.processing-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Optimizations for different screen sizes */
+@media (max-width: 375px) {
+  .rapid-capture-button {
+    width: 56px;
+    height: 56px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    right: 16px;
+  }
+
+  .capture-settings-panel {
+    width: calc(100vw - 32px);
+  }
+
+  .context-indicator {
+    font-size: 11px;
+    max-width: 160px;
+  }
+}
+
+/* Landscape optimizations */
+@media (orientation: landscape) and (max-height: 500px) {
+  .rapid-capture-button {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    right: calc(10px + env(safe-area-inset-right));
+  }
+
+  .capture-settings-panel {
+    max-height: 80vh;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .capture-settings-panel {
+    background: #212121;
+    border-color: #424242;
+    color: white;
+  }
+
+  .capture-settings-panel h4 {
+    color: white;
+  }
+
+  .settings-checkbox label {
+    color: #e0e0e0;
+  }
+
+  .settings-select {
+    background: #424242;
+    border-color: #616161;
+    color: white;
+  }
+}
+
+/* Performance optimizations */
+.rapid-capture-button,
+.recent-capture-thumb,
+.capture-badge {
+  will-change: transform;
+}
+
+.capture-settings-panel {
+  will-change: opacity, transform;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .rapid-capture-button,
+  .recent-capture-thumb {
+    transition: none;
+  }
+
+  .capture-feedback {
+    animation: none;
+  }
+
+  .processing-spinner {
+    animation: none;
+    border-top-color: transparent;
+  }
+}

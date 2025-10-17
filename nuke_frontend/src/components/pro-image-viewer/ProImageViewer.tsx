@@ -180,7 +180,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
         .single();
 
       setVehicleOwner(vehicle?.uploaded_by || null);
-      setIsOwnerOrModerator(vehicle?.uploaded_by === user.id);
+      setIsOwnerOrModerator(vehicle?.user_id === user.id || vehicle?.uploaded_by === user.id);
     }
   };
 
