@@ -91,7 +91,7 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
         borderRadius: '8px',
         border: '2px dashed #d1d5db'
       }}>
-        <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>📸</span>
+        <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>+</span>
         <p className="text text-muted">No images uploaded yet</p>
       </div>
     );

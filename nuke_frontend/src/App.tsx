@@ -192,14 +192,12 @@ function App() {
       <Router>
         {/* Global Upload Status - Always visible at top */}
         <GlobalUploadStatus />
-        
-        <div className="layout">        
-          {/* Main content */}
-          <main className="main">
+
+        <AppLayout>
           <Routes>
             {/* Home route - Landing Page */}
             <Route path="/" element={<Discovery />} />
-            
+
             {/* Main routes */}
             <Route path="/discover" element={<Discovery />} />
             <Route path="/dashboard" element={<Dashboard />} />
@@ -221,11 +219,7 @@ function App() {
             {/* <Route path="/business-management" element={<BusinessManagement />} /> */}
             
             {/* Media & Content Tools */}
-            <Route path="/photo-categorizer" element={
-              <AppLayout>
-                <PhotoLibraryCategorizer />
-              </AppLayout>
-            } />
+            <Route path="/photo-categorizer" element={<PhotoLibraryCategorizer />} />
             <Route path="/dropbox-import" element={<DropboxImport />} />
             <Route path="/dropbox-callback" element={<DropboxCallback />} />
             <Route path="/dropbox-ai-process" element={<DropboxAIProcess />} />
@@ -300,11 +294,10 @@ function App() {
               </div>
             } />
           </Routes>
-        </main>
+        </AppLayout>
         {/* Global Upload Progress Bar - Persists across navigation */}
         <UploadProgressBar />
-      </div>
-    </Router>
+      </Router>
     </ToastProvider>
   );
 }

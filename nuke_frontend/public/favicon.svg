@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background -->
+  <rect width="128" height="128" fill="#000000"/>
+  
+  <!-- Glowing blue circle -->
+  <defs>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#4da6ff;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#0066cc;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#003d7a;stop-opacity:0.3" />
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Main circle with glow effect -->
+  <circle cx="64" cy="64" r="45" fill="url(#glowGrad)" filter="url(#glow)"/>
+  
+  <!-- Inner bright core -->
+  <circle cx="64" cy="64" r="25" fill="#66b3ff" opacity="0.9"/>
+</svg>

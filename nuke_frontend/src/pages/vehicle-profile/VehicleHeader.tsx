@@ -246,14 +246,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     <div
       className="vehicle-price-header"
       style={{
-        background: '#f7f7f7',
-        border: '1px solid #ddd',
-        padding: '8px 12px',
-        margin: '8px 12px',
+        background: 'transparent',
+        border: 'none',
+        padding: '12px 16px',
+        margin: '0',
         fontFamily: 'Arial, sans-serif',
         position: 'sticky',
         top: 48,
-        zIndex: 10
+        zIndex: 10,
+        borderBottom: '1px solid #e5e5e5'
       }}
     >
       {/* Combined single-row layout (wraps on narrow screens) */}

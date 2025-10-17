@@ -255,7 +255,7 @@ const UniversalImageUpload: React.FC<UniversalImageUploadProps> = ({
               disabled={disabled}
             />
             <div className="space-y-4">
-              <div className="text-4xl text-gray-400">📁</div>
+              <div className="text-4xl text-gray-400">+</div>
               <div>
                 <p className="text-lg font-medium text-gray-700">Drop images here or click to browse</p>
                 <p className="text-sm text-gray-500">Up to {maxFiles} {category === 'document' ? 'files' : 'images'}, max 10MB each</p>
@@ -292,7 +292,7 @@ const UniversalImageUpload: React.FC<UniversalImageUploadProps> = ({
                 disabled={disabled}
               />
               <div className="space-y-2">
-                <div className="text-2xl text-gray-400">📷</div>
+                <div className="text-2xl text-gray-400">+</div>
                 <p className="text-gray-700">Click to upload or drag and drop</p>
                 <p className="text-sm text-gray-500">{category === 'document' ? 'Images, PDFs up to 10MB' : 'PNG, JPG up to 10MB'}</p>
               </div>
