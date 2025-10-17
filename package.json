@@ -10,7 +10,11 @@
     "db:seed": "bash -c 'if [ \"$ALLOW_PROD\" = \"true\" ]; then echo \"Refusing to run seeds with ALLOW_PROD=true\" && exit 2; fi; psql \"$SUPABASE_DB_URL\" -f supabase/sql/seeds/test_sample_data.sql'",
     "migrations:validate": "node scripts/migrations/validate_migrations.js",
     "migrations:fix": "node scripts/migrations/fix_migrations.js",
-    "db:push:safe": "npm run migrations:validate && supabase db push --yes"
+    "db:push:safe": "npm run migrations:validate && supabase db push --yes",
+    "dev:frontend": "cd nuke_frontend && npm run dev",
+    "dev:backend": "cd nuke_api && mix phx.server",
+    "build:frontend": "cd nuke_frontend && npm run build",
+    "test:frontend": "cd nuke_frontend && npm test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.62.0",
