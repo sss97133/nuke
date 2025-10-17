@@ -182,6 +182,63 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
                   (it as any).metadata.priceSignal = s; // camelCase for UI
                 }
               });
+
+              // 4) Attach status metadata (verification, completeness, needs, counts)
+              try {
+                const { data: statusMeta, error: statusErr } = await supabase
+                  .from('vehicle_status_metadata')
+                  .select('vehicle_id, data_completeness_score, verification_level, contributor_count, photos_count, needs_photos, needs_specifications, needs_history, needs_verification, location_city, location_state')
+                  .in('vehicle_id', ids);
+                if (!statusErr && Array.isArray(statusMeta)) {
+                  const metaMap: Record<string, any> = {};
+                  (statusMeta as any[]).forEach((m: any) => { if (m?.vehicle_id) metaMap[m.vehicle_id] = m; });
+                  vehicleItems.forEach(it => {
+                    const m = metaMap[it.id];
+                    if (m) {
+                      (it as any).metadata.statusMetadata = m;
+                    }
+                  });
+                }
+              } catch (e) {
+                console.debug('status metadata enrichment skipped:', e);
+              }
+
+              // 5) Attach counts for receipts and AI tags (batch queries per table)
+              try {
+                const [docsRes, tagsRes] = await Promise.all([
+                  supabase
+                    .from('vehicle_documents')
+                    .select('vehicle_id')
+                    .in('vehicle_id', ids)
+                    .eq('document_type', 'receipt'),
+                  supabase
+                    .from('image_tags')
+                    .select('vehicle_id')
+                    .in('vehicle_id', ids)
+                ]);
+
+                const receiptsMap: Record<string, number> = {};
+                const tagsMap: Record<string, number> = {};
+                if (!docsRes.error && Array.isArray(docsRes.data)) {
+                  (docsRes.data as any[]).forEach((row: any) => {
+                    const vid = row.vehicle_id;
+                    receiptsMap[vid] = (receiptsMap[vid] || 0) + 1;
+                  });
+                }
+                if (!tagsRes.error && Array.isArray(tagsRes.data)) {
+                  (tagsRes.data as any[]).forEach((row: any) => {
+                    const vid = row.vehicle_id;
+                    tagsMap[vid] = (tagsMap[vid] || 0) + 1;
+                  });
+                }
+
+                vehicleItems.forEach(it => {
+                  (it as any).metadata.receipts_count = receiptsMap[it.id] || 0;
+                  (it as any).metadata.tags_count = tagsMap[it.id] || 0;
+                });
+              } catch (e) {
+                console.debug('receipt/tag counts enrichment skipped:', e);
+              }
             }
           } catch (e) {
             console.debug('price signal enrichment skipped:', e);

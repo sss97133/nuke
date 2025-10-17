@@ -39,6 +39,11 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
     color: '#374151'
   };
 
+  const tinyMutedStyle: React.CSSProperties = {
+    fontSize: '8pt',
+    color: '#6b7280'
+  };
+
   // Map feed item types to allowed tracking entity types
   const mapEntityType = (t: FeedItem['type']): 'vehicle' | 'image' | 'shop' | 'user' | 'timeline_event' | 'search' | 'page' => {
     switch (t) {
@@ -283,6 +288,48 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
                 {item.metadata.event_type.replace('_', ' ')}
               </span>
             )}
+
+        {item.type === 'vehicle' && (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Provenance summary: verification + completeness + counts */}
+            {(() => {
+              const status = (item as any)?.metadata?.statusMetadata;
+              const receiptsCount = (item as any)?.metadata?.receipts_count as number | undefined;
+              const tagsCount = (item as any)?.metadata?.tags_count as number | undefined;
+
+              const chips: JSX.Element[] = [];
+              if (status?.verification_level) {
+                chips.push(
+                  <span key="verif" className="badge" style={smallChipStyle} title="Verification level">
+                    verif: {String(status.verification_level).replace('_', ' ')}
+                  </span>
+                );
+              }
+              if (typeof status?.data_completeness_score === 'number') {
+                chips.push(
+                  <span key="comp" className="badge" style={smallChipStyle} title="Data completeness">
+                    data: {status.data_completeness_score}%
+                  </span>
+                );
+              }
+              if (typeof tagsCount === 'number') {
+                chips.push(
+                  <span key="tags" className="badge" style={smallChipStyle} title="AI tags linked to this vehicle">
+                    tags: {tagsCount}
+                  </span>
+                );
+              }
+              if (typeof receiptsCount === 'number') {
+                chips.push(
+                  <span key="receipts" className="badge" style={smallChipStyle} title="Receipts linked to this vehicle">
+                    receipts: {receiptsCount}
+                  </span>
+                );
+              }
+              return chips;
+            })()}
+          </div>
+        )}
           </div>
         )}
 
@@ -297,6 +344,32 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             <div style={{ color: '#6b7280', fontSize: '8pt' }}>Open details</div>
           </div>
         )}
+
+        {/* Mobile-friendly footer: created_at and location, compact */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, gap: 8, flexWrap: 'wrap' }}>
+          <div style={tinyMutedStyle}>{formatDate(item.created_at)}</div>
+          {item.type === 'vehicle' && (
+            <>
+              {(() => {
+                const sig: any = (item as any)?.metadata?.priceSignal;
+                if (sig?.updated_at) {
+                  const d = new Date(sig.updated_at);
+                  return <div style={tinyMutedStyle}>as of {d.toLocaleDateString()}</div>;
+                }
+                return null;
+              })()}
+              <div style={tinyMutedStyle}>
+                {(() => {
+                  const status = (item as any)?.metadata?.statusMetadata;
+                  if (status?.location_city && status?.location_state) {
+                    return `${status.location_city}, ${status.location_state}`;
+                  }
+                  return '';
+                })()}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Image Lightbox */}
