@@ -90,7 +90,6 @@ const Discovery: React.FC = () => {
   };
 
   return (
-    <AppLayout>
       <div className="fade-in">
         {/* Header */}
         <section className="section">
@@ -193,7 +192,6 @@ const Discovery: React.FC = () => {
         )}
 
       </div>
-    </AppLayout>
   );
 };
 

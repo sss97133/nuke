@@ -5,7 +5,7 @@ import MobileVehicleProfile from '../components/mobile/MobileVehicleProfile';
 import { TimelineEventService } from '../services/timelineEventService';
 import AddEventWizard from '../components/AddEventWizard';
 import EventMap from '../components/EventMap';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import CommentPopup from '../components/CommentPopup';
 import CommentingGuide from '../components/CommentingGuide';
 import VehicleDataEditor from '../components/vehicle/VehicleDataEditor';
@@ -1062,18 +1062,15 @@ const VehicleProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
         <div className="loading-container">
           <div className="loading-spinner"></div>
           <p>Loading vehicle...</p>
         </div>
-      </AppLayout>
     );
   }
 
   if (!vehicle) {
     return (
-      <AppLayout>
         <div className="card">
           <div className="card-body text-center">
             <h2 className="text font-bold" style={{ marginBottom: '12px' }}>Vehicle Not Found</h2>
@@ -1088,7 +1085,6 @@ const VehicleProfile: React.FC = () => {
             </button>
           </div>
         </div>
-      </AppLayout>
     );
   }
 
@@ -1103,7 +1099,7 @@ const VehicleProfile: React.FC = () => {
   }
 
   return (
-    <AppLayout>
+    <>
       <div>
         {/* Vehicle Header with Price */}
         <VehicleHeader
@@ -1492,8 +1488,7 @@ const VehicleProfile: React.FC = () => {
           }}
         />
       )}
-
-    </AppLayout>
+    </>
   );
 };
 

@@ -287,6 +287,31 @@ const ImageLightbox = ({
     }
   };
 
+  const setAsPrimary = async () => {
+    if (!session?.user || !canEdit || !vehicleId || !imageId) return;
+
+    try {
+      // First, remove primary from all images for this vehicle
+      await supabase
+        .from('vehicle_images')
+        .update({ is_primary: false })
+        .eq('vehicle_id', vehicleId);
+
+      // Then set this image as primary
+      const { error } = await supabase
+        .from('vehicle_images')
+        .update({ is_primary: true })
+        .eq('id', imageId);
+
+      if (!error) {
+        console.log('Successfully set as primary image');
+        // Could add toast notification here
+      }
+    } catch (error) {
+      console.error('Error setting primary image:', error);
+    }
+  };
+
   const getTagColor = (type: string) => {
     switch (type) {
       case 'part': return '#3b82f6';
@@ -339,7 +364,7 @@ const ImageLightbox = ({
             <button
               onClick={onPrev}
               className="button button-secondary"
-              style={{ color: 'white', background: 'rgba(255, 255, 255, 0.1)' }}
+              style={{ color: 'white', background: 'rgba(255, 255, 255, 0.2)' }}
             >
               ← Previous
             </button>
@@ -348,7 +373,7 @@ const ImageLightbox = ({
             <button
               onClick={onNext}
               className="button button-secondary"
-              style={{ color: 'white', background: 'rgba(255, 255, 255, 0.1)' }}
+              style={{ color: 'white', background: 'rgba(255, 255, 255, 0.2)' }}
             >
               Next →
             </button>
@@ -368,9 +393,9 @@ const ImageLightbox = ({
               style={{
                 fontSize: '8pt',
                 fontFamily: 'Arial, sans-serif',
-                background: isTagging ? '#424242' : 'rgba(255, 255, 255, 0.1)',
+                background: isTagging ? '#424242' : 'rgba(255, 255, 255, 0.2)',
                 color: isTagging ? 'white' : 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
                 borderRadius: '0px',
                 padding: '4px 8px'
               }}
@@ -385,9 +410,9 @@ const ImageLightbox = ({
               style={{
                 fontSize: '8pt',
                 fontFamily: 'Arial, sans-serif',
-                background: analyzing ? '#666' : 'rgba(255, 255, 255, 0.1)',
+                background: analyzing ? '#666' : 'rgba(255, 255, 255, 0.2)',
                 color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
                 borderRadius: '0px',
                 padding: '4px 8px'
               }}
@@ -405,7 +430,7 @@ const ImageLightbox = ({
             onChange={(e) => setTagView(e.target.value as any)}
             style={{
               fontSize: '10px',
-              background: 'rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.2)',
               color: 'white',
               border: '1px solid rgba(255,255,255,0.3)',
               borderRadius: 0,
@@ -419,6 +444,22 @@ const ImageLightbox = ({
             <option value="all">All</option>
           </select>
         </div>
+        {/* Set as Primary button */}
+        {canEdit && session && vehicleId && imageId && (
+          <button
+            onClick={setAsPrimary}
+            className="button button-secondary"
+            style={{
+              color: 'white',
+              background: 'rgba(34, 197, 94, 0.6)',
+              border: '1px solid rgba(34, 197, 94, 0.8)'
+            }}
+            title="Set as primary image for this vehicle"
+          >
+            ⭐ Set Primary
+          </button>
+        )}
+
         {/* Close button */}
         <button
           onClick={onClose}
@@ -862,6 +903,54 @@ const ImageLightbox = ({
                     {tag.tag_name}
                   </span>
                 ))}
+              </div>
+
+              {/* User Input Area for Tag Quality Improvement */}
+              <div style={{ marginTop: '8px' }}>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>
+                  Add or correct tags to improve data quality:
+                </div>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Enter tag name..."
+                    style={{
+                      flex: 1,
+                      padding: '4px 6px',
+                      fontSize: '11px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      borderRadius: '3px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white'
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                        handleAddTag(e.currentTarget.value.trim());
+                        e.currentTarget.value = '';
+                      }
+                    }}
+                  />
+                  <button
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '10px',
+                      background: 'rgba(59, 130, 246, 0.8)',
+                      border: 'none',
+                      borderRadius: '3px',
+                      color: 'white',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                      if (input && input.value.trim()) {
+                        handleAddTag(input.value.trim());
+                        input.value = '';
+                      }
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
             </div>
           )}
