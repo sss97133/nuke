@@ -104,58 +104,127 @@ const AddVehicle: React.FC = () => {
       setIsScrapingUrl(true);
       setScrapingError(null);
       setLastScrapedUrl(url);
+      // Determine source from URL for proper mapping
+      const detectSourceFromUrl = (u: string): string => {
+        if (u.includes('bringatrailer.com')) return 'Bring a Trailer';
+        if (u.includes('facebook.com/marketplace')) return 'Facebook Marketplace';
+        if (u.includes('craigslist.org')) return 'Craigslist';
+        if (u.includes('autotrader.com')) return 'AutoTrader';
+        if (u.includes('cars.com')) return 'Cars.com';
+        if (u.includes('hagerty.com')) return 'Hagerty';
+        if (u.includes('classic.com')) return 'Classic.com';
+        return 'External URL';
+      };
 
-      console.log('Scraping BAT URL:', url);
+      const SOURCE_LABEL = detectSourceFromUrl(url);
 
-      // Call Supabase Edge Function (scrape-vehicle)
-      const { data: result, error: fnError } = await (supabase as any).functions.invoke('scrape-vehicle', {
-        body: { url }
-      });
-      if (fnError) {
-        throw new Error(`Scraping failed: ${fnError.message || fnError}`);
-      }
+      // Try Supabase Edge Function first (if deployed), then fall back to Phoenix API
+      let scrapedData: any | null = null;
+      let lastErrorMessage: string | null = null;
 
-      if (result.success && result.data) {
-        const scrapedData = result.data;
-
-        // Map scraped data to form fields
-        const updates: Partial<VehicleFormData> = {};
-
-        if (scrapedData.make) updates.make = scrapedData.make;
-        if (scrapedData.model) updates.model = scrapedData.model;
-        if (scrapedData.year) updates.year = parseInt(scrapedData.year);
-        if (scrapedData.vin) updates.vin = scrapedData.vin;
-        if (scrapedData.mileage) updates.mileage = parseInt(scrapedData.mileage.replace(/,/g, ''));
-        if (scrapedData.color) updates.color = scrapedData.color;
-        if (scrapedData.transmission) updates.transmission = scrapedData.transmission;
-        if (scrapedData.engine_size) updates.engine_size = scrapedData.engine_size;
-        if (scrapedData.sale_price) updates.sale_price = scrapedData.sale_price;
-
-        // BAT specific fields
-        updates.bat_auction_url = url;
-        updates.source = 'Bring a Trailer';
-        updates.discovery_source = 'user_import';
-        updates.discovery_url = url;
-        if (scrapedData.title) updates.bat_listing_title = scrapedData.title;
-
-        // Set relationship as discovered since importing from external source
-        updates.relationship_type = 'discovered';
-
-        // Add acquisition context for business users
-        if (scrapedData.sale_price || scrapedData.asking_price) {
-          updates.target_acquisition = true;
-          updates.acquisition_notes = `Discovered on ${scrapedData.source || 'marketplace'} - potential acquisition candidate`;
+      try {
+        // Call Supabase Edge Function (scrape-vehicle) if available
+        const { data: result, error: fnError } = await (supabase as any).functions.invoke('scrape-vehicle', {
+          body: { url }
+        });
+        if (fnError) throw new Error(fnError.message || String(fnError));
+        if (result?.success && result?.data) {
+          scrapedData = result.data;
+        } else {
+          throw new Error(result?.error || 'Edge function returned no data');
         }
+      } catch (edgeErr: any) {
+        lastErrorMessage = edgeErr?.message || 'Edge function unavailable';
 
-        console.log('Updating form with scraped data:', updates);
-        updateFormData(updates);
+        // Phoenix API base URL
+        const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || (import.meta as any).env?.VITE_PHOENIX_API_URL || 'http://localhost:4000/api';
 
-        // Set success message
-        setScrapingError(null);
-
-      } else {
-        throw new Error(result.error || 'Failed to extract data from URL');
+        // Try real scraper endpoint first (if enabled on backend)
+        try {
+          const resp = await fetch(`${API_BASE_URL}/scrape-listing`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+          });
+          if (resp.ok) {
+            const json = await resp.json();
+            if (json?.success && json?.data) {
+              scrapedData = json.data;
+            } else {
+              throw new Error(json?.message || 'Scrape listing returned no data');
+            }
+          } else {
+            throw new Error(`HTTP ${resp.status}`);
+          }
+        } catch (realScrapeErr: any) {
+          // Fallback to mock debug scraper for dev environments
+          try {
+            const resp = await fetch(`${API_BASE_URL}/scrape-test`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url })
+            });
+            if (resp.ok) {
+              const json = await resp.json();
+              if (json?.success && json?.data) {
+                scrapedData = json.data;
+              } else {
+                throw new Error(json?.error || 'Scrape test returned no data');
+              }
+            } else {
+              throw new Error(`HTTP ${resp.status}`);
+            }
+          } catch (debugErr: any) {
+            lastErrorMessage = `Scraping failed (edge + api): ${debugErr?.message || realScrapeErr?.message || lastErrorMessage}`;
+          }
+        }
       }
+
+      if (!scrapedData) {
+        throw new Error(lastErrorMessage || 'Failed to extract data from URL');
+      }
+
+      // Map scraped data to form fields
+      const updates: Partial<VehicleFormData> = {};
+
+      if (scrapedData.make) updates.make = scrapedData.make;
+      if (scrapedData.model) updates.model = scrapedData.model;
+      if (scrapedData.year) updates.year = parseInt(String(scrapedData.year));
+      if (scrapedData.vin) updates.vin = scrapedData.vin;
+      if (scrapedData.mileage) {
+        const mileageStr = typeof scrapedData.mileage === 'string' ? scrapedData.mileage : String(scrapedData.mileage);
+        updates.mileage = parseInt(mileageStr.replace(/,/g, ''));
+      }
+      if (scrapedData.color) updates.color = scrapedData.color;
+      if (scrapedData.transmission) updates.transmission = scrapedData.transmission;
+      if (scrapedData.engine_size) updates.engine_size = scrapedData.engine_size;
+      if (scrapedData.sale_price) updates.sale_price = scrapedData.sale_price;
+
+      // Source and discovery context
+      updates.source = scrapedData.source || SOURCE_LABEL;
+      updates.discovery_source = 'user_import';
+      updates.discovery_url = url;
+
+      // BAT-specific fields only when applicable
+      if (SOURCE_LABEL === 'Bring a Trailer') {
+        updates.bat_auction_url = url;
+        if (scrapedData.title) updates.bat_listing_title = scrapedData.title;
+      }
+
+      // Set relationship as discovered since importing from external source
+      updates.relationship_type = 'discovered';
+
+      // Add acquisition context for business users
+      if (scrapedData.sale_price || scrapedData.asking_price) {
+        updates.target_acquisition = true;
+        updates.acquisition_notes = `Discovered on ${scrapedData.source || SOURCE_LABEL || 'marketplace'} - potential acquisition candidate`;
+      }
+
+      console.log('Updating form with scraped data:', updates);
+      updateFormData(updates);
+
+      // Set success message
+      setScrapingError(null);
 
     } catch (error: any) {
       console.error('URL scraping error:', error);
@@ -547,10 +616,10 @@ const AddVehicle: React.FC = () => {
                       </div>
                     )}
 
-                    {lastScrapedUrl && !isScrapingUrl && !scrapingError && formData.bat_auction_url && (
+                    {lastScrapedUrl && !isScrapingUrl && !scrapingError && (
                       <div className="alert alert-success mb-4">
                         <div className="text-small">
-                          ✓ Successfully imported vehicle data from Bring a Trailer listing
+                          ✓ Successfully imported vehicle data from {formData.source || 'external listing'}
                         </div>
                       </div>
                     )}
