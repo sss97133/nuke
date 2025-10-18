@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RLS Policy Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Supabase RLS Policy Test</h1>
+    <button onclick="testAnonymousInsert()">Test Anonymous Insert</button>
+    <button onclick="testAuthenticatedInsert()">Test Authenticated Insert</button>
+    <button onclick="checkPolicies()">Check RLS Policies</button>
+    <pre id="output"></pre>
+
+    <script>
+        const SUPABASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk';
+        
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message) {
+            document.getElementById('output').textContent += message + '\n';
+        }
+        
+        async function testAnonymousInsert() {
+            log('\n=== Testing Anonymous Insert ===');
+            
+            // Sign out to ensure we're anonymous
+            await supabaseClient.auth.signOut();
+            
+            const { data: session } = await supabaseClient.auth.getSession();
+            log('Current session: ' + (session.session ? 'Authenticated' : 'Anonymous'));
+            
+            const testVehicle = {
+                make: 'Test',
+                model: 'Vehicle',
+                year: 2024,
+                is_public: true
+            };
+            
+            log('Attempting insert with: ' + JSON.stringify(testVehicle));
+            
+            const { data, error } = await supabaseClient
+                .from('vehicles')
+                .insert([testVehicle])
+                .select();
+                
+            if (error) {
+                log('❌ Error: ' + error.message);
+                log('Error code: ' + error.code);
+                log('Error details: ' + JSON.stringify(error));
+            } else {
+                log('✅ Success! Vehicle created: ' + JSON.stringify(data));
+            }
+        }
+        
+        async function testAuthenticatedInsert() {
+            log('\n=== Testing Authenticated Insert ===');
+            
+            const email = prompt('Enter your email:');
+            const password = prompt('Enter your password:');
+            
+            if (!email || !password) {
+                log('Cancelled - no credentials provided');
+                return;
+            }
+            
+            log('Attempting to sign in...');
+            const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+            
+            if (authError) {
+                log('❌ Auth Error: ' + authError.message);
+                return;
+            }
+            
+            log('✅ Signed in as: ' + authData.user.email);
+            
+            const testVehicle = {
+                make: 'Test',
+                model: 'AuthVehicle',
+                year: 2024,
+                is_public: true
+            };
+            
+            log('Attempting insert with: ' + JSON.stringify(testVehicle));
+            
+            const { data, error } = await supabaseClient
+                .from('vehicles')
+                .insert([testVehicle])
+                .select();
+                
+            if (error) {
+                log('❌ Error: ' + error.message);
+                log('Error code: ' + error.code);
+                log('Error details: ' + JSON.stringify(error));
+            } else {
+                log('✅ Success! Vehicle created: ' + JSON.stringify(data));
+                
+                // Clean up - delete the test vehicle
+                if (data && data[0]) {
+                    const { error: deleteError } = await supabaseClient
+                        .from('vehicles')
+                        .delete()
+                        .eq('id', data[0].id);
+                    
+                    if (deleteError) {
+                        log('Could not delete test vehicle: ' + deleteError.message);
+                    } else {
+                        log('Test vehicle deleted');
+                    }
+                }
+            }
+        }
+        
+        async function checkPolicies() {
+            log('\n=== Checking Table Access ===');
+            
+            const { data: session } = await supabaseClient.auth.getSession();
+            log('Current session: ' + (session.session ? 'Authenticated as ' + session.session.user.email : 'Anonymous'));
+            
+            // Try to read vehicles
+            log('\nTesting READ access...');
+            const { data: readData, error: readError } = await supabaseClient
+                .from('vehicles')
+                .select('*')
+                .limit(1);
+                
+            if (readError) {
+                log('❌ Cannot READ vehicles: ' + readError.message);
+            } else {
+                log('✅ Can READ vehicles');
+            }
+            
+            // Check if table exists
+            log('\nChecking table structure...');
+            const { data: columns, error: columnsError } = await supabaseClient
+                .from('vehicles')
+                .select()
+                .limit(0);
+                
+            if (columnsError) {
+                log('❌ Cannot access vehicles table: ' + columnsError.message);
+            } else {
+                log('✅ Table exists and is accessible');
+            }
+        }
+    </script>
+</body>
+</html>

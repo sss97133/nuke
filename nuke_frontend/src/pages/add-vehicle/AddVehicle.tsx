@@ -48,17 +48,25 @@ const AddVehicle: React.FC = () => {
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [extractedImages, setExtractedImages] = useState<File[]>([]);
-  const [imageMetadata, setImageMetadata] = useState<Map<string, ImageMetadata>>(new Map());
+  const [imageMetadata, setImageMetadata] = useState<Record<string, ImageMetadata>>({});
   const [extracting, setExtracting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Get current user
+  // Get authenticated user on component mount
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
     };
+    
     getUser();
+    
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+    
+    return () => subscription.unsubscribe();
   }, []);
 
   // Handle title scan completion
