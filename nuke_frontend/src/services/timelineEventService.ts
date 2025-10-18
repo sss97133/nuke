@@ -445,6 +445,26 @@ export class TimelineEventService {
 
       if (error) {
         console.error('Error creating image upload timeline event (timeline_events):', error);
+      } else {
+        // Dispatch custom events to notify UI components to refresh
+        try {
+          window.dispatchEvent(new CustomEvent('vehicle_images_updated', { 
+            detail: { vehicleId } 
+          }));
+          window.dispatchEvent(new CustomEvent('timeline_updated', { 
+            detail: { vehicleId } 
+          }));
+          window.dispatchEvent(new CustomEvent('timeline_events_created', { 
+            detail: { 
+              vehicleId, 
+              count: 1, 
+              dates: [eventData.event_date] 
+            } 
+          }));
+        } catch (dispatchError) {
+          console.warn('Failed to dispatch UI update events:', dispatchError);
+          // Non-critical, don't fail the timeline event creation
+        }
       }
     } catch (error) {
       console.error('Error in createImageUploadEvent:', error);
