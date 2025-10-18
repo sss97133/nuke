@@ -122,7 +122,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         <div className="header-content">
           <div className="header-left">
             <Link to="/" className="logo">
-              <span className="logo-text">Nuke</span>
+              <span className="logo-text">n-zero</span>
             </Link>
             
             {/* Desktop Navigation */}
