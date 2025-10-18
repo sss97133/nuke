@@ -140,7 +140,7 @@ const VehicleApproval: React.FC = () => {
         .insert({
           extraction_id: extractionId,
           vehicle_id: vehicle.id,
-          approver_id: session?.user?.id,
+          // Note: approver_id is set automatically by RLS
           approved_fields: approvedFields.map(f => f.field),
           approval_notes: notes,
           confidence_score: approvedFields.reduce((sum, f) => sum + f.confidence, 0) / approvedFields.length

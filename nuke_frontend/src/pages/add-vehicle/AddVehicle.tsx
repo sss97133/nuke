@@ -391,7 +391,7 @@ const AddVehicle: React.FC = () => {
                 .from('ownership_verifications')
                 .insert([{
                   vehicle_id: vehicleId,
-                  user_id: user.id,
+                  // Note: user_id is set automatically by RLS
                   status: 'pending',
                   verification_type: 'title_and_id',
                   document_id: docData.id,
