@@ -716,8 +716,11 @@ const VehicleProfile: React.FC = () => {
       }
 
       // Preserve local API by mirroring DB snake_case to camel
-      setVehicle({ ...data, isPublic: (data as any).is_public ?? data.isPublic });
+      const vehicleData = { ...data, isPublic: (data as any).is_public ?? data.isPublic };
+      console.log('Setting vehicle data:', vehicleData);
+      setVehicle(vehicleData);
       setIsPublic(((data as any).is_public ?? data.isPublic) ?? true);
+      console.log('Vehicle state set successfully');
     } catch (error) {
       console.error('Error loading vehicle:', error);
       navigate('/vehicles');
@@ -1072,6 +1075,7 @@ const VehicleProfile: React.FC = () => {
   }
 
   if (!vehicle) {
+    console.log('Rendering Vehicle Not Found - vehicle state is null, loading:', loading);
     return (
         <div className="card">
           <div className="card-body text-center">
@@ -1089,6 +1093,8 @@ const VehicleProfile: React.FC = () => {
         </div>
     );
   }
+  
+  console.log('Rendering vehicle profile with vehicle:', vehicle.id);
 
   // Debug ownership check (only in development)
   if (process.env.NODE_ENV === 'development') {
