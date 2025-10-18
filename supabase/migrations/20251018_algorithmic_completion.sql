@@ -49,54 +49,58 @@ BEGIN
       COUNT(*) FILTER (WHERE image_urls IS NOT NULL AND array_length(image_urls, 1) > 0) as events_with_photos,
       COUNT(*) FILTER (WHERE metadata->>'parts_cost' IS NOT NULL OR metadata->>'labor_cost' IS NOT NULL) as events_with_costs,
       COUNT(*) FILTER (WHERE source = 'professional_shop') as professional_events,
-      EXTRACT(DAY FROM MAX(event_date) - MIN(event_date))::INTEGER as timeline_span_days
+      COALESCE(EXTRACT(DAY FROM (MAX(event_date)::timestamp - MIN(event_date)::timestamp))::INTEGER, 0) as timeline_span_days
     FROM timeline_events
     WHERE vehicle_id = p_vehicle_id
   ),
   cohort_timeline AS (
     SELECT 
-      AVG(event_count) as avg_events,
-      AVG(unique_days) as avg_days,
-      AVG(events_with_photos) as avg_with_photos
+      COALESCE(AVG(event_count), 0) as avg_events,
+      COALESCE(AVG(unique_days), 0) as avg_days,
+      COALESCE(AVG(events_with_photos), 0) as avg_with_photos
     FROM (
       SELECT 
+        te.vehicle_id,
         COUNT(*) as event_count,
-        COUNT(DISTINCT DATE(event_date)) as unique_days,
-        COUNT(*) FILTER (WHERE image_urls IS NOT NULL AND array_length(image_urls, 1) > 0) as events_with_photos
+        COUNT(DISTINCT DATE(te.event_date)) as unique_days,
+        COUNT(*) FILTER (WHERE te.image_urls IS NOT NULL AND array_length(te.image_urls, 1) > 0) as events_with_photos
       FROM timeline_events te
       JOIN vehicles v ON te.vehicle_id = v.id
       WHERE v.make = v_data.make
         AND v.year BETWEEN (v_data.year - 3) AND (v_data.year + 3)
-        AND v.id != p_vehicle_id
+        AND te.vehicle_id != p_vehicle_id
       GROUP BY te.vehicle_id
       HAVING COUNT(*) > 0
     ) cohort
+  ),
+  timeline_calc AS (
+    SELECT
+      CASE
+        WHEN (SELECT avg_events FROM cohort_timeline) > 0 THEN
+          LEAST(100, (
+            (
+              (tt.event_count::NUMERIC / NULLIF((SELECT avg_events FROM cohort_timeline), 0)) * 30 +
+              (tt.events_with_photos::NUMERIC / NULLIF((SELECT avg_with_photos FROM cohort_timeline), 0)) * 40 +
+              (tt.timeline_span_days::NUMERIC / 365.0) * 30
+            ) / 1.0
+          ) * 100)
+        ELSE
+          LEAST(100, (
+            tt.event_count * 3 +
+            tt.events_with_photos * 5 +
+            tt.professional_events * 10
+          ))
+      END as score
+    FROM this_timeline tt
   )
-  SELECT 
-    CASE
-      WHEN (SELECT avg_events FROM cohort_timeline) > 0 THEN
-        -- Relative to cohort
-        LEAST(100, (
-          (
-            ((SELECT event_count FROM this_timeline)::NUMERIC / NULLIF((SELECT avg_events FROM cohort_timeline), 0)) * 30 +
-            ((SELECT events_with_photos FROM this_timeline)::NUMERIC / NULLIF((SELECT avg_with_photos FROM cohort_timeline), 0)) * 40 +
-            ((SELECT timeline_span_days FROM this_timeline)::NUMERIC / 365.0) * 30
-          ) / 1.0
-        ) * 100)
-      ELSE
-        -- Fallback: absolute scoring
-        LEAST(100, (
-          (SELECT event_count FROM this_timeline) * 3 +
-          (SELECT events_with_photos FROM this_timeline) * 5 +
-          (SELECT professional_events FROM this_timeline) * 10
-        ))
-    END INTO timeline_score;
+  SELECT score INTO timeline_score FROM timeline_calc;
   
   ----------------------------------------
   -- DIMENSION 2: FIELD COVERAGE (25%)
   -- Relative to similar vehicles in DB
   ----------------------------------------
   
+  -- Calculate field coverage
   WITH this_fields AS (
     SELECT (
       (CASE WHEN year IS NOT NULL THEN 1 ELSE 0 END) +
@@ -153,21 +157,21 @@ BEGIN
         AND year BETWEEN (v_data.year - 3) AND (v_data.year + 3)
         AND id != p_vehicle_id
     ) cohort
+  ),
+  field_calc AS (
+    SELECT 
+      tf.filled_count,
+      cf.avg_fields,
+      cf.cohort_count,
+      CASE
+        WHEN cf.avg_fields > 0 THEN
+          LEAST(100, (tf.filled_count::NUMERIC / NULLIF(cf.avg_fields, 0)) * 100)
+        ELSE
+          (tf.filled_count::NUMERIC / 20.0) * 100
+      END as score
+    FROM this_fields tf, cohort_fields cf
   )
-  SELECT 
-    (SELECT cohort_count FROM cohort_fields) INTO cohort_size;
-    
-  SELECT
-    CASE
-      WHEN (SELECT avg_fields FROM cohort_fields) > 0 THEN
-        LEAST(100, (
-          (SELECT filled_count FROM this_fields)::NUMERIC / 
-          NULLIF((SELECT avg_fields FROM cohort_fields), 0)
-        ) * 100)
-      ELSE
-        -- Fallback: 20 fields = 100%
-        ((SELECT filled_count FROM this_fields)::NUMERIC / 20.0) * 100
-    END INTO field_score;
+  SELECT score, cohort_count INTO field_score, cohort_size FROM field_calc;
   
   ----------------------------------------
   -- DIMENSION 3: MARKET VERIFICATION (20%)
