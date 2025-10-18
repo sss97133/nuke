@@ -26,7 +26,7 @@ const useAuth = () => {
   
   return { user, loading };
 };
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import EditableField from '../components/editable/EditableField';
 import { ProfileService } from '../services/profileService';
 import { ProfileActivityService } from '../services/profileActivityService';
@@ -302,8 +302,7 @@ const Profile: React.FC = () => {
   );
 
   return (
-    <AppLayout>
-      <div className="container">
+    <div className="container">
         <div className="main">
           {/* Minimal Profile Header */}
           <div style={{
@@ -614,7 +613,7 @@ const Profile: React.FC = () => {
         </div>
         </div>
       </div>
-    </AppLayout>
+    </div>
   );
 };
 
