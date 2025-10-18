@@ -48,9 +48,26 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
       {/* Mobile Header - Sticky */}
       <div style={styles.header}>
         <div style={styles.headerContent}>
-          <h1 style={styles.title}>
-            {vehicle.year} {vehicle.make} {vehicle.model}
-          </h1>
+          <button
+            onClick={() => window.history.back()}
+            style={{
+              background: '#c0c0c0',
+              border: '2px outset #ffffff',
+              color: '#000000',
+              padding: '4px 8px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              fontFamily: '"MS Sans Serif", sans-serif',
+              marginRight: '8px'
+            }}
+          >
+            ← Back
+          </button>
+          <div style={{ flex: 1 }}>
+            <h1 style={styles.title}>
+              {vehicle.year} {vehicle.make} {vehicle.model}
+            </h1>
+          </div>
           <div style={styles.price}>
             ${vehicle.current_value?.toLocaleString() || 'N/A'}
           </div>
@@ -159,37 +176,184 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any }> = ({ vehi
 
 const MobileTimelineTab: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
   const [events, setEvents] = useState<any[]>([]);
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set([new Date().getFullYear()]));
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadTimeline();
+    
+    // Listen for new timeline events
+    const handler = () => loadTimeline();
+    window.addEventListener('timeline_updated', handler);
+    return () => window.removeEventListener('timeline_updated', handler);
   }, [vehicleId]);
 
   const loadTimeline = async () => {
+    setLoading(true);
     const { data } = await supabase
       .from('timeline_events')
       .select('*')
       .eq('vehicle_id', vehicleId)
-      .order('event_date', { ascending: false })
-      .limit(20);
+      .order('event_date', { ascending: false });
 
     setEvents(data || []);
+    setLoading(false);
   };
+
+  // Group events by year
+  const eventsByYear = events.reduce((acc, event) => {
+    const year = new Date(event.event_date).getFullYear();
+    if (!acc[year]) acc[year] = [];
+    acc[year].push(event);
+    return acc;
+  }, {} as Record<number, any[]>);
+
+  const years = Object.keys(eventsByYear).map(Number).sort((a, b) => b - a);
+
+  const toggleYear = (year: number) => {
+    setExpandedYears(prev => {
+      const updated = new Set(prev);
+      if (updated.has(year)) {
+        updated.delete(year);
+      } else {
+        updated.add(year);
+      }
+      return updated;
+    });
+  };
+
+  if (loading) {
+    return <div style={styles.tabContent}>Loading timeline...</div>;
+  }
 
   return (
     <div style={styles.tabContent}>
-      {events.map((event) => (
-        <div key={event.id} style={styles.eventCard}>
-          <div style={styles.eventDate}>
-            {new Date(event.event_date).toLocaleDateString()}
-          </div>
-          <div style={styles.eventTitle}>{event.title}</div>
-          {event.labor_hours && (
-            <div style={styles.eventMeta}>
-              {event.labor_hours} hours
+      {years.map(year => {
+        const yearEvents = eventsByYear[year];
+        const isExpanded = expandedYears.has(year);
+        const totalLabor = yearEvents.reduce((sum, e) => sum + (e.labor_hours || 0), 0);
+
+        return (
+          <div key={year}>
+            {/* Year Header - Touch Friendly */}
+            <div
+              onClick={() => toggleYear(year)}
+              style={{
+                background: '#000080',
+                color: '#ffffff',
+                padding: '12px',
+                border: '2px outset #ffffff',
+                marginBottom: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+            >
+              <span>{year} ({yearEvents.length} events{totalLabor > 0 ? `, ${totalLabor}h` : ''})</span>
+              <span>{isExpanded ? '−' : '+'}</span>
             </div>
-          )}
+
+            {/* Events List - Collapsed/Expanded */}
+            {isExpanded && (
+              <div style={{ marginBottom: '12px' }}>
+                {yearEvents.map(event => (
+                  <div key={event.id} style={{
+                    background: '#ffffff',
+                    border: '1px solid #808080',
+                    padding: '12px',
+                    marginBottom: '4px'
+                  }}>
+                    {/* Event Date */}
+                    <div style={{
+                      fontSize: '10px',
+                      color: '#808080',
+                      marginBottom: '4px'
+                    }}>
+                      {new Date(event.event_date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </div>
+
+                    {/* Event Title */}
+                    <div style={{
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#000000',
+                      marginBottom: '4px'
+                    }}>
+                      {event.title}
+                    </div>
+
+                    {/* Event Description */}
+                    {event.description && (
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#000000',
+                        marginBottom: '4px'
+                      }}>
+                        {event.description}
+                      </div>
+                    )}
+
+                    {/* Labor Hours Badge */}
+                    {event.labor_hours && (
+                      <div style={{
+                        display: 'inline-block',
+                        background: '#000080',
+                        color: '#ffffff',
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        border: '1px solid #ffffff'
+                      }}>
+                        {event.labor_hours}h
+                      </div>
+                    )}
+
+                    {/* Image Previews (if photo event) */}
+                    {event.metadata?.uploadedUrls && event.metadata.uploadedUrls.length > 0 && (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gap: '4px',
+                        marginTop: '8px'
+                      }}>
+                        {event.metadata.uploadedUrls.slice(0, 4).map((url: string, idx: number) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt=""
+                            style={{
+                              width: '100%',
+                              aspectRatio: '1',
+                              objectFit: 'cover',
+                              border: '1px solid #808080'
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {events.length === 0 && (
+        <div style={{
+          textAlign: 'center',
+          padding: '24px',
+          color: '#808080',
+          fontSize: '12px'
+        }}>
+          No timeline events yet
         </div>
-      ))}
+      )}
     </div>
   );
 };
@@ -197,9 +361,16 @@ const MobileTimelineTab: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
 const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicleId, session }) => {
   const [images, setImages] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadImages();
+    
+    // Listen for image updates
+    const handler = () => loadImages();
+    window.addEventListener('vehicle_images_updated', handler);
+    return () => window.removeEventListener('vehicle_images_updated', handler);
   }, [vehicleId]);
 
   const loadImages = async () => {
@@ -210,6 +381,36 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
       .order('taken_at', { ascending: false });
 
     setImages(data || []);
+  };
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (!session?.user?.id) {
+      alert('Please log in to upload images');
+      return;
+    }
+
+    setUploading(true);
+    
+    try {
+      const { ImageUploadService } = await import('../../services/imageUploadService');
+      
+      for (let i = 0; i < files.length; i++) {
+        const result = await ImageUploadService.uploadImage(vehicleId, files[i], 'general');
+        if (!result.success) {
+          console.error('Upload failed:', result.error);
+          alert(`Upload failed: ${result.error}`);
+        }
+      }
+      
+      // Refresh images
+      await loadImages();
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const [likedImages, setLikedImages] = useState<Set<string>>(new Set());
@@ -256,6 +457,38 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
 
   return (
     <div style={styles.tabContent}>
+      {/* Upload Button - Only for logged in users */}
+      {session?.user && (
+        <div style={{ marginBottom: '12px' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            style={{ display: 'none' }}
+            onChange={(e) => handleFileUpload(e.target.files)}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            style={{
+              width: '100%',
+              background: '#000080',
+              color: '#ffffff',
+              border: '2px outset #ffffff',
+              padding: '12px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontFamily: '"MS Sans Serif", sans-serif'
+            }}
+          >
+            {uploading ? 'Uploading...' : '📷 Add Photos'}
+          </button>
+        </div>
+      )}
+
       {/* Grid of images - 2 columns on mobile */}
       <div style={styles.imageGrid}>
         {images.map((image) => (
