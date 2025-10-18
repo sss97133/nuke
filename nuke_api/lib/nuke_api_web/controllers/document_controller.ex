@@ -161,16 +161,55 @@ defmodule NukeApiWeb.DocumentController do
     file_upload = params["file"] || params["document"] || params["titleDocument"] || params["driversLicense"]
 
     if file_upload && file_upload != "" do
-      # For now, return mock data - in production you'd upload to S3/Supabase Storage
-      # The file upload is in the format %Plug.Upload{filename: "...", path: "...", content_type: "..."}
-      {:ok, %{
-        file_url: "https://placeholder-storage.com/#{file_upload.filename}",
-        file_name: file_upload.filename,
-        file_type: file_upload.content_type || "application/octet-stream",
-        file_size: File.stat!(file_upload.path).size
-      }}
+      # Upload to Supabase Storage
+      case upload_to_supabase_storage(file_upload) do
+        {:ok, file_url} ->
+          {:ok, %{
+            file_url: file_url,
+            file_name: file_upload.filename,
+            file_type: file_upload.content_type || "application/octet-stream",
+            file_size: File.stat!(file_upload.path).size
+          }}
+        {:error, reason} ->
+          {:error, reason}
+      end
     else
       {:error, :no_file}
+    end
+  end
+
+  defp upload_to_supabase_storage(file_upload) do
+    # Generate unique filename with timestamp
+    timestamp = DateTime.utc_now() |> DateTime.to_unix()
+    unique_filename = "#{timestamp}_#{file_upload.filename}"
+    storage_path = "documents/#{unique_filename}"
+
+    # Read file content
+    case File.read(file_upload.path) do
+      {:ok, file_content} ->
+        # Upload to Supabase using REST API
+        supabase_url = System.get_env("SUPABASE_URL") || "https://qkgaybvrernstplzjaam.supabase.co"
+        supabase_key = System.get_env("SUPABASE_SERVICE_ROLE_KEY") || System.get_env("SUPABASE_ANON_KEY")
+
+        url = "#{supabase_url}/storage/v1/object/vehicle-images/#{storage_path}"
+
+        headers = [
+          {"Authorization", "Bearer #{supabase_key}"},
+          {"Content-Type", file_upload.content_type || "application/octet-stream"}
+        ]
+
+        case HTTPoison.post(url, file_content, headers) do
+          {:ok, %HTTPoison.Response{status_code: 200}} ->
+            # Return public URL
+            public_url = "#{supabase_url}/storage/v1/object/public/vehicle-images/#{storage_path}"
+            {:ok, public_url}
+          {:ok, %HTTPoison.Response{status_code: status_code, body: body}} ->
+            {:error, "Upload failed with status #{status_code}: #{body}"}
+          {:error, %HTTPoison.Error{reason: reason}} ->
+            {:error, "Upload failed: #{reason}"}
+        end
+      {:error, reason} ->
+        {:error, "Could not read file: #{reason}"}
     end
   end
 
