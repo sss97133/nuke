@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { supabase } from '../lib/supabase';
 import type { VehicleInteractionService } from '../services/vehicleInteractionService';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import type { 
   InteractionRequestWithUser, 
   VehicleInteractionSession,
@@ -189,7 +189,7 @@ const VehicleInteractionManager: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
@@ -200,12 +200,12 @@ const VehicleInteractionManager: React.FC = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
   return (
-    <AppLayout>
+    
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -352,7 +352,7 @@ const VehicleInteractionManager: React.FC = () => {
           </div>
         )}
       </div>
-    </AppLayout>
+    
   );
 };
 

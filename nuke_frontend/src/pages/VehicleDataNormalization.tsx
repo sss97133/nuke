@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { VehicleDataNormalizationService } from '../services/vehicleDataNormalizationService';
 import type { NormalizationStats } from '../services/vehicleDataNormalizationService';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 
 interface VehicleReview {
   vehicle: any;
@@ -80,19 +80,19 @@ const VehicleDataNormalization: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
             <p>Loading normalization data...</p>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
   return (
-    <AppLayout>
+    
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
@@ -319,7 +319,7 @@ const VehicleDataNormalization: React.FC = () => {
           )}
         </div>
       </div>
-    </AppLayout>
+    
   );
 };
 

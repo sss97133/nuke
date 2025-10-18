@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { ModerationService } from '../services/moderationService';
 import { supabase } from '../lib/supabase';
 import type { SubmissionType, CreateSubmissionData } from '../types/moderation';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 
 const VehicleContributionForm: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -217,7 +217,7 @@ const VehicleContributionForm: React.FC = () => {
   };
 
   return (
-    <AppLayout>
+    
       <div className="max-w-2xl mx-auto py-8">
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="mb-6">
@@ -354,7 +354,7 @@ const VehicleContributionForm: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
+    
   );
 };
 

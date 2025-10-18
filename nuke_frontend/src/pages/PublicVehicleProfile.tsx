@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { ModerationService } from '../services/moderationService';
 import { supabase } from '../lib/supabase';
 import type { PublicVehicleProfile, VehicleContentSubmission } from '../types/moderation';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 
 const PublicVehicleProfile: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -246,7 +246,7 @@ const PublicVehicleProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="max-w-4xl mx-auto py-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
@@ -257,13 +257,13 @@ const PublicVehicleProfile: React.FC = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
   if (!profile) {
     return (
-      <AppLayout>
+      
         <div className="max-w-4xl mx-auto py-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Vehicle Not Found</h1>
           <p className="text-gray-600 mb-8">This vehicle profile doesn't exist or isn't public.</p>
@@ -271,12 +271,12 @@ const PublicVehicleProfile: React.FC = () => {
             Go Home
           </button>
         </div>
-      </AppLayout>
+      
     );
   }
 
   return (
-    <AppLayout>
+    
       <div className="max-w-4xl mx-auto py-8">
         {renderVehicleHeader()}
         {renderPhotos()}
@@ -310,7 +310,7 @@ const PublicVehicleProfile: React.FC = () => {
           </div>
         )}
       </div>
-    </AppLayout>
+    
   );
 };
 

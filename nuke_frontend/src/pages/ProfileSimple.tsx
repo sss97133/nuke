@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import ProfessionalToolbox from '../components/profile/ProfessionalToolbox';
 
 interface ProfileData {
@@ -94,7 +94,7 @@ const ProfileSimple: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="container">
           <div className="card">
             <div className="card-body text-center">
@@ -102,13 +102,13 @@ const ProfileSimple: React.FC = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
   if (!profile) {
     return (
-      <AppLayout>
+      
         <div className="container">
           <div className="card">
             <div className="card-body text-center">
@@ -116,14 +116,14 @@ const ProfileSimple: React.FC = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
   const isOwnProfile = currentUser?.id === profile.id;
 
   return (
-    <AppLayout>
+    
       <div className="container">
         <div className="main">
           {/* Profile Card */}
@@ -231,7 +231,7 @@ const ProfileSimple: React.FC = () => {
           )}
         </div>
       </div>
-    </AppLayout>
+    
   );
 };
 

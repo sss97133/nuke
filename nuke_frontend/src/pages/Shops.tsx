@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ShopStructureBuilder } from '../components/shops/ShopStructureBuilder';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import ActivityTimeline from '../components/profile/ActivityTimeline';
 import DocumentVault from '../components/profile/DocumentVault';
 import WorkSessionsPanel from '../components/profile/WorkSessionsPanel';
@@ -211,7 +211,7 @@ const Shops: React.FC = () => {
   }, [docs, licensesRows]);
 
   return (
-    <AppLayout>
+    
       <div className="layout">
         <div className="container">
           <div className="main">
@@ -515,7 +515,7 @@ const Shops: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
+    
   );
 };
 

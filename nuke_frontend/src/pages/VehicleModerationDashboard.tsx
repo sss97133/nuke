@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { ModerationService } from '../services/moderationService';
 import { supabase } from '../lib/supabase';
 import type { ModerationDashboardData, VehicleContentSubmission, SubmissionStatus } from '../types/moderation';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 
 const VehicleModerationDashboard: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -369,20 +369,20 @@ const VehicleModerationDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="max-w-6xl mx-auto py-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-200 rounded w-1/3"></div>
             <div className="h-32 bg-gray-200 rounded"></div>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
   if (!dashboard) {
     return (
-      <AppLayout>
+      
         <div className="max-w-6xl mx-auto py-8 text-center">
           <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
           <p className="text-gray-600 mb-8">You don't have permission to moderate this vehicle.</p>
@@ -390,12 +390,12 @@ const VehicleModerationDashboard: React.FC = () => {
             Back to Vehicles
           </button>
         </div>
-      </AppLayout>
+      
     );
   }
 
   return (
-    <AppLayout>
+    
       <div className="max-w-6xl mx-auto py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Vehicle Moderation Dashboard</h1>
@@ -452,7 +452,7 @@ const VehicleModerationDashboard: React.FC = () => {
           {activeTab === 'settings' && renderSettingsTab()}
         </div>
       </div>
-    </AppLayout>
+    
   );
 };
 
