@@ -100,22 +100,17 @@ const VehicleProfile: React.FC = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   
-  // Detect mobile device
+  // Detect mobile device - but DON'T use early return (breaks React hooks rules)
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      // Only consider screen width, not user agent, to avoid issues when devtools opens
+      setIsMobile(window.innerWidth < 768);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  
-  // If mobile, use mobile-optimized version - moved after all hooks
-  if (isMobile && vehicleId) {
-    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
-  }
 
   // Calculate true legal ownership - requires verified title + matching legal ID
   const isVerifiedOwner = React.useMemo(() => {
@@ -1121,6 +1116,11 @@ const VehicleProfile: React.FC = () => {
       contributorRole,
       canCreateAgreements: contributorRole === 'consigner' || isVerifiedOwner
     });
+  }
+
+  // Use mobile version if on mobile device (but AFTER all hooks have run)
+  if (isMobile && vehicleId) {
+    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
   }
 
   return (
