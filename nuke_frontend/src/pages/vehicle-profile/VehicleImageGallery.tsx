@@ -5,6 +5,8 @@ import type { VehicleImageGalleryProps } from './types';
 
 const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({
   vehicle,
+  session,
+  permissions,
   showMap,
   onToggleMap,
   onImageUpdate
@@ -15,6 +17,7 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({
         <ImageGallery
           vehicleId={vehicle.id}
           onImagesUpdated={onImageUpdate}
+          showUpload={session && (permissions.hasContributorAccess || permissions.isVerifiedOwner)}
         />
 
         {/* Contributors section */}
