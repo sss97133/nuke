@@ -39,7 +39,7 @@ const QuickActions: React.FC = () => {
     },
     ...(!isAuthenticated ? [{
       title: 'Join Community',
-      action: () => navigate('/auth'),
+      action: () => navigate('/login'),
       primary: false
     }] : [])
   ];

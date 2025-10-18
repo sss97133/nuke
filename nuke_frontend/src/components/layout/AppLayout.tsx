@@ -152,9 +152,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             <button 
               className="mobile-menu-button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ display: 'none' }}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
             >
-              ☺
+              ☰
             </button>
 
             {/* Upload Indicator - Windows 95 style */}
