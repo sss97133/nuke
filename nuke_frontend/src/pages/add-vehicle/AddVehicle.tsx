@@ -327,7 +327,7 @@ const AddVehicle: React.FC = () => {
           if (formData.import_url) {
             await supabase.from('timeline_events').insert({
               vehicle_id: vehicleId,
-              user_id: user.id,
+              // Note: user_id is set automatically by RLS
               event_type: 'discovery',
               event_date: new Date().toISOString().split('T')[0],
               description: `Discovered on ${formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External site'}`,
@@ -377,7 +377,7 @@ const AddVehicle: React.FC = () => {
                 .from('ownership_verifications')
                 .insert([{
                   vehicle_id: vehicleId,
-                  user_id: user.id,
+                  // Note: user_id is set automatically by RLS
                   status: 'approved',
                   verification_type: 'title_and_id',
                   document_id: docData.id,

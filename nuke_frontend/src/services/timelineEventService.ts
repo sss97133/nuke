@@ -498,7 +498,7 @@ export class TimelineEventService {
 
       const eventData: any = {
         vehicle_id: vehicleId,
-        user_id: user?.id,
+        // Note: user_id is set automatically by RLS
         event_type: 'vehicle_created',
         source: 'user_input',
         event_date: new Date().toISOString().split('T')[0], // Date only format
