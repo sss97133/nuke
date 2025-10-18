@@ -22,9 +22,9 @@ serve(async (req) => {
       )
     }
 
-    const openAiKey = Deno.env.get('OPENAI_API_KEY')
+    const openAiKey = Deno.env.get('OPEN_AI_API_KEY')
     if (!openAiKey) {
-      throw new Error('OPENAI_API_KEY not configured')
+      throw new Error('OPEN_AI_API_KEY not configured')
     }
 
     console.log('Extracting title data from:', image_url)
@@ -41,7 +41,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Fast and cheap model
+        model: 'gpt-4o', // Standard GPT-4o with vision
         messages: [{
           role: 'user',
           content: [
@@ -108,8 +108,17 @@ Be accurate. If you're not sure, return null for that field.`
       const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim()
       extracted = JSON.parse(cleanContent)
     } catch (parseError) {
-      console.error('Failed to parse JSON:', content, parseError)
-      throw new Error('Failed to parse extraction results')
+      console.error('Failed to parse JSON. Raw content:', content)
+      console.error('Parse error:', parseError)
+      // Return what we got even if parsing failed
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to parse extraction results',
+          raw_content: content,
+          details: String(parseError)
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     return new Response(

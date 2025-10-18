@@ -16,7 +16,7 @@ serve(async (req) => {
     const { imageBase64 } = await req.json()
     
     // Get OpenAI API key from environment (set in Supabase dashboard)
-    const openAiKey = Deno.env.get('OPENAI_API_KEY')
+    const openAiKey = Deno.env.get('OPEN_AI_API_KEY')
     if (!openAiKey) {
       throw new Error('OpenAI API key not configured')
     }
