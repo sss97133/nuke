@@ -11,13 +11,23 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({
   onToggleMap,
   onImageUpdate
 }) => {
+  // Show upload if user is logged in AND (has contributor access OR is verified owner OR is db uploader)
+  const canUpload = Boolean(
+    session && (
+      permissions.hasContributorAccess || 
+      permissions.isVerifiedOwner || 
+      permissions.isDbUploader ||
+      session.user?.id === vehicle.user_id
+    )
+  );
+
   return (
     <div className="card" style={{ gridColumn: '2 / span 1' }}>
       <div className="card-body">
         <ImageGallery
           vehicleId={vehicle.id}
           onImagesUpdated={onImageUpdate}
-          showUpload={session && (permissions.hasContributorAccess || permissions.isVerifiedOwner)}
+          showUpload={canUpload}
         />
 
         {/* Contributors section */}
