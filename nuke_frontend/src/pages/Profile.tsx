@@ -228,59 +228,53 @@ const Profile: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="container">
-          <div className="main">
-            <div className="card">
-              <div className="card-body text-center">
-                <h2 className="text font-bold">Loading...</h2>
-              </div>
+      <div className="container">
+        <div className="main">
+          <div className="card">
+            <div className="card-body text-center">
+              <h2 className="text font-bold">Loading...</h2>
             </div>
           </div>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <AppLayout>
-        <div className="container">
-          <div className="main">
-            <div className="card">
-              <div className="card-body text-center">
-                <h2 className="text font-bold">Error</h2>
-                <p className="text-small text-muted">{error}</p>
-                <button className="button button-primary" onClick={() => loadProfileData()}>
-                  Retry
-                </button>
-              </div>
+      <div className="container">
+        <div className="main">
+          <div className="card">
+            <div className="card-body text-center">
+              <h2 className="text font-bold">Error</h2>
+              <p className="text-small text-muted">{error}</p>
+              <button className="button button-primary" onClick={() => loadProfileData()}>
+                Retry
+              </button>
             </div>
           </div>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
   if (!profileData || !profileData.profile) {
     return (
-      <AppLayout>
-        <div className="container">
-          <div className="main">
-            <div className="card">
-              <div className="card-body text-center">
-                <h2 className="text font-bold">Profile Not Found</h2>
-                <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
-                  Unable to load profile data. You may need to sign out and try again.
-                </p>
-                <button className="button button-secondary" onClick={handleSignOut}>
-                  Log Out
-                </button>
-              </div>
+      <div className="container">
+        <div className="main">
+          <div className="card">
+            <div className="card-body text-center">
+              <h2 className="text font-bold">Profile Not Found</h2>
+              <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
+                Unable to load profile data. You may need to sign out and try again.
+              </p>
+              <button className="button button-secondary" onClick={handleSignOut}>
+                Log Out
+              </button>
             </div>
           </div>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 

@@ -555,7 +555,7 @@ Redirecting to vehicle profile...`);
         </div>
       </div>
     ) : (
-      <AppLayout>{authContent}</AppLayout>
+      authContent
     );
   }
 
