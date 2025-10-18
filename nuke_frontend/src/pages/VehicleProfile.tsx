@@ -146,6 +146,11 @@ const VehicleProfile: React.FC = () => {
     return hasVerifiedOwnership;
   }, [session?.user?.id, vehicle?.id, ownershipVerifications]);
 
+  // If mobile, use mobile-optimized version - moved after all hooks but before data loading
+  if (isMobile && vehicleId) {
+    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
+  }
+
   // Legacy database uploader check (IMPORTANT: This is NOT ownership, just who uploaded)
   const isDbUploader = session?.user?.id === vehicle?.uploaded_by;
 
@@ -1114,11 +1119,6 @@ const VehicleProfile: React.FC = () => {
       contributorRole,
       canCreateAgreements: contributorRole === 'consigner' || isVerifiedOwner
     });
-  }
-
-  // If mobile, use mobile-optimized version - moved after all hooks
-  if (isMobile && vehicleId) {
-    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
   }
 
   return (
