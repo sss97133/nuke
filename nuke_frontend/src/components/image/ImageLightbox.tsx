@@ -256,7 +256,7 @@ const ImageLightbox = ({
 
         // Update the timeline event with the new tags
         await supabase
-          .from('timeline_events')
+          .from('vehicle_timeline_events')
           .update({ manual_tags: manualTags })
           .eq('id', eventId);
       }

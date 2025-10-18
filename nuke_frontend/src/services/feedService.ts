@@ -162,7 +162,7 @@ export class FeedService {
   static async getTimelineEventFeedItems(): Promise<FeedItem[]> {
     try {
       const { data: events, error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('id, vehicle_id, event_type, event_description, event_date, created_at')
         .order('created_at', { ascending: false })
         .limit(20);
@@ -318,7 +318,7 @@ export class FeedService {
     try {
       const [vehicleCount, timelineCount, imageCount, analysisCount, userCount] = await Promise.all([
         supabase.from('vehicles').select('id', { count: 'exact' }).eq('is_public', true),
-        supabase.from('timeline_events').select('id', { count: 'exact' }),
+        supabase.from('vehicle_timeline_events').select('id', { count: 'exact' }),
         supabase.from('vehicle_images').select('id', { count: 'exact' }),
         supabase.from('skynalysis_analyses').select('id', { count: 'exact' }),
         supabase.from('profiles').select('id', { count: 'exact' })

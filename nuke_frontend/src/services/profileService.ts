@@ -34,7 +34,7 @@ export class ProfileService {
         supabase.from('profile_activity').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
         supabase.from('profile_stats').select('*').eq('user_id', userId).single(),
         // Get real contribution data from timeline events with full metadata
-        supabase.from('timeline_events').select('event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId),
+        supabase.from('vehicle_timeline_events').select('event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId),
         // Get image uploads (include EXIF and vehicle_id for proper grouping) 
         supabase.from('vehicle_images').select('created_at, exif_data, user_id, vehicle_id').eq('user_id', userId),
         // Get verifications (no date limit to get full history)

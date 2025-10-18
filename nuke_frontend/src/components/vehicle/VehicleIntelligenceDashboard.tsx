@@ -74,7 +74,7 @@ const VehicleIntelligenceDashboard: React.FC<VehicleIntelligenceProps> = ({ vehi
 
       // Get timeline events for pattern analysis
       const { data: timelineEvents } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('event_date', { ascending: false });
@@ -182,7 +182,7 @@ const VehicleIntelligenceDashboard: React.FC<VehicleIntelligenceProps> = ({ vehi
     try {
       // Get all timeline events with images
       const { data: eventsWithImages } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('id, image_urls')
         .eq('vehicle_id', vehicleId)
         .not('image_urls', 'is', null);

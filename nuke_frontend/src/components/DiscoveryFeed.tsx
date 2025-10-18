@@ -75,7 +75,7 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
       // Fetch timeline events (user actions)
       if (filters.contentTypes.includes('all') || filters.contentTypes.includes('timeline_event')) {
         const { data: timelineEvents, error: timelineError } = await supabase
-          .from('timeline_events')
+          .from('vehicle_timeline_events')
           .select(`
             id,
             title,

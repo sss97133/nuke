@@ -91,7 +91,7 @@ const ComprehensiveAnalytics = () => {
 
       // Load timeline analytics
       const { data: timelineData } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('id, created_at, vehicle_id')
         .eq('user_id', user.id)
         .gte('created_at', startDate.toISOString());

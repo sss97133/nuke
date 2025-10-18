@@ -37,7 +37,7 @@ const SimpleTimeline: React.FC<SimpleTimelineProps> = ({ vehicleId, isOwner }) =
         // Fallback to timeline_events if needed
         if (error || !data || data.length === 0) {
           const legacy = await supabase
-            .from('timeline_events')
+            .from('vehicle_timeline_events')
             .select('*')
             .eq('vehicle_id', vehicleId)
             .order('event_date', { ascending: false })

@@ -371,7 +371,7 @@ export class EventPipeline {
     };
 
     const { error } = await supabase
-      .from('timeline_events')
+      .from('vehicle_timeline_events')
       .insert([eventData]);
 
     if (error) {
@@ -427,7 +427,7 @@ export class EventPipeline {
     };
 
     const { error } = await supabase
-      .from('timeline_events')
+      .from('vehicle_timeline_events')
       .insert([eventData]);
 
     if (error) {
@@ -462,7 +462,7 @@ export class EventPipeline {
     };
 
     const { error } = await supabase
-      .from('timeline_events')
+      .from('vehicle_timeline_events')
       .insert([eventData]);
 
     if (error) {

@@ -344,7 +344,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
         };
 
         const { data: eventRecord, error } = await supabase
-          .from('timeline_events')
+          .from('vehicle_timeline_events')
           .insert([eventPayload])
           .select()
           .single();
@@ -359,7 +359,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
         const uploadedUrls = await uploadEventFilesFor(eventRecord.id, grp.files, grp.stage);
         if (uploadedUrls.length > 0) {
           await supabase
-            .from('timeline_events')
+            .from('vehicle_timeline_events')
             .update({ 
               image_urls: uploadedUrls,
               metadata: {

@@ -257,7 +257,7 @@ const VehicleTimeline: React.FC<{
       // Load from timeline_events table (the actual table with image_urls)
       // Note: vehicle_timeline_events is just a VIEW that might not return all fields
       const { data: timelineData, error: timelineError } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('event_date', { ascending: false })
@@ -381,7 +381,7 @@ const VehicleTimeline: React.FC<{
       }
 
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .delete()
         .eq('id', eventId);
 
@@ -1036,7 +1036,7 @@ const VehicleTimeline: React.FC<{
                                 // Save changes
                                 try {
                                   await supabase
-                                    .from('timeline_events')
+                                    .from('vehicle_timeline_events')
                                     .update({
                                       title: editingEventData.title,
                                       description: editingEventData.description,

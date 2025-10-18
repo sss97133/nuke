@@ -74,7 +74,7 @@ export const useTimelineEvents = (vehicleId?: string) => {
     try {
       // Load timeline events
       const { data: eventsData, error: eventsError } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('event_date', { ascending: false });
@@ -118,7 +118,7 @@ export const useTimelineEvents = (vehicleId?: string) => {
       if (!userData.user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert({
           ...eventData,
           vehicle_id: vehicleId,
@@ -144,7 +144,7 @@ export const useTimelineEvents = (vehicleId?: string) => {
   const updateTimelineEvent = async (eventId: string, updates: Partial<TimelineEvent>) => {
     try {
       const { data, error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .update(updates)
         .eq('id', eventId)
         .select()

@@ -168,7 +168,7 @@ export class CommentService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .update({
           description: notes.trim(),
           updated_at: new Date().toISOString(),

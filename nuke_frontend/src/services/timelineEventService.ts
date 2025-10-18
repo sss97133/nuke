@@ -109,7 +109,7 @@ export class TimelineEventService {
       };
 
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -177,7 +177,7 @@ export class TimelineEventService {
       };
 
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -246,7 +246,7 @@ export class TimelineEventService {
       };
 
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -335,7 +335,7 @@ export class TimelineEventService {
       };
 
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -440,7 +440,7 @@ export class TimelineEventService {
       };
 
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -530,7 +530,7 @@ export class TimelineEventService {
       };
 
       const { error: createErr } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert([eventData]);
 
       if (createErr) {
@@ -633,7 +633,7 @@ export class TimelineEventService {
       };
 
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -657,7 +657,7 @@ export class TimelineEventService {
     try {
       // First check if user is the creator
       const { data: event, error: fetchError } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('metadata')
         .eq('id', eventId)
         .single();
@@ -673,7 +673,7 @@ export class TimelineEventService {
 
       // Update the event
       const { error: updateError } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .update({
           ...updates,
           updated_at: new Date().toISOString()
