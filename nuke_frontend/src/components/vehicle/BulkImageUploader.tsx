@@ -1,7 +1,13 @@
+/**
+ * BulkImageUploader Component
+ * 
+ * CONSOLIDATED: Now uses ImageUploadService for consistent EXIF handling.
+ * Keeps UI features for batch EXIF preview and category inference.
+ */
 import React, { useState, useCallback, useRef } from 'react';
 import type { Upload, X, Image, MapPin, Calendar, Info, Loader2 } from 'lucide-react';
 import type { ImageExifService } from '../../services/imageExifServiceStub';
-import { supabase } from '../../lib/supabase';
+import { ImageUploadService } from '../../services/imageUploadService';
 
 interface BulkImageUploaderProps {
   vehicleId: string;
@@ -124,54 +130,51 @@ export function BulkImageUploader({
     
     setIsProcessing(true);
     const uploadedUrls: string[] = [];
+    const errors: string[] = [];
     
     try {
-      // Upload in batches to avoid overwhelming the server
-      const batchSize = 10;
+      // Upload sequentially with progress tracking
+      // ImageUploadService handles: EXIF extraction, variants, timeline events
       let uploaded = 0;
       
-      for (let i = 0; i < images.length; i += batchSize) {
-        const batch = images.slice(i, i + batchSize);
-        
-        await Promise.all(
-          batch.map(async (img) => {
-            try {
-              const timestamp = Date.now();
-              const ext = img.file.name.split('.').pop();
-              const fileName = `${timestamp}_${Math.random().toString(36).substring(7)}.${ext}`;
-              const filePath = `vehicles/${vehicleId}/images/${fileName}`;
-              
-              const { data, error } = await supabase.storage
-                .from('vehicle-data')
-                .upload(filePath, img.file);
-              
-              if (error) throw error;
-              
-              const { data: { publicUrl } } = supabase.storage
-                .from('vehicle-data')
-                .getPublicUrl(filePath);
-              
-              uploadedUrls.push(publicUrl);
-              
-              // Save to database with EXIF data
-              await supabase.from('vehicle_images').insert({
-                vehicle_id: vehicleId,
-                image_url: publicUrl,
-                category: 'general',
-                metadata: {
-                  originalName: img.file.name,
-                  exifData: img.exifData,
-                  uploadedAt: new Date().toISOString(),
-                }
-              });
-              
-              uploaded++;
-              setUploadProgress(Math.round((uploaded / images.length) * 100));
-            } catch (error) {
-              console.error(`Error uploading ${img.file.name}:`, error);
-            }
-          })
-        );
+      for (const img of images) {
+        try {
+          // Determine category from filename hints
+          const fileName = img.file.name.toLowerCase();
+          let category = 'general';
+          if (fileName.includes('exterior') || fileName.includes('outside')) {
+            category = 'exterior';
+          } else if (fileName.includes('interior') || fileName.includes('inside')) {
+            category = 'interior';
+          } else if (fileName.includes('engine') || fileName.includes('motor')) {
+            category = 'engine';
+          }
+          
+          const result = await ImageUploadService.uploadImage(
+            vehicleId,
+            img.file,
+            category
+          );
+          
+          if (result.success && result.imageUrl) {
+            uploadedUrls.push(result.imageUrl);
+          } else {
+            errors.push(`${img.file.name}: ${result.error || 'Unknown error'}`);
+          }
+          
+          uploaded++;
+          setUploadProgress(Math.round((uploaded / images.length) * 100));
+        } catch (error) {
+          console.error(`Error uploading ${img.file.name}:`, error);
+          errors.push(`${img.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          uploaded++;
+          setUploadProgress(Math.round((uploaded / images.length) * 100));
+        }
+      }
+      
+      if (errors.length > 0) {
+        console.warn(`Upload completed with ${errors.length} errors:`, errors);
+        alert(`Uploaded ${uploadedUrls.length} images successfully.\n\nErrors (${errors.length}):\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...and ${errors.length - 5} more` : ''}`);
       }
       
       onImagesUploaded?.(uploadedUrls);
@@ -183,7 +186,7 @@ export function BulkImageUploader({
       
     } catch (error) {
       console.error('Error uploading images:', error);
-      console.error('Error uploading images');
+      alert('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsProcessing(false);
     }
