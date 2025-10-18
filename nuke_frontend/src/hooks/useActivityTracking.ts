@@ -38,50 +38,27 @@ export const useActivityTracking = () => {
 
       lastTrackedRef.current.set(key, now);
 
-      // Track user activity
-      await supabase.from('user_activity').insert({
+      // Map entity_type to allowed target_type on user_interactions
+      const targetType = (() => {
+        switch (entity_type) {
+          case 'vehicle': return 'vehicle';
+          case 'image': return 'image';
+          case 'shop': return 'shop';
+          case 'user': return 'user';
+          case 'timeline_event':
+          case 'page':
+          case 'search':
+          default: return 'event';
+        }
+      })();
+
+      await supabase.from('user_interactions').insert({
         user_id: user.id,
-        event_type,
-        entity_type,
-        entity_id,
-        metadata,
-        location_lat: location?.lat,
-        location_lng: location?.lng,
-        location_address: location?.address,
-        timestamp: new Date().toISOString()
+        interaction_type: event_type,
+        target_type: targetType,
+        target_id: entity_id ?? null,
+        context: { ...(metadata || {}), location }
       });
-
-      // For certain events, update engagement counters
-      if (entity_id && event_type === 'view') {
-        switch (entity_type) {
-          case 'vehicle':
-            await supabase.rpc('increment_vehicle_views', { vehicle_id: entity_id });
-            break;
-          case 'image':
-            await supabase.rpc('increment_image_views', { image_id: entity_id });
-            break;
-          case 'shop':
-            await supabase.rpc('increment_shop_views', { shop_id: entity_id });
-            break;
-        }
-      }
-
-      if (entity_id && event_type === 'like') {
-        switch (entity_type) {
-          case 'vehicle':
-            await supabase.from('vehicle_likes').upsert({
-              vehicle_id: entity_id,
-              user_id: user.id
-            }, { onConflict: 'vehicle_id,user_id' });
-            break;
-          case 'image':
-            await supabase.from('vehicle_image_likes').upsert({
-              image_id: entity_id,
-              user_id: user.id
-            }, { onConflict: 'image_id,user_id' });
-            break;
-        }
-      }
 
     } catch (error) {
       console.error('Error tracking activity:', error);
