@@ -9,8 +9,6 @@ interface QuickVehicleAddProps {
 const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [scraping, setScraping] = useState(false);
-  const [scrapingError, setScrapingError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     year: '',
     make: '',
@@ -21,82 +19,6 @@ const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
     sourceUrl: '',
     images: [] as File[]
   });
-
-  const parseCraigslistUrl = (url: string): Partial<typeof formData> => {
-    // For Craigslist, extract what we can from the URL and use the data you provided
-    if (url.includes('craigslist.org/cto/d/las-vegas-chevy-square-body/7889210812')) {
-      return {
-        year: '1979',
-        make: 'Chevrolet',
-        model: 'K10',
-        color: '',
-        description: 'Selling my Chevy k10 it was a project but lost interest. Truck does run and drive, new seat new carpet aftermarket gauges, 35-12.50-15 mud terrains. 305 engine with a th350 and 205 transfer case, Danna 44 front axle and 12 bolt in the rear. No trades. Open to offers, need gone. Truck is located in Morenci Arizona. Asking: $9,000'
-      };
-    }
-    
-    // Try to extract year/make/model from URL pattern
-    const urlParts = url.split('/');
-    const titlePart = urlParts.find(part => part.includes('-'));
-    if (titlePart) {
-      // Basic pattern matching for common formats
-      const yearMatch = titlePart.match(/\b(19|20)\d{2}\b/);
-      if (yearMatch) {
-        return { year: yearMatch[0] };
-      }
-    }
-    
-    return {};
-  };
-
-  const handleUrlImport = async () => {
-    if (!formData.sourceUrl) return;
-
-    setScraping(true);
-    setScrapingError(null);
-
-    try {
-      // Check if it's Craigslist - use local parsing
-      if (formData.sourceUrl.includes('craigslist.org')) {
-        const parsed = parseCraigslistUrl(formData.sourceUrl);
-        setFormData(prev => ({
-          ...prev,
-          ...parsed,
-          isContribution: true // Auto-mark as contribution
-        }));
-        setScraping(false);
-        return;
-      }
-
-      // For other sites, try Phoenix API
-      const apiUrl = import.meta.env.VITE_PHOENIX_API_URL || 'http://localhost:4000/api';
-      const response = await fetch(`${apiUrl}/scrape`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: formData.sourceUrl })
-      });
-
-      if (!response.ok) throw new Error('Failed to scrape URL');
-
-      const data = await response.json();
-      
-      // Update form with scraped data
-      setFormData(prev => ({
-        ...prev,
-        year: data.year || prev.year,
-        make: data.make || prev.make,
-        model: data.model || prev.model,
-        color: data.color || prev.color,
-        description: data.description || prev.description,
-        isContribution: true
-      }));
-
-    } catch (error) {
-      console.error('URL scraping error:', error);
-      setScrapingError('Could not import from URL automatically. Please fill in details manually from the listing.');
-    } finally {
-      setScraping(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,11 +58,11 @@ const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
           make: formData.make,
           model: formData.model,
           color: formData.color,
-          // NOTE: DB uses 'notes' for freeform text; map UI description here
-          notes: formData.description || null,
-          // Note: Do NOT include uploaded_by/user_id/discovered_by - they're set automatically by the database via auth context
+          description: formData.description,
+          user_id: user.id,
           is_public: true,
           source: isContribution ? contributionSource : 'User Submission',
+          discovered_by: isContribution ? user.id : null,
           discovery_source: isContribution ? contributionSource : null,
           discovery_url: isContribution ? (formData.sourceUrl || null) : null
         })
@@ -398,40 +320,20 @@ const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
           </div>
 
           {/* Source URL for contributions */}
-          <div style={{ marginBottom: '16px' }}>
-            <label className="text text-bold" style={{ display: 'block', marginBottom: '4px' }}>
-              Source URL {!formData.isContribution && '(Optional)'}
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+          {formData.isContribution && (
+            <div style={{ marginBottom: '16px' }}>
+              <label className="text text-bold" style={{ display: 'block', marginBottom: '4px' }}>
+                Source URL
+              </label>
               <input
                 type="url"
                 className="input"
                 value={formData.sourceUrl}
                 onChange={(e) => setFormData(prev => ({ ...prev, sourceUrl: e.target.value }))}
-                placeholder="https://craigslist.org/... or https://bringatrailer.com/..."
-                style={{ flex: 1 }}
+                placeholder="https://bringatrailer.com/..."
               />
-              <button
-                type="button"
-                onClick={handleUrlImport}
-                className="button button-secondary"
-                disabled={!formData.sourceUrl || scraping}
-                style={{ whiteSpace: 'nowrap' }}
-              >
-                {scraping ? 'Importing...' : 'Import'}
-              </button>
             </div>
-            {scrapingError && (
-              <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
-                {scrapingError}
-              </p>
-            )}
-            {scraping && (
-              <p className="text text-muted" style={{ fontSize: '12px', marginTop: '4px' }}>
-                Importing vehicle data from URL...
-              </p>
-            )}
-          </div>
+          )}
 
           <div style={{ marginBottom: '16px' }}>
             <label className="text text-bold" style={{ display: 'block', marginBottom: '4px' }}>

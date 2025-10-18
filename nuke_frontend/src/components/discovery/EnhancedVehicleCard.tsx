@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import VehicleThumbnail from '../VehicleThumbnail';
 import DataContextModal from './DataContextModal';
-import { computePrimaryPrice, formatCurrency } from '../../services/priceSignalService';
 import '../../design-system.css';
 
 interface VehicleData {
@@ -12,7 +11,6 @@ interface VehicleData {
   year?: number | null;
   vin?: string | null;
   created_at?: string;
-  asking_price?: number | null;
   sale_price?: number | null;
   current_value?: number | null;
   purchase_price?: number | null;
@@ -47,9 +45,9 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
     return 'User';
   };
 
-  // Use the proper pricing signal service to get the correct label and value
-  const priceInfo = computePrimaryPrice(vehicle);
-  const hasPrice = priceInfo.label && priceInfo.amount;
+  const calculateEstimate = () => {
+    return vehicle.current_value || vehicle.sale_price || vehicle.purchase_price || vehicle.msrp || 0;
+  };
 
   const calculateChange = () => {
     const current = vehicle.current_value || vehicle.sale_price || 0;
@@ -70,9 +68,8 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
   };
 
   const getMarketBand = () => {
-    // Use the primary price value for market band calculation
-    const estimate = priceInfo.amount;
-    if (!estimate || estimate === 0) return null;
+    const estimate = calculateEstimate();
+    if (estimate === 0) return null;
     return {
       low: Math.round(estimate * 0.85),
       mid: Math.round(estimate),
@@ -87,9 +84,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
     setModalOpen(true);
   };
 
-  const formatPrice = (price: number | null | undefined) => {
-    if (!price) return '';
-    // Restore compact formatting for the card display
+  const formatPrice = (price: number) => {
     if (price >= 1000) {
       return `$${(price / 1000).toFixed(0)}k`;
     }
@@ -113,6 +108,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
     borderColor: '#9ca3af'
   };
 
+  const estimate = calculateEstimate();
   const change = calculateChange();
   const confidence = getConfidence();
   const band = getMarketBand();
@@ -149,16 +145,16 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
             </div>
 
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-              {hasPrice && (
+              {estimate > 0 && (
                 <span
                   className="badge"
                   style={smallChipStyle}
-                  onClick={(e) => handleBadgeClick(e, 'estimate', priceInfo.amount)}
+                  onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                   title="Click to see comparable valuations"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                   onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
                 >
-                  {priceInfo.label}: {formatPrice(priceInfo.amount!)}
+                  EST: {formatPrice(estimate)}
                 </span>
               )}
               
@@ -169,7 +165,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                     ...smallChipStyle,
                     color: change >= 0 ? '#166534' : '#991b1b'
                   }}
-                  onClick={(e) => handleBadgeClick(e, 'estimate', priceInfo.amount)}
+                  onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                   title="Value change over time"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                   onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
@@ -277,16 +273,16 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   {vehicle.model}
                 </span>
 
-                {hasPrice && (
+                {estimate > 0 && (
                   <span
                     className="badge"
                     style={smallChipStyle}
-                    onClick={(e) => handleBadgeClick(e, 'estimate', priceInfo.amount)}
+                    onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                     title="Click to see comparable valuations"
                     onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                     onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
                   >
-                    {priceInfo.label}: {formatPrice(priceInfo.amount!)}
+                    EST: {formatPrice(estimate)}
                   </span>
                 )}
                 
@@ -297,7 +293,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                       ...smallChipStyle,
                       color: change >= 0 ? '#166534' : '#991b1b'
                     }}
-                    onClick={(e) => handleBadgeClick(e, 'estimate', priceInfo.amount)}
+                    onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                     title="Value change over time"
                     onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                     onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
@@ -421,16 +417,16 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                 {vehicle.model}
               </span>
 
-              {hasPrice && (
+              {estimate > 0 && (
                 <span
                   className="badge"
                   style={smallChipStyle}
-                  onClick={(e) => handleBadgeClick(e, 'estimate', priceInfo.amount)}
+                  onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                   title="Click to see comparable valuations"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                   onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
                 >
-                  {priceInfo.label}: {formatPrice(priceInfo.amount!)}
+                  EST: {formatPrice(estimate)}
                 </span>
               )}
               
@@ -441,7 +437,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                     ...smallChipStyle,
                     color: change >= 0 ? '#166534' : '#991b1b'
                   }}
-                  onClick={(e) => handleBadgeClick(e, 'estimate', priceInfo.amount)}
+                  onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                   title="Value change over time"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                   onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}

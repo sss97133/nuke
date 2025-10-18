@@ -109,13 +109,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   const getAutoDisplay = () => {
     if (!vehicle) return { amount: null as number | null, label: '' };
-
-    // Use RPC signal when available as it includes timeline event data and is more accurate
-    if (rpcSignal && typeof rpcSignal.primary_value === 'number' && rpcSignal.primary_label) {
-      return { amount: rpcSignal.primary_value, label: rpcSignal.primary_label };
-    }
-
-    // Fallback to basic vehicle fields
     // Auction current bid
     if (vehicle.auction_source && vehicle.bid_count && typeof vehicle.current_bid === 'number') {
       return { amount: vehicle.current_bid, label: 'Current Bid' };
@@ -148,15 +141,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const mode = displayMode || 'auto';
     if (mode === 'auto') return getAutoDisplay();
     if (mode === 'estimate') {
-      // Always prefer RPC signal for estimate mode as it includes timeline event data
       if (rpcSignal && typeof rpcSignal.primary_value === 'number' && rpcSignal.primary_label) {
         return { amount: rpcSignal.primary_value, label: rpcSignal.primary_label };
       }
-      // Fallback to basic estimation if RPC unavailable
-      if (typeof vehicle.current_value === 'number') {
-        return { amount: vehicle.current_value, label: 'Estimated Value' };
-      }
-      return { amount: null, label: 'Estimated Value' };
+      const pi = computePrimaryPrice({
+        msrp: (vehicle as any).msrp,
+        current_value: (vehicle as any).current_value,
+        purchase_price: (vehicle as any).purchase_price,
+        asking_price: (vehicle as any).asking_price,
+        sale_price: (vehicle as any).sale_price,
+        is_for_sale: (vehicle as any).is_for_sale,
+      } as any);
+      return { amount: typeof pi.amount === 'number' ? pi.amount : null, label: pi.label || 'Estimated Value' };
     }
     if (mode === 'auction') return { amount: typeof vehicle.current_bid === 'number' ? vehicle.current_bid : null, label: 'Current Bid' };
     if (mode === 'asking') return { amount: typeof vehicle.asking_price === 'number' ? vehicle.asking_price : null, label: 'Asking Price' };

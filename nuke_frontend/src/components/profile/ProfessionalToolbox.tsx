@@ -774,7 +774,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
               {/* Text Paste Section */}
               <div className="form-group">
                 <label className="form-label" style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-                  Option 2: Paste Receipt Text
+                  📋 Option 2: Paste Receipt Text
                 </label>
                 <textarea
                   className="form-control"

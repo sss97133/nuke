@@ -222,7 +222,7 @@ const ReceiptManager: React.FC<ReceiptManagerProps> = ({ userId, onReceiptsChang
         fontSize: '11px',
         color: 'var(--text-muted)'
       }}>
-        Tip: Toggle receipts on/off to show/hide their tools. Original files are preserved.
+        💡 Toggle receipts on/off to show/hide their tools. Original files are preserved.
       </div>
     </div>
   );

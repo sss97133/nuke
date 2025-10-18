@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import BlueGlowIcon from '../ui/BlueGlowIcon';
 import '../../design-system.css';
 
 interface RecentImage {
@@ -8,6 +7,20 @@ interface RecentImage {
   vehicle_id?: string;
   image_url: string;
   created_at: string;
+}
+
+interface RecentVehicle {
+  id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  created_at: string;
+  msrp?: number | null;
+  current_value?: number | null;
+  purchase_price?: number | null;
+  asking_price?: number | null;
+  sale_price?: number | null;
+  is_for_sale?: boolean | null;
 }
 
 interface RecentEvent {
@@ -69,10 +82,42 @@ const getDelta = (v: RecentVehicle) => {
   return { amount: change, percent, isPositive: change >= 0 } as const;
 };
 
+// Vehicle card with image
+const RareVehicleCard = ({ vehicle, onClick }: { vehicle: RecentVehicle; onClick: () => void }) => {
+  const [imageUrl, setImageUrl] = useState<string>('');
+
+  useEffect(() => {
+    supabase
+      .from('vehicle_images')
+      .select('image_url')
+      .eq('vehicle_id', vehicle.id)
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data?.image_url) setImageUrl(data.image_url);
+      });
+  }, [vehicle.id]);
+
+  return (
+    <div onClick={onClick} style={{ cursor: 'pointer', border: '1px solid #ddd', overflow: 'hidden' }}>
+      <div style={{ aspectRatio: '16/9', background: '#000', overflow: 'hidden' }}>
+        {imageUrl ? (
+          <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '32px' }}>🚗</div>
+        )}
+      </div>
+      <div style={{ padding: '8px', background: '#fff' }}>
+        <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+          {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: string; title: string; events: number; onClick: () => void }) => {
   const [imageUrl, setImageUrl] = useState<string>('');
-  const [priceSignal, setPriceSignal] = useState<any>(null);
-  const [recentActivity, setRecentActivity] = useState<string>('');
 
   useEffect(() => {
     supabase
@@ -84,146 +129,46 @@ const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: stri
       .then(({ data }) => {
         if (data?.image_url) setImageUrl(data.image_url);
       });
-
-    // Fetch price signal
-    supabase
-      .from('vehicle_price_signal_view')
-      .select('*')
-      .eq('vehicle_id', vehicleId)
-      .single()
-      .then(({ data }) => {
-        if (data) setPriceSignal(data);
-      })
-      .catch(() => {
-        supabase.rpc('vehicle_price_signal', { vehicle_ids: [vehicleId] })
-          .then(({ data }) => {
-            if (data && data[0]) setPriceSignal(data[0]);
-          });
-      });
-
-    // Get most recent activity
-    supabase
-      .from('timeline_events')
-      .select('event_type, created_at')
-      .eq('vehicle_id', vehicleId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          const hoursAgo = Math.floor((Date.now() - new Date(data.created_at).getTime()) / (1000 * 60 * 60));
-          setRecentActivity(hoursAgo < 1 ? 'Updated just now' : `Updated ${hoursAgo}h ago`);
-        }
-      });
   }, [vehicleId]);
 
-  const handleViewTimeline = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    window.open(`/vehicle/${vehicleId}?tab=timeline`, '_blank');
-  };
-
-  const primaryPrice = priceSignal?.primary_value;
-  const priceLabel = priceSignal?.primary_label;
-
   return (
-    <div style={{ cursor: 'pointer', border: '1px solid #c0c0c0', overflow: 'hidden', position: 'relative' }}>
-      <div onClick={onClick} style={{ aspectRatio: '16/9', background: '#000', position: 'relative' }}>
+    <div onClick={onClick} style={{ cursor: 'pointer', border: '1px solid #ddd', overflow: 'hidden' }}>
+      <div style={{ aspectRatio: '16/9', background: '#000', position: 'relative' }}>
         {imageUrl ? (
           <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
-            <BlueGlowIcon size={32} />
-          </div>
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '32px' }}>🚗</div>
         )}
         <div style={{
           position: 'absolute',
           top: '6px',
           right: '6px',
-          background: 'rgba(220, 38, 38, 0.95)',
+          background: 'rgba(255,0,0,0.9)',
           color: '#fff',
           padding: '3px 8px',
-          fontSize: '8pt',
+          fontSize: '9px',
           fontWeight: 'bold',
-          borderRadius: '2px',
-          border: '1px solid #fff'
+          borderRadius: '2px'
         }}>
-          <BlueGlowIcon size={12} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} />
           {events} UPDATES
         </div>
-        {recentActivity && (
-          <div style={{
-            position: 'absolute',
-            bottom: '6px',
-            left: '6px',
-            background: 'rgba(0,0,0,0.8)',
-            color: '#fff',
-            padding: '2px 6px',
-            fontSize: '8pt',
-            borderRadius: '2px'
-          }}>
-            {recentActivity}
-          </div>
-        )}
       </div>
       <div style={{ padding: '8px', background: '#fff' }}>
-        <div onClick={onClick} style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '4px' }}>{title}</div>
-        
-        {primaryPrice && (
-          <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '12pt', fontWeight: 'bold', fontFamily: 'monospace' }}>
-              {formatCurrency(primaryPrice)}
-              {priceLabel && (
-                <span style={{ fontSize: '7pt', color: '#666', marginLeft: '4px', fontWeight: 600 }}>
-                  {priceLabel}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button
-            onClick={onClick}
-            style={{
-              flex: 1,
-              padding: '4px 8px',
-              fontSize: '8pt',
-              background: '#3b82f6',
-              color: '#fff',
-              border: '1px solid #2563eb',
-              borderRadius: '2px',
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
-          >
-            View Build
-          </button>
-          <button
-            onClick={handleViewTimeline}
-            style={{
-              padding: '4px 8px',
-              fontSize: '8pt',
-              background: '#fff',
-              color: '#333',
-              border: '1px solid #c0c0c0',
-              borderRadius: '2px',
-              cursor: 'pointer',
-              fontWeight: 600
-            }}
-          title="View Timeline"
-        >
-          <BlueGlowIcon size={12} />
-        </button>
-        </div>
+        <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{title}</div>
       </div>
     </div>
   );
 };
 
 const DiscoveryHighlights = () => {
+  const [images, setImages] = useState<RecentImage[]>([]);
+  const [vehicles, setVehicles] = useState<RecentVehicle[]>([]);
+  const [events, setEvents] = useState<RecentEvent[]>([]);
   const [activeShops, setActiveShops] = useState<ActiveShop[]>([]);
+  const [rareVehicles, setRareVehicles] = useState<RecentVehicle[]>([]);
   const [hotVehicles, setHotVehicles] = useState<HotVehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [signalsById, setSignalsById] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -235,15 +180,20 @@ const DiscoveryHighlights = () => {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        const [vehRes, evtRes, sessRes] = await Promise.all([
+        const [imgRes, vehRes, evtRes, sessRes] = await Promise.all([
+          supabase
+            .from('vehicle_images')
+            .select('id, vehicle_id, image_url, created_at')
+            .order('created_at', { ascending: false })
+            .limit(24),
           supabase
             .from('vehicles')
-            .select('id, year, make, model, created_at, vin, color, msrp, current_value, purchase_price, asking_price, sale_price, is_for_sale')
+            .select('id, year, make, model, created_at, msrp, current_value, purchase_price, asking_price, sale_price, is_for_sale')
             .order('created_at', { ascending: false })
             .limit(200),
           supabase
             .from('timeline_events')
-            .select('id, vehicle_id, created_at')
+            .select('id, title, event_type, created_at, vehicle_id')
             .gte('created_at', weekAgo)
             .order('created_at', { ascending: false })
             .limit(400),
@@ -254,6 +204,35 @@ const DiscoveryHighlights = () => {
             .order('created_at', { ascending: false })
             .limit(500)
         ]);
+
+        if (!imgRes.error && imgRes.data) setImages(imgRes.data as any);
+        if (!vehRes.error && vehRes.data) setVehicles(vehRes.data as any);
+
+        // Try to fetch price signals from materialized view first; fallback to RPC for misses
+        try {
+          const ids = (vehRes.data as any[] | null)?.map(v => v.id) || [];
+          if (ids.length > 0) {
+            const have: Record<string, any> = {};
+            const { data: cached, error: mvErr } = await supabase
+              .from('vehicle_price_signal_view')
+              .select('*')
+              .in('vehicle_id', ids);
+            if (!mvErr && Array.isArray(cached)) {
+              (cached as any[]).forEach((s: any) => { if (s?.vehicle_id) have[s.vehicle_id] = s; });
+            }
+            const missing = ids.filter(id => !have[id]);
+            if (missing.length > 0) {
+              const { data: fresh, error: rpcErr } = await supabase.rpc('vehicle_price_signal', { vehicle_ids: missing });
+              if (!rpcErr && Array.isArray(fresh)) {
+                (fresh as any[]).forEach((s: any) => { if (s?.vehicle_id) have[s.vehicle_id] = s; });
+              }
+            }
+            setSignalsById(have);
+          }
+        } catch (e) {
+          console.debug('price signal enrichment skipped in highlights:', e);
+        }
+        if (!evtRes.error && evtRes.data) setEvents((evtRes.data as any).map((e: any) => ({ id: e.id, vehicle_id: e.vehicle_id, title: e.title, event_type: e.event_type, created_at: e.created_at })));
 
         // Compute Active Shops (client-side reduce)
         if (!sessRes.error && sessRes.data) {
@@ -286,6 +265,22 @@ const DiscoveryHighlights = () => {
           }
         }
 
+        // Compute Rare Finds: combos with very low frequency across recent sample
+        if (!vehRes.error && vehRes.data) {
+          const list = vehRes.data as any[];
+          const comboCounts: Record<string, { count: number, sample: any[] }> = {};
+          list.forEach(v => {
+            const key = `${v.year || 'na'}|${(v.make || '').toLowerCase()}|${(v.model || '').toLowerCase()}`;
+            if (!comboCounts[key]) comboCounts[key] = { count: 0, sample: [] };
+            comboCounts[key].count += 1;
+            if (comboCounts[key].sample.length < 3) comboCounts[key].sample.push(v);
+          });
+          const rareCombos = Object.entries(comboCounts)
+            .filter(([, val]) => val.count <= 2) // rarity threshold
+            .slice(0, 8)
+            .flatMap(([, val]) => val.sample);
+          setRareVehicles(rareCombos.map((v: any) => ({ id: v.id, year: v.year, make: v.make, model: v.model, created_at: v.created_at })));
+        }
 
         // Compute Hot Vehicles: most events in last 7 days
         if (!evtRes.error && evtRes.data) {
@@ -294,7 +289,7 @@ const DiscoveryHighlights = () => {
           eventsData.forEach(e => { if (e.vehicle_id) byVehicle[e.vehicle_id] = (byVehicle[e.vehicle_id] || 0) + 1; });
           const topVehicles = Object.entries(byVehicle)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 6);
+            .slice(0, 8);
           const ids = topVehicles.map(([id]) => id);
           if (ids.length > 0) {
             const { data: vehs } = await supabase
@@ -346,6 +341,20 @@ const DiscoveryHighlights = () => {
         </div>
       )}
 
+      {/* Rare Finds - WITH IMAGES */}
+      {rareVehicles.length > 0 && (
+        <div className="card" style={{ border: '1px solid #c0c0c0' }}>
+          <div className="card-header" style={cardHeaderStyle}>Rare Finds</div>
+          <div className="card-body" style={cardBodyStyle}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+              {rareVehicles.slice(0, 6).map(v => (
+                <RareVehicleCard key={v.id} vehicle={v} onClick={() => go(`/vehicle/${v.id}`)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hot Right Now - WITH IMAGES */}
       {hotVehicles.length > 0 && (
         <div className="card" style={{ border: '1px solid #c0c0c0' }}>
@@ -360,6 +369,84 @@ const DiscoveryHighlights = () => {
                   events={h.events}
                   onClick={() => go(`/vehicle/${h.vehicle_id}`)}
                 />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Images */}
+      {images.length > 0 && (
+        <div className="card" style={{ border: '1px solid #c0c0c0' }}>
+          <div className="card-header" style={cardHeaderStyle}>Recent Images</div>
+          <div className="card-body" style={{ ...cardBodyStyle, overflowX: 'auto' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {images.map(img => (
+                <div key={img.id} style={{ width: '110px', height: '74px', overflow: 'hidden', ...boxStyle }} onClick={() => go(img.vehicle_id ? `/vehicle/${img.vehicle_id}` : `/discover`)}>
+                  <img src={img.image_url} alt={img.id} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recently Added Vehicles */}
+      {vehicles.length > 0 && (
+        <div className="card" style={{ border: '1px solid #c0c0c0' }}>
+          <div className="card-header" style={cardHeaderStyle}>Recently Added Vehicles</div>
+          <div className="card-body" style={cardBodyStyle}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px' }}>
+              {vehicles.slice(0, 8).map(v => {
+                const sig = signalsById[v.id];
+                const pi = sig && sig.primary_label && typeof sig.primary_value === 'number'
+                  ? { label: sig.primary_label as 'ASK' | 'SOLD' | 'EST' | 'PAID' | 'MSRP', amount: sig.primary_value as number }
+                  : getPriceInfo(v);
+                const delta = sig && typeof sig.delta_pct === 'number' && typeof sig.delta_amount === 'number'
+                  ? { amount: sig.delta_amount as number, percent: sig.delta_pct as number, isPositive: (sig.delta_amount as number) >= 0 }
+                  : getDelta(v);
+                return (
+                  <div key={v.id} className="text" style={{ ...boxStyle, padding: '6px' }} onClick={() => go(`/vehicle/${v.id}`)}>
+                    <div className="text text-bold" style={to8pt}>
+                      {[v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle'}
+                    </div>
+                    <div className="text text-muted" style={to8pt}>{new Date(v.created_at).toLocaleString()}</div>
+
+                    {/* Price + Delta Chips */}
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px', alignItems: 'center' }}>
+                      {pi.label && typeof pi.amount === 'number' && (
+                        <span style={chipStyle} title={Array.isArray(sig?.sources) ? `Sources: ${sig.sources.join(', ')}` : undefined}>
+                          {pi.label}: {formatCurrency(pi.amount)}
+                        </span>
+                      )}
+                      {delta && (
+                        <span style={{ ...chipStyle, color: delta.isPositive ? '#006400' : '#800000' }} title={Array.isArray(sig?.sources) ? `Sources: ${sig.sources.join(', ')}` : undefined}>
+                          {delta.isPositive ? '↑' : '↓'} {Math.abs(delta.percent).toFixed(1)}%
+                        </span>
+                      )}
+                      {typeof sig?.confidence === 'number' && (
+                        <span style={chipStyle} title="Signal confidence">conf {sig.confidence}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Activity */}
+      {events.length > 0 && (
+        <div className="card" style={{ border: '1px solid #c0c0c0' }}>
+          <div className="card-header" style={cardHeaderStyle}>Recent Activity</div>
+          <div className="card-body" style={cardBodyStyle}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px' }}>
+              {events.map(e => (
+                <div key={e.id} className="text" style={{ ...boxStyle, padding: '6px' }} onClick={() => go(e.vehicle_id ? `/vehicle/${e.vehicle_id}?t=timeline&event=${e.id}` : `/discover`)}>
+                  <div className="text text-bold" style={to8pt}>{e.title || (e.event_type || 'Event').replace('_', ' ')}</div>
+                  <div className="text text-muted" style={to8pt}>{new Date(e.created_at).toLocaleString()}</div>
+                </div>
               ))}
             </div>
           </div>

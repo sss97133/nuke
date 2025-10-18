@@ -140,7 +140,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
       fontFamily: 'Arial, sans-serif'
     }}>
       <h3 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 12px 0' }}>
-        Auction Marketplace
+        🏁 Auction Marketplace
       </h3>
 
       {/* Filters */}
@@ -288,7 +288,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
                 fontWeight: 'bold',
                 zIndex: 1
               }}>
-                FEATURED
+                ⭐ FEATURED
               </div>
             )}
 
@@ -317,7 +317,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
                   fontSize: '24pt',
                   textAlign: 'center'
                 }}>
-                  VEHICLE
+                  🚗
                 </div>
               )}
 
@@ -332,7 +332,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
                 fontSize: '7pt',
                 fontWeight: 'bold'
               }}>
-                TIME {formatTimeRemaining(listing.time_remaining_seconds)}
+                ⏰ {formatTimeRemaining(listing.time_remaining_seconds)}
               </div>
 
               {/* Listing Type Badge */}
@@ -346,7 +346,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
                 fontSize: '7pt',
                 fontWeight: 'bold'
               }}>
-                {listing.listing_type === 'auction' ? 'AUCTION' : 'BUY NOW'}
+                {listing.listing_type === 'auction' ? '🔨 AUCTION' : '💰 BUY NOW'}
               </div>
 
               {/* Image Count */}
@@ -360,7 +360,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
                   padding: '2px 6px',
                   fontSize: '7pt'
                 }}>
-                  IMAGES {listing.images.length}
+                  📷 {listing.images.length}
                 </div>
               )}
             </div>
@@ -402,8 +402,8 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
                 fontSize: '8pt'
               }}>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <span>BIDS {listing.bid_count} bids</span>
-                  <span>WATCHING {listing.watcher_count} watching</span>
+                  <span>🔨 {listing.bid_count} bids</span>
+                  <span>👁️ {listing.watcher_count} watching</span>
                 </div>
               </div>
 

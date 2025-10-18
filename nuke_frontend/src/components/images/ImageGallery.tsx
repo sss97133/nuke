@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { ImageUploadService } from '../../services/imageUploadService';
+import { imageOptimizationService } from '../../services/imageOptimizationService';
 import ImageLightbox from '../image/ImageLightbox';
 
 interface ImageGalleryProps {
@@ -204,12 +204,61 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
     try {
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
+        const fileName = `${Date.now()}_${i}_${file.name}`;
 
-        // Use the working ImageUploadService that we know works
-        const result = await ImageUploadService.uploadImage(vehicleId, file, 'general');
+        // Generate orientation-corrected variants using the optimization service
+        const optimizationResult = await imageOptimizationService.generateVariantBlobs(file);
 
-        if (!result.success) {
-          console.error('Upload failed:', result.error);
+        if (optimizationResult.success && optimizationResult.variantBlobs) {
+          const urls: any = {};
+          const paths: any = {};
+
+          // Upload each variant (thumbnail, medium, large)
+          for (const [variantName, blob] of Object.entries(optimizationResult.variantBlobs)) {
+            const variantPath = `vehicles/${vehicleId}/images/${variantName}/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from('vehicle-data')
+              .upload(variantPath, blob, { upsert: true });
+
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage
+                .from('vehicle-data')
+                .getPublicUrl(variantPath);
+
+              urls[`${variantName}_url`] = urlData.publicUrl;
+              paths[variantName] = variantPath;
+            }
+          }
+
+          // Also upload original file
+          const originalPath = `vehicles/${vehicleId}/images/${fileName}`;
+          const { error: originalError } = await supabase.storage
+            .from('vehicle-data')
+            .upload(originalPath, file);
+
+          if (!originalError) {
+            const { data: originalUrl } = supabase.storage
+              .from('vehicle-data')
+              .getPublicUrl(originalPath);
+
+            // Save to database with all variant URLs
+            await supabase
+              .from('vehicle_images')
+              .insert({
+                vehicle_id: vehicleId,
+                image_url: originalUrl.publicUrl,
+                thumbnail_url: urls.thumbnail_url,
+                medium_url: urls.medium_url,
+                large_url: urls.large_url,
+                storage_path: originalPath,
+                filename: file.name,
+                mime_type: file.type,
+                file_size: file.size,
+                category: 'general',
+                is_primary: i === 0 && allImages.length === 0
+              });
+          }
         }
 
         setUploadProgress(prev => ({...prev, completed: i + 1}));
@@ -225,7 +274,11 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
       setAllImages(refreshedImages || []);
       // If images are currently displayed, refresh displayed images too
       if (showImages) {
+        // Temporarily update allImages for sorting
+        const tempAllImages = allImages;
+        setAllImages(refreshedImages || []);
         const sortedImages = getSortedImages();
+        setAllImages(tempAllImages); // Restore
         setDisplayedImages(sortedImages.slice(0, Math.max(displayedImages.length, imagesPerPage)));
       }
       onImagesUpdated?.();

@@ -154,18 +154,7 @@ class GlobalUploadQueue {
       if (!this.uploadedPhotos.has(item.vehicleId)) {
         this.uploadedPhotos.set(item.vehicleId, []);
       }
-      // Parse date safely from EXIF or file metadata
-      let photoDate: Date;
-      if (exifData.dateTaken) {
-        photoDate = new Date(exifData.dateTaken);
-        // Validate the date
-        if (isNaN(photoDate.getTime())) {
-          photoDate = new Date(item.file.lastModified || Date.now());
-        }
-      } else {
-        photoDate = new Date(item.file.lastModified || Date.now());
-      }
-      
+      const photoDate = exifData.dateTaken ? new Date(exifData.dateTaken) : new Date(item.file.lastModified);
       this.uploadedPhotos.get(item.vehicleId)!.push({
         file: item.file,
         imageUrl: publicUrl,
@@ -226,11 +215,12 @@ class GlobalUploadQueue {
                   metadata: {
                     photo_count: session.length,
                     duration_minutes: Math.round(sessionDuration),
-                    start_time: !isNaN(session[0].dateTaken.getTime()) ? session[0].dateTaken.toISOString() : new Date().toISOString(),
-                    end_time: !isNaN(session[session.length - 1].dateTaken.getTime()) ? session[session.length - 1].dateTaken.toISOString() : new Date().toISOString(),
+                    start_time: session[0].dateTaken.toISOString(),
+                    end_time: session[session.length - 1].dateTaken.toISOString(),
                     image_urls: session.map(p => p.imageUrl)
                   }
-                }
+                },
+                user.id
               );
             }
             

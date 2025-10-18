@@ -116,7 +116,7 @@ const VehicleApproval: React.FC = () => {
       // Create approved vehicle record
       const approvedFields = fieldApprovals.filter(f => f.isApproved);
       const vehicleData: any = {
-        // Note: Do NOT include user_id/owner_id - it's set automatically by the database via auth context
+        owner_id: session?.user?.id,
         data_source: 'ai_approved',
         extraction_id: extractionId
       };
@@ -140,7 +140,7 @@ const VehicleApproval: React.FC = () => {
         .insert({
           extraction_id: extractionId,
           vehicle_id: vehicle.id,
-          // Note: approver_id is set automatically by RLS
+          approver_id: session?.user?.id,
           approved_fields: approvedFields.map(f => f.field),
           approval_notes: notes,
           confidence_score: approvedFields.reduce((sum, f) => sum + f.confidence, 0) / approvedFields.length

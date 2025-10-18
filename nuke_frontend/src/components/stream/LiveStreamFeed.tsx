@@ -30,13 +30,13 @@ const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
   const [filter, setFilter] = useState<string>('all');
 
   const streamTypes = [
-    { value: 'all', label: 'All Streams', icon: 'LIVE' },
-    { value: 'build_session', label: 'Build Sessions', icon: 'BUILD' },
-    { value: 'garage_tour', label: 'Garage Tours', icon: 'GARAGE' },
-    { value: 'dyno_run', label: 'Dyno Runs', icon: 'DYNO' },
-    { value: 'race_event', label: 'Race Events', icon: 'RACE' },
-    { value: 'tutorial', label: 'Tutorials', icon: 'TUTORIAL' },
-    { value: 'q_and_a', label: 'Q&A Sessions', icon: 'Q&A' }
+    { value: 'all', label: 'All Streams', icon: '🔴' },
+    { value: 'build_session', label: 'Build Sessions', icon: '🔧' },
+    { value: 'garage_tour', label: 'Garage Tours', icon: '🏠' },
+    { value: 'dyno_run', label: 'Dyno Runs', icon: '⚡' },
+    { value: 'race_event', label: 'Race Events', icon: '🏁' },
+    { value: 'tutorial', label: 'Tutorials', icon: '📚' },
+    { value: 'q_and_a', label: 'Q&A Sessions', icon: '❓' }
   ];
 
   useEffect(() => {
@@ -113,10 +113,10 @@ const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'live': return 'LIVE';
-      case 'scheduled': return 'SCHEDULED';
-      case 'ended': return 'ENDED';
-      default: return 'UNKNOWN';
+      case 'live': return '🔴';
+      case 'scheduled': return '📅';
+      case 'ended': return '⚫';
+      default: return '⭕';
     }
   };
 
@@ -135,7 +135,7 @@ const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
       fontFamily: 'Arial, sans-serif'
     }}>
       <h3 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 12px 0' }}>
-        Live Streams
+        📺 Live Streams
       </h3>
 
       {/* Stream Type Filter */}
