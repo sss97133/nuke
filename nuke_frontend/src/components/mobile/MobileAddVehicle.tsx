@@ -8,7 +8,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+// import { useAuth } from '../../contexts/AuthContext'; // Not used
 import { ImageUploadService } from '../../services/imageUploadService';
 import { supabase } from '../../lib/supabase';
 import '../../design-system.css';

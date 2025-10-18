@@ -450,7 +450,6 @@ const AllVehicles: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 
