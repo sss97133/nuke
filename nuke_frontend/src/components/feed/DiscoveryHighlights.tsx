@@ -82,40 +82,6 @@ const getDelta = (v: RecentVehicle) => {
   return { amount: change, percent, isPositive: change >= 0 } as const;
 };
 
-// Vehicle card with image
-const RareVehicleCard = ({ vehicle, onClick }: { vehicle: RecentVehicle; onClick: () => void }) => {
-  const [imageUrl, setImageUrl] = useState<string>('');
-
-  useEffect(() => {
-    supabase
-      .from('vehicle_images')
-      .select('image_url')
-      .eq('vehicle_id', vehicle.id)
-      .limit(1)
-      .single()
-      .then(({ data }) => {
-        if (data?.image_url) setImageUrl(data.image_url);
-      });
-  }, [vehicle.id]);
-
-  return (
-    <div onClick={onClick} style={{ cursor: 'pointer', border: '1px solid #ddd', overflow: 'hidden' }}>
-      <div style={{ aspectRatio: '16/9', background: '#000', overflow: 'hidden' }}>
-        {imageUrl ? (
-          <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '32px' }}>🚗</div>
-        )}
-      </div>
-      <div style={{ padding: '8px', background: '#fff' }}>
-        <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
-          {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: string; title: string; events: number; onClick: () => void }) => {
   const [imageUrl, setImageUrl] = useState<string>('');
 
@@ -165,7 +131,6 @@ const DiscoveryHighlights = () => {
   const [vehicles, setVehicles] = useState<RecentVehicle[]>([]);
   const [events, setEvents] = useState<RecentEvent[]>([]);
   const [activeShops, setActiveShops] = useState<ActiveShop[]>([]);
-  const [rareVehicles, setRareVehicles] = useState<RecentVehicle[]>([]);
   const [hotVehicles, setHotVehicles] = useState<HotVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [signalsById, setSignalsById] = useState<Record<string, any>>({});
@@ -265,22 +230,7 @@ const DiscoveryHighlights = () => {
           }
         }
 
-        // Compute Rare Finds: combos with very low frequency across recent sample
-        if (!vehRes.error && vehRes.data) {
-          const list = vehRes.data as any[];
-          const comboCounts: Record<string, { count: number, sample: any[] }> = {};
-          list.forEach(v => {
-            const key = `${v.year || 'na'}|${(v.make || '').toLowerCase()}|${(v.model || '').toLowerCase()}`;
-            if (!comboCounts[key]) comboCounts[key] = { count: 0, sample: [] };
-            comboCounts[key].count += 1;
-            if (comboCounts[key].sample.length < 3) comboCounts[key].sample.push(v);
-          });
-          const rareCombos = Object.entries(comboCounts)
-            .filter(([, val]) => val.count <= 2) // rarity threshold
-            .slice(0, 8)
-            .flatMap(([, val]) => val.sample);
-          setRareVehicles(rareCombos.map((v: any) => ({ id: v.id, year: v.year, make: v.make, model: v.model, created_at: v.created_at })));
-        }
+        
 
         // Compute Hot Vehicles: most events in last 7 days
         if (!evtRes.error && evtRes.data) {
@@ -341,19 +291,7 @@ const DiscoveryHighlights = () => {
         </div>
       )}
 
-      {/* Rare Finds - WITH IMAGES */}
-      {rareVehicles.length > 0 && (
-        <div className="card" style={{ border: '1px solid #c0c0c0' }}>
-          <div className="card-header" style={cardHeaderStyle}>Rare Finds</div>
-          <div className="card-body" style={cardBodyStyle}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
-              {rareVehicles.slice(0, 6).map(v => (
-                <RareVehicleCard key={v.id} vehicle={v} onClick={() => go(`/vehicle/${v.id}`)} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      
 
       {/* Hot Right Now - WITH IMAGES */}
       {hotVehicles.length > 0 && (
