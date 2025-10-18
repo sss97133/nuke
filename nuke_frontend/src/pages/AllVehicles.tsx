@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import AdvancedVehicleSearch from '../components/search/AdvancedVehicleSearch';
 import MarketPulse from '../components/MarketPulse';
@@ -249,8 +249,7 @@ const AllVehicles: React.FC = () => {
 
 
   return (
-    <AppLayout>
-      <div className="fade-in">
+    <div className="fade-in">
 
         {/* Discovery Welcome Section for Non-Authenticated Users */}
         {!session && (
@@ -451,7 +450,7 @@ const AllVehicles: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
+    </div>
   );
 };
 

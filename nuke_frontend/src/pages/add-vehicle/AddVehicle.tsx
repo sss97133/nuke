@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { uploadQueue } from '../../services/globalUploadQueue';
 import { TimelineEventService } from '../../services/timelineEventService';
-import AppLayout from '../../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import TitleScan from '../../components/TitleScan';
 import UniversalImageUpload from '../../components/UniversalImageUpload';
 // Modular components
@@ -1007,7 +1007,7 @@ Redirecting to vehicle profile...`);
   }
 
   // Page mode - use AppLayout
-  return <AppLayout>{formContent}</AppLayout>;
+  return formContent;
 };
 
 export default AddVehicle;
