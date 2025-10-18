@@ -31,6 +31,16 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   
+  // Prevent background scroll when modal is open
+  React.useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+  
   // Photo-first state
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
@@ -124,9 +134,14 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
       }
       
       // Call OpenAI Vision to extract title data
+      console.log('Calling extract-title-data with URL:', urlData.publicUrl);
+      
       const { data: result, error: visionError } = await supabase.functions.invoke('extract-title-data', {
         body: { image_url: urlData.publicUrl }
       });
+      
+      console.log('Title extraction result:', result);
+      console.log('Title extraction error:', visionError);
       
       if (visionError) {
         console.error('Vision error:', visionError);
@@ -322,6 +337,9 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
       zIndex: 9999,
       overflowY: 'auto',
       WebkitOverflowScrolling: 'touch',
+      // Prevent background scroll
+      overscrollBehavior: 'contain',
+      touchAction: 'pan-y',
     }}>
       {/* Header */}
       <div style={{
@@ -329,11 +347,13 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
         top: 0,
         backgroundColor: 'var(--white)',
         borderBottom: '2px solid var(--border-medium)',
-        padding: 'var(--space-3)',
+        padding: 'var(--space-4) var(--space-3)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         zIndex: 10,
+        // Add padding from top of screen
+        paddingTop: 'calc(var(--space-4) + env(safe-area-inset-top, 0px))',
       }}>
         <h1 style={{
           fontSize: '10pt',
