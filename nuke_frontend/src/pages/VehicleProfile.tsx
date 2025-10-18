@@ -132,12 +132,6 @@ const VehicleProfile: React.FC = () => {
     }
   }, []);
 
-  
-  // If mobile, use mobile-optimized version - moved after all hooks
-  if (isMobile && vehicleId) {
-    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
-  }
-
   // Calculate true legal ownership - requires verified title + matching legal ID
   const isVerifiedOwner = React.useMemo(() => {
     if (!session?.user?.id || !vehicle?.id) return false;
@@ -1120,6 +1114,11 @@ const VehicleProfile: React.FC = () => {
       contributorRole,
       canCreateAgreements: contributorRole === 'consigner' || isVerifiedOwner
     });
+  }
+
+  // If mobile, use mobile-optimized version - moved after all hooks
+  if (isMobile && vehicleId) {
+    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
   }
 
   return (
