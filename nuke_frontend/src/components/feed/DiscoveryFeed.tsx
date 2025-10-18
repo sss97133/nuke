@@ -235,6 +235,28 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
         }
       }
 
+      // Attach profile username/avatar for attribution
+      try {
+        const ids = Array.from(new Set(feedItems.map(i => i.user_id).filter(Boolean)));
+        if (ids.length > 0) {
+          const { data: profiles, error: pErr } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', ids);
+          if (!pErr && Array.isArray(profiles)) {
+            const pmap: Record<string, { id: string; username?: string; avatar_url?: string }> = {};
+            (profiles as any[]).forEach((p: any) => { if (p?.id) pmap[p.id] = p; });
+            feedItems = feedItems.map(it => ({
+              ...it,
+              user_name: pmap[it.user_id]?.username ?? it.user_name,
+              user_avatar: pmap[it.user_id]?.avatar_url ?? it.user_avatar,
+            }));
+          }
+        }
+      } catch (e) {
+        console.debug('profile enrichment skipped:', e);
+      }
+
       // Sort all items by created_at
       feedItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
