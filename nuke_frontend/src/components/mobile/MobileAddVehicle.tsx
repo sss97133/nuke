@@ -48,6 +48,7 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
   const [activeSection, setActiveSection] = useState<'photos' | 'details' | 'url'>('photos');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ uploaded: number; total: number } | null>(null);
   
   // Refs
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +100,8 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
     if (!file) return;
     
     setIsProcessingPhotos(true);
+    setError(null);
+    
     try {
       // Upload to storage for processing
       const fileName = `title-scan-${Date.now()}.jpg`;
@@ -106,38 +109,62 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
         .from('vehicle-images')
         .upload(`temp/${fileName}`, file);
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error('Failed to upload title image');
+      }
       
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('vehicle-images')
         .getPublicUrl(`temp/${fileName}`);
       
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get image URL');
+      }
+      
       // Call OpenAI Vision to extract title data
       const { data: result, error: visionError } = await supabase.functions.invoke('extract-title-data', {
         body: { image_url: urlData.publicUrl }
       });
       
-      if (visionError) throw visionError;
-      
-      // Auto-fill from extracted data
-      if (result) {
-        setFormData(prev => ({
-          ...prev,
-          year: result.year || prev.year,
-          make: result.make || prev.make,
-          model: result.model || prev.model,
-          vin: result.vin || prev.vin,
-        }));
+      if (visionError) {
+        console.error('Vision error:', visionError);
+        throw new Error(visionError.message || 'Failed to analyze title');
       }
       
-      // Show success
-      alert('✓ Title scanned! Data auto-filled below.');
-      setActiveSection('details');
+      // Auto-fill from extracted data
+      let fieldsFound = 0;
+      if (result) {
+        const updates: any = {};
+        if (result.year) { updates.year = result.year; fieldsFound++; }
+        if (result.make) { updates.make = result.make; fieldsFound++; }
+        if (result.model) { updates.model = result.model; fieldsFound++; }
+        if (result.vin) { updates.vin = result.vin; fieldsFound++; }
+        
+        setFormData(prev => ({ ...prev, ...updates }));
+      }
+      
+      // Show success with what was found
+      if (fieldsFound > 0) {
+        alert(`✓ Title scanned! Found ${fieldsFound} fields.\nCheck details below.`);
+        setActiveSection('details');
+      } else {
+        alert('Title scanned but no data extracted.\nPlease enter details manually.');
+      }
+      
+      // Clean up temp file after a delay
+      setTimeout(async () => {
+        await supabase.storage
+          .from('vehicle-images')
+          .remove([`temp/${fileName}`]);
+      }, 60000); // Clean up after 1 minute
       
     } catch (error) {
       console.error('Title scan error:', error);
-      alert('Title scan failed. Please enter details manually.');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      setError(`Title scan failed: ${errorMsg}`);
+      alert(`❌ Title scan failed\n\n${errorMsg}\n\nPlease enter details manually.`);
     } finally {
       setIsProcessingPhotos(false);
     }
@@ -194,7 +221,7 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
     }
   };
   
-  // SUBMIT HANDLER
+  // SUBMIT HANDLER WITH BATCH UPLOAD
   const handleSubmit = async () => {
     if (!user) {
       alert('Please sign in to add a vehicle');
@@ -224,14 +251,49 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
       
       if (vehicleError) throw vehicleError;
       
-      // Upload photos
+      // Upload photos in batches
       if (photos.length > 0) {
-        for (const photo of photos) {
-          await ImageUploadService.uploadImage(
-            vehicle.id,
-            photo.file,
-            'general'
-          );
+        const BATCH_SIZE = 5; // Upload 5 at a time
+        const totalPhotos = photos.length;
+        let uploaded = 0;
+        let failed = 0;
+        
+        setUploadProgress({ uploaded: 0, total: totalPhotos });
+        
+        for (let i = 0; i < photos.length; i += BATCH_SIZE) {
+          const batch = photos.slice(i, i + BATCH_SIZE);
+          
+          // Upload batch in parallel
+          const uploadPromises = batch.map(async (photo) => {
+            try {
+              const result = await ImageUploadService.uploadImage(
+                vehicle.id,
+                photo.file,
+                'general'
+              );
+              if (result.success) {
+                uploaded++;
+                setUploadProgress({ uploaded, total: totalPhotos });
+              } else {
+                failed++;
+              }
+            } catch (error) {
+              console.error('Upload error:', error);
+              failed++;
+            }
+          });
+          
+          await Promise.all(uploadPromises);
+          
+          // Update progress display
+          setUploadProgress({ uploaded, total: totalPhotos });
+          console.log(`Uploaded ${uploaded}/${totalPhotos} (${failed} failed)`);
+        }
+        
+        setUploadProgress(null);
+        
+        if (failed > 0) {
+          alert(`Uploaded ${uploaded} photos successfully. ${failed} failed.`);
         }
       }
       
@@ -683,7 +745,12 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
               fontWeight: 'bold',
             }}
           >
-            {isSubmitting ? 'Creating...' : `Add Vehicle${photos.length > 0 ? ` + ${photos.length} Photos` : ''}`}
+            {uploadProgress 
+              ? `Uploading ${uploadProgress.uploaded}/${uploadProgress.total}...`
+              : isSubmitting 
+                ? 'Creating...' 
+                : `Add Vehicle${photos.length > 0 ? ` + ${photos.length} Photos` : ''}`
+            }
           </button>
         )}
       </div>
