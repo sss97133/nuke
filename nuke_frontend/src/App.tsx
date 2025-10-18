@@ -57,6 +57,8 @@ import Inbox from './pages/Inbox';
 // import type { BusinessManagement } from './pages/BusinessManagement';
 import BulkPriceEditor from './pages/admin/BulkPriceEditor';
 import PriceCsvImport from './pages/admin/PriceCsvImport';
+import BookService from './pages/BookService';
+import OrderParts from './pages/OrderParts';
 
 
 // Auth components
@@ -224,6 +226,8 @@ function App() {
             <Route path="/dropbox-callback" element={<DropboxCallback />} />
             <Route path="/dropbox-ai-process" element={<DropboxAIProcess />} />
             <Route path="/live-feed" element={<LiveFeed />} />
+            <Route path="/book" element={<BookService />} />
+            <Route path="/order-parts" element={<OrderParts />} />
             
             {/* Vehicle Management */}
             <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />

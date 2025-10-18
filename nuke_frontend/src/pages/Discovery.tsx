@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import AppLayout from '../components/layout/AppLayout';
 import DiscoveryFeed from '../components/feed/DiscoveryFeed';
 import QuickVehicleAdd from '../components/feed/QuickVehicleAdd';
-import LiveStreamFeed from '../components/stream/LiveStreamFeed';
 import '../design-system.css';
 
 interface BuildAnalysisResult {
@@ -37,7 +36,6 @@ const Discovery: React.FC = () => {
   const [viewMode, setViewMode] = useState<'gallery' | 'compact' | 'technical'>('gallery');
   const [denseModeEnabled, setDenseModeEnabled] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | undefined>();
-  const showStreams = (import.meta as any)?.env?.VITE_SHOW_STREAMS !== '0';
 
   // Check authentication status
   useEffect(() => {
@@ -100,68 +98,7 @@ const Discovery: React.FC = () => {
                 <div className="text-small text-muted">
                   {stats.totalVehicles} vehicles • {stats.totalUsers} members • {stats.recentlyAdded} added this week
                 </div>
-                <div className="flex items-center" style={{ gap: '2px' }}>
-                  <button
-                    className={`button ${viewMode === 'gallery' ? 'button-primary' : 'button-secondary'}`}
-                    onClick={() => {
-                      if (viewMode === 'gallery') {
-                        setDenseModeEnabled(!denseModeEnabled);
-                      } else {
-                        setViewMode('gallery');
-                        setDenseModeEnabled(false);
-                      }
-                    }}
-                    style={{ 
-                      padding: '3px 6px',
-                      fontSize: '8pt',
-                      minWidth: '24px',
-                      height: '20px'
-                    }}
-                    title={viewMode === 'gallery' && denseModeEnabled ? "Gallery (Dense)" : "Gallery"}
-                  >
-                    {viewMode === 'gallery' ? (denseModeEnabled ? 'Gallery*' : 'Gallery') : 'Gallery'}
-                  </button>
-                  <button
-                    className={`button ${viewMode === 'compact' ? 'button-primary' : 'button-secondary'}`}
-                    onClick={() => {
-                      if (viewMode === 'compact') {
-                        setDenseModeEnabled(!denseModeEnabled);
-                      } else {
-                        setViewMode('compact');
-                        setDenseModeEnabled(false);
-                      }
-                    }}
-                    style={{ 
-                      padding: '3px 6px',
-                      fontSize: '8pt',
-                      minWidth: '24px',
-                      height: '20px'
-                    }}
-                    title={viewMode === 'compact' && denseModeEnabled ? "Compact (Dense)" : "Compact"}
-                  >
-                    {viewMode === 'compact' ? (denseModeEnabled ? 'Compact*' : 'Compact') : 'Compact'}
-                  </button>
-                  <button
-                    className={`button ${viewMode === 'technical' ? 'button-primary' : 'button-secondary'}`}
-                    onClick={() => {
-                      if (viewMode === 'technical') {
-                        setDenseModeEnabled(!denseModeEnabled);
-                      } else {
-                        setViewMode('technical');
-                        setDenseModeEnabled(false);
-                      }
-                    }}
-                    style={{ 
-                      padding: '3px 6px',
-                      fontSize: '8pt',
-                      minWidth: '24px',
-                      height: '20px'
-                    }}
-                    title={viewMode === 'technical' && denseModeEnabled ? "Technical (Dense)" : "Technical"}
-                  >
-                    {viewMode === 'technical' ? (denseModeEnabled ? 'Technical*' : 'Technical') : 'Technical'}
-                  </button>
-                </div>
+                <div />
               </div>
             </div>
           </div>
@@ -170,12 +107,6 @@ const Discovery: React.FC = () => {
 
         {/* Content Area */}
         <section className="section">
-          {/* Live Streams */}
-          {showStreams && (
-            <div style={{ marginBottom: '12px' }}>
-              <LiveStreamFeed />
-            </div>
-          )}
 
           <DiscoveryFeed
             viewMode={viewMode}
