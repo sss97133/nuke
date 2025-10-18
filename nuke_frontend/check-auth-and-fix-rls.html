@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Auth & Fix RLS</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Authentication & RLS Debug Tool</h1>
+    
+    <div style="margin: 20px 0;">
+        <h2>Step 1: Check Current User</h2>
+        <button onclick="checkCurrentUser()">Check Authentication Status</button>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <h2>Step 2: Sign In (if needed)</h2>
+        <input type="email" id="email" placeholder="Email" style="margin: 5px;">
+        <input type="password" id="password" placeholder="Password" style="margin: 5px;">
+        <button onclick="signIn()">Sign In</button>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <h2>Step 3: Test Vehicle Insert</h2>
+        <button onclick="testInsert()">Test Insert as Authenticated User</button>
+    </div>
+    
+    <div style="margin: 20px 0; padding: 20px; background: #f0f0f0;">
+        <h2>SQL Commands to Fix RLS (Run in Supabase SQL Editor)</h2>
+        <pre style="background: white; padding: 10px; overflow-x: auto;">
+-- 1. First, check current RLS policies
+SELECT 
+    policyname,
+    cmd,
+    qual,
+    with_check
+FROM pg_policies 
+WHERE tablename = 'vehicles';
+
+-- 2. Drop existing INSERT policies that might be blocking
+DROP POLICY IF EXISTS "Users can insert their own vehicles" ON public.vehicles;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.vehicles;
+DROP POLICY IF EXISTS "Users can create vehicles" ON public.vehicles;
+
+-- 3. Create a new INSERT policy for authenticated users
+CREATE POLICY "Authenticated users can insert vehicles" 
+ON public.vehicles 
+FOR INSERT 
+TO authenticated 
+WITH CHECK (auth.uid() IS NOT NULL);
+
+-- 4. Ensure user_id is set automatically (if column exists)
+-- Check if user_id column exists first
+SELECT column_name, data_type, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'vehicles' 
+AND column_name IN ('user_id', 'uploaded_by', 'discovered_by', 'owner_id');
+
+-- 5. If user_id exists and needs a default value, set it
+-- ALTER TABLE public.vehicles 
+-- ALTER COLUMN user_id SET DEFAULT auth.uid();
+
+-- 6. Verify RLS is enabled
+ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+
+-- 7. Check all policies again to confirm
+SELECT * FROM pg_policies WHERE tablename = 'vehicles';
+        </pre>
+    </div>
+    
+    <pre id="output" style="background: #f9f9f9; padding: 10px; min-height: 200px;"></pre>
+
+    <script>
+        const SUPABASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk';
+        
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message, isError = false) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = isError ? '❌' : '✅';
+            output.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+        }
+        
+        async function checkCurrentUser() {
+            log('Checking current authentication status...');
+            
+            const { data: { user }, error } = await supabaseClient.auth.getUser();
+            
+            if (error) {
+                log(`Auth error: ${error.message}`, true);
+                return;
+            }
+            
+            if (user) {
+                log(`Authenticated as: ${user.email}`);
+                log(`User ID: ${user.id}`);
+                log(`Role: ${user.role || 'authenticated'}`);
+            } else {
+                log('Not authenticated - please sign in', true);
+            }
+        }
+        
+        async function signIn() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                log('Please enter email and password', true);
+                return;
+            }
+            
+            log('Attempting to sign in...');
+            
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+            
+            if (error) {
+                log(`Sign in failed: ${error.message}`, true);
+            } else {
+                log(`Signed in successfully as: ${data.user.email}`);
+                log(`User ID: ${data.user.id}`);
+            }
+        }
+        
+        async function testInsert() {
+            log('Testing vehicle insert...');
+            
+            // First check if we're authenticated
+            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+            
+            if (authError || !user) {
+                log('Not authenticated - please sign in first', true);
+                return;
+            }
+            
+            log(`Authenticated as: ${user.email}`);
+            
+            // Minimal test vehicle
+            const testVehicle = {
+                make: 'Test',
+                model: 'Vehicle',
+                year: 2024,
+                is_public: true
+            };
+            
+            log(`Attempting insert with: ${JSON.stringify(testVehicle)}`);
+            
+            const { data, error } = await supabaseClient
+                .from('vehicles')
+                .insert([testVehicle])
+                .select();
+            
+            if (error) {
+                log(`Insert failed: ${error.message}`, true);
+                log(`Error code: ${error.code}`, true);
+                log(`Error hint: ${error.hint || 'none'}`, true);
+                log(`Error details: ${error.details || 'none'}`, true);
+                
+                if (error.message.includes('row-level security')) {
+                    log('⚠️ RLS Policy Issue - Run the SQL commands above in Supabase Dashboard', true);
+                }
+            } else {
+                log(`Success! Vehicle created with ID: ${data[0].id}`);
+                log(`Full response: ${JSON.stringify(data[0])}`);
+                
+                // Clean up test vehicle
+                const { error: deleteError } = await supabaseClient
+                    .from('vehicles')
+                    .delete()
+                    .eq('id', data[0].id);
+                    
+                if (deleteError) {
+                    log(`Could not delete test vehicle: ${deleteError.message}`, true);
+                } else {
+                    log('Test vehicle cleaned up');
+                }
+            }
+        }
+        
+        // Check auth status on load
+        window.onload = () => {
+            checkCurrentUser();
+        };
+    </script>
+</body>
+</html>

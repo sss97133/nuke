@@ -324,14 +324,14 @@ export class TimelineEventService {
 
       const eventData: any = {
         vehicle_id: vehicleId,
-        user_id: user?.id,
+        // Note: user_id is set automatically by RLS
         event_type: 'photo_session',
         source: 'user_upload',
         event_date: new Date(eventDate).toISOString().split('T')[0],
         title,
         description,
         metadata,
-        documentation_urls: photos.map(p => p.imageUrl)
+        image_urls: photos.map(p => p.imageUrl)  // Changed from documentation_urls to image_urls
       };
 
       const { error } = await supabase
@@ -358,7 +358,19 @@ export class TimelineEventService {
       // Extract meaningful data from EXIF for timeline event
       // Prefer explicit dateTaken, then EXIF DateTimeOriginal/dateTime, else now
       const rawDate = imageMetadata?.dateTaken || imageMetadata?.DateTimeOriginal || imageMetadata?.dateTime;
-      const eventDate = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
+      let eventDate: string;
+      
+      // Handle different date formats safely
+      if (rawDate instanceof Date) {
+        // If it's already a Date object, check if it's valid
+        eventDate = !isNaN(rawDate.getTime()) ? rawDate.toISOString() : new Date().toISOString();
+      } else if (rawDate) {
+        // Try to parse string date
+        const parsedDate = new Date(rawDate);
+        eventDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : new Date().toISOString();
+      } else {
+        eventDate = new Date().toISOString();
+      }
 
       // Determine event title based on available metadata
       let title = 'Photo Added';
@@ -506,7 +518,7 @@ export class TimelineEventService {
         description: `${vehicleData.year} ${vehicleData.make} ${vehicleData.model} profile created${initialImages?.length ? ` with ${initialImages.length} photo${initialImages.length > 1 ? 's' : ''}` : ''}`,
         confidence_score: 100,
         metadata,
-        documentation_urls: initialImages || []
+        image_urls: initialImages || []  // Changed from documentation_urls to image_urls
       };
 
       const { error: createErr } = await supabase
