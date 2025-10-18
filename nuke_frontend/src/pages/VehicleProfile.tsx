@@ -98,6 +98,7 @@ const VehicleProfile: React.FC = () => {
   const [bookmarklets, setBookmarklets] = useState<{ key: string; label: string; href: string }[]>([]);
   const [composeText, setComposeText] = useState<{ title: string; description: string; specs: string[] }>({ title: '', description: '', specs: [] });
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   
   // Detect mobile device
   const [isMobile, setIsMobile] = useState(false);
@@ -228,11 +229,27 @@ const VehicleProfile: React.FC = () => {
     if (!vehicleId) return;
     console.log('VehicleProfile mounted with vehicleId:', vehicleId);
     checkAuth();
-    loadVehicle();
-    loadTimelineEvents();
     loadOwnershipVerifications();
+    // Don't load vehicle and timeline until we know auth status
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId]);
+  
+  // Check auth before loading vehicle
+  useEffect(() => {
+    const checkInitialAuth = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      setAuthChecked(true);
+    };
+    checkInitialAuth();
+  }, []);
+  
+  useEffect(() => {
+    if (!vehicleId || !authChecked) return;
+    loadVehicle();
+    loadTimelineEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleId, authChecked]);
 
   // Listen for auth state changes
   useEffect(() => {
