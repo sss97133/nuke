@@ -159,18 +159,18 @@ const NotificationCenter = ({ isOpen = true, onClose }: NotificationCenterProps)
 
   const getNotificationIcon = (type: string) => {
     const icons: Record<string, string> = {
-      like: 'LIKE',
-      comment: 'COMMENT',
-      follow: 'FOLLOW',
-      mention: 'MENTION',
-      auction_outbid: 'OUTBID',
-      auction_won: 'WON',
-      auction_ending: 'ENDING',
-      stream_live: 'LIVE',
-      build_milestone: 'MILESTONE',
-      system: 'SYSTEM'
+      like: '❤️',
+      comment: '💬',
+      follow: '👤',
+      mention: '📢',
+      auction_outbid: '🔨',
+      auction_won: '🏆',
+      auction_ending: '⏰',
+      stream_live: '📺',
+      build_milestone: '🎯',
+      system: '🔔'
     };
-    return icons[type] || 'NOTIFICATION';
+    return icons[type] || '📋';
   };
 
   if (!isOpen) return null;
@@ -200,7 +200,7 @@ const NotificationCenter = ({ isOpen = true, onClose }: NotificationCenterProps)
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <h3 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0' }}>
-            Notifications
+            🔔 Notifications
           </h3>
           {unreadCount > 0 && (
             <div style={{

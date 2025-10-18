@@ -157,11 +157,11 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
 
   const getCommentTypeIcon = (type: string) => {
     switch (type) {
-      case 'vehicle': return 'VEHICLE';
-      case 'image': return 'IMAGE';
-      case 'event': return 'EVENT';
-      case 'data_point': return 'DATA';
-      default: return 'COMMENT';
+      case 'vehicle': return '🚗';
+      case 'image': return '📷';
+      case 'event': return '📅';
+      case 'data_point': return '📊';
+      default: return '💬';
     }
   };
 

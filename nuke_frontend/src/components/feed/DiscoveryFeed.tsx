@@ -40,110 +40,197 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
       const limit = 20;
       const offset = pageNum * limit;
 
-      console.log('Fetching vehicles with filters:', filters, 'searchQuery:', searchQuery);
+      console.log('Fetching content with filters:', filters, 'searchQuery:', searchQuery);
 
-      // Build vehicle query - ONLY VEHICLES, no timeline events or images
-      let vehicleQuery = supabase
-        .from('vehicles')
-        .select(`
-          id,
-          year,
-          make,
-          model,
-          color,
-          description,
-          created_at,
-          uploaded_by,
-          msrp,
-          current_value,
-          purchase_price,
-          asking_price,
-          sale_price,
-          is_for_sale,
-          vehicle_images(
-            image_url
-          )
-        `);
-
-      // Add search filtering if query exists
-      if (searchQuery && searchQuery.trim()) {
-        const searchTerm = searchQuery.trim();
-        vehicleQuery = vehicleQuery.or(`
-          year::text.ilike.%${searchTerm}%,
-          make.ilike.%${searchTerm}%,
-          model.ilike.%${searchTerm}%,
-          color.ilike.%${searchTerm}%,
-          description.ilike.%${searchTerm}%
-        `);
-      }
-
-      const { data: vehicles, error: vehiclesError } = await vehicleQuery
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      console.log('Vehicles response:', { vehicles, vehiclesError, count: vehicles?.length });
-
+      // Build the content query based on filters
       let feedItems: FeedItem[] = [];
 
-      if (!vehiclesError && vehicles) {
-        const vehicleItems: FeedItem[] = vehicles.map(vehicle => ({
-          id: vehicle.id,
-          type: 'vehicle',
-          title: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-          description: vehicle.description || `${vehicle.color} ${vehicle.make} ${vehicle.model}`,
-          image_url: (vehicle.vehicle_images as any)?.[0]?.image_url,
-          user_id: (vehicle as any).uploaded_by || '',
-          user_name: undefined,
-          user_avatar: undefined,
-          created_at: vehicle.created_at,
-          metadata: {
-            year: vehicle.year,
-            make: vehicle.make,
-            model: vehicle.model,
-            color: vehicle.color,
-            msrp: (vehicle as any).msrp,
-            current_value: (vehicle as any).current_value,
-            purchase_price: (vehicle as any).purchase_price,
-            asking_price: (vehicle as any).asking_price,
-            sale_price: (vehicle as any).sale_price,
-            is_for_sale: (vehicle as any).is_for_sale
-          }
-        }));
+      // Fetch timeline events (user actions)
+      if (filters.contentTypes.includes('all') || filters.contentTypes.includes('timeline_event')) {
+        const { data: timelineEvents, error: timelineError } = await supabase
+          .from('timeline_events')
+          .select(`
+            id,
+            title,
+            description,
+            event_type,
+            image_urls,
+            user_id,
+            vehicle_id,
+            created_at,
+            metadata
+          `)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
 
-        // Enrich with price signals
-        try {
-          const ids = vehicles.map((v: any) => v.id);
-          if (ids.length > 0) {
-            const haveMap: Record<string, any> = {};
-            // 1) Cached view
-            const { data: cached, error: mvErr } = await supabase
-              .from('vehicle_price_signal_view')
-              .select('*')
-              .in('vehicle_id', ids);
-            if (!mvErr && Array.isArray(cached)) {
-              (cached as any[]).forEach((s: any) => { if (s?.vehicle_id) haveMap[s.vehicle_id] = s; });
+        if (!timelineError && timelineEvents) {
+          const timelineItems: FeedItem[] = timelineEvents.map(event => ({
+            id: event.id,
+            type: 'timeline_event',
+            title: event.title || `${event.event_type} Event`,
+            description: event.description || '',
+            images: event.image_urls || [],
+            image_url: event.image_urls?.[0],
+            user_id: event.user_id,
+            user_name: undefined,
+            user_avatar: undefined,
+            created_at: event.created_at,
+            metadata: {
+              ...event.metadata,
+              event_type: event.event_type,
+              vehicle_id: event.vehicle_id
             }
-            // 2) RPC for misses
-            const missing = ids.filter((id: string) => !haveMap[id]);
-            if (missing.length > 0) {
-              const { data: fresh, error: rpcErr } = await supabase.rpc('vehicle_price_signal', { vehicle_ids: missing });
-              if (!rpcErr && Array.isArray(fresh)) {
-                (fresh as any[]).forEach((s: any) => { if (s?.vehicle_id) haveMap[s.vehicle_id] = s; });
-              }
-            }
-            // 3) Attach
-            vehicleItems.forEach(it => {
-              const s = haveMap[it.id];
-              if (s) {
-                (it as any).metadata.priceSignal = s;
-              }
-            });
-          }
-        } catch (e) {
-          console.debug('price signal enrichment skipped:', e);
+          }));
+          feedItems.push(...timelineItems);
         }
-        feedItems = vehicleItems;
       }
+
+      // Fetch recent vehicles
+      if (filters.contentTypes.includes('all') || filters.contentTypes.includes('vehicle')) {
+        console.log('Fetching vehicles...');
+
+        let vehicleQuery = supabase
+          .from('vehicles')
+          .select(`
+            id,
+            year,
+            make,
+            model,
+            color,
+            description,
+            created_at,
+            uploaded_by,
+            msrp,
+            current_value,
+            purchase_price,
+            asking_price,
+            sale_price,
+            is_for_sale,
+            vehicle_images(
+              image_url
+            )
+          `);
+
+        // Add search filtering if query exists
+        if (searchQuery && searchQuery.trim()) {
+          const searchTerm = searchQuery.trim();
+          vehicleQuery = vehicleQuery.or(`
+            year::text.ilike.%${searchTerm}%,
+            make.ilike.%${searchTerm}%,
+            model.ilike.%${searchTerm}%,
+            color.ilike.%${searchTerm}%,
+            description.ilike.%${searchTerm}%
+          `);
+        }
+
+        const { data: vehicles, error: vehiclesError } = await vehicleQuery
+          .order('created_at', { ascending: false })
+          .range(Math.floor(offset/2), Math.floor(offset/2) + Math.floor(limit/2) - 1);
+
+        console.log('Vehicles response:', { vehicles, vehiclesError, count: vehicles?.length });
+
+        if (!vehiclesError && vehicles) {
+          const vehicleItems: FeedItem[] = vehicles.map(vehicle => ({
+            id: vehicle.id,
+            type: 'vehicle',
+            title: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+            description: vehicle.description || `${vehicle.color} ${vehicle.make} ${vehicle.model}`,
+            image_url: (vehicle.vehicle_images as any)?.[0]?.image_url,
+            user_id: (vehicle as any).uploaded_by || '',
+            user_name: undefined,
+            user_avatar: undefined,
+            created_at: vehicle.created_at,
+            metadata: {
+              year: vehicle.year,
+              make: vehicle.make,
+              model: vehicle.model,
+              color: vehicle.color,
+              msrp: (vehicle as any).msrp,
+              current_value: (vehicle as any).current_value,
+              purchase_price: (vehicle as any).purchase_price,
+              asking_price: (vehicle as any).asking_price,
+              sale_price: (vehicle as any).sale_price,
+              is_for_sale: (vehicle as any).is_for_sale
+            }
+          }));
+
+          // Enrich with materialized view first, then RPC for misses (best-effort)
+          try {
+            const ids = vehicles.map((v: any) => v.id);
+            if (ids.length > 0) {
+              const haveMap: Record<string, any> = {};
+              // 1) Cached view
+              const { data: cached, error: mvErr } = await supabase
+                .from('vehicle_price_signal_view')
+                .select('*')
+                .in('vehicle_id', ids);
+              if (!mvErr && Array.isArray(cached)) {
+                (cached as any[]).forEach((s: any) => { if (s?.vehicle_id) haveMap[s.vehicle_id] = s; });
+              }
+              // 2) RPC for misses
+              const missing = ids.filter((id: string) => !haveMap[id]);
+              if (missing.length > 0) {
+                const { data: fresh, error: rpcErr } = await supabase.rpc('vehicle_price_signal', { vehicle_ids: missing });
+                if (!rpcErr && Array.isArray(fresh)) {
+                  (fresh as any[]).forEach((s: any) => { if (s?.vehicle_id) haveMap[s.vehicle_id] = s; });
+                }
+              }
+              // 3) Attach
+              vehicleItems.forEach(it => {
+                const s = haveMap[it.id];
+                if (s) {
+                  (it as any).metadata.priceSignal = s; // camelCase for UI
+                }
+              });
+            }
+          } catch (e) {
+            console.debug('price signal enrichment skipped:', e);
+          }
+          feedItems.push(...vehicleItems);
+        }
+      }
+
+      // Fetch recent images with engagement
+      if (filters.contentTypes.includes('all') || filters.contentTypes.includes('image')) {
+        const { data: images, error: imagesError } = await supabase
+          .from('vehicle_images')
+          .select(`
+            id,
+            vehicle_id,
+            image_url,
+            description,
+            uploaded_by,
+            created_at,
+            gps_latitude,
+            gps_longitude
+          `)
+          .order('created_at', { ascending: false })
+          .range(Math.floor(offset/3), Math.floor(offset/3) + Math.floor(limit/3) - 1);
+
+        if (!imagesError && images) {
+          const imageItems: FeedItem[] = images.map(image => ({
+            id: image.id,
+            type: 'image',
+            title: 'Vehicle Image',
+            description: image.description || 'New vehicle image shared',
+            image_url: image.image_url,
+            user_id: (image as any).uploaded_by || '',
+            user_name: undefined,
+            user_avatar: undefined,
+            location: image.gps_latitude && image.gps_longitude ? {
+              lat: image.gps_latitude,
+              lng: image.gps_longitude
+            } : undefined,
+            created_at: image.created_at,
+            engagement: undefined,
+            metadata: { vehicle_id: (image as any).vehicle_id }
+          }));
+          feedItems.push(...imageItems);
+        }
+      }
+
+      // Sort all items by created_at
+      feedItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       if (reset) {
         setItems(feedItems);

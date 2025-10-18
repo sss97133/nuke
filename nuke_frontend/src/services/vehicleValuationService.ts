@@ -64,11 +64,8 @@ export class VehicleValuationService {
 
     try {
       // Try AI-powered valuation first (most accurate)
-      console.log('Calling AI valuation for vehicle:', vehicleId);
       const { data: aiValuation, error: aiError } = await supabase
         .rpc('calculate_ai_vehicle_valuation', { p_vehicle_id: vehicleId });
-
-      console.log('AI valuation result:', { data: aiValuation, error: aiError });
 
       if (!aiError && aiValuation && aiValuation.length > 0) {
         const av = aiValuation[0];

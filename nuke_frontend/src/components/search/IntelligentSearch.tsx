@@ -495,7 +495,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
               minWidth: '50px'
             }}
           >
-            {isSearching ? 'SEARCHING' : 'SEARCH'}
+            {isSearching ? '⏳' : '🔍'}
           </button>
         </div>
       </form>
@@ -534,7 +534,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                 >
-                  SEARCH {suggestion}
+                  🔍 {suggestion}
                 </div>
               ))}
             </div>

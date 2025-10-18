@@ -421,7 +421,7 @@ const AllVehicles: React.FC = () => {
                                   style={{width: `${calculateHype(vehicle)}%`}}
                                   title={`Hype: ${calculateHype(vehicle)}%`}
                                 ></div>
-                                <span className="hype-text">HOT</span>
+                                <span className="hype-text">🔥</span>
                               </div>
 
                               {/* Date (smart formatting) */}

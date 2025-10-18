@@ -37,11 +37,11 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
 
   const getVerificationIcon = (level: string) => {
     switch (level) {
-      case 'expert_verified': return 'EXPERT';
-      case 'business_verified': return 'BUSINESS';
-      case 'phone_verified': return 'PHONE';
-      case 'email_verified': return 'EMAIL';
-      default: return 'USER';
+      case 'expert_verified': return '🏆';
+      case 'business_verified': return '✅';
+      case 'phone_verified': return '📱';
+      case 'email_verified': return '📧';
+      default: return '👤';
     }
   };
 
@@ -98,7 +98,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
         alignItems: 'center',
         color: '#9ca3af'
       }}>
-        New User
+        👤 New User
       </div>
     );
   }
@@ -131,7 +131,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
         gap: '4px',
         fontWeight: 'bold'
       }}>
-        <span>RATING</span>
+        <span>⭐</span>
         <span>{userRating.trust_level}</span>
       </div>
 
@@ -164,7 +164,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
           gap: '4px',
           fontWeight: 'bold'
         }}>
-          <span>SCORE</span>
+          <span>📈</span>
           <span>{userRating.contribution_score}</span>
         </div>
       )}

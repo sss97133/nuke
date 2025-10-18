@@ -694,7 +694,7 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
                 </div>
               )}
               {imageMetadata.some(m => m.dateTaken) ? (
-                <div className="text-green-600">VERIFIED Date range: {
+                <div className="text-green-600">✅ Date range: {
                   imageMetadata
                     .filter(m => m.dateTaken)
                     .map(m => m.dateTaken!.toLocaleDateString())
@@ -705,23 +705,23 @@ const AddEventWizard: React.FC<AddEventWizardProps> = ({
               )}
               
               {imageMetadata.some(m => m.location) ? (
-                <div className="text-green-600">VERIFIED GPS coordinates found in {imageMetadata.filter(m => m.location).length} photos</div>
+                <div className="text-green-600">✅ GPS coordinates found in {imageMetadata.filter(m => m.location).length} photos</div>
               ) : (
-                <div className="text-orange-600">WARNING No GPS location data found in photos</div>
+                <div className="text-orange-600">⚠️ No GPS location data found in photos</div>
               )}
               
               {imageMetadata.some(m => m.camera) ? (
-                <div className="text-green-600">VERIFIED Camera: {imageMetadata.find(m => m.camera)?.camera?.make} {imageMetadata.find(m => m.camera)?.camera?.model}</div>
+                <div className="text-green-600">✅ Camera: {imageMetadata.find(m => m.camera)?.camera?.make} {imageMetadata.find(m => m.camera)?.camera?.model}</div>
               ) : (
-                <div className="text-gray-500">INFO No camera information found</div>
+                <div className="text-gray-500">ℹ️ No camera information found</div>
               )}
               
               <div className="mt-2 pt-2 border-t border-gray-200">
                 <div className="text-xs text-gray-500">
-                  Processed {imageMetadata.length} image{imageMetadata.length !== 1 ? 's' : ''}
+                  📊 Processed {imageMetadata.length} image{imageMetadata.length !== 1 ? 's' : ''}
                   {!imageMetadata.some(m => m.dateTaken || m.location) && (
                     <div className="mt-1 text-orange-600">
-                      Tip: For best results, use photos taken with a smartphone or camera that includes EXIF data
+                      💡 Tip: For best results, use photos taken with a smartphone or camera that includes EXIF data
                     </div>
                   )}
                 </div>

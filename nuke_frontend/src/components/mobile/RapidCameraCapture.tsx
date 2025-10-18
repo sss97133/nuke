@@ -243,7 +243,7 @@ const RapidCameraCapture: React.FC = () => {
           transition: 'all 0.2s'
         }}
       >
-        {isCapturing ? 'CAPTURING' : 'CAMERA'}
+        {isCapturing ? '⏳' : '📷'}
       </button>
 
       {/* Hidden file input with camera capture */}

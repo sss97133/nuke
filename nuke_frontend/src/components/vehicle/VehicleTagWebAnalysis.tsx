@@ -257,7 +257,7 @@ const VehicleTagWebAnalysis: React.FC<VehicleTagWebAnalysisProps> = ({ vehicleId
             className={`tab-button ${activeTab === 'automotive' ? 'active' : ''}`}
             onClick={() => setActiveTab('automotive')}
           >
-            Automotive
+            🚗 Automotive
           </button>
         </div>
 
@@ -329,7 +329,7 @@ const VehicleTagWebAnalysis: React.FC<VehicleTagWebAnalysisProps> = ({ vehicleId
                 <div key={tag.label} className="automotive-tag-item">
                   <div className="automotive-rank">#{index + 1}</div>
                   <div className="automotive-info">
-                    <div className="automotive-label">AUTO {tag.label}</div>
+                    <div className="automotive-label">🚗 {tag.label}</div>
                     <div className="automotive-stats">
                       {tag.count} occurrences • {(tag.strength_score * 100).toFixed(1)}% strength
                     </div>

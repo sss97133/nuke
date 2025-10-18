@@ -10,9 +10,7 @@ import CommentPopup from '../components/CommentPopup';
 import CommentingGuide from '../components/CommentingGuide';
 import VehicleDataEditor from '../components/vehicle/VehicleDataEditor';
 import VehicleStats from '../components/vehicle/VehicleStats';
-import VehicleMarketIntelligence from '../components/vehicle/VehicleMarketIntelligence';
 import VehicleDocumentManager from '../components/VehicleDocumentManager';
-import BlueGlowIcon from '../components/ui/BlueGlowIcon';
 import PurchaseAgreementManager from '../components/PurchaseAgreementManager';
 import ConsignerManagement from '../components/ConsignerManagement';
 import ReceiptManager from '../components/vehicle/ReceiptManager';
@@ -100,7 +98,6 @@ const VehicleProfile: React.FC = () => {
   const [bookmarklets, setBookmarklets] = useState<{ key: string; label: string; href: string }[]>([]);
   const [composeText, setComposeText] = useState<{ title: string; description: string; specs: string[] }>({ title: '', description: '', specs: [] });
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; city?: string; state?: string } | undefined>();
   
   // Detect mobile device
   const [isMobile, setIsMobile] = useState(false);
@@ -113,24 +110,11 @@ const VehicleProfile: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Get user's geolocation for regional market data
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          // Optionally reverse geocode to get city/state
-          // For now just storing coordinates
-        },
-        (error) => {
-          console.log('Geolocation not available:', error);
-        }
-      );
-    }
-  }, []);
+  
+  // If mobile, use mobile-optimized version - moved after all hooks
+  if (isMobile && vehicleId) {
+    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
+  }
 
   // Calculate true legal ownership - requires verified title + matching legal ID
   const isVerifiedOwner = React.useMemo(() => {
@@ -145,11 +129,6 @@ const VehicleProfile: React.FC = () => {
 
     return hasVerifiedOwnership;
   }, [session?.user?.id, vehicle?.id, ownershipVerifications]);
-
-  // If mobile, use mobile-optimized version - moved after all hooks but before data loading
-  if (isMobile && vehicleId) {
-    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
-  }
 
   // Legacy database uploader check (IMPORTANT: This is NOT ownership, just who uploaded)
   const isDbUploader = session?.user?.id === vehicle?.uploaded_by;
@@ -1148,19 +1127,6 @@ const VehicleProfile: React.FC = () => {
           totalEvents={timelineEvents.length}
         />
 
-        {/* Market Intelligence Section */}
-        <VehicleMarketIntelligence
-          vehicle={{
-            id: vehicle.id,
-            year: vehicle.year,
-            make: vehicle.make,
-            model: vehicle.model,
-            vin: vehicle.vin || undefined,
-            current_value: vehicle.current_value
-          }}
-          userLocation={userLocation}
-        />
-
         {/* Hero Image Section */}
         <VehicleHeroImage leadImageUrl={leadImageUrl} />
 
@@ -1241,13 +1207,10 @@ const VehicleProfile: React.FC = () => {
               {/* Enhanced Photo Tagging System */}
               {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
                 <div id="image-tagging" className="card">
-                  <div className="card-header">
-                    <BlueGlowIcon size={16} style={{ marginRight: '8px', display: 'inline-block', verticalAlign: 'middle' }} />
-                    Image Tagging & AI Validation
-                  </div>
+                  <div className="card-header">🏷️ Image Tagging & AI Validation</div>
                   <div className="card-body">
                     <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
-                      Tag vehicle components, damage, or features. AI tags show as AI (validate them), manual tags as USER.
+                      Tag vehicle components, damage, or features. AI tags show as 🤖 (validate them), manual tags as 👤.
                       Click and drag to create bounding boxes or click to place point tags.
                     </p>
                     <EnhancedImageTagger

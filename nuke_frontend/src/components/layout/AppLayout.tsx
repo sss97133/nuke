@@ -113,6 +113,117 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
   return (
     <div className="app-layout compact win95">
+      {/* Main Navigation Header */}
+      <header className="app-header" style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 100
+      }}>
+        <div className="header-content">
+          <div className="header-left">
+            <Link to="/" className="logo">
+              <span className="logo-text">Nuke</span>
+            </Link>
+            
+            {/* Desktop Navigation */}
+            <nav className="main-nav desktop-nav">
+              <Link 
+                to="/dashboard" 
+                className={`nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
+              >
+                Dashboard
+              </Link>
+              <Link 
+                to="/vehicles" 
+                className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
+              >
+                Vehicles
+              </Link>
+              <Link 
+                to={orgNavPath}
+                className={`nav-link ${isActivePage('/shops') ? 'active' : ''}`}
+              >
+                Organizations
+              </Link>
+            </nav>
+          </div>
+
+          <div className="header-right">
+            <button 
+              className="mobile-menu-button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              style={{ display: 'none' }}
+            >
+              ☺
+            </button>
+
+            {/* Upload Indicator - Windows 95 style */}
+            <GlobalUploadIndicator />
+
+            {/* Notifications */}
+            {session ? <NotificationBell /> : null}
+
+            {session ? (
+              <>
+              <Link to="/inbox" className="nav-link">Inbox</Link>
+              <Link to="/profile" className="profile-bubble">
+                {userProfile?.avatar_url ? (
+                  <img
+                    src={userProfile.avatar_url}
+                    className="profile-image"
+                  />
+                ) : (
+                  <div className="profile-initials">
+                    {session.user?.email?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                )}
+                Profile
+              </Link>
+              </>
+            ) : (
+              <Link to="/login" className="button button-primary">
+                Login
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Navigation Menu */}
+        {mobileMenuOpen && (
+          <nav className="mobile-nav">
+            <Link 
+              to="/dashboard" 
+              className={`mobile-nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Dashboard
+            </Link>
+            <Link 
+              to="/vehicles" 
+              className={`mobile-nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Vehicles
+            </Link>
+            <Link 
+              to="/shops" 
+              className={`mobile-nav-link ${isActivePage('/shops') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Organizations
+            </Link>
+            {session && (
+              <Link 
+                to="/profile" 
+                className="mobile-nav-link"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Profile
+              </Link>
+            )}
+          </nav>
+        )}
+      </header>
 
       {/* Page Header with Title and Actions */}
       {(title || breadcrumbs || showBackButton || primaryAction) && (
