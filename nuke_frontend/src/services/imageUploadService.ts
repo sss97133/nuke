@@ -221,6 +221,12 @@ export class ImageUploadService {
         // Don't fail the entire upload if timeline event creation fails
       }
 
+      // Trigger AI analysis in background (non-blocking)
+      // This happens async after upload completes so user doesn't wait
+      if (isImage) {
+        this.triggerBackgroundAIAnalysis(urlData.publicUrl, vehicleId, dbResult.id);
+      }
+
       return {
         success: true,
         imageId: dbResult.id,
@@ -230,6 +236,30 @@ export class ImageUploadService {
     } catch (error: any) {
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Trigger background AI analysis (non-blocking)
+   * This runs async so upload feels fast
+   */
+  private static triggerBackgroundAIAnalysis(imageUrl: string, vehicleId: string, imageId: string): void {
+    // Fire and forget - don't await this
+    supabase.functions.invoke('auto-analyze-upload', {
+      body: {
+        image_url: imageUrl,
+        vehicle_id: vehicleId,
+        image_id: imageId,
+        trigger_source: 'upload'
+      }
+    }).then(({ data, error }) => {
+      if (error) {
+        console.warn('Background AI analysis trigger failed:', error);
+      } else {
+        console.log('Background AI analysis triggered successfully for:', imageId);
+      }
+    }).catch(err => {
+      console.warn('Background AI analysis request failed:', err);
+    });
   }
 
   /**

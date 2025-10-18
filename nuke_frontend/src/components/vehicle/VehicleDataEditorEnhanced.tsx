@@ -3,7 +3,7 @@ import {
   X, Save, ChevronDown, ChevronUp, Wand2, Upload, 
   Calendar, MapPin, Ruler, Car, AlertCircle, Image as ImageIcon 
 } from 'lucide-react';
-import type { BulkImageUploader } from './BulkImageUploader';
+import { BulkImageUploader } from './BulkImageUploader';
 import type { VehicleSpecService } from '@/services/vehicleSpecService';
 
 interface VehicleDataEditorEnhancedProps {
