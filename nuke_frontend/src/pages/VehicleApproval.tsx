@@ -116,7 +116,7 @@ const VehicleApproval: React.FC = () => {
       // Create approved vehicle record
       const approvedFields = fieldApprovals.filter(f => f.isApproved);
       const vehicleData: any = {
-        owner_id: session?.user?.id,
+        // Note: Do NOT include user_id/owner_id - it's set automatically by the database via auth context
         data_source: 'ai_approved',
         extraction_id: extractionId
       };

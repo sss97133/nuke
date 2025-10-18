@@ -290,8 +290,8 @@ const AddVehicle: React.FC = () => {
       ];
       
       // Filter formData to only include valid columns
+      // Note: Do NOT include user_id - it's set automatically by the database via auth context
       const vehicleData: any = {
-        user_id: user.id,
         discovered_by: formData.import_url ? user.id : undefined,
         discovery_source: formData.import_url ? (formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External URL') : undefined,
         discovery_url: formData.import_url || undefined

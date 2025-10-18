@@ -274,7 +274,7 @@ const DropboxAIProcess: React.FC = () => {
           condition: result.extractedData.condition || null,
           description: `Imported from Dropbox folder: ${result.vehicleName}. Images taken by professional photographer for inventory purposes.`,
           is_public: true,
-          user_id: session?.user?.id || null,
+          // Note: Do NOT include user_id - it's set automatically by the database via auth context
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           // Metadata for provenance tracking
