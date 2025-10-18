@@ -243,7 +243,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
               .getPublicUrl(originalPath);
 
             // Save to database with all variant URLs
-            await supabase
+            const { error: insertError } = await supabase
               .from('vehicle_images')
               .insert({
                 vehicle_id: vehicleId,
@@ -258,6 +258,12 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
                 category: 'general',
                 is_primary: i === 0 && allImages.length === 0
               });
+            
+            if (insertError) {
+              console.error('Failed to save image to database:', insertError);
+              setError(`Upload failed: ${insertError.message}. Please check permissions.`);
+              throw insertError;
+            }
           }
         }
 
@@ -272,15 +278,24 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         .order('is_primary', { ascending: false });
 
       setAllImages(refreshedImages || []);
-      // If images are currently displayed, refresh displayed images too
-      if (showImages) {
-        // Temporarily update allImages for sorting
-        const tempAllImages = allImages;
-        setAllImages(refreshedImages || []);
-        const sortedImages = getSortedImages();
-        setAllImages(tempAllImages); // Restore
-        setDisplayedImages(sortedImages.slice(0, Math.max(displayedImages.length, imagesPerPage)));
-      }
+      
+      // Always show images after upload and refresh the display
+      setShowImages(true);
+      
+      // Refresh displayed images with the new uploads
+      const sortedImages = (refreshedImages || []).sort((a: any, b: any) => {
+        if (sortBy === 'primary') {
+          if (a.is_primary && !b.is_primary) return -1;
+          if (!a.is_primary && b.is_primary) return 1;
+          return 0;
+        }
+        const da = new Date(a.taken_at || a.created_at).getTime();
+        const db = new Date(b.taken_at || b.created_at).getTime();
+        return sortBy === 'date_desc' ? db - da : da - db;
+      });
+      
+      setDisplayedImages(sortedImages.slice(0, Math.max(displayedImages.length, imagesPerPage)));
+      
       onImagesUpdated?.();
 
     } catch (error) {
