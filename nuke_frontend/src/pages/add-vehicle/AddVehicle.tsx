@@ -12,6 +12,8 @@ import VehicleFormFields from './components/VehicleFormFields';
 import VerificationProgress from './components/VerificationProgress';
 import type { VehicleFormData, DetailLevel, ImageUploadProgress, ImageUploadStatus } from './types/index';
 import { extractImageMetadata, reverseGeocode, getEventDateFromImages, getEventLocationFromImages, type ImageMetadata } from '../../utils/imageMetadata';
+import { MobileAddVehicle } from '../../components/mobile/MobileAddVehicle';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface AddVehicleProps {
   mode?: 'modal' | 'page';
@@ -24,6 +26,17 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   onClose,
   onSuccess 
 }) => {
+  const isMobile = useIsMobile();
+  
+  // If mobile, use mobile-optimized version
+  if (isMobile) {
+    return (
+      <MobileAddVehicle 
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
+    );
+  }
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
 

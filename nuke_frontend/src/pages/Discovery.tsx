@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import AppLayout from '../components/layout/AppLayout';
 import DiscoveryFeed from '../components/feed/DiscoveryFeed';
 import AddVehicle from './add-vehicle/AddVehicle';
+import { MobileAddVehicle } from '../components/mobile/MobileAddVehicle';
+import { useIsMobile } from '../hooks/useIsMobile';
 import '../design-system.css';
 
 interface BuildAnalysisResult {
@@ -26,6 +28,7 @@ interface BuildAnalysisResult {
 }
 
 const Discovery: React.FC = () => {
+  const isMobile = useIsMobile();
   const [session, setSession] = useState<any>(null);
   const [stats, setStats] = useState({
     totalVehicles: 0,
@@ -129,15 +132,26 @@ const Discovery: React.FC = () => {
 
         {/* Add Vehicle Modal */}
         {session && showAddVehicle && (
-          <AddVehicle
-            mode="modal"
-            onClose={() => setShowAddVehicle(false)}
-            onSuccess={() => {
-              setShowAddVehicle(false);
-              // Refresh the feed when a new vehicle is added
-              window.location.reload();
-            }}
-          />
+          isMobile ? (
+            <MobileAddVehicle
+              onClose={() => setShowAddVehicle(false)}
+              onSuccess={() => {
+                setShowAddVehicle(false);
+                // Refresh the feed when a new vehicle is added
+                window.location.reload();
+              }}
+            />
+          ) : (
+            <AddVehicle
+              mode="modal"
+              onClose={() => setShowAddVehicle(false)}
+              onSuccess={() => {
+                setShowAddVehicle(false);
+                // Refresh the feed when a new vehicle is added
+                window.location.reload();
+              }}
+            />
+          )
         )}
 
       </div>
