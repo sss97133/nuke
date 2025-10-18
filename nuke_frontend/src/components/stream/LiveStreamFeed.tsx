@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
 import '../../design-system.css';
 
 interface StreamFeedItem {
@@ -24,7 +23,6 @@ interface LiveStreamFeedProps {
 }
 
 const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
-  const { user } = useAuth();
   const [streams, setStreams] = useState<StreamFeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<string>('all');
@@ -63,14 +61,14 @@ const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
       supabase.removeChannel(subscription);
       clearInterval(refreshInterval);
     };
-  }, [user, filter]);
+  }, [filter]);
 
   const loadStreams = async () => {
     setLoading(true);
 
     try {
       const { data, error } = await supabase.rpc('get_live_streams_feed', {
-        viewer_user_id: user?.id || null,
+        viewer_user_id: null,
         limit_count: 50,
         offset_count: 0
       });
