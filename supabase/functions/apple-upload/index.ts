@@ -83,6 +83,19 @@ Deno.serve(async (req: Request) => {
       global: { headers: { Authorization: `Bearer ${jwt}` } }
     })
 
+    // CRITICAL: Verify vehicle exists before processing
+    const { data: vehicle, error: vehicleError } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('id', vehicleId)
+      .single()
+    
+    if (vehicleError || !vehicle) {
+      return badRequest(`Vehicle ${vehicleId} does not exist. Create vehicle first before uploading photos.`)
+    }
+
+    console.log(`Vehicle ${vehicleId} verified, proceeding with upload`)
+
     // Extract EXIF from all files
     const filesWithMetadata: FileWithMetadata[] = []
     for (const file of files) {
