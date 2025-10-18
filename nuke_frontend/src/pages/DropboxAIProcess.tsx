@@ -280,7 +280,6 @@ const DropboxAIProcess: React.FC = () => {
           // Metadata for provenance tracking
           import_source: 'dropbox',
           import_folder: result.vehicleName,
-          photographer_type: 'anonymous_professional',
           ai_confidence: result.confidence,
           total_images: result.allImages.length
         };
