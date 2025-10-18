@@ -138,10 +138,9 @@ const QuickVehicleAdd = ({ onVehicleAdded }: QuickVehicleAddProps) => {
           color: formData.color,
           // NOTE: DB uses 'notes' for freeform text; map UI description here
           notes: formData.description || null,
-          // Note: Do NOT include uploaded_by/user_id - it's set automatically by the database via auth context
+          // Note: Do NOT include uploaded_by/user_id/discovered_by - they're set automatically by the database via auth context
           is_public: true,
           source: isContribution ? contributionSource : 'User Submission',
-          discovered_by: isContribution ? user.id : null,
           discovery_source: isContribution ? contributionSource : null,
           discovery_url: isContribution ? (formData.sourceUrl || null) : null
         })

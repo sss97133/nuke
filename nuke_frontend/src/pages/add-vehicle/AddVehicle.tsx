@@ -282,7 +282,7 @@ const AddVehicle: React.FC = () => {
         'auction_source', 'ownership_verified', 'bat_auction_url', 'bat_sold_price',
         'bat_sale_date', 'bat_bid_count', 'bat_view_count', 'is_daily_driver',
         'is_weekend_car', 'is_track_car', 'is_show_car', 'is_project_car', 'is_garage_kept',
-        'discovered_by', 'discovery_source', 'discovery_url', 'bat_listing_title',
+        'discovery_source', 'discovery_url', 'bat_listing_title',
         'bat_bids', 'bat_comments', 'bat_views', 'bat_location', 'bat_seller',
         'sale_status', 'sale_date', 'status', 'completion_percentage', 'displacement',
         'interior_color', 'is_for_sale', 'is_draft', 'entry_type', 'verification_status',
@@ -290,9 +290,8 @@ const AddVehicle: React.FC = () => {
       ];
       
       // Filter formData to only include valid columns
-      // Note: Do NOT include user_id - it's set automatically by the database via auth context
+      // Note: Do NOT include user_id or discovered_by - they're set automatically by the database via auth context
       const vehicleData: any = {
-        discovered_by: formData.import_url ? user.id : undefined,
         discovery_source: formData.import_url ? (formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External URL') : undefined,
         discovery_url: formData.import_url || undefined
       };
