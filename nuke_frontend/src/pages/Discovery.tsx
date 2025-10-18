@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import AppLayout from '../components/layout/AppLayout';
 import DiscoveryFeed from '../components/feed/DiscoveryFeed';
-import QuickVehicleAdd from '../components/feed/QuickVehicleAdd';
+import AddVehicle from './add-vehicle/AddVehicle';
 import '../design-system.css';
 
 interface BuildAnalysisResult {
@@ -36,6 +36,7 @@ const Discovery: React.FC = () => {
   const [viewMode, setViewMode] = useState<'gallery' | 'compact' | 'technical'>('gallery');
   const [denseModeEnabled, setDenseModeEnabled] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | undefined>();
+  const [showAddVehicle, setShowAddVehicle] = useState(false);
 
   // Check authentication status
   useEffect(() => {
@@ -115,10 +116,24 @@ const Discovery: React.FC = () => {
           />
         </section>
 
-        {/* Quick Add Vehicle Floating Button */}
-        {session && (
-          <QuickVehicleAdd
-            onVehicleAdded={() => {
+        {/* Add Vehicle Floating Button */}
+        {session && !showAddVehicle && (
+          <button
+            onClick={() => setShowAddVehicle(true)}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center text-2xl z-40"
+            title="Add Vehicle"
+          >
+            +
+          </button>
+        )}
+
+        {/* Add Vehicle Modal */}
+        {session && showAddVehicle && (
+          <AddVehicle
+            mode="modal"
+            onClose={() => setShowAddVehicle(false)}
+            onSuccess={() => {
+              setShowAddVehicle(false);
               // Refresh the feed when a new vehicle is added
               window.location.reload();
             }}

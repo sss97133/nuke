@@ -13,7 +13,17 @@ import VerificationProgress from './components/VerificationProgress';
 import type { VehicleFormData, DetailLevel, ImageUploadProgress, ImageUploadStatus } from './types/index';
 import { extractImageMetadata, reverseGeocode, getEventDateFromImages, getEventLocationFromImages, type ImageMetadata } from '../../utils/imageMetadata';
 
-const AddVehicle: React.FC = () => {
+interface AddVehicleProps {
+  mode?: 'modal' | 'page';
+  onClose?: () => void;
+  onSuccess?: (vehicleId: string) => void;
+}
+
+const AddVehicle: React.FC<AddVehicleProps> = ({ 
+  mode = 'page',
+  onClose,
+  onSuccess 
+}) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
 
@@ -105,7 +115,59 @@ const AddVehicle: React.FC = () => {
       setScrapingError(null);
       setLastScrapedUrl(url);
 
-      console.log('Scraping BAT URL:', url);
+      // URL DEDUPLICATION CHECK - prevent redundant imports
+      const { data: existingVehicle, error: dupError } = await supabase
+        .from('vehicles')
+        .select('id, make, model, year, discovered_by')
+        .eq('discovery_url', url)
+        .single();
+
+      if (existingVehicle && !dupError) {
+        // This URL was already imported!
+        
+        // Count existing discoverers
+        const { count: discovererCount } = await supabase
+          .from('user_contributions')
+          .select('id', { count: 'exact', head: true })
+          .eq('vehicle_id', existingVehicle.id)
+          .eq('contribution_type', 'discovery');
+
+        const yourRank = (discovererCount || 0) + 1;
+
+        // Credit this user as additional discoverer
+        if (user?.id) {
+          await supabase.from('user_contributions').insert({
+            user_id: user.id,
+            vehicle_id: existingVehicle.id,
+            contribution_type: 'discovery',
+            metadata: { 
+              discovery_url: url,
+              discovery_rank: yourRank,
+              discovered_at: new Date().toISOString()
+            }
+          });
+        }
+
+        // Show notification and navigate to existing vehicle
+        alert(`This vehicle is already in our system!
+
+${existingVehicle.year} ${existingVehicle.make} ${existingVehicle.model}
+
+You're discoverer #${yourRank}! 🎉
+Redirecting to vehicle profile...`);
+
+        setIsScrapingUrl(false);
+        
+        // Navigate to existing vehicle or close modal
+        if (mode === 'modal' && onClose) {
+          onClose();
+        }
+        navigate(`/vehicle/${existingVehicle.id}`);
+        return;
+      }
+
+      // URL is new - proceed with scraping
+      console.log('New URL - scraping data:', url);
 
       // Call Supabase Edge Function (scrape-vehicle)
       const { data: result, error: fnError } = await (supabase as any).functions.invoke('scrape-vehicle', {
@@ -176,13 +238,12 @@ const AddVehicle: React.FC = () => {
     }
   }, [formData.import_url, handleUrlScraping]);
 
-  // Show preview before final submission
+  // Handle submission - no validation, accept anything
   const handleShowPreview = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      return;
-    }
+    // NO VALIDATION - accept whatever user provides
+    // Algorithm will calculate completion % based on what data exists
     
     setShowPreview(true);
   };
@@ -343,8 +404,18 @@ const AddVehicle: React.FC = () => {
         // Clear autosave data
         clearAutosave();
 
-        // Navigate immediately - uploads continue in background
-        navigate(`/vehicle/${vehicleId}`);
+        // Call success callback (for modal mode)
+        if (onSuccess) {
+          onSuccess(vehicleId);
+        }
+
+        // Close modal or navigate
+        if (mode === 'modal' && onClose) {
+          onClose();
+        } else {
+          // Navigate immediately - uploads continue in background
+          navigate(`/vehicle/${vehicleId}`);
+        }
       } else {
         throw new Error('Failed to create vehicle - no data returned');
       }
@@ -443,32 +514,41 @@ const AddVehicle: React.FC = () => {
 
   // Early return if not authenticated
   if (!user) {
-    return (
-      <AppLayout>
-        <div className="container">
-          <div className="section">
-            <div className="card">
-              <div className="card-body text-center">
-                <h2 className="text font-bold mb-4">Authentication Required</h2>
-                <p className="text-muted mb-4">
-                  You must be logged in to add a vehicle to the database.
-                </p>
-                <button
-                  onClick={() => navigate('/login')}
-                  className="button button-primary"
-                >
-                  Sign In
-                </button>
-              </div>
+    const authContent = (
+      <div className="container">
+        <div className="section">
+          <div className="card">
+            <div className="card-body text-center">
+              <h2 className="text font-bold mb-4">Authentication Required</h2>
+              <p className="text-muted mb-4">
+                You must be logged in to add a vehicle to the database.
+              </p>
+              <button
+                onClick={() => navigate('/login')}
+                className="button button-primary"
+              >
+                Sign In
+              </button>
             </div>
           </div>
         </div>
-      </AppLayout>
+      </div>
+    );
+
+    return mode === 'modal' ? (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg max-w-md w-full p-6">
+          {authContent}
+        </div>
+      </div>
+    ) : (
+      <AppLayout>{authContent}</AppLayout>
     );
   }
 
-  return (
-    <AppLayout>
+  // Main form content
+  const formContent = (
+    <>
       {/* Verification Progress Bar */}
       <div style={{
         position: 'sticky',
@@ -875,8 +955,46 @@ const AddVehicle: React.FC = () => {
           </div>
         </div>
       )}
-    </AppLayout>
+    </>
   );
+
+  // Render based on mode
+  if (mode === 'modal') {
+    return (
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && onClose) {
+            onClose();
+          }
+        }}
+      >
+        <div 
+          className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Modal Header */}
+          <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
+            <h2 className="text-xl font-bold">Add Vehicle</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            >
+              ×
+            </button>
+          </div>
+          
+          {/* Modal Content */}
+          <div className="p-6">
+            {formContent}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Page mode - use AppLayout
+  return <AppLayout>{formContent}</AppLayout>;
 };
 
 export default AddVehicle;
