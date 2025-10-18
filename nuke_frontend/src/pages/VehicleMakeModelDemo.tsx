@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import VehicleMakeModelInput from '../components/forms/VehicleMakeModelInput';
 import type { VehicleDataNormalizationService } from '../services/vehicleDataNormalizationService';
 
@@ -16,7 +16,7 @@ const VehicleMakeModelDemo: React.FC = () => {
   };
 
   return (
-    <AppLayout>
+    
       <div className="max-w-4xl mx-auto py-8 px-4">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -175,7 +175,7 @@ const VehicleMakeModelDemo: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
+    
   );
 };
 

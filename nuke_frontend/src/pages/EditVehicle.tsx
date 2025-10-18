@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { vehicleAPI } from '../services/api';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import VehicleMakeModelInput from '../components/forms/VehicleMakeModelInput';
 import { TimelineEventService } from '../services/timelineEventService';
 import '../design-system.css';
@@ -290,17 +290,17 @@ const EditVehicle: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="loading-container">
           <div className="loading-spinner"></div>
           <p>Loading vehicle...</p>
         </div>
-      </AppLayout>
+      
     );
   }
 
   return (
-    <AppLayout>
+    
       <div className="container">
         <div className="section">
           <header className="card-header mb-4">
@@ -912,7 +912,7 @@ const EditVehicle: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
+    
   );
 };
 

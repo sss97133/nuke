@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import { professionalService, type ProfessionalUser, type ProfessionalSearchFilters } from '../services/professionalService';
 
 const BrowseProfessionals: React.FC = () => {
@@ -77,7 +77,7 @@ const BrowseProfessionals: React.FC = () => {
   };
 
   return (
-    <AppLayout>
+    
       <div className="fade-in">
         {/* Page Header */}
         <section className="section">
@@ -259,7 +259,7 @@ const BrowseProfessionals: React.FC = () => {
           )}
         </section>
       </div>
-    </AppLayout>
+    
   );
 };
 

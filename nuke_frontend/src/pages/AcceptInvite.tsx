@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import '../design-system.css';
 
 const AcceptInvite: React.FC = () => {
@@ -103,7 +103,7 @@ const AcceptInvite: React.FC = () => {
   };
 
   return (
-    <AppLayout>
+    
       <div className="container compact">
         <div className="main">
           <div className="card"><div className="card-body">
@@ -124,7 +124,7 @@ const AcceptInvite: React.FC = () => {
           </div></div>
         </div>
       </div>
-    </AppLayout>
+    
   );
 };
 

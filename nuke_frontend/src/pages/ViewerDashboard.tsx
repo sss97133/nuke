@@ -17,7 +17,7 @@ import {
 import type { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { supabase } from '../lib/supabase';
 import type { VehicleInteractionService } from '../services/vehicleInteractionService';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import type { ViewerReputation, ViewerStats, ViewerActivity } from '../types/vehicleInteractions';
 
 const ViewerDashboard: React.FC = () => {
@@ -164,7 +164,7 @@ const ViewerDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-1/3"></div>
@@ -175,7 +175,7 @@ const ViewerDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
@@ -184,7 +184,7 @@ const ViewerDashboard: React.FC = () => {
   const progress = getProgressToNextLevel();
 
   return (
-    <AppLayout>
+    
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -437,7 +437,7 @@ const ViewerDashboard: React.FC = () => {
           </div>
         )}
       </div>
-    </AppLayout>
+    
   );
 };
 

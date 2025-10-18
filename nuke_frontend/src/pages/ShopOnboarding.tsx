@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import '../design-system.css';
 import { secureDocumentService } from '../services/secureDocumentService';
 
@@ -523,7 +523,7 @@ export default function ShopOnboarding() {
   };
 
   return (
-    <AppLayout>
+    
       <div className="layout compact">
         <div className="container compact">
           <div className="main">
@@ -879,6 +879,6 @@ export default function ShopOnboarding() {
           </div>
         </div>
       </div>
-    </AppLayout>
+    
   );
 }

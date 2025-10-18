@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
+// AppLayout now provided globally by App.tsx
 import ActivityTimeline from '../components/profile/ActivityTimeline';
 import DocumentVault from '../components/profile/DocumentVault';
 import WorkSessionsPanel from '../components/profile/WorkSessionsPanel';
@@ -326,19 +326,19 @@ export default function OrganizationProfile() {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="container compact">
           <div className="main">
             <div className="card"><div className="card-body">Loading organization…</div></div>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
   if (!org) {
     return (
-      <AppLayout>
+      
         <div className="container compact">
           <div className="main">
             <div className="card">
@@ -353,7 +353,7 @@ export default function OrganizationProfile() {
             </div>
           </div>
         </div>
-      </AppLayout>
+      
     );
   }
 
@@ -517,7 +517,7 @@ export default function OrganizationProfile() {
   );
 
   return (
-    <AppLayout>
+    
       <div className="layout compact">
         <div className="container compact">
           <div className="main">
@@ -698,6 +698,6 @@ export default function OrganizationProfile() {
           }
         }} />
       )}
-    </AppLayout>
+    
   );
 }
