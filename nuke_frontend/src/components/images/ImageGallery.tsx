@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { imageOptimizationService } from '../../services/imageOptimizationService';
+import { ImageUploadService } from '../../services/imageUploadService';
 import ImageLightbox from '../image/ImageLightbox';
 
 interface ImageGalleryProps {
@@ -210,68 +210,18 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
     try {
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
-        const fileName = `${Date.now()}_${i}_${file.name}`;
-
-        // Generate orientation-corrected variants using the optimization service
-        const optimizationResult = await imageOptimizationService.generateVariantBlobs(file);
-
-        if (optimizationResult.success && optimizationResult.variantBlobs) {
-          const urls: any = {};
-          const paths: any = {};
-
-          // Upload each variant (thumbnail, medium, large)
-          for (const [variantName, blob] of Object.entries(optimizationResult.variantBlobs)) {
-            const variantPath = `vehicles/${vehicleId}/images/${variantName}/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-              .from('vehicle-data')
-              .upload(variantPath, blob, { upsert: true });
-
-            if (!uploadError) {
-              const { data: urlData } = supabase.storage
-                .from('vehicle-data')
-                .getPublicUrl(variantPath);
-
-              urls[`${variantName}_url`] = urlData.publicUrl;
-              paths[variantName] = variantPath;
-            }
-          }
-
-          // Also upload original file
-          const originalPath = `vehicles/${vehicleId}/images/${fileName}`;
-          const { error: originalError } = await supabase.storage
-            .from('vehicle-data')
-            .upload(originalPath, file);
-
-          if (!originalError) {
-            const { data: originalUrl } = supabase.storage
-              .from('vehicle-data')
-              .getPublicUrl(originalPath);
-
-            // Save to database with all variant URLs
-            const { error: insertError } = await supabase
-              .from('vehicle_images')
-              .insert({
-                vehicle_id: vehicleId,
-                user_id: session.user.id,
-                image_url: originalUrl.publicUrl,
-                thumbnail_url: urls.thumbnail_url,
-                medium_url: urls.medium_url,
-                large_url: urls.large_url,
-                storage_path: originalPath,
-                filename: file.name,
-                mime_type: file.type,
-                file_size: file.size,
-                category: 'general',
-                is_primary: i === 0 && allImages.length === 0
-              });
-            
-            if (insertError) {
-              console.error('Failed to save image to database:', insertError);
-              setError(`Upload failed: ${insertError.message}. Please check permissions.`);
-              throw insertError;
-            }
-          }
+        
+        // Use centralized upload service (handles EXIF, variants, timeline, AI)
+        const result = await ImageUploadService.uploadImage(
+          vehicleId,
+          file,
+          'general'
+        );
+        
+        if (!result.success) {
+          console.error('Upload failed:', result.error);
+          setError(`Upload failed: ${result.error}`);
+          throw new Error(result.error);
         }
 
         setUploadProgress(prev => ({...prev, completed: i + 1}));
