@@ -1,8 +1,7 @@
 <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
   <!-- Pixel art blue glow - retro style -->
   
-  <!-- Dark background -->
-  <rect width="32" height="32" fill="#000000"/>
+  <!-- Transparent background -->
   
   <!-- Pixelated glow layers - each ring is a different blue intensity -->
   <!-- Outer ring -->
