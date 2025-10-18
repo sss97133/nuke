@@ -171,10 +171,24 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
       if (uploadErr) throw new Error(uploadErr);
       setSecureDocId(document.id);
 
-      // 2) Extract fields using AI via edge function
+      // 2) Get public URL for the uploaded document
+      const { data: urlData } = supabase.storage
+        .from('vehicle-images')
+        .getPublicUrl(document.file_path);
+      
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL for title image');
+      }
+      
+      // 3) Extract fields using AI via edge function
       const { data: extracted, error: extractError } = await supabase.functions.invoke('extract-title-data', {
-        body: { image_url: document.file_path }
+        body: { image_url: urlData.publicUrl }
       });
+      
+      if (extractError) {
+        console.error('Edge function error:', extractError);
+        throw new Error(extractError.message || 'Failed to extract title data');
+      }
 
       // If nothing came back, inform but keep secure upload
       if (!extracted || Object.keys(extracted).length === 0) {
