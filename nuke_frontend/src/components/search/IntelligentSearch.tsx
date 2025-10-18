@@ -272,7 +272,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
   const searchTimelineEvents = async (query: string, analysis: any): Promise<SearchResult[]> => {
     let eventQuery = supabase
-      .from('timeline_events')
+      .from('vehicle_timeline_events')
       .select(`
         id,
         title,

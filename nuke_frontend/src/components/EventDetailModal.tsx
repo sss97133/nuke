@@ -29,7 +29,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
   const loadEventDetails = async () => {
     // Load event
     const { data: eventData } = await supabase
-      .from('timeline_events')
+      .from('vehicle_timeline_events')
       .select('*')
       .eq('id', eventId)
       .single();

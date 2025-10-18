@@ -77,7 +77,7 @@ const TimelineEventDetailsPanel: React.FC<TimelineEventDetailsPanelProps> = ({
 
     try {
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .update({ event_type: newEventType })
         .eq('id', event.id);
 

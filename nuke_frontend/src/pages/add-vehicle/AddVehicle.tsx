@@ -331,7 +331,7 @@ Redirecting to vehicle profile...`);
           );
           // Record discovery event when created from URL without EXIF time
           if (formData.import_url) {
-            await supabase.from('timeline_events').insert({
+            await supabase.from('vehicle_timeline_events').insert({
               vehicle_id: vehicleId,
               user_id: user.id,
               event_type: 'discovery',

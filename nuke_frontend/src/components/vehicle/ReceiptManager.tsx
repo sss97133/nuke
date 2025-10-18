@@ -116,7 +116,7 @@ export default function ReceiptManager({ vehicleId, canEdit }: ReceiptManagerPro
       if (error) {
         if (error.message.includes('relation') || error.message.includes('does not exist')) {
           // Store in timeline events as a fallback
-          await supabase.from('timeline_events').insert({
+          await supabase.from('vehicle_timeline_events').insert({
             vehicle_id: vehicleId,
             event_type: 'maintenance',
             title: `Receipt: ${formData.vendor_name}`,

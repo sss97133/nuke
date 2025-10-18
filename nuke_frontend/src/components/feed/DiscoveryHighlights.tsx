@@ -157,7 +157,7 @@ const DiscoveryHighlights = () => {
             .order('created_at', { ascending: false })
             .limit(200),
           supabase
-            .from('timeline_events')
+            .from('vehicle_timeline_events')
             .select('id, title, event_type, created_at, vehicle_id')
             .gte('created_at', weekAgo)
             .order('created_at', { ascending: false })

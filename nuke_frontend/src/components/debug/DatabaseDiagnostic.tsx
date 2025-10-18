@@ -24,7 +24,7 @@ const DatabaseDiagnostic: React.FC = () => {
       // Check table existence and data
       const queries = [
         { name: 'vehicle_timeline_events', query: supabase.from('vehicle_timeline_events').select('*').eq('user_id', user.id).limit(5) },
-        { name: 'timeline_events', query: supabase.from('timeline_events').select('*').eq('user_id', user.id).limit(5) },
+        { name: 'timeline_events', query: supabase.from('vehicle_timeline_events').select('*').eq('user_id', user.id).limit(5) },
         { name: 'vehicle_images', query: supabase.from('vehicle_images').select('*').eq('user_id', user.id).limit(5) },
         { name: 'user_contributions', query: supabase.from('user_contributions').select('*').eq('user_id', user.id).limit(5) },
         { name: 'profiles', query: supabase.from('profiles').select('*').eq('id', user.id).single() }
@@ -55,7 +55,7 @@ const DatabaseDiagnostic: React.FC = () => {
           .eq('user_id', user.id);
         
         const { count: timelineCount } = await supabase
-          .from('timeline_events')
+          .from('vehicle_timeline_events')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id);
 

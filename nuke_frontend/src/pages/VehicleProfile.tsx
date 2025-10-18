@@ -635,7 +635,7 @@ const VehicleProfile: React.FC = () => {
           .select('*')
           .eq('vehicle_id', vehicleId),
         supabase
-          .from('timeline_events')
+          .from('vehicle_timeline_events')
           .select('*')
           .eq('vehicle_id', vehicleId)
           .limit(200)

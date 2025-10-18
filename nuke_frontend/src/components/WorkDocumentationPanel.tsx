@@ -86,7 +86,7 @@ const WorkDocumentationPanel: React.FC<WorkDocumentationPanelProps> = ({
       };
 
       const { error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert({
           vehicle_id: vehicleId,
           user_id: currentUserId,

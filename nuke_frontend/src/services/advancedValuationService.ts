@@ -218,7 +218,7 @@ export class AdvancedValuationService {
     try {
       // Get user's documented work history
       const { data: workHistory } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('labor_hours, metadata, event_type')
         .eq('user_id', userId)
         .not('labor_hours', 'is', null);

@@ -119,7 +119,7 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any }> = ({ vehi
   const loadStats = async () => {
     const [images, events, tags] = await Promise.all([
       supabase.from('vehicle_images').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
-      supabase.from('timeline_events').select('id, labor_hours', { count: 'exact' }).eq('vehicle_id', vehicleId),
+      supabase.from('vehicle_timeline_events').select('id, labor_hours', { count: 'exact' }).eq('vehicle_id', vehicleId),
       supabase.from('image_tags').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId)
     ]);
 
@@ -191,7 +191,7 @@ const MobileTimelineTab: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
   const loadTimeline = async () => {
     setLoading(true);
     const { data } = await supabase
-      .from('timeline_events')
+      .from('vehicle_timeline_events')
       .select('*')
       .eq('vehicle_id', vehicleId)
       .order('event_date', { ascending: false });

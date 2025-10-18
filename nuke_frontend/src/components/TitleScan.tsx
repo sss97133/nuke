@@ -171,9 +171,10 @@ const TitleScan: React.FC<TitleScanProps> = ({ vehicleId, onApply, onComplete, o
       if (uploadErr) throw new Error(uploadErr);
       setSecureDocId(document.id);
 
-      // 2) Extract fields using AI (if API configured)
-      const b64 = await fileToBase64(file);
-      const extracted = await visionAPI.extractTitleFields(b64);
+      // 2) Extract fields using AI via edge function
+      const { data: extracted, error: extractError } = await supabase.functions.invoke('extract-title-data', {
+        body: { image_url: document.file_path }
+      });
 
       // If nothing came back, inform but keep secure upload
       if (!extracted || Object.keys(extracted).length === 0) {

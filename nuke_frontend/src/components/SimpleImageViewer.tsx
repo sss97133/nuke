@@ -186,7 +186,7 @@ const SimpleImageViewer: React.FC<SimpleImageViewerProps> = ({
           const createdDates: string[] = [];
           for (const [date, cnt] of entries) {
             const { error: eventErr } = await supabase
-              .from('timeline_events')
+              .from('vehicle_timeline_events')
               .insert({
                 vehicle_id: vehicleId,
                 user_id: userId,

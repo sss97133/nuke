@@ -47,7 +47,7 @@ export default function SimplePhotoTagger({
     try {
       // Save to database using timeline_events as photo tags
       const { data, error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .insert({
           vehicle_id: vehicleId,
           event_type: 'photo_tag',
@@ -98,7 +98,7 @@ export default function SimplePhotoTagger({
       // Try to delete from database first (if it's a real database ID)
       if (!tagId.startsWith('temp_')) {
         await supabase
-          .from('timeline_events')
+          .from('vehicle_timeline_events')
           .delete()
           .eq('id', tagId)
           .eq('event_type', 'photo_tag');
@@ -126,7 +126,7 @@ export default function SimplePhotoTagger({
       try {
         // Load from database first
         const { data: events, error } = await supabase
-          .from('timeline_events')
+          .from('vehicle_timeline_events')
           .select('*')
           .eq('vehicle_id', vehicleId)
           .eq('event_type', 'photo_tag')

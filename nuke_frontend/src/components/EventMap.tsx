@@ -46,7 +46,7 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
       setError(null);
       const [vte, legacy] = await Promise.all([
         supabase.from('vehicle_timeline_events').select('*').eq('vehicle_id', vehicleId),
-        supabase.from('timeline_events').select('*').eq('vehicle_id', vehicleId).limit(200)
+        supabase.from('vehicle_timeline_events').select('*').eq('vehicle_id', vehicleId).limit(200)
       ]);
       const merged: TimelineEvent[] = [
         ...((vte.data || []) as any[]),
@@ -195,7 +195,7 @@ const EventMap: React.FC<EventMapProps> = ({ vehicleId, showLifeOnly = false }) 
 
           if (found) {
             await supabase
-              .from('timeline_events')
+              .from('vehicle_timeline_events')
               .update({ metadata: { ...(ev.metadata || {}), location_coords: found } })
               .eq('id', ev.id);
             updatedIds.push(ev.id);

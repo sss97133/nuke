@@ -13,7 +13,7 @@ defmodule NukeApi.Vehicles.Timeline do
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
-  schema "vehicle_timeline" do
+  schema "vehicle_timeline_events" do
     # Reference to the vehicle
     belongs_to :vehicle, Vehicle
     
