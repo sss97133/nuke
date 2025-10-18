@@ -49,7 +49,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import OwnershipVerificationDashboard from './components/admin/OwnershipVerificationDashboard';
 import Shops from './pages/Shops';
 import ShopOnboarding from './pages/ShopOnboarding';
-import OrganizationProfile from './pages/OrganizationProfile';
+// import OrganizationProfile from './pages/OrganizationProfile'; // Temporarily disabled due to build errors
 import ErrorBoundary from './components/util/ErrorBoundary';
 import AcceptInvite from './pages/AcceptInvite';
 import Notifications from './pages/Notifications';
@@ -248,7 +248,7 @@ function App() {
             <Route path="/admin/price-import" element={<PriceCsvImport />} />
             <Route path="/shops" element={<Shops />} />
             <Route path="/shops/onboarding" element={<ShopOnboarding />} />
-            <Route path="/org/:orgId" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} />
+            {/* <Route path="/org/:orgId" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} /> */}
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/inbox" element={<Inbox />} />
