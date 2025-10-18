@@ -1,53 +1,26 @@
 <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <!-- Create a much more diffused, ethereal blue glow matching the PNG -->
-    <radialGradient id="etherealBlueGlow" cx="50%" cy="50%" r="80%">
-      <!-- Core bright electric blue -->
-      <stop offset="0%" style="stop-color:#4F9FFF;stop-opacity:1" />
-      <!-- Bright blue center -->
-      <stop offset="20%" style="stop-color:#3B82F6;stop-opacity:0.9" />
-      <!-- Medium blue -->
-      <stop offset="40%" style="stop-color:#2563EB;stop-opacity:0.7" />
-      <!-- Soft blue -->
-      <stop offset="60%" style="stop-color:#1D4ED8;stop-opacity:0.5" />
-      <!-- Very soft blue -->
-      <stop offset="80%" style="stop-color:#1E40AF;stop-opacity:0.2" />
-      <!-- Almost transparent blue -->
-      <stop offset="100%" style="stop-color:#1E3A8A;stop-opacity:0.05" />
-    </radialGradient>
-    
-    <!-- Multiple blur filters for ultra-soft edges -->
-    <filter id="ultraSoftBlur" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="3" result="blur1"/>
-      <feGaussianBlur stdDeviation="2" result="blur2"/>
-      <feMerge>
-        <feMergeNode in="blur1"/>
-        <feMergeNode in="blur2"/>
-      </feMerge>
-    </filter>
-    
-    <!-- Additional soft glow effect -->
-    <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="4" result="glow"/>
-      <feColorMatrix type="matrix" values="1 0 0 0 0.3  0 0.5 1 0 0.8  0 0 1 0 1  0 0 0 1 0" result="blueGlow"/>
-      <feMerge>
-        <feMergeNode in="glow"/>
-        <feMergeNode in="blueGlow"/>
-      </feMerge>
-    </filter>
-  </defs>
+  <!-- Pixel art blue glow - retro style -->
   
-  <!-- Dark background (almost black) -->
-  <rect width="32" height="32" fill="#0F0F0F"/>
+  <!-- Dark background -->
+  <rect width="32" height="32" fill="#000000"/>
   
-  <!-- Main ethereal blue glow -->
-  <circle cx="16" cy="16" r="16" fill="url(#etherealBlueGlow)" filter="url(#ultraSoftBlur)" />
+  <!-- Pixelated glow layers - each ring is a different blue intensity -->
+  <!-- Outer ring -->
+  <circle cx="16" cy="16" r="15" fill="#000033" opacity="0.2"/>
+  <circle cx="16" cy="16" r="13" fill="#000066" opacity="0.3"/>
+  <circle cx="16" cy="16" r="11" fill="#000099" opacity="0.4"/>
   
-  <!-- Additional soft glow layer for more diffusion -->
-  <circle cx="16" cy="16" r="14" fill="url(#etherealBlueGlow)" filter="url(#softGlow)" opacity="0.6" />
+  <!-- Mid rings -->
+  <circle cx="16" cy="16" r="9" fill="#0033cc" opacity="0.6"/>
+  <circle cx="16" cy="16" r="7" fill="#0066ff" opacity="0.7"/>
+  <circle cx="16" cy="16" r="5" fill="#3399ff" opacity="0.8"/>
   
   <!-- Bright core -->
-  <circle cx="16" cy="16" r="8" fill="#4F9FFF" opacity="0.8" />
-  <circle cx="16" cy="16" r="5" fill="#60A5FF" opacity="0.9" />
-  <circle cx="16" cy="16" r="3" fill="#7BB3FF" opacity="1" />
+  <circle cx="16" cy="16" r="3" fill="#66ccff" opacity="0.9"/>
+  <circle cx="16" cy="16" r="2" fill="#99ddff" opacity="1"/>
+  <circle cx="16" cy="16" r="1" fill="#ccffff" opacity="1"/>
+  
+  <!-- Pixel art highlight -->
+  <rect x="14" y="14" width="4" height="4" fill="#ffffff" opacity="0.7"/>
+  <rect x="15" y="15" width="2" height="2" fill="#ffffff" opacity="1"/>
 </svg>
