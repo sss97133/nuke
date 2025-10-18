@@ -72,3 +72,59 @@ export const computeDelta = (m: VehiclePriceMetadata): DeltaInfo | null => {
   const percent = (amount / anchor) * 100;
   return { amount, percent, isPositive: amount >= 0 };
 };
+
+export interface ReadinessBreakdown {
+  listingCompleteness: number;   // 0..40
+  imagesReadiness: number;       // 0..25
+  pricingReadiness: number;      // 0..15
+  verificationReadiness: number; // 0..10
+  activityMomentum: number;      // 0..10
+}
+
+export interface ReadinessResult {
+  score: number;                 // 0..100
+  breakdown: ReadinessBreakdown;
+  eta_days?: number | null;      // optional rough ETA
+}
+
+export const computeReadinessScore = (args: {
+  meta: any;             // vehicle metadata (from feed)
+  imagesCount: number;   // number of images (thumbnails count ok)
+  createdAt?: string;    // ISO date string (vehicle.created_at)
+}): ReadinessResult => {
+  const m = args?.meta || {};
+  const images = Math.max(0, Number(args?.imagesCount || 0));
+
+  let listing = 0;
+  if (m?.year && m?.make && m?.model) listing += 10;
+  if (m?.vin && String(m.vin).length >= 8) listing += 10;
+  if (m?.description && String(m.description).trim().length >= 30) listing += 10;
+  if (m?.color || m?.mileage || m?.trim || m?.transmission) listing += 10;
+  listing = Math.min(40, listing);
+
+  const imgRatio = Math.max(0, Math.min(1, images / 8));
+  const imagesReadiness = Math.round(imgRatio * 25);
+
+  const p = computePrimaryPrice(m);
+  const pricingReadiness = (p.label && typeof p.amount === 'number') ? 15 : 0;
+
+  const verified = Boolean(m?.is_verified_owner || m?.ownership_verified === true);
+  const verificationReadiness = verified ? 10 : 0;
+
+  let activity = 0;
+  if (args?.createdAt) {
+    const days = Math.max(0, (Date.now() - new Date(args.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    if (days <= 7) activity = 10;
+    else if (days <= 30) activity = 5;
+  }
+
+  const breakdown: ReadinessBreakdown = {
+    listingCompleteness: listing,
+    imagesReadiness,
+    pricingReadiness,
+    verificationReadiness,
+    activityMomentum: activity,
+  };
+  const score = Math.max(0, Math.min(100, listing + imagesReadiness + pricingReadiness + verificationReadiness + activity));
+  return { score, breakdown, eta_days: null };
+};

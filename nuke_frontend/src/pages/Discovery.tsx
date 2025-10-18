@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import AppLayout from '../components/layout/AppLayout';
 import DiscoveryFeed from '../components/feed/DiscoveryFeed';
 import QuickVehicleAdd from '../components/feed/QuickVehicleAdd';
-import DiscoveryHighlights from '../components/feed/DiscoveryHighlights';
+import LiveStreamFeed from '../components/stream/LiveStreamFeed';
 import '../design-system.css';
 
 interface BuildAnalysisResult {
@@ -37,6 +37,7 @@ const Discovery: React.FC = () => {
   const [viewMode, setViewMode] = useState<'gallery' | 'compact' | 'technical'>('gallery');
   const [denseModeEnabled, setDenseModeEnabled] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | undefined>();
+  const showStreams = (import.meta as any)?.env?.VITE_SHOW_STREAMS !== '0';
 
   // Check authentication status
   useEffect(() => {
@@ -169,10 +170,12 @@ const Discovery: React.FC = () => {
 
         {/* Content Area */}
         <section className="section">
-          {/* Highlights */}
-          <div style={{ marginBottom: '12px' }}>
-            <DiscoveryHighlights />
-          </div>
+          {/* Live Streams */}
+          {showStreams && (
+            <div style={{ marginBottom: '12px' }}>
+              <LiveStreamFeed />
+            </div>
+          )}
 
           <DiscoveryFeed
             viewMode={viewMode}

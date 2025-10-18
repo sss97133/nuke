@@ -96,6 +96,7 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
             year,
             make,
             model,
+            vin,
             color,
             description,
             created_at,
@@ -136,6 +137,9 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
             title: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
             description: vehicle.description || `${vehicle.color} ${vehicle.make} ${vehicle.model}`,
             image_url: (vehicle.vehicle_images as any)?.[0]?.image_url,
+            images: Array.isArray((vehicle as any).vehicle_images)
+              ? ((vehicle as any).vehicle_images as any[]).map((vi: any) => vi?.image_url).filter(Boolean)
+              : [],
             user_id: (vehicle as any).uploaded_by || '',
             user_name: undefined,
             user_avatar: undefined,
@@ -144,6 +148,8 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
               year: vehicle.year,
               make: vehicle.make,
               model: vehicle.model,
+              vin: (vehicle as any).vin,
+              description: vehicle.description,
               color: vehicle.color,
               msrp: (vehicle as any).msrp,
               current_value: (vehicle as any).current_value,
