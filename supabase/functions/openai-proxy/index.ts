@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Server-side secrets
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  const apiKey = Deno.env.get('OPEN_AI_API_KEY');
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'OPENAI_API_KEY not configured on server' }), {
       status: 500,
