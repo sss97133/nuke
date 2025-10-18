@@ -198,6 +198,12 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   const handleFileUpload = async (files: FileList) => {
     if (!files.length) return;
 
+    // Validate user is logged in
+    if (!session?.user?.id) {
+      setError('You must be logged in to upload images');
+      return;
+    }
+
     const fileArray = Array.from(files);
     setUploadProgress({total: fileArray.length, completed: 0, uploading: true});
 
@@ -247,6 +253,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
               .from('vehicle_images')
               .insert({
                 vehicle_id: vehicleId,
+                user_id: session.user.id,
                 image_url: originalUrl.publicUrl,
                 thumbnail_url: urls.thumbnail_url,
                 medium_url: urls.medium_url,
