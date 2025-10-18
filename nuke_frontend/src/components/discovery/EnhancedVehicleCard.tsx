@@ -89,7 +89,11 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
 
   const formatPrice = (price: number | null | undefined) => {
     if (!price) return '';
-    return formatCurrency(price);
+    // Restore compact formatting for the card display
+    if (price >= 1000) {
+      return `$${(price / 1000).toFixed(0)}k`;
+    }
+    return `$${price.toLocaleString()}`;
   };
 
   const smallChipStyle: React.CSSProperties = {
