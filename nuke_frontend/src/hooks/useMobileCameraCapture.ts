@@ -4,7 +4,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+// Auth context import adjusted to app's pattern: read session via Supabase directly if no context
+import { useAuth } from './useAuth';
 import { AIImageProcessingService, ProcessingContext } from '../services/aiImageProcessingService';
 import { ImageUploadService } from '../services/imageUploadService';
 

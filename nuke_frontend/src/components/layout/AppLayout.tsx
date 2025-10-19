@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import NotificationBell from '../notifications/NotificationBell';
 import '../../design-system.css';
+import RapidCameraCapture from '../mobile/RapidCameraCapture';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -34,6 +36,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const [orgNavPath, setOrgNavPath] = useState<string>('/shops');
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     // Get initial session
@@ -278,6 +281,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         <div className="content-container">
           {children}
         </div>
+        {/* Floating mobile capture button */}
+        {session && isMobile && <RapidCameraCapture />}
       </main>
 
       {/* Footer */}
