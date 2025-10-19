@@ -31,15 +31,17 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // Prevent background scroll when modal is open
+  // Only prevent background scroll when used as a modal
   React.useEffect(() => {
-    const originalStyle = window.getComputedStyle(document.body).overflow;
-    document.body.style.overflow = 'hidden';
-    
-    return () => {
-      document.body.style.overflow = originalStyle;
-    };
-  }, []);
+    if (isModal) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isModal]);
   
   // Photo-first state
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
@@ -331,10 +333,11 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
   
   return (
     <div className="win95" style={{
-      position: 'fixed',
-      inset: 0,
+      position: isModal ? 'fixed' : 'relative',
+      inset: isModal ? 0 : undefined,
+      minHeight: isModal ? undefined : '100vh',
       backgroundColor: 'var(--grey-100)',
-      zIndex: 9999,
+      zIndex: isModal ? 9999 : 1,
       overflowY: 'auto',
       WebkitOverflowScrolling: 'touch',
       // Prevent background scroll
