@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { UserContribution } from '../../types/profile';
 
@@ -13,26 +13,11 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
   const [vehicleDetails, setVehicleDetails] = useState<Map<string, any>>(new Map());
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const year = new Date().getFullYear();
-  console.log('ContributionTimeline: Received contributions:', contributions.length);
-  console.log('ContributionTimeline: Sample contribution:', contributions[0]);
-  console.log('ContributionTimeline: Contribution types:', [...new Set(contributions.map(c => c.contribution_type))]);
-  console.log('ContributionTimeline: Date range:', contributions.length > 0 ? {
-    earliest: contributions.reduce((min, c) => c.contribution_date < min ? c.contribution_date : min, contributions[0]?.contribution_date || ''),
-    latest: contributions.reduce((max, c) => c.contribution_date > max ? c.contribution_date : max, contributions[0]?.contribution_date || ''),
-    sampleDates: contributions.slice(0, 5).map(c => c.contribution_date)
-  } : 'no data');
-  console.log('ContributionTimeline: Raw contributions sample:', contributions.slice(0, 3));
-  console.log('ContributionTimeline: Total contribution count:', contributions.reduce((sum, c) => sum + c.contribution_count, 0));
   
-  // Log if we're seeing fake data
-  if (contributions.some(c => c.contribution_count > 100)) {
-    console.error('ContributionTimeline: WARNING - Seeing fake contribution data with counts > 100!');
-    console.log('ContributionTimeline: High count contributions:', contributions.filter(c => c.contribution_count > 100));
-  }
+  // Quiet heavy debug logging in production; keep component lightweight for mobile
 
-  // Early return if no contributions - BUT ALWAYS SHOW SOMETHING
+  // Early return if no contributions - show an empty state quickly
   if (!contributions || contributions.length === 0) {
-    console.log('ContributionTimeline: No contributions data, rendering empty state');
     return (
       <div className="card">
         <div className="card-header">
@@ -40,16 +25,13 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
         </div>
         <div className="card-body">
           <div className="text-small text-muted">No contributions yet this year.</div>
-          <div className="text-small" style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--grey-100)' }}>
-            DEBUG: Received {contributions?.length || 0} contributions
-          </div>
+          {/* Keep empty state minimal; avoid noisy debug details */}
         </div>
       </div>
     );
   }
 
-  // FORCE RENDER - Always show the component even if data seems wrong
-  console.log('ContributionTimeline: FORCE RENDERING with', contributions.length, 'contributions');
+  // Render with given data
 
   // Helper: normalize any date-ish value to YYYY-MM-DD without timezone shifting
   const toDateOnly = (raw: any): string => {
@@ -77,7 +59,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
     return dates;
   };
 
-  const dateRange = generateDateRange();
+  const dateRange = useMemo(() => generateDateRange(), []);
   
   // Create per-day intensity (hours) using EXACT same logic as VehicleTimeline
   // This ensures user's contribution heatmap matches what appears on vehicle timelines
@@ -85,36 +67,28 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
   // - images: hours += min(9, images/20) + 0.25 baseline
   // - every contribution adds 0.25
   // - cap at 12 hours max
-  const daily = new Map<string, { count: number; hours: number; types: Set<string> }>();
-  
-  for (const c of contributions) {
-    const date = toDateOnly(c.contribution_date);
-    const entry = daily.get(date) || { count: 0, hours: 0, types: new Set() };
-    
-    // Track contribution types for this date
-    entry.types.add(c.contribution_type);
-    entry.count += c.contribution_count;
-
-    // Use EXACT same calculation as VehicleTimeline hoursForDay function
-    if (c.contribution_type === 'image_upload') {
-      // Each image upload: min(9, count/20) + 0.25 baseline
-      entry.hours += Math.min(9, c.contribution_count / 20);
-      entry.hours += 0.25; // baseline session touch
-    } else if (c.contribution_type === 'vehicle_data') {
-      // Vehicle data contributions (timeline events): 0.25 per event
-      entry.hours += 0.25 * c.contribution_count;
-    } else if (c.contribution_type === 'verification') {
-      // Verification contributions: 0.5 per verification (more valuable)
-      entry.hours += 0.5 * c.contribution_count;
-    } else {
-      // Other contributions: 0.25 per unit
-      entry.hours += 0.25 * c.contribution_count;
+  const daily = useMemo(() => {
+    const map = new Map<string, { count: number; hours: number; types: Set<string> }>();
+    for (const c of contributions) {
+      const date = toDateOnly(c.contribution_date);
+      const entry = map.get(date) || { count: 0, hours: 0, types: new Set() };
+      entry.types.add(c.contribution_type);
+      entry.count += c.contribution_count;
+      if (c.contribution_type === 'image_upload') {
+        entry.hours += Math.min(9, c.contribution_count / 20);
+        entry.hours += 0.25;
+      } else if (c.contribution_type === 'vehicle_data') {
+        entry.hours += 0.25 * c.contribution_count;
+      } else if (c.contribution_type === 'verification') {
+        entry.hours += 0.5 * c.contribution_count;
+      } else {
+        entry.hours += 0.25 * c.contribution_count;
+      }
+      entry.hours = Math.min(12, entry.hours);
+      map.set(date, entry);
     }
-
-    // Cap at 12 hours max (same as VehicleTimeline)
-    entry.hours = Math.min(12, entry.hours);
-    daily.set(date, entry);
-  }
+    return map;
+  }, [contributions]);
 
   // Build list of years for navigation - show broader range like VehicleTimeline
   // Include years from contributions plus a reasonable range around current year
@@ -132,7 +106,6 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
     yearIndex.push(y);
   }
   
-  console.log('ContributionTimeline: Year range:', { minYear, maxYear, yearIndex, contributionYears });
   const [selectedYear, setSelectedYear] = useState<number | null>(yearIndex[0] || year);
   
   const selectYear = (y: number) => {
