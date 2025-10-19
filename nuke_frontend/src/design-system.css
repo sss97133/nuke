@@ -135,6 +135,14 @@ body {
   padding: 0;
 }
 
+/* Respect iOS safe-area to avoid content under notches/home bar */
+@supports (padding-top: constant(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Typography - single base size */
 .text { font-size: var(--font-size); }
 .text-small { font-size: var(--font-size); }
