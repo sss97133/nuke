@@ -18,6 +18,8 @@ const LivePlayer: React.FC<LivePlayerProps> = ({ userId, isOwnProfile }) => {
 
   useEffect(() => {
     let mounted = true;
+    let intervalId: number | undefined;
+
     const load = async () => {
       try {
         setLoading(true);
@@ -32,10 +34,45 @@ const LivePlayer: React.FC<LivePlayerProps> = ({ userId, isOwnProfile }) => {
         if (mounted) setLoading(false);
       }
     };
-    load();
 
-    const t = setInterval(load, 15000);
-    return () => { mounted = false; clearInterval(t); };
+    const startPolling = () => {
+      // Avoid overlapping timers
+      if (intervalId !== undefined) return;
+      intervalId = window.setInterval(() => {
+        // Pause network work when tab is hidden to prevent mobile jank
+        if (document.visibilityState === 'visible') {
+          load();
+        }
+      }, 15000);
+    };
+
+    const stopPolling = () => {
+      if (intervalId !== undefined) {
+        clearInterval(intervalId);
+        intervalId = undefined;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        // Refresh immediately when coming back to the tab, then resume polling
+        load();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    // Initial load and polling (only if visible)
+    load();
+    if (document.visibilityState === 'visible') startPolling();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      mounted = false;
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [userId]);
 
   const reload = async () => {

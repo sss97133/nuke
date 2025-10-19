@@ -58,7 +58,6 @@ const Profile: React.FC = () => {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
-  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [emailData, setEmailData] = useState({
     newEmail: '',
     currentPassword: ''
@@ -67,15 +66,7 @@ const Profile: React.FC = () => {
   const [emailChangeMessage, setEmailChangeMessage] = useState('');
   const [showProfileDetails, setShowProfileDetails] = useState(false);
 
-  // Handle window resize for responsive behavior
-  useEffect(() => {
-    const handleResize = () => {
-      setIsLargeScreen(window.innerWidth >= 1024);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // Removed unused resize listener to reduce unnecessary re-renders on mobile
 
   const { user } = useAuth();
   
