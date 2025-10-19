@@ -414,6 +414,19 @@ const styles = {
     textAlign: 'center' as const,
     fontFamily: '"MS Sans Serif", sans-serif'
   },
+  loadingText: {
+    textAlign: 'center' as const,
+    padding: '20px',
+    color: '#808080',
+    fontSize: '12px',
+    fontFamily: '"MS Sans Serif", sans-serif'
+  },
+  metricSubtext: {
+    fontSize: '10px',
+    color: '#808080',
+    textAlign: 'center' as const,
+    fontFamily: '"MS Sans Serif", sans-serif'
+  },
   dots: {
     display: 'flex',
     justifyContent: 'center',
