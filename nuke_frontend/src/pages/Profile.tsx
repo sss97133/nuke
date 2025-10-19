@@ -46,6 +46,7 @@ import InventoryQuickPanel from '../components/profile/InventoryQuickPanel';
 import ActivityOverview from '../components/profile/ActivityOverview';
 import PinnedVehicles from '../components/profile/PinnedVehicles';
 import WalletStatus from '../components/profile/WalletStatus';
+import MobileProfile from '../components/profile/MobileProfile';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -59,6 +60,7 @@ const Profile: React.FC = () => {
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
   const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [emailData, setEmailData] = useState({
     newEmail: '',
     currentPassword: ''
@@ -71,6 +73,7 @@ const Profile: React.FC = () => {
   useEffect(() => {
     const handleResize = () => {
       setIsLargeScreen(window.innerWidth >= 1024);
+      setIsMobile(window.innerWidth < 768);
     };
 
     window.addEventListener('resize', handleResize);
@@ -294,6 +297,21 @@ const Profile: React.FC = () => {
       !!profileData.completion.first_vehicle_added
     )
   );
+
+  // Use mobile layout for small screens
+  if (isMobile) {
+    const targetUserId = userId || currentUserId;
+    if (!targetUserId) {
+      return <div>No user ID available</div>;
+    }
+    
+    return (
+      <MobileProfile 
+        userId={targetUserId} 
+        isCurrentUser={isOwnProfile}
+      />
+    );
+  }
 
   return (
     <div className="container">

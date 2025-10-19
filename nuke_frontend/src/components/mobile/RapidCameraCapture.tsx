@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ImageUploadService } from '../../services/imageUploadService';
 import { extractImageMetadata } from '../../utils/imageMetadata';
+import { useNavigate } from 'react-router-dom';
 import '../../design-system.css';
 
 interface CaptureContext {
@@ -23,6 +24,7 @@ interface GuardrailSettings {
 
 const RapidCameraCapture: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureContext, setCaptureContext] = useState<CaptureContext>({
@@ -37,10 +39,22 @@ const RapidCameraCapture: React.FC = () => {
     privacyMode: 'none'
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [showAlbumButton, setShowAlbumButton] = useState(false);
+  const [unassignedCount, setUnassignedCount] = useState(0);
 
   // Load context on mount
   useEffect(() => {
     loadCaptureContext();
+    checkUnassignedPhotos();
+  }, [user]);
+
+  // Check for unassigned photos periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkUnassignedPhotos();
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
   }, [user]);
 
   const loadCaptureContext = async () => {
@@ -74,6 +88,23 @@ const RapidCameraCapture: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading context:', error);
+    }
+  };
+
+  const checkUnassignedPhotos = async () => {
+    if (!user) return;
+
+    try {
+      const { count } = await supabase
+        .from('user_photo_album')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('assigned_vehicle_id', null);
+
+      setUnassignedCount(count || 0);
+      setShowAlbumButton((count || 0) > 0);
+    } catch (error) {
+      console.error('Error checking unassigned photos:', error);
     }
   };
 
@@ -115,8 +146,8 @@ const RapidCameraCapture: React.FC = () => {
             }));
           }
         } else {
-          // Queue for later filing if no target determined
-          await queueForLaterFiling(file, metadata);
+          // Add to user photo album for later organization
+          await addToPhotoAlbum(file, metadata);
         }
       }
 
@@ -168,20 +199,63 @@ const RapidCameraCapture: React.FC = () => {
     return 'general';
   };
 
-  const queueForLaterFiling = async (file: File, metadata: any) => {
-    // Store in local queue for batch processing
-    const queueKey = `imageQueue_${user?.id}`;
-    const queue = JSON.parse(localStorage.getItem(queueKey) || '[]');
-    
-    queue.push({
-      timestamp: new Date().toISOString(),
-      fileName: file.name,
-      metadata: metadata,
-      // Store file as base64 for offline capability
-      fileData: await fileToBase64(file)
-    });
+  const addToPhotoAlbum = async (file: File, metadata: any) => {
+    try {
+      // Upload to storage
+      const timestamp = Date.now();
+      const fileName = `album/${user?.id}/${timestamp}_${file.name}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('vehicle-data')
+        .upload(fileName, file);
 
-    localStorage.setItem(queueKey, JSON.stringify(queue));
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('vehicle-data')
+        .getPublicUrl(fileName);
+
+      // Create thumbnail URL (if using image transformation service)
+      const thumbnailUrl = publicUrl.replace('/storage/', '/storage/render/image/resize=width:150,height:150,fit:cover/');
+
+      // Add to user photo album
+      const { error: dbError } = await supabase
+        .from('user_photo_album')
+        .insert({
+          user_id: user?.id,
+          image_url: publicUrl,
+          thumbnail_url: thumbnailUrl,
+          storage_path: fileName,
+          file_name: file.name,
+          file_size: file.size,
+          file_type: file.type,
+          taken_date: metadata.dateTime || null,
+          exif_data: metadata,
+          metadata: {
+            camera: metadata.camera,
+            gps: metadata.gps,
+            originalFileName: file.name
+          },
+          processing_status: 'pending'
+        });
+
+      if (dbError) throw dbError;
+
+      // Update unassigned count
+      setUnassignedCount(prev => prev + 1);
+      setShowAlbumButton(true);
+
+      // Show feedback
+      showFeedback('Photo added to your album for later organization', 'success');
+    } catch (error) {
+      console.error('Error adding to photo album:', error);
+      showFeedback('Failed to save photo to album', 'error');
+    }
+  };
+
+  const queueForLaterFiling = async (file: File, metadata: any) => {
+    // Now just adds to photo album instead of local storage
+    await addToPhotoAlbum(file, metadata);
   };
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -349,6 +423,43 @@ const RapidCameraCapture: React.FC = () => {
         </div>
       )}
 
+      {/* Album button - shows when there are unassigned photos */}
+      {showAlbumButton && (
+        <button
+          onClick={() => navigate('/my-album')}
+          style={{
+            position: 'absolute',
+            bottom: '70px',
+            right: '10px',
+            background: '#ff9800',
+            color: 'white',
+            border: 'none',
+            borderRadius: '20px',
+            padding: '8px 16px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+          }}
+        >
+          <span>📚</span>
+          <span>Album</span>
+          {unassignedCount > 0 && (
+            <span style={{
+              background: '#f44336',
+              borderRadius: '10px',
+              padding: '2px 6px',
+              fontSize: '10px',
+              fontWeight: 'bold'
+            }}>
+              {unassignedCount}
+            </span>
+          )}
+        </button>
+      )}
+
       {/* Settings panel */}
       {showSettings && (
         <div style={{
@@ -402,6 +513,15 @@ const RapidCameraCapture: React.FC = () => {
               <option value="blur_plates">Blur License Plates</option>
               <option value="full">Full Privacy</option>
             </select>
+          </div>
+
+          <div style={{ marginTop: '12px', borderTop: '1px solid #e0e0e0', paddingTop: '8px' }}>
+            <button
+              onClick={() => navigate('/my-album')}
+              style={{ width: '100%', fontSize: '8pt' }}
+            >
+              📚 View Photo Album ({unassignedCount} unassigned)
+            </button>
           </div>
         </div>
       )}
