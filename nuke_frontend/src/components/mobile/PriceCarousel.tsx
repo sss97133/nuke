@@ -32,6 +32,7 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, se
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!e.changedTouches || e.changedTouches.length === 0) return;
     const touchEnd = e.changedTouches[0].clientX;
     const distance = touchStart - touchEnd;
     const minSwipe = 50;

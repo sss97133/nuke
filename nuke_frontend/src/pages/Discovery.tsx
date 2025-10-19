@@ -120,11 +120,13 @@ const Discovery: React.FC = () => {
         {/* Content Area */}
         <section className="section">
 
-          <DiscoveryFeed
-            viewMode={viewMode}
-            denseMode={denseModeEnabled}
-            initialLocation={userLocation}
-          />
+          <ErrorBoundary>
+            <DiscoveryFeed
+              viewMode={viewMode}
+              denseMode={denseModeEnabled}
+              initialLocation={userLocation}
+            />
+          </ErrorBoundary>
         </section>
 
         {/* Add Vehicle Floating Button */}
