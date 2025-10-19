@@ -31,21 +31,13 @@ import EditableField from '../components/editable/EditableField';
 import { ProfileService } from '../services/profileService';
 import { ProfileActivityService } from '../services/profileActivityService';
 import type { ProfileData, ProfileEditForm } from '../types/profile';
-import ProfileCompletion from '../components/profile/ProfileCompletion';
-import ProfileAchievements from '../components/profile/ProfileAchievements';
 import VehicleActivityTimeline from '../components/profile/VehicleActivityTimeline';
-import ProfileStats from '../components/profile/ProfileStats';
-import VerificationSummary from '../components/profile/VerificationSummary';
 import ContributionTimeline from '../components/profile/ContributionTimeline';
 import ProfessionalToolbox from '../components/profile/ProfessionalToolbox';
 import { ProfileVerification } from '../components/ProfileVerification';
 import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
 import LivePlayer from '../components/profile/LivePlayer';
-import InventoryQuickPanel from '../components/profile/InventoryQuickPanel';
-import ActivityOverview from '../components/profile/ActivityOverview';
-import PinnedVehicles from '../components/profile/PinnedVehicles';
-import WalletStatus from '../components/profile/WalletStatus';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();

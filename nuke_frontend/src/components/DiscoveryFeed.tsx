@@ -222,11 +222,11 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
           .select(`
             id,
             image_url,
-            description,
-            uploaded_by,
+            caption,
+            user_id,
             created_at,
-            gps_latitude,
-            gps_longitude,
+            latitude,
+            longitude,
             profiles(
               id,
               username,
@@ -242,14 +242,14 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
             id: image.id,
             type: 'image',
             title: 'Vehicle Image',
-            description: image.description || 'New vehicle image shared',
+            description: (image as any).caption || 'New vehicle image shared',
             image_url: image.image_url,
-            user_id: image.uploaded_by || '',
+            user_id: (image as any).user_id || '',
             user_name: (image.profiles as any)?.full_name || (image.profiles as any)?.username,
             user_avatar: (image.profiles as any)?.avatar_url,
-            location: image.gps_latitude && image.gps_longitude ? {
-              lat: image.gps_latitude,
-              lng: image.gps_longitude
+            location: image.latitude && image.longitude ? {
+              lat: image.latitude,
+              lng: image.longitude
             } : undefined,
             created_at: image.created_at,
             engagement: {

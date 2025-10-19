@@ -204,11 +204,11 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
             id,
             vehicle_id,
             image_url,
-            description,
-            uploaded_by,
+            caption,
+            user_id,
             created_at,
-            gps_latitude,
-            gps_longitude
+            latitude,
+            longitude
           `)
           .order('created_at', { ascending: false })
           .range(Math.floor(offset/3), Math.floor(offset/3) + Math.floor(limit/3) - 1);
@@ -218,14 +218,14 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
             id: image.id,
             type: 'image',
             title: 'Vehicle Image',
-            description: image.description || 'New vehicle image shared',
+            description: (image as any).caption || 'New vehicle image shared',
             image_url: image.image_url,
-            user_id: (image as any).uploaded_by || '',
+            user_id: (image as any).user_id || '',
             user_name: undefined,
             user_avatar: undefined,
-            location: image.gps_latitude && image.gps_longitude ? {
-              lat: image.gps_latitude,
-              lng: image.gps_longitude
+            location: (image as any).latitude && (image as any).longitude ? {
+              lat: (image as any).latitude,
+              lng: (image as any).longitude
             } : undefined,
             created_at: image.created_at,
             engagement: undefined,

@@ -58,7 +58,7 @@ const Dashboard: React.FC = () => {
           msrp,
           is_for_sale,
           uploaded_by,
-          profiles:uploaded_by (
+          uploader:uploaded_by (
             username,
             full_name
           )
