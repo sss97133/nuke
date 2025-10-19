@@ -32,10 +32,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const [userProfile, setUserProfile] = useState<any>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orgNavPath, setOrgNavPath] = useState<string>('/shops');
+  const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Mobile detection
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -58,7 +67,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('resize', checkMobile);
+    };
   }, []);
 
   // Compute destination for Organizations nav
@@ -102,17 +114,34 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
   if (loading) {
     return (
-      <div className="app-layout compact win95">
-        <div className="loading-container">
+      <div className="app-layout compact win95" style={{ 
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--white)'
+      }}>
+        <div className="loading-container" style={{
+          textAlign: 'center',
+          padding: 'var(--space-8)'
+        }}>
           <div className="loading-spinner"></div>
-          <p>Loading...</p>
+          <p style={{ 
+            marginTop: 'var(--space-4)',
+            fontSize: 'var(--font-size)',
+            color: 'var(--text-muted)'
+          }}>Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="app-layout compact win95">
+    <div className="app-layout compact win95" style={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       {/* Main Navigation Header */}
       <header className="app-header" style={{
         position: 'sticky',
@@ -152,9 +181,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             <button 
               className="mobile-menu-button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ display: 'none' }}
             >
-              ☺
+              ☰
             </button>
 
             {/* Upload Indicator - Windows 95 style */}
@@ -189,40 +217,38 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         </div>
 
         {/* Mobile Navigation Menu */}
-        {mobileMenuOpen && (
-          <nav className="mobile-nav">
+        <nav className={`mobile-nav ${mobileMenuOpen ? 'open' : ''}`}>
+          <Link 
+            to="/dashboard" 
+            className={`mobile-nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Dashboard
+          </Link>
+          <Link 
+            to="/vehicles" 
+            className={`mobile-nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Vehicles
+          </Link>
+          <Link 
+            to={orgNavPath}
+            className={`mobile-nav-link ${isActivePage('/shops') ? 'active' : ''}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Organizations
+          </Link>
+          {session && (
             <Link 
-              to="/dashboard" 
-              className={`mobile-nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
+              to="/profile" 
+              className="mobile-nav-link"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Dashboard
+              Profile
             </Link>
-            <Link 
-              to="/vehicles" 
-              className={`mobile-nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Vehicles
-            </Link>
-            <Link 
-              to="/shops" 
-              className={`mobile-nav-link ${isActivePage('/shops') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Organizations
-            </Link>
-            {session && (
-              <Link 
-                to="/profile" 
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Profile
-              </Link>
-            )}
-          </nav>
-        )}
+          )}
+        </nav>
       </header>
 
       {/* Page Header with Title and Actions */}
@@ -274,7 +300,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       )}
 
       {/* Main Content Area */}
-      <main className="main-content">
+      <main 
+        className="main-content" 
+        onClick={() => isMobile && mobileMenuOpen && setMobileMenuOpen(false)}
+        style={{ flex: 1, minHeight: 0 }}
+      >
         <div className="content-container">
           {children}
         </div>
