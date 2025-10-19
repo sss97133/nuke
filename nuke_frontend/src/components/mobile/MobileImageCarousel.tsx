@@ -19,27 +19,62 @@ export const MobileImageCarousel: React.FC<MobileImageCarouselProps> = ({
   onImageChange 
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
-  const [isZoomed, setIsZoomed] = useState(false);
+  const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{x: number, y: number} | null>(null);
+  const [scale, setScale] = useState(1);
+  const [lastScale, setLastScale] = useState(1);
+  const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
   const [showLiveStream, setShowLiveStream] = useState(!!liveStreamUrl);
   const imageRef = useRef<HTMLImageElement>(null);
 
+  const getDistance = (touch1: Touch, touch2: Touch) => {
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
+    if (e.touches.length === 1) {
+      // Single touch - track for swipe
+      setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    } else if (e.touches.length === 2) {
+      // Two fingers - pinch zoom
+      const distance = getDistance(e.touches[0], e.touches[1]);
+      setInitialPinchDistance(distance);
+      setLastScale(scale);
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (e.touches.length === 1 && touchStart) {
+      // Single touch - track swipe
+      setTouchEnd({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    } else if (e.touches.length === 2 && initialPinchDistance) {
+      // Pinch zoom - only affects image
+      e.preventDefault(); // Prevent page zoom
+      const currentDistance = getDistance(e.touches[0], e.touches[1]);
+      const newScale = (currentDistance / initialPinchDistance) * lastScale;
+      setScale(Math.min(Math.max(1, newScale), 4)); // Clamp between 1x and 4x
+    }
   };
 
   const handleTouchEnd = () => {
-    if (isZoomed) return; // Don't swipe when zoomed
+    if (scale > 1) {
+      // Zoomed - don't swipe
+      setInitialPinchDistance(null);
+      return;
+    }
+    
+    if (!touchStart || !touchEnd) return;
     
     const minSwipeDistance = 50;
-    const distance = touchStart - touchEnd;
+    const distance = touchStart.x - touchEnd.x;
     
-    if (Math.abs(distance) < minSwipeDistance) return;
+    if (Math.abs(distance) < minSwipeDistance) {
+      setTouchStart(null);
+      setTouchEnd(null);
+      return;
+    }
     
     if (distance > 0 && currentIndex < images.length - 1) {
       // Swipe left - next image
@@ -48,12 +83,18 @@ export const MobileImageCarousel: React.FC<MobileImageCarouselProps> = ({
       // Swipe right - previous image
       goToPrevious();
     }
+    
+    setTouchStart(null);
+    setTouchEnd(null);
+    setInitialPinchDistance(null);
   };
 
   const goToNext = () => {
     if (currentIndex < images.length - 1) {
       const newIndex = currentIndex + 1;
       setCurrentIndex(newIndex);
+      setScale(1); // Reset zoom on image change
+      setLastScale(1);
       onImageChange?.(newIndex);
     }
   };
@@ -62,12 +103,10 @@ export const MobileImageCarousel: React.FC<MobileImageCarouselProps> = ({
     if (currentIndex > 0) {
       const newIndex = currentIndex - 1;
       setCurrentIndex(newIndex);
+      setScale(1); // Reset zoom on image change
+      setLastScale(1);
       onImageChange?.(newIndex);
     }
-  };
-
-  const handleDoubleClick = () => {
-    setIsZoomed(!isZoomed);
   };
 
   useEffect(() => {
@@ -85,7 +124,6 @@ export const MobileImageCarousel: React.FC<MobileImageCarouselProps> = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onDoubleClick={handleDoubleClick}
       >
         {showLiveStream && liveStreamUrl ? (
           <iframe
@@ -100,8 +138,9 @@ export const MobileImageCarousel: React.FC<MobileImageCarouselProps> = ({
             alt=""
             style={{
               ...styles.image,
-              transform: isZoomed ? 'scale(2)' : 'scale(1)',
-              cursor: isZoomed ? 'zoom-out' : 'zoom-in'
+              transform: `scale(${scale})`,
+              transformOrigin: 'center center',
+              transition: scale === 1 ? 'transform 0.3s ease' : 'none'
             }}
           />
         )}
@@ -153,9 +192,9 @@ export const MobileImageCarousel: React.FC<MobileImageCarouselProps> = ({
       )}
 
       {/* Zoom indicator */}
-      {isZoomed && (
+      {scale > 1 && (
         <div style={styles.zoomIndicator}>
-          Pinch or double-tap to zoom out
+          {scale.toFixed(1)}x • Pinch to zoom out
         </div>
       )}
     </div>
