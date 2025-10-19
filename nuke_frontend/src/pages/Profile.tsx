@@ -32,6 +32,7 @@ import { ProfileService } from '../services/profileService';
 import { ProfileActivityService } from '../services/profileActivityService';
 import type { ProfileData, ProfileEditForm } from '../types/profile';
 import ProfileCompletion from '../components/profile/ProfileCompletion';
+import UserPrivateAlbum from '../components/profile/UserPrivateAlbum';
 import ProfileAchievements from '../components/profile/ProfileAchievements';
 import VehicleActivityTimeline from '../components/profile/VehicleActivityTimeline';
 import ProfileStats from '../components/profile/ProfileStats';
@@ -54,7 +55,7 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'achievements' | 'stats' | 'professional' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'albums' | 'achievements' | 'stats' | 'professional' | 'settings'>('overview');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
@@ -459,6 +460,7 @@ const Profile: React.FC = () => {
                 : 'Overview' 
             },
             { key: 'activity', label: 'Activity' },
+            { key: 'albums', label: 'My Photos' },
             { key: 'professional', label: 'Professional' },
             ...(isOwnProfile ? [{ key: 'settings', label: 'Settings' }] : [])
           ].map((tab) => (
@@ -511,6 +513,17 @@ const Profile: React.FC = () => {
             {activeTab === 'activity' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                 <VehicleActivityTimeline userId={profile.id} />
+              </div>
+            )}
+
+            {activeTab === 'albums' && (
+              <div className="card">
+                <div className="card-header">
+                  <h3 className="text font-bold">My Photos</h3>
+                </div>
+                <div className="card-body">
+                  <UserPrivateAlbum userId={profile.id} isOwnProfile={isOwnProfile} />
+                </div>
               </div>
             )}
             

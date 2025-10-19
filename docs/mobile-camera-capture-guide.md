@@ -7,25 +7,18 @@
 Add the RapidCameraCapture component to your main app layout:
 
 ```tsx
+// App.tsx
 import RapidCameraCapture from './components/mobile/RapidCameraCapture';
+import './styles/mobile-capture.css';
 
-function App() {
-  return (
-    <>
-      {/* Your existing app content */}
-      <RapidCameraCapture />
-    </>
-  );
-}
+// Already wired: <RapidCameraCapture /> is rendered once under AppLayout
 ```
 
 ### 2. Import Mobile Styles
 
 Add the mobile capture styles to your app:
 
-```tsx
-import './styles/mobile-capture.css';
-```
+Already imported in App.tsx.
 
 ### 3. Use the Mobile Capture Hook
 
@@ -77,6 +70,8 @@ Based on AI guardrails, images are automatically filed by:
 - **Recent Context**: Uses last viewed vehicle
 - **GPS Location**: Matches work locations
 - **Visual Analysis**: Identifies vehicles in frame
+
+Note: The app now persists the last viewed vehicle automatically when you open a `VehicleProfile` page, so captures immediately file to that vehicle when VIN is not visible.
 
 ### 3. User-Specific Processing
 The system adapts to each user's:
@@ -211,6 +206,7 @@ const mobileSettings = {
 
 3. **Wrong Vehicle Filing**
    - Update recent context
+   - Open the correct vehicle first (last viewed vehicle is auto-used)
    - Check VIN visibility
    - Adjust guardrail settings
 
@@ -232,21 +228,7 @@ console.log('Capture statistics:', stats);
 
 ### With Vehicle Profile Page
 
-```tsx
-function VehicleProfile({ vehicleId }) {
-  // Set context for camera capture
-  useEffect(() => {
-    localStorage.setItem(`lastVehicle_${user.id}`, vehicleId);
-  }, [vehicleId]);
-
-  return (
-    <div>
-      {/* Vehicle details */}
-      <RapidCameraCapture />
-    </div>
-  );
-}
-```
+No extra setup required; `VehicleProfile` now saves the current vehicle as the "last viewed" context automatically.
 
 ### With Work Session Tracking
 
@@ -287,5 +269,7 @@ For issues or questions:
 1. Check the troubleshooting guide
 2. Review guardrails documentation
 3. Contact support with debug logs
+
+New: Check your private album under Profile → My Photos to verify uploads and assign images later.
 
 Remember: The system learns from your usage patterns. The more you use it, the smarter it becomes at filing your images correctly!

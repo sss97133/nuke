@@ -2,9 +2,11 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import './design-system.css';
+import './styles/mobile-capture.css';
 import { ToastProvider } from './hooks/useToast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
+import RapidCameraCapture from './components/mobile/RapidCameraCapture';
 
 // Database components
 import DatabaseAudit from './pages/DatabaseAudit';
@@ -299,6 +301,8 @@ function App() {
             } />
           </Routes>
         </AppLayout>
+        {/* Floating mobile camera capture button - always available */}
+        <RapidCameraCapture />
         {/* Global Upload Progress Bar - Persists across navigation */}
         <UploadProgressBar />
       </Router>

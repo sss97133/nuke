@@ -308,6 +308,20 @@ const VehicleProfile: React.FC = () => {
       loadPresenceCount();
       loadRecentComments();
       checkContributorStatus();
+
+      // Persist last viewed vehicle context for mobile capture guardrails
+      try {
+        const summary = {
+          id: vehicle.id,
+          year: (vehicle as any).year,
+          make: (vehicle as any).make,
+          model: (vehicle as any).model
+        };
+        localStorage.setItem('lastViewedVehicle', JSON.stringify(summary));
+        if (session?.user?.id) {
+          localStorage.setItem(`lastVehicle_${session.user.id}`, vehicle.id);
+        }
+      } catch {}
     }
   }, [vehicle]);
 

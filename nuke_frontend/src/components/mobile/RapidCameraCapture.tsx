@@ -227,21 +227,7 @@ const RapidCameraCapture: React.FC = () => {
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={isCapturing}
-        style={{
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          background: isCapturing ? '#757575' : '#424242',
-          color: 'white',
-          border: 'none',
-          fontSize: '24px',
-          cursor: isCapturing ? 'not-allowed' : 'pointer',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s'
-        }}
+        className="rapid-capture-button"
       >
         {isCapturing ? '⏳' : '📷'}
       </button>
@@ -259,22 +245,7 @@ const RapidCameraCapture: React.FC = () => {
 
       {/* Context indicator */}
       {captureContext.lastVehicleName && (
-        <div style={{
-          position: 'absolute',
-          bottom: '70px',
-          right: '0',
-          background: 'rgba(66, 66, 66, 0.9)',
-          color: 'white',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          fontSize: '7pt',
-          whiteSpace: 'nowrap',
-          maxWidth: '200px',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}>
-          📍 {captureContext.lastVehicleName}
-        </div>
+        <div className="context-indicator">📍 {captureContext.lastVehicleName}</div>
       )}
 
       {/* Settings toggle */}
@@ -299,29 +270,12 @@ const RapidCameraCapture: React.FC = () => {
 
       {/* Recent captures preview */}
       {recentCaptures.length > 0 && (
-        <div style={{
-          position: 'absolute',
-          bottom: '0',
-          right: '70px',
-          display: 'flex',
-          gap: '4px'
-        }}>
+        <div className="recent-captures">
           {recentCaptures.slice(0, 3).map((url, index) => (
-            <div
-              key={index}
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                border: '2px solid white',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
-              }}
-            >
+            <div key={index} className="recent-capture-thumb">
               <img 
                 src={url} 
                 alt={`Recent ${index + 1}`}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
           ))}
@@ -330,73 +284,50 @@ const RapidCameraCapture: React.FC = () => {
 
       {/* Capture count badge */}
       {captureContext.captureCount > 0 && (
-        <div style={{
-          position: 'absolute',
-          top: '-5px',
-          right: '-5px',
-          background: '#f44336',
-          color: 'white',
-          borderRadius: '50%',
-          width: '24px',
-          height: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '10px',
-          fontWeight: 'bold'
-        }}>
-          {captureContext.captureCount}
-        </div>
+        <div className="capture-badge">{captureContext.captureCount}</div>
       )}
 
       {/* Settings panel */}
       {showSettings && (
-        <div style={{
-          position: 'absolute',
-          bottom: '70px',
-          right: '0',
-          background: 'white',
-          border: '1px solid #bdbdbd',
-          borderRadius: '4px',
-          padding: '12px',
-          width: '250px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-        }}>
-          <h4 style={{ margin: '0 0 8px 0', fontSize: '8pt' }}>Capture Settings</h4>
+        <div className="capture-settings-panel">
+          <h4>Capture Settings</h4>
           
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '8pt' }}>
+          <div className="settings-checkbox">
             <input
+              id="auto-detect-vin"
               type="checkbox"
               checked={guardrails.autoDetectVIN}
               onChange={(e) => setGuardrails(prev => ({ ...prev, autoDetectVIN: e.target.checked }))}
             />
-            Auto-detect VIN
-          </label>
+            <label htmlFor="auto-detect-vin">Auto-detect VIN</label>
+          </div>
 
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '8pt' }}>
+          <div className="settings-checkbox">
             <input
+              id="use-recent-context"
               type="checkbox"
               checked={guardrails.useRecentContext}
               onChange={(e) => setGuardrails(prev => ({ ...prev, useRecentContext: e.target.checked }))}
             />
-            Use recent vehicle
-          </label>
+            <label htmlFor="use-recent-context">Use recent vehicle</label>
+          </div>
 
-          <label style={{ display: 'block', marginBottom: '4px', fontSize: '8pt' }}>
+          <div className="settings-checkbox">
             <input
+              id="batch-similar"
               type="checkbox"
               checked={guardrails.batchSimilarPhotos}
               onChange={(e) => setGuardrails(prev => ({ ...prev, batchSimilarPhotos: e.target.checked }))}
             />
-            Batch similar photos
-          </label>
+            <label htmlFor="batch-similar">Batch similar photos</label>
+          </div>
 
-          <div style={{ marginTop: '8px', fontSize: '8pt' }}>
+          <div style={{ marginTop: 8 }}>
             <label>Privacy Mode:</label>
             <select
+              className="settings-select"
               value={guardrails.privacyMode}
               onChange={(e) => setGuardrails(prev => ({ ...prev, privacyMode: e.target.value as any }))}
-              style={{ width: '100%', fontSize: '8pt', marginTop: '2px' }}
             >
               <option value="none">None</option>
               <option value="blur_plates">Blur License Plates</option>
