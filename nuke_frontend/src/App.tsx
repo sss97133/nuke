@@ -2,6 +2,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import './design-system.css';
+import './styles/function-design.css';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './hooks/useToast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
@@ -190,8 +192,9 @@ function App() {
   }
 
   return (
-    <ToastProvider>
-      <Router>
+    <ThemeProvider>
+      <ToastProvider>
+        <Router>
         {/* Global Upload Status - Always visible at top */}
         <GlobalUploadStatus />
 
@@ -301,8 +304,9 @@ function App() {
         </AppLayout>
         {/* Global Upload Progress Bar - Persists across navigation */}
         <UploadProgressBar />
-      </Router>
-    </ToastProvider>
+        </Router>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 
