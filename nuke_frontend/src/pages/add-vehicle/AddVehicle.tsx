@@ -27,16 +27,6 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   onSuccess 
 }) => {
   const isMobile = useIsMobile();
-  
-  // If mobile, use mobile-optimized version
-  if (isMobile) {
-    return (
-      <MobileAddVehicle 
-        onClose={onClose}
-        onSuccess={onSuccess}
-      />
-    );
-  }
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
 
@@ -972,6 +962,16 @@ Redirecting to vehicle profile...`);
   );
 
   // Render based on mode
+  // IMPORTANT: Determine mobile rendering AFTER all hooks have been called
+  // to preserve consistent hook order across renders
+  if (isMobile) {
+    return (
+      <MobileAddVehicle 
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
+    );
+  }
   if (mode === 'modal') {
     return (
       <div 
