@@ -107,26 +107,39 @@ export class AIImageProcessingService {
       return this.userGuardrailsCache.get(userId)!;
     }
 
-    // Load from database
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    // Preferred: fetch consolidated guardrails from RPC if available
+    try {
+      const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_user_guardrails', { p_user_id: userId });
+      if (!rpcError && rpcData && Array.isArray(rpcData) && rpcData[0]?.guardrails) {
+        const parsed: UserGuardrails = rpcData[0].guardrails as UserGuardrails;
+        this.userGuardrailsCache.set(userId, parsed);
+        return parsed;
+      }
+    } catch {}
 
-    // Load user preferences
-    const { data: preferences } = await supabase
-      .from('user_preferences')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    // Fallback: attempt to read from profiles/user_preferences if present; otherwise defaults
+    let profile: any = null;
+    let preferences: any = null;
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      profile = data || null;
+    } catch {}
 
-    // Construct guardrails based on user profile and preferences
-    const guardrails = this.constructGuardrails(userProfile, preferences);
-    
-    // Cache for future use
+    try {
+      const { data } = await supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      preferences = data || null;
+    } catch {}
+
+    const guardrails = this.constructGuardrails(profile, preferences);
     this.userGuardrailsCache.set(userId, guardrails);
-    
     return guardrails;
   }
 

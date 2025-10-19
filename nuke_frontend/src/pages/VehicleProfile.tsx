@@ -99,6 +99,20 @@ const VehicleProfile: React.FC = () => {
   const [composeText, setComposeText] = useState<{ title: string; description: string; specs: string[] }>({ title: '', description: '', specs: [] });
   const [userProfile, setUserProfile] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  // Persist last viewed vehicle for mobile capture context
+  useEffect(() => {
+    if (vehicle && (vehicle as any).id) {
+      try {
+        const payload = {
+          id: (vehicle as any).id,
+          year: (vehicle as any).year || null,
+          make: (vehicle as any).make || null,
+          model: (vehicle as any).model || null
+        };
+        localStorage.setItem('lastViewedVehicle', JSON.stringify(payload));
+      } catch {}
+    }
+  }, [vehicle]);
   
   // Detect mobile device - but DON'T use early return (breaks React hooks rules)
   const [isMobile, setIsMobile] = useState(false);

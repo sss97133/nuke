@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { ImageUploadService } from '../../services/imageUploadService';
-import { extractImageMetadata } from '../../utils/imageMetadata';
+import { useAuth } from '../../hooks/useAuth';
+import { useMobileCameraCapture } from '../../hooks/useMobileCameraCapture';
 import '../../design-system.css';
 
 interface CaptureContext {
@@ -29,6 +28,12 @@ const RapidCameraCapture: React.FC = () => {
     captureCount: 0
   });
   const [recentCaptures, setRecentCaptures] = useState<string[]>([]);
+  const { state: captureState, captureImages } = useMobileCameraCapture({
+    enableOfflineQueue: true,
+    autoProcessing: true,
+    batchMode: true,
+    maxBatchSize: 5
+  });
   const [guardrails, setGuardrails] = useState<GuardrailSettings>({
     autoDetectVIN: true,
     useRecentContext: true,
@@ -79,60 +84,18 @@ const RapidCameraCapture: React.FC = () => {
 
   const handleCapture = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0 || !user) return;
-
     setIsCapturing(true);
-    const capturedUrls: string[] = [];
-
     try {
-      for (const file of Array.from(files)) {
-        // Extract metadata for intelligent filing
-        const metadata = await extractImageMetadata(file);
-        
-        // Determine target vehicle based on guardrails
-        let targetVehicleId = await determineTargetVehicle(file, metadata);
-        
-        if (!targetVehicleId && captureContext.lastVehicleId) {
-          // Use recent context if no vehicle determined
-          targetVehicleId = captureContext.lastVehicleId;
-        }
-
-        if (targetVehicleId) {
-          // Upload to determined vehicle
-          const result = await ImageUploadService.uploadImage(
-            targetVehicleId,
-            file,
-            determineCategory(metadata)
-          );
-
-          if (result.success && result.imageUrl) {
-            capturedUrls.push(result.imageUrl);
-            
-            // Update capture context
-            setCaptureContext(prev => ({
-              ...prev,
-              captureCount: prev.captureCount + 1,
-              lastCaptureTime: new Date()
-            }));
-          }
-        } else {
-          // Queue for later filing if no target determined
-          await queueForLaterFiling(file, metadata);
-        }
-      }
-
-      // Update recent captures for preview
-      setRecentCaptures(prev => [...capturedUrls, ...prev].slice(0, 5));
-
-      // Show success feedback
-      showFeedback(`${files.length} photo${files.length > 1 ? 's' : ''} captured!`);
-
-    } catch (error) {
-      console.error('Capture error:', error);
+      const results = await captureImages(files);
+      const successCount = results.filter(r => r.success).length;
+      showFeedback(`${successCount}/${files.length} captured`);
+    } catch (e) {
+      console.error('Capture error:', e);
       showFeedback('Failed to capture photos', 'error');
     } finally {
       setIsCapturing(false);
     }
-  }, [user, captureContext, guardrails]);
+  }, [user, captureImages]);
 
   const determineTargetVehicle = async (file: File, metadata: any): Promise<string | null> => {
     // AI-powered vehicle detection based on guardrails

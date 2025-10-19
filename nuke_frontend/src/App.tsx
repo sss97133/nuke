@@ -42,6 +42,7 @@ import Discovery from './pages/Discovery';
 // Debug pages removed during cleanup
 import BrowseProfessionals from './pages/BrowseProfessionals';
 import PhotoLibraryCategorizer from './components/PhotoLibraryCategorizer';
+import MyPhotos from './pages/MyPhotos';
 import AppLayout from './components/layout/AppLayout';
 import ViewerDashboard from './pages/ViewerDashboard';
 import VehicleInteractionManager from './pages/VehicleInteractionManager';
@@ -222,6 +223,7 @@ function App() {
             
             {/* Media & Content Tools */}
             <Route path="/photo-categorizer" element={<PhotoLibraryCategorizer />} />
+            <Route path="/my-photos" element={<MyPhotos />} />
             <Route path="/dropbox-import" element={<DropboxImport />} />
             <Route path="/dropbox-callback" element={<DropboxCallback />} />
             <Route path="/dropbox-ai-process" element={<DropboxAIProcess />} />
