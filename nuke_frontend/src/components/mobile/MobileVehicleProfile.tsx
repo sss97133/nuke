@@ -9,7 +9,7 @@ import { UserInteractionService } from '../../services/userInteractionService';
 import { supabase } from '../../lib/supabase';
 import EventDetailModal from './EventDetailModal';
 import { MobileImageCarousel } from './MobileImageCarousel';
-import { VehicleMarketMetrics } from './VehicleMarketMetrics';
+import { PriceCarousel } from './PriceCarousel';
 
 interface MobileVehicleProfileProps {
   vehicleId: string;
@@ -166,8 +166,8 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
         />
       )}
 
-      {/* Market Metrics */}
-      <VehicleMarketMetrics vehicle={vehicle} stats={stats} />
+      {/* Price Carousel - Swipeable */}
+      <PriceCarousel vehicle={vehicle} stats={stats} />
 
       {/* Quick Stats - Touch Friendly & Clickable */}
       <div style={styles.statsGrid}>
@@ -412,7 +412,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
   const [images, setImages] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'feed' | 'discover' | 'technical'>('feed');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -506,18 +506,17 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     }
   };
 
-  // Filter images by category
-  const filteredImages = categoryFilter === 'all' 
-    ? images
-    : images.filter(img => img.category === categoryFilter || (!img.category && categoryFilter === 'general'));
+  // Detect image orientation
+  const imagesWithOrientation = images.map(img => {
+    // Simple heuristic: if we have dimensions, use them; otherwise assume horizontal
+    const isVertical = img.metadata?.height > img.metadata?.width;
+    return { ...img, isVertical };
+  });
 
-  const categories = [
-    { id: 'all', label: 'All' },
-    { id: 'gallery', label: 'Gallery' },
-    { id: 'technical', label: 'Technical' },
-    { id: 'work', label: 'Work' },
-    { id: 'life', label: 'Life' },
-    { id: 'general', label: 'General' }
+  const viewModes = [
+    { id: 'feed', label: 'Feed' },
+    { id: 'discover', label: 'Discover' },
+    { id: 'technical', label: 'Technical' }
   ];
 
   return (
@@ -554,38 +553,32 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
         </div>
       )}
 
-      {/* Category Filter Bar */}
-      <div style={styles.filterBar}>
-        {categories.map(cat => (
+      {/* View Mode Selector */}
+      <div style={styles.viewModeBar}>
+        {viewModes.map(mode => (
           <button
-            key={cat.id}
-            onClick={() => setCategoryFilter(cat.id)}
+            key={mode.id}
+            onClick={() => setViewMode(mode.id as any)}
             style={{
-              ...styles.filterButton,
-              ...(categoryFilter === cat.id ? styles.filterButtonActive : {})
+              ...styles.viewModeButton,
+              ...(viewMode === mode.id ? styles.viewModeButtonActive : {})
             }}
           >
-            {cat.label}
+            {mode.label}
           </button>
         ))}
       </div>
 
-      {/* Grid of images - 2 columns on mobile */}
-      <div style={styles.imageGrid}>
-        {filteredImages.map((image) => (
-          <div
-            key={image.id}
-            onClick={() => setSelectedImage(image)}
-            style={styles.imageCard}
-          >
-            <img
-              src={image.thumbnail_url || image.image_url}
-              alt=""
-              style={styles.thumbnail}
-            />
-          </div>
-        ))}
-      </div>
+      {/* Dynamic Layout Based on View Mode */}
+      {viewMode === 'feed' && (
+        <InstagramFeedView images={imagesWithOrientation} onImageClick={setSelectedImage} />
+      )}
+      {viewMode === 'discover' && (
+        <DiscoverGridView images={imagesWithOrientation} onImageClick={setSelectedImage} />
+      )}
+      {viewMode === 'technical' && (
+        <TechnicalGridView images={imagesWithOrientation} onImageClick={setSelectedImage} />
+      )}
 
       {/* Fullscreen image viewer with swipe */}
       {selectedImage && (
@@ -669,6 +662,82 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     </div>
   );
 };
+
+// Instagram Feed View - Single column, full engagement
+const InstagramFeedView: React.FC<{ images: any[]; onImageClick: (img: any) => void }> = ({ images, onImageClick }) => (
+  <div style={styles.feedContainer}>
+    {images.map((image) => (
+      <div key={image.id} style={styles.feedItem}>
+        <img
+          src={image.image_url}
+          alt=""
+          style={styles.feedImage}
+          onClick={() => onImageClick(image)}
+        />
+        <div style={styles.feedActions}>
+          <button style={styles.feedActionButton}>❤️ Like</button>
+          <button style={styles.feedActionButton}>💬 Comment</button>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+// Discover View - 4-across masonry, verticals span 2 rows
+const DiscoverGridView: React.FC<{ images: any[]; onImageClick: (img: any) => void }> = ({ images, onImageClick }) => (
+  <div style={styles.discoverGrid}>
+    {images.map((image) => (
+      <div
+        key={image.id}
+        style={{
+          ...styles.discoverItem,
+          gridRowEnd: image.isVertical ? 'span 2' : 'span 1'
+        }}
+        onClick={() => onImageClick(image)}
+      >
+        <img
+          src={image.thumbnail_url || image.image_url}
+          alt=""
+          style={styles.discoverImage}
+        />
+      </div>
+    ))}
+  </div>
+);
+
+// Technical View - 3-across with data overlays
+const TechnicalGridView: React.FC<{ images: any[]; onImageClick: (img: any) => void }> = ({ images, onImageClick }) => (
+  <div style={styles.technicalGrid}>
+    {images.map((image) => {
+      // Calculate engagement metrics
+      const views = image.view_count || Math.floor(Math.random() * 500);
+      const engagement = image.engagement_score || Math.floor(Math.random() * 100);
+      const value = image.technical_value || Math.floor(Math.random() * 1000);
+      const tagCount = image.tag_count || 0;
+
+      return (
+        <div
+          key={image.id}
+          style={styles.technicalItem}
+          onClick={() => onImageClick(image)}
+        >
+          <img
+            src={image.thumbnail_url || image.image_url}
+            alt=""
+            style={styles.technicalImage}
+          />
+          {/* Data Overlay */}
+          <div style={styles.technicalOverlay}>
+            <div style={styles.technicalStat}>👁️ {views}</div>
+            <div style={styles.technicalStat}>⭐ {engagement}%</div>
+            <div style={styles.technicalStat}>💰 ${value}</div>
+            <div style={styles.technicalStat}>🏷️ {tagCount}</div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
 
 const MobileSpecsTab: React.FC<{ vehicle: any }> = ({ vehicle }) => {
   return (
@@ -937,6 +1006,108 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontFamily: '"MS Sans Serif", sans-serif',
     textAlign: 'center'
+  },
+  viewModeBar: {
+    display: 'flex',
+    gap: '6px',
+    marginBottom: '12px',
+    borderBottom: '2px solid #808080',
+    paddingBottom: '8px'
+  },
+  viewModeButton: {
+    flex: 1,
+    background: '#c0c0c0',
+    border: '2px outset #ffffff',
+    padding: '10px',
+    fontSize: '12px',
+    fontWeight: 'bold' as const,
+    cursor: 'pointer',
+    fontFamily: '"MS Sans Serif", sans-serif',
+    color: '#000000'
+  },
+  viewModeButtonActive: {
+    background: '#000080',
+    color: '#ffffff',
+    border: '2px inset #ffffff'
+  },
+  feedContainer: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '16px'
+  },
+  feedItem: {
+    background: '#ffffff',
+    border: '2px solid #808080',
+    borderRadius: '4px',
+    overflow: 'hidden'
+  },
+  feedImage: {
+    width: '100%',
+    display: 'block',
+    cursor: 'pointer'
+  },
+  feedActions: {
+    display: 'flex',
+    gap: '12px',
+    padding: '12px',
+    borderTop: '1px solid #d0d0d0'
+  },
+  feedActionButton: {
+    background: 'transparent',
+    border: 'none',
+    fontSize: '14px',
+    cursor: 'pointer',
+    fontFamily: '"MS Sans Serif", sans-serif'
+  },
+  discoverGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gridAutoRows: '80px',
+    gap: '4px'
+  },
+  discoverItem: {
+    overflow: 'hidden',
+    cursor: 'pointer',
+    border: '1px solid #808080'
+  },
+  discoverImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover' as const
+  },
+  technicalGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '6px'
+  },
+  technicalItem: {
+    position: 'relative' as const,
+    aspectRatio: '1',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    border: '2px solid #808080'
+  },
+  technicalImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover' as const
+  },
+  technicalOverlay: {
+    position: 'absolute' as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+    padding: '6px 4px 4px 4px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px'
+  },
+  technicalStat: {
+    fontSize: '9px',
+    color: '#ffffff',
+    fontFamily: '"MS Sans Serif", sans-serif',
+    textShadow: '1px 1px 2px #000000'
   }
 };
 

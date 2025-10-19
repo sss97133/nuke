@@ -1,178 +1,383 @@
-<!-- 5aec0345-1027-4182-b4d1-133f713a8c0b 5971b466-351f-4bb6-a786-e4991bfdf961 -->
-# Mobile Upload Date Fix Plan
+<!-- 5aec0345-1027-4182-b4d1-133f713a8c0b 078fe148-f382-4417-966a-278667328cd6 -->
+# Mobile UX Refinements
 
-## Problem
+## Overview of Changes
 
-Timeline events from mobile uploads are using **upload date** instead of **actual photo dates from EXIF**. When uploading 20+ photos taken over several months, they all get today's date instead of being properly organized on the timeline.
+Transform mobile profile into sophisticated market platform with:
 
-### Current Behavior (Wrong)
+1. Instagram-style image viewer
+2. Swipeable price carousel (share/value/bets/auction)
+3. Pinch-zoom on images only (not UI)
+4. AI-powered clickable specs
+5. Enhanced viewer modes (Feed/Discover/Technical)
 
-- Upload batch of 23 photos from June-October
-- All photos get event_date = `2025-10-18` (upload date) ❌
-- Creates single "Photo Added" event with all 23 images
-- Timeline shows one giant event on October 18
+## 1. Image Zoom Fix
 
-### Desired Behavior (Correct)
+### Current Problem
 
-- Upload batch of 23 photos with various EXIF dates
-- Extract EXIF `dateTimeOriginal` from each photo
-- Group photos by date: June photos, July photos, etc.
-- Create separate timeline events for each date ✅
-- Timeline accurately reflects when work was done
+- Double-tap zooms entire page/UI ❌
+- Zooms into UI elements, not just image ❌
 
-## Root Cause
+### Required Behavior
 
-**`apple-upload` edge function** (line 49):
+- ✅ ONLY pinch-to-zoom gesture
+- ✅ ONLY the image expands (not UI)
+- ✅ Image fills viewport when zoomed
+- ✅ Rest of UI stays at normal scale
 
-```typescript
-const eventDate = String(form.get('event_date') || new Date().toISOString().split('T')[0])
+**Implementation**:
+
+```javascript
+// Remove double-tap zoom handler
+// Add pinch gesture detection
+// Use CSS transform on image element only
+// Prevent page zoom with viewport meta tag
 ```
 
-Falls back to today's date without extracting EXIF data from images.
+## 2. Price Box Swipeable Carousel
 
-## Solution Architecture
+### Current
 
-### Option 1: Edge Function EXIF Extraction (Recommended)
+Single static market metrics card
 
-**Pros:**
+### New: Multi-Screen Swipeable Component
 
-- Centralized - fixes all mobile uploads
-- Works for iOS Shortcuts, web uploads, etc.
-- No client-side changes needed
+**Screen 1: Share Price** (default)
 
-**Cons:**
+```
+┌──────────────────────────┐
+│ $42.15/share  ↑ 2.3%    │
+│ Volatility: ●●○○○        │
+│ Trading: 🟢 Active       │
+└──────────────────────────┘
+```
 
-- Need EXIF library in Deno edge function
-- Slightly slower uploads (process images server-side)
+**Screen 2: Total Value** (swipe left)
 
-### Option 2: Client-Side Pre-Processing
+```
+┌──────────────────────────┐
+│ Market Cap: $45,200      │
+│ Purchase: $38,000        │
+│ Gain: +$7,200 (18.9%)    │
+└──────────────────────────┘
+```
 
-**Pros:**
+**Screen 3: Bets/Speculation** (swipe left again)
 
-- Faster server processing
-- Client already has image data
+```
+┌──────────────────────────┐
+│ 🎲 Market Bets           │
+│ Will reach $50k: 67%     │
+│ Next mod value: +$2k     │
+│ Completion: 3 months     │
+└──────────────────────────┘
+```
 
-**Cons:**
+**Screen 4: Auction Vote** (swipe left again)
 
-- Need to update multiple upload paths
-- iOS Shortcuts can't easily extract EXIF
+```
+┌──────────────────────────┐
+│ 🏛️ Send to Auction?      │
+│ [Vote Yes] [Vote No]     │
+│ Current votes: 3 yes     │
+└──────────────────────────┘
+```
 
-### Recommended: Option 1
+**Windows 95 Styling**:
 
-## Implementation Steps
+- Beveled borders (2px outset/inset)
+- Gray background (#c0c0c0)
+- Blue accents (#000080)
+- Dotted indicators below for screen position
 
-### 1. Add EXIF Extraction to Edge Function
+## 3. Instagram-Style Images View
 
-Update `supabase/functions/apple-upload/index.ts`:
+### Current
 
-```typescript
-import { readExif } from 'npm:exifr'  // Add EXIF library
+Simple 2-column grid, all images same size
 
-// After collecting files, extract EXIF from each
-const filesWithDates: Array<{file: File, exifDate: Date | null}> = []
-for (const file of files) {
-  const arrayBuffer = await file.arrayBuffer()
-  const exif = await readExif(arrayBuffer)
-  const exifDate = exif?.DateTimeOriginal || exif?.DateTime || null
-  filesWithDates.push({ file, exifDate })
+### New: Instagram Feed Layout
+
+**Three View Modes** (buttons at top):
+
+#### Feed View (Default)
+
+- Single column like Instagram Stories
+- Full-width images
+- Vertical scrolling
+- Like/comment buttons on each
+- Optimized for engagement
+
+#### Discover View
+
+- 4 images across (grid)
+- Verticals take 2 boxes tall (more space)
+- Horizontals single box
+- Dense browsing mode
+- Shows more images per screen
+
+#### Technical View
+
+- 3 images across
+- Overlay shows:
+  - View count
+  - Engagement score
+  - Technical value (AI-rated)
+  - Tags count
+- Data-driven display
+
+**Layout Logic**:
+
+```javascript
+if (viewMode === 'feed') {
+  // Single column, full width
+  return <InstagramFeedLayout />
 }
+else if (viewMode === 'discover') {
+  // 4-across grid, verticals span 2 rows
+  const gridItems = images.map(img => ({
+    ...img,
+    span: img.orientation === 'vertical' ? 2 : 1
+  }))
+  return <MasonryGrid items={gridItems} columns={4} />
+}
+else if (viewMode === 'technical') {
+  // 3-across with data overlays
+  return <TechnicalGrid images={images} />
+}
+```
 
-// Group by date
-const dateGroups = new Map<string, typeof filesWithDates>()
-for (const item of filesWithDates) {
-  const dateKey = item.exifDate 
-    ? item.exifDate.toISOString().split('T')[0]
-    : eventDate  // fallback to provided/today
-  
-  if (!dateGroups.has(dateKey)) {
-    dateGroups.set(dateKey, [])
+## 4. Clickable AI-Powered Specs
+
+### Current
+
+Static specs list (year, make, model, etc.)
+
+### New: Interactive AI Research
+
+When you click any spec, opens modal with AI-researched data:
+
+**Example: Click "Engine: V8"**
+
+Modal shows:
+
+```
+┌─────────────────────────────────────┐
+│ ENGINE SPECIFICATIONS               │
+├─────────────────────────────────────┤
+│ Factory Data (AI-sourced):          │
+│ • Type: 350ci V8                    │
+│ • HP: 165 hp @ 3,800 rpm            │
+│ • Torque: 255 lb-ft @ 2,400 rpm     │
+│ • Carburetor: Rochester Quadrajet   │
+│                                     │
+│ Market Context:                     │
+│ • Common engine: 78% of K5s         │
+│ • Rebuild cost: $2,500-4,000        │
+│ • Reliability: Above average        │
+│                                     │
+│ Community Intel:                    │
+│ • Forum discussions: 1,247 posts    │
+│ • Facebook groups: 12 active        │
+│ • Common mods: Headers, cam         │
+│                                     │
+│ Sources:                            │
+│ 📄 Factory service manual p.142     │
+│ 📊 NADA historical data            │
+│ 💬 K5 Blazer Forum (248 threads)   │
+│ 📱 Classic Truck FB Group          │
+└─────────────────────────────────────┘
+```
+
+**AI Guardrails Process**:
+
+1. User clicks "Engine" spec
+2. AI identifies vehicle: 1977 Chevrolet K5
+3. Searches within bounds:
+
+   - Factory manuals for K5 Blazer
+   - Historical value data for 1977
+   - Current market comps
+   - Forum posts about 350ci V8
+   - Facebook group discussions
+
+4. Synthesizes answer with sources
+5. Each spec has unique research pathway
+
+**Clickable Specs**:
+
+- Engine → Factory specs + market data
+- Transmission → Gear ratios + rebuild costs  
+- Drivetrain → 4WD system details
+- Axles → Gear ratio + locker options
+- Tires → Size compatibility + common upgrades
+- Suspension → Lift kit data + ride quality
+
+## 5. Price Carousel Implementation
+
+**Component**: `PriceCarousel.tsx`
+
+Features:
+
+- Horizontal swipe between 4 screens
+- Dots indicator at bottom
+- Windows 95 beveled style
+- Touch-friendly (48px+ touch targets)
+
+Screens:
+
+1. **Share Price** - Trading metrics
+2. **Total Value** - Purchase vs current
+3. **Bets** - Market speculation/predictions
+4. **Auction Vote** - Community voting
+
+## 6. Image Viewer Modes
+
+### Button Bar
+
+```
+[Feed] [Discover] [Technical]
+```
+
+### Feed Mode
+
+- Instagram single-column layout
+- Large images, full engagement
+- Like/comment on each
+- Optimized for scrolling
+
+### Discover Mode  
+
+- Dense 4-across grid
+- Vertical images span 2 rows (portrait gets more space)
+- Horizontal images single row
+- Quick browsing, see more at once
+
+### Technical Mode
+
+- 3-across grid
+- Each image shows overlay:
+  - 👁️ 247 views
+  - ⭐ 89% engagement
+  - 💰 $340 value score
+  - 🏷️ 12 tags
+
+## Implementation Todos
+
+### High Priority (Core UX)
+
+1. Fix image zoom to pinch-only (no double-tap, image-only zoom)
+2. Create swipeable price carousel (4 screens)
+3. Make price box Windows 95 styled
+4. Implement Instagram-style feed view
+
+### Medium Priority (Enhanced Features)
+
+5. Add Discover view (4-across masonry)
+6. Add Technical view (with data overlays)
+7. Make specs clickable with AI research modal
+8. Implement spec-specific AI queries
+
+### Low Priority (Data Infrastructure)
+
+9. Create betting/speculation system
+10. Create auction voting mechanism
+11. Build AI guardrails for spec research
+12. Index factory manuals/forums/Facebook groups
+
+## Technical Approach
+
+### Pinch Zoom
+
+```javascript
+const [scale, setScale] = useState(1);
+const [lastScale, setLastScale] = useState(1);
+
+const handleTouchMove = (e) => {
+  if (e.touches.length === 2) {
+    const dist = getDistanceBetweenTouches(e.touches);
+    const newScale = (dist / initialDist) * lastScale;
+    setScale(Math.min(Math.max(1, newScale), 4)); // 1x to 4x
   }
-  dateGroups.get(dateKey)!.push(item)
-}
+};
 
-// Create separate event for each date group
-for (const [date, groupFiles] of dateGroups.entries()) {
-  // Create event with this date
-  // Upload files for this group
-  // Link to this event
+// Apply transform only to image element
+<img style={{ transform: `scale(${scale})` }} />
+```
+
+### Price Carousel
+
+```javascript
+<SwipeableViews index={priceScreen} onChangeIndex={setPriceScreen}>
+  <SharePriceScreen />
+  <TotalValueScreen />
+  <BettingScreen />
+  <AuctionVoteScreen />
+</SwipeableViews>
+```
+
+### Image Layout Modes
+
+```javascript
+const layouts = {
+  feed: { columns: 1, showEngagement: true },
+  discover: { columns: 4, spanVerticals: 2 },
+  technical: { columns: 3, showMetrics: true }
+};
+```
+
+### AI Spec Research
+
+```javascript
+async function researchSpec(vehicle, specName) {
+  // Call AI with guardrails
+  const context = {
+    vehicle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+    vin: vehicle.vin,
+    spec: specName
+  };
+  
+  const sources = [
+    'factory_manuals',
+    'nada_historical',
+    'current_market_comps',
+    'forums', 
+    'facebook_groups'
+  ];
+  
+  return await ai.research(context, sources, guardrails);
 }
 ```
 
-### 2. Update Image Metadata Storage
+## Questions for Discussion
 
-Ensure `vehicle_images` table captures EXIF date:
+1. **Price carousel screens** - Are 4 screens good, or want more/less?
+2. **Betting system** - What should users bet on? (Value reaching X, completion date, etc.)
+3. **Auction voting** - Threshold votes needed? Who can vote?
+4. **Spec AI sources** - Should we index manuals now or wait?
+5. **Image engagement tracking** - Track views/likes per image?
 
-- Add/use `taken_at` field
-- Populate from EXIF `dateTimeOriginal`
-- Fall back to `created_at` if no EXIF
+## Execution Order
 
-### 3. Handle Edge Cases
+**Phase 1** (Immediate):
 
-- **No EXIF data**: Skip timeline event creation, just store image ✅
-- **Invalid dates**: Validate date is reasonable (after 1970, not in future)
-- **Mixed dates in batch**: Create multiple events, group by date
-- **Single photo**: Just use its EXIF date directly
-- **Explicit event_date param**: If user provides event_date, use that for all photos
+- Fix pinch zoom
+- Price carousel
+- Windows 95 styling
 
-### 4. Update Event Titles
+**Phase 2** (Next):
 
-Instead of generic "Photo set", use descriptive titles:
+- Instagram feed view
+- Discover view
+- Technical view
 
-- Single date: "Photos from [date]"
-- With album name: "Photos from [date] • [album]"
-- Multiple photos same date: "[count] photos from [date]"
+**Phase 3** (After):
 
-## Files to Modify
+- Clickable specs
+- AI research
+- Betting/auction
 
-### Edge Function
-
-- `supabase/functions/apple-upload/index.ts` - Add EXIF extraction, date grouping
-
-### Frontend (Optional Enhancements)
-
-- `nuke_frontend/src/services/imageUploadService.ts` - Extract EXIF before upload
-- `nuke_frontend/src/components/mobile/MobileAddVehicle.tsx` - Show detected dates
-
-### Database
-
-- Verify `vehicle_images.taken_at` is populated correctly
-- Ensure `vehicle_timeline_events.event_date` uses photo dates
-
-## Testing Strategy
-
-1. **Single photo with EXIF**: Verify event gets photo's date
-2. **Batch with same date**: Creates one event with all photos
-3. **Batch with multiple dates**: Creates separate events per date
-4. **Photos without EXIF**: Falls back gracefully to upload date
-5. **Invalid EXIF dates**: Handles edge cases (future dates, invalid formats)
-
-## Success Metrics
-
-✅ Timeline events appear on actual photo dates
-
-✅ Multi-date batches split into separate events
-
-✅ Event titles reflect actual dates
-
-✅ No photos lost or orphaned
-
-✅ Graceful fallback for missing EXIF
-
-## Migration for Existing Wrong-Dated Events
-
-Optional cleanup for the 23 existing events with wrong dates:
-
-```sql
--- Find events with suspiciously recent dates and images
-SELECT id, event_date, image_urls, created_at
-FROM vehicle_timeline_events  
-WHERE source = 'apple_import'
-AND event_date >= '2025-10-18'
-AND array_length(image_urls, 1) > 0;
-
--- For each, extract EXIF from images and update event_date
--- (Would need to implement as script)
-```
+Should I proceed with Phase 1, or do you want to adjust the plan first?
 
 ### To-dos
 
