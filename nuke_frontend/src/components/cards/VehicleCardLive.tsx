@@ -1,9 +1,11 @@
 /**
  * Live Vehicle Card - Homepage Feed
- * Swipeable images, pinch zoom, real-time updates, financial indicators
+ * Swipeable images, pinch zoom, real-time updates, financial indicators, support button
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { CreditsService } from '../../services/creditsService';
+import { SupportVehicleButton } from '../credits/SupportVehicleButton';
 
 interface VehicleCardLiveProps {
   vehicle: any;
@@ -16,9 +18,19 @@ export const VehicleCardLive: React.FC<VehicleCardLiveProps> = ({ vehicle, viewM
   const [touchStart, setTouchStart] = useState<{x: number, y: number} | null>(null);
   const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
   const [lastScale, setLastScale] = useState(1);
+  const [support, setSupport] = useState<any>(null);
   
   const images = vehicle.images || [];
   const sharePrice = vehicle.current_value ? (vehicle.current_value / 1000).toFixed(2) : '0.00';
+
+  useEffect(() => {
+    loadSupport();
+  }, [vehicle.id]);
+
+  const loadSupport = async () => {
+    const supportData = await CreditsService.getVehicleSupport(vehicle.id);
+    setSupport(supportData);
+  };
 
   // Pinch zoom
   const getDistance = (touch1: Touch, touch2: Touch) => {
@@ -160,6 +172,22 @@ export const VehicleCardLive: React.FC<VehicleCardLiveProps> = ({ vehicle, viewM
           }} />
         </div>
 
+        {/* Support Stats */}
+        {support && support.supporter_count > 0 && (
+          <div style={styles.supportStats}>
+            👥 {support.supporter_count} supporters · 
+            💰 {CreditsService.formatCredits(support.total_credits)}
+          </div>
+        )}
+
+        {/* Support Button */}
+        <div style={styles.actions}>
+          <SupportVehicleButton
+            vehicleId={vehicle.id}
+            vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+          />
+        </div>
+
         {/* Live Indicators */}
         {vehicle.is_live && (
           <div style={styles.liveBadge}>🔴 LIVE</div>
@@ -297,6 +325,15 @@ const styles = {
     height: '100%',
     background: 'var(--accent)',
     transition: 'width 0.3s, margin-left 0.3s'
+  },
+  supportStats: {
+    fontSize: '8px',
+    color: 'var(--text-secondary)',
+    marginTop: '6px',
+    marginBottom: '8px'
+  },
+  actions: {
+    marginTop: '8px'
   },
   liveBadge: {
     position: 'absolute' as const,
