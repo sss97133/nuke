@@ -152,7 +152,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             <button 
               className="mobile-menu-button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ display: 'none' }}
             >
               ☺
             </button>
