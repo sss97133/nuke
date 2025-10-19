@@ -1,389 +1,517 @@
-<!-- 5aec0345-1027-4182-b4d1-133f713a8c0b 078fe148-f382-4417-966a-278667328cd6 -->
-# Mobile UX Refinements
+<!-- 5aec0345-1027-4182-b4d1-133f713a8c0b 960146c7-2b55-4fa6-afd8-df80bc545aae -->
+# Homepage Redesign - Cursor-Inspired UI
 
-## Overview of Changes
+## Cursor Design Language Ethos
 
-Transform mobile profile into sophisticated market platform with:
+**Core Principles**:
 
-1. Instagram-style image viewer
-2. Swipeable price carousel (share/value/bets/auction)
-3. Pinch-zoom on images only (not UI)
-4. AI-powered clickable specs
-5. Enhanced viewer modes (Feed/Discover/Technical)
+1. **Minimalism First** - Remove decoration, focus on function
+2. **Information Density** - Small text, tight spacing, more data per screen
+3. **Dark Mode Native** - Dark theme primary, light as alternative
+4. **Purposeful Color** - Gray scale dominant, accent colors for actions only
+5. **Fast Interactions** - No animations/transitions unless functional
+6. **Utility Over Flair** - Small buttons, clear labels, no marketing speak
+7. **Monospace Where Appropriate** - Technical data in monospace fonts
+8. **Clean Hierarchy** - Clear visual structure without heavy borders
 
-## 1. Image Zoom Fix
+## Current Homepage Problems
 
-### Current Problem
+### Search Issues
 
-- Double-tap zooms entire page/UI ❌
-- Zooms into UI elements, not just image ❌
+1. ❌ Enter key doesn't trigger search (but code shows it should - investigate)
+2. ❌ Search button styling unclear
+3. ❌ Too much placeholder text
 
-### Required Behavior
+### Content Problems
 
-- ✅ ONLY pinch-to-zoom gesture
-- ✅ ONLY the image expands (not UI)
-- ✅ Image fills viewport when zoomed
-- ✅ Rest of UI stays at normal scale
+1. ❌ Marketing-style "Platform Statistics" 
+2. ❌ Large, decorative cards
+3. ❌ Too much whitespace
+4. ❌ Unclear value proposition
+5. ❌ No dark mode support
 
-**Implementation**:
+## New Homepage Design
 
-```javascript
-// Remove double-tap zoom handler
-// Add pinch gesture detection
-// Use CSS transform on image element only
-// Prevent page zoom with viewport meta tag
-```
-
-## 2. Price Box Swipeable Carousel
-
-### Current
-
-Single static market metrics card
-
-### New: Multi-Screen Swipeable Component
-
-**Screen 1: Share Price** (default)
+### Layout Structure
 
 ```
-┌──────────────────────────┐
-│ $42.15/share  ↑ 2.3%    │
-│ Volatility: ●●○○○        │
-│ Trading: 🟢 Active       │
-└──────────────────────────┘
+┌────────────────────────────────────────────┐
+│ [Logo] n-zero        [Login] [Dark/Light] │  ← Minimal header, 32px height
+├────────────────────────────────────────────┤
+│                                            │
+│  Vehicle marketplace & project tracker    │  ← One line tagline, 11px text
+│                                            │
+│  ┌──────────────────────────────────────┐ │
+│  │ Search...                       [⌘K] │ │  ← Clean search, Enter works
+│  └──────────────────────────────────────┘ │
+│                                            │
+│  17 vehicles · 8 active today · 142 parts │  ← Dense stats, 10px text
+│                                            │
+├────────────────────────────────────────────┤
+│ [Recent] [For Sale] [Projects] [Near Me]  │  ← Small pill buttons, 22px
+├────────────────────────────────────────────┤
+│                                            │
+│ ┌─────┬─────────────────────────────────┐ │
+│ │ IMG │ 1977 K5 Blazer  $42k  127 mi    │ │  ← Dense cards
+│ │     │ Last update: 2h ago             │ │
+│ └─────┴─────────────────────────────────┘ │
+│                                            │
+│ ┌─────┬─────────────────────────────────┐ │
+│ │ IMG │ 1971 Bronco     $38k  Portland  │ │
+│ │     │ 14 events · Engine rebuild      │ │
+│ └─────┴─────────────────────────────────┘ │
+│                                            │
+└────────────────────────────────────────────┘
 ```
 
-**Screen 2: Total Value** (swipe left)
+### Design Specifications
 
-```
-┌──────────────────────────┐
-│ Market Cap: $45,200      │
-│ Purchase: $38,000        │
-│ Gain: +$7,200 (18.9%)    │
-└──────────────────────────┘
-```
+#### Dark Mode (Primary)
 
-**Screen 3: Bets/Speculation** (swipe left again)
+- Background: `#1e1e1e` (VSCode dark)
+- Surface: `#252526`
+- Border: `#3e3e42` (subtle)
+- Text primary: `#cccccc`
+- Text secondary: `#858585`
+- Accent: `#007acc` (blue for actions)
+- Success: `#4ec9b0`
+- Warning: `#ce9178`
 
-```
-┌──────────────────────────┐
-│ 🎲 Market Bets           │
-│ Will reach $50k: 67%     │
-│ Next mod value: +$2k     │
-│ Completion: 3 months     │
-└──────────────────────────┘
-```
+#### Light Mode
 
-**Screen 4: Auction Vote** (swipe left again)
+- Background: `#ffffff`
+- Surface: `#f3f3f3`
+- Border: `#e5e5e5`
+- Text primary: `#1e1e1e`
+- Text secondary: `#666666`
+- Accent: `#0066cc`
 
-```
-┌──────────────────────────┐
-│ 🏛️ Send to Auction?      │
-│ [Vote Yes] [Vote No]     │
-│ Current votes: 3 yes     │
-└──────────────────────────┘
-```
+#### Typography
 
-**Windows 95 Styling**:
+- Sans: `"Inter", -apple-system, system-ui, sans-serif`
+- Mono: `"SF Mono", "Monaco", "Cascadia Code", monospace`
+- Sizes: 10px, 11px, 13px, 15px, 18px only
+- Line heights: 1.4 for readability
 
-- Beveled borders (2px outset/inset)
-- Gray background (#c0c0c0)
-- Blue accents (#000080)
-- Dotted indicators below for screen position
+#### Spacing
 
-## 3. Instagram-Style Images View
+- Base unit: 4px
+- Grid: 4px, 8px, 12px, 16px, 24px, 32px
+- No arbitrary spacing
 
-### Current
+#### Components
 
-Simple 2-column grid, all images same size
+**Search Bar**:
 
-### New: Instagram Feed Layout
+```css
+height: 36px;
+padding: 0 12px;
+background: var(--surface);
+border: 1px solid var(--border);
+border-radius: 4px;
+font-size: 13px;
+transition: border-color 0.1s;
 
-**Three View Modes** (buttons at top):
-
-#### Feed View (Default)
-
-- Single column like Instagram Stories
-- Full-width images
-- Vertical scrolling
-- Like/comment buttons on each
-- Optimized for engagement
-
-#### Discover View
-
-- 4 images across (grid)
-- Verticals take 2 boxes tall (more space)
-- Horizontals single box
-- Dense browsing mode
-- Shows more images per screen
-
-#### Technical View
-
-- 3 images across
-- Overlay shows:
-  - View count
-  - Engagement score
-  - Technical value (AI-rated)
-  - Tags count
-- Data-driven display
-
-**Layout Logic**:
-
-```javascript
-if (viewMode === 'feed') {
-  // Single column, full width
-  return <InstagramFeedLayout />
-}
-else if (viewMode === 'discover') {
-  // 4-across grid, verticals span 2 rows
-  const gridItems = images.map(img => ({
-    ...img,
-    span: img.orientation === 'vertical' ? 2 : 1
-  }))
-  return <MasonryGrid items={gridItems} columns={4} />
-}
-else if (viewMode === 'technical') {
-  // 3-across with data overlays
-  return <TechnicalGrid images={images} />
+&:focus {
+  border-color: var(--accent);
+  outline: none;
 }
 ```
 
-## 4. Clickable AI-Powered Specs
+**Utility Buttons**:
 
-### Current
+```css
+height: 22px;
+padding: 0 8px;
+font-size: 11px;
+background: var(--surface);
+border: 1px solid var(--border);
+border-radius: 3px;
+cursor: pointer;
 
-Static specs list (year, make, model, etc.)
-
-### New: Interactive AI Research
-
-When you click any spec, opens modal with AI-researched data:
-
-**Example: Click "Engine: V8"**
-
-Modal shows:
-
-```
-┌─────────────────────────────────────┐
-│ ENGINE SPECIFICATIONS               │
-├─────────────────────────────────────┤
-│ Factory Data (AI-sourced):          │
-│ • Type: 350ci V8                    │
-│ • HP: 165 hp @ 3,800 rpm            │
-│ • Torque: 255 lb-ft @ 2,400 rpm     │
-│ • Carburetor: Rochester Quadrajet   │
-│                                     │
-│ Market Context:                     │
-│ • Common engine: 78% of K5s         │
-│ • Rebuild cost: $2,500-4,000        │
-│ • Reliability: Above average        │
-│                                     │
-│ Community Intel:                    │
-│ • Forum discussions: 1,247 posts    │
-│ • Facebook groups: 12 active        │
-│ • Common mods: Headers, cam         │
-│                                     │
-│ Sources:                            │
-│ 📄 Factory service manual p.142     │
-│ 📊 NADA historical data            │
-│ 💬 K5 Blazer Forum (248 threads)   │
-│ 📱 Classic Truck FB Group          │
-└─────────────────────────────────────┘
+&:hover {
+  background: var(--accent-dim);
+}
 ```
 
-**AI Guardrails Process**:
+**Vehicle Cards**:
 
-1. User clicks "Engine" spec
-2. AI identifies vehicle: 1977 Chevrolet K5
-3. Searches within bounds:
+```css
+padding: 8px;
+background: var(--surface);
+border: 1px solid var(--border);
+border-radius: 4px;
+display: flex;
+gap: 8px;
 
-   - Factory manuals for K5 Blazer
-   - Historical value data for 1977
-   - Current market comps
-   - Forum posts about 350ci V8
-   - Facebook group discussions
+.thumbnail {
+  width: 64px;
+  height: 64px;
+  border-radius: 2px;
+}
 
-4. Synthesizes answer with sources
-5. Each spec has unique research pathway
+.title {
+  font-size: 13px;
+  font-weight: 500;
+}
 
-**Clickable Specs**:
-
-- Engine → Factory specs + market data
-- Transmission → Gear ratios + rebuild costs  
-- Drivetrain → 4WD system details
-- Axles → Gear ratio + locker options
-- Tires → Size compatibility + common upgrades
-- Suspension → Lift kit data + ride quality
-
-## 5. Price Carousel Implementation
-
-**Component**: `PriceCarousel.tsx`
-
-Features:
-
-- Horizontal swipe between 4 screens
-- Dots indicator at bottom
-- Windows 95 beveled style
-- Touch-friendly (48px+ touch targets)
-
-Screens:
-
-1. **Share Price** - Trading metrics
-2. **Total Value** - Purchase vs current
-3. **Bets** - Market speculation/predictions
-4. **Auction Vote** - Community voting
-
-## 6. Image Viewer Modes
-
-### Button Bar
-
-```
-[Feed] [Discover] [Technical]
+.meta {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
 ```
 
-### Feed Mode
+## Implementation Plan
 
-- Instagram single-column layout
-- Large images, full engagement
-- Like/comment on each
-- Optimized for scrolling
+### Phase 1: Search Fix (Immediate)
 
-### Discover Mode  
+**File**: `nuke_frontend/src/components/search/IntelligentSearch.tsx`
 
-- Dense 4-across grid
-- Vertical images span 2 rows (portrait gets more space)
-- Horizontal images single row
-- Quick browsing, see more at once
+Issues to investigate:
 
-### Technical Mode
-
-- 3-across grid
-- Each image shows overlay:
-  - 👁️ 247 views
-  - ⭐ 89% engagement
-  - 💰 $340 value score
-  - 🏷️ 12 tags
-
-## Implementation Todos
-
-### High Priority (Core UX)
-
-1. Fix image zoom to pinch-only (no double-tap, image-only zoom)
-2. Create swipeable price carousel (4 screens)
-3. Make price box Windows 95 styled
-4. Implement Instagram-style feed view
-
-### Medium Priority (Enhanced Features)
-
-5. Add Discover view (4-across masonry)
-6. Add Technical view (with data overlays)
-7. Make specs clickable with AI research modal
-8. Implement spec-specific AI queries
-
-### Low Priority (Data Infrastructure)
-
-9. Create betting/speculation system
-10. Create auction voting mechanism
-11. Build AI guardrails for spec research
-12. Index factory manuals/forums/Facebook groups
-
-## Technical Approach
-
-### Pinch Zoom
-
-```javascript
-const [scale, setScale] = useState(1);
-const [lastScale, setLastScale] = useState(1);
-
-const handleTouchMove = (e) => {
-  if (e.touches.length === 2) {
-    const dist = getDistanceBetweenTouches(e.touches);
-    const newScale = (dist / initialDist) * lastScale;
-    setScale(Math.min(Math.max(1, newScale), 4)); // 1x to 4x
-  }
-};
-
-// Apply transform only to image element
-<img style={{ transform: `scale(${scale})` }} />
-```
-
-### Price Carousel
-
-```javascript
-<SwipeableViews index={priceScreen} onChangeIndex={setPriceScreen}>
-  <SharePriceScreen />
-  <TotalValueScreen />
-  <BettingScreen />
-  <AuctionVoteScreen />
-</SwipeableViews>
-```
-
-### Image Layout Modes
-
-```javascript
-const layouts = {
-  feed: { columns: 1, showEngagement: true },
-  discover: { columns: 4, spanVerticals: 2 },
-  technical: { columns: 3, showMetrics: true }
-};
-```
-
-### AI Spec Research
-
-```javascript
-async function researchSpec(vehicle, specName) {
-  // Call AI with guardrails
-  const context = {
-    vehicle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-    vin: vehicle.vin,
-    spec: specName
+1. Check if form `onSubmit` is properly bound
+2. Verify no event.preventDefault() blocking Enter
+3. Test in production bundle
+4. Add explicit keyboard handler if needed
+```typescript
+// Add keyboard shortcut
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    }
+    if (e.key === 'Enter' && document.activeElement === searchInputRef.current) {
+      e.preventDefault();
+      handleSubmit(e as any);
+    }
   };
   
-  const sources = [
-    'factory_manuals',
-    'nada_historical',
-    'current_market_comps',
-    'forums', 
-    'facebook_groups'
-  ];
+  document.addEventListener('keydown', handleKeyDown);
+  return () => document.removeEventListener('keydown', handleKeyDown);
+}, [query]);
+```
+
+
+### Phase 2: Dark Mode System
+
+**File**: `nuke_frontend/src/contexts/ThemeContext.tsx` (new)
+
+```typescript
+export const ThemeProvider: React.FC = ({ children }) => {
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   
-  return await ai.research(context, sources, guardrails);
+  useEffect(() => {
+    // Load from localStorage
+    const saved = localStorage.getItem('theme');
+    if (saved) setTheme(saved as any);
+    
+    // Apply to document
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+  
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+```
+
+### Phase 3: Homepage Redesign
+
+**File**: `nuke_frontend/src/pages/Discovery.tsx`
+
+New structure:
+
+```tsx
+<div className="cursor-homepage">
+  {/* Minimal Header */}
+  <header className="minimal-header">
+    <Logo size="small" />
+    <div className="header-actions">
+      <ThemeToggle />
+      <AuthButton />
+    </div>
+  </header>
+
+  {/* Hero Section - Compact */}
+  <section className="hero-compact">
+    <h1 className="tagline">Vehicle marketplace & project tracker</h1>
+    
+    {/* Clean Search */}
+    <SearchBar 
+      onEnter={handleSearch}
+      placeholder="Search vehicles, parts, or projects..."
+      shortcut="⌘K"
+    />
+    
+    {/* Dense Stats */}
+    <div className="stats-inline">
+      <StatPill label="vehicles" value={stats.totalVehicles} />
+      <StatPill label="active today" value={stats.activeToday} />
+      <StatPill label="parts listed" value={stats.partsCount} />
+    </div>
+  </section>
+
+  {/* Filter Pills */}
+  <nav className="filter-pills">
+    <FilterPill active>Recent</FilterPill>
+    <FilterPill>For Sale</FilterPill>
+    <FilterPill>Projects</FilterPill>
+    <FilterPill>Near Me</FilterPill>
+  </nav>
+
+  {/* Dense Vehicle Grid */}
+  <section className="vehicle-grid-dense">
+    {vehicles.map(v => (
+      <VehicleCardDense key={v.id} vehicle={v} />
+    ))}
+  </section>
+</div>
+```
+
+### Phase 4: CSS Design System
+
+**File**: `nuke_frontend/src/styles/cursor-design-system.css`
+
+```css
+/* Cursor Design System */
+:root[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --surface: #252526;
+  --surface-hover: #2d2d30;
+  --border: #3e3e42;
+  --border-focus: #007acc;
+  --text: #cccccc;
+  --text-secondary: #858585;
+  --text-disabled: #656565;
+  --accent: #007acc;
+  --accent-dim: rgba(0, 122, 204, 0.1);
+  --success: #4ec9b0;
+  --warning: #ce9178;
+  --error: #f48771;
+}
+
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f3f3f3;
+  --surface-hover: #e8e8e8;
+  --border: #e5e5e5;
+  --border-focus: #0066cc;
+  --text: #1e1e1e;
+  --text-secondary: #666666;
+  --text-disabled: #999999;
+  --accent: #0066cc;
+  --accent-dim: rgba(0, 102, 204, 0.1);
+  --success: #16825d;
+  --warning: #b05a00;
+  --error: #d13438;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", -apple-system, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0;
+}
+
+/* Utility Classes */
+.text-xs { font-size: 10px; }
+.text-sm { font-size: 11px; }
+.text-base { font-size: 13px; }
+.text-lg { font-size: 15px; }
+.text-xl { font-size: 18px; }
+
+.font-mono { font-family: "SF Mono", Monaco, monospace; }
+
+.cursor-button {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.cursor-button:hover {
+  background: var(--surface-hover);
+}
+
+.cursor-button:active {
+  background: var(--accent-dim);
 }
 ```
 
-## Questions for Discussion
+## Content Strategy
 
-1. **Price carousel screens** - Are 4 screens good, or want more/less?
-2. **Betting system** - What should users bet on? (Value reaching X, completion date, etc.)
-3. **Auction voting** - Threshold votes needed? Who can vote?
-4. **Spec AI sources** - Should we index manuals now or wait?
-5. **Image engagement tracking** - Track views/likes per image?
+### Old Value Proposition
 
-## Execution Order
+❌ "Build. Track. Share your restoration journey."
 
-**Phase 1** (Immediate):
+❌ Marketing fluff
 
-- Fix pinch zoom
-- Price carousel
-- Windows 95 styling
+❌ Unclear what platform does
 
-**Phase 2** (Next):
+### New Value Proposition
 
-- Instagram feed view
-- Discover view
-- Technical view
+✅ "Vehicle marketplace & project tracker"
 
-**Phase 3** (After):
+✅ Clear, direct, functional
 
-- Clickable specs
-- AI research
-- Betting/auction
+✅ No marketing speak
 
-Should I proceed with Phase 1, or do you want to adjust the plan first?
+### Homepage Sections (Prioritized)
+
+1. **Search** - Primary action, always visible
+2. **Quick Stats** - Context at a glance (dense, inline)
+3. **Filter Pills** - Fast filtering without dropdowns
+4. **Vehicle Grid** - Dense cards showing key data
+5. **Advanced Filters** - Collapsed by default
+
+### Vehicle Card Content (Dense)
+
+Show only:
+
+- Thumbnail (64x64px)
+- Year/Make/Model (13px)
+- Price (if for sale) (11px, mono)
+- Location or last update (10px, secondary)
+- Key metric (events/miles/status) (10px, secondary)
+
+Hide:
+
+- Long descriptions
+- Multiple images
+- Owner info (unless relevant)
+- Unnecessary metadata
+
+## Testing Checklist
+
+**Search Functionality**:
+
+- [ ] Enter key triggers search
+- [ ] ⌘K focuses search bar
+- [ ] Escape clears search
+- [ ] Results load instantly
+- [ ] Loading state is minimal
+
+**Dark/Light Mode**:
+
+- [ ] Toggle works instantly
+- [ ] Preference saves to localStorage
+- [ ] All components support both modes
+- [ ] No flash on page load
+- [ ] Colors meet contrast requirements
+
+**Responsiveness**:
+
+- [ ] Desktop: 3-column grid
+- [ ] Tablet: 2-column grid
+- [ ] Mobile: 1-column with same density
+- [ ] Touch targets ≥44px on mobile
+
+**Performance**:
+
+- [ ] Initial load <2s
+- [ ] Search results <500ms
+- [ ] No layout shift
+- [ ] Smooth scrolling
+
+## Migration Plan
+
+1. **Create new theme system** (no breaking changes)
+2. **Add dark mode CSS** (opt-in initially)
+3. **Redesign Discovery page** (parallel to current)
+4. **Test with users** (A/B if needed)
+5. **Roll out** (make default)
+6. **Deprecate old styles** (cleanup after 30 days)
+
+## Critical Foundation Work (Before Homepage)
+
+**Must be bulletproof first**:
+
+1. **Data Pipelines**:
+
+   - Vehicle profile pipeline
+   - User profile pipeline
+   - Timeline event pipeline
+   - Image pipeline (with real-time EXIF)
+   - Receipt/documentation pipeline
+
+2. **RLS & Ownership**:
+
+   - Row Level Security per user
+   - Ownership roles (owner, contributor, viewer)
+   - Participation security
+   - Simple for users (what they're used to)
+
+3. **Real-Time Infrastructure**:
+
+   - Supabase Realtime subscriptions
+   - Live viewer counts
+   - Live price updates
+   - Live event publishing
+   - WebSocket connections for streaming
+
+4. **Financial Backend** (ASAP):
+
+   - Staking system (legally sound)
+   - Money storage/escrow
+   - Share price calculation (value ÷ 1000)
+   - ETF groupings (Squarebody ETF, etc.)
+   - Tips/donations flow
+   - Financial tools for builders
+
+## Implementation Priority
+
+**Phase 0: Foundation** (Do First):
+
+1. Solidify data pipelines
+2. Lock down RLS/ownership
+3. Set up real-time infrastructure
+4. Build financial backend (legally)
+
+**Phase 1: Search & Core**:
+
+1. Live instant search
+2. Real-time feed
+3. Cursor theme unification (everywhere)
+
+**Phase 2: Vehicle Cards**:
+
+1. Swipeable images with pinch zoom
+2. Live indicators (viewers, updates)
+3. AI-generated key metrics
+4. Financial display (price, shares, staking)
+
+**Phase 3: Content Groups**:
+
+1. Vehicles discovery
+2. Users discovery
+3. Deals section
+4. Innovation showcase
+5. Financial opportunities (ETFs, staking)
+
+**Phase 4: Advanced**:
+
+1. Live streaming integration
+2. Real-time tips
+3. Work-in-progress feeds
+4. View accumulation & buzz generation
 
 ### To-dos
 
-- [ ] Analyze timeline event system and identify errors
-- [ ] Update useTimelineEvents.ts to use vehicle_timeline_events
-- [ ] Update AddEventWizard.tsx to insert into vehicle_timeline_events
-- [ ] Update all timeline display components to read from vehicle_timeline_events
-- [ ] Update Elixir API endpoints to use vehicle_timeline_events
-- [ ] Test event creation and display end-to-end
+- [ ] Fix search Enter key functionality - add explicit keyboard handler
+- [ ] Create ThemeContext and dark/light mode toggle
+- [ ] Build Cursor design system CSS with CSS variables
+- [ ] Redesign Discovery page with dense, Cursor-inspired layout
+- [ ] Add ⌘K keyboard shortcut to focus search
+- [ ] Create VehicleCardDense component with 64px thumbnails
+- [ ] Replace dropdown filters with inline pill buttons
+- [ ] Convert platform stats to inline pills (10px text)

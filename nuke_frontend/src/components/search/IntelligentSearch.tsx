@@ -443,11 +443,19 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     return filters;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (query.trim()) {
       executeSearch(query);
       setShowSuggestions(false);
+    }
+  };
+
+  // Add explicit keyboard handler for Enter key
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
     }
   };
 
@@ -465,9 +473,10 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             ref={searchInputRef}
             type="text"
             className="input"
-            placeholder="Ask anything... 'Show me C10s near me', 'Snap-on tools in use', 'Which builds are stagnating'"
+            placeholder="Search..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
             style={{
