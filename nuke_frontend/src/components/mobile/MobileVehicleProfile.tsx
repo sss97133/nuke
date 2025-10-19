@@ -67,13 +67,10 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
           >
             ← Back
           </button>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={styles.title}>
               {vehicle.year} {vehicle.make} {vehicle.model}
             </h1>
-          </div>
-          <div style={styles.price}>
-            ${vehicle.current_value?.toLocaleString() || 'N/A'}
           </div>
         </div>
       </div>
@@ -192,6 +189,21 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
         </div>
       </div>
 
+      {/* Comments Section */}
+      <div style={styles.commentsSection}>
+        <div style={styles.commentsHeader}>
+          <span style={styles.commentsTitle}>💬 Vehicle Comments</span>
+          <span style={styles.commentsCount}>View all</span>
+        </div>
+        <div style={styles.commentInput}>
+          <input 
+            type="text" 
+            placeholder="Add a comment about this vehicle..."
+            style={styles.input}
+          />
+        </div>
+      </div>
+
       {/* VIN */}
       {vehicle.vin && (
         <div style={styles.card}>
@@ -296,90 +308,86 @@ const MobileTimelineTab: React.FC<{ vehicleId: string; onEventClick: (event: any
             {/* Events List - Collapsed/Expanded */}
             {isExpanded && (
               <div style={{ marginBottom: '12px' }}>
-                {yearEvents.map(event => (
-                  <div 
-                    key={event.id} 
-                    onClick={() => onEventClick(event)}
-                    style={{
-                      background: '#ffffff',
-                      border: '1px solid #808080',
-                      padding: '12px',
-                      marginBottom: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {/* Event Date */}
-                    <div style={{
-                      fontSize: '10px',
-                      color: '#808080',
-                      marginBottom: '4px'
-                    }}>
-                      {new Date(event.event_date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </div>
-
-                    {/* Event Title */}
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      color: '#000000',
-                      marginBottom: '4px'
-                    }}>
-                      {event.title}
-                    </div>
-
-                    {/* Event Description */}
-                    {event.description && (
+                {yearEvents.map(event => {
+                  // Skip generic "Photo Added" events - show only meaningful work
+                  const isPhotoOnlyEvent = event.title.includes('Photo Added') || event.title.includes('photos') || event.title.includes('Photo set');
+                  
+                  // Extract meaningful info
+                  const aiWork = event.metadata?.ai_detected_parts?.[0] || event.description;
+                  const location = event.location_name || event.metadata?.location || null;
+                  const user = event.metadata?.uploaded_by || 'owner';
+                  
+                  return (
+                    <div 
+                      key={event.id} 
+                      onClick={() => onEventClick(event)}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #808080',
+                        padding: '10px',
+                        marginBottom: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {/* Date and Location */}
                       <div style={{
                         fontSize: '11px',
-                        color: '#000000',
-                        marginBottom: '4px'
+                        color: '#808080',
+                        marginBottom: '6px'
                       }}>
-                        {event.description}
+                        {new Date(event.event_date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                        {location && ` • 📍 ${location}`}
+                        {user && ` • 👤 ${user}`}
                       </div>
-                    )}
 
-                    {/* Labor Hours Badge */}
-                    {event.labor_hours && (
+                      {/* What Actually Happened (AI-detected or description) */}
+                      {!isPhotoOnlyEvent && aiWork && (
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: 'bold',
+                          color: '#000000',
+                          marginBottom: '4px'
+                        }}>
+                          {aiWork.length > 100 ? aiWork.substring(0, 100) + '...' : aiWork}
+                        </div>
+                      )}
+
+                      {/* Show original title if it's meaningful work */}
+                      {!isPhotoOnlyEvent && !aiWork && (
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: 'bold',
+                          color: '#000000'
+                        }}>
+                          {event.title}
+                        </div>
+                      )}
+
+                      {/* For photo-only events, show AI-detected context if available */}
+                      {isPhotoOnlyEvent && aiWork && (
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#000000',
+                          fontStyle: 'italic'
+                        }}>
+                          {aiWork.length > 80 ? aiWork.substring(0, 80) + '...' : aiWork}
+                        </div>
+                      )}
+
+                      {/* Comments indicator */}
                       <div style={{
-                        display: 'inline-block',
-                        background: '#000080',
-                        color: '#ffffff',
-                        padding: '2px 6px',
                         fontSize: '10px',
-                        border: '1px solid #ffffff'
+                        color: '#808080',
+                        marginTop: '6px'
                       }}>
-                        {event.labor_hours}h
+                        💬 Tap for details
                       </div>
-                    )}
-
-                    {/* Image Previews (if photo event) */}
-                    {event.metadata?.uploadedUrls && event.metadata.uploadedUrls.length > 0 && (
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(4, 1fr)',
-                        gap: '4px',
-                        marginTop: '8px'
-                      }}>
-                        {event.metadata.uploadedUrls.slice(0, 4).map((url: string, idx: number) => (
-                          <img
-                            key={idx}
-                            src={url}
-                            alt=""
-                            style={{
-                              width: '100%',
-                              aspectRatio: '1',
-                              objectFit: 'cover',
-                              border: '1px solid #808080'
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -784,6 +792,40 @@ const styles: Record<string, React.CSSProperties> = {
   cardValue: {
     fontSize: '12px',
     color: '#000000'
+  },
+  commentsSection: {
+    background: '#ffffff',
+    border: '2px solid #808080',
+    borderRadius: '4px',
+    padding: '12px',
+    marginBottom: '12px'
+  },
+  commentsHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px'
+  },
+  commentsTitle: {
+    fontSize: '12px',
+    fontWeight: 'bold' as const,
+    color: '#000080'
+  },
+  commentsCount: {
+    fontSize: '10px',
+    color: '#808080',
+    cursor: 'pointer'
+  },
+  commentInput: {
+    width: '100%'
+  },
+  input: {
+    width: '100%',
+    padding: '8px',
+    border: '1px inset #808080',
+    fontSize: '12px',
+    fontFamily: '"MS Sans Serif", sans-serif',
+    boxSizing: 'border-box' as const
   },
   eventCard: {
     background: '#ffffff',
