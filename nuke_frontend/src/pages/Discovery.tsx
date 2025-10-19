@@ -6,6 +6,7 @@ import DiscoveryFeed from '../components/feed/DiscoveryFeed';
 import AddVehicle from './add-vehicle/AddVehicle';
 import { MobileAddVehicle } from '../components/mobile/MobileAddVehicle';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { VehicleCardLive } from '../components/cards/VehicleCardLive';
 import '../design-system.css';
 
 interface BuildAnalysisResult {
