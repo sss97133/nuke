@@ -803,7 +803,10 @@ const MobileSpecsTab: React.FC<{ vehicle: any }> = ({ vehicle }) => {
 // Windows 95 Mobile Styles
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    height: '100vh',
+    // Use dynamic viewport height to prevent iOS/Android toolbar jumps
+    height: '100dvh',
+    // Fallbacks for older browsers
+    minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
     background: '#c0c0c0',
@@ -813,7 +816,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    height: '100vh',
+    height: '100dvh',
+    minHeight: '100vh',
     fontSize: '14px',
     fontFamily: '"MS Sans Serif", sans-serif'
   },

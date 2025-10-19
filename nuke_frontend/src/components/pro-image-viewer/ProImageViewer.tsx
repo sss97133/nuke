@@ -1552,11 +1552,12 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
 
           {/* Side Panel */}
           {(showInfo || showComments || showTags) && (
-            <div 
+              <div 
               className="card"
               style={{ 
                 width: '400px', 
-                height: '100vh', 
+                height: '100dvh', 
+                minHeight: '100vh', 
                 borderLeft: '2px inset var(--border-medium)',
                 borderRadius: 0,
                 display: 'flex',
