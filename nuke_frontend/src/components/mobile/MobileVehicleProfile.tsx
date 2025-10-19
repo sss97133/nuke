@@ -7,6 +7,9 @@ import React, { useState, useEffect } from 'react';
 import { MobileImageControls } from '../image/MobileImageControls';
 import { UserInteractionService } from '../../services/userInteractionService';
 import { supabase } from '../../lib/supabase';
+import EventDetailModal from './EventDetailModal';
+import { MobileImageCarousel } from './MobileImageCarousel';
+import { VehicleMarketMetrics } from './VehicleMarketMetrics';
 
 interface MobileVehicleProfileProps {
   vehicleId: string;
@@ -17,6 +20,7 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
   const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'images' | 'specs'>('overview');
   const [vehicle, setVehicle] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
   useEffect(() => {
     loadVehicle();
@@ -93,10 +97,10 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
       {/* Scrollable Content */}
       <div style={styles.content}>
         {activeTab === 'overview' && (
-          <MobileOverviewTab vehicleId={vehicleId} vehicle={vehicle} />
+          <MobileOverviewTab vehicleId={vehicleId} vehicle={vehicle} onTabChange={setActiveTab} />
         )}
         {activeTab === 'timeline' && (
-          <MobileTimelineTab vehicleId={vehicleId} />
+          <MobileTimelineTab vehicleId={vehicleId} onEventClick={setSelectedEvent} />
         )}
         {activeTab === 'images' && (
           <MobileImagesTab vehicleId={vehicleId} session={session} />
@@ -105,15 +109,25 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
           <MobileSpecsTab vehicle={vehicle} />
         )}
       </div>
+
+      {/* Event Detail Modal */}
+      {selectedEvent && (
+        <EventDetailModal 
+          event={selectedEvent} 
+          onClose={() => setSelectedEvent(null)} 
+        />
+      )}
     </div>
   );
 };
 
-const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any }> = ({ vehicleId, vehicle }) => {
+const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange: (tab: string) => void }> = ({ vehicleId, vehicle, onTabChange }) => {
   const [stats, setStats] = useState<any>(null);
+  const [vehicleImages, setVehicleImages] = useState<string[]>([]);
 
   useEffect(() => {
     loadStats();
+    loadImages();
   }, [vehicleId]);
 
   const loadStats = async () => {
@@ -133,23 +147,46 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any }> = ({ vehi
     });
   };
 
+  const loadImages = async () => {
+    const { data } = await supabase
+      .from('vehicle_images')
+      .select('image_url')
+      .eq('vehicle_id', vehicleId)
+      .order('is_primary', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    setVehicleImages(data?.map(img => img.image_url) || []);
+  };
+
   return (
     <div style={styles.tabContent}>
-      {/* Quick Stats - Touch Friendly */}
+      {/* Image Carousel */}
+      {vehicleImages.length > 0 && (
+        <MobileImageCarousel 
+          images={vehicleImages}
+          liveStreamUrl={vehicle.live_stream_url}
+        />
+      )}
+
+      {/* Market Metrics */}
+      <VehicleMarketMetrics vehicle={vehicle} stats={stats} />
+
+      {/* Quick Stats - Touch Friendly & Clickable */}
       <div style={styles.statsGrid}>
-        <div style={styles.statCard}>
+        <div style={{...styles.statCard, cursor: 'pointer'}} onClick={() => onTabChange('images')}>
           <div style={styles.statValue}>{stats?.images || 0}</div>
           <div style={styles.statLabel}>Photos</div>
         </div>
-        <div style={styles.statCard}>
+        <div style={{...styles.statCard, cursor: 'pointer'}} onClick={() => onTabChange('timeline')}>
           <div style={styles.statValue}>{stats?.events || 0}</div>
           <div style={styles.statLabel}>Events</div>
         </div>
-        <div style={styles.statCard}>
+        <div style={{...styles.statCard, cursor: 'pointer'}}>
           <div style={styles.statValue}>{stats?.tags || 0}</div>
           <div style={styles.statLabel}>Tags</div>
         </div>
-        <div style={styles.statCard}>
+        <div style={{...styles.statCard, cursor: 'pointer'}}>
           <div style={styles.statValue}>{stats?.labor_hours || 0}</div>
           <div style={styles.statLabel}>Hours</div>
         </div>
@@ -174,7 +211,7 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any }> = ({ vehi
   );
 };
 
-const MobileTimelineTab: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+const MobileTimelineTab: React.FC<{ vehicleId: string; onEventClick: (event: any) => void }> = ({ vehicleId, onEventClick }) => {
   const [events, setEvents] = useState<any[]>([]);
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set([new Date().getFullYear()]));
   const [loading, setLoading] = useState(true);
@@ -260,12 +297,17 @@ const MobileTimelineTab: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
             {isExpanded && (
               <div style={{ marginBottom: '12px' }}>
                 {yearEvents.map(event => (
-                  <div key={event.id} style={{
-                    background: '#ffffff',
-                    border: '1px solid #808080',
-                    padding: '12px',
-                    marginBottom: '4px'
-                  }}>
+                  <div 
+                    key={event.id} 
+                    onClick={() => onEventClick(event)}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #808080',
+                      padding: '12px',
+                      marginBottom: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
                     {/* Event Date */}
                     <div style={{
                       fontSize: '10px',
@@ -362,6 +404,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
   const [images, setImages] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -455,6 +498,20 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     }
   };
 
+  // Filter images by category
+  const filteredImages = categoryFilter === 'all' 
+    ? images
+    : images.filter(img => img.category === categoryFilter || (!img.category && categoryFilter === 'general'));
+
+  const categories = [
+    { id: 'all', label: 'All' },
+    { id: 'gallery', label: 'Gallery' },
+    { id: 'technical', label: 'Technical' },
+    { id: 'work', label: 'Work' },
+    { id: 'life', label: 'Life' },
+    { id: 'general', label: 'General' }
+  ];
+
   return (
     <div style={styles.tabContent}>
       {/* Upload Button - Only for logged in users */}
@@ -489,9 +546,25 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
         </div>
       )}
 
+      {/* Category Filter Bar */}
+      <div style={styles.filterBar}>
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setCategoryFilter(cat.id)}
+            style={{
+              ...styles.filterButton,
+              ...(categoryFilter === cat.id ? styles.filterButtonActive : {})
+            }}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
       {/* Grid of images - 2 columns on mobile */}
       <div style={styles.imageGrid}>
-        {images.map((image) => (
+        {filteredImages.map((image) => (
           <div
             key={image.id}
             onClick={() => setSelectedImage(image)}
