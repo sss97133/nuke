@@ -1,9 +1,11 @@
 /**
  * Credits Service
  * Handles buying credits, allocating to vehicles, and builder payouts
+ * Uses PaymentProviderManager for multi-provider support
  */
 
 import { supabase } from '../lib/supabase';
+import { paymentManager } from './paymentProvider';
 
 export interface UserCredits {
   balance: number; // In cents (100 = $1)
@@ -35,14 +37,31 @@ export class CreditsService {
   }
 
   /**
-   * Buy credits with Stripe
+   * Buy credits - supports multiple payment providers
    */
-  static async buyCredits(amountUSD: number): Promise<string | null> {
+  static async buyCredits(amountUSD: number, providerId?: string): Promise<string | null> {
     try {
-      // Create Stripe checkout session via edge function
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
+      const amountCents = amountUSD * 100;
+
+      // If no provider specified, recommend best one for this amount
+      const provider = providerId 
+        ? paymentManager.getProvider(providerId)
+        : paymentManager.recommendProvider(amountCents);
+
+      if (!provider) {
+        throw new Error('No payment provider available');
+      }
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Create payment session via provider-specific edge function
+      const { data, error } = await supabase.functions.invoke('create-payment', {
         body: {
-          amount_usd: amountUSD,
+          provider_id: provider.id,
+          amount_cents: amountCents,
+          user_id: user.id,
           success_url: `${window.location.origin}/credits/success`,
           cancel_url: `${window.location.origin}/credits`
         }
@@ -50,12 +69,25 @@ export class CreditsService {
 
       if (error) throw error;
 
-      // Redirect to Stripe checkout
-      return data.checkout_url;
+      return data.payment_url || data.qr_code;
     } catch (error) {
-      console.error('Failed to create checkout:', error);
+      console.error('Failed to create payment:', error);
       return null;
     }
+  }
+
+  /**
+   * Get available payment providers
+   */
+  static getPaymentProviders() {
+    return paymentManager.getAllProviders();
+  }
+
+  /**
+   * Calculate fee for given provider and amount
+   */
+  static calculateFee(providerId: string, amountCents: number): number {
+    return paymentManager.calculateFee(providerId, amountCents);
   }
 
   /**
