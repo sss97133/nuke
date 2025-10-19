@@ -11,9 +11,15 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html, body, #root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh; /* prefer dynamic viewport height on mobile */
+  min-height: -webkit-fill-available; /* iOS Safari safe fallback */
   /* Remove display: flex and place-items: center as they conflict with Tailwind */
 }
 
