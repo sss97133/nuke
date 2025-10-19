@@ -95,7 +95,7 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
       {/* Scrollable Content */}
       <div style={styles.content}>
         {activeTab === 'overview' && (
-          <MobileOverviewTab vehicleId={vehicleId} vehicle={vehicle} onTabChange={setActiveTab} />
+          <MobileOverviewTab vehicleId={vehicleId} vehicle={vehicle} session={session} onTabChange={setActiveTab} />
         )}
         {activeTab === 'timeline' && (
           <MobileTimelineTab vehicleId={vehicleId} onEventClick={setSelectedEvent} />
@@ -119,7 +119,7 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
   );
 };
 
-const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange: (tab: string) => void }> = ({ vehicleId, vehicle, onTabChange }) => {
+const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; session: any; onTabChange: (tab: string) => void }> = ({ vehicleId, vehicle, session, onTabChange }) => {
   const [stats, setStats] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
 
