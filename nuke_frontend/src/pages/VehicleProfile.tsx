@@ -1120,7 +1120,11 @@ const VehicleProfile: React.FC = () => {
 
   // Use mobile version if on mobile device (but AFTER all hooks have run)
   if (isMobile && vehicleId) {
-    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
+    return (
+      <ErrorBoundary>
+        <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />
+      </ErrorBoundary>
+    );
   }
 
   return (
