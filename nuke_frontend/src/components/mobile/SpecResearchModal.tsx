@@ -25,42 +25,49 @@ const SpecResearchModal: React.FC<SpecResearchModalProps> = ({ vehicle, spec, on
     setLoading(true);
 
     try {
-      // Call AI to research this spec with guardrails
-      const context = {
-        vehicle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-        vin: vehicle.vin,
-        spec: spec.name,
-        value: spec.value
-      };
+      // Call AI guardrails edge function
+      const { data, error } = await supabase.functions.invoke('research-spec', {
+        body: {
+          vehicle_id: vehicle.id,
+          spec_name: spec.name.toLowerCase(),
+          spec_value: spec.value,
+          vehicle: {
+            year: vehicle.year,
+            make: vehicle.make,
+            model: vehicle.model,
+            vin: vehicle.vin
+          }
+        }
+      });
 
-      // For now, show mock data structure
-      // TODO: Implement actual AI guardrails research
+      if (error) throw error;
+
+      setResearch(data);
+    } catch (error) {
+      console.error('AI research failed:', error);
+      
+      // Fallback to mock data if edge function fails
       const mockResearch = {
         factoryData: {
           type: spec.value,
-          details: ['Detail 1', 'Detail 2', 'Detail 3']
+          details: ['Spec research temporarily unavailable', 'Please try again later']
         },
         marketContext: {
-          commonality: '78% of similar vehicles',
-          rebuildCost: '$2,500-4,000',
-          reliability: 'Above average'
+          commonality: 'Data loading...',
+          rebuildCost: 'Data loading...',
+          reliability: 'Data loading...'
         },
         communityIntel: {
-          forumPosts: 1247,
-          facebookGroups: 12,
-          commonMods: ['Headers', 'Cam upgrade', 'Intake']
+          forumPosts: 0,
+          facebookGroups: 0,
+          commonMods: ['Research unavailable']
         },
         sources: [
-          { type: 'manual', ref: 'Factory service manual p.142' },
-          { type: 'data', ref: 'NADA historical data' },
-          { type: 'forum', ref: 'K5 Blazer Forum (248 threads)' },
-          { type: 'social', ref: 'Classic Truck FB Group' }
+          { type: 'manual', ref: 'Research service temporarily unavailable' }
         ]
       };
-
+      
       setResearch(mockResearch);
-    } catch (error) {
-      console.error('AI research failed:', error);
     } finally {
       setLoading(false);
     }

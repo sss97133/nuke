@@ -3,15 +3,18 @@
  * Swipeable carousel showing: Share Price / Total Value / Bets / Auction Vote
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { BettingService } from '../../services/bettingService';
+import { AuctionVotingService } from '../../services/auctionVotingService';
 
 interface PriceCarouselProps {
   vehicle: any;
   stats: any;
+  session?: any;
 }
 
-export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats }) => {
+export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, session }) => {
   const [currentScreen, setCurrentScreen] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
 
@@ -55,8 +58,8 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats }) 
         <div style={styles.screenContainer}>
           {currentScreen === 0 && <SharePriceScreen sharePrice={sharePrice} gainPercent={gainPercent} />}
           {currentScreen === 1 && <TotalValueScreen baseValue={baseValue} purchasePrice={purchasePrice} gain={gain} gainPercent={gainPercent} />}
-          {currentScreen === 2 && <BettingScreen baseValue={baseValue} />}
-          {currentScreen === 3 && <AuctionVoteScreen vehicle={vehicle} />}
+          {currentScreen === 2 && <BettingScreen vehicleId={vehicle.id} baseValue={baseValue} />}
+          {currentScreen === 3 && <AuctionVoteScreen vehicle={vehicle} session={session} />}
         </div>
 
         {/* Dots Indicator */}
@@ -135,37 +138,122 @@ const TotalValueScreen: React.FC<{ baseValue: number; purchasePrice: number; gai
 );
 
 // Screen 3: Bets
-const BettingScreen: React.FC<{ baseValue: number }> = ({ baseValue }) => (
-  <div style={styles.screen}>
-    <div style={styles.mainMetric}>
-      <div style={styles.label}>🎲 Market Bets</div>
+const BettingScreen: React.FC<{ vehicleId: string; baseValue: number }> = ({ vehicleId, baseValue }) => {
+  const [betStats, setBetStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadBetStats();
+  }, [vehicleId]);
+
+  const loadBetStats = async () => {
+    try {
+      const stats = await BettingService.getBetStatistics(vehicleId);
+      setBetStats(stats);
+    } catch (error) {
+      console.error('Failed to load bet stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={styles.screen}>
+        <div style={styles.mainMetric}>
+          <div style={styles.label}>🎲 Market Bets</div>
+        </div>
+        <div style={styles.divider} />
+        <div style={styles.loadingText}>Loading predictions...</div>
+      </div>
+    );
+  }
+
+  const valueMilestone = betStats?.value_milestone || { avg_prediction: 50000, confidence: 67, count: 0 };
+  const nextMod = betStats?.next_mod_value || { avg_prediction: 2000, count: 0 };
+
+  return (
+    <div style={styles.screen}>
+      <div style={styles.mainMetric}>
+        <div style={styles.label}>🎲 Market Bets</div>
+        <div style={styles.metricSubtext}>{betStats?.total_bets || 0} active predictions</div>
+      </div>
+      <div style={styles.divider} />
+      <div style={styles.betsList}>
+        <div style={styles.bet}>
+          <span style={styles.betText}>Will reach ${Math.round(valueMilestone.avg_prediction / 1000)}k:</span>
+          <span style={styles.betOdds}>{Math.round(valueMilestone.confidence)}%</span>
+        </div>
+        <div style={styles.bet}>
+          <span style={styles.betText}>Next mod value:</span>
+          <span style={styles.betOdds}>+${(nextMod.avg_prediction / 1000).toFixed(1)}k</span>
+        </div>
+        <div style={styles.bet}>
+          <span style={styles.betText}>Total bettors:</span>
+          <span style={styles.betOdds}>{betStats?.total_bets || 0}</span>
+        </div>
+      </div>
     </div>
-    <div style={styles.divider} />
-    <div style={styles.betsList}>
-      <div style={styles.bet}>
-        <span style={styles.betText}>Will reach $50k:</span>
-        <span style={styles.betOdds}>67%</span>
-      </div>
-      <div style={styles.bet}>
-        <span style={styles.betText}>Next mod value:</span>
-        <span style={styles.betOdds}>+$2k</span>
-      </div>
-      <div style={styles.bet}>
-        <span style={styles.betText}>Completion:</span>
-        <span style={styles.betOdds}>3 mo</span>
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 
 // Screen 4: Auction Vote
-const AuctionVoteScreen: React.FC<{ vehicle: any }> = ({ vehicle }) => {
-  const [voted, setVoted] = useState(false);
+const AuctionVoteScreen: React.FC<{ vehicle: any; session: any }> = ({ vehicle, session }) => {
+  const [voteSummary, setVoteSummary] = useState<any>(null);
+  const [userVote, setUserVote] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadVoteData();
+  }, [vehicle.id, session]);
+
+  const loadVoteData = async () => {
+    try {
+      const [summary, vote] = await Promise.all([
+        AuctionVotingService.getVoteSummary(vehicle.id),
+        session?.user ? AuctionVotingService.getUserVote(vehicle.id, session.user.id) : null
+      ]);
+      
+      setVoteSummary(summary);
+      setUserVote(vote);
+    } catch (error) {
+      console.error('Failed to load vote data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleVote = async (vote: 'yes' | 'no') => {
-    // TODO: Implement voting logic
-    setVoted(true);
+    if (!session?.user) {
+      alert('Please log in to vote');
+      return;
+    }
+
+    try {
+      await AuctionVotingService.castVote({
+        vehicle_id: vehicle.id,
+        user_id: session.user.id,
+        vote
+      });
+      
+      await loadVoteData();
+    } catch (error) {
+      console.error('Failed to cast vote:', error);
+      alert('Failed to submit vote');
+    }
   };
+
+  if (loading) {
+    return (
+      <div style={styles.screen}>
+        <div style={styles.mainMetric}>
+          <div style={styles.label}>🏛️ Send to Auction?</div>
+        </div>
+        <div style={styles.divider} />
+        <div style={styles.loadingText}>Loading votes...</div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.screen}>
@@ -173,7 +261,7 @@ const AuctionVoteScreen: React.FC<{ vehicle: any }> = ({ vehicle }) => {
         <div style={styles.label}>🏛️ Send to Auction?</div>
       </div>
       <div style={styles.divider} />
-      {!voted ? (
+      {!userVote ? (
         <div style={styles.voteButtons}>
           <button style={styles.voteButtonYes} onClick={() => handleVote('yes')}>
             Vote Yes
@@ -184,11 +272,17 @@ const AuctionVoteScreen: React.FC<{ vehicle: any }> = ({ vehicle }) => {
         </div>
       ) : (
         <div style={styles.voteResult}>
-          ✅ Vote recorded
+          ✅ You voted {userVote.vote.toUpperCase()}
         </div>
       )}
       <div style={styles.voteStats}>
-        Current votes: 3 yes, 1 no
+        {voteSummary && voteSummary.total_votes > 0 ? (
+          <>
+            {voteSummary.yes_votes} yes, {voteSummary.no_votes} no ({voteSummary.yes_percent.toFixed(0)}% yes)
+          </>
+        ) : (
+          'No votes yet'
+        )}
       </div>
     </div>
   );

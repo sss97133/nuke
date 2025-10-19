@@ -168,7 +168,7 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
       )}
 
       {/* Price Carousel - Swipeable */}
-      <PriceCarousel vehicle={vehicle} stats={stats} />
+      <PriceCarousel vehicle={vehicle} stats={stats} session={session} />
 
       {/* Quick Stats - Touch Friendly & Clickable */}
       <div style={styles.statsGrid}>
