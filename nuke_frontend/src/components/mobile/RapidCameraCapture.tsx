@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
 import { ImageUploadService } from '../../services/imageUploadService';
 import { extractImageMetadata } from '../../utils/imageMetadata';
 import '../../design-system.css';
@@ -22,7 +21,7 @@ interface GuardrailSettings {
 }
 
 const RapidCameraCapture: React.FC = () => {
-  const { user } = useAuth();
+  const [user, setUser] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureContext, setCaptureContext] = useState<CaptureContext>({
@@ -38,9 +37,26 @@ const RapidCameraCapture: React.FC = () => {
   });
   const [showSettings, setShowSettings] = useState(false);
 
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user || null);
+    };
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Load context on mount
   useEffect(() => {
-    loadCaptureContext();
+    if (user) {
+      loadCaptureContext();
+    }
   }, [user]);
 
   const loadCaptureContext = async () => {

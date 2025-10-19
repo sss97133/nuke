@@ -1,5 +1,6 @@
 // Profile Stats Component - Display user statistics and metrics
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { ProfileStats as ProfileStatsType } from '../../types/profile';
 
 interface ProfileStatsProps {
@@ -8,6 +9,8 @@ interface ProfileStatsProps {
 }
 
 const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, isOwnProfile }) => {
+  const navigate = useNavigate();
+
   if (!stats) {
     return (
       <div className="card">
@@ -143,6 +146,40 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, isOwnProfile }) => {
             <div className="text-small text-muted">
               Last active: {new Date(stats.last_activity).toLocaleDateString()}
             </div>
+          </div>
+        )}
+
+        {/* Photo Album Link - Only for own profile */}
+        {isOwnProfile && (
+          <div style={{ marginTop: '16px', textAlign: 'center' }}>
+            <button
+              onClick={() => navigate('/photos')}
+              className="button button-primary"
+              style={{
+                width: '100%',
+                padding: '10px',
+                fontSize: '10pt',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>📸</span>
+              <span>View Photo Album</span>
+              {stats.total_images > 0 && (
+                <span style={{
+                  background: '#ffffff',
+                  color: '#000080',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontSize: '8pt',
+                  fontWeight: 'bold'
+                }}>
+                  {stats.total_images}
+                </span>
+              )}
+            </button>
           </div>
         )}
       </div>

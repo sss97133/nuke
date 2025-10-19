@@ -5,6 +5,7 @@ import './design-system.css';
 import { ToastProvider } from './hooks/useToast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
+import RapidCameraCapture from './components/mobile/RapidCameraCapture';
 
 // Database components
 import DatabaseAudit from './pages/DatabaseAudit';
@@ -59,6 +60,7 @@ import BulkPriceEditor from './pages/admin/BulkPriceEditor';
 import PriceCsvImport from './pages/admin/PriceCsvImport';
 import BookService from './pages/BookService';
 import OrderParts from './pages/OrderParts';
+import PhotoAlbum from './pages/PhotoAlbum';
 
 
 // Auth components
@@ -278,6 +280,8 @@ function App() {
 
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/:userId" element={<Profile />} />
+            <Route path="/photos" element={<PhotoAlbum />} />
+            <Route path="/photo-album" element={<PhotoAlbum />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -301,6 +305,8 @@ function App() {
         </AppLayout>
         {/* Global Upload Progress Bar - Persists across navigation */}
         <UploadProgressBar />
+        {/* Rapid Camera Capture - Always available for authenticated users */}
+        {session && <RapidCameraCapture />}
       </Router>
     </ToastProvider>
   );
