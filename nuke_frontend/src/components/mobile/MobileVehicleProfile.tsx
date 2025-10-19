@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import EventDetailModal from './EventDetailModal';
 import { MobileImageCarousel } from './MobileImageCarousel';
 import { PriceCarousel } from './PriceCarousel';
+import SpecResearchModal from './SpecResearchModal';
 
 interface MobileVehicleProfileProps {
   vehicleId: string;
@@ -740,16 +741,61 @@ const TechnicalGridView: React.FC<{ images: any[]; onImageClick: (img: any) => v
 );
 
 const MobileSpecsTab: React.FC<{ vehicle: any }> = ({ vehicle }) => {
+  const [selectedSpec, setSelectedSpec] = useState<{name: string; value: any} | null>(null);
+
+  const importantSpecs = [
+    { key: 'year', label: 'Year', researchable: false },
+    { key: 'make', label: 'Make', researchable: false },
+    { key: 'model', label: 'Model', researchable: false },
+    { key: 'vin', label: 'VIN', researchable: false },
+    { key: 'engine', label: 'Engine', researchable: true },
+    { key: 'transmission', label: 'Transmission', researchable: true },
+    { key: 'drivetrain', label: 'Drivetrain', researchable: true },
+    { key: 'axles', label: 'Axles', researchable: true },
+    { key: 'suspension', label: 'Suspension', researchable: true },
+    { key: 'tires', label: 'Tires', researchable: true },
+    { key: 'mileage', label: 'Mileage', researchable: false }
+  ];
+
+  const handleSpecClick = (spec: any) => {
+    if (spec.researchable) {
+      setSelectedSpec({ name: spec.label, value: vehicle[spec.key] });
+    }
+  };
+
   return (
     <div style={styles.tabContent}>
-      {Object.entries(vehicle)
-        .filter(([key, value]) => value && !['id', 'created_at', 'updated_at'].includes(key))
-        .map(([key, value]) => (
-          <div key={key} style={styles.card}>
-            <div style={styles.cardLabel}>{key.replace(/_/g, ' ').toUpperCase()}</div>
+      {importantSpecs.map(spec => {
+        const value = vehicle[spec.key];
+        if (!value) return null;
+
+        return (
+          <div 
+            key={spec.key} 
+            style={{
+              ...styles.card,
+              cursor: spec.researchable ? 'pointer' : 'default',
+              background: spec.researchable ? '#ffffff' : '#c0c0c0'
+            }}
+            onClick={() => handleSpecClick(spec)}
+          >
+            <div style={styles.cardLabel}>
+              {spec.label}
+              {spec.researchable && <span style={{ marginLeft: '6px', fontSize: '10px' }}>🔍</span>}
+            </div>
             <div style={styles.cardValue}>{String(value)}</div>
           </div>
-        ))}
+        );
+      })}
+
+      {/* AI Research Modal */}
+      {selectedSpec && (
+        <SpecResearchModal 
+          vehicle={vehicle}
+          spec={selectedSpec}
+          onClose={() => setSelectedSpec(null)}
+        />
+      )}
     </div>
   );
 };
