@@ -1,6 +1,21 @@
 @import './design-system.css';
 @import './styles/windows95.css';
 
+/* Global safeguards to prevent blank screens on mobile */
+html, body, #root {
+  min-height: 100%;
+}
+
+#root {
+  display: block; /* ensure root always lays out children */
+}
+
+@media (max-width: 768px) {
+  body, html {
+    background: var(--grey-100, #f5f5f5);
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

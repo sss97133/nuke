@@ -20,13 +20,11 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
   render() {
     if (this.state.hasError) {
       return (
-        <div className="container compact">
-          <div className="main">
-            <div className="card"><div className="card-body">
-              <div className="text">An error occurred rendering this section.</div>
-              {this.state.message && <div className="text text-small text-muted" style={{ marginTop: 6 }}>{this.state.message}</div>}
-            </div></div>
-          </div>
+        <div style={{ padding: 12 }}>
+          <div className="card"><div className="card-body">
+            <div className="text">An error occurred rendering this section.</div>
+            {this.state.message && <div className="text text-small text-muted" style={{ marginTop: 6 }}>{this.state.message}</div>}
+          </div></div>
         </div>
       );
     }
