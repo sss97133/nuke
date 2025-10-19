@@ -6,11 +6,11 @@ import '../../design-system.css';
 interface VehicleImage {
   id: string;
   image_url: string;
-  description?: string;
-  uploaded_by: string;
+  caption?: string;
+  user_id: string;
   created_at: string;
-  gps_latitude?: number;
-  gps_longitude?: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface VehicleImageGalleryProps {
@@ -36,11 +36,11 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
         .select(`
           id,
           image_url,
-          description,
-          uploaded_by,
+          caption,
+          user_id,
           created_at,
-          gps_latitude,
-          gps_longitude
+          latitude,
+          longitude
         `)
         .eq('vehicle_id', vehicleId)
         .order('created_at', { ascending: false });

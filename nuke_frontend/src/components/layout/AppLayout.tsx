@@ -154,7 +154,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               style={{ display: 'none' }}
             >
-              ☺
+              Menu
             </button>
 
             {/* Upload Indicator - Windows 95 style */}

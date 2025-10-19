@@ -2,7 +2,6 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import './design-system.css';
-import './styles/function-design.css';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './hooks/useToast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
@@ -201,7 +200,7 @@ function App() {
         <AppLayout>
           <Routes>
             {/* Home route - Landing Page */}
-            <Route path="/" element={<Discovery />} />
+            <Route path="/" element={<AllVehicles />} />
 
             {/* Main routes */}
             <Route path="/discover" element={<Discovery />} />
