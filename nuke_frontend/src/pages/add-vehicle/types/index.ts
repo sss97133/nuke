@@ -77,6 +77,7 @@ export interface VehicleFormData {
   owner_name?: string;
   scanned_fields?: string[];
   import_url?: string;
+  contributor_roles?: ('consigner' | 'mechanic' | 'technician' | 'painter' | 'appraiser' | 'dealer' | 'broker' | 'other')[];
 
   // BAT Integration Fields
   bat_auction_url?: string;
