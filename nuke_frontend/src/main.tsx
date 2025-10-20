@@ -17,3 +17,4 @@ createRoot(document.getElementById('root')!).render(
 
 console.log('[main] React root render invoked');
 /* Force Vercel rebuild Mon Oct 20 18:04:13 AST 2025 */
+// Force rebuild 1761003103
