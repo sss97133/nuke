@@ -1343,10 +1343,10 @@ const VehicleProfile: React.FC = () => {
             onShowCompose={() => setShowCompose(true)}
           />
 
-          {/* Trading Interface - Temporarily disabled due to export issues */}
-          {/* {vehicle && (
+          {/* Trading Interface */}
+          {vehicle && (
             <VehicleProfileTrading vehicleId={vehicle.id} />
-          )} */}
+          )}
 
           {/* Privacy Settings for non-anonymous vehicles */}
           {!vehicle.isAnonymous && session && (
