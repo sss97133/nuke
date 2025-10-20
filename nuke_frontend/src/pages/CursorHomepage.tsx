@@ -42,7 +42,7 @@ const CursorHomepage: React.FC = () => {
     try {
       setLoading(true);
       
-      // Load vehicles
+      // Load vehicles - simplified query without count
       const { data: vehicleData, error } = await supabase
         .from('vehicles')
         .select(`
@@ -56,26 +56,15 @@ const CursorHomepage: React.FC = () => {
           location,
           updated_at,
           created_at,
-          is_for_sale,
-          vehicle_timeline_events(count)
+          is_for_sale
         `)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (!error && vehicleData) {
-        interface VehicleWithEvents extends Vehicle {
-          vehicle_timeline_events?: Array<unknown>;
-          event_count: number;
-        }
-        const vehiclesWithEventCount = vehicleData.map((v: Vehicle) => {
-          const vWithEvents = v as unknown as VehicleWithEvents;
-          return {
-            ...v,
-            event_count: vWithEvents.vehicle_timeline_events?.length || 0
-          };
-        });
-        setVehicles(vehiclesWithEventCount);
-        setFilteredVehicles(vehiclesWithEventCount);
+        // Just use vehicles without event count for now
+        setVehicles(vehicleData);
+        setFilteredVehicles(vehicleData);
       }
 
       // Load stats
