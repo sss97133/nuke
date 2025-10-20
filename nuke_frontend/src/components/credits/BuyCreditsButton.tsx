@@ -118,37 +118,36 @@ const styles = {
   modal: {
     background: 'var(--surface)',
     border: '1px solid var(--border)',
-    borderRadius: '8px',
+    borderRadius: '4px',
     width: '90%',
     maxWidth: '400px',
     maxHeight: '80vh',
     overflow: 'auto'
   },
   header: {
-    background: 'var(--accent)',
-    color: '#ffffff',
-    padding: '16px',
+    padding: '12px',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    borderBottom: '1px solid var(--border)'
   },
   title: {
     margin: 0,
-    fontSize: '14px',
-    fontWeight: 'bold' as const
+    fontSize: '11px',
+    fontWeight: 500 as const
   },
   closeButton: {
     background: 'transparent',
     border: 'none',
-    color: '#ffffff',
-    fontSize: '24px',
+    color: 'var(--text)',
+    fontSize: '18px',
     cursor: 'pointer',
     padding: 0,
-    width: '24px',
-    height: '24px'
+    width: '20px',
+    height: '20px'
   },
   content: {
-    padding: '16px'
+    padding: '12px'
   },
   description: {
     fontSize: '10px',
@@ -163,23 +162,24 @@ const styles = {
     marginBottom: '16px'
   },
   presetButton: {
-    padding: '12px 8px',
+    padding: '8px 6px',
     background: 'var(--bg)',
     border: '1px solid var(--border)',
-    borderRadius: '4px',
+    borderRadius: '3px',
     cursor: 'pointer',
-    fontSize: '11px',
-    fontWeight: 'bold' as const,
+    fontSize: '10px',
+    fontWeight: 500 as const,
     transition: 'border-color 0.1s',
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
-    gap: '4px'
+    gap: '2px',
+    color: 'var(--text)'
   },
   creditCount: {
     fontSize: '8px',
     color: 'var(--text-secondary)',
-    fontWeight: 'normal' as const
+    fontWeight: 400 as const
   },
   divider: {
     textAlign: 'center' as const,
@@ -193,23 +193,23 @@ const styles = {
   },
   input: {
     flex: 1,
-    height: '36px',
-    padding: '0 12px',
+    height: '32px',
+    padding: '0 10px',
     background: 'var(--bg)',
     border: '1px solid var(--border)',
-    borderRadius: '4px',
-    fontSize: '11px',
+    borderRadius: '3px',
+    fontSize: '10px',
     color: 'var(--text)'
   },
   buyButton: {
-    height: '36px',
-    padding: '0 16px',
+    height: '32px',
+    padding: '0 12px',
     background: 'var(--accent)',
     color: '#ffffff',
     border: 'none',
-    borderRadius: '4px',
-    fontSize: '11px',
-    fontWeight: 'bold' as const,
+    borderRadius: '3px',
+    fontSize: '10px',
+    fontWeight: 500 as const,
     cursor: 'pointer'
   }
 };

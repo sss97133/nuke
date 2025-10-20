@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
-import './design-system.css';
+import './styles/function-design.css';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './hooks/useToast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
@@ -32,6 +32,7 @@ import VehicleContributionForm from './pages/VehicleContributionForm';
 // Lazy load VehicleVerification to avoid blocking app startup
 const VehicleVerification = React.lazy(() => import('./pages/VehicleVerification'));
 import AllVehicles from './pages/AllVehicles';
+import CursorHomepage from './pages/CursorHomepage';
 import ProjectManagement from './pages/ProjectManagement';
 import SimpleProjectManager from './pages/SimpleProjectManager';
 import VehicleTasks from './pages/VehicleTasks';
@@ -200,7 +201,7 @@ function App() {
         <AppLayout>
           <Routes>
             {/* Home route - Landing Page */}
-            <Route path="/" element={<AllVehicles />} />
+            <Route path="/" element={<CursorHomepage />} />
 
             {/* Main routes */}
             <Route path="/discover" element={<Discovery />} />

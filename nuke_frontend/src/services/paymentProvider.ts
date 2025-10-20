@@ -99,8 +99,8 @@ export class ClearingHouseProvider implements PaymentProvider {
   private apiUrl: string;
 
   constructor(apiKey?: string, apiUrl?: string) {
-    this.apiKey = apiKey || process.env.CLEARING_HOUSE_API_KEY || '';
-    this.apiUrl = apiUrl || process.env.CLEARING_HOUSE_API_URL || '';
+    this.apiKey = apiKey || (import.meta.env.VITE_CLEARING_HOUSE_API_KEY as string | undefined) || '';
+    this.apiUrl = apiUrl || (import.meta.env.VITE_CLEARING_HOUSE_API_URL as string | undefined) || '';
   }
 
   async createPaymentSession(params: PaymentParams): Promise<PaymentSession> {
