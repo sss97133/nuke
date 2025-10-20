@@ -16,7 +16,7 @@ import ConsignerManagement from '../components/ConsignerManagement';
 import ReceiptManager from '../components/vehicle/ReceiptManager';
 import VehicleTagExplorer from '../components/vehicle/VehicleTagExplorer';
 import EnhancedImageTagger from '../components/vehicle/EnhancedImageTagger';
-import VehicleProfileTrading from '../components/vehicle/VehicleProfileTrading';
+// import VehicleProfileTrading from '../components/vehicle/VehicleProfileTrading';
 import {
   VehicleHeader,
   VehicleHeroImage,
@@ -1344,9 +1344,9 @@ const VehicleProfile: React.FC = () => {
           />
 
           {/* Trading Interface */}
-          {vehicle && (
+          {/* {vehicle && (
             <VehicleProfileTrading vehicleId={vehicle.id} />
-          )}
+          )} */}
 
           {/* Privacy Settings for non-anonymous vehicles */}
           {!vehicle.isAnonymous && session && (
