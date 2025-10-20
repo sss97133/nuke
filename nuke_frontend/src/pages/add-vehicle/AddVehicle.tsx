@@ -296,7 +296,8 @@ Redirecting to vehicle profile...`);
       
       // Filter formData to only include valid columns
       const vehicleData: any = {
-        user_id: user.id,
+        // Don't explicitly set user_id - let RLS/auth handle it
+        // user_id is set by the database through auth context
         discovered_by: formData.import_url ? user.id : undefined,
         discovery_source: formData.import_url ? (formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External URL') : undefined,
         discovery_url: formData.import_url || undefined
