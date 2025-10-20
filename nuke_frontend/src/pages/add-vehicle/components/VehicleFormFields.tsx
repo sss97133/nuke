@@ -182,6 +182,48 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
             )}
           </div>
         </div>
+
+        {/* Contributor Roles - If relationship is consigned or other work-related roles */}
+        {(formData.relationship_type === 'consigned' || formData.relationship_type === 'curated' || formData.relationship_type === 'discovered') && (
+          <div className="form-grid grid-1">
+            <div className="form-group">
+              <label htmlFor="contributor_roles" className="form-label">
+                My Role(s) on This Vehicle <span className="text-muted">(optional)</span>
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '8px' }}>
+                {[
+                  { value: 'consigner', label: '👤 Previously Consigned' },
+                  { value: 'mechanic', label: '🔧 Mechanic / Technician' },
+                  { value: 'painter', label: '🎨 Painter / Body Work' },
+                  { value: 'appraiser', label: '📊 Appraiser' },
+                  { value: 'dealer', label: '🏪 Dealer / Sales' },
+                  { value: 'broker', label: '📋 Broker / Agent' }
+                ].map((role) => (
+                  <label key={role.value} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '6px', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
+                    <input
+                      type="checkbox"
+                      value={role.value}
+                      checked={(formData.contributor_roles || []).includes(role.value as any)}
+                      onChange={(e) => {
+                        const roles = formData.contributor_roles || [];
+                        if (e.target.checked) {
+                          onFieldChange('contributor_roles', [...roles, role.value as any]);
+                        } else {
+                          onFieldChange('contributor_roles', roles.filter(r => r !== role.value));
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px' }}>{role.label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="text-small text-muted" style={{ marginTop: '8px', fontSize: '12px' }}>
+                Check all roles you've had with this vehicle
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Physical Specifications - Basic level and above */}
