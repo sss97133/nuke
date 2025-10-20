@@ -251,7 +251,7 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
       const { data: vehicle, error: vehicleError } = await supabase
         .from('vehicles')
         .insert({
-          user_id: user.id,
+          // Don't explicitly set user_id - let auth context handle it
           year: formData.year ? parseInt(formData.year) : null,
           make: formData.make || null,
           model: formData.model || null,
