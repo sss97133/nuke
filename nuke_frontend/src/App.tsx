@@ -6,6 +6,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './hooks/useToast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Database components
 import DatabaseAudit from './pages/DatabaseAudit';
@@ -306,6 +307,7 @@ function App() {
         <UploadProgressBar />
         </Router>
       </ToastProvider>
+      <SpeedInsights />
     </ThemeProvider>
   );
 }
