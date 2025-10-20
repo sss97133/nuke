@@ -119,7 +119,7 @@ const VehicleProfile: React.FC = () => {
 
     // Check if user has approved ownership verification with both title and legal ID
     const hasVerifiedOwnership = ownershipVerifications.some(verification =>
-      verification.user_id === session.user.id &&
+      verification.user_id === session?.user?.id &&
       verification.status === 'approved' &&
       (verification.verification_type === 'title' || verification.verification_type === 'title_and_id')
     );
@@ -139,7 +139,7 @@ const VehicleProfile: React.FC = () => {
   };
 
   // Row-owner detection (DB owner of vehicle record)
-  const isRowOwner = !!(session?.user?.id && (vehicle as any)?.user_id && session.user.id === (vehicle as any).user_id);
+  const isRowOwner = !!(session?.user?.id && (vehicle as any)?.user_id && session?.user?.id === (vehicle as any).user_id);
 
   const loadSaleSettings = async (vehId: string) => {
     try {
@@ -435,12 +435,12 @@ const VehicleProfile: React.FC = () => {
   };
 
   const loadUserProfile = async () => {
+    if (!session?.user?.id) return;
     try {
-      if (!session?.user?.id) return;
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, email, phone, address, city, state, zip')
-        .eq('id', session.user.id)
+        .eq('id', session?.user?.id)
         .maybeSingle();
       if (error) {
         console.warn('Unable to load user profile:', error.message);
@@ -449,8 +449,8 @@ const VehicleProfile: React.FC = () => {
       if (data) {
         setUserProfile({
           id: data.id,
-          full_name: data.full_name || data.username || session.user.email || 'Unknown User',
-          email: session.user.email || data.email || '',
+          full_name: data.full_name || data.username || session?.user?.email || 'Unknown User',
+          email: session?.user?.email || data.email || '',
           phone: data.phone,
           address: data.address,
           city: data.city,
@@ -606,7 +606,7 @@ const VehicleProfile: React.FC = () => {
         .from('vehicle_contributor_roles')
         .select('role')
         .eq('vehicle_id', vehicle.id)
-        .eq('user_id', session.user.id)
+        .eq('user_id', session?.user?.id)
         .maybeSingle();
 
       if (error) {
