@@ -3022,3 +3022,46 @@ body {
   }
 }
 
+/* ============================================
+   CURSOR IDE DESIGN PATTERNS
+   Premium interactive polish
+   ============================================ */
+
+/* Pattern 1: Thick Borders on Interactive Elements */
+.button,
+.form-input,
+.card,
+button {
+  border: 2px solid var(--border-light);
+  transition: all 0.12s ease;
+}
+
+/* Pattern 2: Interactive Feedback */
+.button:hover,
+.form-input:hover,
+button:hover {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px #0ea5e922;
+}
+
+/* Pattern 3: Focus Ring with Halo */
+.button:focus-visible,
+.form-input:focus-visible,
+button:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px #0ea5e922;
+}
+
+/* Pattern 4: Hover Lift Effect */
+.card:hover {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px #0ea5e922;
+  transform: translateY(-2px);
+}
+
+/* Pattern 5: Smooth Transitions Everywhere */
+* {
+  transition: all 0.12s ease;
+}
+

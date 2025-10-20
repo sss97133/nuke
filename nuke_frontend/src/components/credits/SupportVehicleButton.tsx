@@ -166,49 +166,47 @@ const styles = {
   modal: {
     background: 'var(--surface)',
     border: '1px solid var(--border)',
-    borderRadius: '8px',
+    borderRadius: '4px',
     width: '90%',
     maxWidth: '400px'
   },
   header: {
-    background: 'var(--accent)',
-    color: '#ffffff',
-    padding: '16px',
+    padding: '12px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopLeftRadius: '8px',
-    borderTopRightRadius: '8px'
+    borderBottom: '1px solid var(--border)'
   },
   title: {
     margin: 0,
-    fontSize: '12px',
-    fontWeight: 'bold' as const
+    fontSize: '11px',
+    fontWeight: 500 as const,
+    color: 'var(--text)'
   },
   closeButton: {
     background: 'transparent',
     border: 'none',
-    color: '#ffffff',
-    fontSize: '24px',
+    color: 'var(--text)',
+    fontSize: '18px',
     cursor: 'pointer',
     padding: 0
   },
   content: {
-    padding: '16px'
+    padding: '12px'
   },
   balance: {
-    fontSize: '11px',
+    fontSize: '10px',
     color: 'var(--text-secondary)',
-    marginBottom: '16px'
+    marginBottom: '12px'
   },
   field: {
-    marginBottom: '16px'
+    marginBottom: '12px'
   },
   label: {
     display: 'block',
     fontSize: '10px',
-    fontWeight: 'bold' as const,
-    marginBottom: '6px',
+    fontWeight: 500 as const,
+    marginBottom: '4px',
     color: 'var(--text)'
   },
   quickAmounts: {
@@ -218,17 +216,19 @@ const styles = {
     flexWrap: 'wrap' as const
   },
   quickButton: {
-    padding: '4px 8px',
+    padding: '4px 6px',
     background: 'var(--bg)',
     border: '1px solid var(--border)',
     borderRadius: '3px',
     fontSize: '10px',
     cursor: 'pointer',
-    transition: 'border-color 0.1s'
+    transition: 'border-color 0.1s',
+    color: 'var(--text)'
   },
   quickButtonActive: {
     borderColor: 'var(--accent)',
-    background: 'var(--accent-dim)'
+    background: 'var(--accent-dim)',
+    color: 'var(--accent)'
   },
   input: {
     width: '100%',
@@ -236,8 +236,8 @@ const styles = {
     padding: '0 10px',
     background: 'var(--bg)',
     border: '1px solid var(--border)',
-    borderRadius: '4px',
-    fontSize: '11px',
+    borderRadius: '3px',
+    fontSize: '10px',
     color: 'var(--text)',
     boxSizing: 'border-box' as const
   },
@@ -253,13 +253,13 @@ const styles = {
   },
   supportButton: {
     width: '100%',
-    height: '40px',
+    height: '32px',
     background: 'var(--accent)',
     color: '#ffffff',
     border: 'none',
-    borderRadius: '4px',
-    fontSize: '12px',
-    fontWeight: 'bold' as const,
+    borderRadius: '3px',
+    fontSize: '10px',
+    fontWeight: 500 as const,
     cursor: 'pointer',
     transition: 'opacity 0.1s'
   }

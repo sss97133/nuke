@@ -154,18 +154,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               style={{ display: 'none' }}
             >
-              Menu
+              ☺
             </button>
 
             {/* Upload Indicator - Windows 95 style */}
             <GlobalUploadIndicator />
 
-            {/* Notifications */}
-            {session ? <NotificationBell /> : null}
-
             {session ? (
-              <>
-              <Link to="/inbox" className="nav-link">Inbox</Link>
               <Link to="/profile" className="profile-bubble">
                 {userProfile?.avatar_url ? (
                   <img
@@ -179,9 +174,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 )}
                 Profile
               </Link>
-              </>
             ) : (
-              <Link to="/login" className="button button-primary">
+              <Link to="/login" className="button button-primary" style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}>
                 Login
               </Link>
             )}
