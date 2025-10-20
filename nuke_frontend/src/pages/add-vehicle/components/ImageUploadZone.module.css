@@ -1,0 +1,107 @@
+.uploadZone {
+  border: 2px dashed #cbd5e0;
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uploadZone:hover {
+  border-color: #4299e1;
+  background: linear-gradient(135deg, #ebf8ff 0%, #e6f7ff 100%);
+}
+
+.uploadZone.dragging {
+  border-color: #3182ce;
+  background: linear-gradient(135deg, #bee3f8 0%, #90cdf4 100%);
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.2);
+}
+
+.content {
+  pointer-events: none;
+}
+
+.icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.uploadZone h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 8px 0;
+}
+
+.uploadZone p {
+  font-size: 14px;
+  color: #718096;
+  margin: 8px 0;
+}
+
+.uploadStatus {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #f0fff4;
+  border-left: 3px solid #48bb78;
+  border-radius: 4px;
+  color: #22543d;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.uploadingIndicator {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #edf2f7;
+  border-left: 3px solid #4299e1;
+  border-radius: 4px;
+  color: #2c5282;
+  font-size: 14px;
+  font-weight: 500;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@media (max-width: 768px) {
+  .uploadZone {
+    padding: 32px 16px;
+    min-height: 200px;
+  }
+
+  .icon {
+    font-size: 36px;
+  }
+
+  .uploadZone h3 {
+    font-size: 16px;
+  }
+
+  .uploadZone p {
+    font-size: 13px;
+  }
+}
