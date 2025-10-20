@@ -1119,13 +1119,12 @@ const VehicleProfile: React.FC = () => {
     });
   }
 
-  // Use mobile version if on mobile device (but AFTER all hooks have run)
-  if (isMobile && vehicleId) {
-    return <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />;
-  }
-
+  // Render mobile or desktop version (no early return to avoid hook errors)
   return (
     <>
+      {isMobile && vehicleId ? (
+        <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />
+      ) : (
       <div>
         {/* Vehicle Header with Price */}
         <VehicleHeader
@@ -1486,7 +1485,6 @@ const VehicleProfile: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
 
       {/* Add Event Wizard Modal */}
       {showAddEvent && (
@@ -1518,6 +1516,8 @@ const VehicleProfile: React.FC = () => {
             loadVehicle();
           }}
         />
+      )}
+      </div>
       )}
     </>
   );
