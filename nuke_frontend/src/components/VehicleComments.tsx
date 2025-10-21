@@ -219,7 +219,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         .from('vehicle_comments')
         .insert({
           vehicle_id: vehicleId,
-          user_id: session.user.id,
+          user_id: session?.user?.id,
           comment_text: newComment.trim()
         });
 
