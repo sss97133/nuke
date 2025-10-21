@@ -9,6 +9,7 @@ import { UserInteractionService } from '../../services/userInteractionService';
 import { supabase } from '../../lib/supabase';
 import EventDetailModal from './EventDetailModal';
 import { MobileImageCarousel } from './MobileImageCarousel';
+import { PriceCarousel } from './PriceCarousel';
 import { MobileTimelineHeatmap } from './MobileTimelineHeatmap';
 import SpecResearchModal from './SpecResearchModal';
 
