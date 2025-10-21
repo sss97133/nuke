@@ -50,10 +50,10 @@ Deno.serve(async (req) => {
       const session = event.data.object
 
       const userId = session.client_reference_id || session.metadata?.user_id
-      const credits = parseInt(session.metadata?.credits || '0')
+      const amountCents = session.amount_total // Stripe provides this directly
 
-      if (!userId || !credits) {
-        console.error('Missing user_id or credits in webhook')
+      if (!userId || !amountCents) {
+        console.error('Missing user_id or amount in webhook')
         return new Response('Invalid metadata', { status: 400 })
       }
 
@@ -64,60 +64,19 @@ Deno.serve(async (req) => {
         Deno.env.get('SERVICE_ROLE_KEY')!
       )
 
-      // Add credits to user account
-      const { error: upsertError } = await supabase
-        .from('user_credits')
-        .upsert({
-          user_id: userId,
-          balance: credits, // Will be added via trigger or separate query
-        }, {
-          onConflict: 'user_id',
-          ignoreDuplicates: false
-        })
-
-      if (upsertError) {
-        // If user doesn't exist, insert
-        const { error: insertError } = await supabase
-          .from('user_credits')
-          .insert({
-            user_id: userId,
-            balance: credits
-          })
-        
-        if (!insertError) {
-          // Success - record transaction
-          await supabase.from('credit_transactions').insert({
-            user_id: userId,
-            amount: credits,
-            transaction_type: 'purchase',
-            reference_id: session.id,
-            metadata: {
-              stripe_session_id: session.id,
-              amount_paid: session.amount_total / 100
-            }
-          })
+      // Add cash to user account (professional system)
+      await supabase.rpc('add_cash_to_user', {
+        p_user_id: userId,
+        p_amount_cents: amountCents,
+        p_stripe_payment_id: session.id,
+        p_metadata: {
+          stripe_session_id: session.id,
+          amount_paid_usd: amountCents / 100,
+          payment_method: session.payment_method_types?.[0] || 'card'
         }
-      } else {
-        // User exists, add to balance
-        await supabase.rpc('add_credits_to_user', {
-          p_user_id: userId,
-          p_credits: credits
-        })
+      })
 
-        // Record transaction
-        await supabase.from('credit_transactions').insert({
-          user_id: userId,
-          amount: credits,
-          transaction_type: 'purchase',
-          reference_id: session.id,
-          metadata: {
-            stripe_session_id: session.id,
-            amount_paid: session.amount_total / 100
-          }
-        })
-      }
-
-      console.log(`Added ${credits} credits to user ${userId}`)
+      console.log(`Added $${amountCents / 100} (${amountCents} cents) to user ${userId}`)
     }
 
     return new Response(

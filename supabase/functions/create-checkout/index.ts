@@ -61,8 +61,8 @@ Deno.serve(async (req) => {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: 'Platform Credits',
-              description: `$${amount_usd} in credits to support vehicle builds`
+              name: 'Cash Deposit',
+              description: `Add $${amount_usd} to your trading balance`
             },
             unit_amount: amount_usd * 100, // Convert to cents
           },
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       client_reference_id: user.id,
       metadata: {
         user_id: user.id,
-        credits: amount_usd * 100, // $1 = 100 credits
+        amount_cents: amount_usd * 100, // Amount in cents
       },
     })
 

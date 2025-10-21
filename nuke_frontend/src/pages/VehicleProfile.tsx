@@ -36,6 +36,7 @@ import type {
   LiveSession
 } from './vehicle-profile/types';
 import '../design-system.css';
+import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -1192,6 +1193,12 @@ const VehicleProfile: React.FC = () => {
                 permissions={permissions}
                 onDataPointClick={handleDataPointClick}
                 onEditClick={handleEditClick}
+              />
+
+              {/* Share Holders & Supporters */}
+              <VehicleShareHolders
+                vehicleId={vehicle.id}
+                vehicleValue={vehicle.current_value || 0}
               />
 
               {/* Ownership Panel */}
