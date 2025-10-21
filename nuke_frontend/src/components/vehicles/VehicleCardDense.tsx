@@ -28,7 +28,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showPriceChange = false 
 }) => {
   const formatPrice = (price?: number) => {
-    if (!price) return null;
+    if (!price) return '—';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -54,181 +54,235 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
   // Generate fake price change for demo
   const priceChange = showPriceChange ? (Math.random() > 0.5 ? '+' : '-') + (Math.random() * 10).toFixed(1) + '%' : null;
-  const priceChangeColor = priceChange?.startsWith('+') ? 'var(--success)' : 'var(--error)';
+  const priceChangeColor = priceChange?.startsWith('+') ? '#10b981' : '#ef4444';
 
   // Generate fake social metrics for demo
-  const likes = showSocial ? Math.floor(Math.random() * 50) : 0;
-  const comments = showSocial ? Math.floor(Math.random() * 20) : 0;
+  const views = showSocial ? Math.floor(Math.random() * 500 + 100) : 0;
+  const bids = showSocial ? Math.floor(Math.random() * 15) : 0;
 
-  const getCardStyle = () => {
-    switch (viewMode) {
-      case 'gallery':
-        return {
-          padding: '12px',
-          background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: '4px',
-          display: 'flex',
-          flexDirection: 'row' as const,
+  // LIST VIEW: Spreadsheet/table-like, data-heavy
+  if (viewMode === 'list') {
+    return (
+      <Link
+        to={`/vehicle/${vehicle.id}`}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '40px 1fr 100px 80px 80px 80px 60px',
           gap: '12px',
-          textDecoration: 'none',
-          color: 'inherit',
-          transition: 'all 0.12s ease',
-          width: '100%',
-          boxSizing: 'border-box' as const,
-          cursor: 'pointer',
-        };
-      case 'grid':
-        return {
-          padding: '6px',
+          alignItems: 'center',
+          padding: '6px 12px',
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: '3px',
-          display: 'flex',
-          flexDirection: 'column' as const,
-          gap: '4px',
+          border: '1px solid var(--border)',
+          borderRadius: '2px',
           textDecoration: 'none',
           color: 'inherit',
           transition: 'all 0.12s ease',
-          width: '100%',
-          boxSizing: 'border-box' as const,
-          cursor: 'pointer',
-        };
-      default: // list
-        return {
-          padding: '8px',
+          fontSize: '10px',
+          fontFamily: 'var(--font-mono, monospace)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--accent-dim)';
+          e.currentTarget.style.borderColor = 'var(--accent)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'var(--surface)';
+          e.currentTarget.style.borderColor = 'var(--border)';
+        }}
+      >
+        {/* Small thumbnail */}
+        <div style={{
+          width: '40px',
+          height: '40px',
+          borderRadius: '2px',
+          background: vehicle.primary_image_url ? `url(${vehicle.primary_image_url}) center/cover` : 'var(--border)',
+        }} />
+        
+        {/* Vehicle name */}
+        <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {vehicle.year} {vehicle.make} {vehicle.model}
+        </div>
+        
+        {/* Current value */}
+        <div style={{ textAlign: 'right', fontWeight: 600 }}>
+          {formatPrice(displayPrice)}
+        </div>
+        
+        {/* Price change */}
+        <div style={{ textAlign: 'right', color: priceChangeColor, fontWeight: 600 }}>
+          {priceChange || '—'}
+        </div>
+        
+        {/* Cost basis (fake for now) */}
+        <div style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>
+          {displayPrice ? formatPrice(displayPrice * 0.92) : '—'}
+        </div>
+        
+        {/* Gain/Loss (fake for now) */}
+        <div style={{ textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
+          {displayPrice ? formatPrice(displayPrice * 0.08) : '—'}
+        </div>
+        
+        {/* Time */}
+        <div style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: '8px' }}>
+          {timeAgo}
+        </div>
+      </Link>
+    );
+  }
+
+  // GALLERY VIEW: BAT-style, full-width hero images
+  if (viewMode === 'gallery') {
+    return (
+      <Link
+        to={`/vehicle/${vehicle.id}`}
+        style={{
+          display: 'block',
           background: 'var(--surface)',
           border: '2px solid var(--border)',
           borderRadius: '4px',
-          display: 'flex',
-          gap: '8px',
+          overflow: 'hidden',
           textDecoration: 'none',
           color: 'inherit',
           transition: 'all 0.12s ease',
+          marginBottom: '16px',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = 'var(--accent)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = 'var(--border)';
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = 'none';
+        }}
+      >
+        {/* Full-width hero image */}
+        <div style={{
           width: '100%',
-          boxSizing: 'border-box' as const,
-          minWidth: 0,
-        };
-    }
-  };
+          height: '400px',
+          background: vehicle.primary_image_url ? `url(${vehicle.primary_image_url}) center/cover` : 'var(--border)',
+          position: 'relative',
+        }}>
+          {/* Overlay gradient */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '120px',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+            padding: '20px',
+          }}>
+            {/* Title */}
+            <div style={{ fontSize: '20px', fontWeight: 700, color: 'white', marginBottom: '4px' }}>
+              {vehicle.year} {vehicle.make} {vehicle.model}
+            </div>
+            
+            {/* Stats bar */}
+            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255,255,255,0.9)' }}>
+              {displayPrice && (
+                <span style={{ fontWeight: 600 }}>{formatPrice(displayPrice)}</span>
+              )}
+              {showSocial && views > 0 && <span>👁 {views.toLocaleString()}</span>}
+              {showSocial && bids > 0 && <span>🔨 {bids} bids</span>}
+              {timeAgo && <span>{timeAgo}</span>}
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
 
-  const getImageSize = () => {
-    switch (viewMode) {
-      case 'gallery':
-        return { width: '200px', height: '120px' };
-      case 'grid':
-        return { width: '100%', height: '80px' };
-      default: // list
-        return { width: '64px', height: '64px' };
-    }
-  };
-
+  // GRID VIEW: Instagram/Craigslist style, compact squares
   return (
     <Link
       to={`/vehicle/${vehicle.id}`}
-      style={getCardStyle()}
+      style={{
+        display: 'block',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: '2px',
+        overflow: 'hidden',
+        textDecoration: 'none',
+        color: 'inherit',
+        transition: 'all 0.12s ease',
+        cursor: 'pointer',
+      }}
       onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.borderColor = '#0ea5e9';
-        el.style.boxShadow = '0 0 0 3px #0ea5e922';
-        el.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.borderColor = 'var(--accent)';
+        e.currentTarget.style.transform = 'scale(1.02)';
       }}
       onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.borderColor = 'var(--border)';
-        el.style.boxShadow = 'none';
-        el.style.transform = 'translateY(0)';
+        e.currentTarget.style.borderColor = 'var(--border)';
+        e.currentTarget.style.transform = 'scale(1)';
       }}
     >
-      {/* Image */}
-      <div
-        style={{
-          ...getImageSize(),
-          borderRadius: viewMode === 'list' ? '2px' : '3px',
-          background: vehicle.primary_image_url
-            ? `url(${vehicle.primary_image_url}) center/cover`
-            : 'var(--border)',
-          flexShrink: 0,
-          position: 'relative' as const,
-        }}
-      >
-        {/* Price change indicator for grid view */}
+      {/* Square image */}
+      <div style={{
+        width: '100%',
+        paddingBottom: '100%', // 1:1 aspect ratio
+        background: vehicle.primary_image_url ? `url(${vehicle.primary_image_url}) center/cover` : 'var(--border)',
+        position: 'relative',
+      }}>
+        {/* Price overlay */}
+        {displayPrice && (
+          <div style={{
+            position: 'absolute',
+            bottom: '6px',
+            left: '6px',
+            background: 'rgba(0,0,0,0.75)',
+            color: 'white',
+            padding: '3px 6px',
+            borderRadius: '2px',
+            fontSize: '10px',
+            fontWeight: 600,
+          }}>
+            {formatPrice(displayPrice)}
+          </div>
+        )}
+        
+        {/* Price change badge */}
         {showPriceChange && priceChange && (
           <div style={{
-            position: 'absolute' as const,
-            top: '4px',
-            right: '4px',
-            background: 'var(--bg)',
-            color: priceChangeColor,
-            padding: '2px 4px',
+            position: 'absolute',
+            top: '6px',
+            right: '6px',
+            background: priceChangeColor,
+            color: 'white',
+            padding: '3px 6px',
             borderRadius: '2px',
-            fontSize: '8px',
-            fontWeight: 500,
+            fontSize: '9px',
+            fontWeight: 700,
           }}>
             {priceChange}
           </div>
         )}
       </div>
-
-      {/* Content */}
-      <div style={{ 
-        flex: 1, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: viewMode === 'grid' ? '2px' : '4px', 
-        minWidth: 0, 
-        overflow: 'hidden' 
-      }}>
-        {/* Title */}
+      
+      {/* Compact info */}
+      <div style={{ padding: '6px' }}>
         <div style={{ 
-          fontSize: viewMode === 'grid' ? '10px' : '11px', 
-          fontWeight: 500, 
+          fontSize: '10px', 
+          fontWeight: 600, 
           overflow: 'hidden', 
           textOverflow: 'ellipsis', 
-          whiteSpace: 'nowrap' 
+          whiteSpace: 'nowrap',
+          marginBottom: '2px'
         }}>
-          {vehicle.year} {vehicle.make} {vehicle.model}
+          {vehicle.year} {vehicle.make}
         </div>
-
-        {/* Price */}
-        {displayPrice && (
-          <div style={{ 
-            fontSize: viewMode === 'grid' ? '9px' : '10px', 
-            fontFamily: 'var(--font-mono, monospace)',
-            color: 'var(--text)',
-            fontWeight: 500
-          }}>
-            {formatPrice(displayPrice)}
-          </div>
-        )}
-
-        {/* Social metrics for gallery view */}
-        {showSocial && (likes > 0 || comments > 0) && (
-          <div style={{ 
-            fontSize: '8px', 
-            color: 'var(--text-secondary)',
-            display: 'flex',
-            gap: '8px'
-          }}>
-            {likes > 0 && <span>❤️ {likes}</span>}
-            {comments > 0 && <span>💬 {comments}</span>}
-          </div>
-        )}
-
-        {/* Meta info */}
         <div style={{ 
-          fontSize: '8px', 
-          color: 'var(--text-secondary)', 
-          display: 'flex', 
-          gap: '6px', 
-          alignItems: 'center', 
-          flexWrap: 'wrap' 
+          fontSize: '9px', 
+          color: 'var(--text-secondary)',
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis', 
+          whiteSpace: 'nowrap'
         }}>
-          {vehicle.location && <span>{vehicle.location}</span>}
-          {!vehicle.location && timeAgo && <span>{timeAgo}</span>}
-          {vehicle.event_count !== undefined && vehicle.event_count > 0 && (
-            <span>{vehicle.event_count} events</span>
-          )}
+          {vehicle.model}
         </div>
       </div>
     </Link>

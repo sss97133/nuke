@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { CreditsService } from '../../services/creditsService';
+import { supabase } from '../../lib/supabase';
 
 interface BuyCreditsButtonProps {
   presetAmounts?: number[];
@@ -20,8 +21,16 @@ export const BuyCreditsButton: React.FC<BuyCreditsButtonProps> = ({
   const [loading, setLoading] = useState(false);
 
   const handleBuyCredits = async (amount: number) => {
-    setLoading(true);
     try {
+      // Require authentication before starting checkout
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/login?redirect=${redirect}`;
+        return;
+      }
+
+      setLoading(true);
       const checkoutUrl = await CreditsService.buyCredits(amount);
       if (checkoutUrl) {
         window.location.href = checkoutUrl;

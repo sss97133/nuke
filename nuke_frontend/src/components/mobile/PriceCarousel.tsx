@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { BettingService } from '../../services/bettingService';
 import { AuctionVotingService } from '../../services/auctionVotingService';
+import { BuyCreditsButton } from '../credits/BuyCreditsButton';
 
 interface PriceCarouselProps {
   vehicle: any;
@@ -106,6 +107,9 @@ const SharePriceScreen: React.FC<{ sharePrice: number; gainPercent: number }> = 
         <span style={styles.subLabel}>Trading:</span>
         <span style={styles.subValue}>🟢 Active</span>
       </div>
+    </div>
+    <div style={styles.buySection}>
+      <BuyCreditsButton presetAmounts={[3, 10, 25]} />
     </div>
   </div>
 );
@@ -349,6 +353,11 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '8px'
+  },
+  buySection: {
+    marginTop: '12px',
+    display: 'flex',
+    justifyContent: 'center' as const
   },
   subMetric: {
     display: 'flex',

@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { BuyCreditsButton } from '../credits/BuyCreditsButton';
 
 interface VehicleMarketMetricsProps {
   vehicle: any;
@@ -169,6 +170,11 @@ export const VehicleMarketMetrics: React.FC<VehicleMarketMetricsProps> = ({ vehi
       <div style={styles.hint}>
         💡 Share = Vehicle Value ÷ 1,000 shares
       </div>
+
+      {/* Payments: Buy Credits CTA */}
+      <div style={styles.buySection}>
+        <BuyCreditsButton presetAmounts={[3, 10, 25]} />
+      </div>
     </div>
   );
 };
@@ -242,6 +248,11 @@ const styles = {
     textAlign: 'center' as const,
     marginTop: '8px',
     fontStyle: 'italic' as const
+  },
+  buySection: {
+    marginTop: '12px',
+    display: 'flex',
+    justifyContent: 'center' as const
   }
 };
 
