@@ -167,14 +167,14 @@ export default function Portfolio() {
         }}>
           <div>
             <h1 style={{
-              fontSize: '28px',
+              fontSize: '11px',
               fontWeight: 700,
-              marginBottom: '4px'
+              marginBottom: '2px'
             }}>
               Portfolio
             </h1>
             <p style={{
-              fontSize: '13px',
+              fontSize: '9px',
               color: 'var(--text-secondary)'
             }}>
               Trading account · Cash balance · Share holdings
@@ -215,16 +215,16 @@ export default function Portfolio() {
             padding: '20px'
           }}>
             <div style={{
-              fontSize: '10px',
+              fontSize: '8px',
               color: 'var(--text-secondary)',
-              marginBottom: '8px',
+              marginBottom: '4px',
               fontWeight: 600,
               textTransform: 'uppercase'
             }}>
               Total Portfolio Value
             </div>
             <div style={{
-              fontSize: '28px',
+              fontSize: '12px',
               fontWeight: 700,
               color: 'var(--accent)',
               fontFamily: 'var(--font-mono, monospace)'
@@ -244,16 +244,16 @@ export default function Portfolio() {
             padding: '20px'
           }}>
             <div style={{
-              fontSize: '10px',
+              fontSize: '8px',
               color: 'var(--text-secondary)',
-              marginBottom: '8px',
+              marginBottom: '4px',
               fontWeight: 600,
               textTransform: 'uppercase'
             }}>
               Unrealized P&L
             </div>
             <div style={{
-              fontSize: '28px',
+              fontSize: '12px',
               fontWeight: 700,
               color: totalUnrealizedPL >= 0 ? 'var(--success)' : 'var(--error)',
               fontFamily: 'var(--font-mono, monospace)'
@@ -453,20 +453,20 @@ export default function Portfolio() {
                         </div>
 
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            marginBottom: '2px'
-                          }}>
-                            {getTransactionLabel(tx.transaction_type)}
-                          </div>
-                          <div style={{
-                            fontSize: '11px',
-                            color: 'var(--text-secondary)',
-                            fontFamily: 'var(--font-mono, monospace)'
-                          }}>
-                            {formatDate(tx.created_at)}
-                          </div>
+                        <div style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          marginBottom: '2px'
+                        }}>
+                          {getTransactionLabel(tx.transaction_type)}
+                        </div>
+                        <div style={{
+                          fontSize: '9px',
+                          color: 'var(--text-secondary)',
+                          fontFamily: 'var(--font-mono, monospace)'
+                        }}>
+                          {formatDate(tx.created_at)}
+                        </div>
                           {tx.metadata?.amount_paid_usd && (
                             <div style={{
                               fontSize: '10px',

@@ -132,19 +132,19 @@ export default function TradePanel({
     }}>
       {/* Header */}
       <div style={{
-        padding: '16px 20px',
+        padding: '12px',
         borderBottom: '2px solid var(--border)'
       }}>
         <h3 style={{
-          fontSize: '16px',
+          fontSize: '10px',
           fontWeight: 700,
           margin: 0,
-          marginBottom: '4px'
+          marginBottom: '2px'
         }}>
           Trade Shares
         </h3>
         <div style={{
-          fontSize: '11px',
+          fontSize: '9px',
           color: 'var(--text-secondary)'
         }}>
           {vehicleName}
@@ -208,11 +208,11 @@ export default function TradePanel({
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
             Current Share Price
           </div>
           <div style={{
-            fontSize: '18px',
+            fontSize: '11px',
             fontWeight: 700,
             color: 'var(--accent)',
             fontFamily: 'var(--font-mono, monospace)'

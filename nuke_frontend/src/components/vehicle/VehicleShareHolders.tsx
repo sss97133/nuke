@@ -168,7 +168,7 @@ export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compa
         alignItems: 'center'
       }}>
         <h3 style={{
-          fontSize: '16px',
+          fontSize: '10px',
           fontWeight: 700,
           margin: 0
         }}>
@@ -246,14 +246,14 @@ export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compa
                 >
                   {/* Left: User info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      marginBottom: '2px',
-                      color: 'var(--text)'
-                    }}>
-                      {supporter.is_anonymous ? '🔒 Anonymous' : `@${supporter.supporter_username}`}
-                    </div>
+                      <div style={{
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        marginBottom: '2px',
+                        color: 'var(--text)'
+                      }}>
+                        {supporter.is_anonymous ? '🔒 Anonymous' : `@${supporter.supporter_username}`}
+                      </div>
                     {supporter.message && (
                       <div style={{
                         fontSize: '11px',
