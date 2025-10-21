@@ -10,7 +10,6 @@ interface Vehicle {
   make?: string;
   model?: string;
   current_value?: number;
-  location?: string;
   updated_at?: string;
   created_at?: string;
   is_public?: boolean;
@@ -41,7 +40,7 @@ const CursorHomepage: React.FC = () => {
     try {
       setLoading(true);
       
-      // Load vehicles - removed primary_image_url as it doesn't exist in schema
+      // Load vehicles - only query columns that exist in production schema
       const { data: vehicleData, error } = await supabase
         .from('vehicles')
         .select(`
@@ -50,7 +49,6 @@ const CursorHomepage: React.FC = () => {
           make,
           model,
           current_value,
-          location,
           updated_at,
           created_at,
           is_public
@@ -131,7 +129,8 @@ const CursorHomepage: React.FC = () => {
         filtered = vehicles.filter(v => v.event_count && v.event_count > 0);
         break;
       case 'near_me':
-        filtered = vehicles.filter(v => v.location);
+        // Location column doesn't exist yet - show all for now
+        filtered = vehicles;
         break;
       default:
         filtered = vehicles;
