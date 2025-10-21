@@ -287,7 +287,7 @@ const VehiclesInner: React.FC = () => {
       // Skip localStorage to prevent hardcoded vehicles
       const localVehicles: Vehicle[] = [];
       
-      if (session) {
+      if (session?.user?.id) {
         try {
           console.log('Fetching vehicles for user:', session.user.id);
           const { data, error } = await supabase
@@ -328,7 +328,7 @@ const VehiclesInner: React.FC = () => {
   };
 
   const syncLocalVehiclesToSupabase = async () => {
-    if (!session) {
+    if (!session?.user?.id) {
       alert('Please log in to sync vehicles to the cloud');
       return;
     }
