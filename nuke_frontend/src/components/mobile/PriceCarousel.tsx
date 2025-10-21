@@ -18,7 +18,7 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, se
   const [currentScreen, setCurrentScreen] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
 
-  const screens = 4;
+  const screens = 3; // Changed from 4 - AuctionVoteScreen temporarily disabled
   
   // Calculate market data
   const baseValue = vehicle.current_value || vehicle.purchase_price || 25000;
@@ -59,7 +59,8 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, se
           {currentScreen === 0 && <SharePriceScreen sharePrice={sharePrice} gainPercent={gainPercent} />}
           {currentScreen === 1 && <TotalValueScreen baseValue={baseValue} purchasePrice={purchasePrice} gain={gain} gainPercent={gainPercent} />}
           {currentScreen === 2 && <BettingScreen vehicleId={vehicle.id} baseValue={baseValue} />}
-          {currentScreen === 3 && <AuctionVoteScreen vehicle={vehicle} session={session} />}
+          {/* Temporarily disabled - session error debugging */}
+          {/* {currentScreen === 3 && <AuctionVoteScreen vehicle={vehicle} session={session} />} */}
         </div>
 
         {/* Dots Indicator */}
