@@ -210,7 +210,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
     setSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session?.user?.id) {
         console.error('Must be logged in to comment');
         return;
       }

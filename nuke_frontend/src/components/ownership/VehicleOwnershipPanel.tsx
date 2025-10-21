@@ -157,7 +157,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
 
   const getSessionStatus = () => {
     if (!session) return { status: 'logged_out', message: 'Not logged in', color: 'red' };
-    if (!session.user.id) return { status: 'invalid_session', message: 'Invalid session', color: 'red' };
+    if (!session?.user?.id) return { status: 'invalid_session', message: 'Invalid session', color: 'red' };
     return { status: 'logged_in', message: 'Authenticated', color: 'green' };
   };
 
@@ -289,7 +289,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         {/* Collapsible Details */}
         {showDetails && (
           <div className="text-muted" style={{ marginTop: '8px' }}>
-            {session && (
+            {session?.user && (
               <div style={{ marginBottom: '4px' }}>
                 <span className="font-bold">User:</span> {session.user.user_metadata?.full_name || session.user.email}
               </div>
@@ -399,7 +399,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         </div>
 
         {/* Access Request Onboarding Questionnaire */}
-        {showAccessRequest && (
+        {showAccessRequest && session?.user && (
           <div className="modal-overlay">
             <div className="modal">
               <div className="modal-header">
@@ -408,6 +408,8 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
               <div className="modal-body">
                 <form onSubmit={async (e) => {
                   e.preventDefault();
+                  if (!session?.user?.id) return;
+                  
                   const formData = new FormData(e.target as HTMLFormElement);
                   const relationship = formData.get('relationship') as string;
                   const contribution = formData.get('contribution') as string;
@@ -517,7 +519,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         )}
 
         {/* Simple Ownership Claim Form */}
-        {showOwnershipForm && (
+        {showOwnershipForm && session?.user && (
           <div className="modal-overlay">
             <div className="modal">
               <div className="modal-header">
@@ -527,6 +529,11 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
 
               <form onSubmit={async (e) => {
                 e.preventDefault();
+                if (!session?.user?.id) {
+                  alert('Please log in to claim ownership');
+                  return;
+                }
+                
                 const formData = new FormData(e.target as HTMLFormElement);
                 const claimType = formData.get('claimType') as string;
                 const documentFile = formData.get('documentFile') as File;
@@ -622,12 +629,13 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     alert('Document uploaded! Running verification...');
                     
                     // Process the document asynchronously
-                    DocumentVerificationService.processDocumentUpload(
-                      claimType === 'title' ? 'title' : 'drivers_license',
-                      document.file_url,
-                      vehicle.id,
-                      session.user.id
-                    ).then(result => {
+                    if (session?.user?.id) {
+                      DocumentVerificationService.processDocumentUpload(
+                        claimType === 'title' ? 'title' : 'drivers_license',
+                        document.file_url,
+                        vehicle.id,
+                        session.user.id
+                      ).then(result => {
                       if (!result) {
                         return;
                       }
@@ -644,6 +652,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                       }
                       loadOwnershipData();
                     });
+                    }
                   } else {
                     alert('Document submitted successfully!');
                   }

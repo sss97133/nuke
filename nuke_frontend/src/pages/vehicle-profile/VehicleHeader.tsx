@@ -192,8 +192,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
   };
 
-  const isRowOwner = !!(session?.user?.id && (vehicle as any)?.user_id && session.user.id === (vehicle as any).user_id);
-  const isUploaderAsTempOwner = !!(session?.user?.id && !((vehicle as any)?.user_id) && session.user.id === vehicle.uploaded_by);
+  const isRowOwner = !!(session?.user?.id && (vehicle as any)?.user_id && session?.user?.id === (vehicle as any).user_id);
+  const isUploaderAsTempOwner = !!(session?.user?.id && !((vehicle as any)?.user_id) && session?.user?.id === vehicle.uploaded_by);
   const isOwnerLike = isVerifiedOwner || contributorRole === 'owner' || isRowOwner || isUploaderAsTempOwner;
 
   const computeResponsibleLabel = (): string => {
