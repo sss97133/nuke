@@ -63,7 +63,7 @@ import PriceCsvImport from './pages/admin/PriceCsvImport';
 import BookService from './pages/BookService';
 import OrderParts from './pages/OrderParts';
 import CreditsSuccess from './pages/CreditsSuccess';
-import CreditsInventory from './pages/CreditsInventory';
+import Portfolio from './pages/Portfolio';
 
 
 // Auth components
@@ -235,9 +235,12 @@ function App() {
             <Route path="/book" element={<BookService />} />
             <Route path="/order-parts" element={<OrderParts />} />
             
-            {/* Credits & Payments */}
+            {/* Portfolio & Trading */}
+            <Route path="/portfolio/success" element={<CreditsSuccess />} />
+            <Route path="/portfolio" element={<Portfolio />} />
+            {/* Legacy redirects */}
             <Route path="/credits/success" element={<CreditsSuccess />} />
-            <Route path="/credits" element={<CreditsInventory />} />
+            <Route path="/credits" element={<Portfolio />} />
             
             {/* Vehicle Management */}
             <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
