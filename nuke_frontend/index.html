@@ -10,7 +10,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <title>n-zero</title>
-    <!-- Cache bust: Force deployment of session fixes -->
+    <!-- DEPLOYMENT FORCE: Mobile session fixes MUST go live -->
+    <meta name="deployment-force" content="mobile-session-fix-$(date +%s)">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
