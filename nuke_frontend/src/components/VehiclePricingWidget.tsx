@@ -10,6 +10,7 @@ import { pricingService } from '../services/pricingService';
 import { supabase } from '../lib/supabase';
 import { VehicleValuationService } from '../services/vehicleValuationService';
 import type { VehicleValuation } from '../services/vehicleValuationService';
+import { BuyCreditsButton } from './credits/BuyCreditsButton';
 
 interface VehiclePricingWidgetProps {
   vehicleId: string;
@@ -760,6 +761,11 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
               </div>
             </div>
           )}
+
+          {/* Payments: Buy Credits CTA (desktop) */}
+          <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
+            <BuyCreditsButton presetAmounts={[3, 10, 25]} />
+          </div>
         </div>
       </div>
 

@@ -57,11 +57,9 @@ export class CreditsService {
       if (!user) throw new Error('Not authenticated');
 
       // Create payment session via provider-specific edge function
-      const { data, error } = await supabase.functions.invoke('create-payment', {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          provider_id: provider.id,
-          amount_cents: amountCents,
-          user_id: user.id,
+          amount_usd: amountUSD,
           success_url: `${window.location.origin}/credits/success`,
           cancel_url: `${window.location.origin}/credits`
         }
@@ -69,7 +67,7 @@ export class CreditsService {
 
       if (error) throw error;
 
-      return data.payment_url || data.qr_code;
+      return data.checkout_url;
     } catch (error) {
       console.error('Failed to create payment:', error);
       return null;

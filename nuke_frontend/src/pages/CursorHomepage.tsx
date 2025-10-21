@@ -270,24 +270,50 @@ const CursorHomepage: React.FC = () => {
         {loading ? (
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Loading...</div>
         ) : (
-          <div style={{
-            display: viewMode === 'grid' ? 'grid' : 'flex',
-            flexDirection: viewMode === 'list' ? 'column' : viewMode === 'gallery' ? 'column' : 'row',
-            gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(200px, 1fr))' : undefined,
-            gap: '8px',
-            width: '100%',
-            flexWrap: 'nowrap'
-          }}>
-            {sortVehicles(filteredVehicles).map(vehicle => (
-              <VehicleCardDense 
-                key={vehicle.id} 
-                vehicle={vehicle} 
-                viewMode={viewMode}
-                showSocial={viewMode === 'gallery'}
-                showPriceChange={viewMode === 'grid'}
-              />
-            ))}
-          </div>
+          <>
+            {/* List view: Column header */}
+            {viewMode === 'list' && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '40px 1fr 100px 80px 80px 80px 60px',
+                gap: '12px',
+                padding: '6px 12px',
+                fontSize: '8px',
+                fontWeight: 700,
+                color: 'var(--text-secondary)',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid var(--border)',
+                marginBottom: '4px',
+                fontFamily: 'var(--font-mono, monospace)',
+              }}>
+                <div></div>
+                <div>Vehicle</div>
+                <div style={{ textAlign: 'right' }}>Value</div>
+                <div style={{ textAlign: 'right' }}>Change</div>
+                <div style={{ textAlign: 'right' }}>Cost</div>
+                <div style={{ textAlign: 'right' }}>Gain/Loss</div>
+                <div style={{ textAlign: 'right' }}>Time</div>
+              </div>
+            )}
+            
+            <div style={{
+              display: viewMode === 'grid' ? 'grid' : 'flex',
+              flexDirection: 'column',
+              gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(180px, 1fr))' : undefined,
+              gap: viewMode === 'list' ? '2px' : viewMode === 'grid' ? '8px' : '0',
+              width: '100%',
+            }}>
+              {sortVehicles(filteredVehicles).map(vehicle => (
+                <VehicleCardDense 
+                  key={vehicle.id} 
+                  vehicle={vehicle} 
+                  viewMode={viewMode}
+                  showSocial={viewMode === 'gallery'}
+                  showPriceChange={viewMode === 'grid'}
+                />
+              ))}
+            </div>
+          </>
         )}
       </section>
     </div>
