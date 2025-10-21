@@ -51,7 +51,7 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
     try {
       setLoading(true);
 
-      // Load all timeline events with optional images
+      // Load all timeline events with image_urls array
       const { data: events, error } = await supabase
         .from('vehicle_timeline_events')
         .select(`
@@ -61,6 +61,7 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
           description,
           event_type,
           event_date,
+          image_urls,
           metadata
         `)
         .eq('vehicle_id', vehicleId)
@@ -68,23 +69,13 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
 
       if (error) throw error;
 
-      // Load images for events separately
-      const eventIds = events?.map(e => e.id) || [];
-      let eventImages: any[] = [];
-      
-      if (eventIds.length > 0) {
-        const { data: imgData } = await supabase
-          .from('timeline_event_images')
-          .select('event_id, image_url, id')
-          .in('event_id', eventIds);
-        
-        eventImages = imgData || [];
-      }
-
-      // Attach images to events
+      // Transform image_urls array into images array format
       const eventsWithImages = events?.map(event => ({
         ...event,
-        images: eventImages.filter(img => img.event_id === event.id)
+        images: (event.image_urls || []).map((url, idx) => ({
+          image_url: url,
+          id: `${event.id}-img-${idx}` // Generate temp ID for rendering
+        }))
       })) || [];
 
       // Group events by year and day
