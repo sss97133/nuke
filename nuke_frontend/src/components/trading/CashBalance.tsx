@@ -129,14 +129,14 @@ export default function CashBalance({ compact = false, showActions = true }: Pro
 
       {/* Total Balance */}
       <div style={{
-        marginBottom: '16px',
-        padding: '16px',
+        marginBottom: '12px',
+        padding: '12px',
         background: 'var(--accent-dim)',
         border: '2px solid var(--accent)',
-        borderRadius: '6px'
+        borderRadius: '4px'
       }}>
         <div style={{
-          fontSize: '10px',
+          fontSize: '8px',
           color: 'var(--text-secondary)',
           marginBottom: '4px',
           fontWeight: 600,
@@ -145,7 +145,7 @@ export default function CashBalance({ compact = false, showActions = true }: Pro
           Total Balance
         </div>
         <div style={{
-          fontSize: '32px',
+          fontSize: '14px',
           fontWeight: 700,
           color: 'var(--accent)',
           fontFamily: 'var(--font-mono, monospace)',
@@ -159,21 +159,21 @@ export default function CashBalance({ compact = false, showActions = true }: Pro
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: '12px',
-        marginBottom: '16px'
+        gap: '8px',
+        marginBottom: '12px'
       }}>
         <div>
           <div style={{
-            fontSize: '9px',
+            fontSize: '8px',
             color: 'var(--text-secondary)',
-            marginBottom: '4px',
+            marginBottom: '2px',
             textTransform: 'uppercase',
             fontWeight: 600
           }}>
             Available
           </div>
           <div style={{
-            fontSize: '16px',
+            fontSize: '11px',
             fontWeight: 700,
             color: 'var(--success)',
             fontFamily: 'var(--font-mono, monospace)'
@@ -184,16 +184,16 @@ export default function CashBalance({ compact = false, showActions = true }: Pro
 
         <div>
           <div style={{
-            fontSize: '9px',
+            fontSize: '8px',
             color: 'var(--text-secondary)',
-            marginBottom: '4px',
+            marginBottom: '2px',
             textTransform: 'uppercase',
             fontWeight: 600
           }}>
             Reserved
           </div>
           <div style={{
-            fontSize: '16px',
+            fontSize: '11px',
             fontWeight: 700,
             color: 'var(--text-secondary)',
             fontFamily: 'var(--font-mono, monospace)'
