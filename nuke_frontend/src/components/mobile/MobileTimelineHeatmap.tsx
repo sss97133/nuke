@@ -14,7 +14,6 @@ interface TimelineEvent {
   description?: string;
   event_type: string;
   event_date: string;
-  labor_hours?: number;
   image_urls?: string[];
   images?: { image_url: string; id: string }[];
   metadata?: any;
@@ -23,14 +22,14 @@ interface TimelineEvent {
 interface DayData {
   date: string;
   events: TimelineEvent[];
-  laborHours: number;
+  eventCount: number;
   imageCount: number;
 }
 
 interface YearData {
   year: number;
   eventCount: number;
-  laborHours: number;
+  totalImages: number;
   days: Map<string, DayData>;
 }
 
@@ -62,7 +61,6 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
           description,
           event_type,
           event_date,
-          labor_hours,
           metadata
         `)
         .eq('vehicle_id', vehicleId)
@@ -101,28 +99,28 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
           grouped.set(year, {
             year,
             eventCount: 0,
-            laborHours: 0,
+            totalImages: 0,
             days: new Map()
           });
         }
 
         const yearData = grouped.get(year)!;
         yearData.eventCount++;
-        yearData.laborHours += event.labor_hours || 0;
+        yearData.totalImages += event.images?.length || 0;
 
         if (!yearData.days.has(dateStr)) {
           yearData.days.set(dateStr, {
             date: dateStr,
             events: [],
-            laborHours: 0,
+            eventCount: 0,
             imageCount: 0
           });
         }
 
         const dayData = yearData.days.get(dateStr)!;
         dayData.events.push(event as TimelineEvent);
-        dayData.laborHours += event.labor_hours || 0;
-        dayData.imageCount += event.timeline_event_images?.length || 0;
+        dayData.eventCount++;
+        dayData.imageCount += event.images?.length || 0;
       });
 
       setYearData(grouped);
@@ -148,12 +146,12 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
       return '#ebedf0'; // No work - light gray
     }
 
-    const hours = dayData.laborHours;
-    if (hours === 0) return '#d9f99d'; // Events but no hours - light green
-    if (hours < 2) return '#a7f3d0'; // < 2 hours - light mint
-    if (hours < 5) return '#34d399'; // 2-5 hours - green
-    if (hours < 10) return '#10b981'; // 5-10 hours - emerald
-    return '#059669'; // 10+ hours - dark green
+    const count = dayData.eventCount;
+    if (count === 1) return '#d9f99d'; // 1 event - light green
+    if (count === 2) return '#a7f3d0'; // 2 events - light mint
+    if (count <= 5) return '#34d399'; // 3-5 events - green
+    if (count <= 10) return '#10b981'; // 6-10 events - emerald
+    return '#059669'; // 10+ events - dark green
   };
 
   const generateYearCalendar = (year: number) => {
@@ -180,7 +178,7 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
       currentWeek.push(dayData || {
         date: dateStr,
         events: [],
-        laborHours: 0,
+        eventCount: 0,
         imageCount: 0
       });
 
@@ -203,9 +201,9 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
     const date = new Date(dayData.date);
     const formatted = date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
     
-    if (dayData.events.length === 0) return `${formatted}: No work`;
+    if (dayData.events.length === 0) return `${formatted}: No events`;
     
-    return `${formatted}: ${dayData.events.length} events • ~${dayData.laborHours.toFixed(1)} hrs`;
+    return `${formatted}: ${dayData.events.length} events${dayData.imageCount > 0 ? ` • ${dayData.imageCount} images` : ''}`;
   };
 
   const years = Array.from(yearData.keys()).sort((a, b) => b - a);
@@ -232,7 +230,7 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
               onClick={() => toggleYear(year)}
               style={styles.yearHeader}
             >
-              <span>{year} ({yearInfo.eventCount} events{yearInfo.laborHours > 0 ? `, ${Math.round(yearInfo.laborHours)}h` : ''})</span>
+              <span>{year} ({yearInfo.eventCount} events{yearInfo.totalImages > 0 ? `, ${yearInfo.totalImages} images` : ''})</span>
               <span style={styles.expandIcon}>{isExpanded ? '−' : '+'}</span>
             </div>
 
@@ -342,8 +340,8 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
 
                   <div style={styles.eventMeta}>
                     <span style={styles.eventType}>{event.event_type}</span>
-                    {event.labor_hours && (
-                      <span style={styles.laborHours}>{event.labor_hours}h</span>
+                    {event.images && event.images.length > 0 && (
+                      <span style={styles.imageCount}>{event.images.length} 📷</span>
                     )}
                   </div>
                 </div>
@@ -534,7 +532,7 @@ const styles = {
     padding: '2px 6px',
     borderRadius: '2px'
   },
-  laborHours: {
+  imageCount: {
     background: '#008000',
     color: '#ffffff',
     padding: '2px 6px',
