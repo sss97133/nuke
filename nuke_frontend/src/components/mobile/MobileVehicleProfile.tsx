@@ -130,13 +130,16 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
   }, [vehicleId]);
 
   const loadStats = async () => {
-    const [images, events, tags] = await Promise.all([
+    const [images, events, tags, workSessions] = await Promise.all([
       supabase.from('vehicle_images').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
-      supabase.from('vehicle_timeline_events').select('id, labor_hours', { count: 'exact' }).eq('vehicle_id', vehicleId),
-      supabase.from('image_tags').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId)
+      supabase.from('vehicle_timeline_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
+      supabase.from('image_tags').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
+      supabase.from('work_sessions').select('duration_minutes').eq('vehicle_id', vehicleId)
     ]);
 
-    const totalLabor = events.data?.reduce((sum, e) => sum + (e.labor_hours || 0), 0) || 0;
+    // Calculate total labor hours from work_sessions (duration is in minutes)
+    const totalMinutes = workSessions.data?.reduce((sum, s) => sum + (s.duration_minutes || 0), 0) || 0;
+    const totalLabor = Math.round(totalMinutes / 60);
 
     setStats({
       images: images.count || 0,
