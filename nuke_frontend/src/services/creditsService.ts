@@ -1,11 +1,12 @@
 /**
- * Credits Service
- * Handles buying credits, allocating to vehicles, and builder payouts
- * Uses PaymentProviderManager for multi-provider support
+ * Credits Service (LEGACY)
+ * DEPRECATED: Use CashBalanceService for new features
+ * This file remains for backward compatibility only
  */
 
 import { supabase } from '../lib/supabase';
 import { paymentManager } from './paymentProvider';
+import { CashBalanceService } from './cashBalanceService';
 
 export interface UserCredits {
   balance: number; // In cents (100 = $1)
@@ -37,41 +38,11 @@ export class CreditsService {
   }
 
   /**
-   * Buy credits - supports multiple payment providers
+   * Buy credits - DEPRECATED: Use CashBalanceService.depositCash()
    */
   static async buyCredits(amountUSD: number, providerId?: string): Promise<string | null> {
-    try {
-      const amountCents = amountUSD * 100;
-
-      // If no provider specified, recommend best one for this amount
-      const provider = providerId 
-        ? paymentManager.getProvider(providerId)
-        : paymentManager.recommendProvider(amountCents);
-
-      if (!provider) {
-        throw new Error('No payment provider available');
-      }
-
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Create payment session via provider-specific edge function
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: {
-          amount_usd: amountUSD,
-          success_url: `${window.location.origin}/credits/success`,
-          cancel_url: `${window.location.origin}/credits`
-        }
-      });
-
-      if (error) throw error;
-
-      return data.checkout_url;
-    } catch (error) {
-      console.error('Failed to create payment:', error);
-      return null;
-    }
+    console.warn('CreditsService.buyCredits() is deprecated. Use CashBalanceService.depositCash() instead.');
+    return CashBalanceService.depositCash(amountUSD);
   }
 
   /**

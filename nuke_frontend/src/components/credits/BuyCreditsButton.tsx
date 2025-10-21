@@ -1,10 +1,10 @@
 /**
- * Buy Credits Button
- * Opens Stripe checkout to purchase platform credits
+ * Deposit Cash Button
+ * Opens Stripe checkout to add cash to trading balance
  */
 
 import React, { useState } from 'react';
-import { CreditsService } from '../../services/creditsService';
+import { CashBalanceService } from '../../services/cashBalanceService';
 import { supabase } from '../../lib/supabase';
 
 interface BuyCreditsButtonProps {
@@ -20,7 +20,7 @@ export const BuyCreditsButton: React.FC<BuyCreditsButtonProps> = ({
   const [customAmount, setCustomAmount] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleBuyCredits = async (amount: number) => {
+  const handleDeposit = async (amount: number) => {
     try {
       // Require authentication before starting checkout
       const { data: { user } } = await supabase.auth.getUser();
@@ -31,14 +31,14 @@ export const BuyCreditsButton: React.FC<BuyCreditsButtonProps> = ({
       }
 
       setLoading(true);
-      const checkoutUrl = await CreditsService.buyCredits(amount);
+      const checkoutUrl = await CashBalanceService.depositCash(amount);
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
       } else {
         alert('Failed to create checkout session');
       }
     } catch (error) {
-      console.error('Buy credits error:', error);
+      console.error('Deposit error:', error);
       alert('Failed to start checkout');
     } finally {
       setLoading(false);
@@ -52,33 +52,33 @@ export const BuyCreditsButton: React.FC<BuyCreditsButtonProps> = ({
         className={className || 'btn-utility'}
         disabled={loading}
       >
-        💰 Buy Credits
+        💵 Deposit Cash
       </button>
 
       {showModal && (
         <div style={styles.overlay} onClick={() => setShowModal(false)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div style={styles.header}>
-              <h3 style={styles.title}>Buy Credits</h3>
+              <h3 style={styles.title}>Deposit Cash</h3>
               <button onClick={() => setShowModal(false)} style={styles.closeButton}>×</button>
             </div>
 
             <div style={styles.content}>
               <p style={styles.description}>
-                Credits let you support vehicle builds. $1 = 100 credits.
-                Platform takes 1% fee. Builders receive 99%.
+                Add cash to your trading balance. Use it to buy shares, trade vehicles, and build your portfolio.
+                Platform fee: 2% on trades.
               </p>
 
               <div style={styles.presets}>
                 {presetAmounts.map(amount => (
                   <button
                     key={amount}
-                    onClick={() => handleBuyCredits(amount)}
+                    onClick={() => handleDeposit(amount)}
                     disabled={loading}
                     style={styles.presetButton}
                   >
                     ${amount}
-                    <span style={styles.creditCount}>{amount * 100} credits</span>
+                    <span style={styles.creditCount}>USD</span>
                   </button>
                 ))}
               </div>
@@ -96,11 +96,11 @@ export const BuyCreditsButton: React.FC<BuyCreditsButtonProps> = ({
                   style={styles.input}
                 />
                 <button
-                  onClick={() => handleBuyCredits(parseInt(customAmount) || 0)}
+                  onClick={() => handleDeposit(parseInt(customAmount) || 0)}
                   disabled={loading || !customAmount || parseInt(customAmount) < 1}
                   style={styles.buyButton}
                 >
-                  Buy
+                  Deposit
                 </button>
               </div>
             </div>
