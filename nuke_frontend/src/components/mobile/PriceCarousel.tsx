@@ -18,7 +18,7 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, se
   const [currentScreen, setCurrentScreen] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
 
-  const screens = 3; // Changed from 4 - AuctionVoteScreen temporarily disabled
+  const screens = 4; // AuctionVoteScreen now properly handles session
   
   // Calculate market data
   const baseValue = vehicle.current_value || vehicle.purchase_price || 25000;
@@ -59,8 +59,7 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, se
           {currentScreen === 0 && <SharePriceScreen sharePrice={sharePrice} gainPercent={gainPercent} />}
           {currentScreen === 1 && <TotalValueScreen baseValue={baseValue} purchasePrice={purchasePrice} gain={gain} gainPercent={gainPercent} />}
           {currentScreen === 2 && <BettingScreen vehicleId={vehicle.id} baseValue={baseValue} />}
-          {/* Temporarily disabled - session error debugging */}
-          {/* {currentScreen === 3 && <AuctionVoteScreen vehicle={vehicle} session={session} />} */}
+          {currentScreen === 3 && <AuctionVoteScreen vehicle={vehicle} session={session} />}
         </div>
 
         {/* Dots Indicator */}
@@ -199,20 +198,26 @@ const BettingScreen: React.FC<{ vehicleId: string; baseValue: number }> = ({ veh
 };
 
 // Screen 4: Auction Vote
-const AuctionVoteScreen: React.FC<{ vehicle: any; session: any }> = ({ vehicle, session }) => {
+const AuctionVoteScreen: React.FC<{ vehicle: any; session?: any }> = ({ vehicle, session }) => {
   const [voteSummary, setVoteSummary] = useState<any>(null);
   const [userVote, setUserVote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadVoteData();
-  }, [vehicle.id, session]);
+    if (session?.user?.id) {
+      loadVoteData();
+    } else {
+      setLoading(false);
+    }
+  }, [vehicle.id, session?.user?.id]);
 
   const loadVoteData = async () => {
+    if (!session?.user?.id) return; // Early return guard
+    
     try {
       const [summary, vote] = await Promise.all([
         AuctionVotingService.getVoteSummary(vehicle.id),
-        session?.user ? AuctionVotingService.getUserVote(vehicle.id, session.user.id) : null
+        AuctionVotingService.getUserVote(vehicle.id, session.user.id)
       ]);
       
       setVoteSummary(summary);
@@ -262,7 +267,14 @@ const AuctionVoteScreen: React.FC<{ vehicle: any; session: any }> = ({ vehicle, 
         <div style={styles.label}>🏛️ Send to Auction?</div>
       </div>
       <div style={styles.divider} />
-      {!userVote ? (
+      {!session?.user?.id ? (
+        <div style={styles.loginPrompt}>
+          <div style={styles.loginText}>Login to vote on auctions</div>
+          <button style={styles.loginButton} onClick={() => window.location.href = '/login'}>
+            Login
+          </button>
+        </div>
+      ) : !userVote ? (
         <div style={styles.voteButtons}>
           <button style={styles.voteButtonYes} onClick={() => handleVote('yes')}>
             Vote Yes
@@ -397,6 +409,26 @@ const styles = {
     border: '2px outset #ffffff',
     padding: '12px',
     fontSize: '13px',
+    fontWeight: 'bold' as const,
+    cursor: 'pointer',
+    fontFamily: '"MS Sans Serif", sans-serif'
+  },
+  loginPrompt: {
+    textAlign: 'center' as const,
+    marginBottom: '12px'
+  },
+  loginText: {
+    fontSize: '12px',
+    color: '#000080',
+    marginBottom: '8px',
+    fontFamily: '"MS Sans Serif", sans-serif'
+  },
+  loginButton: {
+    background: '#c0c0c0',
+    color: '#000000',
+    border: '2px outset #ffffff',
+    padding: '8px 16px',
+    fontSize: '12px',
     fontWeight: 'bold' as const,
     cursor: 'pointer',
     fontFamily: '"MS Sans Serif", sans-serif'
