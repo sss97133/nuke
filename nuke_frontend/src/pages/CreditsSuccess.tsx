@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CreditsService } from '../services/creditsService';
+import { CashBalanceService } from '../services/cashBalanceService';
 
 export default function CreditsSuccess() {
   const navigate = useNavigate();
@@ -18,8 +18,8 @@ export default function CreditsSuccess() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const userBalance = await CreditsService.getUserBalance(user.id);
-        setBalance(userBalance);
+        const userBalance = await CashBalanceService.getUserBalance(user.id);
+        setBalance(userBalance?.balance_cents || 0);
       }
     } catch (error) {
       console.error('Failed to load balance:', error);
@@ -70,7 +70,7 @@ export default function CreditsSuccess() {
           marginBottom: '12px',
           color: 'var(--text)'
         }}>
-          Payment Successful!
+          Deposit Successful!
         </h1>
 
         {/* Message */}
@@ -80,7 +80,7 @@ export default function CreditsSuccess() {
           marginBottom: '24px',
           lineHeight: 1.5
         }}>
-          Your credits have been added to your account. You can now use them to support vehicles and builders on the platform.
+          Cash has been added to your trading account. You can now buy shares, trade vehicles, and build your portfolio.
         </p>
 
         {/* Balance Display */}
@@ -99,7 +99,7 @@ export default function CreditsSuccess() {
               color: 'var(--accent)',
               marginBottom: '8px'
             }}>
-              Current Balance
+              Cash Balance
             </div>
             <div style={{
               fontSize: '32px',
@@ -107,14 +107,14 @@ export default function CreditsSuccess() {
               color: 'var(--accent)',
               fontFamily: 'var(--font-mono, monospace)'
             }}>
-              {CreditsService.formatCredits(balance)}
+              {CashBalanceService.formatCurrency(balance)}
             </div>
             <div style={{
               fontSize: '10px',
               color: 'var(--text-secondary)',
               marginTop: '4px'
             }}>
-              {balance} credits
+              Available for trading
             </div>
           </div>
         )}
@@ -139,7 +139,7 @@ export default function CreditsSuccess() {
           flexDirection: 'column'
         }}>
           <button
-            onClick={() => navigate('/credits')}
+            onClick={() => navigate('/portfolio')}
             style={{
               border: '2px solid var(--accent)',
               background: 'var(--accent-dim)',
@@ -154,7 +154,7 @@ export default function CreditsSuccess() {
               width: '100%'
             }}
           >
-            View Credit History
+            View Portfolio
           </button>
 
           <button
