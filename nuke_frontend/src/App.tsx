@@ -62,6 +62,8 @@ import BulkPriceEditor from './pages/admin/BulkPriceEditor';
 import PriceCsvImport from './pages/admin/PriceCsvImport';
 import BookService from './pages/BookService';
 import OrderParts from './pages/OrderParts';
+import CreditsSuccess from './pages/CreditsSuccess';
+import CreditsInventory from './pages/CreditsInventory';
 
 
 // Auth components
@@ -232,6 +234,10 @@ function App() {
             <Route path="/live-feed" element={<LiveFeed />} />
             <Route path="/book" element={<BookService />} />
             <Route path="/order-parts" element={<OrderParts />} />
+            
+            {/* Credits & Payments */}
+            <Route path="/credits/success" element={<CreditsSuccess />} />
+            <Route path="/credits" element={<CreditsInventory />} />
             
             {/* Vehicle Management */}
             <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
