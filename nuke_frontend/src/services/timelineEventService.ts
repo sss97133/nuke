@@ -350,7 +350,7 @@ export class TimelineEventService {
     vehicleId: string,
     imageMetadata: any,
     userId?: string
-  ): Promise<void> {
+  ): Promise<string | null> {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
@@ -436,15 +436,19 @@ export class TimelineEventService {
         event_date: new Date(eventDate).toISOString().split('T')[0], // Date only format
         title,
         description,
-        metadata
+        metadata,
+        image_urls: [imageMetadata.imageUrl] // ✅ CRITICAL: Store image URL in event
       };
 
-      const { error } = await supabase
+      const { data: eventResult, error } = await supabase
         .from('vehicle_timeline_events')
-        .insert([eventData]);
+        .insert([eventData])
+        .select('id')
+        .single();
 
       if (error) {
         console.error('Error creating image upload timeline event (timeline_events):', error);
+        return null;
       } else {
         // Dispatch custom events to notify UI components to refresh
         try {
@@ -465,9 +469,12 @@ export class TimelineEventService {
           console.warn('Failed to dispatch UI update events:', dispatchError);
           // Non-critical, don't fail the timeline event creation
         }
+
+        return eventResult.id; // ✅ Return event ID so image can be linked
       }
     } catch (error) {
       console.error('Error in createImageUploadEvent:', error);
+      return null;
     }
   }
 

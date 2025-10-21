@@ -188,10 +188,10 @@ export class ImageUploadService {
         return { success: false, error: `Database error: ${dbError.message}` };
       }
 
-      // Create timeline event after successful upload
+      // Create timeline event after successful upload and link image to it
       try {
         if (isImage) {
-          await TimelineEventService.createImageUploadEvent(
+          const eventId = await TimelineEventService.createImageUploadEvent(
             vehicleId,
             {
               fileName: file.name,
@@ -202,6 +202,14 @@ export class ImageUploadService {
             },
             user.id
           );
+
+          // ✅ CRITICAL FIX: Link the image to the timeline event
+          if (eventId) {
+            await supabase
+              .from('vehicle_images')
+              .update({ timeline_event_id: eventId })
+              .eq('id', dbResult.id);
+          }
         } else {
           // Create document upload timeline event
           await TimelineEventService.createDocumentUploadEvent(
