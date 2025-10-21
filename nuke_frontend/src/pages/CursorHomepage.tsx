@@ -9,13 +9,12 @@ interface Vehicle {
   year?: number;
   make?: string;
   model?: string;
-  primary_image_url?: string;
-  sale_price?: number;
   current_value?: number;
   location?: string;
   updated_at?: string;
   created_at?: string;
-  is_for_sale?: boolean;
+  is_public?: boolean;
+  event_count?: number;
 }
 
 const CursorHomepage: React.FC = () => {
@@ -42,7 +41,7 @@ const CursorHomepage: React.FC = () => {
     try {
       setLoading(true);
       
-      // Load vehicles - simplified query without count
+      // Load vehicles - removed primary_image_url as it doesn't exist in schema
       const { data: vehicleData, error } = await supabase
         .from('vehicles')
         .select(`
@@ -50,26 +49,27 @@ const CursorHomepage: React.FC = () => {
           year,
           make,
           model,
-          primary_image_url,
-          sale_price,
           current_value,
           location,
           updated_at,
           created_at,
-          is_for_sale
+          is_public
         `)
+        .eq('is_public', true)
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (!error && vehicleData) {
-        // Just use vehicles without event count for now
+      if (error) {
+        console.error('Error loading vehicles:', error);
+      } else if (vehicleData) {
+        // Just use vehicles without images for now - images can be added later
         setVehicles(vehicleData);
         setFilteredVehicles(vehicleData);
       }
 
-      // Load stats
+      // Load stats - count only public vehicles
       const [vehicleCount, activeCount] = await Promise.all([
-        supabase.from('vehicles').select('id', { count: 'exact' }),
+        supabase.from('vehicles').select('id', { count: 'exact' }).eq('is_public', true),
         supabase.from('profiles').select('id', { count: 'exact' }),
       ]);
 
@@ -124,7 +124,8 @@ const CursorHomepage: React.FC = () => {
         filtered = vehicles;
         break;
       case 'for_sale':
-        filtered = vehicles.filter(v => v.is_for_sale);
+        // is_for_sale column doesn't exist - skip filter for now
+        filtered = vehicles;
         break;
       case 'projects':
         filtered = vehicles.filter(v => v.event_count && v.event_count > 0);
@@ -153,8 +154,8 @@ const CursorHomepage: React.FC = () => {
       
       switch (sortBy) {
         case 'price':
-          aVal = a.sale_price || a.current_value || 0;
-          bVal = b.sale_price || b.current_value || 0;
+          aVal = a.current_value || 0;
+          bVal = b.current_value || 0;
           break;
         case 'date':
           aVal = new Date(a.created_at || '').getTime();
