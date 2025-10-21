@@ -9,7 +9,7 @@ import { UserInteractionService } from '../../services/userInteractionService';
 import { supabase } from '../../lib/supabase';
 import EventDetailModal from './EventDetailModal';
 import { MobileImageCarousel } from './MobileImageCarousel';
-import { PriceCarousel } from './PriceCarousel';
+import { MobileTimelineHeatmap } from './MobileTimelineHeatmap';
 import SpecResearchModal from './SpecResearchModal';
 
 interface MobileVehicleProfileProps {
@@ -98,7 +98,7 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
           <MobileOverviewTab vehicleId={vehicleId} vehicle={vehicle} onTabChange={setActiveTab} session={session} />
         )}
         {activeTab === 'timeline' && (
-          <MobileTimelineTab vehicleId={vehicleId} onEventClick={setSelectedEvent} />
+          <MobileTimelineHeatmap vehicleId={vehicleId} />
         )}
         {activeTab === 'images' && (
           <MobileImagesTab vehicleId={vehicleId} session={session} />
@@ -224,190 +224,7 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
   );
 };
 
-const MobileTimelineTab: React.FC<{ vehicleId: string; onEventClick: (event: any) => void }> = ({ vehicleId, onEventClick }) => {
-  const [events, setEvents] = useState<any[]>([]);
-  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set([new Date().getFullYear()]));
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadTimeline();
-    
-    // Listen for new timeline events
-    const handler = () => loadTimeline();
-    window.addEventListener('timeline_updated', handler);
-    return () => window.removeEventListener('timeline_updated', handler);
-  }, [vehicleId]);
-
-  const loadTimeline = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('vehicle_timeline_events')
-      .select('*')
-      .eq('vehicle_id', vehicleId)
-      .order('event_date', { ascending: false });
-
-    setEvents(data || []);
-    setLoading(false);
-  };
-
-  // Group events by year
-  const eventsByYear = events.reduce((acc, event) => {
-    const year = new Date(event.event_date).getFullYear();
-    if (!acc[year]) acc[year] = [];
-    acc[year].push(event);
-    return acc;
-  }, {} as Record<number, any[]>);
-
-  const years = Object.keys(eventsByYear).map(Number).sort((a, b) => b - a);
-
-  const toggleYear = (year: number) => {
-    setExpandedYears(prev => {
-      const updated = new Set(prev);
-      if (updated.has(year)) {
-        updated.delete(year);
-      } else {
-        updated.add(year);
-      }
-      return updated;
-    });
-  };
-
-  if (loading) {
-    return <div style={styles.tabContent}>Loading timeline...</div>;
-  }
-
-  return (
-    <div style={styles.tabContent}>
-      {years.map(year => {
-        const yearEvents = eventsByYear[year];
-        const isExpanded = expandedYears.has(year);
-        const totalLabor = yearEvents.reduce((sum, e) => sum + (e.labor_hours || 0), 0);
-
-        return (
-          <div key={year}>
-            {/* Year Header - Touch Friendly */}
-            <div
-              onClick={() => toggleYear(year)}
-              style={{
-                background: '#000080',
-                color: '#ffffff',
-                padding: '12px',
-                border: '2px outset #ffffff',
-                marginBottom: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}
-            >
-              <span>{year} ({yearEvents.length} events{totalLabor > 0 ? `, ${totalLabor}h` : ''})</span>
-              <span>{isExpanded ? '−' : '+'}</span>
-            </div>
-
-            {/* Events List - Collapsed/Expanded */}
-            {isExpanded && (
-              <div style={{ marginBottom: '12px' }}>
-                {yearEvents.map(event => {
-                  // Skip generic "Photo Added" events - show only meaningful work
-                  const isPhotoOnlyEvent = event.title.includes('Photo Added') || event.title.includes('photos') || event.title.includes('Photo set');
-                  
-                  // Extract meaningful info
-                  const aiWork = event.metadata?.ai_detected_parts?.[0] || event.description;
-                  const location = event.location_name || event.metadata?.location || null;
-                  const user = event.metadata?.uploaded_by || 'owner';
-                  
-                  return (
-                    <div 
-                      key={event.id} 
-                      onClick={() => onEventClick(event)}
-                      style={{
-                        background: '#ffffff',
-                        border: '1px solid #808080',
-                        padding: '10px',
-                        marginBottom: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {/* Date and Location */}
-                      <div style={{
-                        fontSize: '11px',
-                        color: '#808080',
-                        marginBottom: '6px'
-                      }}>
-                        {new Date(event.event_date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                        {location && ` • 📍 ${location}`}
-                        {user && ` • 👤 ${user}`}
-                      </div>
-
-                      {/* What Actually Happened (AI-detected or description) */}
-                      {!isPhotoOnlyEvent && aiWork && (
-                        <div style={{
-                          fontSize: '13px',
-                          fontWeight: 'bold',
-                          color: '#000000',
-                          marginBottom: '4px'
-                        }}>
-                          {aiWork.length > 100 ? aiWork.substring(0, 100) + '...' : aiWork}
-                        </div>
-                      )}
-
-                      {/* Show original title if it's meaningful work */}
-                      {!isPhotoOnlyEvent && !aiWork && (
-                        <div style={{
-                          fontSize: '13px',
-                          fontWeight: 'bold',
-                          color: '#000000'
-                        }}>
-                          {event.title}
-                        </div>
-                      )}
-
-                      {/* For photo-only events, show AI-detected context if available */}
-                      {isPhotoOnlyEvent && aiWork && (
-                        <div style={{
-                          fontSize: '12px',
-                          color: '#000000',
-                          fontStyle: 'italic'
-                        }}>
-                          {aiWork.length > 80 ? aiWork.substring(0, 80) + '...' : aiWork}
-                        </div>
-                      )}
-
-                      {/* Comments indicator */}
-                      <div style={{
-                        fontSize: '10px',
-                        color: '#808080',
-                        marginTop: '6px'
-                      }}>
-                        💬 Tap for details
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {events.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          padding: '24px',
-          color: '#808080',
-          fontSize: '12px'
-        }}>
-          No timeline events yet
-        </div>
-      )}
-    </div>
-  );
-};
+// Old MobileTimelineTab component removed - replaced by MobileTimelineHeatmap
 
 const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicleId, session }) => {
   const [images, setImages] = useState<any[]>([]);
