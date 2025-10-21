@@ -37,7 +37,7 @@ import type {
 } from './vehicle-profile/types';
 import '../design-system.css';
 import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
-import TradePanel from '../components/trading/TradePanel';
+import FinancialProducts from '../components/financial/FinancialProducts';
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -1196,12 +1196,11 @@ const VehicleProfile: React.FC = () => {
                 onEditClick={handleEditClick}
               />
 
-              {/* Trading Panel */}
-              <TradePanel
+              {/* Financial Products */}
+              <FinancialProducts
                 vehicleId={vehicle.id}
                 vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                currentSharePrice={(vehicle.current_value || 0) / 1000}
-                totalShares={1000}
+                vehicleValue={vehicle.current_value || 0}
               />
 
               {/* Share Holders & Supporters */}
