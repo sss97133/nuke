@@ -13,7 +13,7 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({
 }) => {
   // Show upload if user is logged in AND (has contributor access OR is verified owner OR is db uploader)
   const canUpload = Boolean(
-    session && (
+    session?.user && (
       permissions.hasContributorAccess || 
       permissions.isVerifiedOwner || 
       permissions.isDbUploader ||
