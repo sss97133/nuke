@@ -321,9 +321,9 @@ export default function Portfolio() {
                   padding: '48px 20px',
                   textAlign: 'center',
                   color: 'var(--text-secondary)',
-                  fontSize: '13px'
+                  fontSize: '9px'
                 }}>
-                  No share holdings yet. Start trading to build your portfolio!
+                  No holdings yet. Invest in vehicles to build your portfolio.
                 </div>
               ) : (
                 <div>
@@ -418,9 +418,9 @@ export default function Portfolio() {
                   padding: '48px 20px',
                   textAlign: 'center',
                   color: 'var(--text-secondary)',
-                  fontSize: '13px'
+                  fontSize: '9px'
                 }}>
-                  No transactions yet. Deposit cash to get started!
+                  Ready to invest? Deposit cash to begin trading.
                 </div>
               ) : (
                 <div>
