@@ -28,8 +28,14 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
   onClose,
   onSuccess
 }) => {
-  const { user } = useAuth();
   const navigate = useNavigate();
+  const [user, setUser] = useState<any | null>(null);
+  // Retrieve authenticated user via Supabase (avoids undefined useAuth)
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data?.user ?? null);
+    });
+  }, []);
   
   // Prevent background scroll when modal is open
   React.useEffect(() => {

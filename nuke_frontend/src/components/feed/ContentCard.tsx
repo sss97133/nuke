@@ -78,6 +78,9 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!e.changedTouches || e.changedTouches.length === 0) {
+      return;
+    }
     const end = e.changedTouches[0].clientX;
     const start = touchStartX.current ?? end;
     const now = Date.now();
@@ -190,7 +193,8 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             height: viewMode === 'gallery' ? '200px' :
                    viewMode === 'compact' ? '120px' :
                    '60px',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            touchAction: 'manipulation'
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}

@@ -199,8 +199,9 @@ function App() {
         {/* Global Upload Status - Always visible at top */}
         <GlobalUploadStatus />
 
-        <AppLayout>
-          <Routes>
+        <ErrorBoundary>
+          <AppLayout>
+            <Routes>
             {/* Home route - Landing Page */}
             <Route path="/" element={<CursorHomepage />} />
 
@@ -301,8 +302,9 @@ function App() {
                 </div>
               </div>
             } />
-          </Routes>
-        </AppLayout>
+            </Routes>
+          </AppLayout>
+        </ErrorBoundary>
         {/* Global Upload Progress Bar - Persists across navigation */}
         <UploadProgressBar />
         </Router>

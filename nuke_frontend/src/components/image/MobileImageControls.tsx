@@ -70,6 +70,10 @@ export const MobileImageControls: React.FC<MobileImageControlsProps> = ({
 
     if (!touchStart) return;
 
+    if (!e.changedTouches || e.changedTouches.length === 0) {
+      setTouchStart(null);
+      return;
+    }
     const touch = e.changedTouches[0];
     const deltaX = touch.clientX - touchStart.x;
     const deltaY = touch.clientY - touchStart.y;

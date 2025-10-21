@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import SearchFiltersComponent from './SearchFilters';
 import ContentCard from './ContentCard';
+import ErrorBoundary from '../util/ErrorBoundary';
 import type { FeedItem, DiscoveryFeedProps, SearchFilters } from './types';
 import '../../design-system.css';
 
@@ -336,7 +337,9 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
                 key={item.id}
                 ref={index === items.length - 1 ? lastItemRef : null}
               >
-                <ContentCard item={item} viewMode={viewMode} denseMode={denseMode} />
+                <ErrorBoundary>
+                  <ContentCard item={item} viewMode={viewMode} denseMode={denseMode} />
+                </ErrorBoundary>
               </div>
             ))}
           </div>

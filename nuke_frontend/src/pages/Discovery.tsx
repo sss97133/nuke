@@ -42,6 +42,14 @@ const Discovery: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | undefined>();
   const [showAddVehicle, setShowAddVehicle] = useState(false);
 
+  // Optimize mobile UX: default to compact, enable dense mode
+  React.useEffect(() => {
+    if (isMobile) {
+      setViewMode('compact');
+      setDenseModeEnabled(true);
+    }
+  }, [isMobile]);
+
   // Check authentication status
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -113,19 +121,31 @@ const Discovery: React.FC = () => {
         {/* Content Area */}
         <section className="section">
 
-          <DiscoveryFeed
-            viewMode={viewMode}
-            denseMode={denseModeEnabled}
-            initialLocation={userLocation}
-          />
+          <ErrorBoundary>
+            <DiscoveryFeed
+              viewMode={viewMode}
+              denseMode={denseModeEnabled}
+              initialLocation={userLocation}
+            />
+          </ErrorBoundary>
         </section>
 
         {/* Add Vehicle Floating Button */}
         {session && !showAddVehicle && (
           <button
+            type="button"
             onClick={() => setShowAddVehicle(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center text-2xl z-40"
+            className="fixed w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center text-2xl z-40"
             title="Add Vehicle"
+            aria-label="Add Vehicle"
+            aria-haspopup="dialog"
+            aria-expanded={showAddVehicle}
+            style={{
+              position: 'fixed',
+              bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+              right: 'calc(16px + env(safe-area-inset-right, 0px))',
+              touchAction: 'manipulation'
+            }}
           >
             +
           </button>
