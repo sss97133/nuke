@@ -74,9 +74,9 @@ export default function BondInvestment({ vehicleId, vehicleName }: BondInvestmen
 
       if (error) throw error;
 
-      alert(`Successfully purchased ${CashBalanceService.formatCurrency(amountCents)} in bonds!`);
       setAmount('1000');
       await loadData();
+      alert(`✅ Purchased ${CashBalanceService.formatCurrency(amountCents)} in bonds!`);
 
     } catch (error) {
       console.error('Bond purchase error:', error);
@@ -184,25 +184,25 @@ export default function BondInvestment({ vehicleId, vehicleName }: BondInvestmen
           ))}
         </div>
 
-        <input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Custom amount (cents)"
-          min="100"
-          step="100"
-          style={{
-            width: '100%',
-            padding: '8px',
-            fontSize: '10px',
-            fontFamily: 'var(--font-mono, monospace)',
-            border: '2px solid var(--border)',
-            borderRadius: '4px',
-            background: 'var(--bg)',
-            color: 'var(--text)',
-            boxSizing: 'border-box'
-          }}
-        />
+            <input
+              type="number"
+              value={(parseInt(amount) / 100).toFixed(2)}
+              onChange={(e) => setAmount(Math.floor(parseFloat(e.target.value) * 100).toString())}
+              placeholder="10.00"
+              min="1"
+              step="0.01"
+              style={{
+                width: '100%',
+                padding: '8px',
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono, monospace)',
+                border: '2px solid var(--border)',
+                borderRadius: '4px',
+                background: 'var(--bg)',
+                color: 'var(--text)',
+                boxSizing: 'border-box'
+              }}
+            />
         <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginTop: '4px' }}>
           Available: {CashBalanceService.formatCurrency(balance)}
         </div>

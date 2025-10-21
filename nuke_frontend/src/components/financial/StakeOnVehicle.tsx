@@ -100,10 +100,10 @@ export default function StakeOnVehicle({ vehicleId, vehicleName, vehicleValue }:
 
       if (error) throw error;
 
-      alert(`Successfully staked ${CashBalanceService.formatCurrency(amountCents)} on ${vehicleName}!`);
       setAmount('300');
       setMessage('');
       await loadData();
+      alert(`✅ Staked ${CashBalanceService.formatCurrency(amountCents)} on ${vehicleName}!`);
 
     } catch (error) {
       console.error('Stake error:', error);
@@ -228,11 +228,11 @@ export default function StakeOnVehicle({ vehicleId, vehicleName, vehicleValue }:
 
             <input
               type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Custom amount (cents)"
-              min="300"
-              step="100"
+              value={(parseInt(amount) / 100).toFixed(2)}
+              onChange={(e) => setAmount(Math.floor(parseFloat(e.target.value) * 100).toString())}
+              placeholder="3.00"
+              min="3"
+              step="0.01"
               style={{
                 width: '100%',
                 padding: '8px',

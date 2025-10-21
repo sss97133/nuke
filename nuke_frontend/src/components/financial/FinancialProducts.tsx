@@ -14,10 +14,10 @@ export default function FinancialProducts({ vehicleId, vehicleName, vehicleValue
   const [activeTab, setActiveTab] = useState<'shares' | 'bonds' | 'stakes' | 'whole'>('stakes');
 
   const tabs = [
-    { id: 'stakes', label: '💰 Profit Stakes', desc: 'Earn % of sale profit' },
-    { id: 'shares', label: '📊 Trade Shares', desc: 'Buy/sell anytime' },
-    { id: 'bonds', label: '🏦 Bonds', desc: 'Fixed interest' },
-    { id: 'whole', label: '🚗 Buy Whole', desc: 'Own 100%' }
+    { id: 'stakes', label: '💰 Stakes', desc: 'Earn profit %' },
+    { id: 'shares', label: '📊 Shares', desc: 'Trade' },
+    { id: 'bonds', label: '🏦 Bonds', desc: 'Fixed return' },
+    { id: 'whole', label: '🚗 Whole', desc: 'Own 100%' }
   ];
 
   return (
