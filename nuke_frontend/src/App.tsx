@@ -66,6 +66,7 @@ import OrderParts from './pages/OrderParts';
 import CreditsSuccess from './pages/CreditsSuccess';
 import Portfolio from './pages/Portfolio';
 import BuilderDashboard from './pages/BuilderDashboard';
+import BrowseInvestments from './pages/BrowseInvestments';
 
 
 // Auth components
@@ -247,6 +248,9 @@ function App() {
             
             {/* Builder Dashboard */}
             <Route path="/builder" element={<BuilderDashboard />} />
+            
+            {/* Browse Investments */}
+            <Route path="/browse-investments" element={<BrowseInvestments />} />
             
             {/* Vehicle Management */}
             <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
