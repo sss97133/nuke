@@ -3,7 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 import { supabase } from './lib/supabase';
 // Design system imported via index.css
 import { ThemeProvider } from './contexts/ThemeContext';
-import { ToastProvider } from './hooks/useToast';
+import { ToastProvider as OldToastProvider } from './hooks/useToast';
+import { ToastProvider } from './components/ui/Toast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -64,6 +65,7 @@ import BookService from './pages/BookService';
 import OrderParts from './pages/OrderParts';
 import CreditsSuccess from './pages/CreditsSuccess';
 import Portfolio from './pages/Portfolio';
+import BuilderDashboard from './pages/BuilderDashboard';
 
 
 // Auth components
@@ -196,6 +198,7 @@ function App() {
 
   return (
     <ThemeProvider>
+      <OldToastProvider>
       <ToastProvider>
         <Router>
         {/* Global Upload Status - Always visible at top */}
@@ -241,6 +244,9 @@ function App() {
             {/* Legacy redirects */}
             <Route path="/credits/success" element={<CreditsSuccess />} />
             <Route path="/credits" element={<Portfolio />} />
+            
+            {/* Builder Dashboard */}
+            <Route path="/builder" element={<BuilderDashboard />} />
             
             {/* Vehicle Management */}
             <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
@@ -316,6 +322,7 @@ function App() {
         <UploadProgressBar />
         </Router>
       </ToastProvider>
+      </OldToastProvider>
       <SpeedInsights />
     </ThemeProvider>
   );

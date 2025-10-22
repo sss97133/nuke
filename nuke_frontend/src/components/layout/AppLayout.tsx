@@ -134,10 +134,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 Dashboard
               </Link>
               <Link 
+                to="/portfolio" 
+                className={`nav-link ${isActivePage('/portfolio') ? 'active' : ''}`}
+              >
+                💰 Portfolio
+              </Link>
+              <Link 
                 to="/vehicles" 
                 className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
               >
                 Vehicles
+              </Link>
+              <Link 
+                to="/builder" 
+                className={`nav-link ${isActivePage('/builder') ? 'active' : ''}`}
+              >
+                🔧 Builder
               </Link>
               <Link 
                 to={orgNavPath}
@@ -193,11 +205,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               Dashboard
             </Link>
             <Link 
+              to="/portfolio" 
+              className={`mobile-nav-link ${isActivePage('/portfolio') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              💰 Portfolio
+            </Link>
+            <Link 
               to="/vehicles" 
               className={`mobile-nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
               onClick={() => setMobileMenuOpen(false)}
             >
               Vehicles
+            </Link>
+            <Link 
+              to="/builder" 
+              className={`mobile-nav-link ${isActivePage('/builder') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              🔧 Builder
             </Link>
             <Link 
               to="/shops" 

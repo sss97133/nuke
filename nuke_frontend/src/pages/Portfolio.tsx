@@ -16,13 +16,41 @@ interface ShareHolding {
   unrealized_gain_loss_pct: number;
 }
 
+interface Stake {
+  id: string;
+  vehicle_id: string;
+  vehicle_year?: number;
+  vehicle_make?: string;
+  vehicle_model?: string;
+  amount_cents: number;
+  profit_share_pct: number;
+  status: string;
+  created_at: string;
+}
+
+interface Bond {
+  id: string;
+  vehicle_id: string;
+  vehicle_year?: number;
+  vehicle_make?: string;
+  vehicle_model?: string;
+  principal_cents: number;
+  interest_rate: number;
+  term_months: number;
+  maturity_date: string;
+  accrued_interest_cents: number;
+  status: string;
+}
+
 export default function Portfolio() {
   const navigate = useNavigate();
   const [cashBalance, setCashBalance] = useState<any>(null);
   const [holdings, setHoldings] = useState<ShareHolding[]>([]);
+  const [stakes, setStakes] = useState<Stake[]>([]);
+  const [bonds, setBonds] = useState<Bond[]>([]);
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'holdings' | 'transactions'>('holdings');
+  const [activeTab, setActiveTab] = useState<'overview' | 'cash' | 'shares' | 'stakes' | 'bonds'>('overview');
 
   useEffect(() => {
     loadData();
@@ -81,6 +109,92 @@ export default function Portfolio() {
       const txHistory = await CashBalanceService.getTransactionHistory(user.id, 100);
       setTransactions(txHistory);
 
+      // Load stakes
+      const { data: stakesData } = await supabase
+        .from('profit_share_stakes')
+        .select(`
+          id,
+          vehicle_id,
+          amount_cents,
+          profit_share_pct,
+          status,
+          created_at,
+          vehicle_funding_rounds!inner(
+            vehicles!inner(
+              year,
+              make,
+              model
+            )
+          )
+        `)
+        .eq('staker_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (stakesData) {
+        const formattedStakes = stakesData.map((s: any) => ({
+          id: s.id,
+          vehicle_id: s.vehicle_id,
+          vehicle_year: s.vehicle_funding_rounds?.vehicles?.year,
+          vehicle_make: s.vehicle_funding_rounds?.vehicles?.make,
+          vehicle_model: s.vehicle_funding_rounds?.vehicles?.model,
+          amount_cents: s.amount_cents,
+          profit_share_pct: s.profit_share_pct,
+          status: s.status,
+          created_at: s.created_at
+        }));
+        setStakes(formattedStakes);
+      }
+
+      // Load bonds
+      const { data: bondsData } = await supabase
+        .from('bond_holdings')
+        .select(`
+          id,
+          bond_id,
+          principal_cents,
+          purchase_date,
+          vehicle_bonds!inner(
+            vehicle_id,
+            interest_rate,
+            term_months,
+            maturity_date,
+            status,
+            vehicles!inner(
+              year,
+              make,
+              model
+            )
+          )
+        `)
+        .eq('holder_id', user.id)
+        .order('purchase_date', { ascending: false });
+
+      if (bondsData) {
+        const formattedBonds = bondsData.map((b: any) => {
+          const daysSincePurchase = Math.floor(
+            (Date.now() - new Date(b.purchase_date).getTime()) / (1000 * 60 * 60 * 24)
+          );
+          const accruedInterest = Math.floor(
+            (b.principal_cents * (b.vehicle_bonds.interest_rate / 100) * daysSincePurchase) / 365
+          );
+          
+          return {
+            id: b.id,
+            vehicle_id: b.vehicle_bonds.vehicle_id,
+            vehicle_year: b.vehicle_bonds.vehicles?.year,
+            vehicle_make: b.vehicle_bonds.vehicles?.make,
+            vehicle_model: b.vehicle_bonds.vehicles?.model,
+            principal_cents: b.principal_cents,
+            interest_rate: b.vehicle_bonds.interest_rate,
+            term_months: b.vehicle_bonds.term_months,
+            maturity_date: b.vehicle_bonds.maturity_date,
+            accrued_interest_cents: accruedInterest,
+            status: b.vehicle_bonds.status
+          };
+        });
+        setBonds(formattedBonds);
+      }
+
     } catch (error) {
       console.error('Failed to load portfolio:', error);
     } finally {
@@ -123,9 +237,11 @@ export default function Portfolio() {
     }
   };
 
-  const totalPortfolioValue = (cashBalance?.balance_cents || 0) + 
-    holdings.reduce((sum, h) => sum + (h.shares_owned * h.current_mark * 100), 0);
-
+  const sharesValue = holdings.reduce((sum, h) => sum + (h.shares_owned * h.current_mark * 100), 0);
+  const stakesValue = stakes.reduce((sum, s) => sum + s.amount_cents, 0);
+  const bondsValue = bonds.reduce((sum, b) => sum + b.principal_cents + b.accrued_interest_cents, 0);
+  
+  const totalPortfolioValue = (cashBalance?.balance_cents || 0) + sharesValue + stakesValue + bondsValue;
   const totalUnrealizedPL = holdings.reduce((sum, h) => sum + (h.unrealized_gain_loss || 0) * 100, 0);
 
   if (loading) {
@@ -268,42 +384,103 @@ export default function Portfolio() {
         <div style={{
           display: 'flex',
           gap: '8px',
-          marginBottom: '16px'
+          marginBottom: '16px',
+          overflowX: 'auto',
+          scrollbarWidth: 'none'
         }}>
           <button
-            onClick={() => setActiveTab('holdings')}
+            onClick={() => setActiveTab('overview')}
             style={{
               border: '2px solid var(--border)',
-              background: activeTab === 'holdings' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'holdings' ? 'var(--accent)' : 'var(--text)',
-              padding: '8px 16px',
-              fontSize: '12px',
+              background: activeTab === 'overview' ? 'var(--accent-dim)' : 'var(--surface)',
+              color: activeTab === 'overview' ? 'var(--accent)' : 'var(--text)',
+              padding: '6px 12px',
+              fontSize: '9px',
               fontWeight: 600,
               fontFamily: 'Arial, sans-serif',
               cursor: 'pointer',
               transition: '0.12s',
-              borderRadius: '4px'
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
             }}
           >
-            Share Holdings ({holdings.length})
+            Overview
           </button>
 
           <button
-            onClick={() => setActiveTab('transactions')}
+            onClick={() => setActiveTab('cash')}
             style={{
               border: '2px solid var(--border)',
-              background: activeTab === 'transactions' ? 'var(--accent-dim)' : 'var(--surface)',
-              color: activeTab === 'transactions' ? 'var(--accent)' : 'var(--text)',
-              padding: '8px 16px',
-              fontSize: '12px',
+              background: activeTab === 'cash' ? 'var(--accent-dim)' : 'var(--surface)',
+              color: activeTab === 'cash' ? 'var(--accent)' : 'var(--text)',
+              padding: '6px 12px',
+              fontSize: '9px',
               fontWeight: 600,
               fontFamily: 'Arial, sans-serif',
               cursor: 'pointer',
               transition: '0.12s',
-              borderRadius: '4px'
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
             }}
           >
-            Transactions ({transactions.length})
+            Cash
+          </button>
+
+          <button
+            onClick={() => setActiveTab('shares')}
+            style={{
+              border: '2px solid var(--border)',
+              background: activeTab === 'shares' ? 'var(--accent-dim)' : 'var(--surface)',
+              color: activeTab === 'shares' ? 'var(--accent)' : 'var(--text)',
+              padding: '6px 12px',
+              fontSize: '9px',
+              fontWeight: 600,
+              fontFamily: 'Arial, sans-serif',
+              cursor: 'pointer',
+              transition: '0.12s',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Shares ({holdings.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('stakes')}
+            style={{
+              border: '2px solid var(--border)',
+              background: activeTab === 'stakes' ? 'var(--accent-dim)' : 'var(--surface)',
+              color: activeTab === 'stakes' ? 'var(--accent)' : 'var(--text)',
+              padding: '6px 12px',
+              fontSize: '9px',
+              fontWeight: 600,
+              fontFamily: 'Arial, sans-serif',
+              cursor: 'pointer',
+              transition: '0.12s',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Stakes ({stakes.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('bonds')}
+            style={{
+              border: '2px solid var(--border)',
+              background: activeTab === 'bonds' ? 'var(--accent-dim)' : 'var(--surface)',
+              color: activeTab === 'bonds' ? 'var(--accent)' : 'var(--text)',
+              padding: '6px 12px',
+              fontSize: '9px',
+              fontWeight: 600,
+              fontFamily: 'Arial, sans-serif',
+              cursor: 'pointer',
+              transition: '0.12s',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Bonds ({bonds.length})
           </button>
         </div>
 
@@ -314,7 +491,122 @@ export default function Portfolio() {
           borderRadius: '8px',
           overflow: 'hidden'
         }}>
-          {activeTab === 'holdings' && (
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div style={{ padding: '20px' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px',
+                marginBottom: '24px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Cash
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 600 }}>
+                    {CashBalanceService.formatCurrency(cashBalance?.balance_cents || 0)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Shares
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 600 }}>
+                    {CashBalanceService.formatCurrency(sharesValue)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Stakes
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 600 }}>
+                    {CashBalanceService.formatCurrency(stakesValue)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Bonds
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 600 }}>
+                    {CashBalanceService.formatCurrency(bondsValue)}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                border: '2px solid var(--border)',
+                borderRadius: '4px',
+                padding: '16px',
+                background: 'var(--bg)'
+              }}>
+                <div style={{ fontSize: '9px', fontWeight: 600, marginBottom: '12px' }}>
+                  Portfolio Breakdown
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                    <span>Total Assets</span>
+                    <span style={{ fontWeight: 600 }}>{CashBalanceService.formatCurrency(totalPortfolioValue)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px' }}>
+                    <span>Unrealized P&L</span>
+                    <span style={{ 
+                      fontWeight: 600, 
+                      color: totalUnrealizedPL >= 0 ? 'var(--success)' : 'var(--error)' 
+                    }}>
+                      {totalUnrealizedPL >= 0 ? '+' : ''}
+                      {CashBalanceService.formatCurrency(totalUnrealizedPL)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cash Tab */}
+          {activeTab === 'cash' && (
+            <div style={{ padding: '20px' }}>
+              <CashBalance compact={false} showActions={true} />
+              
+              <div style={{ marginTop: '20px' }}>
+                <div style={{ fontSize: '9px', fontWeight: 600, marginBottom: '12px' }}>
+                  Recent Transactions
+                </div>
+                {transactions.slice(0, 10).map((tx, index) => (
+                  <div
+                    key={tx.id}
+                    style={{
+                      padding: '12px',
+                      borderBottom: index < 9 ? '1px solid var(--border)' : 'none',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '9px', fontWeight: 600 }}>
+                        {getTransactionLabel(tx.transaction_type)}
+                      </div>
+                      <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                        {formatDate(tx.created_at)}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      color: tx.amount_cents > 0 ? 'var(--success)' : 'var(--error)'
+                    }}>
+                      {tx.amount_cents > 0 ? '+' : ''}
+                      {CashBalanceService.formatCurrency(Math.abs(tx.amount_cents))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Shares Tab */}
+          {activeTab === 'shares' && (
             <>
               {holdings.length === 0 ? (
                 <div style={{
@@ -411,84 +703,133 @@ export default function Portfolio() {
             </>
           )}
 
-          {activeTab === 'transactions' && (
+          {/* Stakes Tab */}
+          {activeTab === 'stakes' && (
             <>
-              {transactions.length === 0 ? (
+              {stakes.length === 0 ? (
                 <div style={{
                   padding: '48px 20px',
                   textAlign: 'center',
                   color: 'var(--text-secondary)',
                   fontSize: '9px'
                 }}>
-                  Ready to invest? Deposit cash to begin trading.
+                  No stakes yet. Support vehicle restorations and earn profit shares.
                 </div>
               ) : (
                 <div>
-                  {transactions.map((tx, index) => (
+                  {stakes.map((stake, index) => (
                     <div
-                      key={tx.id}
+                      key={stake.id}
                       style={{
                         padding: '16px 20px',
-                        borderBottom: index < transactions.length - 1 ? '1px solid var(--border)' : 'none',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '16px'
+                        borderBottom: index < stakes.length - 1 ? '1px solid var(--border)' : 'none',
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                        gap: '16px',
+                        alignItems: 'center'
                       }}
                     >
-                      {/* Left: Icon + Details */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                        <div style={{
-                          fontSize: '24px',
-                          width: '40px',
-                          height: '40px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'var(--bg)',
-                          borderRadius: '4px',
-                          border: '2px solid var(--border)'
-                        }}>
-                          {getTransactionIcon(tx.transaction_type)}
+                      <div>
+                        <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
+                          {stake.vehicle_year} {stake.vehicle_make} {stake.vehicle_model}
                         </div>
-
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          marginBottom: '2px'
-                        }}>
-                          {getTransactionLabel(tx.transaction_type)}
-                        </div>
-                        <div style={{
-                          fontSize: '9px',
-                          color: 'var(--text-secondary)',
-                          fontFamily: 'var(--font-mono, monospace)'
-                        }}>
-                          {formatDate(tx.created_at)}
-                        </div>
-                          {tx.metadata?.amount_paid_usd && (
-                            <div style={{
-                              fontSize: '10px',
-                              color: 'var(--text-secondary)',
-                              marginTop: '2px'
-                            }}>
-                              Via Stripe: {tx.metadata.payment_method || 'card'}
-                            </div>
-                          )}
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                          {formatDate(stake.created_at)}
                         </div>
                       </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 600 }}>
+                          {CashBalanceService.formatCurrency(stake.amount_cents)}
+                        </div>
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                          Staked
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 600 }}>
+                          {stake.profit_share_pct.toFixed(2)}%
+                        </div>
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                          Profit Share
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{
+                          fontSize: '8px',
+                          fontWeight: 600,
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          background: stake.status === 'active' ? 'var(--accent-dim)' : 'var(--surface)',
+                          color: stake.status === 'active' ? 'var(--accent)' : 'var(--text-secondary)',
+                          display: 'inline-block'
+                        }}>
+                          {stake.status}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
 
-                      {/* Right: Amount */}
-                      <div style={{
-                        fontSize: '16px',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono, monospace)',
-                        color: tx.amount_cents > 0 ? 'var(--success)' : 'var(--error)',
-                        textAlign: 'right'
-                      }}>
-                        {tx.amount_cents > 0 ? '+' : ''}
-                        {CashBalanceService.formatCurrency(Math.abs(tx.amount_cents))}
+          {/* Bonds Tab */}
+          {activeTab === 'bonds' && (
+            <>
+              {bonds.length === 0 ? (
+                <div style={{
+                  padding: '48px 20px',
+                  textAlign: 'center',
+                  color: 'var(--text-secondary)',
+                  fontSize: '9px'
+                }}>
+                  No bonds yet. Invest in fixed-income vehicle bonds.
+                </div>
+              ) : (
+                <div>
+                  {bonds.map((bond, index) => (
+                    <div
+                      key={bond.id}
+                      style={{
+                        padding: '16px 20px',
+                        borderBottom: index < bonds.length - 1 ? '1px solid var(--border)' : 'none',
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                        gap: '16px',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>
+                          {bond.vehicle_year} {bond.vehicle_make} {bond.vehicle_model}
+                        </div>
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                          {bond.interest_rate}% · {bond.term_months} months
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 600 }}>
+                          {CashBalanceService.formatCurrency(bond.principal_cents)}
+                        </div>
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                          Principal
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--success)' }}>
+                          +{CashBalanceService.formatCurrency(bond.accrued_interest_cents)}
+                        </div>
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                          Accrued Interest
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                          Matures
+                        </div>
+                        <div style={{ fontSize: '9px', fontWeight: 600 }}>
+                          {new Date(bond.maturity_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                        </div>
                       </div>
                     </div>
                   ))}
