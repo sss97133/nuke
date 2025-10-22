@@ -140,6 +140,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 💰 Portfolio
               </Link>
               <Link 
+                to="/browse-investments" 
+                className={`nav-link ${isActivePage('/browse-investments') ? 'active' : ''}`}
+              >
+                📊 Invest
+              </Link>
+              <Link 
                 to="/vehicles" 
                 className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
               >
@@ -210,6 +216,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               onClick={() => setMobileMenuOpen(false)}
             >
               💰 Portfolio
+            </Link>
+            <Link 
+              to="/browse-investments" 
+              className={`mobile-nav-link ${isActivePage('/browse-investments') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              📊 Invest
             </Link>
             <Link 
               to="/vehicles" 
