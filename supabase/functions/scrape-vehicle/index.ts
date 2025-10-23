@@ -206,7 +206,7 @@ function scrapeCraigslist(doc: any, url: string): any {
     listing_url: url
   }
 
-  // Extract title (e.g. "1972 GMC Suburban - $5,500")
+  // Extract title (e.g. "1972 GMC Suburban - $5,500 (El Centro)")
   const titleElement = doc.querySelector('h1, .postingtitletext #titletextonly')
   if (titleElement) {
     data.title = titleElement.textContent.trim()
@@ -218,20 +218,30 @@ function scrapeCraigslist(doc: any, url: string): any {
     }
     
     // Extract make/model (e.g., "1972 GMC Suburban")
-    const vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s+-|\s*$)/i)
+    const vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s+-|\()/i)
     if (vehicleMatch) {
       data.make = vehicleMatch[2]
       data.model = vehicleMatch[3].trim()
     }
     
-    // Extract price from title
+    // Extract price from title (supports "- $5,500" or "$5,500")
     const priceMatch = data.title.match(/\$\s*([\d,]+)/)
     if (priceMatch) {
       data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
     }
+    
+    // Extract location from title (e.g., "(El Centro)")
+    const locationMatch = data.title.match(/\(([^)]+)\)\s*$/i)
+    if (locationMatch) {
+      data.location = locationMatch[1].trim()
+    }
   }
 
-  // Extract attributes (condition, cylinders, drive, fuel, etc.)
+  // Extract ALL text from page for comprehensive parsing
+  const fullText = doc.body?.textContent || ''
+  
+  // Extract attributes using multiple methods
+  // Method 1: Structured attrgroup parsing
   const attrGroups = doc.querySelectorAll('.attrgroup')
   attrGroups.forEach((group: any) => {
     const spans = group.querySelectorAll('span')
@@ -262,6 +272,55 @@ function scrapeCraigslist(doc: any, url: string): any {
       }
     })
   })
+  
+  // Method 2: Regex parsing from full text (fallback if attrgroup parsing fails)
+  if (!data.condition) {
+    const condMatch = fullText.match(/condition:\s*(\w+)/i)
+    if (condMatch) data.condition = condMatch[1]
+  }
+  
+  if (!data.cylinders) {
+    const cylMatch = fullText.match(/cylinders:\s*(\d+)\s+cylinders/i)
+    if (cylMatch) data.cylinders = parseInt(cylMatch[1])
+  }
+  
+  if (!data.drivetrain) {
+    const driveMatch = fullText.match(/drive:\s*([\w\d]+)/i)
+    if (driveMatch) data.drivetrain = driveMatch[1]
+  }
+  
+  if (!data.fuel_type) {
+    const fuelMatch = fullText.match(/fuel:\s*(\w+)/i)
+    if (fuelMatch) data.fuel_type = fuelMatch[1]
+  }
+  
+  if (!data.mileage) {
+    const odoMatch = fullText.match(/odometer:\s*([\d,]+)/i)
+    if (odoMatch) data.mileage = parseInt(odoMatch[1].replace(/,/g, ''))
+  }
+  
+  if (!data.color) {
+    const colorMatch = fullText.match(/paint color:\s*(\w+)/i)
+    if (colorMatch) data.color = colorMatch[1]
+  }
+  
+  if (!data.title_status) {
+    const titleMatch = fullText.match(/title status:\s*(\w+)/i)
+    if (titleMatch) data.title_status = titleMatch[1]
+  }
+  
+  if (!data.transmission) {
+    const transMatch = fullText.match(/transmission:\s*(\w+)/i)
+    if (transMatch) data.transmission = transMatch[1]
+  }
+  
+  if (!data.body_style) {
+    const typeMatch = fullText.match(/type:\s*(\w+)/i)
+    if (typeMatch) data.body_style = typeMatch[1]
+  }
+  
+  // Store full extracted text for AI analysis
+  data.full_text = fullText.substring(0, 10000) // First 10k chars
 
   // Extract description
   const descElement = doc.querySelector('#postingbody')
