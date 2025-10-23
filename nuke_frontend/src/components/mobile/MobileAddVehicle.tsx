@@ -279,26 +279,49 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
         // Download and add images if present
         if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0) {
           try {
-            const downloadedFiles = await downloadImagesFromUrls(scrapedData.images, scrapedData.source);
-            if (downloadedFiles.length > 0) {
-              const newPhotos = downloadedFiles.map(file => ({
-                file,
-                preview: URL.createObjectURL(file),
-                uploadStatus: 'pending' as const
-              }));
-              setPhotos(prev => [...prev, ...newPhotos]);
+            // Use processed images from edge function (already analyzed with Rekognition)
+            if (scrapedData.processed_images && scrapedData.processed_images.length > 0) {
+              const imageFiles: File[] = [];
+              
+              for (const processedImg of scrapedData.processed_images) {
+                try {
+                  const response = await fetch(processedImg.s3_url);
+                  if (!response.ok) continue;
+                  
+                  const blob = await response.blob();
+                  const filename = `${scrapedData.source}_${processedImg.index + 1}.jpg`;
+                  const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+                  
+                  // Store Rekognition analysis
+                  (file as any).rekognitionData = processedImg.analysis;
+                  imageFiles.push(file);
+                  
+                  console.log(`Image ${processedImg.index + 1} AI tags:`, processedImg.analysis?.labels?.slice(0, 3).map((l: any) => l.name).join(', '));
+                } catch (err) {
+                  console.error(`Failed to process image ${processedImg.index}:`, err);
+                }
+              }
+              
+              if (imageFiles.length > 0) {
+                const newPhotos = imageFiles.map(file => ({
+                  file,
+                  preview: URL.createObjectURL(file),
+                  uploadStatus: 'pending' as const
+                }));
+                setPhotos(prev => [...prev, ...newPhotos]);
+              }
             }
           } catch (imgError) {
-            console.error('Image download error:', imgError);
+            console.error('Image processing error:', imgError);
             setErrorState(
-              `Data imported successfully, but some images failed to download. ${scrapedData.images.length} images available.`,
+              `Data imported successfully, but image processing failed.`,
               'warning'
             );
           }
         }
         
         setErrorState(
-          `✓ Imported from ${scrapedData.source}!\n${scrapedData.images?.length || 0} images downloaded.`,
+          `✓ Imported from ${scrapedData.source}!\n${scrapedData.image_count || 0} images analyzed with AI.`,
           'info'
         );
         setActiveSection('details');
