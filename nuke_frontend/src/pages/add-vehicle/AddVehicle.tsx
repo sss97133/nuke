@@ -26,19 +26,9 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   onClose,
   onSuccess 
 }) => {
-  const isMobile = useIsMobile();
-  
-  // If mobile, use mobile-optimized version
-  if (isMobile) {
-    return (
-      <MobileAddVehicle 
-        onClose={onClose}
-        onSuccess={onSuccess}
-      />
-    );
-  }
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
+  const isMobile = useIsMobile();
 
   // Form state using custom hook
   const {
@@ -78,11 +68,115 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   // Get current user
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+      } catch (error) {
+        console.error('Error getting user:', error);
+        setSubmitError('Failed to authenticate user');
+      }
     };
     getUser();
   }, []);
+
+  // If mobile, use mobile-optimized version AFTER all hooks are called
+  if (isMobile) {
+    return (
+      <MobileAddVehicle 
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
+    );
+  }
+
+  // Helper function to download images from URLs and convert to File objects
+  const downloadImagesAsFiles = async (imageUrls: string[], source: string = 'external'): Promise<File[]> => {
+    const files: File[] = [];
+    const MAX_CONCURRENT = 5; // Download 5 images at a time
+    const DOWNLOAD_TIMEOUT = 15000; // 15 second timeout per image
+    
+    try {
+      // Process in batches to avoid overwhelming the browser
+      for (let i = 0; i < imageUrls.length; i += MAX_CONCURRENT) {
+        const batch = imageUrls.slice(i, i + MAX_CONCURRENT);
+        const batchPromises = batch.map(async (url, batchIndex) => {
+          try {
+            const globalIndex = i + batchIndex;
+            console.log(`Downloading image ${globalIndex + 1}/${imageUrls.length}: ${url}`);
+            
+            // Use CORS proxy to fetch images from external sites
+            const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+            
+            // Create abort controller for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT);
+            
+            const response = await fetch(corsProxyUrl, {
+              signal: controller.signal,
+              headers: {
+                'Accept': 'image/*',
+                'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0)'
+              }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const blob = await response.blob();
+            
+            // Validate blob size (max 10MB)
+            if (blob.size > 10 * 1024 * 1024) {
+              throw new Error(`Image too large: ${Math.round(blob.size / 1024 / 1024)}MB`);
+            }
+            
+            // Determine file extension from URL or content type
+            let extension = 'jpg';
+            const urlExt = url.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i);
+            if (urlExt) {
+              extension = urlExt[1].toLowerCase();
+            } else if (blob.type) {
+              const typeExt = blob.type.split('/')[1];
+              if (typeExt && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(typeExt)) {
+                extension = typeExt;
+              }
+            }
+            
+            // Create filename with source prefix
+            const filename = `${source.toLowerCase().replace(/\s+/g, '_')}_${globalIndex + 1}.${extension}`;
+            
+            // Convert blob to File
+            const file = new File([blob], filename, { type: blob.type || `image/${extension}` });
+            
+            return file;
+          } catch (error: any) {
+            if (error.name === 'AbortError') {
+              console.error(`Download timeout for image ${url}`);
+            } else {
+              console.error(`Failed to download image ${url}:`, error);
+            }
+            return null;
+          }
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        const successfulFiles = batchResults.filter((f): f is File => f !== null);
+        files.push(...successfulFiles);
+        
+        // Small delay between batches to be respectful
+        if (i + MAX_CONCURRENT < imageUrls.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    } catch (error) {
+      console.error('Batch download error:', error);
+      throw new Error(`Image download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    
+    return files;
+  };
 
   // Handle title scan completion
   const handleTitleScanComplete = useCallback((scannedData: any) => {
@@ -183,7 +277,7 @@ Redirecting to vehicle profile...`);
       console.log('New URL - scraping data:', url);
 
       // Call Supabase Edge Function (scrape-vehicle)
-      const { data: result, error: fnError } = await (supabase as any).functions.invoke('scrape-vehicle', {
+      const { data: result, error: fnError } = await supabase.functions.invoke('scrape-vehicle', {
         body: { url }
       });
       if (fnError) {
@@ -218,15 +312,43 @@ Redirecting to vehicle profile...`);
 
         // Add acquisition context for business users
         if (scrapedData.sale_price || scrapedData.asking_price) {
-          updates.target_acquisition = true;
-          updates.acquisition_notes = `Discovered on ${scrapedData.source || 'marketplace'} - potential acquisition candidate`;
+          updates.notes = `Discovered on ${scrapedData.source || 'marketplace'} - potential acquisition candidate`;
         }
 
         console.log('Updating form with scraped data:', updates);
         updateFormData(updates);
 
-        // Set success message
-        setScrapingError(null);
+        // Download and convert images if present
+        if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0) {
+          console.log(`Found ${scrapedData.images.length} images, downloading...`);
+          setExtracting(true);
+          
+          try {
+            const downloadedFiles = await downloadImagesAsFiles(scrapedData.images, scrapedData.source);
+            
+            if (downloadedFiles.length > 0) {
+              console.log(`Successfully downloaded ${downloadedFiles.length}/${scrapedData.images.length} images`);
+              setExtractedImages(prev => [...prev, ...downloadedFiles]);
+              
+              // Show success message with count
+              if (downloadedFiles.length === scrapedData.images.length) {
+                setScrapingError(null);
+              } else {
+                setScrapingError(`✓ Data imported! Downloaded ${downloadedFiles.length}/${scrapedData.images.length} images (some failed)`);
+              }
+            } else {
+              setScrapingError(`✓ Data imported, but no images could be downloaded. Check console for details.`);
+            }
+          } catch (imgError: any) {
+            console.error('Image download error:', imgError);
+            // Don't fail the entire scrape if images fail
+            setScrapingError(`✓ Data imported successfully, but image download failed: ${imgError.message}`);
+          } finally {
+            setExtracting(false);
+          }
+        } else {
+          setScrapingError(null);
+        }
 
       } else {
         throw new Error(result.error || 'Failed to extract data from URL');
@@ -245,7 +367,7 @@ Redirecting to vehicle profile...`);
     if (formData.import_url) {
       // Debounce URL scraping
       const timeoutId = setTimeout(() => {
-        handleUrlScraping(formData.import_url);
+        handleUrlScraping(formData.import_url!);
       }, 1000);
       return () => clearTimeout(timeoutId);
     }
@@ -495,7 +617,7 @@ Redirecting to vehicle profile...`);
 
       // Only auto-fill location if not set (photos taken at purchase location is common)
       if (eventLocation && !formData.purchase_location) {
-        updates.purchase_location = eventLocation;
+        updates.purchase_location = `${eventLocation.latitude}, ${eventLocation.longitude}`;
       }
 
       if (Object.keys(updates).length > 0) {
