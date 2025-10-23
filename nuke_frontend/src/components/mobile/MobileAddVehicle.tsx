@@ -130,9 +130,15 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
             const globalIndex = i + batchIndex;
             console.log(`Downloading image ${globalIndex + 1}/${imageUrls.length}`);
             
-            const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-            const response = await fetch(corsProxyUrl, {
-              timeout: 10000 // 10 second timeout
+            // Use Supabase image proxy to bypass CORS
+            const proxyUrl = `https://qkgaybvrernstplzjaam.supabase.co/functions/v1/image-proxy`;
+            const response = await fetch(proxyUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ url }),
+              signal: AbortSignal.timeout(15000),
             });
             
             if (!response.ok) {

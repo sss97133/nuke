@@ -332,13 +332,18 @@ Redirecting to vehicle profile...`);
                 const imageUrl = scrapedData.images[i];
                 console.log(`Downloading image ${i + 1}/${maxImages}: ${imageUrl}`);
                 
-                // Try direct fetch first (works for most Craigslist images)
-                const response = await fetch(imageUrl, {
-                  mode: 'cors',
-                  signal: AbortSignal.timeout(10000),
+                // Use Supabase image proxy to bypass CORS
+                const proxyUrl = `https://qkgaybvrernstplzjaam.supabase.co/functions/v1/image-proxy`;
+                const response = await fetch(proxyUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ url: imageUrl }),
+                  signal: AbortSignal.timeout(15000),
                 });
                 
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
                 
                 const blob = await response.blob();
                 if (blob.size > 10 * 1024 * 1024) {
