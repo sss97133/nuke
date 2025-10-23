@@ -802,7 +802,7 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
 
               <div>
                 <label style={{ fontSize: '11pt', fontWeight: 'bold', display: 'block', marginBottom: 'var(--space-1)' }}>
-                  Relationship to Vehicle
+                  Role <span style={{ color: 'red' }}>*</span>
                 </label>
                 <select
                   value={formData.relationship_type}
@@ -816,12 +816,17 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
                     minHeight: '48px'
                   }}
                 >
-                  <option value="discovered">I discovered this vehicle</option>
-                  <option value="owned">I own this vehicle</option>
-                  <option value="previously_owned">I previously owned this vehicle</option>
-                  <option value="interested">I'm interested in this vehicle</option>
-                  <option value="curated">I'm curating this vehicle</option>
-                  <option value="consigned">This vehicle is consigned to me</option>
+                  <option value="">Select your role</option>
+                  <option value="owned">Owner</option>
+                  <option value="previously_owned">Previous Owner</option>
+                  <option value="discovered">Discoverer</option>
+                  <option value="interested">Interested Buyer</option>
+                  <option value="mechanic">Mechanic</option>
+                  <option value="painter">Painter</option>
+                  <option value="appraiser">Appraiser</option>
+                  <option value="dealer">Dealer</option>
+                  <option value="broker">Broker</option>
+                  <option value="curated">Curator</option>
                 </select>
               </div>
 
@@ -978,7 +983,7 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
                 <div><strong>Make:</strong> {formData.make}</div>
                 <div><strong>Model:</strong> {formData.model}</div>
                 <div><strong>VIN:</strong> {formData.vin || 'Not specified'}</div>
-                <div><strong>Relationship:</strong> {formData.relationship_type.replace('_', ' ')}</div>
+                <div><strong>Role:</strong> {formData.relationship_type.replace('_', ' ')}</div>
                 {formData.import_url && <div><strong>Source:</strong> <a href={formData.import_url} target="_blank" rel="noopener noreferrer">View listing</a></div>}
                 {formData.notes && <div><strong>Notes:</strong> {formData.notes}</div>}
                 <div><strong>Photos:</strong> {photos.length} images</div>
