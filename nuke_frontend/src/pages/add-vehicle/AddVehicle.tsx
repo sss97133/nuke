@@ -318,34 +318,54 @@ Redirecting to vehicle profile...`);
         console.log('Updating form with scraped data:', updates);
         updateFormData(updates);
 
-        // Download and convert images if present
-        if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0) {
-          console.log(`Found ${scrapedData.images.length} images, downloading...`);
+        // Use processed images from edge function (server-side downloaded and analyzed)
+        if (scrapedData.processed_images && Array.isArray(scrapedData.processed_images) && scrapedData.processed_images.length > 0) {
+          console.log(`Found ${scrapedData.processed_images.length} processed images with Rekognition analysis`);
           setExtracting(true);
           
           try {
-            const downloadedFiles = await downloadImagesAsFiles(scrapedData.images, scrapedData.source);
+            // Convert S3 URLs to File objects for upload queue
+            const imageFiles: File[] = [];
             
-            if (downloadedFiles.length > 0) {
-              console.log(`Successfully downloaded ${downloadedFiles.length}/${scrapedData.images.length} images`);
-              setExtractedImages(prev => [...prev, ...downloadedFiles]);
-              
-              // Show success message with count
-              if (downloadedFiles.length === scrapedData.images.length) {
-                setScrapingError(null);
-              } else {
-                setScrapingError(`✓ Data imported! Downloaded ${downloadedFiles.length}/${scrapedData.images.length} images (some failed)`);
+            for (const processedImg of scrapedData.processed_images) {
+              try {
+                // Fetch from S3
+                const response = await fetch(processedImg.s3_url);
+                if (!response.ok) continue;
+                
+                const blob = await response.blob();
+                const filename = `${scrapedData.source}_${processedImg.index + 1}.jpg`;
+                const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+                
+                // Store Rekognition analysis as metadata (you can save this to database later)
+                (file as any).rekognitionData = processedImg.analysis;
+                
+                imageFiles.push(file);
+                console.log(`Image ${processedImg.index + 1} - Labels:`, processedImg.analysis?.labels?.slice(0, 5).map((l: any) => l.name).join(', '));
+                console.log(`Image ${processedImg.index + 1} - Text detected:`, processedImg.analysis?.text?.map((t: any) => t.text).join(', '));
+              } catch (err) {
+                console.error(`Failed to process image ${processedImg.index}:`, err);
               }
+            }
+            
+            if (imageFiles.length > 0) {
+              console.log(`Successfully processed ${imageFiles.length}/${scrapedData.processed_images.length} images with AI analysis`);
+              setExtractedImages(prev => [...prev, ...imageFiles]);
+              
+              // Show success message with AI analysis info
+              setScrapingError(`✓ Data imported! ${imageFiles.length} images analyzed with AWS Rekognition`);
             } else {
-              setScrapingError(`✓ Data imported, but no images could be downloaded. Check console for details.`);
+              setScrapingError(`✓ Data imported, but no images could be processed.`);
             }
           } catch (imgError: any) {
-            console.error('Image download error:', imgError);
-            // Don't fail the entire scrape if images fail
-            setScrapingError(`✓ Data imported successfully, but image download failed: ${imgError.message}`);
+            console.error('Image processing error:', imgError);
+            setScrapingError(`✓ Data imported successfully, but image processing failed: ${imgError.message}`);
           } finally {
             setExtracting(false);
           }
+        } else if (scrapedData.images && scrapedData.images.length > 0) {
+          // Fallback: if processed_images not available, show message
+          setScrapingError(`✓ Data imported! ${scrapedData.images.length} image URLs found (not yet processed)`);
         } else {
           setScrapingError(null);
         }

@@ -1,10 +1,29 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
+import { S3Client, PutObjectCommand } from 'npm:@aws-sdk/client-s3@3.577.0'
+import { RekognitionClient, DetectLabelsCommand, DetectTextCommand } from 'npm:@aws-sdk/client-rekognition@3.577.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Initialize AWS clients
+const s3Client = new S3Client({
+  region: Deno.env.get('AWS_REGION') || 'us-east-1',
+  credentials: {
+    accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') || '',
+    secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') || '',
+  },
+})
+
+const rekognitionClient = new RekognitionClient({
+  region: Deno.env.get('AWS_REGION') || 'us-east-1',
+  credentials: {
+    accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') || '',
+    secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') || '',
+  },
+})
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -22,9 +41,17 @@ serve(async (req) => {
       )
     }
 
-    // Use CORS proxy to fetch BAT content (avoids authentication issues)
-    const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`
-    const response = await fetch(corsProxyUrl)
+    // Detect platform
+    const isCraigslist = url.includes('craigslist.org')
+    const isBringATrailer = url.includes('bringatrailer.com')
+
+    // Fetch HTML directly (server-side, no CORS issues)
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    })
 
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`)
@@ -37,10 +64,275 @@ serve(async (req) => {
       throw new Error('Failed to parse HTML')
     }
 
-    const data: any = {
-      source: 'Bring a Trailer',
-      listing_url: url
+    // Route to appropriate scraper
+    let data: any
+    if (isCraigslist) {
+      data = scrapeCraigslist(doc, url)
+    } else if (isBringATrailer) {
+      data = scrapeBringATrailer(doc, url)
+    } else {
+      // Generic scraper
+      data = {
+        source: 'Unknown',
+        listing_url: url
+      }
     }
+
+    // Download images and analyze with Rekognition
+    if (data.images && data.images.length > 0) {
+      console.log(`Processing ${data.images.length} images...`)
+      const processedImages = await downloadAndAnalyzeImages(data.images, data.source || 'unknown')
+      data.processed_images = processedImages
+      data.image_count = processedImages.length
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, data }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    )
+
+  } catch (error) {
+    console.error('Error in scrape-vehicle:', error)
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    )
+  }
+})
+
+async function downloadAndAnalyzeImages(imageUrls: string[], source: string): Promise<any[]> {
+  const results = []
+  const maxImages = 10 // Limit to first 10 images to avoid timeouts
+  
+  for (let i = 0; i < Math.min(imageUrls.length, maxImages); i++) {
+    const imageUrl = imageUrls[i]
+    try {
+      console.log(`Downloading image ${i + 1}/${Math.min(imageUrls.length, maxImages)}: ${imageUrl}`)
+      
+      // Download image
+      const imageResponse = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0)',
+          'Accept': 'image/*',
+        },
+        signal: AbortSignal.timeout(15000), // 15 second timeout
+      })
+
+      if (!imageResponse.ok) {
+        console.warn(`Failed to download image ${imageUrl}: ${imageResponse.status}`)
+        continue
+      }
+
+      const imageBuffer = await imageResponse.arrayBuffer()
+      const imageBytes = new Uint8Array(imageBuffer)
+      
+      // Check size (max 10MB for Rekognition)
+      if (imageBytes.length > 10 * 1024 * 1024) {
+        console.warn(`Image too large: ${imageUrl}`)
+        continue
+      }
+
+      // Analyze with Rekognition
+      const labels = await analyzeImageWithRekognition(imageBytes)
+      
+      // Upload to S3
+      const s3Key = await uploadToS3(imageBytes, source, i, imageUrl)
+      
+      results.push({
+        original_url: imageUrl,
+        s3_key: s3Key,
+        s3_url: `https://${Deno.env.get('AWS_S3_BUCKET')}.s3.amazonaws.com/${s3Key}`,
+        analysis: labels,
+        index: i,
+      })
+      
+    } catch (error) {
+      console.error(`Error processing image ${imageUrl}:`, error.message)
+      // Continue with next image
+    }
+  }
+  
+  return results
+}
+
+async function analyzeImageWithRekognition(imageBytes: Uint8Array): Promise<any> {
+  try {
+    const [labelsResult, textResult] = await Promise.all([
+      // Detect labels (objects, scenes, actions)
+      rekognitionClient.send(new DetectLabelsCommand({
+        Image: { Bytes: imageBytes },
+        MaxLabels: 20,
+        MinConfidence: 70,
+      })),
+      // Detect text (for VIN, plate numbers, etc.)
+      rekognitionClient.send(new DetectTextCommand({
+        Image: { Bytes: imageBytes },
+      })),
+    ])
+
+    return {
+      labels: labelsResult.Labels?.map(l => ({
+        name: l.Name,
+        confidence: l.Confidence,
+        categories: l.Categories?.map(c => c.Name),
+      })) || [],
+      text: textResult.TextDetections?.filter(t => t.Type === 'LINE').map(t => ({
+        text: t.DetectedText,
+        confidence: t.Confidence,
+      })) || [],
+    }
+  } catch (error) {
+    console.error('Rekognition analysis failed:', error.message)
+    return { labels: [], text: [], error: error.message }
+  }
+}
+
+async function uploadToS3(imageBytes: Uint8Array, source: string, index: number, originalUrl: string): Promise<string> {
+  const bucket = Deno.env.get('AWS_S3_BUCKET') || 'nuke-vehicle-images'
+  const timestamp = Date.now()
+  const extension = originalUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)?.[1] || 'jpg'
+  const key = `scraped/${source.toLowerCase().replace(/\s+/g, '_')}/${timestamp}_${index}.${extension}`
+  
+  await s3Client.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: imageBytes,
+    ContentType: `image/${extension}`,
+    CacheControl: 'max-age=31536000',
+  }))
+  
+  return key
+}
+
+function scrapeCraigslist(doc: any, url: string): any {
+  const data: any = {
+    source: 'Craigslist',
+    listing_url: url
+  }
+
+  // Extract title (e.g. "1972 GMC Suburban - $5,500")
+  const titleElement = doc.querySelector('h1, .postingtitletext #titletextonly')
+  if (titleElement) {
+    data.title = titleElement.textContent.trim()
+    
+    // Parse year/make/model from title
+    const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
+    if (yearMatch) {
+      data.year = yearMatch[0]
+    }
+    
+    // Extract make/model (e.g., "1972 GMC Suburban")
+    const vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s+-|\s*$)/i)
+    if (vehicleMatch) {
+      data.make = vehicleMatch[2]
+      data.model = vehicleMatch[3].trim()
+    }
+    
+    // Extract price from title
+    const priceMatch = data.title.match(/\$\s*([\d,]+)/)
+    if (priceMatch) {
+      data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+    }
+  }
+
+  // Extract attributes (condition, cylinders, drive, fuel, etc.)
+  const attrGroups = doc.querySelectorAll('.attrgroup')
+  attrGroups.forEach((group: any) => {
+    const spans = group.querySelectorAll('span')
+    spans.forEach((span: any) => {
+      const text = span.textContent.trim()
+      
+      // Parse specific attributes
+      if (text.includes('condition:')) {
+        data.condition = text.replace('condition:', '').trim()
+      } else if (text.includes('cylinders:')) {
+        const cylMatch = text.match(/(\d+)\s+cylinders/)
+        if (cylMatch) data.cylinders = parseInt(cylMatch[1])
+      } else if (text.includes('drive:')) {
+        data.drivetrain = text.replace('drive:', '').trim()
+      } else if (text.includes('fuel:')) {
+        data.fuel_type = text.replace('fuel:', '').trim()
+      } else if (text.includes('odometer:')) {
+        const odoMatch = text.match(/odometer:\s*([\d,]+)/)
+        if (odoMatch) data.mileage = parseInt(odoMatch[1].replace(/,/g, ''))
+      } else if (text.includes('paint color:')) {
+        data.color = text.replace('paint color:', '').trim()
+      } else if (text.includes('title status:')) {
+        data.title_status = text.replace('title status:', '').trim()
+      } else if (text.includes('transmission:')) {
+        data.transmission = text.replace('transmission:', '').trim()
+      } else if (text.includes('type:')) {
+        data.body_style = text.replace('type:', '').trim()
+      }
+    })
+  })
+
+  // Extract description
+  const descElement = doc.querySelector('#postingbody')
+  if (descElement) {
+    data.description = descElement.textContent.trim().substring(0, 5000)
+  }
+
+  // Extract images - Craigslist uses thumbnail links
+  const images: string[] = []
+  
+  // Method 1: Look for thumbnail links
+  const thumbLinks = doc.querySelectorAll('a.thumb')
+  thumbLinks.forEach((link: any) => {
+    const href = link.getAttribute('href')
+    if (href && href.startsWith('http')) {
+      images.push(href)
+    }
+  })
+  
+  // Method 2: Look for image tags in slideshow
+  if (images.length === 0) {
+    const slideshowImgs = doc.querySelectorAll('.slide img, .gallery img, #thumbs img')
+    slideshowImgs.forEach((img: any) => {
+      const src = img.getAttribute('src')
+      if (src) {
+        // Convert thumbnail URLs to full-size
+        const fullSrc = src.replace(/_\d+x\d+[a-z]*\.jpg$/i, '.jpg').replace(/_thumb_/i, '_')
+        if (!images.includes(fullSrc)) {
+          images.push(fullSrc)
+        }
+      }
+    })
+  }
+
+  // Method 3: Parse from data attributes or inline JSON
+  if (images.length === 0) {
+    try {
+      const scriptTags = doc.querySelectorAll('script')
+      for (const script of scriptTags) {
+        const content = script.textContent || ''
+        // Look for image array patterns in JS
+        const imgMatch = content.match(/"images"\s*:\s*\[(.*?)\]/s)
+        if (imgMatch) {
+          const urls = imgMatch[1].match(/https?:\/\/[^"'\s]+/g)
+          if (urls) {
+            images.push(...urls)
+            break
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing scripts for images:', e)
+    }
+  }
+
+  if (images.length > 0) {
+    data.images = Array.from(new Set(images)).slice(0, 50)
+  }
+
+  return data
+}
+
+function scrapeBringATrailer(doc: any, url: string): any {
+  const data: any = {
+    source: 'Bring a Trailer',
+    listing_url: url
+  }
 
     // Extract title
     const titleElement = doc.querySelector('h1')
@@ -189,21 +481,11 @@ serve(async (req) => {
       data.images = Array.from(new Set(normalized)).slice(0, 50)
     }
 
-    // Extract description
-    const descElement = doc.querySelector('.post-content, .listing-description, article')
-    if (descElement) {
-      data.description = descElement.textContent.trim().substring(0, 5000)
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, data }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    )
-
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    )
+  // Extract description
+  const descElement = doc.querySelector('.post-content, .listing-description, article')
+  if (descElement) {
+    data.description = descElement.textContent.trim().substring(0, 5000)
   }
-})
+
+  return data
+}
