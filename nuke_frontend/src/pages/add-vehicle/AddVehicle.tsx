@@ -318,54 +318,63 @@ Redirecting to vehicle profile...`);
         console.log('Updating form with scraped data:', updates);
         updateFormData(updates);
 
-        // Use processed images from edge function (server-side downloaded and analyzed)
-        if (scrapedData.processed_images && Array.isArray(scrapedData.processed_images) && scrapedData.processed_images.length > 0) {
-          console.log(`Found ${scrapedData.processed_images.length} processed images with Rekognition analysis`);
+        // Download images directly from source URLs (no CORS proxy needed for Craigslist)
+        if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0) {
+          console.log(`Found ${scrapedData.images.length} images, downloading directly...`);
           setExtracting(true);
           
           try {
-            // Convert S3 URLs to File objects for upload queue
             const imageFiles: File[] = [];
+            const maxImages = Math.min(scrapedData.images.length, 10);
             
-            for (const processedImg of scrapedData.processed_images) {
+            for (let i = 0; i < maxImages; i++) {
               try {
-                // Fetch from S3
-                const response = await fetch(processedImg.s3_url);
-                if (!response.ok) continue;
+                const imageUrl = scrapedData.images[i];
+                console.log(`Downloading image ${i + 1}/${maxImages}: ${imageUrl}`);
+                
+                // Try direct fetch first (works for most Craigslist images)
+                const response = await fetch(imageUrl, {
+                  mode: 'cors',
+                  signal: AbortSignal.timeout(10000),
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 const blob = await response.blob();
-                const filename = `${scrapedData.source}_${processedImg.index + 1}.jpg`;
+                if (blob.size > 10 * 1024 * 1024) {
+                  console.warn(`Image too large: ${blob.size} bytes`);
+                  continue;
+                }
+                
+                const ext = imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)?.[1] || 'jpg';
+                const filename = `${scrapedData.source?.toLowerCase().replace(/\s+/g, '_')}_${i + 1}.${ext}`;
                 const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
                 
-                // Store Rekognition analysis as metadata (you can save this to database later)
-                (file as any).rekognitionData = processedImg.analysis;
-                
                 imageFiles.push(file);
-                console.log(`Image ${processedImg.index + 1} - Labels:`, processedImg.analysis?.labels?.slice(0, 5).map((l: any) => l.name).join(', '));
-                console.log(`Image ${processedImg.index + 1} - Text detected:`, processedImg.analysis?.text?.map((t: any) => t.text).join(', '));
               } catch (err) {
-                console.error(`Failed to process image ${processedImg.index}:`, err);
+                console.error(`Failed to download image ${i + 1}:`, err);
+                // Continue with next image
               }
             }
             
             if (imageFiles.length > 0) {
-              console.log(`Successfully processed ${imageFiles.length}/${scrapedData.processed_images.length} images with AI analysis`);
+              console.log(`Successfully downloaded ${imageFiles.length}/${maxImages} images`);
               setExtractedImages(prev => [...prev, ...imageFiles]);
               
-              // Show success message with AI analysis info
-              setScrapingError(`✓ Data imported! ${imageFiles.length} images analyzed with AWS Rekognition`);
+              if (imageFiles.length === maxImages) {
+                setScrapingError(null);
+              } else {
+                setScrapingError(`✓ Data imported! Downloaded ${imageFiles.length}/${maxImages} images (some failed)`);
+              }
             } else {
-              setScrapingError(`✓ Data imported, but no images could be processed.`);
+              setScrapingError(`✓ Data imported! ${scrapedData.images.length} image URLs found (download them manually if needed)`);
             }
           } catch (imgError: any) {
-            console.error('Image processing error:', imgError);
-            setScrapingError(`✓ Data imported successfully, but image processing failed: ${imgError.message}`);
+            console.error('Image download error:', imgError);
+            setScrapingError(`✓ Data imported successfully. Images available but download failed: ${imgError.message}`);
           } finally {
             setExtracting(false);
           }
-        } else if (scrapedData.images && scrapedData.images.length > 0) {
-          // Fallback: if processed_images not available, show message
-          setScrapingError(`✓ Data imported! ${scrapedData.images.length} image URLs found (not yet processed)`);
         } else {
           setScrapingError(null);
         }

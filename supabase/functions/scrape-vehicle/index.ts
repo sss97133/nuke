@@ -78,14 +78,10 @@ serve(async (req) => {
       }
     }
 
-    // Download images and analyze with Rekognition
-    if (data.images && data.images.length > 0) {
-      console.log(`Processing ${data.images.length} images...`)
-      const processedImages = await downloadAndAnalyzeImages(data.images, data.source || 'unknown')
-      data.processed_images = processedImages
-      data.image_count = processedImages.length
-    }
-
+    // Return data immediately without image processing to avoid timeouts
+    // Image URLs are returned, frontend can handle downloading
+    console.log(`Found ${data.images?.length || 0} image URLs`)
+    
     return new Response(
       JSON.stringify({ success: true, data }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -102,7 +98,7 @@ serve(async (req) => {
 
 async function downloadAndAnalyzeImages(imageUrls: string[], source: string): Promise<any[]> {
   const results = []
-  const maxImages = 10 // Limit to first 10 images to avoid timeouts
+  const maxImages = 5 // Limit to first 5 images to avoid timeouts
   
   for (let i = 0; i < Math.min(imageUrls.length, maxImages); i++) {
     const imageUrl = imageUrls[i]
