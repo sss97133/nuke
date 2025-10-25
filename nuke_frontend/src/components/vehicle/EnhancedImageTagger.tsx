@@ -142,7 +142,7 @@ export default function EnhancedImageTagger({
         }
       }
 
-      const { data: imageTags, error } = await query.order('created_at', { ascending: true });
+      const { data: imageTags, error } = await query.order('inserted_at', { ascending: true });
 
       if (error) {
         console.error('Error loading tags:', error);

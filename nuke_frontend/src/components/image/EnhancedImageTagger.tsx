@@ -60,7 +60,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
         .select('*')
         .eq('image_url', imageUrl)
         .eq('vehicle_id', vehicleId)
-        .order('created_at', { ascending: false });
+        .order('inserted_at', { ascending: false });
 
       if (error) {
         console.error('Error loading tags:', error);
