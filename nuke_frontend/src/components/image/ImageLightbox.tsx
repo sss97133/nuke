@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useImageTags } from '../../hooks/useImageTags';
 import type { Tag } from '../../services/tagService';
@@ -77,11 +77,12 @@ const ImageLightbox = ({
     verifyTag: verifyTagFn,
     rejectTag: rejectTagFn,
     triggerAIAnalysis: triggerAIAnalysisFn,
+    createTag: createTagFn,
+    loadTags,
     canEdit: userCanEdit
   } = useImageTags(imageId);
 
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [zoom, setZoom] = useState(1);
   const [analyzing, setAnalyzing] = useState(false);
   const [isTagging, setIsTagging] = useState(false);
   const [tagView, setTagView] = useState<'off' | 'ai' | 'manual' | 'all'>('all');
@@ -93,6 +94,7 @@ const ImageLightbox = ({
   const [tagType, setTagType] = useState<'part' | 'tool' | 'brand' | 'process' | 'issue' | 'custom'>('part');
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Get session for manual tagging
   useEffect(() => {
@@ -100,6 +102,57 @@ const ImageLightbox = ({
       setSession(session);
     });
   }, []);
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        // Allow Enter and Escape in inputs
+        if (e.key === 'Enter' || e.key === 'Escape') {
+          return; // Let input handler deal with it
+        }
+        return;
+      }
+
+      switch (e.key) {
+        case 'Escape':
+          e.preventDefault();
+          onClose();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (onPrev) onPrev();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (onNext) onNext();
+          break;
+        case 't':
+        case 'T':
+          e.preventDefault();
+          if (canEdit && session) {
+            setIsTagging(prev => !prev);
+            setShowTagInput(false);
+            setCurrentSelection(null);
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, onPrev, onNext, canEdit, session]);
 
   // Simplified handlers using unified service
   const handleVerifyTag = async (tagId: string) => {
@@ -136,14 +189,16 @@ const ImageLightbox = ({
     return { x, y };
   };
 
-  // Tag filtering: Off / AI (unverified) / Manual (verified) / All
-  const filterTag = (t: ImageTag) => {
-    if (tagView === 'off') return false;
-    if (tagView === 'ai') return t.verified === false;
-    if (tagView === 'manual') return t.verified === true;
-    return true;
-  };
-  const visibleTags = tags.filter(filterTag);
+  // Tag filtering: Off / AI (unverified) / Manual (verified) / All - Memoized for performance
+  const visibleTags = useMemo(() => {
+    const filterTag = (t: ImageTag) => {
+      if (tagView === 'off') return false;
+      if (tagView === 'ai') return t.verified === false;
+      if (tagView === 'manual') return t.verified === true;
+      return true;
+    };
+    return tags.filter(filterTag);
+  }, [tags, tagView]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isTagging || !canEdit) return;
@@ -199,47 +254,35 @@ const ImageLightbox = ({
         height: currentSelection.height
       };
 
-      const { data, error } = await supabase
-        .from('image_tags')
-        .insert([{
-          image_id: imageId,
-          vehicle_id: vehicleId,
-          timeline_event_id: timelineEventId,
-          tag_name: tagData.tag_name,
-          tag_type: tagData.tag_type,
-          x_position: tagData.x_position,
-          y_position: tagData.y_position,
-          width: tagData.width,
-          height: tagData.height,
-          source_type: 'manual',
-          confidence: 100,
-          verified: true,
-          created_by: session.user.id,
-          metadata: {}
-        }])
-        .select()
-        .single();
-
-      if (!error && data) {
-        // Reload tags to show new one
-        const { tags: refreshedTags } = await import('../../hooks/useImageTags');
+      // Use hook's createTag function
+      await createTagFn(vehicleId, tagData);
         
-        // Reset form
-        setTagName('');
-        setShowTagInput(false);
-        setCurrentSelection(null);
-        
-        // Show success feedback
-        if (navigator.vibrate) {
-          navigator.vibrate(20);
-        }
-      } else {
-        console.error('Error creating tag:', error);
-        alert('Failed to create tag. Please try again.');
+      // Reset form
+      setTagName('');
+      setShowTagInput(false);
+      setCurrentSelection(null);
+      
+      // Show success feedback
+      if (navigator.vibrate) {
+        navigator.vibrate(20);
       }
     } catch (error) {
       console.error('Error creating tag:', error);
-      alert('Failed to create tag. Please try again.');
+    }
+  };
+
+  // Handle adding tag from quick input (bottom panel)
+  const handleAddTag = async (tagNameInput: string) => {
+    if (!tagNameInput.trim() || !vehicleId || !imageId) return;
+
+    try {
+      // Create non-spatial tag
+      await createTagFn(vehicleId, {
+        tag_name: tagNameInput.trim(),
+        tag_type: 'custom'
+      });
+    } catch (error) {
+      console.error('Error adding tag:', error);
     }
   };
 
@@ -276,7 +319,8 @@ const ImageLightbox = ({
         .eq('created_by', session.user.id); // Only allow deletion of own tags
 
       if (!error) {
-        setTags(prev => prev.filter(tag => tag.id !== tagId));
+        // Reload tags from hook
+        await loadTags();
 
         if (timelineEventId) {
           await updateTimelineEventTags(timelineEventId);
@@ -314,12 +358,12 @@ const ImageLightbox = ({
 
   const getTagColor = (type: string) => {
     switch (type) {
-      case 'part': return '#3b82f6';
-      case 'tool': return '#f59e0b';
-      case 'brand': return '#10b981';
-      case 'process': return '#8b5cf6';
-      case 'issue': return '#ef4444';
-      default: return '#6b7280';
+      case 'part': return '#2a2a2a';
+      case 'tool': return '#424242';
+      case 'brand': return '#008000'; // Win95 green
+      case 'process': return '#800080'; // Win95 purple
+      case 'issue': return '#ff0000'; // Win95 red
+      default: return '#808080'; // Win95 grey
     }
   };
 
@@ -446,18 +490,18 @@ const ImageLightbox = ({
         </div>
         {/* Set as Primary button */}
         {canEdit && session && vehicleId && imageId && (
-          <button
-            onClick={setAsPrimary}
-            className="button button-secondary"
-            style={{
-              color: 'white',
-              background: 'rgba(34, 197, 94, 0.6)',
-              border: '1px solid rgba(34, 197, 94, 0.8)'
-            }}
-            title="Set as primary image for this vehicle"
-          >
-            ⭐ Set Primary
-          </button>
+            <button
+              onClick={setAsPrimary}
+              className="button button-secondary"
+              style={{
+                color: 'white',
+                background: '#008000',
+                border: '1px solid #008000'
+              }}
+              title="Set as primary image for this vehicle"
+            >
+              ⭐ Set Primary
+            </button>
         )}
 
         {/* Close button */}
@@ -547,26 +591,29 @@ const ImageLightbox = ({
             top: `${currentSelection.y}%`,
             width: `${currentSelection.width}%`,
             height: `${currentSelection.height}%`,
-            border: '2px dashed #3b82f6',
-            background: 'rgba(59, 130, 246, 0.2)',
+            border: '2px dashed #2a2a2a',
+            background: 'rgba(42, 42, 42, 0.2)',
             pointerEvents: 'none'
           }} />
         )}
       </div>
 
-      {/* Tags Sidebar - Windows 95 Style - ALWAYS SHOW */}
+      {/* Tags Sidebar - Windows 95 Style - Responsive */}
       <div style={{
-        position: 'absolute',
-        right: '20px',
-        top: '80px',
-        width: '300px',
+        position: isMobile ? 'fixed' : 'absolute',
+        right: isMobile ? '0' : '20px',
+        top: isMobile ? 'auto' : '80px',
+        bottom: isMobile ? '0' : 'auto',
+        left: isMobile ? '0' : 'auto',
+        width: isMobile ? '100%' : '300px',
+        maxWidth: isMobile ? '100vw' : '300px',
         background: '#c0c0c0',
         border: '2px outset #ffffff',
         borderRight: '2px solid #808080',
         borderBottom: '2px solid #808080',
         padding: '2px',
         zIndex: 10002,
-        maxHeight: 'calc(100vh - 160px)',
+        maxHeight: isMobile ? '40vh' : 'calc(100vh - 160px)',
         fontFamily: '"MS Sans Serif", sans-serif'
       }}>
         {/* Title Bar */}
@@ -862,14 +909,14 @@ const ImageLightbox = ({
       {(title || description) && (
         <div style={{
           position: 'absolute',
-          bottom: '20px',
+          bottom: isMobile ? '42vh' : '20px',
           left: '20px',
-          right: '20px',
+          right: isMobile ? '20px' : (tags.length > 0 ? '340px' : '20px'),
           background: 'rgba(0, 0, 0, 0.7)',
           color: 'white',
           padding: '16px',
-          borderRadius: '8px',
-          maxWidth: '600px',
+          borderRadius: '0px',
+          maxWidth: isMobile ? '100%' : '600px',
           margin: '0 auto'
         }}>
           {title && (
@@ -896,8 +943,8 @@ const ImageLightbox = ({
                       background: getTagColor(tag.tag_type),
                       color: 'white',
                       padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontSize: '11px'
+                      borderRadius: '0px',
+                      fontSize: '9pt'
                     }}
                   >
                     {tag.tag_name}
@@ -917,9 +964,9 @@ const ImageLightbox = ({
                     style={{
                       flex: 1,
                       padding: '4px 6px',
-                      fontSize: '11px',
+                      fontSize: '9pt',
                       border: '1px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '3px',
+                      borderRadius: '0px',
                       background: 'rgba(255, 255, 255, 0.1)',
                       color: 'white'
                     }}
@@ -933,10 +980,10 @@ const ImageLightbox = ({
                   <button
                     style={{
                       padding: '4px 8px',
-                      fontSize: '10px',
-                      background: 'rgba(59, 130, 246, 0.8)',
+                      fontSize: '8pt',
+                      background: 'rgba(42, 42, 42, 0.8)',
                       border: 'none',
-                      borderRadius: '3px',
+                      borderRadius: '0px',
                       color: 'white',
                       cursor: 'pointer'
                     }}
@@ -958,18 +1005,41 @@ const ImageLightbox = ({
       )}
 
       {/* Instructions */}
-      {isTagging && canEdit && (
+      {isTagging && canEdit && !isMobile && (
         <div style={{
           position: 'absolute',
           top: '80px',
           left: '20px',
-          background: 'rgba(59, 130, 246, 0.9)',
+          background: 'rgba(42, 42, 42, 0.9)',
           color: 'white',
           padding: '12px',
-          borderRadius: '8px',
-          fontSize: '14px'
+          borderRadius: '0px',
+          fontSize: '8pt'
         }}>
           📝 Click and drag to select an area to tag
+        </div>
+      )}
+      
+      {/* Loading State */}
+      {!imageLoaded && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center',
+          color: 'white'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid rgba(255, 255, 255, 0.3)',
+            borderTop: '4px solid white',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 12px'
+          }} />
+          <p style={{ fontSize: '8pt', margin: 0 }}>Loading image...</p>
         </div>
       )}
     </div>
