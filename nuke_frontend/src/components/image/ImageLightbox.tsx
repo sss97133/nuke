@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useImageTags } from '../../hooks/useImageTags';
 import type { Tag } from '../../services/tagService';
@@ -378,7 +379,8 @@ const ImageLightbox = ({
 
   if (!isOpen) return null;
 
-  return (
+  // Render lightbox as portal at document root to escape parent div constraints
+  return createPortal(
     <div style={{
       position: 'fixed',
       top: 0,
@@ -782,6 +784,19 @@ const ImageLightbox = ({
           maxHeight: 'calc(100vh - 280px)',
           overflowY: 'auto'
         }}>
+          {!session && tags.length > 0 && (
+            <div style={{
+              background: '#ffffe1',
+              border: '1px solid #000000',
+              padding: '6px',
+              margin: '4px',
+              fontSize: '8pt',
+              fontFamily: '"MS Sans Serif", sans-serif'
+            }}>
+              <strong>Login to add/verify tags</strong>
+            </div>
+          )}
+          
           {tags.length === 0 ? (
             <div style={{
               textAlign: 'center',
@@ -792,6 +807,7 @@ const ImageLightbox = ({
             }}>
               No tags yet.
               {canEdit && session && <><br/>Click ADD to create tags<br/>or AI Analyze to detect parts.</>}
+              {!session && <><br/>Login to create tags</>}
             </div>
           ) : (
             tags.map(tag => (
@@ -866,8 +882,8 @@ const ImageLightbox = ({
                   </div>
                 )}
                 
-                {/* Verify/Reject Buttons - AI tags only */}
-                {!tag.verified && tag.source_type === 'ai' && tag.metadata?.ai_supervised === true && (
+                {/* Verify/Reject Buttons - AI tags only - Only show if logged in */}
+                {!tag.verified && tag.source_type === 'ai' && tag.metadata?.ai_supervised === true && session && (
                   <div style={{ marginTop: '4px', display: 'flex', gap: '2px' }}>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleVerifyTag(tag.id); }}
@@ -897,6 +913,20 @@ const ImageLightbox = ({
                     >
                       Reject
                     </button>
+                  </div>
+                )}
+                
+                {/* Login prompt for AI tags if not logged in */}
+                {!tag.verified && tag.source_type === 'ai' && !session && (
+                  <div style={{
+                    marginTop: '4px',
+                    padding: '3px 4px',
+                    background: '#ffffe1',
+                    border: '1px solid #808080',
+                    fontSize: '8pt',
+                    color: '#000000'
+                  }}>
+                    Login to verify
                   </div>
                 )}
               </div>
@@ -952,53 +982,70 @@ const ImageLightbox = ({
                 ))}
               </div>
 
-              {/* User Input Area for Tag Quality Improvement */}
-              <div style={{ marginTop: '8px' }}>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>
-                  Add or correct tags to improve data quality:
+              {/* User Input Area for Tag Quality Improvement - Only show if logged in */}
+              {session && (
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>
+                    Add or correct tags to improve data quality:
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="Enter tag name..."
+                      style={{
+                        flex: 1,
+                        padding: '4px 6px',
+                        fontSize: '9pt',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        borderRadius: '0px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white'
+                      }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                          handleAddTag(e.currentTarget.value.trim());
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                    />
+                    <button
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '8pt',
+                        background: 'rgba(42, 42, 42, 0.8)',
+                        border: 'none',
+                        borderRadius: '0px',
+                        color: 'white',
+                        cursor: 'pointer'
+                      }}
+                      onClick={(e) => {
+                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                        if (input && input.value.trim()) {
+                          handleAddTag(input.value.trim());
+                          input.value = '';
+                        }
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    placeholder="Enter tag name..."
-                    style={{
-                      flex: 1,
-                      padding: '4px 6px',
-                      fontSize: '9pt',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      borderRadius: '0px',
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      color: 'white'
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                        handleAddTag(e.currentTarget.value.trim());
-                        e.currentTarget.value = '';
-                      }
-                    }}
-                  />
-                  <button
-                    style={{
-                      padding: '4px 8px',
-                      fontSize: '8pt',
-                      background: 'rgba(42, 42, 42, 0.8)',
-                      border: 'none',
-                      borderRadius: '0px',
-                      color: 'white',
-                      cursor: 'pointer'
-                    }}
-                    onClick={(e) => {
-                      const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                      if (input && input.value.trim()) {
-                        handleAddTag(input.value.trim());
-                        input.value = '';
-                      }
-                    }}
-                  >
-                    Add
-                  </button>
+              )}
+              
+              {/* Login prompt if not logged in */}
+              {!session && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '8px',
+                  background: 'rgba(255, 255, 225, 0.2)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  fontSize: '8pt',
+                  color: '#ffffe1',
+                  textAlign: 'center'
+                }}>
+                  Login to add tags
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -1042,7 +1089,8 @@ const ImageLightbox = ({
           <p style={{ fontSize: '8pt', margin: 0 }}>Loading image...</p>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 
