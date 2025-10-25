@@ -587,7 +587,11 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
             type="file"
             multiple
             accept="image/*"
-            onChange={handleFileInputChange}
+            onChange={(e) => {
+              if (e.target.files) {
+                handleFileUpload(e.target.files);
+              }
+            }}
             style={{ display: 'none' }}
             id={`image-upload-${vehicleId}`}
           />
