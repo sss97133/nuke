@@ -255,7 +255,7 @@ const ImageLightbox = ({
 
   // Tag filtering: Off / AI (unverified) / Manual (verified) / All - Memoized for performance
   const visibleTags = useMemo(() => {
-    const filterTag = (t: ImageTag) => {
+    const filterTag = (t: any) => {
       if (tagView === 'off') return false;
       if (tagView === 'ai') return t.verified === false;
       if (tagView === 'manual') return t.verified === true;
