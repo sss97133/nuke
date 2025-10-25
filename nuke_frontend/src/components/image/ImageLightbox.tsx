@@ -227,6 +227,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     setCheckoutModalOpen(true);
   }, [selectedSpatialTag, vehicleId]);
 
+  const handleBuyPart = useCallback((partId: string) => {
+    // Open checkout modal for the selected part
+    setSelectedPart(partId);
+    setCheckoutModalOpen(true);
+  }, []);
+
   const handleEnrichPart = useCallback((tagId: string) => {
     const tag = tags.find(t => t.id === tagId);
     if (tag) {
