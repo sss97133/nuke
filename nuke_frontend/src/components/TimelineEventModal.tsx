@@ -420,13 +420,28 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
             )}
           </div>
 
-          {/* Details Sidebar */}
-          <div className="w-80 border-l overflow-y-auto" style={{ 
-            borderLeft: '1px solid #e0e0e0',
-            backgroundColor: '#f5f5f5',
-            padding: '8px',
+          {/* Details Sidebar - Receipt Style */}
+          <div className="w-96 border-l overflow-y-auto" style={{ 
+            borderLeft: '2px solid #bdbdbd',
+            backgroundColor: '#ffffff',
+            padding: '12px',
             fontSize: '8pt'
           }}>
+            {/* WORK ORDER / RECEIPT HEADER */}
+            <div style={{
+              borderBottom: '2px solid #000',
+              paddingBottom: '8px',
+              marginBottom: '12px'
+            }}>
+              <div style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '2px' }}>
+                WORK ORDER
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                {formatDate(currentEvent.event_date)}
+                {currentEvent.mileage_at_event && ` • ${currentEvent.mileage_at_event.toLocaleString()} mi`}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* Work Session Analysis */}
               {(() => {
