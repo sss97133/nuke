@@ -40,7 +40,7 @@ const CursorHomepage: React.FC = () => {
     try {
       setLoading(true);
       
-      // Load vehicles - only query columns that exist in production schema
+      // Load vehicles with primary images
       const { data: vehicleData, error } = await supabase
         .from('vehicles')
         .select(`
@@ -60,9 +60,25 @@ const CursorHomepage: React.FC = () => {
       if (error) {
         console.error('Error loading vehicles:', error);
       } else if (vehicleData) {
-        // Just use vehicles without images for now - images can be added later
-        setVehicles(vehicleData);
-        setFilteredVehicles(vehicleData);
+        // Load primary images for each vehicle
+        const vehiclesWithImages = await Promise.all(
+          vehicleData.map(async (v) => {
+            const { data: imageData } = await supabase
+              .from('vehicle_images')
+              .select('image_url, variants')
+              .eq('vehicle_id', v.id)
+              .eq('is_primary', true)
+              .single();
+            
+            return {
+              ...v,
+              primary_image_url: imageData?.variants?.thumbnail || imageData?.variants?.medium || imageData?.image_url || null
+            };
+          })
+        );
+        
+        setVehicles(vehiclesWithImages);
+        setFilteredVehicles(vehiclesWithImages);
       }
 
       // Load stats - count only public vehicles
