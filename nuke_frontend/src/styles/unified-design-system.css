@@ -23,17 +23,17 @@
   
   /* Border Colors */
   --border: #bdbdbd;        /* Medium grey */
-  --border-focus: #0066cc;
+  --border-focus: #2a2a2a;  /* Dark grey, not blue */
   
   /* Text Colors - Dark grey, NOT black */
   --text: #2a2a2a;          /* Dark grey, readable */
   --text-secondary: #666666;
   --text-disabled: #999999;
   
-  /* Accent Colors */
-  --accent: #0e75dd;
-  --accent-dim: rgba(14, 117, 221, 0.1);
-  --accent-bright: #1a8cff;
+  /* Accent Colors - No blue, grey only */
+  --accent: #2a2a2a;
+  --accent-dim: rgba(42, 42, 42, 0.08);
+  --accent-bright: #000000;
   
   /* Status Colors */
   --success: #16825d;
@@ -112,15 +112,15 @@ body {
 }
 
 .btn-utility.active {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: var(--accent);
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
 }
 
 .btn-primary {
-  border: 2px solid var(--accent);
-  background: var(--accent-dim);
-  color: var(--accent);
+  border: 2px solid var(--text);
+  background: var(--surface);
+  color: var(--text);
   padding: 8px 16px;
   font-size: 10px;
   font-weight: 600;
@@ -130,8 +130,8 @@ body {
 }
 
 .btn-primary:hover {
-  background: var(--accent);
-  color: white;
+  background: var(--text);
+  color: var(--surface);
 }
 
 /* ================================================
