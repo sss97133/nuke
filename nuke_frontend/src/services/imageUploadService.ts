@@ -262,9 +262,8 @@ export class ImageUploadService {
     }).then(({ data, error }) => {
       if (error) {
         console.warn('Background AI analysis trigger failed:', error);
-      } else {
-        console.log('Background AI analysis triggered successfully for:', imageId);
       }
+      // Removed noisy success log - only log errors
     }).catch(err => {
       console.warn('Background AI analysis request failed:', err);
     });

@@ -286,10 +286,12 @@ const VehicleProfile: React.FC = () => {
     window.addEventListener('vehicle_images_updated', imageHandler);
     window.addEventListener('timeline_updated', timelineHandler);
 
-    // Force timeline refresh every 30 seconds if on page
+    // Refresh timeline periodically (reduced from 30s to 60s to prevent excessive re-renders)
     const intervalId = setInterval(() => {
-      loadTimelineEvents();
-    }, 30000);
+      if (document.visibilityState === 'visible') {
+        loadTimelineEvents();
+      }
+    }, 60000); // 60 seconds, only when page is visible
 
     return () => {
       window.removeEventListener('vehicle_images_updated', imageHandler);
@@ -299,8 +301,9 @@ const VehicleProfile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId]);
 
+  // Use vehicle.id instead of vehicle object to prevent render loops
   useEffect(() => {
-    if (vehicle) {
+    if (vehicle?.id) {
       loadVehicleImages();
       loadViewCount();
       recordView();
@@ -312,7 +315,8 @@ const VehicleProfile: React.FC = () => {
       loadRecentComments();
       checkContributorStatus();
     }
-  }, [vehicle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id]); // Only re-run when vehicle ID changes, not on every vehicle object change
 
   // Refresh hero/gallery when images update elsewhere
   useEffect(() => {
@@ -320,12 +324,14 @@ const VehicleProfile: React.FC = () => {
       if (!vehicle?.id) return;
       if (!e?.detail?.vehicleId || e.detail.vehicleId === vehicle.id) {
         loadVehicleImages();
-        recomputeScoresForVehicle(vehicle.id);
+        // Don't recompute scores on every image update - too expensive and causes loops
+        // recomputeScoresForVehicle(vehicle.id);
       }
     };
     window.addEventListener('vehicle_images_updated', handler);
     return () => window.removeEventListener('vehicle_images_updated', handler);
-  }, [vehicle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id]); // Depend on ID only, not entire vehicle object
 
   // Listen for timeline events created from image uploads to prompt review and refresh timeline
   useEffect(() => {
@@ -339,7 +345,8 @@ const VehicleProfile: React.FC = () => {
     };
     window.addEventListener('timeline_events_created', onEventsCreated as any);
     return () => window.removeEventListener('timeline_events_created', onEventsCreated as any);
-  }, [vehicle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id]); // Depend on ID only
 
   // Recompute and persist scores for key fields
   const recomputeScoresForVehicle = async (vehId: string) => {
@@ -620,9 +627,7 @@ const VehicleProfile: React.FC = () => {
         setContributorRole(data.role);
         setHasContributorAccess(true);
         // Give contributors with certain roles owner-like access
-        if (data.role === 'owner' || data.role === 'restorer' || data.role === 'previous_owner') {
-          console.log('Contributor has elevated access:', data.role);
-        }
+        // Removed console.log to reduce noise
       }
     } catch (error) {
       console.debug('Error checking contributor status:', error);
@@ -1109,7 +1114,7 @@ const VehicleProfile: React.FC = () => {
     );
   }
   
-  console.log('Rendering vehicle profile with vehicle:', vehicle.id);
+  // console.log('Rendering vehicle profile with vehicle:', vehicle.id); // Removed noisy log
 
   // Debug ownership check (only in development)
   if (process.env.NODE_ENV === 'development') {
