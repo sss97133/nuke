@@ -63,6 +63,7 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   const [extractedImages, setExtractedImages] = useState<File[]>([]);
   const [imageMetadata, setImageMetadata] = useState<Map<string, ImageMetadata>>(new Map());
   const [extracting, setExtracting] = useState(false);
+  const [extractProgress, setExtractProgress] = useState<{current: number, total: number} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get current user
@@ -624,14 +625,34 @@ Redirecting to vehicle profile...`);
       setExtractedImages(allImages);
 
       // Extract metadata from images in batches to avoid memory issues
-      const BATCH_SIZE = 10;
+      // Reduced BATCH_SIZE from 10 to 3 to prevent memory issues with large uploads
+      const BATCH_SIZE = 3;
       const metadataResults: ImageMetadata[] = [];
       
+      // Show progress indicator
       for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
         const batch = imageFiles.slice(i, i + BATCH_SIZE);
-        const batchResults = await Promise.all(batch.map(extractImageMetadata));
-        metadataResults.push(...batchResults);
+        const current = Math.min(i + BATCH_SIZE, imageFiles.length);
+        setExtractProgress({ current, total: imageFiles.length });
+        console.log(`Processing EXIF metadata: ${current}/${imageFiles.length} images`);
+        
+        try {
+          // Add timeout to prevent hanging on problematic images
+          const batchResults = await Promise.race([
+            Promise.all(batch.map(extractImageMetadata)),
+            new Promise<ImageMetadata[]>((_, reject) => 
+              setTimeout(() => reject(new Error('EXIF extraction timeout')), 10000)
+            )
+          ]);
+          metadataResults.push(...batchResults);
+        } catch (error) {
+          console.warn(`EXIF extraction failed for batch ${i}-${i + BATCH_SIZE}, continuing with empty metadata:`, error);
+          // Push empty metadata for failed batch
+          metadataResults.push(...batch.map(() => ({ dateTaken: null, location: null } as ImageMetadata)));
+        }
       }
+      
+      setExtractProgress(null); // Clear progress when done
       
       // Store metadata keyed by filename (merge with existing metadata)
       const metadataMap = new Map<string, ImageMetadata>(imageMetadata);
@@ -949,7 +970,11 @@ Redirecting to vehicle profile...`);
                         {extracting ? (
                           <div className="flex flex-col items-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
-                            <p className="text-small font-bold text-primary">Processing...</p>
+                            <p className="text-small font-bold text-primary">
+                              {extractProgress 
+                                ? `Processing ${extractProgress.current}/${extractProgress.total} images...` 
+                                : 'Processing...'}
+                            </p>
                           </div>
                         ) : (
                           <div>

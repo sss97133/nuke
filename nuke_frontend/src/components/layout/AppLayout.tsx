@@ -131,19 +131,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 to="/dashboard" 
                 className={`nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
               >
-                Dashboard
-              </Link>
-              <Link 
-                to="/portfolio" 
-                className={`nav-link ${isActivePage('/portfolio') ? 'active' : ''}`}
-              >
-                💰 Portfolio
-              </Link>
-              <Link 
-                to="/browse-investments" 
-                className={`nav-link ${isActivePage('/browse-investments') ? 'active' : ''}`}
-              >
-                📊 Invest
+                Home
               </Link>
               <Link 
                 to="/vehicles" 
@@ -152,10 +140,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 Vehicles
               </Link>
               <Link 
-                to="/builder" 
-                className={`nav-link ${isActivePage('/builder') ? 'active' : ''}`}
+                to="/market" 
+                className={`nav-link ${isActivePage('/market') || isActivePage('/portfolio') || isActivePage('/browse-investments') || isActivePage('/builder') ? 'active' : ''}`}
               >
-                🔧 Builder
+                Market
               </Link>
               <Link 
                 to={orgNavPath}
@@ -172,7 +160,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               style={{ display: 'none' }}
             >
-              ☺
+              ☰
             </button>
 
             {/* Upload Indicator - Windows 95 style */}
@@ -208,21 +196,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               className={`mobile-nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
               onClick={() => setMobileMenuOpen(false)}
             >
-              Dashboard
-            </Link>
-            <Link 
-              to="/portfolio" 
-              className={`mobile-nav-link ${isActivePage('/portfolio') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              💰 Portfolio
-            </Link>
-            <Link 
-              to="/browse-investments" 
-              className={`mobile-nav-link ${isActivePage('/browse-investments') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              📊 Invest
+              Home
             </Link>
             <Link 
               to="/vehicles" 
@@ -232,11 +206,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               Vehicles
             </Link>
             <Link 
-              to="/builder" 
-              className={`mobile-nav-link ${isActivePage('/builder') ? 'active' : ''}`}
+              to="/market" 
+              className={`mobile-nav-link ${isActivePage('/market') ? 'active' : ''}`}
               onClick={() => setMobileMenuOpen(false)}
             >
-              🔧 Builder
+              Market
             </Link>
             <Link 
               to="/shops" 

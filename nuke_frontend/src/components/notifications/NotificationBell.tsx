@@ -49,7 +49,7 @@ const NotificationBell: React.FC = () => {
 
   return (
     <button className="button button-small" onClick={() => navigate('/notifications')} title="Notifications">
-      🔔
+      Notifications
       {count > 0 && <span className="badge" style={{ marginLeft: 6 }}>{count}</span>}
     </button>
   );
