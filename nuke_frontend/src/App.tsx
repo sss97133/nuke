@@ -67,6 +67,8 @@ import CreditsSuccess from './pages/CreditsSuccess';
 import Portfolio from './pages/Portfolio';
 import BuilderDashboard from './pages/BuilderDashboard';
 import BrowseInvestments from './pages/BrowseInvestments';
+import Market from './pages/Market';
+import Legal from './pages/Legal';
 
 
 // Auth components
@@ -239,17 +241,21 @@ function App() {
             <Route path="/book" element={<BookService />} />
             <Route path="/order-parts" element={<OrderParts />} />
             
-            {/* Portfolio & Trading */}
+            {/* Market - Unified Investment Hub */}
+            <Route path="/market" element={<Market />} />
+            <Route path="/legal" element={<Legal />} />
+            
+            {/* Portfolio & Trading - Legacy routes redirect to Market */}
             <Route path="/portfolio/success" element={<CreditsSuccess />} />
             <Route path="/portfolio" element={<Portfolio />} />
             {/* Legacy redirects */}
             <Route path="/credits/success" element={<CreditsSuccess />} />
             <Route path="/credits" element={<Portfolio />} />
             
-            {/* Builder Dashboard */}
+            {/* Builder Dashboard - Legacy route, use Market instead */}
             <Route path="/builder" element={<BuilderDashboard />} />
             
-            {/* Browse Investments */}
+            {/* Browse Investments - Legacy route, use Market instead */}
             <Route path="/browse-investments" element={<BrowseInvestments />} />
             
             {/* Vehicle Management */}
