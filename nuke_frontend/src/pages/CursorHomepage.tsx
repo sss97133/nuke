@@ -14,6 +14,8 @@ interface Vehicle {
   created_at?: string;
   is_public?: boolean;
   event_count?: number;
+  image_count?: number;
+  primary_image_url?: string;
 }
 
 const CursorHomepage: React.FC = () => {
@@ -287,30 +289,7 @@ const CursorHomepage: React.FC = () => {
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Loading...</div>
         ) : (
           <>
-            {/* List view: Column header */}
-            {viewMode === 'list' && (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '40px 1fr 100px 80px 80px 80px 60px',
-                gap: '12px',
-                padding: '6px 12px',
-                fontSize: '8px',
-                fontWeight: 700,
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                borderBottom: '1px solid var(--border)',
-                marginBottom: '4px',
-                fontFamily: 'var(--font-mono, monospace)',
-              }}>
-                <div></div>
-                <div>Vehicle</div>
-                <div style={{ textAlign: 'right' }}>Value</div>
-                <div style={{ textAlign: 'right' }}>Change</div>
-                <div style={{ textAlign: 'right' }}>Cost</div>
-                <div style={{ textAlign: 'right' }}>Gain/Loss</div>
-                <div style={{ textAlign: 'right' }}>Time</div>
-              </div>
-            )}
+            {/* List view: No header, cleaner */}
             
             <div style={{
               display: viewMode === 'grid' ? 'grid' : 'flex',
