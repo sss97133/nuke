@@ -565,6 +565,50 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
     return <div className="text-center p-8 text-red-500">{error}</div>;
   }
 
+  // If no images but user can upload, show upload UI
+  if (allImages.length === 0 && showUpload) {
+    return (
+      <div style={{ padding: 'var(--space-4)' }}>
+        <div style={{ 
+          textAlign: 'center', 
+          padding: 'var(--space-6)', 
+          border: '2px dashed var(--border)',
+          borderRadius: '0px',
+          marginBottom: 'var(--space-3)'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--space-2)' }}>📷</div>
+          <p className="text" style={{ marginBottom: 'var(--space-2)', fontWeight: 700 }}>
+            No images yet
+          </p>
+          <p className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
+            Upload the first image to get started
+          </p>
+          <input
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={handleFileInputChange}
+            style={{ display: 'none' }}
+            id={`image-upload-${vehicleId}`}
+          />
+          <label
+            htmlFor={`image-upload-${vehicleId}`}
+            className="button button-primary"
+            style={{ 
+              display: 'inline-block',
+              cursor: 'pointer',
+              fontSize: '9pt',
+              padding: '10px 20px'
+            }}
+          >
+            Upload Images
+          </label>
+        </div>
+      </div>
+    );
+  }
+
+  // If no images and can't upload, show empty state
   if (allImages.length === 0) {
     return (
       <div className="text-center p-8">
