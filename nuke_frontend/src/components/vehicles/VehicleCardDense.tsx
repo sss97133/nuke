@@ -15,6 +15,7 @@ interface VehicleCardDenseProps {
     created_at?: string;
     is_for_sale?: boolean;
     event_count?: number;
+    image_count?: number;
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -60,71 +61,89 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const views = showSocial ? Math.floor(Math.random() * 500 + 100) : 0;
   const bids = showSocial ? Math.floor(Math.random() * 15) : 0;
 
-  // LIST VIEW: Spreadsheet/table-like, data-heavy
+  // LIST VIEW: Clean, scannable, proper marketplace
   if (viewMode === 'list') {
     return (
       <Link
         to={`/vehicle/${vehicle.id}`}
         style={{
-          display: 'grid',
-          gridTemplateColumns: '40px 1fr 100px 80px 80px 80px 60px',
-          gap: '12px',
+          display: 'flex',
+          gap: '16px',
           alignItems: 'center',
-          padding: '6px 12px',
+          padding: '12px',
           background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '2px',
+          border: '2px solid var(--border)',
+          borderRadius: '0px',
           textDecoration: 'none',
           color: 'inherit',
           transition: 'all 0.12s ease',
-          fontSize: '10px',
-          fontFamily: 'var(--font-mono, monospace)',
+          marginBottom: '2px',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'var(--accent-dim)';
-          e.currentTarget.style.borderColor = 'var(--accent)';
+          e.currentTarget.style.background = 'var(--grey-50)';
+          e.currentTarget.style.borderColor = 'var(--text)';
+          e.currentTarget.style.transform = 'translateX(4px)';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'var(--surface)';
           e.currentTarget.style.borderColor = 'var(--border)';
+          e.currentTarget.style.transform = 'translateX(0)';
         }}
       >
-        {/* Small thumbnail */}
+        {/* Bigger thumbnail - 120px square */}
         <div style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: '2px',
-          background: vehicle.primary_image_url ? `url(${vehicle.primary_image_url}) center/cover` : 'var(--border)',
-        }} />
-        
-        {/* Vehicle name */}
-        <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {vehicle.year} {vehicle.make} {vehicle.model}
+          width: '120px',
+          height: '120px',
+          flexShrink: 0,
+          borderRadius: '0px',
+          border: '2px solid var(--border)',
+          background: vehicle.primary_image_url ? `url(${vehicle.primary_image_url}) center/cover` : 'var(--grey-200)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '32px',
+        }}>
+          {!vehicle.primary_image_url && '🚗'}
         </div>
         
-        {/* Current value */}
-        <div style={{ textAlign: 'right', fontWeight: 600 }}>
-          {formatPrice(displayPrice)}
-        </div>
-        
-        {/* Price change */}
-        <div style={{ textAlign: 'right', color: priceChangeColor, fontWeight: 600 }}>
-          {priceChange || '—'}
-        </div>
-        
-        {/* Cost basis (fake for now) */}
-        <div style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>
-          {displayPrice ? formatPrice(displayPrice * 0.92) : '—'}
-        </div>
-        
-        {/* Gain/Loss (fake for now) */}
-        <div style={{ textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
-          {displayPrice ? formatPrice(displayPrice * 0.08) : '—'}
-        </div>
-        
-        {/* Time */}
-        <div style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: '8px' }}>
-          {timeAgo}
+        {/* Main content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Vehicle name */}
+          <div style={{ 
+            fontSize: '11pt', 
+            fontWeight: 700, 
+            marginBottom: '4px',
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis', 
+            whiteSpace: 'nowrap' 
+          }}>
+            {vehicle.year} {vehicle.make} {vehicle.model}
+          </div>
+          
+          {/* Value */}
+          {displayPrice && (
+            <div style={{ 
+              fontSize: '9pt', 
+              color: 'var(--text-secondary)',
+              marginBottom: '4px' 
+            }}>
+              {formatPrice(displayPrice)}
+            </div>
+          )}
+          
+          {/* Meta info */}
+          <div style={{ 
+            fontSize: '8pt', 
+            color: 'var(--text-muted)',
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}>
+            {vehicle.event_count && (
+              <span>{vehicle.event_count} events</span>
+            )}
+            {timeAgo && <span>Updated {timeAgo}</span>}
+          </div>
         </div>
       </Link>
     );
