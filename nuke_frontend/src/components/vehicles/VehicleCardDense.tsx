@@ -84,124 +84,90 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const displayPrice = vehicle.sale_price || vehicle.current_value;
   const timeAgo = formatTimeAgo(vehicle.updated_at || vehicle.created_at);
 
-  // LIST VIEW: Clean, scannable, proper marketplace
+  // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
     return (
       <Link
         to={`/vehicle/${vehicle.id}`}
         style={{
-          display: 'flex',
-          gap: '16px',
+          display: 'grid',
+          gridTemplateColumns: '60px 2fr 1fr 1fr 80px 60px',
+          gap: '12px',
           alignItems: 'center',
-          padding: '12px',
+          padding: '6px 8px',
           background: 'var(--surface)',
-          border: '2px solid var(--border)',
+          border: '1px solid var(--border)',
           borderRadius: '0px',
           textDecoration: 'none',
           color: 'inherit',
           transition: 'all 0.12s ease',
-          marginBottom: '2px',
+          marginBottom: '1px',
+          fontSize: '8pt',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = 'var(--grey-50)';
           e.currentTarget.style.borderColor = 'var(--text)';
-          e.currentTarget.style.transform = 'translateX(4px)';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'var(--surface)';
           e.currentTarget.style.borderColor = 'var(--border)';
-          e.currentTarget.style.transform = 'translateX(0)';
         }}
       >
-        {/* Thumbnail - 120px (uses thumbnail variant) */}
+        {/* Compact thumbnail - 60px */}
         <div style={{
-          width: '120px',
-          height: '120px',
+          width: '60px',
+          height: '60px',
           flexShrink: 0,
           borderRadius: '0px',
-          border: '2px solid var(--border)',
+          border: '1px solid var(--border)',
           background: imageUrl ? `url(${imageUrl}) center/cover` : 'var(--grey-200)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '32px',
+          fontSize: '20px',
         }}>
           {!imageUrl && '🚗'}
         </div>
         
-        {/* Main content - Information dense */}
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px' }}>
-          {/* Left: Vehicle facts */}
-          <div>
-            <div style={{ 
-              fontSize: '11pt', 
-              fontWeight: 700, 
-              marginBottom: '2px',
-              overflow: 'hidden', 
-              textOverflow: 'ellipsis', 
-              whiteSpace: 'nowrap' 
-            }}>
-              {vehicle.year} {vehicle.make} {vehicle.model}
-            </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              {vehicle.uploader_name && `by ${vehicle.uploader_name}`}
-              {vehicle.vin && ` • VIN: ${vehicle.vin.slice(-6)}`}
-            </div>
-            <div style={{ 
-              fontSize: '8pt', 
-              color: 'var(--text-secondary)',
-              display: 'flex',
-              gap: '8px',
-            }}>
-              {vehicle.mileage && <span>{vehicle.mileage.toLocaleString()} mi</span>}
-              {vehicle.condition_rating && <span>Cond: {vehicle.condition_rating}/10</span>}
-              {vehicle.image_count ? <span>{vehicle.image_count} images</span> : null}
-              {vehicle.event_count ? <span>{vehicle.event_count} events</span> : null}
-            </div>
-          </div>
-          
-          {/* Center: Finance */}
-          <div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '2px' }}>VALUE</div>
-            <div style={{ fontSize: '10pt', fontWeight: 700 }}>
-              {formatPrice(vehicle.current_value)}
-            </div>
-            {vehicle.purchase_price && (
-              <>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '6px', marginBottom: '2px' }}>PAID</div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-secondary)' }}>
-                  {formatPrice(vehicle.purchase_price)}
-                </div>
-              </>
-            )}
-          </div>
-          
-          {/* Right: Status & Profit */}
-          <div>
-            {vehicle.asking_price && (
-              <>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '2px' }}>ASKING</div>
-                <div style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--accent)' }}>
-                  {formatPrice(vehicle.asking_price)}
-                </div>
-              </>
-            )}
-            {/* Only show profit if it makes sense (not garbage data) */}
-            {vehicle.current_value && vehicle.purchase_price && 
-             vehicle.purchase_price > 0 && 
-             vehicle.purchase_price < vehicle.current_value * 5 && (
-              <>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '6px', marginBottom: '2px' }}>GAIN</div>
-                <div style={{ 
-                  fontSize: '9pt', 
-                  fontWeight: 600,
-                  color: vehicle.current_value > vehicle.purchase_price ? '#10b981' : '#ef4444' 
-                }}>
-                  {formatPrice(vehicle.current_value - vehicle.purchase_price)}
-                </div>
-              </>
-            )}
-          </div>
+        {/* Vehicle - single line */}
+        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontWeight: 700, fontSize: '9pt' }}>
+            {vehicle.year} {vehicle.make} {vehicle.model}
+          </span>
+          <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
+            {vehicle.uploader_name && `by ${vehicle.uploader_name}`}
+          </span>
+        </div>
+        
+        {/* Stats - compact */}
+        <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+          {vehicle.mileage ? `${(vehicle.mileage / 1000).toFixed(0)}k mi` : '—'}
+          {vehicle.condition_rating && ` • C:${vehicle.condition_rating}`}
+          {vehicle.vin && ` • ${vehicle.vin.slice(-4)}`}
+        </div>
+        
+        {/* Counts */}
+        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+          {vehicle.image_count || 0} img • {vehicle.event_count || 0} evt
+        </div>
+        
+        {/* Value */}
+        <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '9pt' }}>
+          {formatPrice(vehicle.current_value)}
+        </div>
+        
+        {/* Profit (if valid) */}
+        <div style={{ textAlign: 'right', fontSize: '8pt', fontWeight: 600 }}>
+          {vehicle.current_value && vehicle.purchase_price && 
+           vehicle.purchase_price > 0 && 
+           vehicle.purchase_price < vehicle.current_value * 5 ? (
+            <span style={{ color: vehicle.current_value > vehicle.purchase_price ? '#10b981' : '#ef4444' }}>
+              {vehicle.current_value > vehicle.purchase_price ? '+' : ''}
+              {formatPrice(vehicle.current_value - vehicle.purchase_price)}
+            </span>
+          ) : (
+            <span style={{ color: 'var(--text-muted)' }}>—</span>
+          )}
         </div>
       </Link>
     );
