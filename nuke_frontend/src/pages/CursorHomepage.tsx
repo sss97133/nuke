@@ -9,10 +9,17 @@ interface Vehicle {
   year?: number;
   make?: string;
   model?: string;
+  vin?: string;
+  mileage?: number;
   current_value?: number;
+  purchase_price?: number;
+  asking_price?: number;
+  condition_rating?: number;
   updated_at?: string;
   created_at?: string;
   is_public?: boolean;
+  uploaded_by?: string;
+  uploader_name?: string;
   event_count?: number;
   image_count?: number;
   primary_image_url?: string;
@@ -42,7 +49,7 @@ const CursorHomepage: React.FC = () => {
     try {
       setLoading(true);
       
-      // Load vehicles with primary images
+      // Load vehicles with all relevant data
       const { data: vehicleData, error } = await supabase
         .from('vehicles')
         .select(`
@@ -50,10 +57,16 @@ const CursorHomepage: React.FC = () => {
           year,
           make,
           model,
+          vin,
+          mileage,
           current_value,
+          purchase_price,
+          asking_price,
           updated_at,
           created_at,
-          is_public
+          is_public,
+          uploaded_by,
+          condition_rating
         `)
         .eq('is_public', true)
         .order('created_at', { ascending: false })
@@ -62,25 +75,47 @@ const CursorHomepage: React.FC = () => {
       if (error) {
         console.error('Error loading vehicles:', error);
       } else if (vehicleData) {
-        // Load primary images for each vehicle
-        const vehiclesWithImages = await Promise.all(
+        // Load enriched data: images, uploader names, counts
+        const vehiclesWithData = await Promise.all(
           vehicleData.map(async (v) => {
-            const { data: imageData } = await supabase
-              .from('vehicle_images')
-              .select('image_url, variants')
-              .eq('vehicle_id', v.id)
-              .eq('is_primary', true)
-              .single();
+            const [imageData, uploaderData, imageCount, eventCount] = await Promise.all([
+              // Primary image
+              supabase
+                .from('vehicle_images')
+                .select('image_url, variants')
+                .eq('vehicle_id', v.id)
+                .eq('is_primary', true)
+                .single(),
+              // Uploader name
+              supabase
+                .from('profiles')
+                .select('full_name, username')
+                .eq('id', v.uploaded_by)
+                .single(),
+              // Image count
+              supabase
+                .from('vehicle_images')
+                .select('id', { count: 'exact', head: true })
+                .eq('vehicle_id', v.id),
+              // Event count
+              supabase
+                .from('timeline_events')
+                .select('id', { count: 'exact', head: true })
+                .eq('vehicle_id', v.id),
+            ]);
             
             return {
               ...v,
-              primary_image_url: imageData?.variants?.thumbnail || imageData?.variants?.medium || imageData?.image_url || null
+              primary_image_url: imageData.data?.variants?.thumbnail || imageData.data?.variants?.medium || imageData.data?.image_url || null,
+              uploader_name: uploaderData.data?.full_name || uploaderData.data?.username || 'Unknown',
+              image_count: imageCount.count || 0,
+              event_count: eventCount.count || 0,
             };
           })
         );
         
-        setVehicles(vehiclesWithImages);
-        setFilteredVehicles(vehiclesWithImages);
+        setVehicles(vehiclesWithData);
+        setFilteredVehicles(vehiclesWithData);
       }
 
       // Load stats - count only public vehicles
