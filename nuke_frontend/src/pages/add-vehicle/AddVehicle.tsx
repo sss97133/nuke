@@ -58,7 +58,6 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   // Image upload state
   const [uploadProgress, setUploadProgress] = useState<ImageUploadProgress>({});
   const [uploadStatus, setUploadStatus] = useState<ImageUploadStatus>({});
-  const [showImageUpload, setShowImageUpload] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [extractedImages, setExtractedImages] = useState<File[]>([]);
   const [imageMetadata, setImageMetadata] = useState<Map<string, ImageMetadata>>(new Map());
@@ -888,17 +887,43 @@ Redirecting to vehicle profile...`);
                   </p>
                 </div>
                 <div className="card-body">
+                  {/* Always show upload button for better UX */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif"
+                    multiple
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+                  
                   {/* Add/Upload Button */}
                   <button
                     type="button"
-                    onClick={() => setShowImageUpload(!showImageUpload)}
+                    onClick={() => fileInputRef.current?.click()}
                     className="button button-primary w-full mb-3"
-                    style={{ fontSize: '9pt' }}
+                    style={{ 
+                      fontSize: '9pt',
+                      minHeight: '44px',
+                      fontWeight: 'bold'
+                    }}
+                    disabled={extracting}
                   >
-                    {extractedImages.length > 0 
+                    {extracting 
+                      ? `Processing ${extractProgress?.current || 0}/${extractProgress?.total || 0}...`
+                      : extractedImages.length > 0 
                       ? `Add More Images (${extractedImages.length}/300)` 
-                      : '📷 Upload Images'}
+                      : 'Click to Upload Images'}
                   </button>
+                  
+                  <div style={{
+                    fontSize: '8pt',
+                    textAlign: 'center',
+                    color: 'var(--text-muted)',
+                    marginBottom: 'var(--space-2)'
+                  }}>
+                    Or drag &amp; drop images below
+                  </div>
 
                   {/* Image thumbnails - smaller size */}
                   {extractedImages.length > 0 && (
@@ -945,50 +970,45 @@ Redirecting to vehicle profile...`);
                     </div>
                   )}
 
-                  {/* Drop Zone */}
-                  {showImageUpload && (
-                    <>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleFileSelect}
-                        style={{ display: 'none' }}
-                      />
-                      <div
-                        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                          extracting ? 'border-primary bg-primary bg-opacity-10' : 'border-grey-300 hover:border-primary hover:bg-grey-50 cursor-pointer'
-                        }`}
-                        onDrop={handleDrop}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDragEnter={(e) => e.preventDefault()}
-                        onDragLeave={(e) => e.preventDefault()}
-                        onClick={() => !extracting && fileInputRef.current?.click()}
-                        style={{ marginTop: 'var(--space-2)' }}
-                      >
-                        {extracting ? (
-                          <div className="flex flex-col items-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
-                            <p className="text-small font-bold text-primary">
-                              {extractProgress 
-                                ? `Processing ${extractProgress.current}/${extractProgress.total} images...` 
-                                : 'Processing...'}
-                            </p>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="text font-medium text-grey-900 mb-1">
-                              Drop or Click
-                            </div>
-                            <p className="text-small text-muted">
-                              Max 300 images total
-                            </p>
-                          </div>
-                        )}
+                  {/* Drop Zone - Always visible */}
+                  <div
+                    className={`border-2 border-dashed p-6 text-center transition-colors ${
+                      extracting ? 'border-primary bg-primary bg-opacity-10' : 'border-grey-300 hover:border-primary hover:bg-grey-50 cursor-pointer'
+                    }`}
+                    onDrop={handleDrop}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDragEnter={(e) => e.preventDefault()}
+                    onDragLeave={(e) => e.preventDefault()}
+                    onClick={() => !extracting && fileInputRef.current?.click()}
+                    style={{ 
+                      marginTop: 'var(--space-2)',
+                      borderRadius: '0px',
+                      minHeight: '120px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {extracting ? (
+                      <div className="flex flex-col items-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                        <p className="text-small font-bold text-primary">
+                          {extractProgress 
+                            ? `Processing ${extractProgress.current}/${extractProgress.total} images...` 
+                            : 'Processing...'}
+                        </p>
                       </div>
-                    </>
-                  )}
+                    ) : (
+                      <div>
+                        <div className="text font-medium text-grey-900 mb-1" style={{ fontSize: '8pt' }}>
+                          Drag &amp; Drop Images Here
+                        </div>
+                        <p className="text-small text-muted" style={{ fontSize: '8pt' }}>
+                          Accepts: JPG, PNG, HEIC, WebP • Max 300 images
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
