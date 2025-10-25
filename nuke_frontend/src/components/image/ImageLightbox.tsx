@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useImageTags } from '../../hooks/useImageTags';
 import type { Tag } from '../../services/tagService';
 import { MobileImageControls, MobileFloatingActions } from './MobileImageControls';
-import ShoppablePartTag from '../parts/ShoppablePartTag';
+import SpatialPartPopup from '../parts/SpatialPartPopup';
 import PartCheckoutModal from '../parts/PartCheckoutModal';
 import PartEnrichmentModal from '../parts/PartEnrichmentModal';
 import '../../design-system.css';
@@ -138,22 +138,30 @@ const ImageLightbox = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Parts marketplace state
+  // Parts marketplace state - SPATIAL POPUP (not sidebar)
+  const [spatialPopupOpen, setSpatialPopupOpen] = useState(false);
+  const [selectedSpatialTag, setSelectedSpatialTag] = useState<any>(null);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [enrichmentModalOpen, setEnrichmentModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<any>(null);
   const [selectedTagForEnrichment, setSelectedTagForEnrichment] = useState<any>(null);
 
-  const handleBuyPart = useCallback((supplier: any, partNumber: string) => {
+  const handleTagClick = useCallback((tag: any) => {
+    setSelectedSpatialTag(tag);
+    setSpatialPopupOpen(true);
+  }, []);
+
+  const handleSpatialOrder = useCallback((supplier: any) => {
     setSelectedPart({
-      name: partNumber,
-      partNumber,
+      name: selectedSpatialTag.tag_name,
+      partNumber: selectedSpatialTag.oem_part_number,
       supplier,
       vehicleId,
-      imageTagId: null
+      imageTagId: selectedSpatialTag.id
     });
+    setSpatialPopupOpen(false);
     setCheckoutModalOpen(true);
-  }, [vehicleId]);
+  }, [selectedSpatialTag, vehicleId]);
 
   const handleEnrichPart = useCallback((tagId: string) => {
     const tag = tags.find(t => t.id === tagId);
