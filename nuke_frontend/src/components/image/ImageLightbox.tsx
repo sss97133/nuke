@@ -4,6 +4,9 @@ import { supabase } from '../../lib/supabase';
 import { useImageTags } from '../../hooks/useImageTags';
 import type { Tag } from '../../services/tagService';
 import { MobileImageControls, MobileFloatingActions } from './MobileImageControls';
+import ShoppablePartTag from '../parts/ShoppablePartTag';
+import PartCheckoutModal from '../parts/PartCheckoutModal';
+import PartEnrichmentModal from '../parts/PartEnrichmentModal';
 import '../../design-system.css';
 
 interface ImageTag {
@@ -42,6 +45,29 @@ interface ImageTag {
   };
   source_type?: 'manual' | 'ai';
   sellable?: boolean;
+  
+  // Parts Marketplace Fields
+  oem_part_number?: string;
+  aftermarket_part_numbers?: string[];
+  part_description?: string;
+  fits_vehicles?: string[];
+  suppliers?: Array<{
+    supplier_id: string;
+    supplier_name: string;
+    price_cents: number;
+    url: string;
+    in_stock: boolean;
+    shipping_days?: number;
+  }>;
+  lowest_price_cents?: number;
+  highest_price_cents?: number;
+  price_last_updated?: string;
+  is_shoppable?: boolean;
+  affiliate_links?: any[];
+  condition?: 'new' | 'used' | 'remanufactured' | 'unknown';
+  warranty_info?: string;
+  install_difficulty?: 'easy' | 'moderate' | 'hard' | 'expert';
+  estimated_install_time_minutes?: number;
 }
 
 interface ImageLightboxProps {
@@ -111,6 +137,43 @@ const ImageLightbox = ({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Parts marketplace state
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [enrichmentModalOpen, setEnrichmentModalOpen] = useState(false);
+  const [selectedPart, setSelectedPart] = useState<any>(null);
+  const [selectedTagForEnrichment, setSelectedTagForEnrichment] = useState<any>(null);
+
+  const handleBuyPart = useCallback((supplier: any, partNumber: string) => {
+    setSelectedPart({
+      name: partNumber,
+      partNumber,
+      supplier,
+      vehicleId,
+      imageTagId: null
+    });
+    setCheckoutModalOpen(true);
+  }, [vehicleId]);
+
+  const handleEnrichPart = useCallback((tagId: string) => {
+    const tag = tags.find(t => t.id === tagId);
+    if (tag) {
+      setSelectedTagForEnrichment({
+        id: tag.id,
+        tag_name: tag.tag_name,
+        vehicle_id: vehicleId
+      });
+      setEnrichmentModalOpen(true);
+    }
+  }, [tags, vehicleId]);
+
+  const handlePurchaseSuccess = useCallback((purchaseId: string) => {
+    console.log('Purchase successful:', purchaseId);
+  }, []);
+
+  const handleEnrichmentSave = useCallback(() => {
+    loadTags();
+  }, [loadTags]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -811,125 +874,12 @@ const ImageLightbox = ({
             </div>
           ) : (
             tags.map(tag => (
-              <div key={tag.id} style={{
-                background: tag.verified ? '#c0c0c0' : '#ffffff',
-                border: '1px solid #808080',
-                padding: '4px',
-                marginBottom: '4px',
-                fontSize: '11px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
-                  <span style={{
-                    display: 'inline-block',
-                    width: '10px',
-                    height: '10px',
-                    background: tag.source_type === 'ai' ? '#000080' : '#008080',
-                    border: '1px solid #000000'
-                  }} />
-                  <span style={{ fontWeight: 'bold', color: '#000000' }}>
-                    {tag.tag_name}
-                  </span>
-                  {tag.verified && (
-                    <span style={{ 
-                      background: '#008000',
-                      color: '#ffffff',
-                      padding: '0 3px',
-                      fontSize: '9px',
-                      fontWeight: 'bold'
-                    }}>OK</span>
-                  )}
-                </div>
-                    
-                {/* Part Details */}
-                {(tag.metadata?.part_number || tag.metadata?.brand) && (
-                  <div style={{ color: '#000000', fontSize: '10px', marginBottom: '2px' }}>
-                    {tag.metadata?.part_number && `Part#: ${tag.metadata.part_number}`}
-                    {tag.metadata?.part_number && tag.metadata?.brand && ' | '}
-                    {tag.metadata?.brand}
-                  </div>
-                )}
-                
-                {/* Cost */}
-                {tag.metadata?.estimated_cost && (
-                  <div style={{ color: '#008000', fontSize: '10px', fontWeight: 'bold' }}>
-                    ${tag.metadata.estimated_cost}
-                  </div>
-                )}
-                
-                {/* Vendor Links */}
-                {tag.metadata?.vendor_links && tag.metadata.vendor_links.length > 0 && (
-                  <div style={{ marginTop: '4px', display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
-                    {tag.metadata.vendor_links.map((link: any, idx: number) => (
-                      <a
-                        key={idx}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          padding: '1px 4px',
-                          background: '#c0c0c0',
-                          color: '#000000',
-                          textDecoration: 'none',
-                          fontSize: '9px',
-                          border: '1px outset #ffffff',
-                          fontFamily: '"MS Sans Serif", sans-serif'
-                        }}
-                      >
-                        {link.vendor}
-                      </a>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Verify/Reject Buttons - AI tags only - Only show if logged in */}
-                {!tag.verified && tag.source_type === 'ai' && tag.metadata?.ai_supervised === true && session && (
-                  <div style={{ marginTop: '4px', display: 'flex', gap: '2px' }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleVerifyTag(tag.id); }}
-                      style={{
-                        padding: '2px 6px',
-                        background: '#c0c0c0',
-                        color: '#000000',
-                        border: '1px outset #ffffff',
-                        fontSize: '10px',
-                        cursor: 'pointer',
-                        fontFamily: '"MS Sans Serif", sans-serif'
-                      }}
-                    >
-                      Verify
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleRejectTag(tag.id); }}
-                      style={{
-                        padding: '2px 6px',
-                        background: '#c0c0c0',
-                        color: '#000000',
-                        border: '1px outset #ffffff',
-                        fontSize: '10px',
-                        cursor: 'pointer',
-                        fontFamily: '"MS Sans Serif", sans-serif'
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                )}
-                
-                {/* Login prompt for AI tags if not logged in */}
-                {!tag.verified && tag.source_type === 'ai' && !session && (
-                  <div style={{
-                    marginTop: '4px',
-                    padding: '3px 4px',
-                    background: '#ffffe1',
-                    border: '1px solid #808080',
-                    fontSize: '8pt',
-                    color: '#000000'
-                  }}>
-                    Login to verify
-                  </div>
-                )}
-              </div>
+              <ShoppablePartTag
+                key={tag.id}
+                tag={tag as any}
+                onBuy={handleBuyPart}
+                onEnrichPart={handleEnrichPart}
+              />
             ))
           )}
         </div>
@@ -1088,6 +1038,26 @@ const ImageLightbox = ({
           }} />
           <p style={{ fontSize: '8pt', margin: 0 }}>Loading image...</p>
         </div>
+      )}
+
+      {/* Part Checkout Modal */}
+      {checkoutModalOpen && selectedPart && (
+        <PartCheckoutModal
+          part={selectedPart}
+          isOpen={checkoutModalOpen}
+          onClose={() => setCheckoutModalOpen(false)}
+          onSuccess={handlePurchaseSuccess}
+        />
+      )}
+
+      {/* Part Enrichment Modal */}
+      {enrichmentModalOpen && selectedTagForEnrichment && (
+        <PartEnrichmentModal
+          tag={selectedTagForEnrichment}
+          isOpen={enrichmentModalOpen}
+          onClose={() => setEnrichmentModalOpen(false)}
+          onSave={handleEnrichmentSave}
+        />
       )}
     </div>,
     document.body
