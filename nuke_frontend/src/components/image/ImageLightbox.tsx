@@ -339,7 +339,24 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       if (tagView === 'manual') return t.verified === true;
       return true;
     };
-    return tags.filter(filterTag);
+    const filtered = tags.filter(filterTag);
+    
+    // DEBUG LOGGING
+    console.log('🔍 TAG DEBUG:', {
+      totalTags: tags.length,
+      tagView: tagView,
+      visibleTags: filtered.length,
+      spatialTags: filtered.filter(t => t.x_position != null).length,
+      sampleTag: tags[0] ? {
+        id: tags[0].id,
+        name: tags[0].tag_name,
+        verified: tags[0].verified,
+        coords: {x: tags[0].x_position, y: tags[0].y_position},
+        isShoppable: tags[0].is_shoppable
+      } : null
+    });
+    
+    return filtered;
   }, [tags, tagView]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
