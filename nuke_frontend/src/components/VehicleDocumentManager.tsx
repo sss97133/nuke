@@ -90,8 +90,8 @@ const VehicleDocumentManager: React.FC<Props> = ({ vehicleId, isOwner, hasContri
     { open: false, doc: null, fieldName: '', fieldValue: '' }
   );
 
-  // Debug access permissions
-  console.log('VehicleDocumentManager access:', { isOwner, hasContributorAccess, canAccess: isOwner || hasContributorAccess });
+  // Debug access permissions (removed noisy log - causes console spam)
+  // console.log('VehicleDocumentManager access:', { isOwner, hasContributorAccess, canAccess: isOwner || hasContributorAccess });
 
   const [form, setForm] = useState({
     privacy_level: 'owner_only' as DocumentPrivacy
