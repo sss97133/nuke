@@ -645,56 +645,9 @@ const ImageLightbox = ({
               tag={tag}
               isShoppable={isShoppable}
               onClick={() => handleTagClick(tag)}
-      style={{
-        position: 'absolute',
-        left: `${tag.x_position}%`,
-        top: `${tag.y_position}%`,
-        transform: 'translate(-50%, -50%)',
-        width: isHovered ? '16px' : '12px',
-        height: isHovered ? '16px' : '12px',
-        background: isShoppable ? '#008000' : '#808080',
-        border: '2px solid #ffffff',
-        borderRadius: '50%',
-        cursor: 'pointer',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
-        transition: 'all 0.12s ease',
-        zIndex: isHovered ? 10001 : 10000,
-        pointerEvents: 'auto'
-      }}
-    >
-      {/* Hover Tooltip */}
-      {isHovered && (
-        <div style={{
-          position: 'absolute',
-          bottom: '100%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          marginBottom: '6px',
-          background: '#ffffe1',
-          color: '#000000',
-          padding: '3px 6px',
-          border: '1px solid #000000',
-          fontSize: '9pt',
-          fontWeight: 'bold',
-          whiteSpace: 'nowrap',
-          fontFamily: '"MS Sans Serif", sans-serif',
-          boxShadow: '2px 2px 0 rgba(0,0,0,0.2)',
-          pointerEvents: 'none'
-        }}>
-          {tag.tag_name}
-          {isShoppable && ' 🛒'}
-          {tag.oem_part_number && (
-            <div style={{ fontSize: '7pt', color: '#424242', fontWeight: 'normal' }}>
-              Part# {tag.oem_part_number}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const ImageLightbox: React.FC<ImageLightboxProps> = ({
+            />
+          );
+        })}
 
         {/* Current Selection */}
         {currentSelection && (
