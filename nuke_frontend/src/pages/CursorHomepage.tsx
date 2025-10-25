@@ -22,6 +22,12 @@ interface Vehicle {
   uploader_name?: string;
   event_count?: number;
   image_count?: number;
+  image_url?: string;
+  image_variants?: {
+    thumbnail?: string;
+    medium?: string;
+    large?: string;
+  };
   primary_image_url?: string;
 }
 
@@ -79,7 +85,7 @@ const CursorHomepage: React.FC = () => {
         const vehiclesWithData = await Promise.all(
           vehicleData.map(async (v) => {
             const [imageData, uploaderData, imageCount, eventCount] = await Promise.all([
-              // Primary image
+              // Primary image with all variants
               supabase
                 .from('vehicle_images')
                 .select('image_url, variants')
@@ -104,9 +110,14 @@ const CursorHomepage: React.FC = () => {
                 .eq('vehicle_id', v.id),
             ]);
             
+            // Store all variants for component to choose optimal size
+            const variants = imageData.data?.variants || {};
+            
             return {
               ...v,
-              primary_image_url: imageData.data?.variants?.thumbnail || imageData.data?.variants?.medium || imageData.data?.image_url || null,
+              image_url: imageData.data?.image_url || null,
+              image_variants: variants,
+              primary_image_url: variants.thumbnail || variants.medium || imageData.data?.image_url || null, // Default to thumbnail
               uploader_name: uploaderData.data?.full_name || uploaderData.data?.username || 'Unknown',
               image_count: imageCount.count || 0,
               event_count: eventCount.count || 0,
