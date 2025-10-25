@@ -7,6 +7,7 @@ import { MobileImageControls, MobileFloatingActions } from './MobileImageControl
 import SpatialPartPopup from '../parts/SpatialPartPopup';
 import PartCheckoutModal from '../parts/PartCheckoutModal';
 import PartEnrichmentModal from '../parts/PartEnrichmentModal';
+import ShoppablePartTag from '../parts/ShoppablePartTag';
 import '../../design-system.css';
 
 interface ImageTag {
