@@ -186,7 +186,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 </div>
               </>
             )}
-            {vehicle.current_value && vehicle.purchase_price && (
+            {/* Only show profit if it makes sense (not garbage data) */}
+            {vehicle.current_value && vehicle.purchase_price && 
+             vehicle.purchase_price > 0 && 
+             vehicle.purchase_price < vehicle.current_value * 5 && (
               <>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '6px', marginBottom: '2px' }}>GAIN</div>
                 <div style={{ 
@@ -206,7 +209,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
   // GALLERY VIEW: Full-width, information-dense overlay
   if (viewMode === 'gallery') {
-    const profit = vehicle.current_value && vehicle.purchase_price 
+    // Only calculate profit if data makes sense
+    const profit = vehicle.current_value && vehicle.purchase_price &&
+                   vehicle.purchase_price > 0 &&
+                   vehicle.purchase_price < vehicle.current_value * 5
       ? vehicle.current_value - vehicle.purchase_price 
       : null;
     
@@ -308,7 +314,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }
 
   // GRID VIEW: Compact but information-dense
-  const profit = vehicle.current_value && vehicle.purchase_price 
+  // Only calculate profit if data makes sense
+  const profit = vehicle.current_value && vehicle.purchase_price &&
+                 vehicle.purchase_price > 0 &&
+                 vehicle.purchase_price < vehicle.current_value * 5
     ? vehicle.current_value - vehicle.purchase_price 
     : null;
   
