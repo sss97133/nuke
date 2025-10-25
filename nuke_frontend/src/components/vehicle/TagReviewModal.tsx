@@ -14,7 +14,7 @@ interface AITag {
   verified: boolean;
   source_type: string;
   image_id?: string;
-  created_at?: string;
+  inserted_at?: string;
 }
 
 const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicleId }) => {
@@ -33,7 +33,7 @@ const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicl
       // Fetch AI-detected tags that need review (unverified AI tags)
       const { data, error } = await supabase
         .from('image_tags')
-        .select('id, tag_name, confidence, verified, source_type, image_id, created_at')
+        .select('id, tag_name, confidence, verified, source_type, image_id, inserted_at')
         .eq('vehicle_id', vehicleId)
         .eq('source_type', 'ai')
         .eq('verified', false)
@@ -45,7 +45,7 @@ const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicl
         // Try to show any AI tags even if verified
         const { data: fallbackData } = await supabase
           .from('image_tags')
-          .select('id, tag_name, confidence, verified, source_type, image_id, created_at')
+          .select('id, tag_name, confidence, verified, source_type, image_id, inserted_at')
           .eq('vehicle_id', vehicleId)
           .eq('source_type', 'ai')
           .order('confidence', { ascending: false })

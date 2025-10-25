@@ -404,7 +404,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
         .from('image_tags')
         .select('*')
         .eq('image_id', imageId)
-        .order('created_at', { ascending: false });
+        .order('inserted_at', { ascending: false });
 
       if (error) {
         console.error('Failed to load image tags from Supabase:', error);
@@ -421,7 +421,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
           type: tag.tag_type || 'general',
           isEditing: false,
           created_by: tag.created_by || 'user',
-          created_at: tag.created_at
+          created_at: tag.inserted_at
         }));
 
         setImageTags(localTags);
