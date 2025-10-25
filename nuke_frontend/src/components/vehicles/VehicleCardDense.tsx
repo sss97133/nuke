@@ -9,6 +9,12 @@ interface VehicleCardDenseProps {
     model?: string;
     vin?: string;
     mileage?: number;
+    image_url?: string;
+    image_variants?: {
+      thumbnail?: string;
+      medium?: string;
+      large?: string;
+    };
     primary_image_url?: string;
     sale_price?: number;
     current_value?: number;
@@ -56,16 +62,27 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return `${Math.floor(diffInHours / 168)}w ago`;
   };
 
+  // Get optimal image for this view mode
+  const getImageUrl = () => {
+    const variants = vehicle.image_variants || {};
+    switch (viewMode) {
+      case 'list':
+        // 120px thumbnail - use smallest
+        return variants.thumbnail || variants.medium || vehicle.image_url || null;
+      case 'grid':
+        // ~200px squares - use medium
+        return variants.medium || variants.thumbnail || vehicle.image_url || null;
+      case 'gallery':
+        // 300px hero - use large
+        return variants.large || variants.medium || vehicle.image_url || null;
+      default:
+        return vehicle.primary_image_url;
+    }
+  };
+
+  const imageUrl = getImageUrl();
   const displayPrice = vehicle.sale_price || vehicle.current_value;
   const timeAgo = formatTimeAgo(vehicle.updated_at || vehicle.created_at);
-
-  // Generate fake price change for demo
-  const priceChange = showPriceChange ? (Math.random() > 0.5 ? '+' : '-') + (Math.random() * 10).toFixed(1) + '%' : null;
-  const priceChangeColor = priceChange?.startsWith('+') ? '#10b981' : '#ef4444';
-
-  // Generate fake social metrics for demo
-  const views = showSocial ? Math.floor(Math.random() * 500 + 100) : 0;
-  const bids = showSocial ? Math.floor(Math.random() * 15) : 0;
 
   // LIST VIEW: Clean, scannable, proper marketplace
   if (viewMode === 'list') {
@@ -96,20 +113,20 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           e.currentTarget.style.transform = 'translateX(0)';
         }}
       >
-        {/* Bigger thumbnail - 120px square */}
+        {/* Thumbnail - 120px (uses thumbnail variant) */}
         <div style={{
           width: '120px',
           height: '120px',
           flexShrink: 0,
           borderRadius: '0px',
           border: '2px solid var(--border)',
-          background: vehicle.primary_image_url ? `url(${vehicle.primary_image_url}) center/cover` : 'var(--grey-200)',
+          background: imageUrl ? `url(${imageUrl}) center/cover` : 'var(--grey-200)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '32px',
         }}>
-          {!vehicle.primary_image_url && '🚗'}
+          {!imageUrl && '🚗'}
         </div>
         
         {/* Main content - Information dense */}
@@ -216,18 +233,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           e.currentTarget.style.transform = 'translateX(0)';
         }}
       >
-        {/* Large hero image with data overlay */}
+        {/* Large hero image (uses large variant) */}
         <div style={{
           width: '100%',
           height: '300px',
-          background: vehicle.primary_image_url ? `url(${vehicle.primary_image_url}) center/cover` : 'var(--grey-200)',
+          background: imageUrl ? `url(${imageUrl}) center/cover` : 'var(--grey-200)',
           position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '48px',
         }}>
-          {!vehicle.primary_image_url && '🚗'}
+          {!imageUrl && '🚗'}
           
           {/* Data overlay - bottom */}
           <div style={{
@@ -318,18 +335,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
-      {/* Square image */}
+      {/* Square image (uses medium variant) */}
       <div style={{
         width: '100%',
         paddingBottom: '100%',
-        background: vehicle.primary_image_url ? `url(${vehicle.primary_image_url}) center/cover` : 'var(--grey-200)',
+        background: imageUrl ? `url(${imageUrl}) center/cover` : 'var(--grey-200)',
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: '32px',
       }}>
-        {!vehicle.primary_image_url && '🚗'}
+        {!imageUrl && '🚗'}
         
         {/* Value tag */}
         {vehicle.current_value && (
