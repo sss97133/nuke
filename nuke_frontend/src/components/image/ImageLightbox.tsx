@@ -619,42 +619,65 @@ const ImageLightbox = ({
           }}
         />
 
-        {/* Tag Overlays on Image - Windows 95 Style */}
-        {imageLoaded && visibleTags.filter(tag => tag.x_position != null && tag.y_position != null).map(tag => (
-          <div
-            key={tag.id}
-            style={{
-              position: 'absolute',
-              left: `${tag.x_position}%`,
-              top: `${tag.y_position}%`,
-              width: `${tag.width || 15}%`,
-              height: `${tag.height || 15}%`,
-              border: tag.verified ? '2px solid #ffff00' : '2px dashed #ff0000',
-              background: tag.verified ? 'rgba(255,255,0,0.1)' : 'rgba(255,0,0,0.1)',
-              pointerEvents: 'auto',
-              cursor: 'pointer'
-            }}
-          >
-            {/* Tag Label - Windows 95 Tooltip Style */}
-            <div style={{
-              position: 'absolute',
-              top: '-22px',
-              left: '0',
-              background: '#ffffe1',
-              color: '#000000',
-              padding: '2px 4px',
-              border: '1px solid #000000',
-              fontSize: '11px',
-              fontWeight: 'normal',
-              whiteSpace: 'nowrap',
-              fontFamily: '"MS Sans Serif", sans-serif',
-              boxShadow: '1px 1px 0 #808080'
-            }}>
-              {tag.tag_name}
-              {tag.metadata?.part_number && ` (${tag.metadata.part_number})`}
+        {/* Spatial Tag Markers - LMC Truck Style Dots */}
+        {imageLoaded && visibleTags.filter(tag => tag.x_position != null && tag.y_position != null).map(tag => {
+          const isShoppable = tag.is_shoppable || (tag.suppliers && tag.suppliers.length > 0);
+          const [isHovered, setIsHovered] = useState(false);
+          
+          return (
+            <div
+              key={tag.id}
+              onClick={() => handleTagClick(tag)}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+              style={{
+                position: 'absolute',
+                left: `${tag.x_position}%`,
+                top: `${tag.y_position}%`,
+                transform: 'translate(-50%, -50%)',
+                width: isHovered ? '16px' : '12px',
+                height: isHovered ? '16px' : '12px',
+                background: isShoppable ? '#008000' : '#808080',
+                border: '2px solid #ffffff',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                transition: 'all 0.12s ease',
+                zIndex: isHovered ? 10001 : 10000,
+                pointerEvents: 'auto'
+              }}
+            >
+              {/* Hover Tooltip */}
+              {isHovered && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  marginBottom: '6px',
+                  background: '#ffffe1',
+                  color: '#000000',
+                  padding: '3px 6px',
+                  border: '1px solid #000000',
+                  fontSize: '9pt',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap',
+                  fontFamily: '"MS Sans Serif", sans-serif',
+                  boxShadow: '2px 2px 0 rgba(0,0,0,0.2)',
+                  pointerEvents: 'none'
+                }}>
+                  {tag.tag_name}
+                  {isShoppable && ' 🛒'}
+                  {tag.oem_part_number && (
+                    <div style={{ fontSize: '7pt', color: '#424242', fontWeight: 'normal' }}>
+                      Part# {tag.oem_part_number}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Current Selection */}
         {currentSelection && (
@@ -1046,6 +1069,21 @@ const ImageLightbox = ({
           }} />
           <p style={{ fontSize: '8pt', margin: 0 }}>Loading image...</p>
         </div>
+      )}
+
+      {/* Spatial Part Popup - LMC Truck Style */}
+      {spatialPopupOpen && selectedSpatialTag && (
+        <SpatialPartPopup
+          part={{
+            name: selectedSpatialTag.tag_name,
+            oem_part_number: selectedSpatialTag.oem_part_number,
+            suppliers: selectedSpatialTag.suppliers || [],
+            x: selectedSpatialTag.x_position || 50,
+            y: selectedSpatialTag.y_position || 50
+          }}
+          onClose={() => setSpatialPopupOpen(false)}
+          onOrder={handleSpatialOrder}
+        />
       )}
 
       {/* Part Checkout Modal */}
