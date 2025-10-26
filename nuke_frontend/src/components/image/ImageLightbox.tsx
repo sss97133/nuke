@@ -847,7 +847,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <span>Tags ({tags.length})</span>
+          <span>Tags ({visibleTags.length})</span>
           <div style={{ display: 'flex', gap: '2px' }}>
             <button
               onClick={() => setSidebarMinimized(true)}
@@ -990,7 +990,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         )}
           
         {/* AI Analyze Button */}
-        {canEdit && session && !tagsLoading && tags.length === 0 && (
+        {canEdit && session && !tagsLoading && visibleTags.length === 0 && (
           <div style={{ padding: '4px', marginBottom: '2px' }}>
             <button
               onClick={handleAIAnalysis}
@@ -1020,7 +1020,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           maxHeight: 'calc(100vh - 280px)',
           overflowY: 'auto'
         }}>
-          {!session && tags.length > 0 && (
+          {!session && visibleTags.length > 0 && (
             <div style={{
               background: '#ffffe1',
               border: '1px solid #000000',
@@ -1033,7 +1033,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             </div>
           )}
           
-          {tags.length === 0 ? (
+          {visibleTags.length === 0 ? (
             <div style={{
               textAlign: 'center',
               color: '#808080',
@@ -1046,7 +1046,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               {!session && <><br/>Login to create tags</>}
             </div>
           ) : (
-            tags.map(tag => (
+            visibleTags.map(tag => (
               <ShoppablePartTag
                 key={tag.id}
                 tag={tag as any}
@@ -1080,7 +1080,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             zIndex: 10002
           }}
         >
-          Tags ({tags.length})
+          Tags ({visibleTags.length})
         </button>
       )}
 
@@ -1090,7 +1090,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           position: 'absolute',
           bottom: isMobile ? '42vh' : '20px',
           left: '20px',
-          right: isMobile ? '20px' : (tags.length > 0 ? '340px' : '20px'),
+          right: isMobile ? '20px' : (visibleTags.length > 0 ? '340px' : '20px'),
           background: 'rgba(0, 0, 0, 0.7)',
           color: 'white',
           padding: '16px',
@@ -1109,13 +1109,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             </p>
           )}
 
-          {tags.length > 0 && (
+          {visibleTags.length > 0 && (
             <div style={{ marginTop: '12px' }}>
               <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '6px' }}>
-                Tags: {tags.length}
+                Tags: {visibleTags.length}
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {tags.map(tag => (
+                {visibleTags.map(tag => (
                   <span
                     key={tag.id}
                     style={{
