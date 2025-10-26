@@ -216,6 +216,11 @@ const VehicleInteractionPanel: React.FC<VehicleInteractionPanelProps> = ({
           <button
             onClick={() => setShowRequestForm(true)}
             className="button button-primary"
+            style={{
+              fontSize: '8pt',
+              fontFamily: '"MS Sans Serif", sans-serif',
+              borderRadius: '0px'
+            }}
           >
             Make Request
           </button>
@@ -229,6 +234,11 @@ const VehicleInteractionPanel: React.FC<VehicleInteractionPanelProps> = ({
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`tab-button ${activeTab === tab ? 'active' : ''}`}
+            style={{
+              fontSize: '8pt',
+              fontFamily: '"MS Sans Serif", sans-serif',
+              borderRadius: '0px'
+            }}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
             {tab === 'requests' && requests.length > 0 && (
@@ -255,6 +265,11 @@ const VehicleInteractionPanel: React.FC<VehicleInteractionPanelProps> = ({
                   }}
                   className="interaction-option"
                   title={interaction.description}
+                  style={{
+                    fontSize: '8pt',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    borderRadius: '0px'
+                  }}
                 >
                   <Icon className="interaction-icon" />
                   <div className="interaction-label">
