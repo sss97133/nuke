@@ -79,15 +79,10 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
     getUser();
   }, []);
 
-  // If mobile, use mobile-optimized version AFTER all hooks are called
-  if (isMobile) {
-    return (
-      <MobileAddVehicle 
-        onClose={onClose}
-        onSuccess={onSuccess}
-      />
-    );
-  }
+  // Note: Do NOT return early here based on isMobile.
+  // We must call all hooks in this component before any conditional return
+  // to keep hook order consistent across renders. The mobile return is placed
+  // later (just before the auth gate) after all hooks are declared.
 
   // Helper function to download images from URLs and convert to File objects
   const downloadImagesAsFiles = async (imageUrls: string[], source: string = 'external'): Promise<File[]> => {
@@ -407,6 +402,8 @@ Redirecting to vehicle profile...`);
     }
   }, [formData.import_url, handleUrlScraping]);
 
+  // (mobile rendering is handled near the bottom, after all hooks)
+
   // Handle submission - no validation, accept anything
   const handleShowPreview = (e: React.FormEvent) => {
     e.preventDefault();
@@ -702,7 +699,17 @@ Redirecting to vehicle profile...`);
     }
   }, [processImages]);
 
-  // Early return if not authenticated
+  // If mobile, render mobile-optimized flow regardless of auth (it handles auth messaging)
+  if (isMobile) {
+    return (
+      <MobileAddVehicle
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />
+    );
+  }
+
+  // Early return if not authenticated (desktop flow only)
   if (!user) {
     const authContent = (
       <div className="container">
