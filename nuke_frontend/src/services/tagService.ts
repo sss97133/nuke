@@ -26,6 +26,29 @@ export interface Tag {
   confidence: number;  // 0-100 for display
   verified: boolean;
   
+  // Parts Marketplace fields
+  is_shoppable?: boolean;
+  oem_part_number?: string;
+  aftermarket_part_numbers?: string[];
+  part_description?: string;
+  fits_vehicles?: string;
+  suppliers?: Array<{
+    supplier_id: string;
+    supplier_name: string;
+    url: string;
+    price_cents: number;
+    in_stock: boolean;
+    shipping_days?: number;
+  }>;
+  lowest_price_cents?: number;
+  highest_price_cents?: number;
+  price_last_updated?: string;
+  affiliate_links?: any;
+  condition?: string;
+  warranty_info?: string;
+  install_difficulty?: string;
+  estimated_install_time_minutes?: number;
+  
   // Metadata (all the good stuff)
   metadata: {
     ai_supervised?: boolean;
@@ -195,6 +218,22 @@ export class TagService {
       source_type: dbTag.source_type || 'manual',
       confidence: typeof dbTag.confidence === 'number' ? dbTag.confidence : 100,
       verified: dbTag.verified || false,
+      // Parts marketplace fields
+      is_shoppable: dbTag.is_shoppable,
+      oem_part_number: dbTag.oem_part_number,
+      aftermarket_part_numbers: dbTag.aftermarket_part_numbers,
+      part_description: dbTag.part_description,
+      fits_vehicles: dbTag.fits_vehicles,
+      suppliers: dbTag.suppliers,
+      lowest_price_cents: dbTag.lowest_price_cents,
+      highest_price_cents: dbTag.highest_price_cents,
+      price_last_updated: dbTag.price_last_updated,
+      affiliate_links: dbTag.affiliate_links,
+      condition: dbTag.condition,
+      warranty_info: dbTag.warranty_info,
+      install_difficulty: dbTag.install_difficulty,
+      estimated_install_time_minutes: dbTag.estimated_install_time_minutes,
+      // Metadata and audit
       metadata: dbTag.metadata || {},
       created_by: dbTag.created_by,
       inserted_at: dbTag.inserted_at,
