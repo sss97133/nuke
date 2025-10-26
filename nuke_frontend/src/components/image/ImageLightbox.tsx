@@ -617,8 +617,16 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           {onPrev && (
             <button
               onClick={onPrev}
-              className="button button-secondary"
-              style={{ color: 'white', background: 'rgba(255, 255, 255, 0.2)' }}
+              className="button"
+              style={{
+                fontSize: '8pt',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                color: '#fff',
+                background: 'rgba(192, 192, 192, 0.2)',
+                border: '1px solid rgba(192, 192, 192, 0.5)',
+                borderRadius: '0px',
+                padding: '3px 6px'
+              }}
             >
               ← Previous
             </button>
@@ -626,8 +634,16 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           {onNext && (
             <button
               onClick={onNext}
-              className="button button-secondary"
-              style={{ color: 'white', background: 'rgba(255, 255, 255, 0.2)' }}
+              className="button"
+              style={{
+                fontSize: '8pt',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                color: '#fff',
+                background: 'rgba(192, 192, 192, 0.2)',
+                border: '1px solid rgba(192, 192, 192, 0.5)',
+                borderRadius: '0px',
+                padding: '3px 6px'
+              }}
             >
               Next →
             </button>

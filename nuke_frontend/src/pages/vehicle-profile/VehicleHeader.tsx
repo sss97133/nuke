@@ -386,14 +386,24 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         <button
           className="button button-small"
           onClick={() => setHistoryOpen(true)}
-          style={{ cursor: 'pointer' }}
+          style={{
+            cursor: 'pointer',
+            fontSize: '8pt',
+            fontFamily: '"MS Sans Serif", sans-serif',
+            borderRadius: '0px'
+          }}
         >
           History
         </button>
         <button
           className="button button-small"
           onClick={() => setAnalysisOpen(true)}
-          style={{ cursor: 'pointer' }}
+          style={{
+            cursor: 'pointer',
+            fontSize: '8pt',
+            fontFamily: '"MS Sans Serif", sans-serif',
+            borderRadius: '0px'
+          }}
         >
           Analysis
         </button>
@@ -401,7 +411,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           className="button button-small button-primary"
           onClick={() => setTagReviewOpen(true)}
           title="Review AI-detected tags"
-          style={{ cursor: 'pointer' }}
+          style={{
+            cursor: 'pointer',
+            fontSize: '8pt',
+            fontFamily: '"MS Sans Serif", sans-serif',
+            borderRadius: '0px'
+          }}
         >
           Review Tags
         </button>
