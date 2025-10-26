@@ -373,42 +373,46 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       return;
     }
 
-    // ON-DEMAND PART IDENTIFICATION
-    // User clicks anywhere on image → identify part → show shopping
-    const coords = getImageCoordinates(e.clientX, e.clientY);
-    if (!coords || !vehicleId || !imageId) return;
-
-    try {
-      // Call AI to identify what part is at these coordinates
-      const { data: identifiedPart, error } = await supabase.functions.invoke('identify-part-at-click', {
-        body: {
-          vehicle_id: vehicleId,
-          image_id: imageId,
-          image_url: imageUrl,
-          x_position: coords.x,
-          y_position: coords.y
-        }
-      });
-
-      if (error) throw error;
-
-      if (identifiedPart && identifiedPart.part_name) {
-        // Part identified! Show spatial popup
-        setSelectedSpatialTag({
-          tag_name: identifiedPart.part_name,
-          oem_part_number: identifiedPart.oem_part_number,
-          suppliers: identifiedPart.suppliers || [],
-          x_position: coords.x,
-          y_position: coords.y,
-          lowest_price_cents: identifiedPart.lowest_price_cents,
-          highest_price_cents: identifiedPart.highest_price_cents
-        });
-        setSpatialPopupOpen(true);
-      }
-    } catch (err) {
-      console.log('Part identification unavailable:', err);
-      // Silently fail - user can still use manual tagging
-    }
+    // DISABLED: On-demand part ID creates too many fake tags
+    // Only use existing tagged dots - user can press T to manually tag
+    // TODO: Re-enable when catalog is populated with real parts
+    
+    // // ON-DEMAND PART IDENTIFICATION
+    // // User clicks anywhere on image → identify part → show shopping
+    // const coords = getImageCoordinates(e.clientX, e.clientY);
+    // if (!coords || !vehicleId || !imageId) return;
+    //
+    // try {
+    //   // Call AI to identify what part is at these coordinates
+    //   const { data: identifiedPart, error } = await supabase.functions.invoke('identify-part-at-click', {
+    //     body: {
+    //       vehicle_id: vehicleId,
+    //       image_id: imageId,
+    //       image_url: imageUrl,
+    //       x_position: coords.x,
+    //       y_position: coords.y
+    //     }
+    //   });
+    //
+    //   if (error) throw error;
+    //
+    //   if (identifiedPart && identifiedPart.part_name) {
+    //     // Part identified! Show spatial popup
+    //     setSelectedSpatialTag({
+    //       tag_name: identifiedPart.part_name,
+    //       oem_part_number: identifiedPart.oem_part_number,
+    //       suppliers: identifiedPart.suppliers || [],
+    //       x_position: coords.x,
+    //       y_position: coords.y,
+    //       lowest_price_cents: identifiedPart.lowest_price_cents,
+    //       highest_price_cents: identifiedPart.highest_price_cents
+    //     });
+    //     setSpatialPopupOpen(true);
+    //   }
+    // } catch (err) {
+    //   console.log('Part identification unavailable:', err);
+    //   // Silently fail - user can still use manual tagging
+    // }
   }, [isTagging, vehicleId, imageId, imageUrl, getImageCoordinates]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
