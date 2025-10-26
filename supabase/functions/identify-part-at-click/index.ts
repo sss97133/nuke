@@ -9,6 +9,12 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getCatalogPartsForSystem } from './catalog-helpers.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -18,6 +24,11 @@ const supabase = createClient(
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
     const { vehicle_id, image_id, image_url, x_position, y_position } = await req.json();
 
@@ -37,12 +48,12 @@ serve(async (req) => {
         method: 'dimensional_match',
         confidence: 95
       }), {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     // STEP 2: Use AI vision to identify part (slower but works for any part)
-    const aiIdentification = await identifyPartWithAI(image_url, x_position, y_position);
+    const aiIdentification = await identifyPartWithAI(image_url, x_position, y_position, vehicle_id);
     
     if (aiIdentification) {
       const catalogData = await lookupInCatalog(aiIdentification.part_name, vehicle_id);
@@ -56,7 +67,7 @@ serve(async (req) => {
         method: 'ai_vision',
         confidence: aiIdentification.confidence
       }), {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -65,14 +76,14 @@ serve(async (req) => {
       error: 'No part identified at these coordinates'
     }), {
       status: 404,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('Part identification error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
@@ -127,59 +138,162 @@ function determineViewAngle(imageUrl: string): string {
 // AI VISION IDENTIFICATION (Slower - works for any part)
 // ============================================================================
 
-async function identifyPartWithAI(imageUrl: string, x: number, y: number): Promise<any> {
-  if (!OPENAI_API_KEY) {
-    console.warn('OpenAI API key not configured');
+async function identifyPartWithAI(imageUrl: string, x: number, y: number, vehicleId: string): Promise<any> {
+  const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+  
+  if (!ANTHROPIC_API_KEY) {
+    console.warn('Anthropic API key not configured');
     return null;
   }
 
-  const prompt = `You are an expert automotive parts identifier. A user clicked at position ${x}%, ${y}% on this vehicle image. 
+  // Get vehicle context for better identification
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select('year, make, model')
+    .eq('id', vehicleId)
+    .single();
 
-Identify what automotive part is at that location. Be specific.
+  const vehicleContext = vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : 'GM Truck';
+
+  // STEP 1: Identify general area/system
+  const contextPrompt = `You are analyzing a ${vehicleContext}. The user clicked at position ${x}%, ${y}% on this image.
+
+First, determine:
+1. What VIEW is this? (engine bay, exterior front, interior dash, undercarriage, side, rear)
+2. What SYSTEM is visible at ${x}%, ${y}%? (brake system, cooling, electrical, fuel, exhaust, suspension, body panels)
+3. What general COMPONENT TYPE? (cylinder, hose, bracket, panel, light assembly, etc.)
 
 Respond ONLY with JSON:
 {
-  "part_name": "Master Cylinder",
-  "part_category": "brake_system",
-  "oem_typical_format": "GM-MC-XXXX or similar",
-  "confidence": 85
+  "view_angle": "engine_bay",
+  "system": "brake_system", 
+  "component_type": "cylinder",
+  "confidence": 90
 }`;
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Stage 1: Context identification with Claude
+    const contextResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'gpt-4-vision-preview',
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 400,
         messages: [
           {
             role: 'user',
             content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: imageUrl } }
+              {
+                type: 'image',
+                source: {
+                  type: 'url',
+                  url: imageUrl
+                }
+              },
+              {
+                type: 'text',
+                text: contextPrompt
+              }
             ]
           }
-        ],
-        max_tokens: 300
+        ]
       })
     });
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    const contextData = await contextResponse.json();
+    const contextText = contextData.content?.[0]?.text;
     
-    if (content) {
-      const parsed = JSON.parse(content);
-      return parsed;
+    if (!contextText) {
+      console.error('No context from Claude:', contextData);
+      return null;
     }
+
+    // Parse context
+    const context = JSON.parse(contextText.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    
+    // STEP 2: Get catalog parts for this system
+    const catalogParts = await getCatalogPartsForSystem(vehicleContext, context.system, context.component_type);
+
+    // STEP 3: Precise identification with catalog reference
+    const identificationPrompt = `You identified this as a ${context.component_type} in the ${context.system} at ${x}%, ${y}%.
+
+Here are the common ${vehicleContext} ${context.system} parts from the catalog:
+${catalogParts.map(p => `- ${p.part_name} (${p.oem_part_number}): ${p.part_description || ''}`).join('\n')}
+
+Now, based on the EXACT visual appearance, location, size, and mounting at ${x}%, ${y}%, which specific part is this?
+
+Consider:
+- Color (black, chrome, painted, rusty?)
+- Size relative to other components
+- Mounting location and brackets
+- Connected hoses/wires
+- Any visible labels or markings
+
+Respond ONLY with JSON:
+{
+  "part_name": "Master Cylinder",
+  "matched_catalog_part": "GM-MC-15643918",
+  "visual_confidence": 92,
+  "reasoning": "Black cylindrical unit, brake fluid reservoir on top, mounted on firewall driver side, brake lines connected"
+}`;
+
+    const identifyResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 500,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'url',
+                  url: imageUrl
+                }
+              },
+              {
+                type: 'text',
+                text: identificationPrompt
+              }
+            ]
+          }
+        ]
+      })
+    });
+
+    const identifyData = await identifyResponse.json();
+    const identifyText = identifyData.content?.[0]?.text;
+    
+    if (!identifyText) {
+      console.error('No identification from Claude:', identifyData);
+      return null;
+    }
+
+    const identification = JSON.parse(identifyText.match(/\{[\s\S]*\}/)?.[0] || '{}');
+    
+    return {
+      part_name: identification.part_name,
+      part_category: context.system,
+      oem_typical_format: identification.matched_catalog_part,
+      confidence: identification.visual_confidence,
+      reasoning: identification.reasoning
+    };
 
   } catch (err) {
     console.error('AI vision error:', err);
+    return null;
   }
-
-  return null;
 }
 
 // ============================================================================
