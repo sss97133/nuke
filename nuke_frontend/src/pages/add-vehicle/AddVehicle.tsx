@@ -1010,49 +1010,82 @@ Redirecting to vehicle profile...`);
                     Or drag &amp; drop images below
                   </div>
 
-                  {/* Image thumbnails - smaller size */}
+                  {/* Image thumbnails - show only first 20 for performance */}
                   {extractedImages.length > 0 && (
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
-                      gap: 'var(--space-1)',
-                      marginBottom: 'var(--space-2)',
-                      maxHeight: '60vh',
-                      overflowY: 'auto'
-                    }}>
-                      {extractedImages.map((file, index) => (
-                        <div key={index} style={{
-                          border: '1px solid var(--border-medium)',
-                          padding: '2px',
-                          backgroundColor: 'var(--grey-100)'
-                        }}>
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={file.name}
-                            style={{
-                              width: '100%',
-                              height: '60px',
-                              objectFit: 'cover',
-                              border: '1px solid var(--border-dark)'
-                            }}
-                          />
-                          <div style={{ fontSize: '7pt', textAlign: 'center', marginTop: '2px' }}>
-                            {(() => {
-                              const metadata = imageMetadata.get(file.name);
-                              const dateTaken = metadata?.dateTaken;
-                              return dateTaken ? (
-                                <div className="text-muted">
+                    <>
+                      <div style={{
+                        fontSize: '8pt',
+                        textAlign: 'center',
+                        color: 'var(--text-success)',
+                        marginBottom: 'var(--space-2)',
+                        padding: 'var(--space-2)',
+                        backgroundColor: 'var(--success-bg)',
+                        border: '1px solid var(--border-success)',
+                        borderRadius: 'var(--radius)'
+                      }}>
+                        ✓ {extractedImages.length} image{extractedImages.length !== 1 ? 's' : ''} ready to upload
+                        {extractedImages.length > 20 && ' (showing first 20)'}
+                      </div>
+                      
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+                        gap: 'var(--space-1)',
+                        marginBottom: 'var(--space-2)',
+                        maxHeight: '40vh',
+                        overflowY: 'auto'
+                      }}>
+                        {extractedImages.slice(0, 20).map((file, index) => {
+                          const metadata = imageMetadata.get(file.name);
+                          const dateTaken = metadata?.dateTaken;
+                          
+                          return (
+                            <div key={index} style={{
+                              border: '1px solid var(--border-medium)',
+                              padding: '2px',
+                              backgroundColor: 'var(--grey-100)',
+                              position: 'relative'
+                            }}>
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={file.name}
+                                style={{
+                                  width: '100%',
+                                  height: '60px',
+                                  objectFit: 'cover',
+                                  border: '1px solid var(--border-dark)'
+                                }}
+                                loading="lazy"
+                              />
+                              {dateTaken && (
+                                <div style={{ 
+                                  fontSize: '7pt', 
+                                  textAlign: 'center', 
+                                  marginTop: '2px',
+                                  color: 'var(--text-muted)'
+                                }}>
                                   {dateTaken.toLocaleDateString('en-US', { 
                                     month: 'short', 
                                     day: 'numeric'
                                   })}
                                 </div>
-                              ) : null;
-                            })()}
-                          </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {extractedImages.length > 20 && (
+                        <div style={{
+                          fontSize: '8pt',
+                          textAlign: 'center',
+                          color: 'var(--text-muted)',
+                          fontStyle: 'italic'
+                        }}>
+                          + {extractedImages.length - 20} more image{extractedImages.length - 20 !== 1 ? 's' : ''} (not shown for performance)
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
 
                   {/* Drop Zone - Always visible */}
@@ -1179,14 +1212,17 @@ Redirecting to vehicle profile...`);
                     <div className="text-small text-muted font-bold">Vehicle Images ({extractedImages.length})</div>
                     <div className="text-small text-muted" style={{ fontSize: '8pt', marginTop: 'var(--space-1)' }}>
                       Images will upload in the background after vehicle creation. You can navigate the site while uploads continue.
+                      {extractedImages.length > 12 && ' (Showing first 12 preview thumbnails)'}
                     </div>
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
                       gap: 'var(--space-2)',
-                      marginTop: 'var(--space-2)'
+                      marginTop: 'var(--space-2)',
+                      maxHeight: '300px',
+                      overflowY: 'auto'
                     }}>
-                      {extractedImages.map((file, index) => {
+                      {extractedImages.slice(0, 12).map((file, index) => {
                         const metadata = imageMetadata.get(file.name);
                         const dateTaken = metadata?.dateTaken;
                         return (
@@ -1205,6 +1241,7 @@ Redirecting to vehicle profile...`);
                                 border: '1px solid var(--border-dark)',
                                 marginBottom: 'var(--space-1)'
                               }}
+                              loading="lazy"
                             />
                             {dateTaken && (
                               <div className="text-muted" style={{ fontSize: '7pt', textAlign: 'center' }}>
@@ -1215,6 +1252,17 @@ Redirecting to vehicle profile...`);
                         );
                       })}
                     </div>
+                    {extractedImages.length > 12 && (
+                      <div style={{
+                        fontSize: '8pt',
+                        textAlign: 'center',
+                        color: 'var(--text-muted)',
+                        marginTop: 'var(--space-2)',
+                        fontStyle: 'italic'
+                      }}>
+                        + {extractedImages.length - 12} more image{extractedImages.length - 12 !== 1 ? 's' : ''} ready to upload
+                      </div>
+                    )}
                   </div>
                 )}
 
