@@ -186,6 +186,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
   // Get session for manual tagging
   useEffect(() => {
@@ -645,15 +646,15 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               className="button"
               style={{
                 fontSize: '8pt',
-                fontFamily: 'Arial, sans-serif',
-                background: isTagging ? '#424242' : 'rgba(255, 255, 255, 0.2)',
-                color: isTagging ? 'white' : 'white',
-                border: '1px solid rgba(255, 255, 255, 0.5)',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                background: isTagging ? '#c0c0c0' : 'rgba(192, 192, 192, 0.3)',
+                color: isTagging ? '#000' : '#fff',
+                border: isTagging ? '2px inset #808080' : '1px solid rgba(192, 192, 192, 0.5)',
                 borderRadius: '0px',
-                padding: '4px 8px'
+                padding: '3px 6px'
               }}
             >
-              {isTagging ? '✓ Manual' : '🏷️ Tag'}
+              {isTagging ? 'TAGGING' : 'TAG'}
             </button>
 
               <button
@@ -662,30 +663,32 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               className="button"
               style={{
                 fontSize: '8pt',
-                fontFamily: 'Arial, sans-serif',
-                background: analyzing ? '#666' : 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.5)',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                background: analyzing ? '#808080' : 'rgba(192, 192, 192, 0.3)',
+                color: analyzing ? '#c0c0c0' : '#fff',
+                border: analyzing ? '1px inset #808080' : '1px solid rgba(192, 192, 192, 0.5)',
                 borderRadius: '0px',
-                padding: '4px 8px'
+                padding: '3px 6px',
+                cursor: analyzing ? 'not-allowed' : 'pointer'
               }}
             >
-              {analyzing ? '🔄 AI...' : '🤖 AI Tag'}
+              {analyzing ? 'AI...' : 'AI'}
             </button>
           </>
         )}
 
         {/* Tag layer control */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ color: 'white', fontSize: '10px' }}>Tags:</span>
+          <span style={{ color: '#c0c0c0', fontSize: '8pt', fontFamily: '"MS Sans Serif", sans-serif' }}>Tags:</span>
           <select
             value={tagView}
             onChange={(e) => setTagView(e.target.value as any)}
             style={{
-              fontSize: '10px',
-              background: 'rgba(255,255,255,0.2)',
+              fontSize: '8pt',
+              fontFamily: '"MS Sans Serif", sans-serif',
+              background: 'rgba(192,192,192,0.2)',
               color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
+              border: '1px solid rgba(192,192,192,0.3)',
               borderRadius: 0,
               padding: '2px 4px'
             }}
@@ -701,26 +704,38 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         {canEdit && session && vehicleId && imageId && (
             <button
               onClick={setAsPrimary}
-              className="button button-secondary"
+              className="button"
               style={{
-                color: 'white',
-                background: '#008000',
-                border: '1px solid #008000'
+                fontSize: '8pt',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                color: '#000',
+                background: '#c0c0c0',
+                border: '1px outset #ffffff',
+                borderRadius: '0px',
+                padding: '3px 6px'
               }}
               title="Set as primary image for this vehicle"
             >
-              ⭐ Set Primary
+              PRIMARY
             </button>
         )}
 
         {/* Close button */}
         <button
           onClick={onClose}
-          className="button button-secondary"
-          style={{ color: 'white', background: 'rgba(255, 255, 255, 0.1)' }}
+          className="button"
+          style={{
+            fontSize: '8pt',
+            fontFamily: '"MS Sans Serif", sans-serif',
+            color: '#fff',
+            background: 'rgba(192, 192, 192, 0.2)',
+            border: '1px solid rgba(192, 192, 192, 0.5)',
+            borderRadius: '0px',
+            padding: '3px 6px'
+          }}
           title="Close"
         >
-          ✕ Close
+          ✕
         </button>
         </div>
       </div>
@@ -786,6 +801,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       </div>
 
       {/* Tags Sidebar - Windows 95 Style - Responsive */}
+      {!sidebarMinimized && (
       <div style={{
         position: isMobile ? 'fixed' : 'absolute',
         right: isMobile ? '0' : '20px',
@@ -808,7 +824,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           background: '#000080',
           color: '#ffffff',
           padding: '2px 4px',
-          fontSize: '11px',
+          fontSize: '8pt',
           fontWeight: 'bold',
           marginBottom: '2px',
           display: 'flex',
@@ -816,22 +832,40 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           alignItems: 'center'
         }}>
           <span>Tags ({tags.length})</span>
-          {canEdit && session && (
+          <div style={{ display: 'flex', gap: '2px' }}>
             <button
-              onClick={() => setIsTagging(!isTagging)}
+              onClick={() => setSidebarMinimized(true)}
               style={{
-                background: isTagging ? '#ffffff' : 'transparent',
-                color: isTagging ? '#000000' : '#ffffff',
-                border: 'none',
-                padding: '1px 4px',
-                fontSize: '10px',
+                background: '#c0c0c0',
+                color: '#000',
+                border: '1px outset #fff',
+                padding: '0 4px',
+                fontSize: '8pt',
                 cursor: 'pointer',
-                fontFamily: '"MS Sans Serif", sans-serif'
+                fontFamily: '"MS Sans Serif", sans-serif',
+                lineHeight: '12px'
               }}
+              title="Minimize"
             >
-              {isTagging ? 'STOP' : 'ADD'}
+              _
             </button>
-          )}
+            {canEdit && session && (
+              <button
+                onClick={() => setIsTagging(!isTagging)}
+                style={{
+                  background: isTagging ? '#ffffff' : '#c0c0c0',
+                  color: isTagging ? '#000000' : '#000',
+                  border: isTagging ? '1px inset #808080' : '1px outset #fff',
+                  padding: '0 4px',
+                  fontSize: '8pt',
+                  cursor: 'pointer',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+              >
+                {isTagging ? 'STOP' : 'ADD'}
+              </button>
+            )}
+          </div>
         </div>
         
         {/* Manual Tagging Instructions */}
@@ -840,7 +874,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             background: '#ffffe1',
             border: '1px solid #000000',
             padding: '4px',
-            fontSize: '10px',
+            fontSize: '8pt',
+            fontFamily: '"MS Sans Serif", sans-serif',
             color: '#000000',
             marginBottom: '2px'
           }}>
@@ -973,8 +1008,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             <div style={{
               background: '#ffffe1',
               border: '1px solid #000000',
-              padding: '6px',
-              margin: '4px',
+              padding: '4px',
+              margin: '2px',
               fontSize: '8pt',
               fontFamily: '"MS Sans Serif", sans-serif'
             }}>
@@ -986,12 +1021,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             <div style={{
               textAlign: 'center',
               color: '#808080',
-              fontSize: '10px',
-              padding: '12px',
+              fontSize: '8pt',
+              padding: '8px',
               fontFamily: '"MS Sans Serif", sans-serif'
             }}>
               No tags yet.
-              {canEdit && session && <><br/>Click ADD to create tags<br/>or AI Analyze to detect parts.</>}
+              {canEdit && session && <><br/>Click ADD to create tags<br/>or AI to detect parts.</>}
               {!session && <><br/>Login to create tags</>}
             </div>
           ) : (
@@ -1006,6 +1041,32 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           )}
         </div>
       </div>
+      )}
+
+      {/* Minimized Sidebar Button */}
+      {sidebarMinimized && (
+        <button
+          onClick={() => setSidebarMinimized(false)}
+          style={{
+            position: isMobile ? 'fixed' : 'absolute',
+            right: '20px',
+            top: '80px',
+            background: '#000080',
+            color: '#ffffff',
+            border: '2px outset #ffffff',
+            borderRight: '2px solid #808080',
+            borderBottom: '2px solid #808080',
+            padding: '4px 8px',
+            fontSize: '8pt',
+            fontFamily: '"MS Sans Serif", sans-serif',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            zIndex: 10002
+          }}
+        >
+          Tags ({tags.length})
+        </button>
+      )}
 
       {/* Image Info */}
       {(title || description) && (
