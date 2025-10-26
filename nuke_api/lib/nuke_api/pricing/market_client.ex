@@ -80,33 +80,72 @@ defmodule NukeApi.Pricing.MarketClient do
   end
 
   @doc """
-  Fetch data from Marketcheck API.
+  Fetch comprehensive data from Marketcheck API.
 
   Marketcheck provides 60M+ API calls/month with comprehensive
-  dealer inventory and auction data.
+  dealer inventory, auction data, and vehicle history.
+  
+  This function combines multiple MarketCheck endpoints:
+  - Vehicle search for current market listings
+  - Vehicle history by VIN for validation data
+  - Market trends and analytics
   """
   def fetch_marketcheck_data(vehicle) do
     with {:ok, api_key} <- get_api_key(:marketcheck),
-         {:ok, response} <- make_marketcheck_request(vehicle, api_key) do
+         {:ok, api_secret} <- get_api_secret(:marketcheck) do
 
-      market_data = %{
-        source: "marketcheck",
-        data_type: "listing",
-        price_value: parse_price(response, "average_price"),
-        price_range_low: parse_price(response, "min_price"),
-        price_range_high: parse_price(response, "max_price"),
-        confidence_score: parse_confidence(response),
-        raw_data: response,
-        location: "national",
-        days_on_market: parse_days_on_market(response),
-        mileage_at_time: vehicle.mileage
-      }
+      # Fetch multiple data sources in parallel
+      tasks = [
+        Task.async(fn -> fetch_marketcheck_listings(vehicle, api_key) end),
+        Task.async(fn -> fetch_marketcheck_history(vehicle, api_key, api_secret) end),
+        Task.async(fn -> fetch_marketcheck_trends(vehicle, api_key) end)
+      ]
 
-      {:ok, market_data}
+      results = Task.await_many(tasks, 15_000)
+      
+      # Combine all MarketCheck data sources
+      combined_data = combine_marketcheck_results(results, vehicle)
+      
+      {:ok, combined_data}
     else
       {:error, reason} ->
         Logger.warning("Marketcheck API failed: #{inspect(reason)}")
         {:error, reason}
+    end
+  end
+
+  @doc """
+  Fetch vehicle history by VIN from MarketCheck API.
+  
+  This provides crucial validation data including:
+  - Previous listings and price history
+  - Ownership changes
+  - Market exposure duration
+  - Regional price variations
+  """
+  def fetch_marketcheck_history(vehicle, api_key, api_secret) do
+    if vehicle.vin do
+      case make_marketcheck_history_request(vehicle.vin, api_key, api_secret) do
+        {:ok, response} ->
+          history_data = %{
+            source: "marketcheck_history",
+            data_type: "historical_sale",
+            price_history: parse_price_history(response),
+            ownership_changes: parse_ownership_changes(response),
+            market_exposure: parse_market_exposure(response),
+            regional_data: parse_regional_data(response),
+            confidence_score: calculate_history_confidence(response),
+            raw_data: response
+          }
+          {:ok, history_data}
+        
+        {:error, reason} ->
+          Logger.info("MarketCheck history unavailable for VIN #{vehicle.vin}: #{inspect(reason)}")
+          {:ok, nil}
+      end
+    else
+      Logger.info("No VIN available for MarketCheck history lookup")
+      {:ok, nil}
     end
   end
 
@@ -210,6 +249,13 @@ defmodule NukeApi.Pricing.MarketClient do
     end
   end
 
+  defp get_api_secret(source) do
+    case Application.get_env(:nuke_api, :market_apis)[:"#{source}_secret"] do
+      nil -> {:error, :missing_api_secret}
+      secret -> {:ok, secret}
+    end
+  end
+
   defp make_vehicle_databases_request(vehicle, api_key) do
     url = "https://api.vehicledatabase.com/market-value"
     headers = [
@@ -235,14 +281,59 @@ defmodule NukeApi.Pricing.MarketClient do
     end
   end
 
-  defp make_marketcheck_request(vehicle, api_key) do
+  # MarketCheck API request functions
+
+  defp fetch_marketcheck_listings(vehicle, api_key) do
+    case make_marketcheck_search_request(vehicle, api_key) do
+      {:ok, response} ->
+        %{
+          source: "marketcheck",
+          data_type: "listing",
+          price_value: parse_price(response, "average_price"),
+          price_range_low: parse_price(response, "min_price"),
+          price_range_high: parse_price(response, "max_price"),
+          confidence_score: parse_confidence(response),
+          raw_data: response,
+          location: "national",
+          days_on_market: parse_days_on_market(response),
+          mileage_at_time: vehicle.mileage,
+          listing_count: get_in(response, ["num_found"]) || 0
+        }
+      {:error, reason} ->
+        Logger.warning("MarketCheck listings failed: #{inspect(reason)}")
+        nil
+    end
+  end
+
+  defp fetch_marketcheck_trends(vehicle, api_key) do
+    case make_marketcheck_trends_request(vehicle, api_key) do
+      {:ok, response} ->
+        %{
+          source: "marketcheck_trends",
+          data_type: "market_analysis",
+          price_trend: get_in(response, ["price_trend"]),
+          inventory_trend: get_in(response, ["inventory_trend"]),
+          demand_score: get_in(response, ["demand_score"]),
+          market_velocity: get_in(response, ["market_velocity"]),
+          confidence_score: 75,
+          raw_data: response
+        }
+      {:error, reason} ->
+        Logger.info("MarketCheck trends unavailable: #{inspect(reason)}")
+        nil
+    end
+  end
+
+  defp make_marketcheck_search_request(vehicle, api_key) do
     query_params = URI.encode_query([
       {"api_key", api_key},
       {"year", vehicle.year},
       {"make", vehicle.make},
       {"model", vehicle.model},
       {"trim", vehicle.trim || ""},
-      {"mileage", vehicle.mileage}
+      {"mileage", vehicle.mileage},
+      {"radius", 500},  # National search
+      {"rows", 50}      # More results for better analysis
     ])
 
     url = "https://api.marketcheck.com/v2/search/car?" <> query_params
@@ -254,6 +345,80 @@ defmodule NukeApi.Pricing.MarketClient do
         {:error, "API returned #{status}: #{body}"}
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp make_marketcheck_history_request(vin, api_key, api_secret) do
+    url = "https://api.marketcheck.com/v2/history/car/#{vin}"
+    
+    headers = [
+      {"X-Api-Key", api_key},
+      {"X-Api-Secret", api_secret},
+      {"Content-Type", "application/json"}
+    ]
+
+    case HTTPoison.get(url, headers) do
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        {:ok, Jason.decode!(body)}
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        {:error, "Vehicle history not found"}
+      {:ok, %HTTPoison.Response{status_code: status, body: body}} ->
+        {:error, "API returned #{status}: #{body}"}
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp make_marketcheck_trends_request(vehicle, api_key) do
+    query_params = URI.encode_query([
+      {"api_key", api_key},
+      {"year", vehicle.year},
+      {"make", vehicle.make},
+      {"model", vehicle.model}
+    ])
+
+    url = "https://api.marketcheck.com/v2/stats/car?" <> query_params
+
+    case HTTPoison.get(url) do
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        {:ok, Jason.decode!(body)}
+      {:ok, %HTTPoison.Response{status_code: status, body: body}} ->
+        {:error, "API returned #{status}: #{body}"}
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # Combine MarketCheck results from multiple endpoints
+  defp combine_marketcheck_results(results, vehicle) do
+    [listings_result, history_result, trends_result] = results
+    
+    base_data = listings_result || %{
+      source: "marketcheck",
+      data_type: "listing",
+      price_value: nil,
+      confidence_score: 0,
+      mileage_at_time: vehicle.mileage
+    }
+
+    # Enhance with history data if available
+    enhanced_data = if history_result do
+      Map.merge(base_data, %{
+        historical_data: history_result,
+        confidence_score: min(base_data.confidence_score + 20, 95)
+      })
+    else
+      base_data
+    end
+
+    # Add trends data if available
+    if trends_result do
+      Map.merge(enhanced_data, %{
+        market_trends: trends_result,
+        confidence_score: min(enhanced_data.confidence_score + 10, 95)
+      })
+    else
+      enhanced_data
     end
   end
 
@@ -352,6 +517,88 @@ defmodule NukeApi.Pricing.MarketClient do
       days when is_number(days) -> days
       _ -> nil
     end
+  end
+
+  # MarketCheck-specific parsing functions
+  
+  defp parse_price_history(response) do
+    case get_in(response, ["price_history"]) do
+      history when is_list(history) ->
+        Enum.map(history, fn entry ->
+          %{
+            date: entry["date"],
+            price: entry["price"],
+            source: entry["source"] || "marketcheck",
+            listing_type: entry["listing_type"] || "dealer"
+          }
+        end)
+      _ -> []
+    end
+  end
+
+  defp parse_ownership_changes(response) do
+    case get_in(response, ["ownership_history"]) do
+      ownership when is_list(ownership) ->
+        Enum.map(ownership, fn entry ->
+          %{
+            date: entry["date"],
+            owner_type: entry["owner_type"],
+            location: entry["location"],
+            duration_days: entry["duration_days"]
+          }
+        end)
+      _ -> []
+    end
+  end
+
+  defp parse_market_exposure(response) do
+    %{
+      total_days_listed: get_in(response, ["total_days_listed"]) || 0,
+      listing_count: get_in(response, ["listing_count"]) || 0,
+      average_days_per_listing: get_in(response, ["average_days_per_listing"]) || 0,
+      first_listed_date: get_in(response, ["first_listed_date"]),
+      last_listed_date: get_in(response, ["last_listed_date"])
+    }
+  end
+
+  defp parse_regional_data(response) do
+    case get_in(response, ["regional_data"]) do
+      regional when is_list(regional) ->
+        Enum.map(regional, fn entry ->
+          %{
+            region: entry["region"],
+            average_price: entry["average_price"],
+            listing_count: entry["listing_count"],
+            days_on_market: entry["days_on_market"]
+          }
+        end)
+      _ -> []
+    end
+  end
+
+  defp calculate_history_confidence(response) do
+    base_confidence = 60
+    
+    # Increase confidence based on data richness
+    confidence = if get_in(response, ["price_history"]) && length(get_in(response, ["price_history"]) || []) > 0 do
+      base_confidence + 20
+    else
+      base_confidence
+    end
+    
+    confidence = if get_in(response, ["ownership_history"]) && length(get_in(response, ["ownership_history"]) || []) > 0 do
+      confidence + 15
+    else
+      confidence
+    end
+    
+    confidence = if get_in(response, ["total_days_listed"]) && get_in(response, ["total_days_listed"]) > 0 do
+      confidence + 10
+    else
+      confidence
+    end
+    
+    min(95, confidence)
   end
 
   defp store_market_data(market_data, vehicle_id) do
