@@ -63,6 +63,7 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   const [imageMetadata, setImageMetadata] = useState<Map<string, ImageMetadata>>(new Map());
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState<{current: number, total: number} | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get current user
@@ -596,11 +597,26 @@ Redirecting to vehicle profile...`);
 
   // Process images (from drag-drop or file picker)
   const processImages = useCallback(async (files: File[]) => {
-    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    // Filter to image files - check both MIME type and file extension
+    const imageFiles = files.filter(file => {
+      // Check MIME type
+      if (file.type && file.type.startsWith('image/')) {
+        return true;
+      }
+      
+      // Check file extension (fallback for files without MIME type, e.g. from iPhoto)
+      const ext = file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/);
+      return ext !== null;
+    });
 
     if (imageFiles.length === 0) {
-      alert('No image files detected. Please select image files (JPG, PNG, etc.)');
+      console.error('No valid image files found', files.map(f => ({name: f.name, type: f.type})));
+      alert(`No image files detected. Found ${files.length} file(s) but none are recognized as images.\n\nSupported formats: JPG, PNG, GIF, WebP, HEIC\n\nTip: Try dragging from Finder instead of iPhoto.`);
       return;
+    }
+    
+    if (imageFiles.length < files.length) {
+      console.warn(`Filtered out ${files.length - imageFiles.length} non-image files`);
     }
 
     // Limit to 300 images total - will process and upload in background
@@ -683,10 +699,72 @@ Redirecting to vehicle profile...`);
   }, [formData.purchase_date, formData.purchase_location, updateFormData]);
 
   // Handle drag and drop
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set to false if leaving the drop zone itself, not a child element
+    if (e.currentTarget === e.target) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files);
-    await processImages(files);
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    console.log('Drop event triggered');
+    console.log('dataTransfer.files:', e.dataTransfer.files);
+    console.log('dataTransfer.items:', e.dataTransfer.items);
+    
+    // Try to get files from both files and items APIs
+    const files: File[] = [];
+    
+    // First try dataTransfer.files (standard way)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      console.log('Found files via dataTransfer.files');
+      files.push(...Array.from(e.dataTransfer.files));
+    }
+    
+    // Also try dataTransfer.items (better for some apps like iPhoto)
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      console.log('Processing dataTransfer.items');
+      for (let i = 0; i < e.dataTransfer.items.length; i++) {
+        const item = e.dataTransfer.items[i];
+        console.log(`Item ${i}: kind=${item.kind}, type=${item.type}`);
+        
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) {
+            console.log(`Got file from item: ${file.name}, type=${file.type}, size=${file.size}`);
+            // Only add if not already in files array
+            if (!files.find(f => f.name === file.name && f.size === file.size)) {
+              files.push(file);
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`Total files collected: ${files.length}`);
+    if (files.length > 0) {
+      await processImages(files);
+    } else {
+      console.error('No files found in drop event');
+      alert('No files detected in drop. Please try:\n1. Selecting files using the "Click to Upload" button\n2. Dragging files from Finder instead of iPhoto\n3. Exporting files from iPhoto first, then dragging');
+    }
   }, [processImages]);
 
   // Handle file input selection
@@ -979,13 +1057,17 @@ Redirecting to vehicle profile...`);
 
                   {/* Drop Zone - Always visible */}
                   <div
-                    className={`border-2 border-dashed p-6 text-center transition-colors ${
-                      extracting ? 'border-primary bg-primary bg-opacity-10' : 'border-grey-300 hover:border-primary hover:bg-grey-50 cursor-pointer'
+                    className={`border-2 border-dashed p-6 text-center transition-all ${
+                      extracting 
+                        ? 'border-primary bg-primary bg-opacity-10' 
+                        : isDragging
+                        ? 'border-blue-500 bg-blue-50 scale-102'
+                        : 'border-grey-300 hover:border-primary hover:bg-grey-50 cursor-pointer'
                     }`}
                     onDrop={handleDrop}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDragEnter={(e) => e.preventDefault()}
-                    onDragLeave={(e) => e.preventDefault()}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
                     onClick={() => !extracting && fileInputRef.current?.click()}
                     style={{ 
                       marginTop: 'var(--space-2)',
@@ -993,7 +1075,8 @@ Redirecting to vehicle profile...`);
                       minHeight: '120px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      transform: isDragging ? 'scale(1.02)' : 'scale(1)'
                     }}
                   >
                     {extracting ? (
@@ -1003,6 +1086,15 @@ Redirecting to vehicle profile...`);
                           {extractProgress 
                             ? `Processing ${extractProgress.current}/${extractProgress.total} images...` 
                             : 'Processing...'}
+                        </p>
+                      </div>
+                    ) : isDragging ? (
+                      <div>
+                        <div className="text font-medium text-blue-600 mb-1" style={{ fontSize: '9pt' }}>
+                          📁 Drop Images Now!
+                        </div>
+                        <p className="text-small text-muted" style={{ fontSize: '8pt' }}>
+                          Release to upload
                         </p>
                       </div>
                     ) : (
