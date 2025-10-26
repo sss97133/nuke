@@ -212,8 +212,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [selectedTagForEnrichment, setSelectedTagForEnrichment] = useState<any>(null);
 
   const handleTagClick = useCallback((tag: any) => {
+    console.log('🔍 Tag clicked:', tag.tag_name, 'shoppable:', tag.is_shoppable, 'suppliers:', tag.suppliers?.length);
     setSelectedSpatialTag(tag);
     setSpatialPopupOpen(true);
+    console.log('🔍 Popup state set to true');
   }, []);
 
   const handleSpatialOrder = useCallback((supplier: any) => {
