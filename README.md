@@ -1,4 +1,4 @@
-# Nuke - Vehicle Management Platform
+# N-Zero Granular data Management Platform
 
 A comprehensive vehicle management system with photo analysis, timeline tracking, and valuation capabilities.
 
