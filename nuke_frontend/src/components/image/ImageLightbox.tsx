@@ -772,9 +772,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: isTagging ? 'crosshair' : 'pointer'
+          cursor: isTagging ? 'crosshair' : 'default'
         }}
-        onClick={handleImageClick}
+        onClick={isTagging ? handleImageClick : undefined}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
