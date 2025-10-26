@@ -297,14 +297,51 @@ export class VehicleValuationService {
         }
       }
 
-      // 2. Get market comparables
+      // 2. Get market data including MarketCheck validated sources
       const { data: vehicle } = await supabase
         .from('vehicles')
-        .select('make, model, year')
+        .select('make, model, year, vin')
         .eq('id', vehicleId)
         .single();
 
       if (vehicle) {
+        // Get MarketCheck market data if available
+        const { data: marketCheckData } = await supabase
+          .from('market_data')
+          .select('*')
+          .eq('vehicle_id', vehicleId)
+          .in('source', ['marketcheck', 'marketcheck_history', 'marketcheck_trends'])
+          .order('created_at', { ascending: false });
+
+        let marketCheckValue = 0;
+        let marketCheckConfidence = 0;
+
+        if (marketCheckData && marketCheckData.length > 0) {
+          // Process MarketCheck data for valuation
+          const listingData = marketCheckData.find(d => d.source === 'marketcheck');
+          const historyData = marketCheckData.find(d => d.source === 'marketcheck_history');
+          const trendsData = marketCheckData.find(d => d.source === 'marketcheck_trends');
+
+          if (listingData && listingData.price_value) {
+            marketCheckValue = parseFloat(listingData.price_value);
+            marketCheckConfidence = listingData.confidence_score || 70;
+            
+            // Adjust confidence based on additional data sources
+            if (historyData) {
+              marketCheckConfidence = Math.min(marketCheckConfidence + 15, 95);
+              valuation.dataSources.push('MarketCheck History');
+            }
+            
+            if (trendsData) {
+              marketCheckConfidence = Math.min(marketCheckConfidence + 10, 95);
+              valuation.dataSources.push('MarketCheck Trends');
+            }
+            
+            valuation.dataSources.push('MarketCheck Live Data');
+          }
+        }
+
+        // Get traditional comparables
         const { data: comparables } = await supabase
           .from('build_benchmarks')
           .select('sale_price')
@@ -312,19 +349,43 @@ export class VehicleValuationService {
           .eq('year', vehicle.year)
           .limit(5);
 
+        let comparablesValue = 0;
         if (comparables && comparables.length > 0) {
-          const avgComp = comparables.reduce((sum, c) => 
+          comparablesValue = comparables.reduce((sum, c) => 
             sum + (c.sale_price || 0), 0) / comparables.length;
+          valuation.dataSources.push('Market Comparables');
+        }
+
+        // Blend market values with preference for MarketCheck (more current)
+        if (marketCheckValue > 0 && comparablesValue > 0) {
+          // Weight MarketCheck higher due to real-time data
+          const blendedMarketValue = (marketCheckValue * 0.7) + (comparablesValue * 0.3);
           
-          // If we have no invested amount, use comparables
           if (valuation.totalInvested === 0) {
-            valuation.estimatedValue = avgComp;
+            valuation.estimatedValue = blendedMarketValue;
           } else {
             // Blend invested amount with market value
-            valuation.estimatedValue = (valuation.totalInvested * 0.7) + (avgComp * 0.3);
+            valuation.estimatedValue = (valuation.totalInvested * 0.6) + (blendedMarketValue * 0.4);
           }
           
-          valuation.dataSources.push('Market Comparables');
+          valuation.confidence = Math.min(valuation.confidence + marketCheckConfidence * 0.3, 95);
+        } else if (marketCheckValue > 0) {
+          // Use MarketCheck data only
+          if (valuation.totalInvested === 0) {
+            valuation.estimatedValue = marketCheckValue;
+          } else {
+            valuation.estimatedValue = (valuation.totalInvested * 0.7) + (marketCheckValue * 0.3);
+          }
+          
+          valuation.confidence = Math.min(valuation.confidence + marketCheckConfidence * 0.4, 95);
+        } else if (comparablesValue > 0) {
+          // Fallback to traditional comparables
+          if (valuation.totalInvested === 0) {
+            valuation.estimatedValue = comparablesValue;
+          } else {
+            valuation.estimatedValue = (valuation.totalInvested * 0.7) + (comparablesValue * 0.3);
+          }
+          
           valuation.confidence = Math.min(valuation.confidence + 10, 95);
         }
       }

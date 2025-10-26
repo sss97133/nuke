@@ -65,6 +65,7 @@ config :phoenix, :json_library, Jason
 config :nuke_api, :market_apis, [
   vehicle_databases: System.get_env("VEHICLE_DATABASES_API_KEY"),
   marketcheck: System.get_env("MARKETCHECK_API_KEY"),
+  marketcheck_secret: System.get_env("MARKETCHECK_API_SECRET"),
   vinaudit: System.get_env("VINAUDIT_API_KEY"),
   nada: System.get_env("NADA_API_KEY"),
   blackbook: System.get_env("BLACKBOOK_API_KEY")
