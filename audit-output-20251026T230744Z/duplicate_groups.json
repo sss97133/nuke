@@ -1,0 +1,144 @@
+{
+  "title_match": {
+    "develop mobile photo upload and album feature": [
+      140,
+      138,
+      137,
+      136
+    ],
+    "investigate and fix blank mobile pages": [
+      139,
+      135,
+      134,
+      133
+    ]
+  },
+  "branch_match": {},
+  "file_overlap": {
+    "135-142": {
+      "pr1": 142,
+      "pr2": 135,
+      "overlap1": 50.0,
+      "overlap2": 33.33333333333333,
+      "shared_files": [
+        "nuke_frontend/src/components/mobile/MobileAddVehicle.tsx"
+      ]
+    },
+    "133-142": {
+      "pr1": 142,
+      "pr2": 133,
+      "overlap1": 50.0,
+      "overlap2": 50.0,
+      "shared_files": [
+        "nuke_frontend/src/components/mobile/MobileAddVehicle.tsx"
+      ]
+    },
+    "130-142": {
+      "pr1": 142,
+      "pr2": 130,
+      "overlap1": 50.0,
+      "overlap2": 14.285714285714285,
+      "shared_files": [
+        "nuke_frontend/src/components/mobile/MobileAddVehicle.tsx"
+      ]
+    },
+    "125-142": {
+      "pr1": 142,
+      "pr2": 125,
+      "overlap1": 50.0,
+      "overlap2": 100.0,
+      "shared_files": [
+        "nuke_frontend/src/pages/add-vehicle/AddVehicle.tsx"
+      ]
+    },
+    "134-141": {
+      "pr1": 141,
+      "pr2": 134,
+      "overlap1": 100.0,
+      "overlap2": 33.33333333333333,
+      "shared_files": [
+        "nuke_frontend/src/components/mobile/MobileVehicleProfile.tsx"
+      ]
+    },
+    "138-140": {
+      "pr1": 140,
+      "pr2": 138,
+      "overlap1": 42.857142857142854,
+      "overlap2": 50.0,
+      "shared_files": [
+        "nuke_frontend/src/App.tsx",
+        "nuke_frontend/src/pages/VehicleProfile.tsx",
+        "nuke_frontend/src/components/mobile/RapidCameraCapture.tsx"
+      ]
+    },
+    "126-140": {
+      "pr1": 140,
+      "pr2": 126,
+      "overlap1": 42.857142857142854,
+      "overlap2": 42.857142857142854,
+      "shared_files": [
+        "nuke_frontend/src/hooks/useMobileCameraCapture.ts",
+        "nuke_frontend/src/services/aiImageProcessingService.ts",
+        "nuke_frontend/src/components/mobile/RapidCameraCapture.tsx"
+      ]
+    },
+    "137-138": {
+      "pr1": 138,
+      "pr2": 137,
+      "overlap1": 50.0,
+      "overlap2": 30.0,
+      "shared_files": [
+        "nuke_frontend/src/App.tsx",
+        "nuke_frontend/src/components/mobile/RapidCameraCapture.tsx",
+        "nuke_frontend/src/pages/Profile.tsx"
+      ]
+    },
+    "133-135": {
+      "pr1": 135,
+      "pr2": 133,
+      "overlap1": 33.33333333333333,
+      "overlap2": 50.0,
+      "shared_files": [
+        "nuke_frontend/src/components/mobile/MobileAddVehicle.tsx"
+      ]
+    },
+    "131-135": {
+      "pr1": 135,
+      "pr2": 131,
+      "overlap1": 66.66666666666666,
+      "overlap2": 33.33333333333333,
+      "shared_files": [
+        "nuke_frontend/src/design-system.css",
+        "nuke_frontend/src/components/layout/AppLayout.tsx"
+      ]
+    },
+    "133-134": {
+      "pr1": 134,
+      "pr2": 133,
+      "overlap1": 33.33333333333333,
+      "overlap2": 50.0,
+      "shared_files": [
+        "MOBILE_BLANK_PAGE_FIX.md"
+      ]
+    },
+    "130-133": {
+      "pr1": 133,
+      "pr2": 130,
+      "overlap1": 50.0,
+      "overlap2": 14.285714285714285,
+      "shared_files": [
+        "nuke_frontend/src/components/mobile/MobileAddVehicle.tsx"
+      ]
+    },
+    "129-131": {
+      "pr1": 131,
+      "pr2": 129,
+      "overlap1": 33.33333333333333,
+      "overlap2": 40.0,
+      "shared_files": [
+        "nuke_frontend/index.html",
+        "nuke_frontend/src/components/layout/AppLayout.tsx"
+      ]
+    }
+  }
+}
