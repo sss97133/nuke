@@ -1,0 +1,56 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Skip to content":
+    - /url: "#geist-skip-nav"
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - link "Vercel logo":
+        - /url: /home
+        - button "Vercel Logo":
+          - img "Vercel Logo"
+      - navigation [ref=e4]:
+        - navigation [ref=e5]:
+          - link "Sign Up" [ref=e6] [cursor=pointer]:
+            - /url: /signup?next=%2Fsso-api%3Furl%3Dhttps%253A%252F%252Fnukefrontend-5dzr395le-nzero.vercel.app%252F%26nonce%3D1a721623f287fce4825a6ad383b7d210fa577f1423d0d23d2e99e6802fb4a696
+            - paragraph [ref=e8]: Sign Up
+    - main [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Log in to Vercel" [level=1] [ref=e13]
+        - generic [ref=e14]:
+          - generic [ref=e15]:
+            - textbox "Email Address" [ref=e17]
+            - button "Continue with Email" [ref=e19] [cursor=pointer]:
+              - generic [ref=e20]: Continue with Email
+          - generic [ref=e21]:
+            - button "Continue with Google" [ref=e22] [cursor=pointer]:
+              - img [ref=e24]
+              - generic [ref=e30]: Continue with Google
+            - button "Continue with GitHub" [ref=e31] [cursor=pointer]:
+              - img [ref=e33]
+              - generic [ref=e37]: Continue with GitHub
+            - button "Continue with SAML SSO" [ref=e39] [cursor=pointer]:
+              - img [ref=e41]
+              - generic [ref=e43]: Continue with SAML SSO
+            - button "Continue with Passkey" [ref=e44] [cursor=pointer]:
+              - img [ref=e46]
+              - generic [ref=e48]: Continue with Passkey
+            - button "Show other options" [ref=e49] [cursor=pointer]:
+              - generic [ref=e50]: Show other options
+        - paragraph [ref=e51]:
+          - text: Don't have an account?
+          - link "Sign Up" [ref=e52] [cursor=pointer]:
+            - /url: /signup?next=%2Fsso-api%3Furl%3Dhttps%3A%2F%2Fnukefrontend-5dzr395le-nzero.vercel.app%2F%26nonce%3D1a721623f287fce4825a6ad383b7d210fa577f1423d0d23d2e99e6802fb4a696
+      - generic [ref=e55]:
+        - link "Terms" [ref=e56] [cursor=pointer]:
+          - /url: /legal/terms
+        - link "Privacy Policy" [ref=e57] [cursor=pointer]:
+          - /url: /legal/privacy-policy
+  - alert [ref=e58]
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - img
+```
