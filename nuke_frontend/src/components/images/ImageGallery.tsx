@@ -39,12 +39,14 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   const [showImages, setShowImages] = useState(false);
   const [imagesPerPage] = useState(25);
   const [autoLoad, setAutoLoad] = useState(false);
+  const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{total: number, completed: number, uploading: boolean}>({total: 0, completed: 0, uploading: false});
   const [imageCommentCounts, setImageCommentCounts] = useState<Record<string, number>>({});
   const [imageUploaderNames, setImageUploaderNames] = useState<Record<string, string>>({});
   const [imageTagTextsById, setImageTagTextsById] = useState<Record<string, string[]>>({});
   const [imageViewCounts, setImageViewCounts] = useState<Record<string, number>>({});
   const [uploaderOrgNames, setUploaderOrgNames] = useState<Record<string, string>>({});
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
 
   // Tagging state
   const [imageTags, setImageTags] = useState<ImageTag[]>([]);
@@ -61,6 +63,24 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   const [filteredTools, setFilteredTools] = useState<any[]>([]);
   const [showToolSearch, setShowToolSearch] = useState(false);
   const [toolSearchTerm, setToolSearchTerm] = useState('');
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!infiniteScrollEnabled || !sentinelRef.current) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && !loadingMore && displayedImages.length < allImages.length) {
+          loadMoreImages();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [infiniteScrollEnabled, loadingMore, displayedImages.length, allImages.length]);
 
   // Check authentication and permissions
   useEffect(() => {
@@ -307,6 +327,11 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   };
 
   const loadMoreImages = () => {
+    if (!infiniteScrollEnabled) {
+      // First click - enable infinite scroll
+      setInfiniteScrollEnabled(true);
+    }
+    
     setLoadingMore(true);
     const currentCount = displayedImages.length;
     const sortedImages = getSortedImages();
@@ -807,28 +832,39 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         </div>
       )}
 
-      {/* Load More Button */}
+      {/* Load More Button / Infinite Scroll Sentinel */}
       {showImages && displayedImages.length < allImages.length && (
         <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
-          <button
-            className="button button-small"
-            onClick={loadMoreImages}
-            disabled={loadingMore}
-            style={{ marginRight: 'var(--space-2)' }}
-          >
-            {loadingMore ? 'Loading...' :
-              (allImages.length - displayedImages.length <= imagesPerPage
-                ? 'Load Remaining Images'
-                : `Load ${Math.min(imagesPerPage, allImages.length - displayedImages.length)} More`
-              )
-            }
-          </button>
-          <button
-            className="button button-small"
-            onClick={handleUnloadImages}
-          >
-            Hide All Images
-          </button>
+          {!infiniteScrollEnabled && (
+            <button
+              className="button button-small"
+              onClick={loadMoreImages}
+              disabled={loadingMore}
+              style={{ marginRight: 'var(--space-2)' }}
+            >
+              {loadingMore ? 'Loading...' :
+                (allImages.length - displayedImages.length <= imagesPerPage
+                  ? 'Load Remaining Images'
+                  : `Load ${Math.min(imagesPerPage, allImages.length - displayedImages.length)} More`
+                )
+              }
+            </button>
+          )}
+          {infiniteScrollEnabled && loadingMore && (
+            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)' }}>
+              Loading more images...
+            </div>
+          )}
+          {!infiniteScrollEnabled && (
+            <button
+              className="button button-small"
+              onClick={handleUnloadImages}
+            >
+              Hide All Images
+            </button>
+          )}
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} style={{ height: '1px' }} />
         </div>
       )}
 

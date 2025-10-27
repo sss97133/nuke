@@ -13,7 +13,7 @@
       - navigation [ref=e4]:
         - navigation [ref=e5]:
           - link "Sign Up" [ref=e6] [cursor=pointer]:
-            - /url: /signup?next=%2Fsso-api%3Furl%3Dhttps%253A%252F%252Fnukefrontend-5dzr395le-nzero.vercel.app%252F%26nonce%3De3bc8fe780c1b3801002e763d7dde794fd2e6fdd395e4baeee8de5e2633b2797
+            - /url: /signup?next=%2Fsso-api%3Furl%3Dhttps%253A%252F%252Fnukefrontend-5dzr395le-nzero.vercel.app%252F%26nonce%3D6baef30b0052c42e1b2782b2e320d8614c7eaf54f6795160e3bd2c48d9f2b134
             - paragraph [ref=e8]: Sign Up
     - main [ref=e9]:
       - generic [ref=e10]:
@@ -41,7 +41,7 @@
         - paragraph [ref=e51]:
           - text: Don't have an account?
           - link "Sign Up" [ref=e52] [cursor=pointer]:
-            - /url: /signup?next=%2Fsso-api%3Furl%3Dhttps%3A%2F%2Fnukefrontend-5dzr395le-nzero.vercel.app%2F%26nonce%3De3bc8fe780c1b3801002e763d7dde794fd2e6fdd395e4baeee8de5e2633b2797
+            - /url: /signup?next=%2Fsso-api%3Furl%3Dhttps%3A%2F%2Fnukefrontend-5dzr395le-nzero.vercel.app%2F%26nonce%3D6baef30b0052c42e1b2782b2e320d8614c7eaf54f6795160e3bd2c48d9f2b134
       - generic [ref=e55]:
         - link "Terms" [ref=e56] [cursor=pointer]:
           - /url: /legal/terms
