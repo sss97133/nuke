@@ -103,9 +103,9 @@ const CursorHomepage: React.FC = () => {
                 .from('vehicle_images')
                 .select('id', { count: 'exact', head: true })
                 .eq('vehicle_id', v.id),
-              // Event count
+              // Event count (use vehicle_timeline_events view)
               supabase
-                .from('timeline_events')
+                .from('vehicle_timeline_events')
                 .select('id', { count: 'exact', head: true })
                 .eq('vehicle_id', v.id),
             ]);

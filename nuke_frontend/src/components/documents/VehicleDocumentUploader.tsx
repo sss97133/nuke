@@ -18,6 +18,7 @@ import {
   Tag
 } from 'lucide-react';
 import VehicleErrorBoundary from '../vehicle/VehicleErrorBoundary';
+import SmartInvoiceUploader from '../SmartInvoiceUploader';
 
 interface DocumentUploadProps {
   vehicleId: string;
@@ -651,9 +652,25 @@ const VehicleDocumentUploader: React.FC<DocumentUploadProps> = memo(({
             </div>
           )}
 
-          {/* Upload Zone */}
-          {uploadState.status === 'idle' && !previewMode && (
+      {/* Upload Zone */}
+      {uploadState.status === 'idle' && !previewMode && (
             <>
+          {/* Smart Uploader CTA */}
+          <div className="card" style={{ padding: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+            <div className="text font-bold" style={{ marginBottom: 'var(--space-1)' }}>Smart Invoice Upload</div>
+            <div className="text-small" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+              Parse invoices automatically, categorize parts, and update value instantly.
+            </div>
+            <SmartInvoiceUploader
+              vehicleId={vehicleId}
+              onClose={() => {}}
+              onSaved={() => {
+                try { window.dispatchEvent(new CustomEvent('valuation_updated', { detail: { vehicleId } } as any)); } catch {}
+                onSuccess?.([]);
+              }}
+            />
+          </div>
+
               <div
                 className="upload-zone"
                 style={{

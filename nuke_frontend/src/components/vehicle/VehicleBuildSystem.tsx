@@ -92,16 +92,22 @@ const VehicleBuildSystem: React.FC<VehicleBuildSystemProps> = memo(({
         estimatedValue: valuation.estimatedValue
       });
 
-      // Set the valuation for the valuation tab
+      // Set the valuation for the valuation tab, prefer categoryBreakdown
+      const categoryBreakdown = (valuation as any).categoryBreakdown && (valuation as any).categoryBreakdown.length > 0
+        ? (valuation as any).categoryBreakdown
+        : [];
       setValuation({
         totalInvested: valuation.totalInvested,
         currentMarketValue: valuation.estimatedValue,
         comparableVehicles: [],
-        valueBreakdown: valuation.topParts.map(part => ({
-          category: 'Parts',
-          invested: part.price,
-          marketValue: part.price * 1.2
-        }))
+        valueBreakdown: (categoryBreakdown.length > 0
+          ? categoryBreakdown
+          : valuation.topParts.map(part => ({
+              category: 'Parts',
+              invested: part.price,
+              marketValue: part.price * 1.2
+            }))
+        )
       });
 
       // Get the build ID if it exists

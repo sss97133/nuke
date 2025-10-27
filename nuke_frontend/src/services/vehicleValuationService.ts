@@ -25,6 +25,8 @@ export interface VehicleValuation {
   laborHours: number;
   installedParts: number;
   pendingParts: number;
+  // Category breakdown from receipts/build items
+  categoryBreakdown?: Array<{ category: string; invested: number; marketValue: number }>;
   
   // Top line items with image evidence
   topParts: Array<{
@@ -62,44 +64,7 @@ export class VehicleValuationService {
       return cached.data;
     }
 
-    try {
-      // Try AI-powered valuation first (most accurate)
-      const { data: aiValuation, error: aiError } = await supabase
-        .rpc('calculate_ai_vehicle_valuation', { p_vehicle_id: vehicleId });
-
-      if (!aiError && aiValuation && aiValuation.length > 0) {
-        const av = aiValuation[0];
-        const valuation: VehicleValuation = {
-          totalInvested: parseFloat(av.base_value) + parseFloat(av.parts_value) + parseFloat(av.labor_value),
-          buildBudget: 0,
-          estimatedValue: parseFloat(av.estimated_value),
-          marketLow: parseFloat(av.estimated_value) * 0.85,
-          marketHigh: parseFloat(av.estimated_value) * 1.15,
-          confidence: parseFloat(av.confidence_score),
-          dataSources: av.data_sources || [],
-          partsInvestment: parseFloat(av.parts_value),
-          laborHours: av.breakdown?.labor_hours || 0,
-          installedParts: av.breakdown?.parts_detected || 0,
-          pendingParts: 0,
-          topParts: [],
-          lastUpdated: new Date().toISOString(),
-          hasRealData: true
-        };
-
-        // Cache and return
-        this.cache.set(vehicleId, {
-          data: valuation,
-          timestamp: Date.now()
-        });
-
-        return valuation;
-      }
-
-      // Fallback to legacy method if AI valuation fails
-      console.warn('AI valuation failed, using legacy method');
-    } catch (error) {
-      console.error('AI valuation error:', error);
-    }
+    // Deterministic valuation using receipts, labor, and market data
 
     try {
       // Initialize valuation object
@@ -140,7 +105,7 @@ export class VehicleValuationService {
         if (receiptIds.length > 0) {
           const { data: receiptItems } = await supabase
             .from('receipt_items')
-            .select('receipt_id, description, total_price')
+            .select('receipt_id, description, total_price, category')
             .in('receipt_id', receiptIds);
 
           if (receiptItems && receiptItems.length > 0) {
@@ -193,6 +158,30 @@ export class VehicleValuationService {
               images: (imagesByPart.get(p.name) || []).slice(0, 3)
             }));
             valuation.partsInvestment = partsArray.reduce((sum, x) => sum + (x.price || 0), 0);
+
+            // Build category breakdown (use provided category or infer from description)
+            const byCategory: Record<string, { invested: number; marketValue: number }> = {};
+            const inferCategory = (desc?: string, cat?: string | null) => {
+              const d = (desc || '').toLowerCase();
+              const c = (cat || '').toLowerCase();
+              if (c) return c.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+              if (/engine|motor|intake|exhaust|radiator|coolant|filter|spark/i.test(d)) return 'Engine';
+              if (/brake|pad|rotor|caliper|master/i.test(d)) return 'Brakes';
+              if (/suspension|shock|spring|coilover|strut/i.test(d)) return 'Suspension';
+              if (/transmission|clutch|gear|drivetrain/i.test(d)) return 'Transmission';
+              if (/tire|wheel|rim/i.test(d)) return 'Wheels & Tires';
+              if (/body|panel|fender|hood|bumper|paint|wrap/i.test(d)) return 'Body/Paint';
+              if (/interior|seat|trim|dash|carpet|stereo/i.test(d)) return 'Interior';
+              if (/electrical|wiring|harness|battery|alternator/i.test(d)) return 'Electrical';
+              return 'Misc';
+            };
+            receiptItems.forEach((it: any) => {
+              const cat = inferCategory(it.description, it.category);
+              if (!byCategory[cat]) byCategory[cat] = { invested: 0, marketValue: 0 };
+              byCategory[cat].invested += it.total_price || 0;
+              byCategory[cat].marketValue += (it.total_price || 0) * 1.15;
+            });
+            valuation.categoryBreakdown = Object.entries(byCategory).map(([category, v]) => ({ category, invested: v.invested, marketValue: v.marketValue }));
           }
         }
       }
@@ -304,6 +293,7 @@ export class VehicleValuationService {
         .eq('id', vehicleId)
         .single();
 
+      let marketBase = 0;
       if (vehicle) {
         // Get MarketCheck market data if available
         const { data: marketCheckData } = await supabase
@@ -338,6 +328,7 @@ export class VehicleValuationService {
             }
             
             valuation.dataSources.push('MarketCheck Live Data');
+            if (!isNaN(marketCheckValue) && marketCheckValue > 0) marketBase = marketCheckValue;
           }
         }
 
@@ -360,6 +351,7 @@ export class VehicleValuationService {
         if (marketCheckValue > 0 && comparablesValue > 0) {
           // Weight MarketCheck higher due to real-time data
           const blendedMarketValue = (marketCheckValue * 0.7) + (comparablesValue * 0.3);
+          marketBase = blendedMarketValue;
           
           if (valuation.totalInvested === 0) {
             valuation.estimatedValue = blendedMarketValue;
@@ -371,6 +363,7 @@ export class VehicleValuationService {
           valuation.confidence = Math.min(valuation.confidence + marketCheckConfidence * 0.3, 95);
         } else if (marketCheckValue > 0) {
           // Use MarketCheck data only
+          marketBase = marketCheckValue;
           if (valuation.totalInvested === 0) {
             valuation.estimatedValue = marketCheckValue;
           } else {
@@ -380,6 +373,7 @@ export class VehicleValuationService {
           valuation.confidence = Math.min(valuation.confidence + marketCheckConfidence * 0.4, 95);
         } else if (comparablesValue > 0) {
           // Fallback to traditional comparables
+          marketBase = comparablesValue;
           if (valuation.totalInvested === 0) {
             valuation.estimatedValue = comparablesValue;
           } else {
@@ -435,10 +429,28 @@ export class VehicleValuationService {
         }
       }
 
-      // 4. Calculate final values
-      if (valuation.totalInvested > 0) {
-        // Use actual investment as base
-        valuation.estimatedValue = valuation.estimatedValue || valuation.totalInvested;
+      // 4. Include documented labor from work sessions at $75/hr
+      try {
+        const { data: workSessions } = await supabase
+          .rpc('get_vehicle_work_sessions', { p_vehicle_id: vehicleId });
+        const hours = (workSessions || []).reduce((sum: number, s: any) => sum + (s.labor_hours || 0), 0);
+        if (hours > 0) {
+          valuation.laborHours = Math.max(valuation.laborHours, hours);
+          valuation.totalInvested += hours * 75;
+          if (!valuation.dataSources.includes('Work Sessions')) valuation.dataSources.push('Work Sessions');
+        }
+      } catch {}
+
+      // 5. Calculate final values per new model: market + modifications premium + documentation bonus
+      const documentationBonus = aiExtractedValue * 0.1;
+      if (marketBase > 0) {
+        const premiumFromParts = Math.max(0, valuation.partsInvestment - marketBase * 0.5);
+        valuation.estimatedValue = Math.max(
+          Math.round(marketBase + premiumFromParts + documentationBonus),
+          valuation.estimatedValue || 0
+        );
+      } else if (valuation.totalInvested > 0 && !valuation.estimatedValue) {
+        valuation.estimatedValue = valuation.totalInvested + documentationBonus;
       }
 
       // Set market range
@@ -447,10 +459,12 @@ export class VehicleValuationService {
         valuation.marketHigh = valuation.estimatedValue * 1.15;
       }
 
-      // Default confidence if no data
-      if (valuation.confidence === 0) {
-        valuation.confidence = valuation.hasRealData ? 70 : 0;
-      }
+      // Confidence model: receipts 90 + market 5 + photos 5 (cap 95)
+      let finalConfidence = 70;
+      if (receipts && receipts.length > 0) finalConfidence = 90;
+      if (marketBase > 0) finalConfidence += 5;
+      if ((images?.length || 0) > 100) finalConfidence += 5;
+      valuation.confidence = Math.min(finalConfidence, 95);
 
       // Cache the result
       this.cache.set(vehicleId, {

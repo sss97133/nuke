@@ -39,7 +39,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
   const loadEventData = async () => {
     const [eventResult, imagesResult] = await Promise.all([
       supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select('*')
         .eq('id', eventId)
         .single(),

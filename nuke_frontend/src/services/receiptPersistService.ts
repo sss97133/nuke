@@ -41,13 +41,27 @@ export class ReceiptPersistService {
 
       const items = parsed.items || [];
       if (items.length > 0) {
+        // Simple auto-categorization for parts to power valuation categories
+        const autoCategory = (desc?: string, existing?: string | null) => {
+          if (existing) return existing;
+          const d = (desc || '').toLowerCase();
+          if (/engine|motor|intake|exhaust|radiator|coolant|filter|spark/.test(d)) return 'Engine';
+          if (/brake|pad|rotor|caliper|master/.test(d)) return 'Brakes';
+          if (/suspension|shock|spring|coilover|strut/.test(d)) return 'Suspension';
+          if (/transmission|clutch|gear|drivetrain/.test(d)) return 'Transmission';
+          if (/tire|wheel|rim/.test(d)) return 'Wheels & Tires';
+          if (/body|panel|fender|hood|bumper|paint|wrap/.test(d)) return 'Body/Paint';
+          if (/interior|seat|trim|dash|carpet|stereo/.test(d)) return 'Interior';
+          if (/electrical|wiring|harness|battery|alternator/.test(d)) return 'Electrical';
+          return null;
+        };
         const rows = items.map((it, idx) => ({
           receipt_id: receipt.id,
           line_number: it.line_number ?? idx + 1,
           description: it.description || null,
           part_number: it.part_number || null,
           vendor_sku: it.vendor_sku || null,
-          category: it.category || null,
+          category: autoCategory(it.description, it.category) || null,
           quantity: it.quantity ?? null,
           unit_price: it.unit_price ?? null,
           total_price: it.total_price ?? null
@@ -56,6 +70,9 @@ export class ReceiptPersistService {
         if (itemErr) throw itemErr;
       }
 
+      // Trigger valuation refresh events for this vehicle
+      try { window.dispatchEvent(new CustomEvent('valuation_updated', { detail: { vehicleId: params.vehicleId } } as any)); } catch {}
+      try { window.dispatchEvent(new CustomEvent('timeline_updated', { detail: { vehicleId: params.vehicleId } } as any)); } catch {}
       return { id: receipt.id };
     } catch (e: any) {
       return { error: e?.message || 'Failed to save receipt' };
