@@ -23,6 +23,8 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
   const [vehicle, setVehicle] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadVehicle();
@@ -39,6 +41,39 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
       .single();
     
     setVehicle(data);
+  };
+
+  const handleQuickUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (!session?.user?.id) {
+      alert('Please log in to upload images');
+      return;
+    }
+
+    setUploading(true);
+    
+    try {
+      const { ImageUploadService } = await import('../../services/imageUploadService');
+      
+      for (let i = 0; i < files.length; i++) {
+        const result = await ImageUploadService.uploadImage(vehicleId, files[i], 'general');
+        if (!result.success) {
+          console.error('Upload failed:', result.error);
+          alert(`Upload failed: ${result.error}`);
+        }
+      }
+      
+      // Trigger refresh on images tab
+      window.dispatchEvent(new Event('vehicle_images_updated'));
+      
+      // Show success message
+      alert(`✓ ${files.length} photo${files.length > 1 ? 's' : ''} uploaded successfully!`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (!isMobile) {
@@ -108,6 +143,55 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
           <MobileSpecsTab vehicle={vehicle} />
         )}
       </div>
+
+      {/* Floating Action Button (FAB) for Camera - Always visible when logged in */}
+      {session?.user && (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            style={{ display: 'none' }}
+            onChange={(e) => handleQuickUpload(e.target.files)}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: uploading ? '#808080' : '#000080',
+              color: '#ffffff',
+              border: '3px outset #ffffff',
+              fontSize: '28px',
+              cursor: uploading ? 'wait' : 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: '"MS Sans Serif", sans-serif',
+              transition: 'transform 0.2s',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onTouchEnd={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title="Take photo"
+          >
+            {uploading ? '⏳' : '📷'}
+          </button>
+        </>
+      )}
 
       {/* Event Detail Modal */}
       {selectedEvent && (
