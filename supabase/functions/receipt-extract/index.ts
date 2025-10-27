@@ -155,34 +155,88 @@ serve(async (req: Request) => {
         fileUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
       }
       
-      const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [{
-            role: 'user',
-            content: [{
-              type: 'text',
-              text: `Extract invoice/receipt data from this document. Return JSON with: vendor_name, receipt_date, subtotal, tax, total, items array (each with: description, quantity, unit_price, total_price). If you can't find a field, use null.`
-            }, {
-              type: 'image_url',
-              image_url: { url: fileUrl }
-            }]
-          }],
-          response_format: { type: 'json_object' },
-          max_tokens: 2000
-        })
-      });
-      
-      if (openaiResp.ok) {
-        const data = await openaiResp.json();
-        const content = data.choices[0].message.content;
-        const parsed = JSON.parse(content);
-        return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      // For PDFs, download and extract text first
+      if (mimeType === 'application/pdf') {
+        try {
+          // Fetch PDF bytes
+          const pdfResp = await fetch(fileUrl);
+          const pdfBytes = await pdfResp.arrayBuffer();
+          
+          // Import PDF parsing library
+          const { getDocument, GlobalWorkerOptions } = await import('https://esm.sh/pdfjs-dist@3.11.174');
+          GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+          
+          // Parse PDF
+          const loadingTask = getDocument({ data: new Uint8Array(pdfBytes) });
+          const pdf = await loadingTask.promise;
+          
+          let fullText = '';
+          for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map((item: any) => item.str).join(' ');
+            fullText += pageText + '\n';
+          }
+          
+          // Use OpenAI to parse the extracted text
+          const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [{
+                role: 'user',
+                content: `Extract invoice/receipt data from this text. Return JSON with: vendor_name, receipt_date, subtotal, tax, total, items array (each with: description, quantity, unit_price, total_price, part_number if available). If field not found, use null.\n\nText:\n${fullText.slice(0, 8000)}`
+              }],
+              response_format: { type: 'json_object' },
+              max_tokens: 2000
+            })
+          });
+          
+          if (openaiResp.ok) {
+            const data = await openaiResp.json();
+            const content = data.choices[0].message.content;
+            const parsed = JSON.parse(content);
+            return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          }
+        } catch (pdfError) {
+          console.error('PDF parsing failed:', pdfError);
+          // Continue to Azure fallback
+        }
+      } else {
+        // For images, use Vision API
+        const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [{
+              role: 'user',
+              content: [{
+                type: 'text',
+                text: `Extract invoice/receipt data from this document. Return JSON with: vendor_name, receipt_date, subtotal, tax, total, items array (each with: description, quantity, unit_price, total_price, part_number if available). If you can't find a field, use null.`
+              }, {
+                type: 'image_url',
+                image_url: { url: fileUrl }
+              }]
+            }],
+            response_format: { type: 'json_object' },
+            max_tokens: 2000
+          })
+        });
+        
+        if (openaiResp.ok) {
+          const data = await openaiResp.json();
+          const content = data.choices[0].message.content;
+          const parsed = JSON.parse(content);
+          return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
       }
     }
 
