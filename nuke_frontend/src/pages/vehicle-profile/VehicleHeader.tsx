@@ -436,47 +436,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </button>
       </div>
 
-      {/* Valuation Crown Jewel (Windows 95 / cursor style) */}
-      {vehicle?.id && valuation && (
-        <div className="card" style={{ marginTop: 8, padding: '8px' }}>
-          <div className="valuation" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-            {/* BIG NUMBER */}
-            <div className="value-display" style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-              <div className="currency" style={{ fontSize: '14px', fontWeight: 700 }}>$</div>
-              <div className="amount" style={{ fontSize: '24px', fontWeight: 800 }}>
-                {Number(valuation.estimatedValue || 0).toLocaleString()}
-              </div>
-            </div>
-
-            {/* CONFIDENCE */}
-            <div className="confidence-display">
-              <div className="confidence-bar" style={{ height: 8, border: '1px solid var(--border-medium)', background: 'var(--grey-200)', position: 'relative' }}>
-                <div className="fill" style={{ width: `${Math.min(valuation.confidence || 0, 100)}%`, height: 6, background: '#008000' }} />
-              </div>
-              <div className="confidence-text" style={{ fontSize: '10px', marginTop: 2 }}>
-                {Math.round(valuation.confidence)}% Confidence ✅
-              </div>
-            </div>
-
-            {/* DATA SOURCES */}
-            {Array.isArray(valuation.dataSources) && valuation.dataSources.length > 0 && (
-              <div className="data-sources" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {valuation.dataSources.slice(0, 4).map((s: string, idx: number) => (
-                  <div key={idx} className="source" style={{ fontSize: '10px', border: '1px solid var(--border-light)', padding: '2px 4px', background: 'var(--grey-100)' }}>
-                    ✓ {s}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* RANGE */}
-            <div className="value-range" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-              <div>Low: {formatCurrency(valuation.estimatedValue * 0.85)}</div>
-              <div>High: {formatCurrency(valuation.estimatedValue * 1.15)}</div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Valuation Crown Jewel REMOVED - Redundant with VehiclePricingWidget below */}
       {/* Price History Modal */}
       {vehicle?.id && (
         <PriceHistoryModal vehicleId={vehicle.id} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
