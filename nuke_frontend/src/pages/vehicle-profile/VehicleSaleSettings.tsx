@@ -1,9 +1,12 @@
 import React from 'react';
 import VehicleResults from '../../components/VehicleResults';
+import BuyVehicleButton from '../../components/BuyVehicleButton';
 import type { VehicleSaleSettingsProps } from './types';
 
 const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
   vehicle,
+  session,
+  permissions,
   saleSettings,
   savingSale,
   viewCount,
@@ -144,14 +147,28 @@ const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="button button-primary" disabled={savingSale} onClick={onSaveSaleSettings}>
-              {savingSale ? 'Saving…' : 'Save Sale Settings'}
-            </button>
-            <button className="button" onClick={() => composeListingForPartner('bring_a_trailer')}>
-              Compose & Autofill
-            </button>
-          </div>
+          {/* Show sale settings to owner */}
+          {permissions?.isVerifiedOwner && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="button button-primary" disabled={savingSale} onClick={onSaveSaleSettings}>
+                {savingSale ? 'Saving…' : 'Save Sale Settings'}
+              </button>
+              <button className="button" onClick={() => composeListingForPartner('bring_a_trailer')}>
+                Compose & Autofill
+              </button>
+            </div>
+          )}
+
+          {/* Show buy button to non-owners when vehicle is for sale */}
+          {!permissions?.isVerifiedOwner && vehicle.is_for_sale && vehicle.asking_price && (
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
+              <BuyVehicleButton
+                vehicleId={vehicle.id}
+                salePrice={vehicle.asking_price}
+                vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              />
+            </div>
+          )}
 
           {/* Existing market summary (read-only) */}
           <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 12, paddingTop: 12 }}>
