@@ -113,39 +113,80 @@ serve(async (req: Request) => {
     const provider = (Deno.env.get('RECEIPT_PROVIDER') || '').toLowerCase();
     const awsEndpoint = Deno.env.get('AWS_RECEIPT_ENDPOINT');
     const awsApiKey = Deno.env.get('AWS_RECEIPT_API_KEY');
+    const openaiKey = Deno.env.get('openai_api_key');
 
     // Prefer AWS API Gateway if configured
     if (provider === 'aws' || awsEndpoint) {
-      // Construct target URL
-      let target = (awsEndpoint || '').trim();
-      if (!target) throw new Error('AWS_RECEIPT_ENDPOINT not set');
-      // If the endpoint is the stage root, append route
-      if (!/\/analyze-receipt\/?$/.test(target)) {
-        target = target.replace(/\/$/, '') + '/analyze-receipt';
+      try {
+        let target = (awsEndpoint || '').trim();
+        if (!target) throw new Error('AWS_RECEIPT_ENDPOINT not set');
+        if (!/\/analyze-receipt\/?$/.test(target)) {
+          target = target.replace(/\/$/, '') + '/analyze-receipt';
+        }
+        let fileUrl = url;
+        if (!fileUrl && bucket && path) {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL');
+          if (!supabaseUrl) throw new Error('SUPABASE_URL not set');
+          fileUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+        }
+        if (!fileUrl) throw new Error('No url provided');
+
+        const resp = await fetch(target, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...(awsApiKey ? { 'x-api-key': awsApiKey } : {})
+          },
+          body: JSON.stringify({ url: fileUrl, mimeType })
+        });
+        const text = await resp.text();
+        if (!resp.ok) throw new Error(`AWS gateway error ${resp.status}: ${text}`);
+        return new Response(text, { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      } catch (awsError) {
+        console.log('AWS parsing failed, falling back to OpenAI:', awsError);
       }
-      // Prefer direct URL if given; else build public url from bucket/path
+    }
+
+    // Fallback to OpenAI if Azure/AWS not configured
+    if (openaiKey) {
       let fileUrl = url;
       if (!fileUrl && bucket && path) {
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        if (!supabaseUrl) throw new Error('SUPABASE_URL not set');
         fileUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
       }
-      if (!fileUrl) throw new Error('No url provided');
-
-      const resp = await fetch(target, {
+      
+      const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'content-type': 'application/json',
-          ...(awsApiKey ? { 'x-api-key': awsApiKey } : {})
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ url: fileUrl, mimeType })
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{
+            role: 'user',
+            content: [{
+              type: 'text',
+              text: `Extract invoice/receipt data from this document. Return JSON with: vendor_name, receipt_date, subtotal, tax, total, items array (each with: description, quantity, unit_price, total_price). If you can't find a field, use null.`
+            }, {
+              type: 'image_url',
+              image_url: { url: fileUrl }
+            }]
+          }],
+          response_format: { type: 'json_object' },
+          max_tokens: 2000
+        })
       });
-      const text = await resp.text();
-      if (!resp.ok) throw new Error(`AWS gateway error ${resp.status}: ${text}`);
-      return new Response(text, { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      
+      if (openaiResp.ok) {
+        const data = await openaiResp.json();
+        const content = data.choices[0].message.content;
+        const parsed = JSON.parse(content);
+        return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
     }
 
-    // Fallback: Azure Form Recognizer (requires env vars set)
+    // Last resort: Azure Form Recognizer (requires env vars set)
     const bytes = await fetchFileBytes({ url, bucket, path });
     const azure = await analyzeWithAzureReceipt(bytes);
     const parsed = mapAzureToParsed(azure);
