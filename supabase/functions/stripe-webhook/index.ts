@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
 
       const userId = session.client_reference_id || session.metadata?.user_id
       const amountCents = session.amount_total // Stripe provides this directly
+      const purchaseType = session.metadata?.purchase_type || 'credits'
 
       if (!userId || !amountCents) {
         console.error('Missing user_id or amount in webhook')
@@ -60,23 +61,80 @@ Deno.serve(async (req) => {
       // Initialize Supabase with service role
       const { createClient } = await import('jsr:@supabase/supabase-js@2')
       const supabase = createClient(
-        Deno.env.get('PROJECT_URL')!,
-        Deno.env.get('SERVICE_ROLE_KEY')!
+        Deno.env.get('PROJECT_URL') || Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
       )
 
-      // Add cash to user account (professional system)
-      await supabase.rpc('add_cash_to_user', {
-        p_user_id: userId,
-        p_amount_cents: amountCents,
-        p_stripe_payment_id: session.id,
-        p_metadata: {
-          stripe_session_id: session.id,
-          amount_paid_usd: amountCents / 100,
-          payment_method: session.payment_method_types?.[0] || 'card'
+      // Route based on purchase type
+      if (purchaseType === 'vehicle_transaction') {
+        // Handle vehicle transaction facilitation fee
+        const transactionId = session.metadata?.transaction_id
+        
+        if (!transactionId) {
+          console.error('Missing transaction_id for vehicle transaction')
+          return new Response('Invalid metadata', { status: 400 })
         }
-      })
 
-      console.log(`Added $${amountCents / 100} (${amountCents} cents) to user ${userId}`)
+        // Update transaction with payment confirmation
+        await supabase
+          .from('vehicle_transactions')
+          .update({
+            stripe_payment_id: session.payment_intent,
+            fee_paid_at: new Date().toISOString(),
+            status: 'pending_documents'
+          })
+          .eq('id', transactionId)
+
+        console.log(`Vehicle transaction ${transactionId} fee paid: $${amountCents / 100}`)
+
+        // Trigger document generation
+        try {
+          await fetch(`${Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')}/functions/v1/generate-transaction-documents`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')}`
+            },
+            body: JSON.stringify({ transaction_id: transactionId })
+          })
+        } catch (err) {
+          console.error('Failed to trigger document generation:', err)
+        }
+
+        // Trigger SMS notifications
+        try {
+          await fetch(`${Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')}/functions/v1/send-transaction-sms`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')}`
+            },
+            body: JSON.stringify({ 
+              transaction_id: transactionId,
+              notification_type: 'sign_request'
+            })
+          })
+        } catch (err) {
+          console.error('Failed to trigger SMS notifications:', err)
+        }
+
+        // Note: Shipping listing will be created after BOTH parties sign
+        // This is handled by the transaction service when checking signature status
+      } else {
+        // Default: Add cash to user account (existing functionality)
+        await supabase.rpc('add_cash_to_user', {
+          p_user_id: userId,
+          p_amount_cents: amountCents,
+          p_stripe_payment_id: session.id,
+          p_metadata: {
+            stripe_session_id: session.id,
+            amount_paid_usd: amountCents / 100,
+            payment_method: session.payment_method_types?.[0] || 'card'
+          }
+        })
+
+        console.log(`Added $${amountCents / 100} (${amountCents} cents) to user ${userId}`)
+      }
     }
 
     return new Response(

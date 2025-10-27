@@ -69,6 +69,8 @@ import BuilderDashboard from './pages/BuilderDashboard';
 import BrowseInvestments from './pages/BrowseInvestments';
 import Market from './pages/Market';
 import Legal from './pages/Legal';
+import SignDocument from './pages/SignDocument';
+import ShippingSettings from './pages/admin/ShippingSettings';
 
 
 // Auth components
@@ -275,6 +277,10 @@ function App() {
             <Route path="/admin/ownership-verifications" element={<OwnershipVerificationDashboard />} />
             <Route path="/admin/price-editor" element={<BulkPriceEditor />} />
             <Route path="/admin/price-import" element={<PriceCsvImport />} />
+            <Route path="/admin/shipping-settings" element={<ShippingSettings />} />
+            
+            {/* Transaction & Signature Routes */}
+            <Route path="/sign/:token" element={<SignDocument />} />
             <Route path="/shops" element={<Shops />} />
             <Route path="/shops/onboarding" element={<ShopOnboarding />} />
             {/* <Route path="/org/:orgId" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} /> */}
