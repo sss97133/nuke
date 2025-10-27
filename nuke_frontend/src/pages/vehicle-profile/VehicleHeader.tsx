@@ -331,17 +331,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 sale_price: (vehicle as any).sale_price,
                 is_for_sale: (vehicle as any).is_for_sale,
               } as any;
-              const pi = sig && sig.primary_label && typeof sig.primary_value === 'number'
-                ? { label: sig.primary_label as any, amount: sig.primary_value as number }
-                : computePrimaryPrice(priceMeta);
               const delta = sig && typeof sig.delta_pct === 'number' && typeof sig.delta_amount === 'number'
                 ? { amount: sig.delta_amount as number, percent: sig.delta_pct as number, isPositive: (sig.delta_amount as number) >= 0 }
                 : computeDelta(priceMeta);
               return (
                 <>
-                  {pi.label && typeof pi.amount === 'number' && (
-                    <span style={smallChipStyle} title={Array.isArray(sig?.sources) ? `Sources: ${sig.sources.join(', ')}` : undefined}>{pi.label}: {formatCurrency(pi.amount)}</span>
-                  )}
+                  {/* Removed redundant price badge - already shown in main display above */}
                   {delta && (
                     <span style={{ ...smallChipStyle, color: delta.isPositive ? '#006400' : '#800000' }} title={Array.isArray(sig?.sources) ? `Sources: ${sig.sources.join(', ')}` : undefined}>
                       {delta.isPositive ? '↑' : '↓'} {Math.abs(delta.percent).toFixed(1)}%

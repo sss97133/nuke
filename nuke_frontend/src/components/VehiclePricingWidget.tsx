@@ -543,17 +543,11 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '12px', letterSpacing: '0.5px' }}>
               MARKET RANGE
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div>
                 <div style={{ fontSize: '11px', color: '#6b7280' }}>LOW</div>
                 <div style={{ fontSize: '16px', fontWeight: '500' }}>
                   {formatCurrency((pricingStatus.estimated_value || 0) * 0.85)}
-                </div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#6b7280' }}>AVERAGE</div>
-                <div style={{ fontSize: '16px', fontWeight: '600', color: '#059669' }}>
-                  {formatCurrency(pricingStatus.estimated_value)}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
