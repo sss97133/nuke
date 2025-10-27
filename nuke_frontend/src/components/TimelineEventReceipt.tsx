@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 
 interface TimelineEventReceiptProps {
@@ -89,7 +90,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
   };
 
   if (loading || !event) {
-    return (
+    return createPortal(
       <div style={{
         position: 'fixed',
         inset: 0,
@@ -100,7 +101,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         zIndex: 10000
       }}>
         <div style={{ color: '#fff', fontSize: '10pt' }}>Loading...</div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
