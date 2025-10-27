@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import AddEventWizard from './AddEventWizard';
 import UniversalImageUpload from './UniversalImageUpload';
@@ -80,6 +80,71 @@ const VehicleTimeline: React.FC<{
   const [lastScrollTime, setLastScrollTime] = useState<number>(0);
   const [vehicleValueMeta, setVehicleValueMeta] = useState<{ current_value?: number|null; asking_price?: number|null; purchase_price?: number|null; msrp?: number|null } | null>(null);
   const [readyTargetHours, setReadyTargetHours] = useState<number>(100);
+
+  // Mobile responsiveness for timeline grid
+  const gridWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [cellSize, setCellSize] = useState<number>(12);
+  const [gapSize, setGapSize] = useState<number>(2);
+  const weekdayLabelColWidth = 24; // px
+  const yearsColumnWidth = 80; // px
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 640px)');
+    const onChange = () => setIsMobile(media.matches);
+    onChange();
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    // Recompute cell size to fit available width (particularly on mobile)
+    const recompute = () => {
+      const wrapper = gridWrapperRef.current;
+      if (!wrapper) return;
+      const totalWeeksMax = 53;
+      const availableWidth = (() => {
+        const rect = wrapper.getBoundingClientRect();
+        const sideYears = isMobile ? 0 : yearsColumnWidth;
+        // wrapper spans the grid column already; use its width directly
+        return Math.max(0, rect.width - 0 - 0); // padding handled by parent
+      })();
+
+      if (!isMobile) {
+        // Desktop: try to keep 12px cells, fall back if very constrained
+        const desired = 12;
+        const gaps = gapSize * (totalWeeksMax - 1);
+        const needed = weekdayLabelColWidth + totalWeeksMax * desired + gaps;
+        if (needed <= availableWidth) {
+          setCellSize(desired);
+          return;
+        }
+      }
+
+      // Mobile (or constrained): determine max columns we will show to maintain legibility
+      const minCell = 8; // keep touchable and visible
+      const maxColsFit = (avail: number) => {
+        // width = weekdayLabelColWidth + cols*cell + (cols-1)*gap
+        // Solve for cols given cell = minCell
+        let cols = 53;
+        for (let c = 53; c >= 4; c--) {
+          const widthNeeded = weekdayLabelColWidth + c * minCell + (c - 1) * gapSize;
+          if (widthNeeded <= avail) return c;
+        }
+        return 4;
+      };
+
+      const cols = maxColsFit(availableWidth);
+      // If we can show all 53 with minCell keep minCell; otherwise adjust cell so cols fit exactly
+      const gaps = gapSize * (cols - 1);
+      const newCell = Math.floor((availableWidth - weekdayLabelColWidth - gaps) / cols);
+      setCellSize(Math.max(6, Math.min(12, newCell)));
+    };
+
+    recompute();
+    window.addEventListener('resize', recompute);
+    return () => window.removeEventListener('resize', recompute);
+  }, [isMobile, gapSize]);
 
   useEffect(() => {
     loadTimelineEvents();
@@ -512,46 +577,48 @@ const VehicleTimeline: React.FC<{
 
                   return (
                     <div key={targetYear} id={`year-${targetYear}`} className="bg-white rounded-lg p-2">
-                      {/* Months header positioned above everything */}
-                      <div style={{ marginBottom: '2px' }}>
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '24px repeat(53, 12px)',
-                            gap: '2px',
-                            justifyContent: 'start'
-                          }}
-                        >
-                          {/* empty cell to align with weekday label column */}
-                          <div style={{ gridColumn: '1 / span 1' }} />
-                          {/* Month labels - each month gets ~4.4 columns (53 weeks / 12 months) */}
-                          {Array.from({ length: 12 }, (_, monthIndex) => {
-                            const startWeek = Math.floor((monthIndex * 53) / 12);
-                            const endWeek = Math.floor(((monthIndex + 1) * 53) / 12);
-                            const monthWidth = endWeek - startWeek;
-                            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                            return (
-                              <div
-                                key={monthIndex}
-                                style={{
-                                  gridColumn: `${startWeek + 2} / span ${monthWidth}`,
-                                  textAlign: 'center',
-                                  fontSize: '8pt',
-                                  color: '#888888',
-                                  lineHeight: '8px'
-                                }}
-                              >
-                                {monthNames[monthIndex]}
-                              </div>
-                            );
-                          })}
+                      {/* Months header positioned above everything - hide on mobile for clarity */}
+                      {!isMobile && (
+                        <div style={{ marginBottom: '2px' }}>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: `24px repeat(53, ${cellSize}px)`,
+                              gap: `${gapSize}px`,
+                              justifyContent: 'start'
+                            }}
+                          >
+                            {/* empty cell to align with weekday label column */}
+                            <div style={{ gridColumn: '1 / span 1' }} />
+                            {/* Month labels - each month gets ~4.4 columns (53 weeks / 12 months) */}
+                            {Array.from({ length: 12 }, (_, monthIndex) => {
+                              const startWeek = Math.floor((monthIndex * 53) / 12);
+                              const endWeek = Math.floor(((monthIndex + 1) * 53) / 12);
+                              const monthWidth = endWeek - startWeek;
+                              const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                              return (
+                                <div
+                                  key={monthIndex}
+                                  style={{
+                                    gridColumn: `${startWeek + 2} / span ${monthWidth}`,
+                                    textAlign: 'center',
+                                    fontSize: '8pt',
+                                    color: '#888888',
+                                    lineHeight: '8px'
+                                  }}
+                                >
+                                  {monthNames[monthIndex]}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
+                      )}
                       
                       {/* Timeline and Years Grid in columns */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 80px', gap: '8px' }}>
                         {/* Timeline grid column */}
-                        <div>
+                        <div ref={gridWrapperRef}>
 
 
                       {/* Vertical Day Grid: Weekday labels + 7 rows × 53 columns */}
@@ -563,7 +630,26 @@ const VehicleTimeline: React.FC<{
                         const dow = gridStart.getDay(); // 0=Sun,1=Mon,...
                         const diffToMonday = (dow + 6) % 7; // 0 if Monday, 6 if Sunday
                         gridStart.setDate(gridStart.getDate() - diffToMonday);
-                        const totalWeeks = 53;
+                        const totalWeeksMax = 53;
+                        // Determine how many weeks to render (mobile shows last N weeks that fit)
+                        let totalWeeks = totalWeeksMax;
+                        let startWeekOffset = 0;
+                        if (isMobile) {
+                          // Compute how many columns fit with current cell size
+                          const wrapper = gridWrapperRef.current;
+                          const availableWidth = wrapper ? wrapper.getBoundingClientRect().width : 320;
+                          const maxCols = (() => {
+                            for (let c = totalWeeksMax; c >= 8; c--) {
+                              const widthNeeded = weekdayLabelColWidth + c * cellSize + (c - 1) * gapSize;
+                              if (widthNeeded <= availableWidth) return c;
+                            }
+                            return Math.min(20, totalWeeksMax);
+                          })();
+                          totalWeeks = Math.min(totalWeeksMax, Math.max(8, maxCols));
+                          startWeekOffset = totalWeeksMax - totalWeeks; // show the most recent weeks
+                        }
+                        // Apply start week offset for mobile slice
+                        gridStart.setDate(gridStart.getDate() + startWeekOffset * 7);
 
                         const hoursForDay = (dayEvents: TimelineEvent[]): number => {
                           let hours = 0;
@@ -585,9 +671,9 @@ const VehicleTimeline: React.FC<{
                         };
 
                         return (
-                          <div style={{ display: 'grid', gridTemplateColumns: '24px auto', gap: '2px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: `${weekdayLabelColWidth}px auto`, gap: `${gapSize}px` }}>
                             {/* Weekday labels (Mon-Sun) */}
-                            <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, 12px)', gap: '2px' }}>
+                            <div style={{ display: 'grid', gridTemplateRows: `repeat(7, ${cellSize}px)`, gap: `${gapSize}px` }}>
                               {['M','T','W','T','F','S','S'].map((d, i) => (
                                 <div key={i} style={{ textAlign: 'center', fontSize: '8pt', color: '#888888', lineHeight: '12px' }}>{d}</div>
                               ))}
@@ -598,9 +684,9 @@ const VehicleTimeline: React.FC<{
                                 className="timeline-grid"
                                 style={{
                                   display: 'grid',
-                                  gridTemplateRows: 'repeat(7, 12px)',
-                                  gridTemplateColumns: `repeat(${Math.min(53, totalWeeks)}, 12px)`,
-                                  gap: '2px',
+                                  gridTemplateRows: `repeat(7, ${cellSize}px)`,
+                                  gridTemplateColumns: `repeat(${Math.min(53, totalWeeks)}, ${cellSize}px)`,
+                                  gap: `${gapSize}px`,
                                   justifyContent: 'start'
                                 }}
                                 onWheel={handleTimelineScroll}
@@ -640,8 +726,8 @@ const VehicleTimeline: React.FC<{
                                       style={{
                                         gridRow: dayIdx + 1,
                                         gridColumn: weekIdx + 1,
-                                        width: '12px',
-                                        height: '12px',
+                                        width: `${cellSize}px`,
+                                        height: `${cellSize}px`,
                                         backgroundColor: inYear ? colorForHours(hours) : '#f5f5f5',
                                         borderRadius: '2px',
                                         border: clickable ? '1px solid rgba(0,0,0,0.1)' : 'none',
@@ -657,8 +743,21 @@ const VehicleTimeline: React.FC<{
                       })()}
                         </div>
 
-                        {/* Years column - moved to right side */}
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingLeft: '4px' }}>
+                        {/* Years selector */}
+                        {isMobile ? (
+                          <div style={{ marginTop: '8px' }}>
+                            <select
+                              value={selectedYear ?? currentTopYear}
+                              onChange={(e) => selectYear(Number(e.target.value))}
+                              style={{ padding: '4px 6px', fontSize: '10pt' }}
+                            >
+                              {yearIndex.map(y => (
+                                <option key={y} value={y}>{y}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingLeft: '4px' }}>
                           {(() => {
                             const yearsToShow = yearIndex;
                             if (yearsToShow.length <= 5) {
@@ -730,7 +829,8 @@ const VehicleTimeline: React.FC<{
                               );
                             }
                           })()}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -866,7 +966,7 @@ const VehicleTimeline: React.FC<{
             tabIndex={0}
             ref={(el) => el?.focus()}
           >
-            <div className="card" style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto' }}>
+            <div className="card" style={{ maxWidth: '640px', width: '95vw', maxHeight: '85vh', overflow: 'auto' }}>
               <div className="card-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -922,6 +1022,35 @@ const VehicleTimeline: React.FC<{
                 </div>
               </div>
               <div className="card-body">
+              {(() => {
+                // Aggregate day images across events
+                const dayImages: string[] = Array.from(new Set((selectedDayEvents || []).flatMap(ev => Array.isArray(ev.image_urls) ? ev.image_urls : [])));
+                if (dayImages.length === 0) return null;
+                return (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '6px' }}>Day gallery ({dayImages.length})</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                      {dayImages.slice(0, 12).map((u, i) => (
+                        <div
+                          key={`${u}-${i}`}
+                          onClick={(e) => { e.stopPropagation(); setPopupImageUrl(u); }}
+                          style={{
+                            width: '100%',
+                            paddingBottom: '100%',
+                            backgroundImage: `url(${u})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                          title="Open image"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="space-y-2">
                 {Array.from(new Map((selectedDayEvents || []).map(ev => [ev.id, ev])).values()).map((ev) => {
                   // If event has no images but it's a photo event, try to get image from metadata
@@ -947,20 +1076,23 @@ const VehicleTimeline: React.FC<{
                     <div key={ev.id} className="alert alert-default" style={{ cursor: 'pointer' }} onClick={() => setSelectedEventForDetail(ev.id)}>
                       <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
                         {shown.length > 0 && (
-                          <img
-                            src={shown[0]}
-                            alt="Event photo"
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              objectFit: 'cover',
-                              flexShrink: 0
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPopupImageUrl(shown[0]);
-                            }}
-                          />
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 40px)', gridAutoRows: '40px', gap: '4px', flexShrink: 0 }}>
+                            {shown.slice(0, 4).map((u, i) => (
+                              <div
+                                key={`${u}-${i}`}
+                                onClick={(e) => { e.stopPropagation(); setPopupImageUrl(u); }}
+                                style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  backgroundImage: `url(${u})`,
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center',
+                                  borderRadius: '4px'
+                                }}
+                                title="Open image"
+                              />
+                            ))}
+                          </div>
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {isEditing ? (
@@ -997,9 +1129,11 @@ const VehicleTimeline: React.FC<{
                                 </span>
                                 {(() => {
                                   const met = calcEventImpact(ev);
-                                  return met.hours > 0 ? (
-                                    <span className="badge">{met.hours.toFixed(1)}h work</span>
-                                  ) : null;
+                                  const parts: React.ReactNode[] = [];
+                                  if (met.hours > 0) parts.push(<span key="h" className="badge">{met.hours.toFixed(1)}h work</span>);
+                                  if (met.valueUSD > 0) parts.push(<span key="v" className="badge badge-success">≈ {currency(Math.round(met.valueUSD))}</span>);
+                                  if (typeof (ev as any).cost_amount === 'number') parts.push(<span key="c" className="badge badge-info">cost {currency((ev as any).cost_amount)}</span>);
+                                  return parts;
                                 })()}
                               </div>
                             </>
