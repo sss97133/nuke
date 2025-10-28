@@ -105,13 +105,13 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
           <button
             onClick={() => window.history.back()}
             style={{
-              background: '#c0c0c0',
+              background: '#e0e0e0',
               border: '2px outset #ffffff',
               color: '#000000',
               padding: '4px 8px',
               fontSize: '12px',
               cursor: 'pointer',
-              fontFamily: '"MS Sans Serif", sans-serif',
+              fontFamily: 'Arial, sans-serif',
               marginRight: '8px'
             }}
           >
@@ -182,7 +182,7 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
               width: '64px',
               height: '64px',
               borderRadius: '50%',
-              background: uploading ? '#808080' : '#000080',
+              background: uploading ? '#bdbdbd' : '#0066cc',
               color: '#ffffff',
               border: '3px outset #ffffff',
               fontSize: '28px',
@@ -192,7 +192,7 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontFamily: '"MS Sans Serif", sans-serif',
+              fontFamily: 'Arial, sans-serif',
               transition: 'transform 0.2s',
               WebkitTapHighlightColor: 'transparent'
             }}
@@ -585,14 +585,14 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
             disabled={uploading}
             style={{
               width: '100%',
-              background: '#000080',
+              background: '#0066cc',
               color: '#ffffff',
               border: '2px outset #ffffff',
               padding: '12px',
               fontSize: '14px',
               fontWeight: 'bold',
               cursor: 'pointer',
-              fontFamily: '"MS Sans Serif", sans-serif'
+              fontFamily: 'Arial, sans-serif'
             }}
           >
             {uploading ? 'Uploading...' : '📷 Add Photos'}
@@ -676,7 +676,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
                 onClick={() => handleLike(selectedImage.id)}
                 style={{
                   ...styles.actionButton,
-                  background: likedImages.has(selectedImage.id) ? '#008000' : '#c0c0c0',
+                  background: likedImages.has(selectedImage.id) ? '#28a745' : '#e0e0e0',
                   color: likedImages.has(selectedImage.id) ? '#ffffff' : '#000000'
                 }}
               >
@@ -686,7 +686,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
                 onClick={() => handleSave(selectedImage.id)}
                 style={{
                   ...styles.actionButton,
-                  background: savedImages.has(selectedImage.id) ? '#000080' : '#c0c0c0',
+                  background: savedImages.has(selectedImage.id) ? '#0066cc' : '#e0e0e0',
                   color: savedImages.has(selectedImage.id) ? '#ffffff' : '#000000'
                 }}
               >
@@ -696,7 +696,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
                 onClick={() => handleDislike(selectedImage.id)}
                 style={{
                   ...styles.actionButton,
-                  background: '#c0c0c0'
+                  background: '#e0e0e0'
                 }}
               >
                 ✕
@@ -840,14 +840,14 @@ const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }
           style={{
             width: '100%',
             padding: '14px',
-            background: '#000080',
+            background: '#0066cc',
             color: '#ffffff',
             border: '2px outset #ffffff',
             borderRadius: '4px',
             fontSize: '14px',
             fontWeight: 'bold',
             cursor: 'pointer',
-            fontFamily: '"MS Sans Serif", sans-serif',
+            fontFamily: 'Arial, sans-serif',
             marginBottom: '12px'
           }}
         >
@@ -865,7 +865,7 @@ const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }
             style={{
               ...styles.card,
               cursor: spec.researchable ? 'pointer' : 'default',
-              background: spec.researchable ? '#ffffff' : '#c0c0c0'
+              background: spec.researchable ? '#ffffff' : '#e0e0e0'
             }}
             onClick={() => handleSpecClick(spec)}
           >
@@ -913,8 +913,8 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    background: '#c0c0c0',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    background: '#e0e0e0', // var(--grey-200)
+    fontFamily: 'Arial, sans-serif'
   },
   loading: {
     display: 'flex',
@@ -922,11 +922,11 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     height: '100dvh',
     minHeight: '100vh',
-    fontSize: '14px',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontSize: '10px', // Design system standard
+    fontFamily: 'Arial, sans-serif'
   },
   header: {
-    background: '#000080',
+    background: '#0066cc', // Primary blue (better contrast than navy)
     color: '#ffffff',
     padding: '12px',
     borderBottom: '2px solid #ffffff'
@@ -937,34 +937,34 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center'
   },
   title: {
-    fontSize: '14px',
+    fontSize: '10px', // Design system standard
     fontWeight: 'bold',
     margin: 0
   },
   price: {
-    fontSize: '16px',
+    fontSize: '12px', // Slightly larger for importance
     fontWeight: 'bold'
   },
   tabBar: {
     display: 'flex',
-    background: '#c0c0c0',
-    borderBottom: '2px solid #808080',
+    background: '#e0e0e0', // var(--grey-200)
+    borderBottom: '2px solid #bdbdbd', // var(--border-medium)
     padding: '2px'
   },
   tab: {
     flex: 1,
     padding: '8px 4px',
-    background: '#c0c0c0',
+    background: '#e0e0e0', // var(--grey-200)
     border: '2px outset #ffffff',
     color: '#000000',
-    fontSize: '11px',
+    fontSize: '10px', // Design system standard
     fontWeight: 'bold',
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   activeTab: {
     background: '#ffffff',
-    border: '2px inset #808080'
+    border: '2px inset #bdbdbd' // var(--border-medium)
   },
   content: {
     flex: 1,
@@ -984,7 +984,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '8px'
   },
   statCard: {
-    background: '#c0c0c0',
+    background: '#e0e0e0',
     border: '2px outset #ffffff',
     padding: '12px',
     textAlign: 'center'
@@ -992,7 +992,7 @@ const styles: Record<string, React.CSSProperties> = {
   statValue: {
     fontSize: '24px',
     fontWeight: 'bold',
-    color: '#000080',
+    color: '#0066cc',
     marginBottom: '4px'
   },
   statLabel: {
@@ -1001,7 +1001,7 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase'
   },
   card: {
-    background: '#c0c0c0',
+    background: '#e0e0e0',
     border: '1px solid #808080',
     padding: '8px',
     marginBottom: '4px'
@@ -1032,11 +1032,11 @@ const styles: Record<string, React.CSSProperties> = {
   commentsTitle: {
     fontSize: '12px',
     fontWeight: 'bold' as const,
-    color: '#000080'
+    color: '#0066cc'
   },
   commentsCount: {
     fontSize: '10px',
-    color: '#808080',
+    color: '#bdbdbd',
     cursor: 'pointer'
   },
   commentInput: {
@@ -1047,7 +1047,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px',
     border: '1px inset #808080',
     fontSize: '12px',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     boxSizing: 'border-box' as const
   },
   eventCard: {
@@ -1058,7 +1058,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   eventDate: {
     fontSize: '10px',
-    color: '#808080',
+    color: '#bdbdbd',
     marginBottom: '4px'
   },
   eventTitle: {
@@ -1069,7 +1069,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   eventMeta: {
     fontSize: '11px',
-    color: '#000080'
+    color: '#0066cc'
   },
   imageGrid: {
     display: 'grid',
@@ -1110,12 +1110,12 @@ const styles: Record<string, React.CSSProperties> = {
     right: '12px',
     width: '40px',
     height: '40px',
-    background: '#c0c0c0',
+    background: '#e0e0e0',
     border: '2px outset #ffffff',
     color: '#000000',
     fontSize: '20px',
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   imageCounter: {
     position: 'absolute',
@@ -1125,7 +1125,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ffffff',
     padding: '4px 8px',
     fontSize: '12px',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     borderRadius: '2px'
   },
   floatingActions: {
@@ -1143,7 +1143,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '2px outset #ffffff',
     fontSize: '20px',
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     transition: 'all 0.1s ease'
   },
   gestureHints: {
@@ -1158,7 +1158,7 @@ const styles: Record<string, React.CSSProperties> = {
   hintText: {
     color: '#ffffff',
     fontSize: '11px',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     textAlign: 'center'
   },
   viewModeBar: {
@@ -1170,17 +1170,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   viewModeButton: {
     flex: 1,
-    background: '#c0c0c0',
+    background: '#e0e0e0',
     border: '2px outset #ffffff',
     padding: '10px',
     fontSize: '12px',
     fontWeight: 'bold' as const,
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     color: '#000000'
   },
   viewModeButtonActive: {
-    background: '#000080',
+    background: '#0066cc',
     color: '#ffffff',
     border: '2px inset #ffffff'
   },
@@ -1213,7 +1213,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     fontSize: '14px',
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   discoverGrid: {
     display: 'grid',
@@ -1262,7 +1262,7 @@ const styles: Record<string, React.CSSProperties> = {
   technicalStat: {
     fontSize: '9px',
     color: '#ffffff',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     textShadow: '1px 1px 2px #000000'
   },
   actionButtonsRow: {
@@ -1274,14 +1274,14 @@ const styles: Record<string, React.CSSProperties> = {
   actionBtn: {
     flex: 1,
     padding: '14px',
-    background: '#000080',
+    background: '#0066cc',
     color: '#ffffff',
     border: '2px outset #ffffff',
     borderRadius: '4px',
     fontSize: '14px',
     fontWeight: 'bold' as const,
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     transition: 'transform 0.1s'
   }
 };

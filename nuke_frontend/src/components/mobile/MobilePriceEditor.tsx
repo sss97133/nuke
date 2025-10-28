@@ -283,14 +283,14 @@ const styles = {
   },
   title: {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '10px',
     fontFamily: '"MS Sans Serif", sans-serif',
     fontWeight: 'bold'
   },
   closeBtn: {
     background: 'none',
     border: 'none',
-    fontSize: '24px',
+    fontSize: '10px',
     cursor: 'pointer',
     padding: '0'
   },
@@ -309,17 +309,17 @@ const styles = {
     textAlign: 'center' as const
   },
   gainLabel: {
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: 'bold',
     marginBottom: '4px'
   },
   gainValue: {
-    fontSize: '24px',
+    fontSize: '10px',
     fontWeight: 'bold',
     fontFamily: 'monospace'
   },
   gainPct: {
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold',
     marginTop: '4px'
   },
@@ -329,7 +329,7 @@ const styles = {
     gap: '6px'
   },
   label: {
-    fontSize: '13px',
+    fontSize: '10px',
     fontWeight: 'bold',
     fontFamily: '"MS Sans Serif", sans-serif'
   },
@@ -337,7 +337,7 @@ const styles = {
     padding: '14px',
     border: '2px inset #c0c0c0',
     borderRadius: '4px',
-    fontSize: '16px',
+    fontSize: '10px',
     fontFamily: 'monospace'
   },
   toggleField: {
@@ -358,14 +358,14 @@ const styles = {
     cursor: 'pointer'
   },
   toggleText: {
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold'
   },
   historySection: {
     marginTop: '8px'
   },
   historyTitle: {
-    fontSize: '13px',
+    fontSize: '10px',
     fontWeight: 'bold',
     marginBottom: '8px'
   },
@@ -403,7 +403,7 @@ const styles = {
     color: '#ffffff',
     border: '2px outset #ffffff',
     borderRadius: '4px',
-    fontSize: '16px',
+    fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer',
     fontFamily: '"MS Sans Serif", sans-serif',
