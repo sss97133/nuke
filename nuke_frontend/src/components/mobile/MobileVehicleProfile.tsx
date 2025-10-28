@@ -623,10 +623,9 @@ const DiscoverGridView: React.FC<{ images: any[]; onImageClick: (img: any) => vo
 const TechnicalGridView: React.FC<{ images: any[]; onImageClick: (img: any) => void }> = ({ images, onImageClick }) => (
   <div style={styles.technicalGrid}>
     {images.map((image) => {
-      // Calculate engagement metrics
-      const views = image.view_count || Math.floor(Math.random() * 500);
-      const engagement = image.engagement_score || Math.floor(Math.random() * 100);
-      const value = image.technical_value || Math.floor(Math.random() * 1000);
+      const views = image.view_count || 0;
+      const engagement = image.engagement_score || 0;
+      const value = image.technical_value || 0;
       const tagCount = image.tag_count || 0;
 
       return (
