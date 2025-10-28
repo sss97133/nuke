@@ -223,7 +223,7 @@ export default function Market() {
             boxShadow: '4px 4px 0 rgba(0,0,0,0.2)'
           }}>
             <div style={{ fontSize: '9pt', marginBottom: '8px', opacity: 0.9 }}>
-              💰 Your Buying Power
+              Your Buying Power
             </div>
             <div style={{ fontSize: '32pt', fontWeight: 'bold', marginBottom: '8px' }}>
               {formatCurrency(cashBalance / 100)}
@@ -338,7 +338,7 @@ export default function Market() {
             {/* Top Gainers */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: 'var(--space-2)', color: '#008000' }}>
-                🔥 Top Gainers
+                Top Gainers
               </h2>
               <div style={{ background: 'var(--white)', border: '2px solid var(--border)' }}>
                 {topGainers.map((item, idx) => (
@@ -390,7 +390,7 @@ export default function Market() {
             {/* Top Losers */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: 'var(--space-2)', color: '#800000' }}>
-                📉 Top Losers
+                Top Losers
               </h2>
               <div style={{ background: 'var(--white)', border: '2px solid var(--border)' }}>
                 {topLosers.map((item, idx) => (
@@ -437,7 +437,7 @@ export default function Market() {
             {/* Most Active */}
             <div>
               <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
-                📊 Most Active
+                Most Active
               </h2>
               <div style={{ background: 'var(--white)', border: '2px solid var(--border)' }}>
                 {mostActive.map((item, idx) => (
