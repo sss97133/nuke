@@ -240,9 +240,6 @@ const AllVehicles: React.FC = () => {
     // Live streaming (major boost)
     if (vehicle.is_streaming) hype += 35;
 
-    // Recent updates (mock data - would need actual update tracking)
-    // if (vehicle.recent_updates) hype += 10;
-
     // Cap at 100% and ensure minimum of 5%
     return Math.min(Math.max(hype, 5), 100);
   };
