@@ -72,7 +72,7 @@ import Market from './pages/Market';
 import Legal from './pages/Legal';
 import SignDocument from './pages/SignDocument';
 import ShippingSettings from './pages/admin/ShippingSettings';
-
+import { MobileOrg } from './pages/mobile/MobileOrg';
 
 // Auth components
 import ResetPassword from './pages/ResetPassword';
@@ -286,6 +286,8 @@ function App() {
             <Route path="/shops/onboarding" element={<ShopOnboarding />} />
             <Route path="/shops/new" element={<CreateOrganization />} />
             <Route path="/org/:id" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} />
+            <Route path="/mobile/org/:orgId" element={<MobileOrg />} />
+            <Route path="/mobile/org" element={<MobileOrg />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/inbox" element={<Inbox />} />
