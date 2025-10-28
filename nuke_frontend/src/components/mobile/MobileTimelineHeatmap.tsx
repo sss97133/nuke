@@ -213,7 +213,8 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
         date: dateStr,
         events: [],
         eventCount: 0,
-        imageCount: 0
+        imageCount: 0,
+        durationHours: 0
       });
 
       if (currentWeek.length === 7) {
