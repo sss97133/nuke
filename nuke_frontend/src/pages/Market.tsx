@@ -70,14 +70,13 @@ export default function Market() {
 
       if (!vehicles) return;
 
-      // Calculate changes (mock for now - would come from price history table)
       const marketItems: MarketItem[] = vehicles.map(v => {
         const change = (v.current_value && v.purchase_price) 
           ? v.current_value - v.purchase_price 
-          : (v.current_value || 0) * (Math.random() * 0.2 - 0.1);
+          : 0;
         const changePct = v.purchase_price 
           ? (change / v.purchase_price) * 100
-          : (Math.random() * 20 - 10);
+          : 0;
         
         return {
           id: v.id,

@@ -27,11 +27,16 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    console.log('[MobileVehicleProfile] Component mounted, isMobile:', isMobile);
     loadVehicle();
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
   }, [vehicleId]);
+
+  useEffect(() => {
+    console.log('[MobileVehicleProfile] Active tab changed to:', activeTab);
+  }, [activeTab]);
 
   const loadVehicle = async () => {
     const { data } = await supabase
@@ -638,10 +643,10 @@ const TechnicalGridView: React.FC<{ images: any[]; onImageClick: (img: any) => v
         />
           {/* Data Overlay */}
           <div style={styles.technicalOverlay}>
-            <div style={styles.technicalStat}>👁️ {views}</div>
-            <div style={styles.technicalStat}>⭐ {engagement}%</div>
-            <div style={styles.technicalStat}>💰 ${value}</div>
-            <div style={styles.technicalStat}>🏷️ {tagCount}</div>
+            {views > 0 && <div style={styles.technicalStat}>{views} views</div>}
+            {engagement > 0 && <div style={styles.technicalStat}>{engagement}%</div>}
+            {value > 0 && <div style={styles.technicalStat}>${value.toLocaleString()}</div>}
+            {tagCount > 0 && <div style={styles.technicalStat}>{tagCount} tags</div>}
           </div>
         </div>
       );
