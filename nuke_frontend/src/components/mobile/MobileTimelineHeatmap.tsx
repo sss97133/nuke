@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
 
 interface TimelineEvent {
@@ -361,8 +362,8 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
         );
       })}
 
-      {/* Day Detail Modal */}
-      {selectedDay && (
+      {/* Day Detail Modal - USING PORTAL TO ESCAPE PARENT CONTAINER */}
+      {selectedDay && ReactDOM.createPortal(
         <div style={styles.modalOverlay} onClick={() => setSelectedDay(null)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
@@ -417,7 +418,8 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -515,7 +517,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: 999999,
     padding: '16px'
   },
   modal: {
