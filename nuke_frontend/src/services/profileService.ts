@@ -108,6 +108,25 @@ export class ProfileService {
         });
       }
       
+      // Process organization timeline events
+      if (orgTimelineResult.data) {
+        orgTimelineResult.data.forEach((event: any) => {
+          const raw = event.event_date || event.created_at;
+          if (!raw) return;
+          const date = toDateOnly(raw);
+          bump(date, 'business_event', {
+            metadata: { 
+              event_type: event.event_type,
+              title: event.title,
+              description: event.description,
+              business_id: event.business_id
+            },
+            related_vehicle_id: null,
+            created_at: raw,
+          });
+        });
+      }
+      
       // Process image uploads (prefer EXIF capture date, normalized to date-only)
       // Group by vehicle_id AND date so each vehicle gets separate contributions
       if (vehicleImagesResult.data) {

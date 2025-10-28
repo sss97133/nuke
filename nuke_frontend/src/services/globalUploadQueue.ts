@@ -67,15 +67,15 @@ class GlobalUploadQueue {
       
       const { data: recentImages } = await supabase
         .from('vehicle_images')
-        .select('original_filename, file_size, taken_at')
-        .gte('uploaded_at', thirtyDaysAgo.toISOString());
+        .select('filename, file_size, taken_at')
+        .gte('created_at', thirtyDaysAgo.toISOString());
       
       if (recentImages) {
         recentImages.forEach(img => {
-          if (img.original_filename && img.file_size) {
+          if (img.filename && img.file_size) {
             // Create fingerprint from stored metadata
             const takenTimestamp = img.taken_at ? new Date(img.taken_at).getTime() : 0;
-            const fingerprint = `${img.original_filename}_${img.file_size}_${takenTimestamp}`;
+            const fingerprint = `${img.filename}_${img.file_size}_${takenTimestamp}`;
             this.uploadedFingerprints.add(fingerprint);
           }
         });

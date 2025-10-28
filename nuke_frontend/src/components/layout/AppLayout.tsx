@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import NotificationBell from '../notifications/NotificationBell';
+import CashBalanceWidget from '../CashBalanceWidget';
 import '../../design-system.css';
 
 interface AppLayoutProps {
@@ -165,6 +166,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
             {/* Upload Indicator - Windows 95 style */}
             <GlobalUploadIndicator />
+
+            {/* Cash Balance Widget */}
+            <CashBalanceWidget />
 
             {session ? (
               <Link to="/profile" className="profile-bubble">

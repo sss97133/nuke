@@ -53,7 +53,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import OwnershipVerificationDashboard from './components/admin/OwnershipVerificationDashboard';
 import Shops from './pages/Shops';
 import ShopOnboarding from './pages/ShopOnboarding';
-// import OrganizationProfile from './pages/OrganizationProfile'; // Temporarily disabled due to build errors
+import CreateOrganization from './pages/CreateOrganization';
+import OrganizationProfile from './pages/OrganizationProfile';
 import ErrorBoundary from './components/util/ErrorBoundary';
 import AcceptInvite from './pages/AcceptInvite';
 import Notifications from './pages/Notifications';
@@ -283,7 +284,8 @@ function App() {
             <Route path="/sign/:token" element={<SignDocument />} />
             <Route path="/shops" element={<Shops />} />
             <Route path="/shops/onboarding" element={<ShopOnboarding />} />
-            {/* <Route path="/org/:orgId" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} /> */}
+            <Route path="/shops/new" element={<CreateOrganization />} />
+            <Route path="/org/:id" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/inbox" element={<Inbox />} />
