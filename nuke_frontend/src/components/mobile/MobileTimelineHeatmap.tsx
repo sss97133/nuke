@@ -50,6 +50,32 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // AI Value Impact Calculations
+  const calculateValueImpact = (event: any): string => {
+    const hours = event.duration_hours || 0;
+    const cost = event.cost_amount || 0;
+    
+    // Estimate labor value at $120/hr shop rate
+    const laborValue = hours * 120;
+    const totalValue = laborValue + (cost * 0.5); // Parts add 50% of cost to value
+    
+    if (totalValue < 500) return '💎 Minor Impact';
+    if (totalValue < 2000) return '💎 +$' + Math.round(totalValue).toLocaleString();
+    if (totalValue < 5000) return '🔥 +$' + Math.round(totalValue).toLocaleString();
+    return '🚀 +$' + Math.round(totalValue).toLocaleString() + ' Major';
+  };
+
+  const getValueImpactColor = (event: any): string => {
+    const hours = event.duration_hours || 0;
+    const cost = event.cost_amount || 0;
+    const totalValue = (hours * 120) + (cost * 0.5);
+    
+    if (totalValue < 500) return 'rgba(100, 100, 100, 0.1)';
+    if (totalValue < 2000) return 'rgba(0, 128, 255, 0.15)';
+    if (totalValue < 5000) return 'rgba(255, 140, 0, 0.2)';
+    return 'rgba(255, 0, 0, 0.25)';
+  };
+
   useEffect(() => {
     if (vehicleId) {
       loadTimelineData();
@@ -432,6 +458,9 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
                     {event.duration_hours && event.duration_hours > 0 && (
                       <span style={styles.durationBadge}>{event.duration_hours.toFixed(1)}h</span>
                     )}
+                    {event.cost_amount && event.cost_amount > 0 && (
+                      <span style={styles.costBadge}>${event.cost_amount.toLocaleString()}</span>
+                    )}
                     {event.images && event.images.length > 0 && (
                       <span style={styles.imageCount}>{event.images.length} 📷</span>
                     )}
@@ -439,6 +468,16 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
                       <span style={styles.participantBadge}>{event.participant_count} 👤</span>
                     )}
                   </div>
+                  
+                  {/* AI Value Impact Badge */}
+                  {(event.cost_amount || event.duration_hours) && (
+                    <div style={{
+                      ...styles.valueImpactBadge,
+                      background: getValueImpactColor(event)
+                    }}>
+                      {calculateValueImpact(event)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -646,6 +685,25 @@ const styles = {
     color: '#ffffff',
     padding: '2px 6px',
     borderRadius: '2px'
+  },
+  costBadge: {
+    background: '#008000',
+    color: '#ffffff',
+    padding: '2px 6px',
+    borderRadius: '2px',
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    fontSize: '11px'
+  },
+  valueImpactBadge: {
+    marginTop: '8px',
+    padding: '8px 12px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    textAlign: 'center' as const,
+    border: '1px solid rgba(0,0,0,0.15)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
   }
 };
 
