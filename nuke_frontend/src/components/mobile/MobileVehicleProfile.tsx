@@ -236,13 +236,14 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
   const loadImages = async () => {
     const { data } = await supabase
       .from('vehicle_images')
-      .select('image_url')
+      .select('image_url, medium_url, large_url')
       .eq('vehicle_id', vehicleId)
       .order('is_primary', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(10);
     
-    setVehicleImages(data?.map(img => img.image_url) || []);
+    // Use medium_url for mobile carousel (400px), fallback to large, then original
+    setVehicleImages(data?.map(img => img.medium_url || img.large_url || img.image_url) || []);
   };
 
   return (

@@ -71,7 +71,6 @@ export const CashBalanceWidget: React.FC = () => {
         }}
         title="Your buying power"
       >
-        <span style={{ fontSize: '8pt' }}>💰</span>
         <span style={{ fontWeight: 'bold' }}>
           {balance ? formatCurrency(balance.available_cents) : '—'}
         </span>
@@ -147,7 +146,7 @@ export const CashBalanceWidget: React.FC = () => {
                 onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-200)'}
                 onMouseLeave={(e) => e.currentTarget.style.background = 'var(--grey-100)'}
               >
-                💸 Invest Now
+                Invest Now
               </button>
 
               <button
@@ -168,7 +167,7 @@ export const CashBalanceWidget: React.FC = () => {
                 onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-200)'}
                 onMouseLeave={(e) => e.currentTarget.style.background = 'var(--grey-100)'}
               >
-                📊 View Portfolio
+                View Portfolio
               </button>
 
               <button
@@ -189,7 +188,7 @@ export const CashBalanceWidget: React.FC = () => {
                 onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-200)'}
                 onMouseLeave={(e) => e.currentTarget.style.background = 'var(--grey-100)'}
               >
-                ➕ Add Funds
+                Add Funds
               </button>
             </div>
           </div>

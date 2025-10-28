@@ -308,11 +308,11 @@ const CursorHomepage: React.FC = () => {
               textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
               marginBottom: '16px'
             }}>
-              <span>📸 {currentHypeVehicle.image_count} photos</span>
-              <span>📝 {currentHypeVehicle.event_count} events</span>
-              <span>👁️ {currentHypeVehicle.view_count || 0} views</span>
+              <span>{currentHypeVehicle.image_count} photos</span>
+              <span>{currentHypeVehicle.event_count} events</span>
+              <span>{currentHypeVehicle.view_count || 0} views</span>
               {currentHypeVehicle.activity_7d! > 0 && (
-                <span>⚡ {currentHypeVehicle.activity_7d} updates this week</span>
+                <span>{currentHypeVehicle.activity_7d} updates this week</span>
               )}
             </div>
 
@@ -383,7 +383,7 @@ const CursorHomepage: React.FC = () => {
           marginBottom: 'var(--space-3)'
         }}>
           <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0 }}>
-            What's Popping 🔥
+            What's Popping
           </h2>
           <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
             {feedVehicles.length} vehicles · Updated just now
@@ -547,7 +547,6 @@ const CursorHomepage: React.FC = () => {
             padding: 'var(--space-8)',
             textAlign: 'center'
           }}>
-            <div style={{ fontSize: '32pt', marginBottom: '16px' }}>🚗</div>
             <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
               No vehicles yet
             </div>

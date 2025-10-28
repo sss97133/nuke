@@ -75,26 +75,26 @@ export default function Dashboard() {
           if (gainPct > 20) {
             actions.push({
               id: `alert-${vehicle.id}`,
-              type: 'portfolio_alert',
-              title: `${vehicle.year} ${vehicle.make} ${vehicle.model} up ${gainPct.toFixed(0)}%`,
-              description: `Consider selling? Market value increased significantly.`,
-              action_text: 'View Vehicle',
-              action_url: `/vehicle/${vehicle.id}`,
-              priority: 'high',
-              icon: '📈'
+          type: 'portfolio_alert',
+          title: `${vehicle.year} ${vehicle.make} ${vehicle.model} up ${gainPct.toFixed(0)}%`,
+          description: `Consider selling? Market value increased significantly.`,
+          action_text: 'View Vehicle',
+          action_url: `/vehicle/${vehicle.id}`,
+          priority: 'high',
+          icon: '+'
             });
           }
 
           if (gainPct < -10) {
             actions.push({
-              id: `alert-loss-${vehicle.id}`,
-              type: 'portfolio_alert',
-              title: `${vehicle.year} ${vehicle.make} ${vehicle.model} down ${Math.abs(gainPct).toFixed(0)}%`,
-              description: `Value dropped below purchase price. Review market conditions.`,
-              action_text: 'View Vehicle',
-              action_url: `/vehicle/${vehicle.id}`,
-              priority: 'medium',
-              icon: '📉'
+            id: `alert-loss-${vehicle.id}`,
+            type: 'portfolio_alert',
+            title: `${vehicle.year} ${vehicle.make} ${vehicle.model} down ${Math.abs(gainPct).toFixed(0)}%`,
+            description: `Value dropped below purchase price. Review market conditions.`,
+            action_text: 'View Vehicle',
+            action_url: `/vehicle/${vehicle.id}`,
+            priority: 'medium',
+            icon: '-'
             });
           }
         }
@@ -113,7 +113,7 @@ export default function Dashboard() {
             action_text: 'Add Photos',
             action_url: `/vehicle/${vehicle.id}`,
             priority: 'medium',
-            icon: '📸'
+            icon: 'IMG'
           });
         }
 
@@ -126,7 +126,7 @@ export default function Dashboard() {
             action_text: 'Add Price',
             action_url: `/vehicle/${vehicle.id}`,
             priority: 'low',
-            icon: '💰'
+            icon: '$'
           });
         }
 
@@ -139,7 +139,7 @@ export default function Dashboard() {
             action_text: 'Add Value',
             action_url: `/vehicle/${vehicle.id}`,
             priority: 'low',
-            icon: '📊'
+            icon: 'VAL'
           });
         }
       });
@@ -171,7 +171,7 @@ export default function Dashboard() {
               action_text: 'View Listing',
               action_url: `/vehicle/${match.id}`,
               priority: 'medium',
-              icon: '🔥'
+              icon: 'NEW'
             });
           });
         }
@@ -331,10 +331,10 @@ export default function Dashboard() {
         {/* Main Content Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-4)' }}>
           {/* Left Column: Action Items */}
-          <div>
-            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
-              ⚡ What To Do Next
-            </h2>
+        <div>
+          <h2 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+            What To Do Next
+          </h2>
 
             {actionItems.length === 0 ? (
               <div style={{
@@ -415,7 +415,7 @@ export default function Dashboard() {
           {/* Right Column: Portfolio Performance */}
           <div>
             <h2 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
-              📊 Your Holdings
+              Your Holdings
             </h2>
 
             <div style={{
@@ -425,7 +425,6 @@ export default function Dashboard() {
             }}>
               {portfolioHoldings.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--text-muted)' }}>
-                  <div style={{ fontSize: '32pt', marginBottom: '8px' }}>🚗</div>
                   <div style={{ fontSize: '9pt' }}>No vehicles yet</div>
                   <button
                     onClick={() => navigate('/add-vehicle')}
@@ -482,7 +481,7 @@ export default function Dashboard() {
             {dealMatches.length > 0 && (
               <div style={{ marginTop: 'var(--space-3)' }}>
                 <h2 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
-                  🔥 Deals For You
+                  Deals For You
                 </h2>
                 <div style={{
                   background: 'var(--white)',

@@ -53,7 +53,7 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
 
       // Load all timeline events with image_urls array
       const { data: events, error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .select(`
           id,
           vehicle_id,
@@ -323,6 +323,7 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
                           src={img.image_url}
                           alt=""
                           style={styles.thumbnail}
+                          loading="lazy"
                           onClick={() => window.open(img.image_url, '_blank')}
                         />
                       ))}

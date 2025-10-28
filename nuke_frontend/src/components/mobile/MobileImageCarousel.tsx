@@ -206,7 +206,7 @@ const styles = {
     position: 'relative' as const,
     width: '100%',
     height: '300px',
-    background: '#000000',
+    background: '#f0f0f0',
     overflow: 'hidden'
   },
   imageContainer: {
@@ -218,9 +218,9 @@ const styles = {
     touchAction: 'pan-y pinch-zoom' as const
   },
   image: {
-    maxWidth: '100%',
-    maxHeight: '100%',
-    objectFit: 'contain' as const,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover' as const,
     transition: 'transform 0.3s ease',
     userSelect: 'none' as const
   },
