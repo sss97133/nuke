@@ -335,8 +335,31 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     // Listen for image updates
     const handler = () => loadImages();
     window.addEventListener('vehicle_images_updated', handler);
-    return () => window.removeEventListener('vehicle_images_updated', handler);
-  }, [vehicleId]);
+    
+    // Listen for timeline image clicks to open in enhanced viewer
+    const imageViewerHandler = (e: any) => {
+      const { imageUrl, eventId, vehicleId: eventVehicleId } = e.detail;
+      // Find the image in our list
+      const image = images.find(img => img.image_url === imageUrl);
+      if (image) {
+        setSelectedImage(image);
+      } else {
+        // If not found, create a minimal image object
+        setSelectedImage({
+          id: `timeline-${eventId}`,
+          image_url: imageUrl,
+          vehicle_id: eventVehicleId,
+          timeline_event_id: eventId
+        });
+      }
+    };
+    window.addEventListener('open_image_viewer', imageViewerHandler);
+    
+    return () => {
+      window.removeEventListener('vehicle_images_updated', handler);
+      window.removeEventListener('open_image_viewer', imageViewerHandler);
+    };
+  }, [vehicleId, images]);
 
   const loadImages = async () => {
     const { data } = await supabase

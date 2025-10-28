@@ -411,7 +411,17 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
                           alt=""
                           style={styles.thumbnail}
                           loading="lazy"
-                          onClick={() => window.open(img.image_url, '_blank')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Trigger custom event to open enhanced viewer with this image
+                            window.dispatchEvent(new CustomEvent('open_image_viewer', {
+                              detail: { 
+                                imageUrl: img.image_url,
+                                eventId: event.id,
+                                vehicleId: event.vehicle_id
+                              }
+                            }));
+                          }}
                         />
                       ))}
                     </div>
