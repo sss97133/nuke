@@ -28,6 +28,10 @@ ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS price_sources TEXT[];
 -- Create function to trigger price discovery
 CREATE OR REPLACE FUNCTION trigger_auto_price_discovery()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_supabase_url text := current_setting('app.supabase_url', true);
+  v_service_role_key text := current_setting('app.service_role_key', true);
+  v_headers jsonb := jsonb_build_object('Content-Type', 'application/json');
 BEGIN
   -- Only trigger for new vehicles or when year/make/model changes
   IF TG_OP = 'INSERT' OR 
@@ -37,17 +41,26 @@ BEGIN
        OLD.model IS DISTINCT FROM NEW.model
      )) THEN
     
-    -- Call the Edge Function asynchronously (fire and forget)
-    PERFORM net.http_post(
-      url := current_setting('app.supabase_url') || '/functions/v1/auto-price-discovery',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-      ),
-      body := jsonb_build_object(
-        'vehicle_id', NEW.id::text
-      )
-    );
+    -- Attach Authorization header only if configured
+    IF v_service_role_key IS NOT NULL AND length(v_service_role_key) > 0 THEN
+      v_headers := v_headers || jsonb_build_object('Authorization', 'Bearer ' || v_service_role_key);
+    END IF;
+
+    -- Call the Edge Function asynchronously (best-effort; never abort the update)
+    IF v_supabase_url IS NOT NULL AND length(v_supabase_url) > 0 THEN
+      BEGIN
+        PERFORM net.http_post(
+          url := v_supabase_url || '/functions/v1/auto-price-discovery',
+          headers := v_headers,
+          body := jsonb_build_object('vehicle_id', NEW.id::text)
+        );
+      EXCEPTION WHEN others THEN
+        -- Avoid breaking writes if HTTP call fails or settings are missing
+        RAISE NOTICE 'auto-price-discovery call skipped: %', SQLERRM;
+      END;
+    ELSE
+      RAISE NOTICE 'auto-price-discovery skipped: app.supabase_url not set';
+    END IF;
     
     -- Log the trigger
     INSERT INTO vehicle_activity_log (vehicle_id, activity_type, details)
@@ -57,7 +70,7 @@ BEGIN
   
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Create the trigger
 DROP TRIGGER IF EXISTS auto_price_discovery_trigger ON vehicles;
@@ -106,23 +119,31 @@ CREATE POLICY "Users can view activity logs for vehicles they can see" ON vehicl
 CREATE OR REPLACE FUNCTION manual_price_discovery(p_vehicle_id UUID)
 RETURNS JSONB AS $$
 DECLARE
-  result JSONB;
+  result JSONB := jsonb_build_object('success', false, 'message', 'not called');
+  v_supabase_url text := current_setting('app.supabase_url', true);
+  v_service_role_key text := current_setting('app.service_role_key', true);
+  v_headers jsonb := jsonb_build_object('Content-Type', 'application/json');
 BEGIN
-  -- Call the Edge Function
-  SELECT net.http_post(
-    url := current_setting('app.supabase_url') || '/functions/v1/auto-price-discovery',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-    ),
-    body := jsonb_build_object(
-      'vehicle_id', p_vehicle_id::text
-    )
-  ) INTO result;
-  
+  IF v_service_role_key IS NOT NULL AND length(v_service_role_key) > 0 THEN
+    v_headers := v_headers || jsonb_build_object('Authorization', 'Bearer ' || v_service_role_key);
+  END IF;
+
+  IF v_supabase_url IS NOT NULL AND length(v_supabase_url) > 0 THEN
+    BEGIN
+      SELECT net.http_post(
+        url := v_supabase_url || '/functions/v1/auto-price-discovery',
+        headers := v_headers,
+        body := jsonb_build_object('vehicle_id', p_vehicle_id::text)
+      ) INTO result;
+    EXCEPTION WHEN others THEN
+      result := jsonb_build_object('success', false, 'error', SQLERRM);
+    END;
+  ELSE
+    result := jsonb_build_object('success', false, 'error', 'app.supabase_url not set');
+  END IF;
   RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Success message
 DO $$

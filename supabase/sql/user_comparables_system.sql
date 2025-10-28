@@ -156,6 +156,9 @@ CREATE OR REPLACE FUNCTION submit_comparable(
 RETURNS JSONB AS $$
 DECLARE
   result JSONB;
+  v_supabase_url text := current_setting('app.supabase_url', true);
+  v_service_role_key text := current_setting('app.service_role_key', true);
+  v_headers jsonb := jsonb_build_object('Content-Type', 'application/json');
 BEGIN
   -- Validate URL format
   IF p_comparable_url !~ '^https?://' THEN
@@ -177,24 +180,34 @@ BEGIN
     );
   END IF;
   
-  -- Call the validation Edge Function
-  SELECT net.http_post(
-    url := current_setting('app.supabase_url') || '/functions/v1/validate-comparable',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-    ),
-    body := jsonb_build_object(
-      'vehicle_id', p_vehicle_id::text,
-      'comparable_url', p_comparable_url,
-      'submitted_by', auth.uid()::text,
-      'notes', p_notes
-    )
-  ) INTO result;
+  -- Attach Authorization header only if configured
+  IF v_service_role_key IS NOT NULL AND length(v_service_role_key) > 0 THEN
+    v_headers := v_headers || jsonb_build_object('Authorization', 'Bearer ' || v_service_role_key);
+  END IF;
+
+  -- Call the validation Edge Function (best-effort)
+  IF v_supabase_url IS NOT NULL AND length(v_supabase_url) > 0 THEN
+    BEGIN
+      SELECT net.http_post(
+        url := v_supabase_url || '/functions/v1/validate-comparable',
+        headers := v_headers,
+        body := jsonb_build_object(
+          'vehicle_id', p_vehicle_id::text,
+          'comparable_url', p_comparable_url,
+          'submitted_by', auth.uid()::text,
+          'notes', p_notes
+        )
+      ) INTO result;
+    EXCEPTION WHEN others THEN
+      result := jsonb_build_object('success', false, 'error', SQLERRM);
+    END;
+  ELSE
+    result := jsonb_build_object('success', false, 'error', 'app.supabase_url not set');
+  END IF;
   
   RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Function to vote on a comparable
 CREATE OR REPLACE FUNCTION vote_on_comparable(
