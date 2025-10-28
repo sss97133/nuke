@@ -36,6 +36,18 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
     loadEventData();
   }, [eventId]);
 
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
   const loadEventData = async () => {
     const [eventResult, imagesResult] = await Promise.all([
       supabase
@@ -112,7 +124,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
     : 0;
   const totalCost = event.cost_amount || partsTotal + laborCost;
 
-  return (
+  return createPortal(
     <div 
       style={{
         position: 'fixed',
@@ -413,7 +425,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

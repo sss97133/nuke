@@ -107,8 +107,12 @@ const VehicleProfile: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const checkMobile = () => {
-      // Only consider screen width, not user agent, to avoid issues when devtools opens
-      setIsMobile(window.innerWidth < 768);
+      // Check both screen width and touch capability for better mobile detection
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isNarrowScreen = window.innerWidth < 768;
+      const isMobileDevice = isNarrowScreen || (hasTouch && window.innerWidth < 1024);
+      console.log('[VehicleProfile] Mobile detection:', { isNarrowScreen, hasTouch, isMobileDevice, width: window.innerWidth });
+      setIsMobile(isMobileDevice);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
