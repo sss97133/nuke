@@ -151,7 +151,7 @@ export class ImageUploadService {
           user_id: user.id,
           image_url: urlData.publicUrl,
           file_name: fileName,
-          original_filename: file.name, // Store original filename for duplicate detection
+          filename: file.name, // Store original filename for duplicate detection
           storage_path: storagePath,
           category: category,
           file_size: file.size,

@@ -216,8 +216,18 @@ const Shops: React.FC = () => {
         <div className="container">
           <div className="main">
             <div className="section">
-              <h1 className="heading-1">Organizations</h1>
-              <p className="text text-muted">Manage your business organizations and team members</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-2)' }}>
+                <div>
+                  <h1 className="heading-1">Organizations</h1>
+                  <p className="text text-muted">Manage your business organizations and team members</p>
+                </div>
+                <button
+                  onClick={() => navigate('/shops/new')}
+                  className="button button-primary"
+                >
+                  + Create Organization
+                </button>
+              </div>
             </div>
 
             {/* Organizations Hub */}

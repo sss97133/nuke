@@ -212,6 +212,62 @@ export default function Market() {
           </p>
         </div>
 
+        {/* CASH BALANCE - HERO SECTION */}
+        {cashBalance > 0 && (
+          <div style={{
+            background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)',
+            border: '3px solid #000080',
+            padding: 'var(--space-4)',
+            marginBottom: 'var(--space-4)',
+            color: '#ffffff',
+            boxShadow: '4px 4px 0 rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ fontSize: '9pt', marginBottom: '8px', opacity: 0.9 }}>
+              💰 Your Buying Power
+            </div>
+            <div style={{ fontSize: '32pt', fontWeight: 'bold', marginBottom: '8px' }}>
+              {formatCurrency(cashBalance / 100)}
+            </div>
+            <div style={{ fontSize: '10pt', marginBottom: '16px' }}>
+              Ready to invest · {mostActive.filter(v => (v.current_value / 1000) <= cashBalance / 100).length} vehicles available at this price
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => {
+                  const affordable = mostActive.find(v => (v.current_value / 1000) <= cashBalance / 100);
+                  if (affordable) navigate(`/vehicle/${affordable.id}`);
+                }}
+                style={{
+                  background: '#00ff00',
+                  color: '#000000',
+                  border: '2px outset #ffffff',
+                  padding: '8px 16px',
+                  fontSize: '9pt',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+              >
+                INVEST NOW
+              </button>
+              <button
+                onClick={() => alert('Add funds coming soon via Stripe')}
+                style={{
+                  background: 'transparent',
+                  color: '#ffffff',
+                  border: '2px outset #ffffff',
+                  padding: '8px 16px',
+                  fontSize: '9pt',
+                  cursor: 'pointer',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+              >
+                Add More Funds
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Market Stats Bar */}
         <div style={{
           display: 'grid',
