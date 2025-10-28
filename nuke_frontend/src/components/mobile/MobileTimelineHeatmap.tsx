@@ -50,6 +50,7 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
   const loadTimelineData = async () => {
     try {
       setLoading(true);
+      console.log('[MobileTimelineHeatmap] Loading events for vehicle:', vehicleId);
 
       // Load all timeline events with image_urls array
       const { data: events, error } = await supabase
@@ -67,7 +68,12 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
         .eq('vehicle_id', vehicleId)
         .order('event_date', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[MobileTimelineHeatmap] Query error:', error);
+        throw error;
+      }
+
+      console.log('[MobileTimelineHeatmap] Loaded events:', events?.length || 0);
 
       // Transform image_urls array into images array format
       const eventsWithImages = events?.map(event => ({
@@ -114,9 +120,10 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
         dayData.imageCount += event.images?.length || 0;
       });
 
+      console.log('[MobileTimelineHeatmap] Grouped into years:', Array.from(grouped.keys()));
       setYearData(grouped);
     } catch (error) {
-      console.error('Error loading timeline data:', error);
+      console.error('[MobileTimelineHeatmap] Error loading timeline data:', error);
     } finally {
       setLoading(false);
     }
@@ -203,6 +210,14 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
     return (
       <div style={styles.loading}>
         Loading timeline...
+      </div>
+    );
+  }
+
+  if (years.length === 0) {
+    return (
+      <div style={styles.loading}>
+        No timeline events yet. Add photos or events to start building your vehicle's history!
       </div>
     );
   }
