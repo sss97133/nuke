@@ -221,7 +221,7 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
   const loadStats = async () => {
     const [images, events, tags, workSessions] = await Promise.all([
       supabase.from('vehicle_images').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
-      supabase.from('timeline_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
+      supabase.from('vehicle_timeline_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
       supabase.from('image_tags').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
       supabase.from('work_sessions').select('duration_minutes').eq('vehicle_id', vehicleId)
     ]);
