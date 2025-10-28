@@ -149,7 +149,8 @@ DROP POLICY IF EXISTS "allow_public_read_vehicle_images" ON storage.objects;
 
 -- Ensure authenticated users can upload documents to vehicles/{vehicleId}/documents/
 -- (This path is used by SmartInvoiceUploader and VehicleDocumentUploader)
-CREATE POLICY IF NOT EXISTS "auth upload vehicle documents" ON storage.objects
+DROP POLICY IF EXISTS "auth upload vehicle documents" ON storage.objects;
+CREATE POLICY "auth upload vehicle documents" ON storage.objects
   FOR INSERT
   WITH CHECK (
     bucket_id = 'vehicle-data'
@@ -165,8 +166,9 @@ CREATE POLICY IF NOT EXISTS "auth upload vehicle documents" ON storage.objects
 -- Current policy checks: (foldername(name))[1] = auth.uid()::text
 
 -- This should work correctly - verify with test
--- If issues occur, add explicit policy:
-CREATE POLICY IF NOT EXISTS "auth upload user receipts" ON storage.objects
+-- Add explicit policy for clarity:
+DROP POLICY IF EXISTS "auth upload user receipts" ON storage.objects;
+CREATE POLICY "auth upload user receipts" ON storage.objects
   FOR INSERT  
   WITH CHECK (
     bucket_id = 'tool-data'

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { supabase } from '../lib/supabase';
 import AddEventWizard from './AddEventWizard';
 import UniversalImageUpload from './UniversalImageUpload';
@@ -740,11 +741,11 @@ const VehicleTimeline: React.FC<{
           </div>
         )}
 
-        {/* Image Lightbox for Grid Popup */}
-        {popupImageUrl && (
+        {/* Image Lightbox for Grid Popup - USING PORTAL TO ESCAPE TIMELINE DIV */}
+        {popupImageUrl && ReactDOM.createPortal(
           <div
             className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center"
-            style={{ zIndex: 1002, overflow: 'hidden' }}
+            style={{ zIndex: 10002, overflow: 'hidden' }}
             onClick={() => setPopupImageUrl(null)}
           >
             <div className="relative max-w-4xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
@@ -762,11 +763,12 @@ const VehicleTimeline: React.FC<{
                 ×
               </button>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
+        {/* Delete Confirmation Modal - USING PORTAL TO ESCAPE TIMELINE DIV */}
+        {showDeleteConfirm && ReactDOM.createPortal(
           <div style={{
             position: 'fixed',
             top: 0,
@@ -818,7 +820,8 @@ const VehicleTimeline: React.FC<{
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Work Timeline Display */}
@@ -829,11 +832,11 @@ const VehicleTimeline: React.FC<{
         )}
 
 
-        {/* Day Events Popup (for Grid View) */}
-        {showDayPopup && selectedDayEvents && selectedDayEvents.length > 0 && (
+        {/* Day Events Popup (for Grid View) - USING PORTAL TO ESCAPE TIMELINE DIV */}
+        {showDayPopup && selectedDayEvents && selectedDayEvents.length > 0 && ReactDOM.createPortal(
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-            style={{ zIndex: 1001 }}
+            style={{ zIndex: 10001 }}
             onClick={() => setShowDayPopup(false)}
             onKeyDown={(e) => {
               // Keyboard navigation
@@ -1088,7 +1091,8 @@ const VehicleTimeline: React.FC<{
               </div>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
 
@@ -1105,9 +1109,9 @@ const VehicleTimeline: React.FC<{
           />
         )}
 
-        {/* Bulk Image Upload Modal */}
-        {showBulkUpload && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 1001 }}>
+        {/* Bulk Image Upload Modal - USING PORTAL TO ESCAPE TIMELINE DIV */}
+        {showBulkUpload && ReactDOM.createPortal(
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 10001 }}>
             <div className="bg-white p-6 rounded max-w-4xl w-full mx-4 max-h-screen overflow-auto">
               <UniversalImageUpload
                 vehicleId={vehicleId}
@@ -1121,7 +1125,8 @@ const VehicleTimeline: React.FC<{
                 }}
               />
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Event Detail Modal - Receipt Style */}
