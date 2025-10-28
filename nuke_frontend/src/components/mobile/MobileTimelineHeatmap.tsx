@@ -204,7 +204,11 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
     let currentWeek: DayData[] = [];
     let currentDate = new Date(startDate);
 
-    while (currentDate <= lastDay || currentWeek.length < 7) {
+    // Safety limit to prevent infinite loops
+    let maxIterations = 400; // 53 weeks * 7 days = 371 max
+    while ((currentDate <= lastDay || currentWeek.length < 7) && maxIterations > 0) {
+      maxIterations--;
+      
       const dateStr = currentDate.toISOString().split('T')[0];
       const dayData = yearInfo.days.get(dateStr);
       const isCurrentYear = currentDate.getFullYear() === year;
@@ -223,6 +227,16 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
       }
 
       currentDate.setDate(currentDate.getDate() + 1);
+      
+      // Break if we've gone way past the year
+      if (currentDate.getFullYear() > year + 1) {
+        console.warn('[MobileTimelineHeatmap] Breaking calendar generation - went past year boundary');
+        break;
+      }
+    }
+    
+    if (maxIterations === 0) {
+      console.error('[MobileTimelineHeatmap] ⚠️  Calendar generation hit safety limit!');
     }
 
     if (currentWeek.length > 0) {
