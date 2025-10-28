@@ -284,13 +284,13 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
         <div style={styles.actionButtonsRow}>
           <button
             onClick={() => setShowPriceEditor(true)}
-            style={styles.actionButton}
+            style={styles.actionBtn}
           >
             💰 Edit Price
           </button>
           <button
             onClick={() => setShowDocUploader(true)}
-            style={styles.actionButton}
+            style={styles.actionBtn}
           >
             📄 Upload Doc
           </button>
@@ -1271,7 +1271,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: '12px',
     marginBottom: '12px'
   },
-  actionButton: {
+  actionBtn: {
     flex: 1,
     padding: '14px',
     background: '#000080',
