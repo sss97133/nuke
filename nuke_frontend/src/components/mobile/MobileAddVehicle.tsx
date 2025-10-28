@@ -370,9 +370,8 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
         year: formData.year ? parseInt(formData.year) : null,
         vin: formData.vin || null,
         discovery_url: formData.import_url || null,
-        relationship_type: formData.relationship_type,
         notes: formData.notes || null,
-        created_by: user.id,
+        user_id: user.id,
         is_public: true
       };
 
