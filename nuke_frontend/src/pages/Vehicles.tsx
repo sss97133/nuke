@@ -694,22 +694,34 @@ const VehiclesInner: React.FC = () => {
 
                             <div className="vehicle-details">
                               <div className="detail-item">
-                                <span className="detail-label">Value:</span>
-                                <span className="detail-value">
-                                  {vehicle.current_value ? `$${vehicle.current_value.toLocaleString()}` :
-                                   vehicle.msrp ? `~$${vehicle.msrp.toLocaleString()}` : 'Not estimated'}
+                                <span className="detail-label">ROI:</span>
+                                <span className="detail-value" style={{
+                                  color: vehicle.current_value && vehicle.purchase_price && vehicle.current_value > vehicle.purchase_price ? '#008000' : 
+                                         vehicle.current_value && vehicle.purchase_price && vehicle.current_value < vehicle.purchase_price ? '#800000' : 
+                                         'var(--text)'
+                                }}>
+                                  {vehicle.current_value && vehicle.purchase_price ? (
+                                    <>
+                                      {vehicle.current_value > vehicle.purchase_price ? '+' : ''}
+                                      ${(vehicle.current_value - vehicle.purchase_price).toLocaleString()} 
+                                      ({((vehicle.current_value - vehicle.purchase_price) / vehicle.purchase_price * 100).toFixed(0)}%)
+                                    </>
+                                  ) : vehicle.current_value ? `$${vehicle.current_value.toLocaleString()}` : 'Add purchase price'}
                                 </span>
                               </div>
                               <div className="detail-item">
-                                <span className="detail-label">Profile:</span>
+                                <span className="detail-label">Build:</span>
                                 <span className="detail-value">
-                                  {vehicle.completion_percentage ? `${vehicle.completion_percentage}% complete` : 'Incomplete'}
+                                  {vehicle.image_count || 0} photos · {vehicle.event_count || 0} events
+                                  {vehicle.build_hours ? ` · ${vehicle.build_hours}h` : ''}
                                 </span>
                               </div>
                               <div className="detail-item">
-                                <span className="detail-label">Activity:</span>
+                                <span className="detail-label">Interest:</span>
                                 <span className="detail-value">
-                                  {vehicle.view_count ? `${vehicle.view_count} views` : 'No views yet'}
+                                  {vehicle.view_count ? `${vehicle.view_count} views` : '0 views'}
+                                  {vehicle.inquiries_count ? ` · ${vehicle.inquiries_count} inquiries` : ''}
+                                  {vehicle.current_bid ? ` · $${vehicle.current_bid.toLocaleString()} bid` : ''}
                                 </span>
                               </div>
                             </div>
