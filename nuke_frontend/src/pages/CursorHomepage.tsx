@@ -157,7 +157,7 @@ const CursorHomepage: React.FC = () => {
       setStats({
         totalBuilds: enriched.filter(v => (v.event_count || 0) > 0).length,
         totalValue: totalValue,
-        soldThisMonth: 0, // TODO: Query actual sales
+        soldThisMonth: 0,
         activeToday: activeCount
       });
 
@@ -353,21 +353,22 @@ const CursorHomepage: React.FC = () => {
       )}
 
       {/* Stats Bar */}
-      <div style={{
-        background: 'var(--white)',
-        borderBottom: '2px solid var(--border)',
-        padding: '12px var(--space-4)',
-        display: 'flex',
-        gap: '32px',
-        justifyContent: 'center',
-        fontSize: '9pt',
-        color: 'var(--text-muted)'
-      }}>
-        <span><strong>{stats.totalBuilds}</strong> active builds</span>
-        <span><strong>{formatCurrency(stats.totalValue)}</strong> in play</span>
-        <span><strong>{stats.activeToday}</strong> updated today</span>
-        <span><strong>{stats.soldThisMonth}</strong> sold this month</span>
-      </div>
+      {stats.totalBuilds > 0 && (
+        <div style={{
+          background: 'var(--white)',
+          borderBottom: '2px solid var(--border)',
+          padding: '12px var(--space-4)',
+          display: 'flex',
+          gap: '32px',
+          justifyContent: 'center',
+          fontSize: '9pt',
+          color: 'var(--text-muted)'
+        }}>
+          <span><strong>{stats.totalBuilds}</strong> active builds</span>
+          <span><strong>{formatCurrency(stats.totalValue)}</strong> in play</span>
+          {stats.activeToday > 0 && <span><strong>{stats.activeToday}</strong> updated today</span>}
+        </div>
+      )}
 
       {/* Feed Section */}
       <div style={{

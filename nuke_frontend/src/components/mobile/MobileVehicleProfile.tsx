@@ -216,7 +216,7 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
   const loadStats = async () => {
     const [images, events, tags, workSessions] = await Promise.all([
       supabase.from('vehicle_images').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
-      supabase.from('vehicle_timeline_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
+      supabase.from('timeline_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
       supabase.from('image_tags').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
       supabase.from('work_sessions').select('duration_minutes').eq('vehicle_id', vehicleId)
     ]);
@@ -576,9 +576,10 @@ const InstagramFeedView: React.FC<{ images: any[]; onImageClick: (img: any) => v
     {images.map((image) => (
       <div key={image.id} style={styles.feedItem}>
         <img
-          src={image.image_url}
+          src={image.medium_url || image.large_url || image.image_url}
           alt=""
           style={styles.feedImage}
+          loading="lazy"
           onClick={() => onImageClick(image)}
         />
         <div style={styles.feedActions}>
@@ -603,9 +604,10 @@ const DiscoverGridView: React.FC<{ images: any[]; onImageClick: (img: any) => vo
         onClick={() => onImageClick(image)}
       >
         <img
-          src={image.thumbnail_url || image.image_url}
+          src={image.thumbnail_url || image.medium_url || image.image_url}
           alt=""
           style={styles.discoverImage}
+          loading="lazy"
         />
       </div>
     ))}
@@ -628,11 +630,12 @@ const TechnicalGridView: React.FC<{ images: any[]; onImageClick: (img: any) => v
           style={styles.technicalItem}
           onClick={() => onImageClick(image)}
         >
-          <img
-            src={image.thumbnail_url || image.image_url}
-            alt=""
-            style={styles.technicalImage}
-          />
+        <img
+          src={image.thumbnail_url || image.medium_url || image.image_url}
+          alt=""
+          style={styles.technicalImage}
+          loading="lazy"
+        />
           {/* Data Overlay */}
           <div style={styles.technicalOverlay}>
             <div style={styles.technicalStat}>👁️ {views}</div>
@@ -902,9 +905,9 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center'
   },
   fullImage: {
-    maxWidth: '100%',
-    maxHeight: '100%',
-    objectFit: 'contain'
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover' as const
   },
   closeButton: {
     position: 'absolute',
@@ -999,6 +1002,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   feedImage: {
     width: '100%',
+    height: '400px',
+    objectFit: 'cover' as const,
     display: 'block',
     cursor: 'pointer'
   },
