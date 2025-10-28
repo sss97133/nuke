@@ -31,6 +31,8 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showAnimation, setShowAnimation] = useState<'like' | 'save' | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -72,6 +74,20 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
     lastTap.current = now;
   };
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartX.current;
+    const deltaY = touch.clientY - touchStartY.current;
+    
+    // Instagram-style: Show swipe progress for horizontal swipes
+    if (Math.abs(deltaX) > 30 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Only show offset if not at boundaries
+      if ((deltaX < 0 && currentIndex < images.length - 1) || (deltaX > 0 && currentIndex > 0)) {
+        setSwipeOffset(deltaX * 0.8); // Dampen the movement slightly
+      }
+    }
+  };
+
   const handleTouchEnd = (e: React.TouchEvent) => {
     const touch = e.changedTouches[0];
     const deltaX = touch.clientX - touchStartX.current;
@@ -84,26 +100,47 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
       return;
     }
 
-    // Swipe detection
+    // Reset swipe offset and animate transition
+    setSwipeOffset(0);
+    
+    // Swipe detection - INSTAGRAM-LIKE
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-      // Horizontal swipe
-      if (deltaX > 0) {
-        // Swipe right → Save
-        handleSwipeRight();
-      } else {
+      setIsTransitioning(true);
+      
+      // Horizontal swipe - Navigate between images (SMOOTH like Instagram)
+      if (deltaX < 0) {
         // Swipe left → Next image
         if (currentIndex < images.length - 1) {
-          setCurrentIndex(currentIndex + 1);
+          setTimeout(() => {
+            setCurrentIndex(currentIndex + 1);
+            setIsTransitioning(false);
+          }, 50);
+          vibrate(10);
+        } else {
+          setIsTransitioning(false);
+        }
+      } else {
+        // Swipe right → Previous image
+        if (currentIndex > 0) {
+          setTimeout(() => {
+            setCurrentIndex(currentIndex - 1);
+            setIsTransitioning(false);
+          }, 50);
+          vibrate(10);
+        } else {
+          setIsTransitioning(false);
         }
       }
     } else if (Math.abs(deltaY) > 50) {
       // Vertical swipe
       if (deltaY > 0) {
-        // Swipe down → Close
+        // Swipe down → Close (Instagram style)
         onClose();
+        vibrate(20);
       } else {
         // Swipe up → Show details
         setShowDetails(true);
+        vibrate(15);
       }
     }
   };
@@ -186,6 +223,7 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
       <div
         style={styles.imageContainer}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         <img
@@ -193,7 +231,9 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
           alt=""
           style={{
             ...styles.image,
-            transform: `scale(${scale})`
+            transform: `translateX(${swipeOffset}px) scale(${scale})`,
+            transition: swipeOffset === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+            opacity: Math.max(0.3, 1 - Math.abs(swipeOffset) / 400) // Fade slightly during swipe
           }}
         />
 
@@ -306,10 +346,10 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
               <h4 style={styles.sectionTitle}>Gestures</h4>
               <div style={styles.gestureList}>
                 <div>Double-tap → Like ❤️</div>
-                <div>Swipe right → Save ⭐</div>
-                <div>Swipe down → Close</div>
-                <div>Swipe up → Show details</div>
-                <div>Long-press → Quick tag</div>
+                <div>Swipe left/right → Navigate images 👈👉</div>
+                <div>Swipe down → Close viewer ⬇️</div>
+                <div>Swipe up → Show details ⬆️</div>
+                <div>Long-press → Quick tag 🏷️</div>
               </div>
             </div>
           </div>
@@ -318,8 +358,25 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
 
       {/* Gesture Hint (fades out after 3s) */}
       <div style={styles.gestureHint}>
-        Double-tap = Like • Swipe right = Save
+        Double-tap = Like • Swipe left/right = Navigate • Swipe down = Close
       </div>
+      
+      {/* Instagram-like progress dots */}
+      {images.length > 1 && (
+        <div style={styles.dotsContainer}>
+          {images.map((_, idx) => (
+            <div
+              key={idx}
+              style={{
+                ...styles.dot,
+                background: idx === currentIndex ? '#ffffff' : 'rgba(255, 255, 255, 0.3)',
+                width: idx === currentIndex ? '8px' : '6px',
+                height: idx === currentIndex ? '8px' : '6px'
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>,
     document.body
   );
@@ -560,6 +617,20 @@ const styles = {
     fontFamily: '"MS Sans Serif", sans-serif',
     pointerEvents: 'none' as const,
     animation: 'fadeOut 3s ease-out forwards'
+  },
+  dotsContainer: {
+    position: 'absolute' as const,
+    top: '70px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    gap: '4px',
+    zIndex: 10
+  },
+  dot: {
+    borderRadius: '50%',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.5)'
   }
 };
 
