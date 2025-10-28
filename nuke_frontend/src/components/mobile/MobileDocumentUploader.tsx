@@ -344,14 +344,14 @@ const styles = {
   },
   title: {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '10px',
     fontFamily: '"MS Sans Serif", sans-serif',
     fontWeight: 'bold'
   },
   closeBtn: {
     background: 'none',
     border: 'none',
-    fontSize: '24px',
+    fontSize: '10px',
     cursor: 'pointer',
     padding: '0',
     width: '32px',
@@ -384,12 +384,12 @@ const styles = {
     fontSize: '36px'
   },
   categoryName: {
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold',
     textAlign: 'center' as const
   },
   categoryDesc: {
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#666',
     textAlign: 'center' as const
   },
@@ -398,11 +398,11 @@ const styles = {
     textAlign: 'center' as const
   },
   spinner: {
-    fontSize: '48px',
+    fontSize: '10px',
     animation: 'spin 2s linear infinite'
   },
   processingSubtext: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#666',
     marginTop: '8px'
   },
@@ -440,7 +440,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     padding: '4px 0',
-    fontSize: '12px',
+    fontSize: '10px',
     borderBottom: '1px solid rgba(0,0,128,0.1)'
   },
   field: {
@@ -449,7 +449,7 @@ const styles = {
     gap: '6px'
   },
   label: {
-    fontSize: '13px',
+    fontSize: '10px',
     fontWeight: 'bold',
     fontFamily: '"MS Sans Serif", sans-serif'
   },
@@ -457,14 +457,14 @@ const styles = {
     padding: '12px',
     border: '2px inset #c0c0c0',
     borderRadius: '4px',
-    fontSize: '14px',
+    fontSize: '10px',
     fontFamily: '"MS Sans Serif", sans-serif'
   },
   textarea: {
     padding: '12px',
     border: '2px inset #c0c0c0',
     borderRadius: '4px',
-    fontSize: '14px',
+    fontSize: '10px',
     fontFamily: '"MS Sans Serif", sans-serif',
     resize: 'vertical' as const
   },
@@ -480,7 +480,7 @@ const styles = {
     background: '#c0c0c0',
     border: '2px outset #ffffff',
     borderRadius: '4px',
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer',
     fontFamily: '"MS Sans Serif", sans-serif'
@@ -492,7 +492,7 @@ const styles = {
     color: '#ffffff',
     border: '2px outset #ffffff',
     borderRadius: '4px',
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer',
     fontFamily: '"MS Sans Serif", sans-serif'
