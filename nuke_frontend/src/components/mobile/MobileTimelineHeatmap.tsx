@@ -17,6 +17,10 @@ interface TimelineEvent {
   image_urls?: string[];
   images?: { image_url: string; id: string }[];
   metadata?: any;
+  duration_hours?: number;
+  participant_count?: number;
+  verification_count?: number;
+  service_info?: any;
 }
 
 interface DayData {
@@ -24,12 +28,14 @@ interface DayData {
   events: TimelineEvent[];
   eventCount: number;
   imageCount: number;
+  durationHours: number;
 }
 
 interface YearData {
   year: number;
   eventCount: number;
   totalImages: number;
+  totalDurationHours: number;
   days: Map<string, DayData>;
 }
 
@@ -44,17 +50,22 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadTimelineData();
+    if (vehicleId) {
+      loadTimelineData();
+    }
   }, [vehicleId]);
 
   const loadTimelineData = async () => {
     try {
       setLoading(true);
-      console.log('[MobileTimelineHeatmap] Loading events for vehicle:', vehicleId);
+      console.log('[MobileTimelineHeatmap] ===== LOADING TIMELINE DATA =====');
+      console.log('[MobileTimelineHeatmap] Vehicle ID:', vehicleId);
+      console.log('[MobileTimelineHeatmap] Vehicle ID type:', typeof vehicleId);
 
-      // Load all timeline events with image_urls array
+      // Load all timeline events with image_urls array from enriched view
+      // vehicle_timeline_events is a VIEW that includes participant_count, verification_count, and service_info
       const { data: events, error } = await supabase
-        .from('timeline_events')
+        .from('vehicle_timeline_events')
         .select(`
           id,
           vehicle_id,
@@ -63,17 +74,24 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
           event_type,
           event_date,
           image_urls,
-          metadata
+          metadata,
+          duration_hours,
+          participant_count,
+          verification_count,
+          service_info
         `)
         .eq('vehicle_id', vehicleId)
         .order('event_date', { ascending: false });
 
       if (error) {
-        console.error('[MobileTimelineHeatmap] Query error:', error);
+        console.error('[MobileTimelineHeatmap] ❌ QUERY ERROR:', error);
+        console.error('[MobileTimelineHeatmap] Error details:', JSON.stringify(error, null, 2));
         throw error;
       }
 
-      console.log('[MobileTimelineHeatmap] Loaded events:', events?.length || 0);
+      console.log('[MobileTimelineHeatmap] ✅ Query successful');
+      console.log('[MobileTimelineHeatmap] Events loaded:', events?.length || 0);
+      console.log('[MobileTimelineHeatmap] First event sample:', events?.[0]);
 
       // Transform image_urls array into images array format
       const eventsWithImages = events?.map(event => ({
@@ -97,6 +115,7 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
             year,
             eventCount: 0,
             totalImages: 0,
+            totalDurationHours: 0,
             days: new Map()
           });
         }
@@ -104,13 +123,15 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
         const yearData = grouped.get(year)!;
         yearData.eventCount++;
         yearData.totalImages += event.images?.length || 0;
+        yearData.totalDurationHours += event.duration_hours || 0;
 
         if (!yearData.days.has(dateStr)) {
           yearData.days.set(dateStr, {
             date: dateStr,
             events: [],
             eventCount: 0,
-            imageCount: 0
+            imageCount: 0,
+            durationHours: 0
           });
         }
 
@@ -118,12 +139,15 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
         dayData.events.push(event as TimelineEvent);
         dayData.eventCount++;
         dayData.imageCount += event.images?.length || 0;
+        dayData.durationHours += event.duration_hours || 0;
       });
 
       console.log('[MobileTimelineHeatmap] Grouped into years:', Array.from(grouped.keys()));
       setYearData(grouped);
     } catch (error) {
       console.error('[MobileTimelineHeatmap] Error loading timeline data:', error);
+      // Set empty data on error so UI doesn't stay in loading state
+      setYearData(new Map());
     } finally {
       setLoading(false);
     }
@@ -144,6 +168,17 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
       return '#ebedf0'; // No work - light gray
     }
 
+    // Use duration_hours if available for more accurate work intensity
+    const hours = dayData.durationHours;
+    if (hours > 0) {
+      if (hours < 2) return '#d9f99d'; // < 2 hours - light green
+      if (hours < 4) return '#a7f3d0'; // 2-4 hours - light mint
+      if (hours <= 8) return '#34d399'; // 4-8 hours - green
+      if (hours <= 12) return '#10b981'; // 8-12 hours - emerald
+      return '#059669'; // 12+ hours - dark green
+    }
+
+    // Fallback to event count if no duration data
     const count = dayData.eventCount;
     if (count === 1) return '#d9f99d'; // 1 event - light green
     if (count === 2) return '#a7f3d0'; // 2 events - light mint
@@ -201,7 +236,14 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
     
     if (dayData.events.length === 0) return `${formatted}: No events`;
     
-    return `${formatted}: ${dayData.events.length} events${dayData.imageCount > 0 ? ` • ${dayData.imageCount} images` : ''}`;
+    let title = `${formatted}: ${dayData.events.length} events`;
+    if (dayData.durationHours > 0) {
+      title += ` • ${dayData.durationHours.toFixed(1)}h`;
+    }
+    if (dayData.imageCount > 0) {
+      title += ` • ${dayData.imageCount} images`;
+    }
+    return title;
   };
 
   const years = Array.from(yearData.keys()).sort((a, b) => b - a);
@@ -209,7 +251,8 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
   if (loading) {
     return (
       <div style={styles.loading}>
-        Loading timeline...
+        <div style={{ marginBottom: '8px' }}>Loading timeline...</div>
+        <div style={{ fontSize: '10px', color: '#666' }}>Vehicle ID: {vehicleId}</div>
       </div>
     );
   }
@@ -217,7 +260,16 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
   if (years.length === 0) {
     return (
       <div style={styles.loading}>
-        No timeline events yet. Add photos or events to start building your vehicle's history!
+        <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>No Timeline Events Found</div>
+        <div style={{ fontSize: '11px', marginBottom: '8px' }}>
+          This vehicle doesn't have any timeline events yet.
+        </div>
+        <div style={{ fontSize: '10px', color: '#666' }}>
+          Add photos or events to start building your vehicle's history!
+        </div>
+        <div style={{ fontSize: '9px', color: '#999', marginTop: '12px' }}>
+          Debug: Vehicle ID = {vehicleId}
+        </div>
       </div>
     );
   }
@@ -236,7 +288,11 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
               onClick={() => toggleYear(year)}
               style={styles.yearHeader}
             >
-              <span>{year} ({yearInfo.eventCount} events{yearInfo.totalImages > 0 ? `, ${yearInfo.totalImages} images` : ''})</span>
+              <span>
+                {year} ({yearInfo.eventCount} events
+                {yearInfo.totalDurationHours > 0 ? `, ${yearInfo.totalDurationHours.toFixed(1)}h` : ''}
+                {yearInfo.totalImages > 0 ? `, ${yearInfo.totalImages} images` : ''})
+              </span>
               <span style={styles.expandIcon}>{isExpanded ? '−' : '+'}</span>
             </div>
 
@@ -347,8 +403,14 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
 
                   <div style={styles.eventMeta}>
                     <span style={styles.eventType}>{event.event_type}</span>
+                    {event.duration_hours && event.duration_hours > 0 && (
+                      <span style={styles.durationBadge}>{event.duration_hours.toFixed(1)}h</span>
+                    )}
                     {event.images && event.images.length > 0 && (
                       <span style={styles.imageCount}>{event.images.length} 📷</span>
+                    )}
+                    {event.participant_count && event.participant_count > 0 && (
+                      <span style={styles.participantBadge}>{event.participant_count} 👤</span>
                     )}
                   </div>
                 </div>
@@ -541,6 +603,18 @@ const styles = {
   },
   imageCount: {
     background: '#008000',
+    color: '#ffffff',
+    padding: '2px 6px',
+    borderRadius: '2px'
+  },
+  durationBadge: {
+    background: '#800080',
+    color: '#ffffff',
+    padding: '2px 6px',
+    borderRadius: '2px'
+  },
+  participantBadge: {
+    background: '#808000',
     color: '#ffffff',
     padding: '2px 6px',
     borderRadius: '2px'

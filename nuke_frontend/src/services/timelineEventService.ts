@@ -108,8 +108,9 @@ export class TimelineEventService {
         source_url: batData.auction_url
       };
 
+      // Write to base table (vehicle_timeline_events is a VIEW, can't insert into it)
       const { error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -176,8 +177,9 @@ export class TimelineEventService {
         metadata
       };
 
+      // Write to base table (vehicle_timeline_events is a VIEW, can't insert into it)
       const { error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -245,8 +247,9 @@ export class TimelineEventService {
         metadata
       };
 
+      // Write to base table (vehicle_timeline_events is a VIEW, can't insert into it)
       const { error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -334,8 +337,9 @@ export class TimelineEventService {
         documentation_urls: photos.map(p => p.imageUrl)
       };
 
+      // Write to base table (vehicle_timeline_events is a VIEW, can't insert into it)
       const { error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -440,14 +444,15 @@ export class TimelineEventService {
         image_urls: [imageMetadata.imageUrl] // ✅ CRITICAL: Store image URL in event
       };
 
+      // Write to base table (vehicle_timeline_events is a VIEW, can't insert into it)
       const { data: eventResult, error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .insert([eventData])
         .select('id')
         .single();
 
       if (error) {
-        console.error('Error creating image upload timeline event (timeline_events):', error);
+        console.error('Error creating image upload timeline event:', error);
         return null;
       } else {
         // Dispatch custom events to notify UI components to refresh
@@ -536,12 +541,13 @@ export class TimelineEventService {
         documentation_urls: initialImages || []
       };
 
+      // Write to base table (vehicle_timeline_events is a VIEW, can't insert into it)
       const { error: createErr } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .insert([eventData]);
 
       if (createErr) {
-        console.error('Error creating vehicle creation timeline event (timeline_events):', createErr);
+        console.error('Error creating vehicle creation timeline event:', createErr);
       }
     } catch (error) {
       console.error('Error in createVehicleCreationEvent:', error);
@@ -639,8 +645,9 @@ export class TimelineEventService {
         metadata
       };
 
+      // Write to base table (vehicle_timeline_events is a VIEW, can't insert into it)
       const { error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .insert([eventData]);
 
       if (error) {
@@ -662,7 +669,7 @@ export class TimelineEventService {
     userId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // First check if user is the creator
+      // Read from enriched view to check permissions
       const { data: event, error: fetchError } = await supabase
         .from('vehicle_timeline_events')
         .select('metadata')
@@ -678,9 +685,9 @@ export class TimelineEventService {
         return { success: false, error: 'Only the event creator can edit this event' };
       }
 
-      // Update the event
+      // Write to base table (vehicle_timeline_events is a VIEW, can't update it)
       const { error: updateError } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .update({
           ...updates,
           updated_at: new Date().toISOString()

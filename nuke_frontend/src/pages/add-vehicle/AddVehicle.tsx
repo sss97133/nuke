@@ -486,14 +486,18 @@ Redirecting to vehicle profile...`);
           );
           // Record discovery event when created from URL without EXIF time
           if (formData.import_url) {
-            await supabase.from('vehicle_timeline_events').insert({
+            await supabase.from('timeline_events').insert({
               vehicle_id: vehicleId,
               user_id: user.id,
               event_type: 'discovery',
+              source: 'external_listing',
+              title: 'Vehicle Discovered',
               event_date: new Date().toISOString().split('T')[0],
               description: `Discovered on ${formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External site'}`,
-              source_type: 'external_listing',
-              confidence_score: 70
+              metadata: {
+                source_type: 'external_listing',
+                confidence_score: 70
+              }
             });
           }
         } catch (error) {

@@ -641,22 +641,20 @@ const VehicleProfile: React.FC = () => {
   const loadTimelineEvents = async () => {
     if (!vehicleId) return;
     try {
-      const [vte, legacy] = await Promise.all([
-        supabase
-          .from('vehicle_timeline_events')
-          .select('*')
-          .eq('vehicle_id', vehicleId),
-        supabase
-          .from('vehicle_timeline_events')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .limit(200)
-      ]);
+      // Query the enriched view once (includes participant_count, verification_count, service_info)
+      // vehicle_timeline_events is a VIEW over timeline_events with computed fields
+      const { data: events, error: eventsError } = await supabase
+        .from('vehicle_timeline_events')
+        .select('*')
+        .eq('vehicle_id', vehicleId)
+        .order('event_date', { ascending: false });
 
-      const a = (vte.data || []).map((e: any) => ({ ...e, __table: 'vehicle_timeline_events' }));
-      const b = (legacy.data || []).map((e: any) => ({ ...e, __table: 'timeline_events' }));
-      let merged = [...a, ...b]
-        .sort((x: any, y: any) => new Date(y.event_date).getTime() - new Date(x.event_date).getTime());
+      if (eventsError) {
+        console.error('Error loading timeline events:', eventsError);
+        return;
+      }
+
+      let merged = (events || []).map((e: any) => ({ ...e, __table: 'vehicle_timeline_events' }));
 
       // If no events in DB yet, derive photo events from vehicle_images so timeline isn't empty
       if (merged.length === 0) {
