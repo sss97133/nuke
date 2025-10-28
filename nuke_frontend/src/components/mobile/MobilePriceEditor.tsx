@@ -68,30 +68,37 @@ export const MobilePriceEditor: React.FC<MobilePriceEditorProps> = ({
 
       if (updateError) throw updateError;
 
-      // Add to price history
-      const historyEntries = [];
-      const priceTypes: Array<{ key: string; type: string }> = [
-        { key: 'msrp', type: 'msrp' },
-        { key: 'purchase_price', type: 'purchase' },
-        { key: 'current_value', type: 'current' },
-        { key: 'asking_price', type: 'asking' }
-      ];
+      // Add to price history (best-effort; non-fatal on error)
+      try {
+        const historyEntries: any[] = [];
+        const priceTypes: Array<{ key: string; type: string }> = [
+          { key: 'msrp', type: 'msrp' },
+          { key: 'purchase_price', type: 'purchase' },
+          { key: 'current_value', type: 'current' },
+          { key: 'asking_price', type: 'asking' }
+        ];
 
-      priceTypes.forEach(({ key, type }) => {
-        const value = updates[key];
-        const oldValue = initialData?.[key];
-        if (value && value !== oldValue) {
-          historyEntries.push({
-            vehicle_id: vehicleId,
-            price_type: type,
-            value: value,
-            source: 'mobile_ui'
-          });
+        priceTypes.forEach(({ key, type }) => {
+          const value = (updates as any)[key];
+          const oldValue = initialData?.[key];
+          if (typeof value === 'number' && !Number.isNaN(value) && value !== oldValue) {
+            historyEntries.push({
+              vehicle_id: vehicleId,
+              price_type: type,
+              value,
+              source: 'mobile_ui'
+            });
+          }
+        });
+
+        if (historyEntries.length > 0) {
+          const { error: histErr } = await supabase
+            .from('vehicle_price_history')
+            .insert(historyEntries);
+          if (histErr) console.debug('price history insert skipped:', histErr.message);
         }
-      });
-
-      if (historyEntries.length > 0) {
-        await supabase.from('vehicle_price_history').insert(historyEntries);
+      } catch (e) {
+        console.debug('price history non-fatal error:', e);
       }
 
       // Trigger refresh
