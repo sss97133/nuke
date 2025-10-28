@@ -14,6 +14,10 @@ import { MobileTimelineHeatmap } from './MobileTimelineHeatmap';
 import SpecResearchModal from './SpecResearchModal';
 import { EnhancedMobileImageViewer } from './EnhancedMobileImageViewer';
 import { TimelinePhotosView } from './TimelinePhotosView';
+import { MobileDocumentUploader } from './MobileDocumentUploader';
+import { MobilePriceEditor } from './MobilePriceEditor';
+import { MobileCommentBox } from './MobileCommentBox';
+import { MobileVehicleDataEditor } from './MobileVehicleDataEditor';
 
 interface MobileVehicleProfileProps {
   vehicleId: string;
@@ -27,6 +31,8 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [showDocUploader, setShowDocUploader] = useState(false);
+  const [showPriceEditor, setShowPriceEditor] = useState(false);
 
   useEffect(() => {
     console.log('[MobileVehicleProfile] Component mounted, isMobile:', isMobile);
@@ -141,13 +147,16 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
           <MobileOverviewTab vehicleId={vehicleId} vehicle={vehicle} onTabChange={setActiveTab} session={session} />
         )}
         {activeTab === 'timeline' && (
-          <MobileTimelineHeatmap vehicleId={vehicleId} />
+          <div>
+            <MobileTimelineHeatmap vehicleId={vehicleId} />
+            <MobileCommentBox vehicleId={vehicleId} session={session} targetType="vehicle" />
+          </div>
         )}
         {activeTab === 'images' && (
           <MobileImagesTab vehicleId={vehicleId} session={session} />
         )}
         {activeTab === 'specs' && (
-          <MobileSpecsTab vehicle={vehicle} />
+          <MobileSpecsTab vehicle={vehicle} session={session} vehicleId={vehicleId} />
         )}
       </div>
 
@@ -214,6 +223,8 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
 const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange: (tab: string) => void; session: any }> = ({ vehicleId, vehicle, onTabChange, session }) => {
   const [stats, setStats] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
+  const [showPriceEditor, setShowPriceEditor] = useState(false);
+  const [showDocUploader, setShowDocUploader] = useState(false);
 
   useEffect(() => {
     loadStats();
@@ -263,9 +274,62 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
         />
       )}
 
-      {/* Price Carousel - Swipeable */}
-      <PriceCarousel vehicle={vehicle} stats={stats} session={session} />
+      {/* Price Carousel - Now Clickable to Edit */}
+      <div onClick={() => session?.user && setShowPriceEditor(true)} style={{ cursor: session?.user ? 'pointer' : 'default' }}>
+        <PriceCarousel vehicle={vehicle} stats={stats} session={session} />
+      </div>
 
+      {/* Action Buttons (Owner Only) */}
+      {session?.user && (
+        <div style={styles.actionButtonsRow}>
+          <button
+            onClick={() => setShowPriceEditor(true)}
+            style={styles.actionButton}
+          >
+            💰 Edit Price
+          </button>
+          <button
+            onClick={() => setShowDocUploader(true)}
+            style={styles.actionButton}
+          >
+            📄 Upload Doc
+          </button>
+        </div>
+      )}
+
+      {/* Modals */}
+      {showPriceEditor && (
+        <MobilePriceEditor
+          vehicleId={vehicleId}
+          initialData={vehicle}
+          session={session}
+          onClose={() => setShowPriceEditor(false)}
+          onSaved={() => {
+            setShowPriceEditor(false);
+            window.location.reload(); // Refresh to show new prices
+          }}
+        />
+      )}
+
+      {showDocUploader && (
+        <MobileDocumentUploader
+          vehicleId={vehicleId}
+          session={session}
+          onClose={() => setShowDocUploader(false)}
+          onSuccess={() => {
+            setShowDocUploader(false);
+            window.dispatchEvent(new Event('vehicle_documents_updated'));
+          }}
+        />
+      )}
+
+      {/* Comment Section */}
+      <MobileCommentBox 
+        vehicleId={vehicleId}
+        session={session}
+        targetType="vehicle"
+      />
+      
       {/* Quick Stats - Touch Friendly & Clickable */}
       <div style={styles.statsGrid}>
         <div style={{...styles.statCard, cursor: 'pointer'}} onClick={() => onTabChange('images')}>
@@ -654,6 +718,13 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
           </div>
         </MobileImageControls>
       )}
+
+      {/* Comment Section for Images */}
+      <MobileCommentBox 
+        vehicleId={vehicleId}
+        session={session}
+        targetType="vehicle"
+      />
     </div>
   );
 };
@@ -736,8 +807,9 @@ const TechnicalGridView: React.FC<{ images: any[]; onImageClick: (img: any) => v
   </div>
 );
 
-const MobileSpecsTab: React.FC<{ vehicle: any }> = ({ vehicle }) => {
+const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }> = ({ vehicle, session, vehicleId }) => {
   const [selectedSpec, setSelectedSpec] = useState<{name: string; value: any} | null>(null);
+  const [showDataEditor, setShowDataEditor] = useState(false);
 
   const importantSpecs = [
     { key: 'year', label: 'Year', researchable: false },
@@ -761,6 +833,28 @@ const MobileSpecsTab: React.FC<{ vehicle: any }> = ({ vehicle }) => {
 
   return (
     <div style={styles.tabContent}>
+      {/* Edit Button */}
+      {session?.user && (
+        <button
+          onClick={() => setShowDataEditor(true)}
+          style={{
+            width: '100%',
+            padding: '14px',
+            background: '#000080',
+            color: '#ffffff',
+            border: '2px outset #ffffff',
+            borderRadius: '4px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontFamily: '"MS Sans Serif", sans-serif',
+            marginBottom: '12px'
+          }}
+        >
+          ✏️ Edit Vehicle Data
+        </button>
+      )}
+
       {importantSpecs.map(spec => {
         const value = vehicle[spec.key];
         if (!value) return null;
@@ -790,6 +884,20 @@ const MobileSpecsTab: React.FC<{ vehicle: any }> = ({ vehicle }) => {
           vehicle={vehicle}
           spec={selectedSpec}
           onClose={() => setSelectedSpec(null)}
+        />
+      )}
+
+      {/* Data Editor Modal */}
+      {showDataEditor && (
+        <MobileVehicleDataEditor
+          vehicleId={vehicleId}
+          vehicle={vehicle}
+          session={session}
+          onClose={() => setShowDataEditor(false)}
+          onSaved={() => {
+            setShowDataEditor(false);
+            window.location.reload();
+          }}
         />
       )}
     </div>
@@ -1156,6 +1264,25 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ffffff',
     fontFamily: '"MS Sans Serif", sans-serif',
     textShadow: '1px 1px 2px #000000'
+  },
+  actionButtonsRow: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '12px',
+    marginBottom: '12px'
+  },
+  actionButton: {
+    flex: 1,
+    padding: '14px',
+    background: '#000080',
+    color: '#ffffff',
+    border: '2px outset #ffffff',
+    borderRadius: '4px',
+    fontSize: '14px',
+    fontWeight: 'bold' as const,
+    cursor: 'pointer',
+    fontFamily: '"MS Sans Serif", sans-serif',
+    transition: 'transform 0.1s'
   }
 };
 
