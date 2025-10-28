@@ -484,42 +484,43 @@ const styles = {
   },
   monthLabels: {
     display: 'grid',
-    gridTemplateColumns: '24px repeat(53, 12px)',
-    gap: '2px',
+    gridTemplateColumns: '20px repeat(53, 8px)',
+    gap: '1px',
     justifyContent: 'start',
     marginBottom: '2px'
   },
   calendarGrid: {
     display: 'grid',
-    gridTemplateColumns: '24px auto',
-    gap: '2px'
+    gridTemplateColumns: '20px auto',
+    gap: '1px'
   },
   dayLabels: {
     display: 'grid',
-    gridTemplateRows: 'repeat(7, 12px)',
-    gap: '2px'
+    gridTemplateRows: 'repeat(7, 8px)',
+    gap: '1px'
   },
   dayLabel: {
     textAlign: 'center' as const,
-    fontSize: '8pt',
+    fontSize: '7pt',
     color: '#888',
-    lineHeight: '12px',
+    lineHeight: '8px',
     fontFamily: '"MS Sans Serif", sans-serif'
   },
   weeksGrid: {
     display: 'grid',
-    gridTemplateRows: 'repeat(7, 12px)',
-    gridTemplateColumns: 'repeat(53, 12px)',
-    gap: '2px',
-    justifyContent: 'start'
+    gridTemplateRows: 'repeat(7, 8px)',
+    gridTemplateColumns: 'repeat(53, 8px)',
+    gap: '1px',
+    justifyContent: 'start',
+    overflowX: 'auto' as const // Allow horizontal scroll if still needed
   },
   weekColumn: {
     display: 'contents'
   },
   dayCell: {
-    width: '12px',
-    height: '12px',
-    borderRadius: '2px',
+    width: '8px',
+    height: '8px',
+    borderRadius: '1px',
     transition: 'all 0.2s'
   },
   modalOverlay: {

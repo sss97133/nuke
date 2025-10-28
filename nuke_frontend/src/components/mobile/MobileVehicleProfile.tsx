@@ -12,6 +12,8 @@ import { MobileImageCarousel } from './MobileImageCarousel';
 import { PriceCarousel } from './PriceCarousel';
 import { MobileTimelineHeatmap } from './MobileTimelineHeatmap';
 import SpecResearchModal from './SpecResearchModal';
+import { EnhancedMobileImageViewer } from './EnhancedMobileImageViewer';
+import { TimelinePhotosView } from './TimelinePhotosView';
 
 interface MobileVehicleProfileProps {
   vehicleId: string;
@@ -324,7 +326,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
   const [images, setImages] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
-  const [viewMode, setViewMode] = useState<'feed' | 'discover' | 'technical'>('feed');
+  const [viewMode, setViewMode] = useState<'feed' | 'timeline' | 'discover'>('timeline');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -339,7 +341,17 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
   const loadImages = async () => {
     const { data } = await supabase
       .from('vehicle_images')
-      .select('*')
+      .select(`
+        *,
+        timeline_events:timeline_event_id(
+          id,
+          title,
+          event_date,
+          cost_amount,
+          duration_hours,
+          description
+        )
+      `)
       .eq('vehicle_id', vehicleId)
       .order('taken_at', { ascending: false });
 
@@ -418,6 +430,42 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     }
   };
 
+  const handleDelete = async (imageId: string, image: any) => {
+    if (!session?.user?.id) return;
+    if (image.user_id !== session.user.id) {
+      alert('You can only delete images you uploaded');
+      return;
+    }
+    
+    if (!confirm('Delete this image? This cannot be undone.')) return;
+    
+    try {
+      // Delete from database (will cascade to storage via trigger or we handle it)
+      const { error } = await supabase
+        .from('vehicle_images')
+        .delete()
+        .eq('id', imageId);
+      
+      if (error) throw error;
+      
+      // Refresh images
+      await loadImages();
+      
+      // Close viewer if this was the selected image
+      if (selectedImage?.id === imageId) {
+        setSelectedImage(null);
+      }
+      
+      // Dispatch update event
+      window.dispatchEvent(new CustomEvent('vehicle_images_updated', {
+        detail: { vehicleId }
+      }));
+    } catch (error) {
+      console.error('Delete failed:', error);
+      alert('Failed to delete image. Please try again.');
+    }
+  };
+
   // Detect image orientation
   const imagesWithOrientation = images.map(img => {
     // Simple heuristic: if we have dimensions, use them; otherwise assume horizontal
@@ -427,8 +475,8 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
 
   const viewModes = [
     { id: 'feed', label: 'Feed' },
-    { id: 'discover', label: 'Discover' },
-    { id: 'technical', label: 'Technical' }
+    { id: 'timeline', label: 'Timeline Photos' },
+    { id: 'discover', label: 'Discover' }
   ];
 
   return (
@@ -485,15 +533,27 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
       {viewMode === 'feed' && (
         <InstagramFeedView images={imagesWithOrientation} onImageClick={setSelectedImage} />
       )}
+      {viewMode === 'timeline' && (
+        <TimelinePhotosView images={images} onImageClick={setSelectedImage} session={session} />
+      )}
       {viewMode === 'discover' && (
         <DiscoverGridView images={imagesWithOrientation} onImageClick={setSelectedImage} />
       )}
-      {viewMode === 'technical' && (
-        <TechnicalGridView images={imagesWithOrientation} onImageClick={setSelectedImage} />
+
+      {/* Enhanced fullscreen image viewer with gestures and context */}
+      {selectedImage && (
+        <EnhancedMobileImageViewer
+          images={images}
+          initialIndex={images.findIndex(img => img.id === selectedImage.id)}
+          vehicleId={vehicleId}
+          session={session}
+          onClose={() => setSelectedImage(null)}
+          onDelete={(imageId) => handleDelete(imageId, selectedImage)}
+        />
       )}
 
-      {/* Fullscreen image viewer with swipe */}
-      {selectedImage && (
+      {/* OLD VIEWER - Keeping as fallback */}
+      {false && selectedImage && (
         <MobileImageControls
           onSwipeLeft={() => {
             const idx = images.findIndex(i => i.id === selectedImage.id);
