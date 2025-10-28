@@ -32,22 +32,34 @@ ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS condition_last_analyzed TIMESTAMP 
 -- Create function to trigger condition analysis when images are added
 CREATE OR REPLACE FUNCTION trigger_condition_analysis()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_supabase_url text := current_setting('app.supabase_url', true);
+  v_service_role_key text := current_setting('app.service_role_key', true);
+  v_headers jsonb := jsonb_build_object('Content-Type', 'application/json');
 BEGIN
   -- Only trigger if this is a new image or significant change
   IF TG_OP = 'INSERT' OR 
      (TG_OP = 'UPDATE' AND OLD.image_url IS DISTINCT FROM NEW.image_url) THEN
     
-    -- Call condition analysis function asynchronously
-    PERFORM net.http_post(
-      url := current_setting('app.supabase_url') || '/functions/v1/ai-condition-pricing',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-      ),
-      body := jsonb_build_object(
-        'vehicle_id', NEW.vehicle_id::text
-      )
-    );
+    -- Attach Authorization header only if configured
+    IF v_service_role_key IS NOT NULL AND length(v_service_role_key) > 0 THEN
+      v_headers := v_headers || jsonb_build_object('Authorization', 'Bearer ' || v_service_role_key);
+    END IF;
+
+    -- Call condition analysis function asynchronously (best-effort)
+    IF v_supabase_url IS NOT NULL AND length(v_supabase_url) > 0 THEN
+      BEGIN
+        PERFORM net.http_post(
+          url := v_supabase_url || '/functions/v1/ai-condition-pricing',
+          headers := v_headers,
+          body := jsonb_build_object('vehicle_id', NEW.vehicle_id::text)
+        );
+      EXCEPTION WHEN others THEN
+        RAISE NOTICE 'ai-condition-pricing call skipped: %', SQLERRM;
+      END;
+    ELSE
+      RAISE NOTICE 'ai-condition-pricing skipped: app.supabase_url not set';
+    END IF;
     
     -- Log the trigger
     INSERT INTO vehicle_activity_log (vehicle_id, activity_type, details)
@@ -57,7 +69,7 @@ BEGIN
   
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Create trigger on vehicle_images
 DROP TRIGGER IF EXISTS condition_analysis_trigger ON vehicle_images;
@@ -110,23 +122,32 @@ CREATE POLICY "Users can view condition analyses for vehicles they can see" ON v
 CREATE OR REPLACE FUNCTION analyze_vehicle_condition(p_vehicle_id UUID)
 RETURNS JSONB AS $$
 DECLARE
-  result JSONB;
+  result JSONB := jsonb_build_object('success', false, 'message', 'not called');
+  v_supabase_url text := current_setting('app.supabase_url', true);
+  v_service_role_key text := current_setting('app.service_role_key', true);
+  v_headers jsonb := jsonb_build_object('Content-Type', 'application/json');
 BEGIN
-  -- Call the Edge Function
-  SELECT net.http_post(
-    url := current_setting('app.supabase_url') || '/functions/v1/ai-condition-pricing',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-    ),
-    body := jsonb_build_object(
-      'vehicle_id', p_vehicle_id::text
-    )
-  ) INTO result;
-  
+  IF v_service_role_key IS NOT NULL AND length(v_service_role_key) > 0 THEN
+    v_headers := v_headers || jsonb_build_object('Authorization', 'Bearer ' || v_service_role_key);
+  END IF;
+
+  IF v_supabase_url IS NOT NULL AND length(v_supabase_url) > 0 THEN
+    BEGIN
+      SELECT net.http_post(
+        url := v_supabase_url || '/functions/v1/ai-condition-pricing',
+        headers := v_headers,
+        body := jsonb_build_object('vehicle_id', p_vehicle_id::text)
+      ) INTO result;
+    EXCEPTION WHEN others THEN
+      result := jsonb_build_object('success', false, 'error', SQLERRM);
+    END;
+  ELSE
+    result := jsonb_build_object('success', false, 'error', 'app.supabase_url not set');
+  END IF;
+
   RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- View for condition analysis summary
 CREATE OR REPLACE VIEW vehicle_condition_summary AS
