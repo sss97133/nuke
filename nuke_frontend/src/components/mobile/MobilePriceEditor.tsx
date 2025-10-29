@@ -52,7 +52,7 @@ export const MobilePriceEditor: React.FC<MobilePriceEditorProps> = ({
 
     try {
       // Build update payload
-      const updates: any = {
+      const rawUpdates: Record<string, any> = {
         msrp: prices.msrp ? parseFloat(prices.msrp) : null,
         purchase_price: prices.purchase_price ? parseFloat(prices.purchase_price) : null,
         current_value: prices.current_value ? parseFloat(prices.current_value) : null,
@@ -60,11 +60,28 @@ export const MobilePriceEditor: React.FC<MobilePriceEditorProps> = ({
         is_for_sale: prices.is_for_sale
       };
 
-      // Update vehicle
+      // Some deployments don't have all columns (e.g. asking_price, is_for_sale).
+      // Only send fields that exist on the loaded row to avoid "column does not exist" errors.
+      const allowedKeys = new Set(Object.keys(initialData || {}));
+      const updates: Record<string, any> = {};
+      for (const [key, value] of Object.entries(rawUpdates)) {
+        if (allowedKeys.has(key)) updates[key] = value;
+      }
+
+      // If nothing is allowed, fall back to the core price fields which exist everywhere
+      if (Object.keys(updates).length === 0) {
+        ['msrp', 'purchase_price', 'current_value'].forEach((k) => {
+          if (k in rawUpdates) updates[k] = (rawUpdates as any)[k];
+        });
+      }
+
+      // Update vehicle and return updated row (helps surface precise errors)
       const { error: updateError } = await supabase
         .from('vehicles')
         .update(updates)
-        .eq('id', vehicleId);
+        .eq('id', vehicleId)
+        .select()
+        .single();
 
       if (updateError) throw updateError;
 
@@ -106,9 +123,20 @@ export const MobilePriceEditor: React.FC<MobilePriceEditorProps> = ({
       
       onSaved?.();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Save error:', error);
-      alert('Failed to save prices. Please try again.');
+      // Provide a clearer message for common cases while keeping the generic fallback
+      const message =
+        (typeof error?.message === 'string' && error.message) ||
+        (typeof error?.hint === 'string' && error.hint) ||
+        '';
+      if (message.includes('row-level security') || message.includes('permission')) {
+        alert('You do not have permission to edit this vehicle.');
+      } else if (message.includes('column') && message.includes('does not exist')) {
+        alert('This vehicle schema is missing some price fields. Try saving MSRP, Purchase, or Current Value only.');
+      } else {
+        alert('Failed to save prices. Please try again.');
+      }
     } finally {
       setSaving(false);
     }
