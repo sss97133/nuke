@@ -364,17 +364,36 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
 
     try {
       // Create vehicle
-      const vehicleData = {
+      const allowedRelationshipTypes = new Set([
+        'owned',
+        'previously_owned',
+        'interested',
+        'discovered',
+        'curated',
+        'consigned'
+      ]);
+
+      const normalizedRelationship: string = allowedRelationshipTypes.has(formData.relationship_type)
+        ? formData.relationship_type
+        : 'discovered';
+
+      const vehicleData: any = {
         make: formData.make,
         model: formData.model,
         year: formData.year ? parseInt(formData.year) : null,
         vin: formData.vin || null,
         discovery_url: formData.import_url || null,
-        relationship_type: formData.relationship_type,
+        relationship_type: normalizedRelationship,
         notes: formData.notes || null,
-        created_by: user.id,
+        // Use existing schema fields; avoid non-existent created_by
+        user_id: user.id,
         is_public: true
       };
+
+      // If discovered via URL, also mark discovered_by when available
+      if ((formData.import_url && formData.import_url.length > 0) || normalizedRelationship === 'discovered') {
+        vehicleData.discovered_by = user.id;
+      }
 
       const { data: vehicle, error: vehicleError } = await supabase
         .from('vehicles')
