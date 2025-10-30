@@ -8,6 +8,7 @@ import { ToastProvider } from './components/ui/Toast';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { TestMode } from './lib/test-mode';
 
 // Database components
 import DatabaseAudit from './pages/DatabaseAudit';

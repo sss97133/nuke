@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CashBalanceService } from '../../services/cashBalanceService';
+import { AuctionMarketEngine } from '../../services/auctionMarketEngine';
 
 interface TradePanelProps {
   vehicleId: string;
@@ -95,20 +96,61 @@ export default function TradePanel({
 
       setLoading(true);
 
-      // TODO: Call auctionMarketEngine.placeOrder() when market system is deployed
-      // For now, show confirmation
-      const confirmed = confirm(
-        `${tradeType.toUpperCase()} ORDER\n\n` +
-        `${numShares} shares @ $${numPrice}\n` +
-        `Total: ${CashBalanceService.formatCurrency(totalCost)}\n\n` +
-        `This will be submitted to the order book.\n` +
-        `Continue?`
+      // Get or create offering for this vehicle
+      let { data: offering, error: offeringError } = await supabase
+        .from('vehicle_offerings')
+        .select('id')
+        .eq('vehicle_id', vehicleId)
+        .single();
+
+      if (offeringError || !offering) {
+        // Create offering if it doesn't exist
+        const { data: newOffering, error: createError } = await supabase
+          .from('vehicle_offerings')
+          .insert({
+            vehicle_id: vehicleId,
+            total_shares: totalShares,
+            shares_available: totalShares,
+            current_share_price: currentSharePrice,
+            status: 'active'
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        offering = newOffering;
+      }
+
+      // Place order via AuctionMarketEngine
+      const { order, trades } = await AuctionMarketEngine.placeOrder(
+        offering.id,
+        user.id,
+        tradeType,
+        numShares,
+        numPrice,
+        'day'
       );
 
-      if (confirmed) {
-        alert('Market system deployment pending. Order book coming soon!');
-        // TODO: Implement actual order placement
-        // await AuctionMarketEngine.placeOrder(vehicleId, user.id, tradeType, numShares, numPrice);
+      // Show result
+      if (trades.length > 0) {
+        const totalFilled = trades.reduce((sum, t) => sum + t.shares_traded, 0);
+        const avgPrice = trades.reduce((sum, t) => sum + (t.shares_traded * t.price_per_share), 0) / totalFilled;
+        
+        alert(
+          `Order ${order.status.toUpperCase()}!\n\n` +
+          `Filled: ${totalFilled} shares @ avg $${avgPrice.toFixed(2)}\n` +
+          `Order ID: ${order.id.substring(0, 8)}...`
+        );
+        
+        // Refresh balance and shares
+        await loadUserData();
+      } else {
+        alert(
+          `Order PLACED!\n\n` +
+          `${numShares} shares @ $${numPrice}\n` +
+          `Status: ${order.status}\n` +
+          `Waiting for matching orders...`
+        );
       }
 
     } catch (error) {
