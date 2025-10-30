@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CashBalanceService } from '../services/cashBalanceService';
 import '../design-system.css';
@@ -27,6 +27,7 @@ interface PortfolioHolding {
 
 export default function Market() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -41,16 +42,30 @@ export default function Market() {
   const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
   const [cashBalance, setCashBalance] = useState(0);
 
+  // Filter state from URL
+  const [filterYear, setFilterYear] = useState<number | null>(null);
+  const [filterMake, setFilterMake] = useState<string | null>(null);
+  const [filterModel, setFilterModel] = useState<string | null>(null);
+
   useEffect(() => {
     loadSession();
-  }, []);
+    
+    // Parse URL parameters
+    const year = searchParams.get('year');
+    const make = searchParams.get('make');
+    const model = searchParams.get('model');
+    
+    if (year) setFilterYear(parseInt(year));
+    if (make) setFilterMake(make);
+    if (model) setFilterModel(model);
+  }, [searchParams]);
 
   useEffect(() => {
     if (session) {
       loadMarketData();
       loadPortfolioData();
     }
-  }, [session]);
+  }, [session, filterYear, filterMake, filterModel]);
 
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -61,10 +76,17 @@ export default function Market() {
   const loadMarketData = async () => {
     try {
       // Get vehicles with price changes
-      const { data: vehicles } = await supabase
+      let query = supabase
         .from('vehicles')
         .select('id, year, make, model, current_value, purchase_price, view_count, image_count')
-        .not('current_value', 'is', null)
+        .not('current_value', 'is', null);
+
+      // Apply filters if present
+      if (filterYear) query = query.eq('year', filterYear);
+      if (filterMake) query = query.ilike('make', filterMake);
+      if (filterModel) query = query.ilike('model', filterModel);
+
+      const { data: vehicles } = await query
         .order('current_value', { ascending: false })
         .limit(50);
 
