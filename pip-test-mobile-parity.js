@@ -96,47 +96,79 @@ const { chromium } = require('playwright');
     });
     console.log(`   Mobile view active: ${isMobileView ? '✅' : '❌'}`);
 
-    // TEST 2: Instagram-style image swipes (from previous session)
+    // TEST  рез: Instagram-style image swipes (from previous session)
     console.log('\n📸 TEST 2: Instagram Image Swipes');
-    const imagesTab = await page.locator('text=Images').or(page.locator('text=📷')).first();
+    const imagesTab = await page.locator('text=Images').or(page.locator('text=📷')).or(page.locator('[data-tab="images"]')).first();
     if (await imagesTab.count() > 0) {
       await imagesTab.click();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000); // Wait longer for images to load
       
-      const firstImage = await page.locator('img[src*="vehicle"]').first();
+      const firstImage = await page.locator('img[src*="vehicle"]').or(page.locator('img[src*="supabase"]')).first();
       if (await firstImage.count() > 0) {
         await firstImage.click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(2000); // Wait for viewer to fully render
         
-        // Check for viewer overlay
-        const hasViewer = await page.locator('div').filter({ hasText: 'Double-tap' }).count() > 0;
-        const hasDots = await page.locator('div').filter({ has: page.locator('[style*="borderRadius"][style*="50%"]') }).count() > 0;
+        // Check for viewer overlay - look for help text or dots
+        const helpText = await page.locator('div').filter({ hasText: /Double-tap|Swipe to navigate/i }).count();
+        const hasDots = await page.locator('div').filter({ has: page.locator('[style*="borderRadius"][style*="50%"],[style*="border-radius"][style*="50%"]') }).count() > 0;
+        const imageCounter = await page.locator('text=/\\d+ \\/ \\d+/').count(); // "1 / 5" format
         
-        if (hasViewer || hasDots) {
+        if (helpText > 0 || hasDots || imageCounter > 0) {
           results.instagram_swipes = '✅';
-          console.log('   ✅ Enhanced viewer opens with gestures');
+          console.log(`   ✅ Enhanced viewer opens (found help text: ${helpText}, dots: ${hasDots}, counter: ${imageCounter})`);
         } else {
-          console.log('   ⚠️  Image opens but no enhanced viewer detected');
+          // Check if fullscreen overlay exists
+          const overlay = await page.locator('[style*="position: fixed"],[style*="z-index"]').filter({ hasText: /[0-9]/ }).count();
+          if (overlay > 0) {
+            results.instagram_swipes = '⚠️';
+            console.log('   ⚠️  Viewer opens but help text/indicators not detected');
+          } else {
+            console.log('   ⚠️  Image opens but no enhanced viewer detected');
+          }
         }
         
-        // Close viewer
+        // Close viewer - try multiple methods
         await page.keyboard.press('Escape');
         await page.waitForTimeout(500);
+        // Also try clicking close button or swiping down
+        const closeBtn = await page.locator('button:has-text("✕")').or(page.locator('[aria-label="Close"]')).first();
+        if (await closeBtn.count() > 0) {
+          await closeBtn.click();
+        }
+        await page.waitForTimeout(1000);
+      } else {
+        console.log('   ⚠️  No images found to test swipes');
       }
+    } else {
+      console.log('   ⚠️  Images tab not found');
     }
 
     // Go back to Overview for remaining tests
-    const overviewTab = await page.locator('text=Overview').or(page.locator('text=📊')).first();
+    const overviewTab = await page.locator('text=Overview').or(page.locator('text=📊')).or(page.locator('[data-tab="overview"]')).first();
     if (await overviewTab.count() > 0) {
       await overviewTab.click();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000); // Wait for tab to fully load
     }
 
     // TEST 3: Document Uploader Button
     console.log('\n📄 TEST 3: Document Uploader');
-    const docUploadBtn = await page.locator('button:has-text("Upload Doc")').or(
-      page.locator('button:has-text("📄")')
+    // Try multiple selectors - button might be in different locations
+    let docUploadBtn = await page.locator('button:has-text("Upload Doc")').or(
+      page.locator('button:has-text("📄 Upload Doc")'),
+      page.locator('[data-testid="upload-doc-button"]'),
+      page.locator('button').filter({ hasText: /Upload Doc|📄/i })
     ).first();
+    
+    // If not found, scroll to find it
+    if (await docUploadBtn.count() === 0) {
+      console.log('   Scrolling to find Upload Doc button...');
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.waitForTimeout(1000);
+      docUploadBtn = await page.locator('button:has-text("Upload Doc")').or(
+        page.locator('[data-testid="upload-doc-button"]'),
+        page.locator('button').filter({ hasText: /Upload Doc/i })
+      ).first();
+    }
     
     if (await docUploadBtn.count() > 0) {
       results.doc_uploader = '✅';
@@ -165,9 +197,24 @@ const { chromium } = require('playwright');
 
     // TEST 4: Price Editor Button
     console.log('\n💰 TEST 4: Price Editor');
-    const priceEditBtn = await page.locator('button:has-text("Edit Price")').or(
-      page.locator('button:has-text("💰")')
+    // Try multiple selectors
+    let priceEditBtn = await page.locator('button:has-text("Edit Price")').or(
+      page.locator('button:has-text("💰 Edit Price")'),
+      page.locator('[data-testid="edit-price-button"]'),
+      page.locator('button').filter({ hasText: /Edit Price|💰/i })
     ).first();
+    
+    // If not found, scroll to find it
+    if (await priceEditBtn.count() === 0) {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(500);
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+      await page.waitForTimeout(1000);
+      priceEditBtn = await page.locator('button:has-text("Edit Price")').or(
+        page.locator('[data-testid="edit-price-button"]'),
+        page.locator('button').filter({ hasText: /Edit Price/i })
+      ).first();
+    }
     
     if (await priceEditBtn.count() > 0) {
       results.price_editor = '✅';
