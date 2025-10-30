@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { UserInteractionService } from '../../services/userInteractionService';
 
 interface HeroVehicle {
   id: string;
@@ -24,12 +25,14 @@ interface MobileHeroCarouselProps {
   vehicles: HeroVehicle[];
   onNavigate: (vehicleId: string) => void;
   onDataClick: (type: 'year' | 'make' | 'model', value: string | number) => void;
+  session?: any;
 }
 
 export const MobileHeroCarousel: React.FC<MobileHeroCarouselProps> = ({
   vehicles,
   onNavigate,
-  onDataClick
+  onDataClick,
+  session
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -78,10 +81,40 @@ export const MobileHeroCarousel: React.FC<MobileHeroCarouselProps> = ({
 
     if (isLeftSwipe && currentIndex < vehicles.length - 1) {
       handleNext();
+      // Track swipe gesture
+      if (session?.user) {
+        UserInteractionService.logInteraction(
+          session.user.id,
+          'view',
+          'vehicle',
+          vehicles[currentIndex + 1]?.id || 'unknown',
+          {
+            source_page: '/homepage',
+            device_type: 'mobile',
+            gesture_type: 'swipe',
+            direction: 'left'
+          }
+        );
+      }
       // Haptic feedback
       if (navigator.vibrate) navigator.vibrate(20);
     } else if (isRightSwipe && currentIndex > 0) {
       handlePrevious();
+      // Track swipe gesture
+      if (session?.user) {
+        UserInteractionService.logInteraction(
+          session.user.id,
+          'view',
+          'vehicle',
+          vehicles[currentIndex - 1]?.id || 'unknown',
+          {
+            source_page: '/homepage',
+            device_type: 'mobile',
+            gesture_type: 'swipe',
+            direction: 'right'
+          }
+        );
+      }
       if (navigator.vibrate) navigator.vibrate(20);
     }
 

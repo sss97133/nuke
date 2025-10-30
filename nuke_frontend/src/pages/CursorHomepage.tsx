@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { MobileHeroCarousel } from '../components/mobile/MobileHeroCarousel';
+import { UserInteractionService } from '../services/userInteractionService';
 
 interface HypeVehicle {
   id: string;
@@ -31,6 +32,7 @@ const CursorHomepage: React.FC = () => {
   const [currentHypeIndex, setCurrentHypeIndex] = useState(0);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
   const [isMobile, setIsMobile] = useState(false);
+  const [session, setSession] = useState<any>(null);
   const [stats, setStats] = useState({
     totalBuilds: 0,
     totalValue: 0,
@@ -39,6 +41,13 @@ const CursorHomepage: React.FC = () => {
   });
   const navigate = useNavigate();
   const timerRef = useRef<NodeJS.Timeout>();
+
+  // Load session for interaction tracking
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+    });
+  }, []);
 
   // Detect mobile
   useEffect(() => {
@@ -247,12 +256,56 @@ const CursorHomepage: React.FC = () => {
   }
 
   const handleDataClick = (type: 'year' | 'make' | 'model', value: string | number) => {
+    // Track ETF navigation click
+    if (session?.user) {
+      UserInteractionService.logInteraction(
+        session.user.id,
+        'view',
+        'vehicle',
+        'etf-navigation',
+        {
+          source_page: '/homepage',
+          device_type: isMobile ? 'mobile' : 'desktop',
+          gesture_type: 'click',
+          etf_type: type,
+          etf_value: String(value)
+        }
+      );
+    }
+
     if (type === 'year') {
       navigate(`/market?year=${value}`);
     } else if (type === 'make') {
       navigate(`/market?make=${encodeURIComponent(String(value))}`);
     } else if (type === 'model') {
       navigate(`/market?model=${encodeURIComponent(String(value))}`);
+    }
+  };
+
+  const handleTimePeriodChange = async (period: TimePeriod) => {
+    setTimePeriod(period);
+    
+    // Track time period selection
+    if (session?.user) {
+      await UserInteractionService.logInteraction(
+        session.user.id,
+        'view',
+        'vehicle',
+        'time-period-filter',
+        {
+          source_page: '/homepage',
+          device_type: isMobile ? 'mobile' : 'desktop',
+          time_period: period
+        }
+      );
+
+      // Save preference
+      await supabase
+        .from('user_preferences')
+        .upsert({
+          user_id: session.user.id,
+          settings: { preferred_time_period: period }
+        }, { onConflict: 'user_id' });
     }
   };
 
@@ -264,6 +317,7 @@ const CursorHomepage: React.FC = () => {
           vehicles={hypeVehicles}
           onNavigate={(id) => navigate(`/vehicle/${id}`)}
           onDataClick={handleDataClick}
+          session={session}
         />
       ) : currentHypeVehicle && (
         <div
@@ -490,7 +544,7 @@ const CursorHomepage: React.FC = () => {
               ].map(period => (
                 <button
                   key={period.id}
-                  onClick={() => setTimePeriod(period.id as TimePeriod)}
+                  onClick={() => handleTimePeriodChange(period.id as TimePeriod)}
                   style={{
                     background: timePeriod === period.id ? 'var(--text)' : 'var(--white)',
                     color: timePeriod === period.id ? 'var(--white)' : 'var(--text)',

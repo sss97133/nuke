@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { UserInteractionService } from '../../services/userInteractionService';
 
 interface TimelineEvent {
   id: string;
@@ -39,7 +40,14 @@ export const MobileTimelineVisual: React.FC<MobileTimelineVisualProps> = ({ vehi
   const [months, setMonths] = useState<MonthData[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<MonthData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+    });
+  }, []);
 
   useEffect(() => {
     if (vehicleId) {
@@ -145,7 +153,26 @@ export const MobileTimelineVisual: React.FC<MobileTimelineVisualProps> = ({ vehi
           <div
             key={month.month}
             style={styles.monthCard}
-            onClick={() => setSelectedMonth(month)}
+            onClick={() => {
+              setSelectedMonth(month);
+              // Track timeline interaction
+              if (session?.user) {
+                UserInteractionService.logInteraction(
+                  session.user.id,
+                  'view',
+                  'event',
+                  month.month,
+                  {
+                    vehicle_id: vehicleId,
+                    source_page: '/vehicle/timeline',
+                    device_type: 'mobile',
+                    gesture_type: 'tap',
+                    event_count: month.events.length,
+                    image_count: month.imageCount
+                  }
+                );
+              }
+            }}
           >
             {/* Month Image Preview */}
             {month.firstImage ? (
