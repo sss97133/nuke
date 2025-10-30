@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabase';
 import EventDetailModal from './EventDetailModal';
 import { MobileImageCarousel } from './MobileImageCarousel';
 import { PriceCarousel } from './PriceCarousel';
-import { MobileTimelineHeatmap } from './MobileTimelineHeatmap';
+import { MobileTimelineVisual } from './MobileTimelineVisual';
 import SpecResearchModal from './SpecResearchModal';
 import { EnhancedMobileImageViewer } from './EnhancedMobileImageViewer';
 import { TimelinePhotosView } from './TimelinePhotosView';
@@ -148,7 +148,7 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
         )}
         {activeTab === 'timeline' && (
           <div>
-            <MobileTimelineHeatmap vehicleId={vehicleId} />
+            <MobileTimelineVisual vehicleId={vehicleId} />
             <MobileCommentBox vehicleId={vehicleId} session={session} targetType="vehicle" />
           </div>
         )}

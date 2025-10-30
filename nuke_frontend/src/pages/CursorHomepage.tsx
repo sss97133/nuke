@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
+import { MobileHeroCarousel } from '../components/mobile/MobileHeroCarousel';
 
 interface HypeVehicle {
   id: string;
@@ -21,11 +22,15 @@ interface HypeVehicle {
   created_at?: string;
 }
 
+type TimePeriod = 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
+
 const CursorHomepage: React.FC = () => {
   const [hypeVehicles, setHypeVehicles] = useState<HypeVehicle[]>([]);
   const [feedVehicles, setFeedVehicles] = useState<HypeVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentHypeIndex, setCurrentHypeIndex] = useState(0);
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
+  const [isMobile, setIsMobile] = useState(false);
   const [stats, setStats] = useState({
     totalBuilds: 0,
     totalValue: 0,
@@ -35,9 +40,19 @@ const CursorHomepage: React.FC = () => {
   const navigate = useNavigate();
   const timerRef = useRef<NodeJS.Timeout>();
 
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   useEffect(() => {
     loadHypeFeed();
-  }, []);
+  }, [timePeriod]);
 
   // Auto-rotate hype banner every 5 seconds
   useEffect(() => {
@@ -49,18 +64,45 @@ const CursorHomepage: React.FC = () => {
     }
   }, [hypeVehicles.length]);
 
+  const getTimePeriodFilter = () => {
+    const now = new Date();
+    switch (timePeriod) {
+      case 'RT': // Real-time - last hour
+        return new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+      case 'D': // Daily
+        return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      case 'W': // Weekly
+        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      case 'Q': // Quarter (90 days)
+        return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      case '1Y': // 1 Year
+        return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString();
+      default: // AT - All Time
+        return null;
+    }
+  };
+
   const loadHypeFeed = async () => {
     try {
       setLoading(true);
 
+      const periodFilter = getTimePeriodFilter();
+
       // Get vehicles with activity metrics
-      const { data: vehicles, error } = await supabase
+      let query = supabase
         .from('vehicles')
         .select(`
-          id, year, make, model, current_value, purchase_price, view_count, created_at
+          id, year, make, model, current_value, purchase_price, view_count, created_at, updated_at
         `)
-        .eq('is_public', true)
-        .order('created_at', { ascending: false })
+        .eq('is_public', true);
+
+      // Apply time period filter if not "All Time"
+      if (periodFilter) {
+        query = query.gte('updated_at', periodFilter);
+      }
+
+      const { data: vehicles, error } = await query
+        .order('updated_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
@@ -94,27 +136,36 @@ const CursorHomepage: React.FC = () => {
           const activity7d = recentActivity.count || 0;
           const totalImages = imageCount.count || 0;
           const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
+          const update_hours = (Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60);
           const is_new = age_hours < 24;
+          const is_hot = update_hours < 1; // Updated in last hour
           
           let hypeScore = 0;
           let hypeReason = '';
 
+          // Real-time activity
+          if (is_hot && timePeriod === 'RT') {
+            hypeScore += 60;
+            hypeReason = 'LIVE NOW';
+          }
+
           // New and hot
           if (is_new && totalImages > 10) {
             hypeScore += 50;
-            hypeReason = '🔥 JUST POSTED';
+            hypeReason = hypeReason || 'JUST POSTED';
           }
 
-          // High activity
+          // High activity (weighted by time period)
           if (activity7d >= 5) {
             hypeScore += 30;
-            hypeReason = hypeReason || '📈 ACTIVE BUILD';
+            hypeReason = hypeReason || 'ACTIVE BUILD';
           }
 
-          // Big ROI
+          // Big ROI (weighted by time period)
           if (roi > 100) {
-            hypeScore += 40;
-            hypeReason = hypeReason || `💰 ${roi.toFixed(0)}% GAIN`;
+            const periodMultiplier = timePeriod === 'D' ? 2 : timePeriod === 'W' ? 1.5 : 1;
+            hypeScore += 40 * periodMultiplier;
+            hypeReason = hypeReason || `${roi.toFixed(0)}% GAIN`;
           }
 
           // Well documented
@@ -125,7 +176,7 @@ const CursorHomepage: React.FC = () => {
           // High views
           if ((v.view_count || 0) > 20) {
             hypeScore += 15;
-            hypeReason = hypeReason || '👁️ TRENDING';
+            hypeReason = hypeReason || 'TRENDING';
           }
 
           return {
@@ -136,7 +187,7 @@ const CursorHomepage: React.FC = () => {
             roi_pct: roi,
             primary_image_url: imageCount.data?.[0]?.thumbnail_url || imageCount.data?.[0]?.image_url || null,
             hype_score: hypeScore,
-            hype_reason: hypeReason || '📋 DOCUMENTED'
+            hype_reason: hypeReason || 'DOCUMENTED'
           };
         })
       );
@@ -195,10 +246,26 @@ const CursorHomepage: React.FC = () => {
     );
   }
 
+  const handleDataClick = (type: 'year' | 'make' | 'model', value: string | number) => {
+    if (type === 'year') {
+      navigate(`/market?year=${value}`);
+    } else if (type === 'make') {
+      navigate(`/market?make=${encodeURIComponent(String(value))}`);
+    } else if (type === 'model') {
+      navigate(`/market?model=${encodeURIComponent(String(value))}`);
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Hype Banner - Top 3 Rotating */}
-      {currentHypeVehicle && (
+      {/* Hype Banner - Mobile vs Desktop */}
+      {isMobile && hypeVehicles.length > 0 ? (
+        <MobileHeroCarousel
+          vehicles={hypeVehicles}
+          onNavigate={(id) => navigate(`/vehicle/${id}`)}
+          onDataClick={handleDataClick}
+        />
+      ) : currentHypeVehicle && (
         <div
           onClick={() => navigate(`/vehicle/${currentHypeVehicle.id}`)}
           style={{
@@ -223,15 +290,17 @@ const CursorHomepage: React.FC = () => {
           {/* Hype Badge */}
           <div style={{
             position: 'absolute',
-            top: '16px',
-            left: '16px',
-            background: '#ff0000',
+            top: '12px',
+            left: '12px',
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(8px)',
             color: '#ffffff',
-            padding: '8px 16px',
-            fontSize: '12pt',
-            fontWeight: 'bold',
-            border: '2px solid #ffffff',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+            padding: '4px 10px',
+            fontSize: '9pt',
+            fontWeight: '600',
+            borderRadius: '4px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            letterSpacing: '0.5px'
           }}>
             {currentHypeVehicle.hype_reason}
           </div>
@@ -269,31 +338,83 @@ const CursorHomepage: React.FC = () => {
           {/* Vehicle Info */}
           <div style={{ maxWidth: '800px' }}>
             <div style={{
-              fontSize: '32pt',
-              fontWeight: 'bold',
+              fontSize: '28pt',
+              fontWeight: '600',
               color: '#ffffff',
-              textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-              marginBottom: '8px'
+              textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
+              marginBottom: '12px',
+              display: 'flex',
+              gap: '8px',
+              flexWrap: 'wrap',
+              alignItems: 'baseline'
             }}>
-              {currentHypeVehicle.year} {currentHypeVehicle.make} {currentHypeVehicle.model}
+              <span 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/market?year=${currentHypeVehicle.year}`);
+                }}
+                style={{ 
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                  opacity: 0.95
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.95'}
+              >
+                {currentHypeVehicle.year}
+              </span>
+              <span 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/market?make=${encodeURIComponent(currentHypeVehicle.make || '')}`);
+                }}
+                style={{ 
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                  opacity: 0.95
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.95'}
+              >
+                {currentHypeVehicle.make}
+              </span>
+              <span 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/market?make=${encodeURIComponent(currentHypeVehicle.make || '')}&model=${encodeURIComponent(currentHypeVehicle.model || '')}`);
+                }}
+                style={{ 
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                  opacity: 0.95
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.95'}
+              >
+                {currentHypeVehicle.model}
+              </span>
             </div>
 
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{
-                fontSize: '24pt',
-                fontWeight: 'bold',
+                fontSize: '22pt',
+                fontWeight: '700',
                 color: '#ffffff',
-                textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
+                textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
+                fontFamily: 'monospace'
               }}>
                 {formatCurrency(currentHypeVehicle.current_value || 0)}
               </div>
 
               {currentHypeVehicle.roi_pct !== undefined && currentHypeVehicle.roi_pct !== 0 && (
                 <div style={{
-                  fontSize: '18pt',
-                  fontWeight: 'bold',
-                  color: currentHypeVehicle.roi_pct >= 0 ? '#00ff00' : '#ff0000',
-                  textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
+                  fontSize: '16pt',
+                  fontWeight: '700',
+                  color: currentHypeVehicle.roi_pct >= 0 ? '#4ade80' : '#f87171',
+                  textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  padding: '4px 8px',
+                  borderRadius: '4px'
                 }}>
                   {currentHypeVehicle.roi_pct >= 0 ? '↑' : '↓'} {Math.abs(currentHypeVehicle.roi_pct).toFixed(0)}%
                 </div>
@@ -302,11 +423,11 @@ const CursorHomepage: React.FC = () => {
 
             <div style={{
               display: 'flex',
-              gap: '24px',
-              fontSize: '10pt',
-              color: '#ffffff',
-              textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-              marginBottom: '16px'
+              gap: '16px',
+              fontSize: '9pt',
+              color: 'rgba(255, 255, 255, 0.9)',
+              textShadow: '1px 1px 3px rgba(0,0,0,0.8)',
+              fontWeight: '500'
             }}>
               <span>{currentHypeVehicle.image_count} photos</span>
               <span>{currentHypeVehicle.event_count} events</span>
@@ -314,39 +435,6 @@ const CursorHomepage: React.FC = () => {
               {currentHypeVehicle.activity_7d! > 0 && (
                 <span>{currentHypeVehicle.activity_7d} updates this week</span>
               )}
-            </div>
-
-            {/* Quick Invest Buttons */}
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {[10, 50, 100].map(amount => (
-                <button
-                  key={amount}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // TODO: Implement quick invest
-                    alert(`Invest $${amount} - Coming soon!`);
-                  }}
-                  style={{
-                    background: '#008000',
-                    color: '#ffffff',
-                    border: '2px outset #ffffff',
-                    padding: '8px 16px',
-                    fontSize: '10pt',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    fontFamily: '"MS Sans Serif", sans-serif'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#006400';
-                    e.stopPropagation();
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#008000';
-                  }}
-                >
-                  INVEST ${amount}
-                </button>
-              ))}
             </div>
           </div>
         </div>
@@ -381,11 +469,56 @@ const CursorHomepage: React.FC = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 'var(--space-3)'
+          marginBottom: 'var(--space-3)',
+          flexWrap: 'wrap',
+          gap: '12px'
         }}>
-          <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0 }}>
-            What's Popping
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0 }}>
+              What's Popping
+            </h2>
+            
+            {/* Time Period Selector */}
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              {[
+                { id: 'AT', label: 'All Time' },
+                { id: '1Y', label: '1 Year' },
+                { id: 'Q', label: 'Quarter' },
+                { id: 'W', label: 'Week' },
+                { id: 'D', label: 'Day' },
+                { id: 'RT', label: 'Live' }
+              ].map(period => (
+                <button
+                  key={period.id}
+                  onClick={() => setTimePeriod(period.id as TimePeriod)}
+                  style={{
+                    background: timePeriod === period.id ? 'var(--text)' : 'var(--white)',
+                    color: timePeriod === period.id ? 'var(--white)' : 'var(--text)',
+                    border: '1px solid var(--border)',
+                    padding: '4px 8px',
+                    fontSize: '8pt',
+                    cursor: 'pointer',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    fontWeight: timePeriod === period.id ? 'bold' : 'normal',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (timePeriod !== period.id) {
+                      e.currentTarget.style.borderColor = 'var(--text)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (timePeriod !== period.id) {
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                    }
+                  }}
+                >
+                  {period.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
             {feedVehicles.length} vehicles · Updated just now
           </div>
@@ -434,12 +567,15 @@ const CursorHomepage: React.FC = () => {
                       position: 'absolute',
                       top: '8px',
                       left: '8px',
-                      background: '#ff0000',
+                      background: 'rgba(0, 0, 0, 0.7)',
+                      backdropFilter: 'blur(8px)',
                       color: '#ffffff',
-                      padding: '4px 8px',
+                      padding: '3px 8px',
                       fontSize: '8pt',
-                      fontWeight: 'bold',
-                      border: '1px solid #ffffff'
+                      fontWeight: '600',
+                      borderRadius: '3px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      letterSpacing: '0.3px'
                     }}>
                       {vehicle.hype_reason}
                     </div>
@@ -460,13 +596,57 @@ const CursorHomepage: React.FC = () => {
               )}
 
               {/* Content */}
-              <div style={{ padding: 'var(--space-2)' }}>
+              <div style={{ padding: '12px' }}>
                 <div style={{
                   fontSize: '10pt',
-                  fontWeight: 'bold',
-                  marginBottom: '8px'
+                  fontWeight: '600',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  gap: '6px',
+                  flexWrap: 'wrap'
                 }}>
-                  {vehicle.year} {vehicle.make} {vehicle.model}
+                  <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/market?year=${vehicle.year}`);
+                    }}
+                    style={{ 
+                      cursor: 'pointer',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = ''}
+                  >
+                    {vehicle.year}
+                  </span>
+                  <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/market?make=${encodeURIComponent(vehicle.make || '')}`);
+                    }}
+                    style={{ 
+                      cursor: 'pointer',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = ''}
+                  >
+                    {vehicle.make}
+                  </span>
+                  <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/market?make=${encodeURIComponent(vehicle.make || '')}&model=${encodeURIComponent(vehicle.model || '')}`);
+                    }}
+                    style={{ 
+                      cursor: 'pointer',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = ''}
+                  >
+                    {vehicle.model}
+                  </span>
                 </div>
 
                 {/* Price & ROI */}
@@ -474,16 +654,19 @@ const CursorHomepage: React.FC = () => {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '8px'
+                  marginBottom: '12px'
                 }}>
-                  <div style={{ fontSize: '12pt', fontWeight: 'bold' }}>
+                  <div style={{ fontSize: '12pt', fontWeight: '700', fontFamily: 'monospace' }}>
                     {formatCurrency(vehicle.current_value || 0)}
                   </div>
                   {vehicle.roi_pct !== undefined && vehicle.roi_pct !== 0 && (
                     <div style={{
                       fontSize: '9pt',
-                      fontWeight: 'bold',
-                      color: vehicle.roi_pct >= 0 ? '#008000' : '#800000'
+                      fontWeight: '700',
+                      color: vehicle.roi_pct >= 0 ? '#10b981' : '#ef4444',
+                      background: vehicle.roi_pct >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      padding: '3px 6px',
+                      borderRadius: '3px'
                     }}>
                       {vehicle.roi_pct >= 0 ? '↑' : '↓'} {Math.abs(vehicle.roi_pct).toFixed(0)}%
                     </div>
@@ -497,44 +680,11 @@ const CursorHomepage: React.FC = () => {
                   gap: '8px',
                   fontSize: '8pt',
                   color: 'var(--text-muted)',
-                  marginBottom: '12px'
+                  fontWeight: '500'
                 }}>
                   <div>{vehicle.image_count} photos</div>
                   <div>{vehicle.event_count} events</div>
                   <div>{vehicle.view_count || 0} views</div>
-                </div>
-
-                {/* Quick Invest */}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {[3, 10, 25].map(amount => (
-                    <button
-                      key={amount}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        alert(`Invest $${amount} - Coming soon!`);
-                      }}
-                      style={{
-                        flex: 1,
-                        background: 'var(--grey-100)',
-                        border: '1px outset var(--border)',
-                        padding: '4px',
-                        fontSize: '8pt',
-                        cursor: 'pointer',
-                        fontFamily: '"MS Sans Serif", sans-serif'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#008000';
-                        e.currentTarget.style.color = '#ffffff';
-                        e.stopPropagation();
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'var(--grey-100)';
-                        e.currentTarget.style.color = 'var(--text)';
-                      }}
-                    >
-                      ${amount}
-                    </button>
-                  ))}
                 </div>
               </div>
             </div>
