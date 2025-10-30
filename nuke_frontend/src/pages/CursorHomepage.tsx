@@ -578,172 +578,24 @@ const CursorHomepage: React.FC = () => {
           </div>
         </div>
 
-        {/* Feed Grid */}
+        {/* Dense Feed List - Using VehicleCardDense component */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: 'var(--space-3)'
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0'
         }}>
           {feedVehicles.map((vehicle) => (
-            <div
+            <VehicleCardDense
               key={vehicle.id}
-              onClick={() => navigate(`/vehicle/${vehicle.id}`)}
-              style={{
-                background: 'var(--white)',
-                border: '2px solid var(--border)',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                overflow: 'hidden'
+              vehicle={{
+                ...vehicle,
+                primary_image_url: vehicle.primary_image_url
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--text)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '4px 4px 0 rgba(0,0,0,0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border)';
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              {/* Image */}
-              {vehicle.primary_image_url ? (
-                <div style={{
-                  height: '200px',
-                  backgroundImage: `url(${vehicle.primary_image_url})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  position: 'relative'
-                }}>
-                  {/* Hype Badge */}
-                  {vehicle.hype_score! > 40 && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '8px',
-                      left: '8px',
-                      background: 'rgba(0, 0, 0, 0.7)',
-                      backdropFilter: 'blur(8px)',
-                      color: '#ffffff',
-                      padding: '3px 8px',
-                      fontSize: '8pt',
-                      fontWeight: '600',
-                      borderRadius: '3px',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      letterSpacing: '0.3px'
-                    }}>
-                      {vehicle.hype_reason}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{
-                  height: '200px',
-                  background: 'var(--grey-200)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-muted)',
-                  fontSize: '8pt'
-                }}>
-                  No image
-                </div>
-              )}
-
-              {/* Content */}
-              <div style={{ padding: '12px' }}>
-                <div style={{
-                  fontSize: '10pt',
-                  fontWeight: '600',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  gap: '6px',
-                  flexWrap: 'wrap'
-                }}>
-                  <span 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/market?year=${vehicle.year}`);
-                    }}
-                    style={{ 
-                      cursor: 'pointer',
-                      transition: 'color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = ''}
-                  >
-                    {vehicle.year}
-                  </span>
-                  <span 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/market?make=${encodeURIComponent(vehicle.make || '')}`);
-                    }}
-                    style={{ 
-                      cursor: 'pointer',
-                      transition: 'color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = ''}
-                  >
-                    {vehicle.make}
-                  </span>
-                  <span 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/market?make=${encodeURIComponent(vehicle.make || '')}&model=${encodeURIComponent(vehicle.model || '')}`);
-                    }}
-                    style={{ 
-                      cursor: 'pointer',
-                      transition: 'color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = ''}
-                  >
-                    {vehicle.model}
-                  </span>
-                </div>
-
-                {/* Price & ROI */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px'
-                }}>
-                  <div style={{ fontSize: '12pt', fontWeight: '700', fontFamily: 'monospace' }}>
-                    {formatCurrency(vehicle.current_value || 0)}
-                  </div>
-                  {vehicle.roi_pct !== undefined && vehicle.roi_pct !== 0 && (
-                    <div style={{
-                      fontSize: '9pt',
-                      fontWeight: '700',
-                      color: vehicle.roi_pct >= 0 ? '#10b981' : '#ef4444',
-                      background: vehicle.roi_pct >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      padding: '3px 6px',
-                      borderRadius: '3px'
-                    }}>
-                      {vehicle.roi_pct >= 0 ? '↑' : '↓'} {Math.abs(vehicle.roi_pct).toFixed(0)}%
-                    </div>
-                  )}
-                </div>
-
-                {/* Stats */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: '8px',
-                  fontSize: '8pt',
-                  color: 'var(--text-muted)',
-                  fontWeight: '500'
-                }}>
-                  <div>{vehicle.image_count} photos</div>
-                  <div>{vehicle.event_count} events</div>
-                  <div>{vehicle.view_count || 0} views</div>
-                </div>
-              </div>
-            </div>
+              viewMode="list"
+            />
           ))}
         </div>
+
 
         {feedVehicles.length === 0 && !loading && (
           <div style={{
