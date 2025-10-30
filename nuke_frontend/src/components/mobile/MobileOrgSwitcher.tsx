@@ -157,7 +157,7 @@ const styles = {
     textAlign: 'left' as const
   },
   orgName: {
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold'
   },
   orgRole: {
@@ -166,7 +166,7 @@ const styles = {
     textTransform: 'capitalize' as const
   },
   arrow: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#666'
   },
   dropdown: {
