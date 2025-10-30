@@ -182,14 +182,14 @@ const styles = {
   },
   title: {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '10px',
     fontFamily: '"MS Sans Serif", sans-serif',
     fontWeight: 'bold'
   },
   closeBtn: {
     background: 'none',
     border: 'none',
-    fontSize: '24px',
+    fontSize: '12px',
     cursor: 'pointer'
   },
   sectionsContainer: {
@@ -206,7 +206,7 @@ const styles = {
     border: 'none',
     borderBottom: '2px solid #c0c0c0',
     padding: '16px',
-    fontSize: '15px',
+    fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer',
     display: 'flex',
@@ -226,7 +226,7 @@ const styles = {
     gap: '6px'
   },
   label: {
-    fontSize: '13px',
+    fontSize: '10px',
     fontWeight: 'bold',
     fontFamily: '"MS Sans Serif", sans-serif'
   },
@@ -234,7 +234,7 @@ const styles = {
     padding: '14px',
     border: '2px inset #c0c0c0',
     borderRadius: '4px',
-    fontSize: '16px',
+    fontSize: '10px',
     fontFamily: '"MS Sans Serif", sans-serif'
   },
   saveBtn: {
@@ -244,7 +244,7 @@ const styles = {
     color: '#ffffff',
     border: '2px outset #ffffff',
     borderRadius: '4px',
-    fontSize: '16px',
+    fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer',
     fontFamily: '"MS Sans Serif", sans-serif'

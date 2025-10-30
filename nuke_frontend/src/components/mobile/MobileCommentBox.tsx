@@ -183,7 +183,7 @@ const styles = {
     border: '2px solid #c0c0c0',
     padding: '12px',
     borderRadius: '4px',
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold',
     fontFamily: '"MS Sans Serif", sans-serif',
     cursor: 'pointer',
@@ -192,7 +192,7 @@ const styles = {
     alignItems: 'center'
   },
   expandIcon: {
-    fontSize: '12px'
+    fontSize: '10px'
   },
   thread: {
     marginTop: '12px',
@@ -218,16 +218,16 @@ const styles = {
     marginBottom: '6px'
   },
   commentAuthor: {
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: 'bold',
     color: '#000080'
   },
   commentTime: {
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#666'
   },
   commentText: {
-    fontSize: '13px',
+    fontSize: '10px',
     lineHeight: '1.4',
     wordWrap: 'break-word' as const
   },
@@ -242,7 +242,7 @@ const styles = {
     padding: '12px',
     border: '2px inset #c0c0c0',
     borderRadius: '4px',
-    fontSize: '14px',
+    fontSize: '10px',
     fontFamily: '"MS Sans Serif", sans-serif',
     resize: 'none' as const
   },
@@ -253,7 +253,7 @@ const styles = {
     color: '#ffffff',
     border: '2px outset #ffffff',
     borderRadius: '50%',
-    fontSize: '20px',
+    fontSize: '12px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',

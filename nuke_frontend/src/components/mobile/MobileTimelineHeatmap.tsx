@@ -303,13 +303,13 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
     return (
       <div style={styles.loading}>
         <div style={{ marginBottom: '12px', fontWeight: 'bold' }}>No Timeline Events Found</div>
-        <div style={{ fontSize: '11px', marginBottom: '8px' }}>
+        <div style={{ fontSize: '10px', marginBottom: '8px' }}>
           This vehicle doesn't have any timeline events yet.
         </div>
         <div style={{ fontSize: '10px', color: '#666' }}>
           Add photos or events to start building your vehicle's history!
         </div>
-        <div style={{ fontSize: '9px', color: '#999', marginTop: '12px' }}>
+        <div style={{ fontSize: '10px', color: '#999', marginTop: '12px' }}>
           Debug: Vehicle ID = {vehicleId}
         </div>
       </div>
@@ -501,7 +501,7 @@ const styles = {
     textAlign: 'center' as const,
     padding: '24px',
     color: '#888',
-    fontSize: '12px',
+    fontSize: '10px',
     fontFamily: '"MS Sans Serif", sans-serif'
   },
   yearSection: {
@@ -517,12 +517,12 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold' as const,
     fontFamily: '"MS Sans Serif", sans-serif'
   },
   expandIcon: {
-    fontSize: '18px',
+    fontSize: '10px',
     lineHeight: '1'
   },
   heatmapContainer: {
@@ -605,7 +605,7 @@ const styles = {
   },
   modalTitle: {
     margin: 0,
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: 'bold' as const
   },
   closeButton: {
@@ -615,7 +615,7 @@ const styles = {
     width: '24px',
     height: '24px',
     cursor: 'pointer',
-    fontSize: '16px',
+    fontSize: '10px',
     fontWeight: 'bold' as const,
     lineHeight: '1',
     fontFamily: '"MS Sans Serif", sans-serif'
@@ -633,13 +633,13 @@ const styles = {
     padding: '8px'
   },
   eventTitle: {
-    fontSize: '13px',
+    fontSize: '10px',
     fontWeight: 'bold' as const,
     marginBottom: '4px',
     color: '#000'
   },
   eventDescription: {
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#000',
     marginBottom: '8px'
   },
@@ -699,7 +699,7 @@ const styles = {
     marginTop: '8px',
     padding: '8px 12px',
     borderRadius: '12px',
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: 'bold',
     textAlign: 'center' as const,
     border: '1px solid rgba(0,0,0,0.15)',
