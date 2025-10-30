@@ -53,15 +53,17 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
 }) => {
   const navigate = useNavigate();
   
-  // Prevent background scroll when modal is open
+  // Only prevent background scroll when used as a modal
   useEffect(() => {
-    const originalStyle = window.getComputedStyle(document.body).overflow;
-    document.body.style.overflow = 'hidden';
-    
-    return () => {
-      document.body.style.overflow = originalStyle;
-    };
-  }, []);
+    if (onClose) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [onClose]);
   
   // Core state
   const [user, setUser] = useState<any>(null);
