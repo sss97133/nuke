@@ -30,6 +30,8 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
   const [session, setSession] = useState<any>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [hasContributorAccess, setHasContributorAccess] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [showDocUploader, setShowDocUploader] = useState(false);
   const [showPriceEditor, setShowPriceEditor] = useState(false);
@@ -41,6 +43,12 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
       setSession(session);
     });
   }, [vehicleId]);
+
+  useEffect(() => {
+    if (session && vehicle) {
+      checkOwnership();
+    }
+  }, [session, vehicle]);
 
   useEffect(() => {
     console.log('[MobileVehicleProfile] Active tab changed to:', activeTab);
@@ -56,10 +64,44 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
     setVehicle(data);
   };
 
+  const checkOwnership = async () => {
+    if (!session?.user || !vehicle) {
+      setIsOwner(false);
+      setHasContributorAccess(false);
+      return;
+    }
+
+    const isVehicleOwner = vehicle.uploaded_by === session.user.id || vehicle.user_id === session.user.id;
+    setIsOwner(isVehicleOwner);
+
+    // Check for contributor access
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_contributors')
+        .select('role')
+        .eq('vehicle_id', vehicleId)
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const allowedRoles = ['owner', 'co_owner', 'restorer', 'moderator', 'consigner'];
+        setHasContributorAccess(allowedRoles.includes(data.role));
+      }
+    } catch (err) {
+      console.error('Error checking contributor access:', err);
+    }
+  };
+
   const handleQuickUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     if (!session?.user?.id) {
       alert('Please log in to upload images');
+      return;
+    }
+
+    // Check ownership
+    if (!isOwner && !hasContributorAccess) {
+      alert('Only the vehicle owner or contributors can upload images');
       return;
     }
 
@@ -160,8 +202,8 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
         )}
       </div>
 
-      {/* Floating Action Button (FAB) for Camera - Always visible when logged in */}
-      {session?.user && (
+      {/* Floating Action Button (FAB) for Camera - Only for owners/contributors */}
+      {(session?.user && (isOwner || hasContributorAccess)) && (
         <>
           <input
             ref={fileInputRef}
@@ -225,11 +267,44 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [showPriceEditor, setShowPriceEditor] = useState(false);
   const [showDocUploader, setShowDocUploader] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [hasContributorAccess, setHasContributorAccess] = useState(false);
 
   useEffect(() => {
     loadStats();
     loadImages();
-  }, [vehicleId]);
+    checkOwnership();
+  }, [vehicleId, session]);
+
+  const checkOwnership = async () => {
+    if (!session?.user || !vehicle) {
+      setIsOwner(false);
+      setHasContributorAccess(false);
+      return;
+    }
+
+    // Check if user is the vehicle owner (uploaded_by or user_id)
+    const isVehicleOwner = vehicle.uploaded_by === session.user.id || vehicle.user_id === session.user.id;
+    setIsOwner(isVehicleOwner);
+
+    // Check for contributor access
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_contributors')
+        .select('role')
+        .eq('vehicle_id', vehicleId)
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        // Allow edit access for these roles
+        const allowedRoles = ['owner', 'co_owner', 'restorer', 'moderator', 'consigner'];
+        setHasContributorAccess(allowedRoles.includes(data.role));
+      }
+    } catch (err) {
+      console.error('Error checking contributor access:', err);
+    }
+  };
 
   const loadStats = async () => {
     const [images, events, tags, workSessions] = await Promise.all([
@@ -274,46 +349,37 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
         />
       )}
 
-      {/* Price Carousel - Now Clickable to Edit */}
-      <div onClick={() => session?.user && setShowPriceEditor(true)} style={{ cursor: session?.user ? 'pointer' : 'default' }}>
+      {/* Price Carousel - Clickable to Edit (owners only) */}
+      <div 
+        onClick={() => (isOwner || hasContributorAccess) && setShowPriceEditor(true)} 
+        style={{ cursor: (isOwner || hasContributorAccess) ? 'pointer' : 'default' }}
+      >
         <PriceCarousel vehicle={vehicle} stats={stats} session={session} />
       </div>
 
-      {/* Action Buttons - Always visible */}
-      <div style={styles.actionButtonsRow}>
-        <button
-          onClick={() => {
-            if (!session?.user) {
-              alert('Please sign in to edit prices');
-              return;
-            }
-            setShowPriceEditor(true);
-          }}
-          style={{
-            ...styles.actionBtn,
-            opacity: session?.user ? 1 : 0.6
-          }}
-          data-testid="edit-price-button"
-        >
-          💰 Edit Price
-        </button>
-        <button
-          onClick={() => {
-            if (!session?.user) {
-              alert('Please sign in to upload documents');
-              return;
-            }
-            setShowDocUploader(true);
-          }}
-          style={{
-            ...styles.actionBtn,
-            opacity: session?.user ? 1 : 0.6
-          }}
-          data-testid="upload-doc-button"
-        >
-          📄 Upload Doc
-        </button>
-      </div>
+      {/* Action Buttons - Only visible to owners/contributors */}
+      {(session?.user && (isOwner || hasContributorAccess)) && (
+        <div style={styles.actionButtonsRow}>
+          <button
+            onClick={() => {
+              setShowPriceEditor(true);
+            }}
+            style={styles.actionBtn}
+            data-testid="edit-price-button"
+          >
+            💰 Edit Price
+          </button>
+          <button
+            onClick={() => {
+              setShowDocUploader(true);
+            }}
+            style={styles.actionBtn}
+            data-testid="upload-doc-button"
+          >
+            📄 Upload Doc
+          </button>
+        </div>
+      )}
 
       {/* Modals */}
       {showPriceEditor && (
@@ -409,10 +475,15 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [viewMode, setViewMode] = useState<'feed' | 'timeline' | 'discover'>('timeline');
+  const [isOwner, setIsOwner] = useState(false);
+  const [hasContributorAccess, setHasContributorAccess] = useState(false);
+  const [vehicle, setVehicle] = useState<any>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    loadVehicle();
     loadImages();
+    checkOwnership();
     
     // Listen for image updates
     const handler = () => loadImages();
@@ -443,6 +514,52 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     };
   }, [vehicleId, images]);
 
+  const loadVehicle = async () => {
+    const { data } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('id', vehicleId)
+      .single();
+    setVehicle(data);
+  };
+
+  const checkOwnership = async () => {
+    if (!session?.user || !vehicleId) {
+      setIsOwner(false);
+      setHasContributorAccess(false);
+      return;
+    }
+
+    // Load vehicle to check ownership
+    const { data: vehicleData } = await supabase
+      .from('vehicles')
+      .select('uploaded_by, user_id')
+      .eq('id', vehicleId)
+      .single();
+
+    if (vehicleData) {
+      const isVehicleOwner = vehicleData.uploaded_by === session.user.id || vehicleData.user_id === session.user.id;
+      setIsOwner(isVehicleOwner);
+    }
+
+    // Check for contributor access
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_contributors')
+        .select('role')
+        .eq('vehicle_id', vehicleId)
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const allowedRoles = ['owner', 'co_owner', 'restorer', 'moderator', 'consigner'];
+        setHasContributorAccess(allowedRoles.includes(data.role));
+      }
+    } catch (err) {
+      console.error('Error checking contributor access:', err);
+    }
+  };
+
   const loadImages = async () => {
     const { data } = await supabase
       .from('vehicle_images')
@@ -467,6 +584,12 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     if (!files || files.length === 0) return;
     if (!session?.user?.id) {
       alert('Please log in to upload images');
+      return;
+    }
+
+    // Check ownership
+    if (!isOwner && !hasContributorAccess) {
+      alert('Only the vehicle owner or contributors can upload images');
       return;
     }
 
@@ -586,8 +709,8 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
 
   return (
     <div style={styles.tabContent}>
-      {/* Upload Button - Only for logged in users */}
-      {session?.user && (
+      {/* Upload Button - Only for owners/contributors */}
+      {(session?.user && (isOwner || hasContributorAccess)) && (
         <div style={{ marginBottom: '12px' }}>
           <input
             ref={fileInputRef}
@@ -828,6 +951,40 @@ const TechnicalGridView: React.FC<{ images: any[]; onImageClick: (img: any) => v
 const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }> = ({ vehicle, session, vehicleId }) => {
   const [selectedSpec, setSelectedSpec] = useState<{name: string; value: any} | null>(null);
   const [showDataEditor, setShowDataEditor] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [hasContributorAccess, setHasContributorAccess] = useState(false);
+
+  useEffect(() => {
+    checkOwnership();
+  }, [session, vehicle]);
+
+  const checkOwnership = async () => {
+    if (!session?.user || !vehicle) {
+      setIsOwner(false);
+      setHasContributorAccess(false);
+      return;
+    }
+
+    const isVehicleOwner = vehicle.uploaded_by === session.user.id || vehicle.user_id === session.user.id;
+    setIsOwner(isVehicleOwner);
+
+    // Check for contributor access
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_contributors')
+        .select('role')
+        .eq('vehicle_id', vehicleId)
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const allowedRoles = ['owner', 'co_owner', 'restorer', 'moderator', 'consigner'];
+        setHasContributorAccess(allowedRoles.includes(data.role));
+      }
+    } catch (err) {
+      console.error('Error checking contributor access:', err);
+    }
+  };
 
   const importantSpecs = [
     { key: 'year', label: 'Year', researchable: false },
@@ -851,8 +1008,8 @@ const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }
 
   return (
     <div style={styles.tabContent}>
-      {/* Edit Button */}
-      {session?.user && (
+      {/* Edit Button - Only for owners/contributors */}
+      {(session?.user && (isOwner || hasContributorAccess)) && (
         <button
           onClick={() => setShowDataEditor(true)}
           style={{
