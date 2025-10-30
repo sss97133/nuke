@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { supabase } from '../../../lib/supabase';
 import {
   ImageData,
   ViewerState,
@@ -238,18 +239,69 @@ export function useProImageViewer(): UseProImageViewerResult {
   }, []);
 
   const addComment = useCallback(async (text: string) => {
-    // TODO: Implement comment creation
-    console.log('Adding comment:', text);
-  }, []);
+    if (!viewerState.selectedImage) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('image_comments')
+        .insert({
+          image_id: viewerState.selectedImage.id,
+          comment_text: text,
+          user_id: supabase.auth.getUser().then(r => r.data.user?.id)
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCommentState(prev => ({
+        ...prev,
+        comments: [...prev.comments, data]
+      }));
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      setError('Failed to add comment');
+    }
+  }, [viewerState.selectedImage]);
 
   const updateComment = useCallback(async (commentId: string, text: string) => {
-    // TODO: Implement comment updating
-    console.log('Updating comment:', commentId, text);
+    try {
+      const { error } = await supabase
+        .from('image_comments')
+        .update({ comment_text: text, updated_at: new Date().toISOString() })
+        .eq('id', commentId);
+
+      if (error) throw error;
+
+      setCommentState(prev => ({
+        ...prev,
+        comments: prev.comments.map(c => 
+          c.id === commentId ? { ...c, comment_text: text } : c
+        )
+      }));
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      setError('Failed to update comment');
+    }
   }, []);
 
   const deleteComment = useCallback(async (commentId: string) => {
-    // TODO: Implement comment deletion
-    console.log('Deleting comment:', commentId);
+    try {
+      const { error } = await supabase
+        .from('image_comments')
+        .delete()
+        .eq('id', commentId);
+
+      if (error) throw error;
+
+      setCommentState(prev => ({
+        ...prev,
+        comments: prev.comments.filter(c => c.id !== commentId)
+      }));
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      setError('Failed to delete comment');
+    }
   }, []);
 
   // Utility Actions

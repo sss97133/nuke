@@ -279,23 +279,41 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
         <PriceCarousel vehicle={vehicle} stats={stats} session={session} />
       </div>
 
-      {/* Action Buttons (Owner Only) */}
-      {session?.user && (
-        <div style={styles.actionButtonsRow}>
-          <button
-            onClick={() => setShowPriceEditor(true)}
-            style={styles.actionBtn}
-          >
-            💰 Edit Price
-          </button>
-          <button
-            onClick={() => setShowDocUploader(true)}
-            style={styles.actionBtn}
-          >
-            📄 Upload Doc
-          </button>
-        </div>
-      )}
+      {/* Action Buttons - Always visible */}
+      <div style={styles.actionButtonsRow}>
+        <button
+          onClick={() => {
+            if (!session?.user) {
+              alert('Please sign in to edit prices');
+              return;
+            }
+            setShowPriceEditor(true);
+          }}
+          style={{
+            ...styles.actionBtn,
+            opacity: session?.user ? 1 : 0.6
+          }}
+          data-testid="edit-price-button"
+        >
+          💰 Edit Price
+        </button>
+        <button
+          onClick={() => {
+            if (!session?.user) {
+              alert('Please sign in to upload documents');
+              return;
+            }
+            setShowDocUploader(true);
+          }}
+          style={{
+            ...styles.actionBtn,
+            opacity: session?.user ? 1 : 0.6
+          }}
+          data-testid="upload-doc-button"
+        >
+          📄 Upload Doc
+        </button>
+      </div>
 
       {/* Modals */}
       {showPriceEditor && (

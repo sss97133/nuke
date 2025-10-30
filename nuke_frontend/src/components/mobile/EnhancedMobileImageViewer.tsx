@@ -264,10 +264,14 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
         )}
       </div>
 
-      {/* Bottom Bar - Info Button + Image Counter */}
+      {/* Bottom Bar - Info Button + Image Counter + Help Text */}
       <div style={styles.bottomBar}>
         <div style={styles.imageCounter}>
           {currentIndex + 1} / {images.length}
+        </div>
+        
+        <div style={styles.helpText}>
+          Double-tap to like • Swipe to navigate
         </div>
         
         <button 
@@ -461,6 +465,15 @@ const styles = {
     fontWeight: 'bold' as const,
     textShadow: '0 1px 3px rgba(0,0,0,0.8)',
     fontFamily: '"MS Sans Serif", sans-serif'
+  },
+  helpText: {
+    fontSize: '10px',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+    fontWeight: '500',
+    textAlign: 'center' as const,
+    flex: 1,
+    pointerEvents: 'auto' as const
   },
   infoButton: {
     border: '2px outset #ffffff',
