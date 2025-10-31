@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import type { vehicleAPI } from '../../services/api';
-import VehicleDocumentManager from '../VehicleDocumentManager';
+import { DocumentUploadButton } from '../vehicle/DocumentUploadButton';
 import TimelineList from '../timeline/TimelineList';
 import ImageGallery from '../images/ImageGallery';
 import PricingIntelligence from '../PricingIntelligence';
@@ -471,10 +471,10 @@ const VehicleDetail = () => {
                           </div>
                         </div>
                       </div>
-                      <VehicleDocumentManager
+                      <DocumentUploadButton
                         vehicleId={vehicle.id}
-                        isOwner={true}
-                        hasContributorAccess={true}
+                        variant="primary"
+                        label="🧾 Upload Document"
                       />
                     </div>
                   )}

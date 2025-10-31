@@ -18,6 +18,58 @@ export interface ImageUploadResult {
 export class ImageUploadService {
   private static readonly STORAGE_BUCKET = 'vehicle-images';
   private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  private static readonly COMPRESS_THRESHOLD = 5 * 1024 * 1024; // Compress files larger than 5MB
+
+  /**
+   * Compress a large image file
+   */
+  private static async compressImage(file: File): Promise<File> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      img.onload = () => {
+        // Calculate new dimensions (max 2000px on longest side)
+        let width = img.width;
+        let height = img.height;
+        const maxDimension = 2000;
+        
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = (height / width) * maxDimension;
+            width = maxDimension;
+          } else {
+            width = (width / height) * maxDimension;
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  }
 
   /**
    * Upload a single image to vehicle
@@ -41,7 +93,19 @@ export class ImageUploadService {
         return { success: false, error: 'Please select an image or PDF file for documents' };
       }
 
-      if (file.size > this.MAX_FILE_SIZE) {
+      // Compress large images
+      let fileToUpload = file;
+      if (isImage && file.size > this.COMPRESS_THRESHOLD) {
+        console.log(`Compressing large image (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        try {
+          fileToUpload = await this.compressImage(file);
+          console.log(`Compressed to ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        } catch (error) {
+          console.warn('Compression failed, uploading original:', error);
+        }
+      }
+
+      if (fileToUpload.size > this.MAX_FILE_SIZE) {
         return { success: false, error: 'File must be smaller than 10MB' };
       }
 
@@ -51,7 +115,7 @@ export class ImageUploadService {
         return { success: false, error: 'Please login to upload images' };
       }
 
-      // Extract EXIF metadata for images only
+      // Extract EXIF metadata for images only (use original file for EXIF, not compressed)
       let metadata: any = {};
       let optimizationResult: any = { success: false };
 
@@ -59,9 +123,9 @@ export class ImageUploadService {
         console.log('Extracting EXIF metadata from:', file.name);
         metadata = await extractImageMetadata(file);
 
-        // Generate optimized variants for images
+        // Generate optimized variants for images (use compressed file)
         console.log('Generating image variants...');
-        optimizationResult = await imageOptimizationService.generateVariantBlobs(file);
+        optimizationResult = await imageOptimizationService.generateVariantBlobs(fileToUpload);
 
         if (!optimizationResult.success) {
           console.warn('Variant generation failed, uploading original only:', optimizationResult.error);
@@ -81,10 +145,10 @@ export class ImageUploadService {
       console.log('File date:', photoDate);
       console.log('Using date for timeline:', photoDate.toISOString());
 
-      // Upload original to storage
+      // Upload original to storage (use compressed version if available)
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from(this.STORAGE_BUCKET)
-        .upload(storagePath, file, {
+        .upload(storagePath, fileToUpload, {
           cacheControl: '3600',
           upsert: false
         });
@@ -154,8 +218,8 @@ export class ImageUploadService {
           filename: file.name, // Store original filename for duplicate detection
           storage_path: storagePath,
           category: category,
-          file_size: file.size,
-          mime_type: file.type,
+          file_size: fileToUpload.size, // Use compressed file size
+          mime_type: fileToUpload.type,
           is_primary: count === 0, // First image becomes primary
           is_sensitive: false, // Required field
           taken_at: photoDate.toISOString(), // Use actual photo date for timeline

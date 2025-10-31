@@ -7,7 +7,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { BuildImportService } from '../../services/buildImportService';
 import { VehicleValuationService } from '../../services/vehicleValuationService';
-import VehicleDocumentUploader from '../documents/VehicleDocumentUploader';
+import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
 import VehicleErrorBoundary from './VehicleErrorBoundary';
 import '../../design-system.css';
 
@@ -726,11 +726,10 @@ const VehicleBuildSystem: React.FC<VehicleBuildSystemProps> = memo(({
 
       {/* Document Upload Modal */}
       {showDocumentUpload && (
-        <VehicleDocumentUploader
+        <SmartInvoiceUploader
           vehicleId={vehicleId}
-          onClose={handleClose}
-          onSuccess={handleUploadSuccess}
-          defaultDocumentType="receipt"
+          onClose={() => setShowDocumentUpload(false)}
+          onSaved={handleUploadSuccess}
         />
       )}
       </div>

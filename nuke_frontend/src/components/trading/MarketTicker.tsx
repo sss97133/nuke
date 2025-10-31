@@ -189,13 +189,13 @@ const MarketTicker: React.FC<MarketTickerProps> = ({ offeringId, vehicleTitle, o
           <button
             onClick={() => setShowBuyForm(true)}
             style={{
-              padding: '10px',
+              padding: '8px',
               background: '#10b981',
               color: 'white',
               border: 'none',
               borderRadius: '2px',
               fontWeight: 'bold',
-              fontSize: '9pt',
+              fontSize: '8pt',
               cursor: 'pointer',
               transition: 'all 0.12s ease'
             }}
@@ -208,18 +208,18 @@ const MarketTicker: React.FC<MarketTickerProps> = ({ offeringId, vehicleTitle, o
               e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            🟢 Buy Shares
+            Buy Shares
           </button>
           <button
             onClick={() => setShowSellForm(true)}
             style={{
-              padding: '10px',
+              padding: '8px',
               background: '#dc2626',
               color: 'white',
               border: 'none',
               borderRadius: '2px',
               fontWeight: 'bold',
-              fontSize: '9pt',
+              fontSize: '8pt',
               cursor: 'pointer',
               transition: 'all 0.12s ease'
             }}
@@ -232,7 +232,7 @@ const MarketTicker: React.FC<MarketTickerProps> = ({ offeringId, vehicleTitle, o
               e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            🔴 Sell Shares
+            Sell Shares
           </button>
         </div>
       ) : showBuyForm ? (

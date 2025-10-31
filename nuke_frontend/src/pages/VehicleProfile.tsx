@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import MobileVehicleProfile from '../components/mobile/MobileVehicleProfile';
@@ -10,12 +10,11 @@ import CommentPopup from '../components/CommentPopup';
 import CommentingGuide from '../components/CommentingGuide';
 import VehicleDataEditor from '../components/vehicle/VehicleDataEditor';
 import VehicleStats from '../components/vehicle/VehicleStats';
-import VehicleDocumentManager from '../components/VehicleDocumentManager';
 import PurchaseAgreementManager from '../components/PurchaseAgreementManager';
 import ConsignerManagement from '../components/ConsignerManagement';
-import ReceiptManager from '../components/vehicle/ReceiptManager';
 import VehicleTagExplorer from '../components/vehicle/VehicleTagExplorer';
 import EnhancedImageTagger from '../components/vehicle/EnhancedImageTagger';
+import { VisualValuationBreakdown } from '../components/vehicle/VisualValuationBreakdown';
 import VehicleProfileTrading from '../components/vehicle/VehicleProfileTrading';
 import {
   VehicleHeader,
@@ -102,6 +101,8 @@ const VehicleProfile: React.FC = () => {
   const [composeText, setComposeText] = useState<{ title: string; description: string; specs: string[] }>({ title: '', description: '', specs: [] });
   const [userProfile, setUserProfile] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [latestExpertValuation, setLatestExpertValuation] = useState<any | null>(null);
+  const expertAnalysisRunningRef = React.useRef(false);
   
   // Detect mobile device - but DON'T use early return (breaks React hooks rules)
   const [isMobile, setIsMobile] = useState(false);
@@ -168,6 +169,66 @@ const VehicleProfile: React.FC = () => {
       }
     } catch {}
   };
+
+  const shouldRunExpertAgent = useCallback((valuation: any | null) => {
+    const canTrigger = Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess);
+    if (!canTrigger) return false;
+    if (!valuation) return true;
+    const lastValuationDate = valuation?.valuation_date ? new Date(valuation.valuation_date) : null;
+    if (!lastValuationDate) return true;
+    const hoursSince = (Date.now() - lastValuationDate.getTime()) / (1000 * 60 * 60);
+    return hoursSince > 24;
+  }, [hasContributorAccess, isRowOwner, isVerifiedOwner]);
+
+  const runExpertAgent = useCallback(async (vehId: string) => {
+    if (expertAnalysisRunningRef.current) return;
+    if (!(isRowOwner || isVerifiedOwner || hasContributorAccess)) return;
+    expertAnalysisRunningRef.current = true;
+    try {
+      console.info('[VehicleProfile] Triggering vehicle-expert-agent for', vehId);
+      const { error } = await supabase.functions.invoke('vehicle-expert-agent', {
+        body: { vehicleId: vehId }
+      });
+      if (error) throw error;
+      const { data } = await supabase
+        .from('vehicle_valuations')
+        .select('id, estimated_value, documented_components, confidence_score, components, environmental_context, value_justification, valuation_date')
+        .eq('vehicle_id', vehId)
+        .order('valuation_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setLatestExpertValuation(data);
+      }
+      window.dispatchEvent(new Event('vehicle_valuation_updated'));
+    } catch (error) {
+      console.error('Expert agent failed:', error);
+    } finally {
+      expertAnalysisRunningRef.current = false;
+    }
+  }, [hasContributorAccess, isRowOwner, isVerifiedOwner]);
+
+  const fetchLatestExpertValuation = useCallback(async (vehId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_valuations')
+        .select('id, estimated_value, documented_components, confidence_score, components, environmental_context, value_justification, valuation_date')
+        .eq('vehicle_id', vehId)
+        .order('valuation_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error) {
+        setLatestExpertValuation(data || null);
+      }
+
+      if (shouldRunExpertAgent(data || null)) {
+        await runExpertAgent(vehId);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch expert valuation:', error);
+    }
+  }, [runExpertAgent, shouldRunExpertAgent]);
 
   // Build a universal package from live vehicle + images and store in localStorage for bookmarklet
   const composeListingForPartner = async (partnerKey: string) => {
@@ -957,12 +1018,12 @@ const VehicleProfile: React.FC = () => {
     return num ? num.toLocaleString() : 'Not specified';
   };
 
-  const handleImportComplete = (results: any) => {
+  const handleImportComplete = async (results: any) => {
     console.log('Vehicle import complete:', results);
 
-    // Reload images from localStorage immediately after upload
     if (vehicle) {
-      loadVehicleImages();
+      await loadVehicleImages();
+      await runExpertAgent(vehicle.id);
     }
   };
 
@@ -1179,11 +1240,13 @@ const VehicleProfile: React.FC = () => {
           )}
         </section>
 
-        {/* AI Pricing Intelligence Section */}
-        <VehiclePricingSection
-          vehicle={vehicle}
-          permissions={permissions}
+        {/* Visual Valuation Breakdown - Truth-Based Pricing */}
+        <section className="section">
+          <VisualValuationBreakdown
+            vehicleId={vehicle.id}
+            isOwner={Boolean(isRowOwner || isVerifiedOwner)}
         />
+        </section>
 
         {/* Data Sources moved to VehiclePricingWidget */}
 
@@ -1227,27 +1290,9 @@ const VehicleProfile: React.FC = () => {
                 />
               )}
 
-              {/* Documents Section — Verified owner, DB uploader, or permitted contributor roles */}
-              {(isVerifiedOwner || isDbUploader || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer','previous_owner'].includes(contributorRole || ''))) && (
-                <div className="card">
-                  <div className="card-header">Documents</div>
-                  <div className="card-body">
-                    <VehicleDocumentManager
-                      vehicleId={vehicle.id}
-                      isOwner={Boolean(isVerifiedOwner || isDbUploader || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer','previous_owner'].includes(contributorRole || '')))}
-                      hasContributorAccess={Boolean(hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer','previous_owner'].includes(contributorRole || ''))}
-                    />
-                  </div>
-                </div>
-              )}
+              {/* REMOVED: VehicleDocumentManager - replaced with SmartInvoiceUploader integrated into Valuation */}
 
-              {/* Receipt Manager — Verified owner, DB uploader, or permitted contributor roles */}
-              {(isVerifiedOwner || isDbUploader || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer','previous_owner'].includes(contributorRole || ''))) && (
-                <ReceiptManager
-                  vehicleId={vehicle.id}
-                  canEdit={Boolean(isVerifiedOwner || isDbUploader || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || '')))}
-                />
-              )}
+              {/* REMOVED: ReceiptManager card - now integrated into VisualValuationBreakdown */}
 
               {/* Enhanced Photo Tagging System */}
               {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
@@ -1326,6 +1371,93 @@ const VehicleProfile: React.FC = () => {
               {/* AI Tag Data Explorer Section */}
               <VehicleTagExplorer vehicleId={vehicle.id} />
 
+              {/* Sale & Distribution Card */}
+              {permissions?.isVerifiedOwner && (
+                <div className="card">
+                  <div className="card-header">Sale & Distribution</div>
+                  <div className="card-body">
+                    {/* For Sale Toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <label className="text">
+                        <input
+                          type="checkbox"
+                          checked={saleSettings.for_sale}
+                          onChange={(e) => setSaleSettings({ ...saleSettings, for_sale: e.target.checked })}
+                        />
+                        <span style={{ marginLeft: 6 }}>For Sale</span>
+                      </label>
+                      <label className="text">
+                        <input
+                          type="checkbox"
+                          checked={saleSettings.live_auction}
+                          onChange={(e) => setSaleSettings({
+                            ...saleSettings,
+                            live_auction: e.target.checked,
+                            for_sale: e.target.checked || saleSettings.for_sale
+                          })}
+                        />
+                        <span style={{ marginLeft: 6 }}>Nuke Live Auction</span>
+                      </label>
+                    </div>
+
+                    {/* Reserve price */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span className="text-small text-muted">Reserve</span>
+                      <input
+                        type="number"
+                        className="text-xs border rounded px-2 py-1"
+                        placeholder="e.g. 25000"
+                        value={saleSettings.reserve}
+                        onChange={(e) => setSaleSettings({
+                          ...saleSettings,
+                          reserve: e.target.value === '' ? '' : Number(e.target.value)
+                        })}
+                        style={{ width: 140 }}
+                      />
+                    </div>
+
+                    {/* Partner checkboxes */}
+                    <div className="text-small text-muted" style={{ marginBottom: 6 }}>
+                      Submit listing package to partners
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                      {[
+                        { k: 'bring_a_trailer', l: 'Bring a Trailer' },
+                        { k: 'cars_and_bids', l: 'Cars & Bids' },
+                        { k: 'ebay_motors', l: 'eBay Motors' },
+                        { k: 'facebook_marketplace', l: 'Facebook Marketplace' },
+                        { k: 'hemmings', l: 'Hemmings' },
+                        { k: 'hagerty', l: 'Hagerty' },
+                        { k: 'sothebys', l: 'RM Sotheby\'s' },
+                        { k: 'christies', l: 'Christie\'s' },
+                        { k: 'pebble_beach', l: 'Pebble Beach' },
+                        { k: 'local_auctioneer_generic', l: 'Local Auctioneer' },
+                      ].map(p => (
+                        <label key={p.k} className="text" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="checkbox"
+                            checked={saleSettings.partners.includes(p.k)}
+                            onChange={(e) => setSaleSettings({
+                              ...saleSettings,
+                              partners: e.target.checked
+                                ? Array.from(new Set([...(saleSettings.partners || []), p.k]))
+                                : (saleSettings.partners || []).filter(x => x !== p.k)
+                            })}
+                          />
+                          <span>{p.l}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="button button-primary" disabled={savingSale} onClick={saveSaleSettings}>
+                        {savingSale ? 'Saving…' : 'Save Sale Settings'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Comments Section */}
               <VehicleCommentsSection
                 ref={commentsSectionRef}
@@ -1342,15 +1474,14 @@ const VehicleProfile: React.FC = () => {
                 showMap={showMap}
                 onToggleMap={() => setShowMap(s => !s)}
                 onImageUpdate={() => {
-                  loadVehicleImages();
-                  handleImportComplete(null);
+                  void handleImportComplete(null);
                 }}
               />
             </div>
           </div>
         </section>
 
-        {/* Vehicle Metadata & Sale Settings */}
+        {/* Vehicle Metadata & Privacy Settings */}
         <section className="section">
           <VehicleSaleSettings
             vehicle={vehicle}
@@ -1366,7 +1497,11 @@ const VehicleProfile: React.FC = () => {
 
           {/* Trading Interface */}
           {vehicle && (
-            <VehicleProfileTrading vehicleId={vehicle.id} />
+            <VehicleProfileTrading
+              vehicleId={vehicle.id}
+              vehicleTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              userId={session?.user?.id}
+            />
           )}
 
           {/* Privacy Settings for non-anonymous vehicles */}

@@ -21,122 +21,122 @@ const VehicleProfileTrading: React.FC<VehicleProfileTradingProps> = ({
   const [activeTab, setActiveTab] = useState<TradingTab>('ticker');
 
   return (
-    <div style={{
-      background: 'white',
-      border: '2px solid #bdbdbd',
-      borderRadius: '4px',
-      padding: '16px',
-      marginTop: '16px'
-    }}>
+    <div className="card">
+      <div className="card-header">Trading</div>
+      <div className="card-body">
       {/* Trading Tabs */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '8px',
-        marginBottom: '16px'
+          gap: '6px',
+          marginBottom: '12px'
       }}>
         <button
           onClick={() => setActiveTab('ticker')}
           style={{
-            padding: '10px',
-            background: activeTab === 'ticker' ? '#3b82f6' : '#e5e7eb',
-            color: activeTab === 'ticker' ? 'white' : '#1f2937',
-            border: '2px solid #bdbdbd',
+              padding: '8px',
+              background: activeTab === 'ticker' ? 'var(--accent)' : 'var(--surface-hover)',
+              color: activeTab === 'ticker' ? 'white' : 'var(--text)',
+              border: '2px solid var(--border)',
             borderRadius: '2px',
+              fontSize: '8pt',
             fontWeight: 'bold',
             cursor: 'pointer',
             transition: 'all 0.12s ease'
           }}
           onMouseEnter={(e) => {
             if (activeTab !== 'ticker') {
-              e.currentTarget.style.background = '#d1d5db';
+                e.currentTarget.style.background = 'var(--surface-active)';
             }
           }}
           onMouseLeave={(e) => {
             if (activeTab !== 'ticker') {
-              e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.background = 'var(--surface-hover)';
             }
           }}
         >
-          📊 Price Ticker
+            Price
         </button>
 
         <button
           onClick={() => setActiveTab('orderbook')}
           style={{
-            padding: '10px',
-            background: activeTab === 'orderbook' ? '#3b82f6' : '#e5e7eb',
-            color: activeTab === 'orderbook' ? 'white' : '#1f2937',
-            border: '2px solid #bdbdbd',
+              padding: '8px',
+              background: activeTab === 'orderbook' ? 'var(--accent)' : 'var(--surface-hover)',
+              color: activeTab === 'orderbook' ? 'white' : 'var(--text)',
+              border: '2px solid var(--border)',
             borderRadius: '2px',
+              fontSize: '8pt',
             fontWeight: 'bold',
             cursor: 'pointer',
             transition: 'all 0.12s ease'
           }}
           onMouseEnter={(e) => {
             if (activeTab !== 'orderbook') {
-              e.currentTarget.style.background = '#d1d5db';
+                e.currentTarget.style.background = 'var(--surface-active)';
             }
           }}
           onMouseLeave={(e) => {
             if (activeTab !== 'orderbook') {
-              e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.background = 'var(--surface-hover)';
             }
           }}
         >
-          📈 Order Book
+            Orders
         </button>
 
         <button
           onClick={() => setActiveTab('portfolio')}
           style={{
-            padding: '10px',
-            background: activeTab === 'portfolio' ? '#3b82f6' : '#e5e7eb',
-            color: activeTab === 'portfolio' ? 'white' : '#1f2937',
-            border: '2px solid #bdbdbd',
+              padding: '8px',
+              background: activeTab === 'portfolio' ? 'var(--accent)' : 'var(--surface-hover)',
+              color: activeTab === 'portfolio' ? 'white' : 'var(--text)',
+              border: '2px solid var(--border)',
             borderRadius: '2px',
+              fontSize: '8pt',
             fontWeight: 'bold',
             cursor: 'pointer',
             transition: 'all 0.12s ease'
           }}
           onMouseEnter={(e) => {
             if (activeTab !== 'portfolio') {
-              e.currentTarget.style.background = '#d1d5db';
+                e.currentTarget.style.background = 'var(--surface-active)';
             }
           }}
           onMouseLeave={(e) => {
             if (activeTab !== 'portfolio') {
-              e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.background = 'var(--surface-hover)';
             }
           }}
         >
-          💼 Portfolio
+            Portfolio
         </button>
 
         <button
           onClick={() => setActiveTab('leaderboard')}
           style={{
-            padding: '10px',
-            background: activeTab === 'leaderboard' ? '#3b82f6' : '#e5e7eb',
-            color: activeTab === 'leaderboard' ? 'white' : '#1f2937',
-            border: '2px solid #bdbdbd',
+              padding: '8px',
+              background: activeTab === 'leaderboard' ? 'var(--accent)' : 'var(--surface-hover)',
+              color: activeTab === 'leaderboard' ? 'white' : 'var(--text)',
+              border: '2px solid var(--border)',
             borderRadius: '2px',
+              fontSize: '8pt',
             fontWeight: 'bold',
             cursor: 'pointer',
             transition: 'all 0.12s ease'
           }}
           onMouseEnter={(e) => {
             if (activeTab !== 'leaderboard') {
-              e.currentTarget.style.background = '#d1d5db';
+                e.currentTarget.style.background = 'var(--surface-active)';
             }
           }}
           onMouseLeave={(e) => {
             if (activeTab !== 'leaderboard') {
-              e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.background = 'var(--surface-hover)';
             }
           }}
         >
-          🏆 Leaderboard
+            Leaders
         </button>
       </div>
 
@@ -174,6 +174,7 @@ const VehicleProfileTrading: React.FC<VehicleProfileTradingProps> = ({
             Sign in to view your portfolio
           </div>
         )}
+      </div>
       </div>
     </div>
   );

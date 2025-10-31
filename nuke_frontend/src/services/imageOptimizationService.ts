@@ -24,8 +24,8 @@ export interface OptimizationResult {
 class ImageOptimizationService {
   private readonly SIZES = {
     thumbnail: { width: 150, quality: 0.7 },
-    medium: { width: 400, quality: 0.8 },
-    large: { width: 800, quality: 0.85 },
+    medium: { width: 400, quality: 0.75 },
+    large: { width: 1200, quality: 0.8 },
   };
 
   /**

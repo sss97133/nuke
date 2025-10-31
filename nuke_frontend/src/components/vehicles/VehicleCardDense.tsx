@@ -294,7 +294,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         display: 'block',
         background: 'var(--surface)',
         border: '2px solid var(--border)',
-        borderRadius: '0px',
+        borderRadius: '2px',
         overflow: 'hidden',
         textDecoration: 'none',
         color: 'inherit',
@@ -304,94 +304,145 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--text)';
         e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--border)';
         e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = 'none';
       }}
     >
       {/* Square image (uses medium variant) */}
       <div style={{
         width: '100%',
-        paddingBottom: '100%',
-        background: imageUrl ? `url(${imageUrl}) center/cover` : 'var(--grey-200)',
+        paddingBottom: '75%', // 4:3 aspect ratio for better content fit
+        background: imageUrl ? `url(${imageUrl}) center/cover` : 'linear-gradient(135deg, var(--grey-100) 0%, var(--grey-200) 100%)',
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: '32px',
+        fontSize: '48px',
       }}>
-        {!imageUrl && '🚗'}
-        
-        {/* Value tag */}
-        {vehicle.current_value && (
-          <div style={{
+        {!imageUrl && (
+          <div style={{ 
+            fontSize: '48px', 
+            opacity: 0.3,
             position: 'absolute',
-            bottom: '6px',
-            left: '6px',
-            background: 'rgba(0,0,0,0.85)',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: '0px',
-            border: '1px solid rgba(255,255,255,0.2)',
-            fontSize: '9pt',
-            fontWeight: 700,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)'
           }}>
-            {formatPrice(vehicle.current_value)}
+            🚗
           </div>
         )}
         
-        {/* Profit badge (if we have data) */}
+        {/* Activity badge */}
+        {(vehicle.image_count && vehicle.image_count > 0) && (
+          <div style={{
+            position: 'absolute',
+            top: '8px',
+            left: '8px',
+            background: 'rgba(0,0,0,0.75)',
+            color: 'white',
+            padding: '3px 6px',
+            borderRadius: '2px',
+            fontSize: '7pt',
+            fontWeight: 600,
+            display: 'flex',
+            gap: '6px',
+            alignItems: 'center'
+          }}>
+            <span>📸 {vehicle.image_count}</span>
+            {vehicle.event_count && vehicle.event_count > 0 && (
+              <span style={{ opacity: 0.7 }}>• {vehicle.event_count} 📅</span>
+            )}
+          </div>
+        )}
+        
+        {/* Profit badge (top right - highest priority) */}
         {profit !== null && profit !== 0 && (
           <div style={{
             position: 'absolute',
-            top: '6px',
-            right: '6px',
+            top: '8px',
+            right: '8px',
             background: profit > 0 ? '#10b981' : '#ef4444',
             color: 'white',
-            padding: '4px 8px',
-            borderRadius: '0px',
-            fontSize: '8pt',
+            padding: '4px 10px',
+            borderRadius: '2px',
+            fontSize: '9pt',
             fontWeight: 700,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
           }}>
             {profit > 0 ? '+' : ''}{formatPrice(profit)}
           </div>
         )}
       </div>
       
-      {/* Dense info panel */}
-      <div style={{ padding: '8px', borderTop: '2px solid var(--border)' }}>
+      {/* Dense info panel - prioritize critical data */}
+      <div style={{ 
+        padding: '10px 12px', 
+        borderTop: '2px solid var(--border)',
+        background: 'var(--surface)'
+      }}>
+        {/* Vehicle name - largest */}
         <div style={{ 
-          fontSize: '10pt', 
+          fontSize: '11pt', 
           fontWeight: 700, 
-          overflow: 'hidden', 
-          textOverflow: 'ellipsis', 
-          whiteSpace: 'nowrap',
-          marginBottom: '2px'
+          lineHeight: 1.2,
+          marginBottom: '4px',
+          color: 'var(--text)'
         }}>
           {vehicle.year} {vehicle.make}
         </div>
         <div style={{ 
           fontSize: '9pt', 
           color: 'var(--text-secondary)',
+          marginBottom: '8px',
+          lineHeight: 1.2,
           overflow: 'hidden', 
           textOverflow: 'ellipsis', 
-          whiteSpace: 'nowrap',
-          marginBottom: '4px'
+          whiteSpace: 'nowrap'
         }}>
           {vehicle.model}
         </div>
+        
+        {/* Value - prominent display */}
+        {vehicle.current_value && (
+          <div style={{
+            fontSize: '13pt',
+            fontWeight: 700,
+            color: 'var(--text)',
+            marginBottom: '6px'
+          }}>
+            {formatPrice(vehicle.current_value)}
+          </div>
+        )}
+        
+        {/* Secondary stats grid */}
         <div style={{
           fontSize: '8pt',
           color: 'var(--text-muted)',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '4px',
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+          paddingTop: '6px',
+          borderTop: '1px solid var(--border)'
         }}>
-          {vehicle.mileage && <span>{(vehicle.mileage / 1000).toFixed(0)}k mi</span>}
-          {vehicle.condition_rating && <span>C:{vehicle.condition_rating}/10</span>}
-          {vehicle.image_count ? <span>{vehicle.image_count} img</span> : null}
-          {vehicle.event_count ? <span>{vehicle.event_count} evt</span> : null}
+          {vehicle.mileage && (
+            <span style={{ fontWeight: 500 }}>
+              {(vehicle.mileage / 1000).toFixed(0)}k mi
+            </span>
+          )}
+          {vehicle.condition_rating && (
+            <span style={{ opacity: 0.8 }}>
+              C:{vehicle.condition_rating}/10
+            </span>
+          )}
+          {timeAgo && (
+            <span style={{ opacity: 0.6, marginLeft: 'auto' }}>
+              {timeAgo}
+            </span>
+          )}
         </div>
       </div>
     </Link>
