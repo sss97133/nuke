@@ -125,7 +125,7 @@ const DocumentVault: React.FC<DocumentVaultProps> = ({ scope, id, allowUpload = 
             const { document, error } = await secureDocumentService.uploadSecureDocument(file, docType, { source: 'DocumentVault' });
             if (error) throw new Error(error);
           } else if (scope === 'vehicle') {
-            setError('Upload not available here. Use VehicleDocumentManager.');
+            setError('Upload not available here. Use vehicle profile page.');
             return;
           }
           setFile(null);

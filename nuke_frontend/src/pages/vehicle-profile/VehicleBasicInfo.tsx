@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import VehicleDataQualityRating from '../../components/VehicleDataQualityRating';
 import VehicleInteractionPanel from '../../components/vehicle/VehicleInteractionPanel';
 import VehicleOwnershipPanel from '../../components/ownership/VehicleOwnershipPanel';
-import VehicleBuildSystem from '../../components/vehicle/VehicleBuildSystem';
 import type { VehicleBasicInfoProps } from './types';
 
 const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
@@ -244,20 +243,9 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         />
       </div>
 
-      {/* Build System */}
-      <div
-        className="card-body"
-        style={{
-          borderTop: '1px solid #e5e7eb',
-          padding: '12px',
-          marginTop: '0'
-        }}
-      >
-        <VehicleBuildSystem
-          vehicleId={vehicle.id}
-          isOwner={isVerifiedOwner || permissions.isDbUploader || hasContributorAccess}
-        />
-      </div>
+      {/* REMOVED: Build System (B&V) - deprecated manual tracking system
+          Replaced by AI Expert Agent valuation in VisualValuationBreakdown
+          Archived to _archive_document_uploaders/ */}
     </div>
   );
 };

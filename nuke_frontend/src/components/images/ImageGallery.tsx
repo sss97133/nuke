@@ -832,51 +832,16 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         </div>
       )}
 
-      {/* Load More Button / Infinite Scroll Sentinel */}
+      {/* Load More - Infinite Scroll */}
       {showImages && displayedImages.length < allImages.length && (
         <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
-          {!infiniteScrollEnabled && (
-            <button
-              className="button button-small"
-              onClick={loadMoreImages}
-              disabled={loadingMore}
-              style={{ marginRight: 'var(--space-2)' }}
-            >
-              {loadingMore ? 'Loading...' :
-                (allImages.length - displayedImages.length <= imagesPerPage
-                  ? 'Load Remaining Images'
-                  : `Load ${Math.min(imagesPerPage, allImages.length - displayedImages.length)} More`
-                )
-              }
-            </button>
-          )}
-          {infiniteScrollEnabled && loadingMore && (
-            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)' }}>
+          {loadingMore && (
+            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '8pt' }}>
               Loading more images...
             </div>
           )}
-          {!infiniteScrollEnabled && (
-            <button
-              className="button button-small"
-              onClick={handleUnloadImages}
-            >
-              Hide All Images
-            </button>
-          )}
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} style={{ height: '1px' }} />
-        </div>
-      )}
-
-      {/* Hide Images Button */}
-      {showImages && displayedImages.length >= allImages.length && (
-        <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
-          <button
-            className="button button-small"
-            onClick={handleUnloadImages}
-          >
-            Hide All Images
-          </button>
         </div>
       )}
 

@@ -145,20 +145,27 @@ export const MobileDocumentUploader: React.FC<MobileDocumentUploaderProps> = ({
 
       if (docError) throw docError;
 
-      // Create timeline event for receipts
+      // Create timeline event for receipts using DOCUMENT DATE, not upload date
       if ((category === 'receipt' || category === 'service_record') && extractedData) {
-        await supabase.from('timeline_events').insert({
+        // CRITICAL: Use receipt_date from the document, NOT today's date
+        const documentDate = extractedData.receipt_date || extractedData.date || new Date().toISOString().split('T')[0];
+        
+        await supabase.from('vehicle_timeline_events').insert({
           vehicle_id: vehicleId,
           user_id: session.user.id,
           event_type: 'service',
           source: 'mobile_document_upload',
           title: extractedData.vendor_name || 'Service',
           description: notes || 'Service documented from receipt',
-          event_date: extractedData.date || new Date().toISOString().split('T')[0],
+          event_date: documentDate, // Use parsed date from receipt
           cost_amount: extractedData.total || null,
           duration_hours: extractedData.estimated_hours || null,
           service_provider_name: extractedData.vendor_name || null,
-          metadata: { extracted_data: extractedData }
+          metadata: { 
+            extracted_data: extractedData,
+            document_date: documentDate,
+            upload_date: new Date().toISOString()
+          }
         });
       }
 
