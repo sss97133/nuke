@@ -45,14 +45,22 @@ const CursorHomepage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (session) {
+    // Load feed for all users (authenticated and unauthenticated)
+    // Public vehicles (is_public=true) are visible to everyone
+    loadHypeFeed();
+  }, [timePeriod]);
+
+  // Also reload when session changes (user logs in/out)
+  useEffect(() => {
+    if (session !== null) {
       loadHypeFeed();
     }
-  }, [session, timePeriod]);
+  }, [session]);
 
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
     setSession(currentSession);
+    setLoading(false); // Always set loading to false after session check
     
     // Load user preference
     if (currentSession?.user) {
