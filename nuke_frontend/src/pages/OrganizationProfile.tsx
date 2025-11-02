@@ -13,6 +13,7 @@ import DropboxImporter from '../components/dealer/DropboxImporter';
 import MobileVINScanner from '../components/dealer/MobileVINScanner';
 import ContractorWorkInput from '../components/contractor/ContractorWorkInput';
 import OrganizationEditor from '../components/organization/OrganizationEditor';
+import EnhancedDealerInventory from '../components/organization/EnhancedDealerInventory';
 import '../design-system.css';
 
 interface Organization {
@@ -1016,61 +1017,12 @@ export default function OrganizationProfile() {
         )}
 
         {activeTab === 'vehicles' && (
-          <div className="card">
-            <div className="card-header">Associated Vehicles ({vehicles.length})</div>
-            <div className="card-body">
-              {vehicles.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--text-muted)', fontSize: '9pt' }}>
-                  No vehicles linked yet
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: '12px' }}>
-                  {vehicles.map(v => (
-                <div
-                      key={v.id}
-                      onClick={() => navigate(`/vehicle/${v.vehicle_id}`)}
-                  style={{
-                        display: 'flex',
-                        gap: '12px',
-                    padding: '12px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--surface)',
-                        cursor: 'pointer',
-                    fontSize: '9pt'
-                  }}
-                >
-                      <div
-                        style={{
-                          width: '80px',
-                          height: '80px',
-                          backgroundImage: v.vehicle_image_url ? `url(${v.vehicle_image_url})` : 'url(/n-zero.png)',
-                          backgroundSize: v.vehicle_image_url ? 'cover' : 'contain',
-                          backgroundPosition: 'center',
-                          backgroundRepeat: 'no-repeat',
-                          backgroundColor: '#f8f9fa',
-                          border: '1px solid var(--border)',
-                          opacity: v.vehicle_image_url ? 1 : 0.3
-                        }}
-                      />
-                      <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                          {v.vehicle_year} {v.vehicle_make} {v.vehicle_model}
-                  </div>
-                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                          Relationship: {v.relationship_type.replace(/_/g, ' ')}
-                        </div>
-                        {v.vehicle_current_value && (
-                          <div style={{ fontSize: '8pt' }}>
-                            Value: ${v.vehicle_current_value.toLocaleString()}
-                          </div>
-                        )}
-                  </div>
-                </div>
-              ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <EnhancedDealerInventory
+            organizationId={id}
+            userId={session?.user?.id || null}
+            canEdit={canEdit}
+            isOwner={isOwner}
+          />
         )}
 
         {activeTab === 'images' && (
