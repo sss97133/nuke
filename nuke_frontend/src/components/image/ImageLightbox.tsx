@@ -187,6 +187,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [attribution, setAttribution] = useState<any>(null);
 
   // Get session for manual tagging
   useEffect(() => {
@@ -194,6 +195,61 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       setSession(session);
     });
   }, []);
+
+  // Fetch attribution data (photographer, uploader, organization, context)
+  useEffect(() => {
+    const loadAttribution = async () => {
+      if (!imageId) return;
+
+      try {
+        // Get image data
+        const { data: imageData } = await supabase
+          .from('vehicle_images')
+          .select(`
+            *,
+            uploader:profiles!vehicle_images_user_id_fkey(id, full_name, avatar_url)
+          `)
+          .eq('id', imageId)
+          .single();
+
+        if (!imageData) return;
+
+        // Get device attribution (photographer)
+        const { data: deviceAttr } = await supabase
+          .from('device_attributions')
+          .select(`
+            *,
+            ghost_user:ghost_users(id, display_name, camera_make, camera_model),
+            actual_contributor:profiles!device_attributions_actual_contributor_id_fkey(id, full_name)
+          `)
+          .eq('image_id', imageId)
+          .single();
+
+        // Get vehicle organizations
+        const { data: vehicleOrgs } = await supabase
+          .from('organization_vehicles')
+          .select(`
+            organization:organizations(id, name, business_type)
+          `)
+          .eq('vehicle_id', vehicleId);
+
+        setAttribution({
+          image: imageData,
+          photographer: deviceAttr?.actual_contributor || deviceAttr?.ghost_user || null,
+          uploader: imageData.uploader,
+          ghostUser: deviceAttr?.ghost_user,
+          organization: vehicleOrgs?.[0]?.organization || null,
+          source: imageData.source,
+          isBaTImport: imageData.source === 'bat_listing',
+          isClaimable: imageData.exif_data?.claimable
+        });
+      } catch (err) {
+        console.error('Error loading attribution:', err);
+      }
+    };
+
+    loadAttribution();
+  }, [imageId, vehicleId]);
 
   // Detect mobile
   useEffect(() => {
@@ -742,23 +798,51 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             </button>
         )}
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="button"
-          style={{
-            fontSize: '8pt',
-            fontFamily: '"MS Sans Serif", sans-serif',
-            color: '#fff',
-            background: 'rgba(192, 192, 192, 0.2)',
-            border: '1px solid rgba(192, 192, 192, 0.5)',
-            borderRadius: '0px',
-            padding: '3px 6px'
-          }}
-          title="Close"
-        >
-          ✕
-        </button>
+        {/* Delete Image button - only for uploader, owner, or moderator */}
+        {canEdit && session && imageId && attribution?.uploader === session.user.id && (
+            <button
+              onClick={async () => {
+                if (!confirm('Delete this image?')) return;
+                
+                try {
+                  const { error } = await supabase
+                    .from('vehicle_images')
+                    .delete()
+                    .eq('id', imageId);
+                  
+                  if (error) throw error;
+                  
+                  // Navigate to next image instead of closing
+                  if (onNext) {
+                    onNext();
+                  } else if (onPrev) {
+                    onPrev();
+                  } else {
+                    onClose();
+                  }
+                  
+                  setTimeout(() => window.location.reload(), 500);
+                } catch (err) {
+                  console.error('Delete error:', err);
+                  alert('Failed to delete image');
+                }
+              }}
+              className="button"
+              style={{
+                fontSize: '7pt',
+                fontFamily: '"MS Sans Serif", sans-serif',
+                color: '#fff',
+                background: 'rgba(200, 0, 0, 0.6)',
+                border: 'none',
+                borderRadius: '0px',
+                padding: '2px 6px',
+                opacity: 0.7
+              }}
+              title="Delete this image"
+            >
+              DEL
+            </button>
+        )}
         </div>
       </div>
 
@@ -930,6 +1014,69 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           onSave={handleEnrichmentSave}
         />
       )}
+
+      {/* Attribution Info Bar */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '20px',
+        right: '20px',
+        background: 'rgba(0, 0, 0, 0.7)',
+        color: 'white',
+        padding: '16px',
+        borderRadius: '0px',
+        maxWidth: '600px',
+        margin: '0 auto'
+      }}>
+        {attribution ? (
+          <div>
+            {/* Photographer / Taken by */}
+            <div style={{ fontSize: '9pt', marginBottom: '4px', color: '#e5e7eb' }}>
+              {attribution.photographer ? (
+                <span>
+                  <strong>@{attribution.photographer.full_name || attribution.photographer.display_name}</strong>
+                  {attribution.ghostUser && !attribution.photographer.full_name && (
+                    <span style={{ color: '#fbbf24', marginLeft: '6px' }}>(unclaimed)</span>
+                  )}
+                </span>
+              ) : (
+                <span style={{ color: '#9ca3af' }}>Photographer unknown</span>
+              )}
+              
+              {attribution.uploader && attribution.uploader.full_name && (
+                <span> • Imported by {attribution.uploader.full_name}</span>
+              )}
+            </div>
+
+            {/* Organization & Context */}
+            <div style={{ fontSize: '8pt', color: '#d1d5db' }}>
+              {attribution.organization && (
+                <span>at <strong>{attribution.organization.name}</strong></span>
+              )}
+              {attribution.source === 'dropbox_import' && (
+                <span> • Dropbox Import</span>
+              )}
+              {attribution.isBaTImport && (
+                <span> • BaT Listing</span>
+              )}
+              {attribution.isClaimable && (
+                <span style={{ color: '#fbbf24' }}> • Claimable by original photographer</span>
+              )}
+            </div>
+
+            {/* Date */}
+            {description && (
+              <p className="text" style={{ margin: '4px 0 0 0', fontSize: '8pt', color: '#e5e7eb' }}>
+                {description}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text" style={{ margin: 0, color: '#e5e7eb', fontSize: '9pt' }}>
+            {description || 'Loading attribution...'}
+          </p>
+        )}
+      </div>
     </div>,
     document.body
   );

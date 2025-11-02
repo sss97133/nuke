@@ -103,6 +103,18 @@ interface ExpertValuation {
 }
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      }
+    });
+  }
+  
   try {
     const { vehicleId } = await req.json();
     
@@ -136,14 +148,20 @@ Deno.serve(async (req) => {
     await saveValuation(vehicleId, valuation);
     
     return new Response(JSON.stringify(valuation), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
     });
     
   } catch (error: any) {
     console.error('Expert agent error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
     });
   }
 });
@@ -592,6 +610,19 @@ async function saveValuation(vehicleId: string, valuation: ExpertValuation): Pro
       updated_at: new Date().toISOString()
     })
     .eq('id', vehicleId);
+  
+  // Record price change in history (trigger will handle this automatically via vehicles update)
+  // But also add expert agent metadata for audit trail
+  await supabase
+    .from('vehicle_price_history')
+    .insert({
+      vehicle_id: vehicleId,
+      price_type: 'current',
+      value: valuation.estimatedTotalValue,
+      source: 'expert_agent',
+      confidence: Math.round(valuation.confidence ?? 0),
+      as_of: new Date().toISOString()
+    });
   
   // Enrich existing tags with value data
   for (const component of valuation.components) {

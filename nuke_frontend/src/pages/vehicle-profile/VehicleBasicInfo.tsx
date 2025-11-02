@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import VehicleDataQualityRating from '../../components/VehicleDataQualityRating';
 import VehicleInteractionPanel from '../../components/vehicle/VehicleInteractionPanel';
 import VehicleOwnershipPanel from '../../components/ownership/VehicleOwnershipPanel';
-import type { VehicleBasicInfoProps } from './types';
+import URLDataDrop from '../../components/vehicle/URLDataDrop';
+import InlineVINEditor from '../../components/vehicle/InlineVINEditor';
+import BaTURLDrop from '../../components/vehicle/BaTURLDrop';
+import type { VehicleBasicInfoProps} from './types';
 
 const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   vehicle,
@@ -14,6 +17,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
 }) => {
   const navigate = useNavigate();
   const { isVerifiedOwner, hasContributorAccess, contributorRole } = permissions;
+  const [collapsed, setCollapsed] = React.useState(false);
 
   const renderVehicleDetails = () => {
     const v: any = vehicle;
@@ -65,12 +69,15 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         borderBottom: '1px solid #bdbdbd',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <span style={{ fontSize: '8pt', fontWeight: 'bold' }}>Basic Information</span>
+        alignItems: 'center',
+        cursor: 'pointer'
+      }} onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Expand' : 'Collapse'}>
+        <span style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+          Basic Information{collapsed ? ` — ${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.vin ? ' • ' + String(vehicle.vin).slice(0,8) + '…' : ''}` : ''}
+        </span>
         {isVerifiedOwner && (
           <button
-            onClick={() => navigate(`/vehicle/${vehicle.id}/edit`)}
+            onClick={(e) => { e.stopPropagation(); navigate(`/vehicle/${vehicle.id}/edit`); }}
             style={{
               background: '#424242',
               color: 'white',
@@ -85,11 +92,35 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           </button>
         )}
       </div>
-
+      {!collapsed && (
+      <>
       {/* Data Quality Rating */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
         <VehicleDataQualityRating vehicleId={vehicle.id} />
       </div>
+
+      {/* Inline VIN Editor (for contributors/owners) */}
+      {hasContributorAccess && (
+        <div style={{ padding: '12px', borderBottom: '1px solid #bdbdbd' }}>
+          <InlineVINEditor
+            vehicleId={vehicle.id}
+            currentVIN={vehicle.vin}
+            canEdit={true}
+            onVINUpdated={() => window.location.reload()}
+          />
+        </div>
+      )}
+
+      {/* BaT URL Drop (for contributors/owners) */}
+      {hasContributorAccess && (
+        <div style={{ padding: '12px', borderBottom: '1px solid #bdbdbd' }}>
+          <BaTURLDrop
+            vehicleId={vehicle.id}
+            canEdit={true}
+            onDataImported={() => window.location.reload()}
+          />
+        </div>
+      )}
 
       {/* Vehicle Details */}
       <div style={{ padding: '12px' }}>
@@ -242,6 +273,9 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           responsibleName={undefined}
         />
       </div>
+
+      </>
+      )}
 
       {/* REMOVED: Build System (B&V) - deprecated manual tracking system
           Replaced by AI Expert Agent valuation in VisualValuationBreakdown

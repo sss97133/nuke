@@ -2,10 +2,9 @@ import React, { useEffect, useState } from 'react';
 import type { VehicleHeaderProps } from './types';
 import { computePrimaryPrice, computeDelta, formatCurrency } from '../../services/priceSignalService';
 import { supabase } from '../../lib/supabase';
-import PriceHistoryModal from '../../components/vehicle/PriceHistoryModal';
-import PriceAnalysisPanel from '../../components/vehicle/PriceAnalysisPanel';
-import TagReviewModal from '../../components/vehicle/TagReviewModal';
+// Deprecated modals (history/analysis/tag review) intentionally removed from UI
 import { VehicleValuationService } from '../../services/vehicleValuationService';
+import TradePanel from '../../components/trading/TradePanel';
 
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
@@ -17,14 +16,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const { isVerifiedOwner, contributorRole } = permissions;
   const [rpcSignal, setRpcSignal] = useState<any | null>(null);
   const [trendPct30d, setTrendPct30d] = useState<number | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [tagReviewOpen, setTagReviewOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState<'auto'|'estimate'|'auction'|'asking'|'sale'|'purchase'|'msrp'>('auto');
   const [responsibleMode, setResponsibleMode] = useState<'auto'|'owner'|'consigner'|'uploader'|'listed_by'|'custom'>('auto');
   const [responsibleCustom, setResponsibleCustom] = useState<string>('');
   const [valuation, setValuation] = useState<any | null>(null);
   const [loadingValuation, setLoadingValuation] = useState(false);
+  const [latestInsight, setLatestInsight] = useState<any | null>(null);
+  const [showSources, setShowSources] = useState(false);
+  const [showTrade, setShowTrade] = useState(false);
+  const [showOwnerCard, setShowOwnerCard] = useState(false);
+  const [ownerProfile, setOwnerProfile] = useState<any | null>(null);
+  const [ownerStats, setOwnerStats] = useState<{ contributions: number; vehicles: number } | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -117,6 +120,62 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     })();
   }, [vehicle?.id]);
 
+  // Load latest AI image insight for status chips
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!vehicle?.id) { setLatestInsight(null); return; }
+        const { data } = await supabase
+          .from('profile_image_insights')
+          .select('summary, condition_score, condition_label, confidence, checklist, summary_date')
+          .eq('vehicle_id', vehicle.id)
+          .order('summary_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setLatestInsight(data || null);
+      } catch {
+        setLatestInsight(null);
+      }
+    })();
+  }, [vehicle?.id]);
+
+  // Load owner profile and stats when owner card opens
+  useEffect(() => {
+    if (!showOwnerCard) return;
+    (async () => {
+      try {
+        const ownerId = (vehicle as any)?.uploaded_by || (vehicle as any)?.user_id;
+        if (!ownerId) return;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .eq('id', ownerId)
+          .maybeSingle();
+        setOwnerProfile(profile || null);
+        const { count: contribCount } = await supabase
+          .from('user_contributions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', ownerId);
+        const { count: vehicleCount } = await supabase
+          .from('vehicles')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', ownerId);
+        setOwnerStats({ contributions: contribCount || 0, vehicles: vehicleCount || 0 });
+        if (session?.user?.id) {
+          const { data: follow } = await supabase
+            .from('user_follows')
+            .select('id')
+            .eq('follower_id', session.user.id)
+            .eq('following_id', ownerId)
+            .maybeSingle();
+          setIsFollowing(!!follow);
+        }
+      } catch (err) {
+        console.warn('Owner card load failed:', err);
+      }
+    })();
+  }, [showOwnerCard, vehicle, session?.user?.id]);
+
   const smallChipStyle: React.CSSProperties = {
     background: '#f3f4f6',
     border: '1px solid #c0c0c0',
@@ -158,8 +217,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const getDisplayValue = () => {
     if (!vehicle) return { amount: null as number | null, label: '' };
     const mode = displayMode || 'auto';
-    if (mode === 'auto') return getAutoDisplay();
+    if (mode === 'auto') {
+      // Prefer computed valuation if available
+      if (valuation && typeof valuation.estimatedValue === 'number' && valuation.estimatedValue > 0) {
+        return { amount: valuation.estimatedValue, label: 'Estimated Value' };
+      }
+      return getAutoDisplay();
+    }
     if (mode === 'estimate') {
+      // Prefer unified valuation service
+      if (valuation && typeof valuation.estimatedValue === 'number' && valuation.estimatedValue > 0) {
+        return { amount: valuation.estimatedValue, label: 'Estimated Value' };
+      }
+      // Fallback to RPC/primary price heuristic
       if (rpcSignal && typeof rpcSignal.primary_value === 'number' && rpcSignal.primary_label) {
         return { amount: rpcSignal.primary_value, label: rpcSignal.primary_label };
       }
@@ -292,6 +362,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 </div>
                 {label && <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{label}</span>}
               </div>
+              <button
+                onClick={() => setShowTrade(true)}
+                className="button button-small button-primary"
+                style={{ fontSize: '8pt', borderRadius: 0 }}
+                title="Trade shares for this vehicle"
+              >
+                Trade Shares
+              </button>
               {isOwnerLike && (
                 <select
                   value={displayMode}
@@ -318,40 +396,80 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {vehicle.year} {vehicle.make} {vehicle.model}
         </div>
 
-        {/* Price signal chips */}
-        {vehicle && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {(() => {
-              const sig = rpcSignal;
-              const priceMeta = {
-                msrp: (vehicle as any).msrp,
-                current_value: (vehicle as any).current_value,
-                purchase_price: (vehicle as any).purchase_price,
-                asking_price: (vehicle as any).asking_price,
-                sale_price: (vehicle as any).sale_price,
-                is_for_sale: (vehicle as any).is_for_sale,
-              } as any;
-              const delta = sig && typeof sig.delta_pct === 'number' && typeof sig.delta_amount === 'number'
-                ? { amount: sig.delta_amount as number, percent: sig.delta_pct as number, isPositive: (sig.delta_amount as number) >= 0 }
-                : computeDelta(priceMeta);
-              return (
-                <>
-                  {/* Removed redundant price badge - already shown in main display above */}
-                  {delta && (
-                    <span style={{ ...smallChipStyle, color: delta.isPositive ? '#006400' : '#800000' }} title={Array.isArray(sig?.sources) ? `Sources: ${sig.sources.join(', ')}` : undefined}>
-                      {delta.isPositive ? '↑' : '↓'} {Math.abs(delta.percent).toFixed(1)}%
-                    </span>
-                  )}
-                  {typeof trendPct30d === 'number' && (
-                    <span style={{ ...smallChipStyle, color: trendPct30d >= 0 ? '#006400' : '#800000' }} title="30d trend from history">
-                      {trendPct30d >= 0 ? '↗' : '↘'} {Math.abs(trendPct30d).toFixed(1)}% 30d
-                    </span>
-                  )}
-                </>
-              );
-            })()}
+        {/* Sources popover toggler */}
+        {valuation && (
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowSources(s => !s)}
+              className="button button-small"
+              title="Show valuation sources"
+              style={{ fontSize: '8pt', borderRadius: 0 }}
+            >
+              Sources
+            </button>
+            {showSources && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '120%',
+                  left: 0,
+                  background: 'white',
+                  border: '1px solid var(--border)',
+                  borderRadius: 4,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                  padding: 8,
+                  width: 260,
+                  zIndex: 50,
+                  fontSize: '10px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <strong>Valuation Sources</strong>
+                  <span style={{ color: '#6b7280' }}>{Math.round(valuation.confidence || 0)}% conf</span>
+                </div>
+                {Array.isArray(valuation.dataSources) && valuation.dataSources.length > 0 ? (
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    {valuation.dataSources.map((s: string, i: number) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div style={{ color: '#6b7280' }}>No sources listed</div>
+                )}
+                <div style={{ borderTop: '1px solid var(--border-light)', marginTop: 6, paddingTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  <div>
+                    <div style={{ color: '#6b7280' }}>Invested</div>
+                    <div style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                      {typeof valuation.totalInvested === 'number' ? `$${Math.round(valuation.totalInvested).toLocaleString()}` : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#6b7280' }}>Labor (h)</div>
+                    <div style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                      {typeof valuation.laborHours === 'number' ? valuation.laborHours.toFixed(1) : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#6b7280' }}>Range</div>
+                    <div style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                      {valuation.marketLow && valuation.marketHigh
+                        ? `$${Math.round(valuation.marketLow).toLocaleString()}–$${Math.round(valuation.marketHigh).toLocaleString()}`
+                        : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#6b7280' }}>Updated</div>
+                    <div style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                      {valuation.lastUpdated ? new Date(valuation.lastUpdated).toLocaleDateString() : '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
+
+        {/* Status chips removed per design feedback; details shown in Sources popover */}
 
         {/* Sale badge */}
         {vehicle.is_for_sale && (
@@ -362,10 +480,77 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
         {/* Responsible badge + owner controls */}
         {responsibleName && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div className="badge badge-primary">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+            <div
+              className="badge badge-primary"
+              title="Click for profile preview"
+              style={{ textDecoration: 'none', cursor: 'pointer' }}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (showOwnerCard) {
+                  window.location.href = `/profile/${(vehicle as any).uploaded_by || (vehicle as any).user_id || ''}`;
+                } else {
+                  setShowOwnerCard(true);
+                }
+              }}
+            >
               {computeResponsibleLabel()}: {responsibleName}
             </div>
+            {showOwnerCard && ownerProfile && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '120%',
+                  left: 0,
+                  background: 'white',
+                  border: '2px solid var(--border)',
+                  borderRadius: 4,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  padding: 12,
+                  width: 280,
+                  zIndex: 100,
+                  fontSize: '9pt'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                  {ownerProfile.avatar_url && (
+                    <img src={ownerProfile.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid var(--border)' }} />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 2 }}>{ownerProfile.full_name || ownerProfile.username || 'User'}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>@{ownerProfile.username || ownerProfile.id.slice(0,8)}</div>
+                  </div>
+                </div>
+                {ownerStats && (
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    <span>{ownerStats.contributions} contributions</span>
+                    <span>{ownerStats.vehicles} vehicles</span>
+                  </div>
+                )}
+                <button
+                  className="button button-primary button-small"
+                  onClick={async () => {
+                    if (!session?.user?.id) return;
+                    const ownerId = ownerProfile.id;
+                    if (isFollowing) {
+                      await supabase.from('user_follows').delete().eq('follower_id', session.user.id).eq('following_id', ownerId);
+                      setIsFollowing(false);
+                    } else {
+                      await supabase.from('user_follows').insert({ follower_id: session.user.id, following_id: ownerId });
+                      setIsFollowing(true);
+                    }
+                  }}
+                  style={{ fontSize: '8pt', width: '100%' }}
+                  disabled={!session?.user?.id}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+                <div style={{ marginTop: 6, fontSize: '7pt', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Click badge again to view full profile
+                </div>
+              </div>
+            )}
             {isOwnerLike && (
               <>
                 <select
@@ -396,58 +581,40 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           </div>
         )}
 
-        {/* Actions */}
-        <button
-          className="button button-small"
-          onClick={() => setHistoryOpen(true)}
-          style={{
-            cursor: 'pointer',
-            fontSize: '8pt',
-            fontFamily: '"MS Sans Serif", sans-serif',
-            borderRadius: '0px'
-          }}
-        >
-          History
-        </button>
-        <button
-          className="button button-small"
-          onClick={() => setAnalysisOpen(true)}
-          style={{
-            cursor: 'pointer',
-            fontSize: '8pt',
-            fontFamily: '"MS Sans Serif", sans-serif',
-            borderRadius: '0px'
-          }}
-        >
-          Analysis
-        </button>
-        <button
-          className="button button-small button-primary"
-          onClick={() => setTagReviewOpen(true)}
-          title="Review AI-detected tags"
-          style={{
-            cursor: 'pointer',
-            fontSize: '8pt',
-            fontFamily: '"MS Sans Serif", sans-serif',
-            borderRadius: '0px'
-          }}
-        >
-          Review Tags
-        </button>
+        {/* Deprecated actions removed: History / Analysis / Review Tags */}
       </div>
+      {/* Trade Modal */}
+      {showTrade && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onClick={() => setShowTrade(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '520px', maxWidth: '95vw' }}>
+            <TradePanel
+              vehicleId={vehicle.id}
+              vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              currentSharePrice={(valuation && typeof valuation.sharePrice === 'number') ? valuation.sharePrice : 1.00}
+              totalShares={1000}
+            />
+            <div style={{ textAlign: 'right', marginTop: 6 }}>
+              <button className="button button-small" onClick={() => setShowTrade(false)} style={{ fontSize: '8pt' }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Valuation Crown Jewel REMOVED - Redundant with VehiclePricingWidget below */}
-      {/* Price History Modal */}
-      {vehicle?.id && (
-        <PriceHistoryModal vehicleId={vehicle.id} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
-      )}
-      {vehicle?.id && (
-        <PriceAnalysisPanel vehicleId={vehicle.id} isOpen={analysisOpen} onClose={() => setAnalysisOpen(false)} />
-      )}
-      {/* Tag Review Modal */}
-      {vehicle?.id && (
-        <TagReviewModal vehicleId={vehicle.id} isOpen={tagReviewOpen} onClose={() => setTagReviewOpen(false)} />
-      )}
     </div>
   );
 };

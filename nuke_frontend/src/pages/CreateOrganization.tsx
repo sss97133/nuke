@@ -1,511 +1,319 @@
-import React, { useState, useEffect } from 'react';
+// Create Organization - Start a new collaborative org profile
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import '../design-system.css';
-
-interface FormData {
-  name: string;
-  business_type: string;
-  description: string;
-  phone: string;
-  email: string;
-  website: string;
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-  logo_url?: string;
-}
 
 export default function CreateOrganization() {
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
   const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    business_type: 'restoration_shop',
-    description: '',
-    phone: '',
-    email: '',
-    website: '',
-    address: '',
-    city: '',
-    state: '',
-    zip: ''
-  });
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session) {
-        navigate('/login');
-      }
-    });
-  }, []);
-
-  const businessTypes = [
-    { value: 'restoration_shop', label: 'Restoration Shop' },
-    { value: 'dealership', label: 'Dealership' },
-    { value: 'garage', label: 'Auto Garage' },
-    { value: 'performance_shop', label: 'Performance Shop' },
-    { value: 'body_shop', label: 'Body Shop' },
-    { value: 'upholstery', label: 'Upholstery Shop' },
-    { value: 'detailing', label: 'Detailing Service' },
-    { value: 'mobile_service', label: 'Mobile Service' },
-    { value: 'parts_supplier', label: 'Parts Supplier' },
-    { value: 'fabrication', label: 'Fabrication Shop' },
-    { value: 'racing_team', label: 'Racing Team' },
-    { value: 'other', label: 'Other' }
-  ];
-
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !session?.user) return;
-
-    try {
-      setUploadingLogo(true);
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `business-logos/${session.user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('vehicle_images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('vehicle_images')
-        .getPublicUrl(filePath);
-
-      setFormData(prev => ({ ...prev, logo_url: publicUrl }));
-    } catch (error: any) {
-      console.error('Error uploading logo:', error);
-      alert(`Error uploading logo: ${error.message}`);
-    } finally {
-      setUploadingLogo(false);
-    }
-  };
+  const [businessName, setBusinessName] = useState('');
+  const [legalName, setLegalName] = useState('');
+  const [businessType, setBusinessType] = useState('');
+  const [description, setDescription] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zipCode, setZipCode] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session?.user) return;
-
-    if (!formData.name.trim()) {
-      alert('Business name is required');
-      return;
-    }
-
-    setLoading(true);
+    setSubmitting(true);
 
     try {
-      // Create business
-      const { data: business, error: businessError } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Authentication required');
+
+      // Create organization
+      const { data: org, error: orgError } = await supabase
         .from('businesses')
         .insert({
-          name: formData.name.trim(),
-          business_type: formData.business_type,
-          description: formData.description.trim() || null,
-          phone: formData.phone.trim() || null,
-          email: formData.email.trim() || null,
-          website: formData.website.trim() || null,
-          address: formData.address.trim() || null,
-          city: formData.city.trim() || null,
-          state: formData.state.trim() || null,
-          zip: formData.zip.trim() || null,
-          logo_url: formData.logo_url || null,
-          owner_id: session.user.id,
-          is_public: false, // Start as private until verified
-          status: 'pending', // Awaiting verification
-          verification_level: 'level_1' // Basic profile only
+          business_name: businessName,
+          legal_name: legalName || null,
+          business_type: businessType || null,
+          description: description || null,
+          phone: phone || null,
+          email: email || null,
+          website: website || null,
+          address: address || null,
+          city: city || null,
+          state: state || null,
+          zip_code: zipCode || null,
+          discovered_by: user.id,
+          uploaded_by: user.id,
+          is_public: true,
+          status: 'active',
+          verification_level: 'unverified'
         })
         .select()
         .single();
 
-      if (businessError) throw businessError;
+      if (orgError) throw orgError;
 
-      // Add user as owner in business_user_roles
-      const { error: roleError } = await supabase
-        .from('business_user_roles')
-        .insert({
-          business_id: business.id,
-          user_id: session.user.id,
-          role: 'owner',
-          can_edit: true,
-          can_invite: true,
-          can_manage_finances: true
-        });
+      // Auto-create contributor record
+      await supabase.from('organization_contributors').insert({
+        organization_id: org.id,
+        user_id: user.id,
+        role: 'owner',
+        contribution_count: 1,
+        status: 'active'
+      });
 
-      if (roleError) throw roleError;
+      // Create timeline event
+      await supabase.from('business_timeline_events').insert({
+        business_id: org.id,
+        created_by: user.id,
+        event_type: 'founded',
+        event_category: 'legal',
+        title: 'Organization created',
+        description: `${businessName} added to the platform`,
+        event_date: new Date().toISOString().split('T')[0],
+        metadata: {
+          initial_creator: user.id
+        }
+      });
 
-      // Navigate to organization profile
-      navigate(`/org/${business.id}`);
+      // Navigate to new org profile
+      navigate(`/org/${org.id}`);
+
     } catch (error: any) {
-      console.error('Error creating business:', error);
-      alert(`Error: ${error.message}`);
+      console.error('Error creating organization:', error);
+      alert(`Failed: ${error.message}`);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ padding: 'var(--space-4)', background: '#f5f5f5', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <button
-            onClick={() => navigate('/shops')}
-            style={{
-              background: 'var(--grey-100)',
-              border: '2px outset var(--border)',
-              padding: '4px 8px',
-              fontSize: '9pt',
-              cursor: 'pointer',
-              marginBottom: 'var(--space-2)',
-              fontFamily: '"MS Sans Serif", sans-serif'
-            }}
-          >
-            ← Back to Organizations
-          </button>
-          <h1 style={{ fontSize: '18pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
-            Create Organization
-          </h1>
-          <p style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-            Start with basic info · Upload docs later to unlock full features
-          </p>
-        </div>
-
-        {/* Verification Levels Info */}
-        <div style={{
-          background: 'var(--white)',
-          border: '2px solid var(--border)',
-          padding: 'var(--space-3)',
-          marginBottom: 'var(--space-4)'
-        }}>
-          <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
-            📋 Verification Levels
+    <div style={{ background: '#f5f5f5', minHeight: '100vh', padding: '20px' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <div className="card">
+          <div className="card-header">
+            <h1 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>Create Organization Profile</h1>
+            <p style={{ margin: '4px 0 0 0', fontSize: '8pt', color: 'var(--text-muted)' }}>
+              Start a collaborative profile for a shop, business, or team
+            </p>
           </div>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            <div style={{ marginBottom: '4px' }}>
-              <strong>Level 1 (Now):</strong> Create profile, upload images, document timeline
-            </div>
-            <div style={{ marginBottom: '4px' }}>
-              <strong>Level 2 (Submit docs):</strong> List vehicles, accept work orders, sell parts
-            </div>
-            <div>
-              <strong>Level 3 (Verified):</strong> Accept payments, issue invoices, full legal access
-            </div>
-          </div>
-        </div>
+          <div className="card-body">
+            <form onSubmit={handleSubmit}>
+              {/* Basic Info */}
+              <div style={{ marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '12px', borderBottom: '1px solid var(--border-light)', paddingBottom: '4px' }}>
+                  Basic Information
+                </h3>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit}>
-          <div style={{
-            background: 'var(--white)',
-            border: '2px solid var(--border)',
-            padding: 'var(--space-4)'
-          }}>
-            {/* Logo Upload */}
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                Logo (optional)
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {formData.logo_url ? (
-                  <div style={{
-                    width: '80px',
-                    height: '80px',
-                    border: '2px solid var(--border)',
-                    backgroundImage: `url(${formData.logo_url})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }} />
-                ) : (
-                  <div style={{
-                    width: '80px',
-                    height: '80px',
-                    border: '2px solid var(--border)',
-                    background: 'var(--grey-100)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '24pt'
-                  }}>
-                    🏢
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                    Business Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    required
+                    className="form-input"
+                    style={{ width: '100%', fontSize: '9pt' }}
+                    placeholder="e.g., Desert Performance"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                    Legal Name
+                  </label>
+                  <input
+                    type="text"
+                    value={legalName}
+                    onChange={(e) => setLegalName(e.target.value)}
+                    className="form-input"
+                    style={{ width: '100%', fontSize: '9pt' }}
+                    placeholder="e.g., Desert Performance LLC"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                    Business Type
+                  </label>
+                  <select
+                    value={businessType}
+                    onChange={(e) => setBusinessType(e.target.value)}
+                    className="form-select"
+                    style={{ width: '100%', fontSize: '9pt' }}
+                  >
+                    <option value="">Select type...</option>
+                    <option value="garage">Garage</option>
+                    <option value="dealership">Dealership</option>
+                    <option value="restoration_shop">Restoration Shop</option>
+                    <option value="performance_shop">Performance Shop</option>
+                    <option value="body_shop">Body Shop</option>
+                    <option value="detailing">Detailing</option>
+                    <option value="mobile_service">Mobile Service</option>
+                    <option value="specialty_shop">Specialty Shop</option>
+                    <option value="parts_supplier">Parts Supplier</option>
+                    <option value="fabrication">Fabrication</option>
+                    <option value="racing_team">Racing Team</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                    Description
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="form-input"
+                    style={{ width: '100%', fontSize: '9pt', minHeight: '80px' }}
+                    placeholder="Brief description of the business..."
+                  />
+                </div>
+              </div>
+
+              {/* Contact Info */}
+              <div style={{ marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '12px', borderBottom: '1px solid var(--border-light)', paddingBottom: '4px' }}>
+                  Contact Information
+                </h3>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="form-input"
+                    style={{ width: '100%', fontSize: '9pt' }}
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="form-input"
+                    style={{ width: '100%', fontSize: '9pt' }}
+                    placeholder="contact@business.com"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    className="form-input"
+                    style={{ width: '100%', fontSize: '9pt' }}
+                    placeholder="https://business.com"
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div style={{ marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '12px', borderBottom: '1px solid var(--border-light)', paddingBottom: '4px' }}>
+                  Location (Optional)
+                </h3>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="form-input"
+                    style={{ width: '100%', fontSize: '9pt' }}
+                    placeholder="123 Main St"
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="form-input"
+                      style={{ width: '100%', fontSize: '9pt' }}
+                      placeholder="Phoenix"
+                    />
                   </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  disabled={uploadingLogo}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className="form-input"
+                      style={{ width: '100%', fontSize: '9pt' }}
+                      placeholder="AZ"
+                      maxLength={2}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
+                      ZIP
+                    </label>
+                    <input
+                      type="text"
+                      value={zipCode}
+                      onChange={(e) => setZipCode(e.target.value)}
+                      className="form-input"
+                      style={{ width: '100%', fontSize: '9pt' }}
+                      placeholder="85001"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  onClick={() => navigate('/vehicles')}
+                  className="button button-secondary"
                   style={{ fontSize: '9pt' }}
-                />
-                {uploadingLogo && <span style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Uploading...</span>}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !businessName}
+                  className="button button-primary"
+                  style={{ fontSize: '9pt' }}
+                >
+                  {submitting ? 'Creating...' : 'Create Organization'}
+                </button>
               </div>
-            </div>
-
-            {/* Business Name */}
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                Business Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="NUKE LTD"
-                required
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '2px inset var(--border)',
-                  fontSize: '9pt',
-                  fontFamily: '"MS Sans Serif", sans-serif'
-                }}
-              />
-            </div>
-
-            {/* Business Type */}
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                Business Type *
-              </label>
-              <select
-                value={formData.business_type}
-                onChange={(e) => setFormData(prev => ({ ...prev, business_type: e.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '2px inset var(--border)',
-                  fontSize: '9pt',
-                  fontFamily: '"MS Sans Serif", sans-serif'
-                }}
-              >
-                {businessTypes.map(type => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Description */}
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Describe your business, services, specializations..."
-                rows={4}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '2px inset var(--border)',
-                  fontSize: '9pt',
-                  fontFamily: '"MS Sans Serif", sans-serif',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-
-            {/* Contact Info Grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 'var(--space-3)',
-              marginBottom: 'var(--space-3)'
-            }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="(555) 123-4567"
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '2px inset var(--border)',
-                    fontSize: '9pt',
-                    fontFamily: '"MS Sans Serif", sans-serif'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="info@business.com"
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '2px inset var(--border)',
-                    fontSize: '9pt',
-                    fontFamily: '"MS Sans Serif", sans-serif'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Website */}
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                Website
-              </label>
-              <input
-                type="url"
-                value={formData.website}
-                onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
-                placeholder="https://..."
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '2px inset var(--border)',
-                  fontSize: '9pt',
-                  fontFamily: '"MS Sans Serif", sans-serif'
-                }}
-              />
-            </div>
-
-            {/* Address */}
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                Street Address
-              </label>
-              <input
-                type="text"
-                value={formData.address}
-                onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                placeholder="123 Main St"
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '2px inset var(--border)',
-                  fontSize: '9pt',
-                  fontFamily: '"MS Sans Serif", sans-serif'
-                }}
-              />
-            </div>
-
-            {/* City, State, ZIP */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '2fr 1fr 1fr',
-              gap: 'var(--space-2)',
-              marginBottom: 'var(--space-4)'
-            }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                  City
-                </label>
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                  placeholder="Las Vegas"
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '2px inset var(--border)',
-                    fontSize: '9pt',
-                    fontFamily: '"MS Sans Serif", sans-serif'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                  State
-                </label>
-                <input
-                  type="text"
-                  value={formData.state}
-                  onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                  placeholder="NV"
-                  maxLength={2}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '2px inset var(--border)',
-                    fontSize: '9pt',
-                    fontFamily: '"MS Sans Serif", sans-serif',
-                    textTransform: 'uppercase'
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                  ZIP
-                </label>
-                <input
-                  type="text"
-                  value={formData.zip}
-                  onChange={(e) => setFormData(prev => ({ ...prev, zip: e.target.value }))}
-                  placeholder="89101"
-                  maxLength={10}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '2px inset var(--border)',
-                    fontSize: '9pt',
-                    fontFamily: '"MS Sans Serif", sans-serif'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Submit Buttons */}
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                type="submit"
-                disabled={loading || !formData.name.trim()}
-                style={{
-                  background: loading ? 'var(--grey-200)' : 'var(--text)',
-                  color: 'var(--white)',
-                  border: '2px outset var(--border)',
-                  padding: '8px 16px',
-                  fontSize: '9pt',
-                  fontWeight: 'bold',
-                  cursor: loading ? 'wait' : 'pointer',
-                  fontFamily: '"MS Sans Serif", sans-serif'
-                }}
-              >
-                {loading ? 'Creating...' : 'Create Organization'}
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/shops')}
-                disabled={loading}
-                style={{
-                  background: 'var(--grey-100)',
-                  border: '2px outset var(--border)',
-                  padding: '8px 16px',
-                  fontSize: '9pt',
-                  cursor: loading ? 'wait' : 'pointer',
-                  fontFamily: '"MS Sans Serif", sans-serif'
-                }}
-              >
-                Cancel
-              </button>
-            </div>
+            </form>
           </div>
-        </form>
+        </div>
+
+        <div style={{ marginTop: '16px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          💡 <strong>Collaborative profiles</strong>: Like vehicles, any user can contribute to this organization profile. You'll be credited as the creator. To claim ownership, you'll need to submit business documents for verification.
+        </div>
       </div>
     </div>
   );
 }
-

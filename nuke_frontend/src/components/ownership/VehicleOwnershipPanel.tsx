@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { DocumentVerificationService } from '../../services/documentVerificationService';
 import OwnershipService from '../../services/ownershipService';
@@ -72,6 +73,9 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
   const [showDetails, setShowDetails] = useState(false);
   const [moderatorStatus, setModeratorStatus] = useState<string>('Loading...');
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string>('');
+  const ownershipUploadId = `ownership-upload-${vehicle.id}`;
 
   useEffect(() => {
     loadOwnershipData();
@@ -321,6 +325,17 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
             </button>
           )}
 
+          {/* Always allow title submission for verification (even if uploader) */}
+          {session && (
+            <button
+              className="button button-primary button-small"
+              onClick={() => setShowOwnershipForm(true)}
+              title="Upload title to verify ownership"
+            >
+              Submit Title
+            </button>
+          )}
+
           {/* Show buttons for non-owners without contributor access */}
           {session && session?.user?.id !== (vehicle?.uploaded_by || vehicle?.user_id) && !isOwner && !hasContributorAccess && (
             <>
@@ -399,9 +414,9 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         </div>
 
         {/* Access Request Onboarding Questionnaire */}
-        {showAccessRequest && session?.user && (
-          <div className="modal-overlay">
-            <div className="modal">
+        {showAccessRequest && session?.user && ReactDOM.createPortal(
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="modal" style={{ background: 'white', width: '640px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
               <div className="modal-header">
                 <div className="modal-title">Request Vehicle Access</div>
               </div>
@@ -515,13 +530,14 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                 </form>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Simple Ownership Claim Form */}
-        {showOwnershipForm && session?.user && (
-          <div className="modal-overlay">
-            <div className="modal">
+        {showOwnershipForm && session?.user && ReactDOM.createPortal(
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="modal" style={{ background: 'white', width: '640px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
               <div className="modal-header">
                 <div className="modal-title">Claim Ownership</div>
               </div>
@@ -574,6 +590,14 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     document_type: claimType 
                   };
 
+                  // Check for existing verification record first
+                  const { data: existing } = await supabase
+                    .from('ownership_verifications')
+                    .select('id, status, title_document_url, drivers_license_url')
+                    .eq('vehicle_id', vehicle.id)
+                    .eq('user_id', session.user.id)
+                    .maybeSingle();
+
                   // Only title makes user confirmed owner, others make pending
                   const status = claimType === 'title' ? 'approved' : 'pending';
 
@@ -598,21 +622,38 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     verificationData.bill_of_sale_url = document.file_url;
                   }
 
-                  // Set pending for ID if uploading title
-                  if (claimType === 'title' && !verificationData.drivers_license_url) {
+                  // Set pending for ID if uploading title (unless already present)
+                  if (claimType === 'title' && !verificationData.drivers_license_url && (!existing || !existing.drivers_license_url)) {
                     verificationData.drivers_license_url = 'pending';
                   }
-                  // Set pending for title if uploading ID
-                  if ((claimType === 'drivers_license' || claimType === 'id') && !verificationData.title_document_url) {
+                  // Set pending for title if uploading ID (unless already present)
+                  if ((claimType === 'drivers_license' || claimType === 'id') && !verificationData.title_document_url && (!existing || !existing.title_document_url)) {
                     verificationData.title_document_url = 'pending';
                   }
 
-                  // Create ownership verification record
-                  const { data: verification, error: verifyError } = await supabase
-                    .from('ownership_verifications')
-                    .insert(verificationData)
-                    .select()
-                    .single();
+                  let verification;
+                  let verifyError;
+
+                  if (existing) {
+                    // Update existing record
+                    const { data: updatedData, error: updateError } = await supabase
+                      .from('ownership_verifications')
+                      .update(verificationData)
+                      .eq('id', existing.id)
+                      .select()
+                      .single();
+                    verification = updatedData;
+                    verifyError = updateError;
+                  } else {
+                    // Create new ownership verification record
+                    const { data: insertedData, error: insertError } = await supabase
+                      .from('ownership_verifications')
+                      .insert(verificationData)
+                      .select()
+                      .single();
+                    verification = insertedData;
+                    verifyError = insertError;
+                  }
 
                   if (verifyError) {
                     console.error('Verification error:', verifyError);
@@ -685,19 +726,34 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
 
                 <div style={{ marginBottom: '8px' }}>
                   <div style={{ marginBottom: '4px' }}>Upload Document:</div>
-                  <input
-                    type="file"
-                    name="documentFile"
-                    accept="image/*,.pdf"
-                    required
-                    style={{
-                      fontSize: '8pt',
-                      fontFamily: 'Arial, sans-serif',
-                      border: '1px solid #ccc',
-                      padding: '2px',
-                      width: '100%'
-                    }}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      id={ownershipUploadId}
+                      ref={fileInputRef}
+                      type="file"
+                      name="documentFile"
+                      accept="image/*,application/pdf"
+                      required
+                      capture="environment"
+                      onChange={(e) => setSelectedFileName(e.currentTarget.files && e.currentTarget.files[0] ? e.currentTarget.files[0].name : '')}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      className="button button-primary button-small"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      style={{ fontSize: '8pt' }}
+                    >
+                      Choose File
+                    </button>
+                    <span className="text-small text-muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {selectedFileName || 'No file selected'}
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -718,13 +774,14 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
               </form>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Role Management Interface Modal */}
-        {showManagement && (
-          <div className="modal-overlay">
-            <div className="modal modal-large">
+        {showManagement && ReactDOM.createPortal(
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="modal modal-large" style={{ background: 'white', width: '860px', maxWidth: '98vw', maxHeight: '92vh', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
               <div className="modal-header">
                 <div className="modal-title">Manage Contributors</div>
                 <button
@@ -745,7 +802,8 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                 />
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

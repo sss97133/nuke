@@ -146,40 +146,6 @@ export const MobileImageCarousel: React.FC<MobileImageCarouselProps> = ({
         )}
       </div>
 
-      {/* Navigation Arrows */}
-      {!showLiveStream && images.length > 1 && (
-        <>
-          {currentIndex > 0 && (
-            <button style={{...styles.navButton, left: '8px'}} onClick={goToPrevious}>
-              ‹
-            </button>
-          )}
-          {currentIndex < images.length - 1 && (
-            <button style={{...styles.navButton, right: '8px'}} onClick={goToNext}>
-              ›
-            </button>
-          )}
-        </>
-      )}
-
-      {/* Dots Indicator */}
-      {!showLiveStream && images.length > 1 && (
-        <div style={styles.dotsContainer}>
-          {images.map((_, idx) => (
-            <div
-              key={idx}
-              style={{
-                ...styles.dot,
-                background: idx === currentIndex ? '#ffffff' : 'rgba(255, 255, 255, 0.5)'
-              }}
-              onClick={() => {
-                setCurrentIndex(idx);
-                onImageChange?.(idx);
-              }}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Live Stream Toggle */}
       {liveStreamUrl && (

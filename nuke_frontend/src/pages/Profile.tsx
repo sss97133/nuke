@@ -38,6 +38,8 @@ import { ProfileVerification } from '../components/ProfileVerification';
 import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
 import LivePlayer from '../components/profile/LivePlayer';
+import DailyContributionReport from '../components/profile/DailyContributionReport';
+import ContractorProfileCard from '../components/contractor/ContractorProfileCard';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -271,6 +273,7 @@ const Profile: React.FC = () => {
   }
 
   const { profile, completion, achievements, recentActivity, stats } = profileData;
+  const dailySummaries = profileData.dailyContributionSummaries || [];
   const isOwnProfile = currentUserId === profile.id;
   const allContribs = profileData.recentContributions || [];
   const years = Array.from(new Set(allContribs.map((c: any) => new Date(c.contribution_date).getFullYear()))).sort((a: number, b: number) => b - a);
@@ -486,10 +489,28 @@ const Profile: React.FC = () => {
         <div className="profile-content">
             {activeTab === 'overview' && (
               <div className="section">
+                {/* Contractor Profile (if applicable) */}
+                {profileData.profile?.id && (
+                  <div style={{ marginBottom: 'var(--space-4)' }}>
+                    <ContractorProfileCard
+                      userId={profileData.profile.id}
+                      isOwnProfile={isOwnProfile}
+                    />
+                  </div>
+                )}
+                
                 {/* Contribution Heatmap */}
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <ContributionTimeline
                     contributions={profileData.recentContributions || []}
+                  />
+                </div>
+
+                {/* Daily Ledger */}
+                <div style={{ marginBottom: 'var(--space-4)' }}>
+                  <DailyContributionReport
+                    summaries={dailySummaries}
+                    isOwnProfile={isOwnProfile}
                   />
                 </div>
                 

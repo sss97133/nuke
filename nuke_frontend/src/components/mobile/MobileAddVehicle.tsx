@@ -13,7 +13,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, getSupabaseFunctionsUrl } from '../../lib/supabase';
 import { ImageUploadService } from '../../services/imageUploadService';
 import '../../design-system.css';
 
@@ -133,7 +133,7 @@ export const MobileAddVehicle: React.FC<MobileAddVehicleProps> = ({
             console.log(`Downloading image ${globalIndex + 1}/${imageUrls.length}`);
             
             // Use Supabase image proxy to bypass CORS
-            const proxyUrl = `https://qkgaybvrernstplzjaam.supabase.co/functions/v1/image-proxy`;
+            const proxyUrl = `${getSupabaseFunctionsUrl()}/image-proxy`;
             const response = await fetch(proxyUrl, {
               method: 'POST',
               headers: {

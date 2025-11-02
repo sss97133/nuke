@@ -26,7 +26,7 @@ export const MobileOrgDashboard: React.FC<MobileOrgDashboardProps> = ({ session 
   const loadOrgData = async (orgId: string) => {
     // Load org details
     const { data: orgData } = await supabase
-      .from('shops')
+      .from('businesses')
       .select('*')
       .eq('id', orgId)
       .single();
@@ -35,7 +35,7 @@ export const MobileOrgDashboard: React.FC<MobileOrgDashboardProps> = ({ session 
 
     // Load team members
     const { data: members } = await supabase
-      .from('shop_members')
+      .from('business_user_roles')
       .select(`
         *,
         profiles:user_id (
@@ -44,16 +44,15 @@ export const MobileOrgDashboard: React.FC<MobileOrgDashboardProps> = ({ session 
           avatar_url
         )
       `)
-      .eq('shop_id', orgId)
-      .eq('status', 'active');
+      .eq('business_id', orgId);
 
     setTeam(members || []);
 
     // Load org vehicles
     const { data: vehicles } = await supabase
-      .from('vehicles')
+      .from('organization_vehicles')
       .select('id')
-      .eq('owner_shop_id', orgId);
+      .eq('organization_id', orgId);
 
     setStats({
       vehicles: vehicles?.length || 0,
@@ -97,7 +96,7 @@ export const MobileOrgDashboard: React.FC<MobileOrgDashboardProps> = ({ session 
               <h2 style={styles.orgName}>{org.name}</h2>
               <div style={styles.orgMeta}>
                 {org.business_type} • {org.city}, {org.state}
-                {org.is_verified && <span style={styles.verifiedBadge}>✓ Verified</span>}
+                {org.is_verified && <span style={styles.verifiedBadge}>Verified</span>}
               </div>
             </div>
           </div>
@@ -120,7 +119,7 @@ export const MobileOrgDashboard: React.FC<MobileOrgDashboardProps> = ({ session 
 
           {/* Team Members */}
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>👥 Team Members</div>
+            <div style={styles.sectionTitle}>Team Members</div>
             <div style={styles.teamList}>
               {team.length === 0 ? (
                 <div style={styles.emptyTeam}>No team members yet</div>
@@ -152,7 +151,7 @@ export const MobileOrgDashboard: React.FC<MobileOrgDashboardProps> = ({ session 
               onClick={() => window.location.href = `/org/${org.id}/settings`}
               style={styles.actionBtn}
             >
-              ⚙️ Settings
+              Settings
             </button>
           </div>
         </>

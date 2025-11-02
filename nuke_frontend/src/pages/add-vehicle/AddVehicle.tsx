@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, getSupabaseFunctionsUrl } from '../../lib/supabase';
 import { uploadQueue } from '../../services/globalUploadQueue';
 import { TimelineEventService } from '../../services/timelineEventService';
 // AppLayout now provided globally by App.tsx
@@ -329,7 +329,7 @@ Redirecting to vehicle profile...`);
                 console.log(`Downloading image ${i + 1}/${maxImages}: ${imageUrl}`);
                 
                 // Use Supabase image proxy to bypass CORS
-                const proxyUrl = `https://qkgaybvrernstplzjaam.supabase.co/functions/v1/image-proxy`;
+                const proxyUrl = `${getSupabaseFunctionsUrl()}/image-proxy`;
                 const response = await fetch(proxyUrl, {
                   method: 'POST',
                   headers: {
@@ -876,7 +876,7 @@ Redirecting to vehicle profile...`);
                         className="button button-secondary"
                         style={{ fontSize: '8pt', padding: '2px 6px' }}
                       >
-                        📄 Scan Title
+                        Scan Title
                       </button>
                     </div>
                   </div>
@@ -895,21 +895,21 @@ Redirecting to vehicle profile...`);
                     {isScrapingUrl && (
                       <div className="alert alert-info mb-4">
                         <div className="text-small">
-                          🔍 Importing vehicle data from URL...
+                          Importing vehicle data from URL...
                         </div>
                       </div>
                     )}
 
                     {scrapingError && (
                       <div className="alert alert-error mb-4">
-                        <div className="text-small">❌ {scrapingError}</div>
+                        <div className="text-small">{scrapingError}</div>
                       </div>
                     )}
 
                     {lastScrapedUrl && !isScrapingUrl && !scrapingError && formData.bat_auction_url && (
                       <div className="alert alert-success mb-4">
                         <div className="text-small">
-                          ✓ Successfully imported vehicle data from Bring a Trailer listing
+                          Successfully imported vehicle data from Bring a Trailer listing
                         </div>
                       </div>
                     )}
@@ -925,7 +925,7 @@ Redirecting to vehicle profile...`);
                       <div className="alert alert-info mb-4">
                         <div className="flex justify-between items-center">
                           <div className="text-small">
-                            💾 Form automatically saved {new Date(autoSaveState.lastSaved).toLocaleTimeString()}
+                            Draft saved {new Date(autoSaveState.lastSaved).toLocaleTimeString()}
                           </div>
                           <button
                             type="button"
@@ -1001,8 +1001,8 @@ Redirecting to vehicle profile...`);
                     {extracting 
                       ? `Processing ${extractProgress?.current || 0}/${extractProgress?.total || 0}...`
                       : extractedImages.length > 0 
-                      ? `Add More Images (${extractedImages.length}/300)` 
-                      : 'Click to Upload Images'}
+                      ? `Add Images (${extractedImages.length}/300)` 
+                      : 'Upload Images'}
                   </button>
                   
                   <div style={{
@@ -1128,7 +1128,7 @@ Redirecting to vehicle profile...`);
                     ) : isDragging ? (
                       <div>
                         <div className="text font-medium text-blue-600 mb-1" style={{ fontSize: '9pt' }}>
-                          📁 Drop Images Now!
+                          Drop images now
                         </div>
                         <p className="text-small text-muted" style={{ fontSize: '8pt' }}>
                           Release to upload

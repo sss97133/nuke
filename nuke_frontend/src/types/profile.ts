@@ -81,11 +81,35 @@ export interface UserContribution {
   id: string;
   user_id: string;
   contribution_date: string;
-  contribution_type: 'vehicle_data' | 'image_upload' | 'timeline_event' | 'verification' | 'annotation';
+  contribution_type: 'vehicle_data' | 'image_upload' | 'timeline_event' | 'verification' | 'annotation' | 'business_event';
   contribution_count: number;
   related_vehicle_id: string | null;
   metadata: Record<string, any>;
   created_at: string;
+}
+
+export interface ContributionHighlight {
+  id: string;
+  type: UserContribution['contribution_type'];
+  title: string;
+  description?: string | null;
+  count: number;
+  value_usd: number;
+  hours: number;
+  metadata: Record<string, any>;
+}
+
+export interface DailyContributionSummary {
+  id: string;
+  date: string;
+  vehicle_id: string | null;
+  vehicle_name?: string | null;
+  total_value_usd: number;
+  total_hours: number;
+  total_images: number;
+  total_events: number;
+  total_verifications: number;
+  highlights: ContributionHighlight[];
 }
 
 export interface ProfileEditForm {
@@ -183,6 +207,7 @@ export interface ProfileData {
   recentActivity: ProfileActivity[];
   stats: ProfileStats | null;
   recentContributions: UserContribution[];
+  dailyContributionSummaries: DailyContributionSummary[];
   certifications: ProfessionalCertification[];
   skills: UserSkill[];
   experience: ProfessionalExperience[];

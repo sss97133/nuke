@@ -4,32 +4,56 @@ import { CashBalanceService } from '../../services/cashBalanceService';
 import { AuctionMarketEngine } from '../../services/auctionMarketEngine';
 
 interface TradePanelProps {
-  vehicleId: string;
-  vehicleName: string;
+  assetType?: 'vehicle' | 'organization';
+  assetId?: string;
+  assetName?: string;
+  offeringId?: string;
+  currentPrice?: number;
+  availableShares?: number;
+  onClose?: () => void;
+  onTrade?: () => void;
+  // Legacy props for backwards compat
+  vehicleId?: string;
+  vehicleName?: string;
   currentSharePrice?: number;
   totalShares?: number;
 }
 
 export default function TradePanel({ 
-  vehicleId, 
+  assetType = 'vehicle',
+  assetId,
+  assetName,
+  offeringId,
+  currentPrice,
+  availableShares,
+  onClose,
+  onTrade,
+  // Legacy
+  vehicleId,
   vehicleName,
   currentSharePrice = 0,
   totalShares = 1000
 }: TradePanelProps) {
+  // Use legacy or new props
+  const finalAssetId = assetId || vehicleId || '';
+  const finalAssetName = assetName || vehicleName || '';
+  const finalOfferingId = offeringId || finalAssetId;
+  const finalCurrentPrice = currentPrice !== undefined ? currentPrice : currentSharePrice;
+  const finalTotalShares = availableShares !== undefined ? availableShares : totalShares;
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [shares, setShares] = useState<string>('');
-  const [price, setPrice] = useState<string>(currentSharePrice.toFixed(2));
+  const [price, setPrice] = useState<string>(finalCurrentPrice.toFixed(2));
   const [balance, setBalance] = useState<number>(0);
   const [userShares, setUserShares] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadUserData();
-  }, [vehicleId]);
+  }, [finalAssetId, assetType]);
 
   useEffect(() => {
-    setPrice(currentSharePrice.toFixed(2));
-  }, [currentSharePrice]);
+    setPrice(finalCurrentPrice.toFixed(2));
+  }, [finalCurrentPrice]);
 
   const loadUserData = async () => {
     try {
@@ -42,16 +66,17 @@ export default function TradePanel({
         setBalance(cashBalance.available_cents);
       }
 
-      // Load user's shares in this vehicle
+      // Load user's shares in this asset (vehicle or org)
+      const tableName = assetType === 'organization' ? 'organization_share_holdings' : 'share_holdings';
       const { data: holdings } = await supabase
-        .from('share_holdings')
+        .from(tableName)
         .select('shares_owned')
         .eq('holder_id', user.id)
-        .eq('offering_id', vehicleId) // Note: This assumes offering_id = vehicle_id
-        .single();
+        .eq('offering_id', finalOfferingId)
+        .maybeSingle();
 
       if (holdings) {
-        setUserShares(holdings.shares_owned);
+        setUserShares(holdings.shares_owned || 0);
       }
     } catch (error) {
       console.error('Failed to load user data:', error);

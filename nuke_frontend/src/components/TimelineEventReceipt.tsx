@@ -31,6 +31,14 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
   const [images, setImages] = useState<any[]>([]);
   const [uploaderName, setUploaderName] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [receiptItems, setReceiptItems] = useState<any[]>([]);
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string>('pending');
+  const [extractionConfidence, setExtractionConfidence] = useState<number | null>(null);
+  const [showPerformerCard, setShowPerformerCard] = useState(false);
+  const [performerProfile, setPerformerProfile] = useState<any>(null);
+  const [showLocationCard, setShowLocationCard] = useState(false);
+  const [locationDetails, setLocationDetails] = useState<any>(null);
 
   useEffect(() => {
     loadEventData();
@@ -69,11 +77,70 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
       if (eventResult.data.user_id) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, username')
+          .select('full_name, username, avatar_url, bio')
           .eq('id', eventResult.data.user_id)
           .single();
         
         setUploaderName(profile?.full_name || profile?.username || 'Unknown');
+        setPerformerProfile({ ...profile, id: eventResult.data.user_id, type: 'user' });
+      }
+
+      // Load shop/location details if present
+      if (eventResult.data.service_provider_name || eventResult.data.location_name) {
+        // Try to find matching shop
+        const { data: shop } = await supabase
+          .from('shops')
+          .select('id, business_name, name, phone, email, address_line1, city, state, latitude, longitude, logo_url')
+          .or(`business_name.ilike.%${eventResult.data.service_provider_name}%,name.ilike.%${eventResult.data.service_provider_name}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (shop) {
+          setLocationDetails({ ...shop, type: 'shop' });
+        } else {
+          setLocationDetails({
+            type: 'location',
+            name: eventResult.data.location_name || eventResult.data.service_provider_name,
+            address: eventResult.data.location_address
+          });
+        }
+      }
+
+      // Check if this event has an associated document (receipt)
+      if (eventResult.data.metadata?.document_id) {
+        const docId = eventResult.data.metadata.document_id;
+        setDocumentId(docId);
+
+        // Load document processing status
+        const { data: document } = await supabase
+          .from('vehicle_documents')
+          .select('ai_processing_status, ai_extraction_confidence')
+          .eq('id', docId)
+          .single();
+
+        if (document) {
+          setProcessingStatus(document.ai_processing_status || 'pending');
+          setExtractionConfidence(document.ai_extraction_confidence);
+        }
+
+        // Load extracted receipt items via receipts table
+        const { data: receipt } = await supabase
+          .from('receipts')
+          .select('id')
+          .eq('document_id', docId)
+          .maybeSingle();
+
+        if (receipt) {
+          const { data: items } = await supabase
+            .from('receipt_items')
+            .select('*')
+            .eq('receipt_id', receipt.id)
+            .order('created_at', { ascending: true });
+
+          if (items && items.length > 0) {
+            setReceiptItems(items);
+          }
+        }
       }
     }
     
@@ -118,11 +185,27 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
     );
   }
 
-  const partsTotal = event.parts_used?.reduce((sum: number, part: any) => sum + (part.cost || 0), 0) || 0;
-  const laborCost = event.duration_hours && event.metadata?.labor_rate 
+  // Calculate totals from extracted receipt items OR fallback to event data
+  const extractedPartsTotal = receiptItems
+    .filter(item => item.category === 'part')
+    .reduce((sum, item) => sum + (item.line_total || item.total_price || 0), 0);
+  const extractedLaborTotal = receiptItems
+    .filter(item => item.category === 'labor')
+    .reduce((sum, item) => sum + (item.line_total || item.total_price || 0), 0);
+  const extractedTaxTotal = receiptItems
+    .filter(item => item.category === 'tax')
+    .reduce((sum, item) => sum + (item.line_total || item.total_price || 0), 0);
+  const extractedTotal = receiptItems.reduce((sum, item) => sum + (item.line_total || item.total_price || 0), 0);
+
+  // Fallback to manual event data if no extraction
+  const manualPartsTotal = event.parts_used?.reduce((sum: number, part: any) => sum + (part.cost || 0), 0) || 0;
+  const manualLaborCost = event.duration_hours && event.metadata?.labor_rate 
     ? event.duration_hours * event.metadata.labor_rate 
     : 0;
-  const totalCost = event.cost_amount || partsTotal + laborCost;
+  
+  const partsTotal = receiptItems.length > 0 ? extractedPartsTotal : manualPartsTotal;
+  const laborCost = receiptItems.length > 0 ? extractedLaborTotal : manualLaborCost;
+  const totalCost = receiptItems.length > 0 ? extractedTotal : (event.cost_amount || manualPartsTotal + manualLaborCost);
 
   return createPortal(
     <div 
@@ -186,12 +269,22 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         </div>
 
         {/* SERVICE PROVIDER / WHO DID THE WORK */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd', position: 'relative' }}>
           <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
             PERFORMED BY:
           </div>
           <div style={{ fontSize: '8pt' }}>
-            {event.service_provider_name || uploaderName || 'Owner/DIY'}
+            <span
+              onClick={() => performerProfile && setShowPerformerCard(!showPerformerCard)}
+              style={{
+                cursor: performerProfile ? 'pointer' : 'default',
+                textDecoration: performerProfile ? 'underline' : 'none',
+                textDecorationStyle: 'dotted',
+                fontWeight: 700
+              }}
+            >
+              {event.service_provider_name || uploaderName || 'Owner/DIY'}
+            </span>
             {event.service_provider_type && (
               <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
                 {event.service_provider_type.replace('_', ' ').toUpperCase()}
@@ -199,8 +292,164 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
             )}
             {event.location_name && (
               <div style={{ marginTop: '4px' }}>
-                📍 {event.location_name}
+                <span
+                  onClick={() => locationDetails && setShowLocationCard(!showLocationCard)}
+                  style={{
+                    cursor: locationDetails ? 'pointer' : 'default',
+                    textDecoration: locationDetails ? 'underline' : 'none',
+                    textDecorationStyle: 'dotted'
+                  }}
+                >
+                  📍 {event.location_name}
+                </span>
                 {event.location_address && <div style={{ color: 'var(--text-secondary)' }}>{event.location_address}</div>}
+              </div>
+            )}
+
+            {/* Performer Mini-Profile Card */}
+            {showPerformerCard && performerProfile && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: '16px',
+                zIndex: 10001,
+                background: 'var(--white)',
+                border: '2px solid var(--border)',
+                borderRadius: '4px',
+                boxShadow: 'var(--shadow)',
+                padding: '12px',
+                minWidth: '240px',
+                marginTop: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <img
+                    src={performerProfile.avatar_url || performerProfile.logo_url || '/default-avatar.png'}
+                    alt={performerProfile.full_name || performerProfile.business_name}
+                    style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: '9pt' }}>
+                      {performerProfile.full_name || performerProfile.business_name || performerProfile.name}
+                    </div>
+                    {performerProfile.username && (
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>@{performerProfile.username}</div>
+                    )}
+                  </div>
+                </div>
+                {performerProfile.bio && (
+                  <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px', borderTop: '1px solid var(--border-light)', paddingTop: '8px' }}>
+                    {performerProfile.bio}
+                  </div>
+                )}
+                {performerProfile.phone && (
+                  <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                    📞 {performerProfile.phone}
+                  </div>
+                )}
+                {performerProfile.email && (
+                  <div style={{ fontSize: '8pt', marginBottom: '8px' }}>
+                    ✉️ {performerProfile.email}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid var(--border-light)', paddingTop: '8px' }}>
+                  <button
+                    onClick={() => {
+                      window.location.href = performerProfile.type === 'shop' 
+                        ? `/org/${performerProfile.id}`
+                        : `/profile/${performerProfile.id}`;
+                    }}
+                    className="button button-primary button-small"
+                    style={{ fontSize: '8pt', flex: 1 }}
+                  >
+                    View Profile
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowPerformerCard(false);
+                    }}
+                    className="button button-secondary button-small"
+                    style={{ fontSize: '8pt' }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Location Mini-Profile Card */}
+            {showLocationCard && locationDetails && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: '16px',
+                zIndex: 10001,
+                background: 'var(--white)',
+                border: '2px solid var(--border)',
+                borderRadius: '4px',
+                boxShadow: 'var(--shadow)',
+                padding: '12px',
+                minWidth: '240px',
+                marginTop: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  {locationDetails.logo_url && (
+                    <img
+                      src={locationDetails.logo_url}
+                      alt={locationDetails.business_name || locationDetails.name}
+                      style={{ width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover' }}
+                    />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: '9pt' }}>
+                      {locationDetails.business_name || locationDetails.name}
+                    </div>
+                    {locationDetails.type === 'shop' && (
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Business</div>
+                    )}
+                  </div>
+                </div>
+                {locationDetails.address_line1 && (
+                  <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                    📍 {locationDetails.address_line1}
+                    {locationDetails.city && locationDetails.state && (
+                      <div style={{ color: 'var(--text-secondary)' }}>
+                        {locationDetails.city}, {locationDetails.state}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {locationDetails.phone && (
+                  <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+                    📞 {locationDetails.phone}
+                  </div>
+                )}
+                {locationDetails.email && (
+                  <div style={{ fontSize: '8pt', marginBottom: '8px' }}>
+                    ✉️ {locationDetails.email}
+                  </div>
+                )}
+                {locationDetails.type === 'shop' && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid var(--border-light)', paddingTop: '8px' }}>
+                    <button
+                      onClick={() => window.location.href = `/org/${locationDetails.id}`}
+                      className="button button-primary button-small"
+                      style={{ fontSize: '8pt', flex: 1 }}
+                    >
+                      View Shop
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowLocationCard(false);
+                      }}
+                      className="button button-secondary button-small"
+                      style={{ fontSize: '8pt' }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -224,8 +473,87 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
           </div>
         </div>
 
-        {/* PARTS & MATERIALS */}
-        {event.parts_used && event.parts_used.length > 0 && (
+        {/* AI EXTRACTION STATUS */}
+        {documentId && processingStatus === 'processing' && (
+          <div style={{
+            padding: '12px 16px',
+            background: '#e0f2fe',
+            border: '1px solid #0ea5e9',
+            margin: '0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '8pt'
+          }}>
+            <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid #0ea5e9', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <span>🤖 AI is extracting receipt data...</span>
+          </div>
+        )}
+
+        {documentId && processingStatus === 'completed' && extractionConfidence && (
+          <div style={{
+            padding: '12px 16px',
+            background: '#d1fae5',
+            border: '1px solid #10b981',
+            margin: '0',
+            fontSize: '8pt',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>✅ AI extraction complete</span>
+            <span style={{ color: 'var(--text-muted)' }}>Confidence: {Math.round(extractionConfidence * 100)}%</span>
+          </div>
+        )}
+
+        {/* PARTS & MATERIALS - AI EXTRACTED */}
+        {receiptItems.filter(item => item.category === 'part').length > 0 && (
+          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
+            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+              PARTS & MATERIALS:
+              {receiptItems.some(item => item.extracted_by_ai) && (
+                <span style={{ fontSize: '7pt', marginLeft: '8px', padding: '2px 6px', background: '#dbeafe', border: '1px solid #3b82f6', borderRadius: '2px' }}>
+                  🤖 AI-extracted
+                </span>
+              )}
+            </div>
+            <table style={{ width: '100%', fontSize: '8pt', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #bdbdbd' }}>
+                  <th style={{ textAlign: 'left', padding: '4px', fontWeight: 700 }}>QTY</th>
+                  <th style={{ textAlign: 'left', padding: '4px', fontWeight: 700 }}>PART/ITEM</th>
+                  <th style={{ textAlign: 'right', padding: '4px', fontWeight: 700 }}>AMOUNT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receiptItems
+                  .filter(item => item.category === 'part')
+                  .map((item: any, idx: number) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #ebebeb' }}>
+                      <td style={{ padding: '4px' }}>{item.quantity || 1}</td>
+                      <td style={{ padding: '4px' }}>
+                        {item.description}
+                        {item.part_number && <span style={{ color: 'var(--text-muted)' }}> #{item.part_number}</span>}
+                        {item.brand && <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>{item.brand}</div>}
+                      </td>
+                      <td style={{ padding: '4px', textAlign: 'right' }}>
+                        {formatCurrency(item.line_total || item.total_price || item.unit_price || 0)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid #000', fontWeight: 700 }}>
+                  <td colSpan={2} style={{ padding: '6px 4px' }}>PARTS SUBTOTAL:</td>
+                  <td style={{ padding: '6px 4px', textAlign: 'right' }}>{formatCurrency(extractedPartsTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+
+        {/* PARTS & MATERIALS - FALLBACK TO MANUAL */}
+        {receiptItems.length === 0 && event.parts_used && event.parts_used.length > 0 && (
           <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
             <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
               PARTS & MATERIALS:
@@ -255,15 +583,50 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
               <tfoot>
                 <tr style={{ borderTop: '2px solid #000', fontWeight: 700 }}>
                   <td colSpan={2} style={{ padding: '6px 4px' }}>PARTS SUBTOTAL:</td>
-                  <td style={{ padding: '6px 4px', textAlign: 'right' }}>{formatCurrency(partsTotal)}</td>
+                  <td style={{ padding: '6px 4px', textAlign: 'right' }}>{formatCurrency(manualPartsTotal)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
 
-        {/* LABOR */}
-        {event.duration_hours && (
+        {/* LABOR - AI EXTRACTED */}
+        {receiptItems.filter(item => item.category === 'labor').length > 0 && (
+          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
+            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+              LABOR:
+            </div>
+            <table style={{ width: '100%', fontSize: '8pt', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #bdbdbd' }}>
+                  <th style={{ textAlign: 'left', padding: '4px', fontWeight: 700 }}>DESCRIPTION</th>
+                  <th style={{ textAlign: 'right', padding: '4px', fontWeight: 700 }}>AMOUNT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receiptItems
+                  .filter(item => item.category === 'labor')
+                  .map((item: any, idx: number) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #ebebeb' }}>
+                      <td style={{ padding: '4px' }}>{item.description}</td>
+                      <td style={{ padding: '4px', textAlign: 'right' }}>
+                        {formatCurrency(item.line_total || item.total_price || 0)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid #000', fontWeight: 700 }}>
+                  <td style={{ padding: '6px 4px' }}>LABOR SUBTOTAL:</td>
+                  <td style={{ padding: '6px 4px', textAlign: 'right' }}>{formatCurrency(extractedLaborTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+
+        {/* LABOR - FALLBACK TO MANUAL */}
+        {receiptItems.length === 0 && event.duration_hours && (
           <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
             <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
               LABOR:
@@ -280,7 +643,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                 </div>
                 <div style={{ fontSize: '9pt', display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #bdbdbd' }}>
                   <span>LABOR SUBTOTAL:</span>
-                  <span>{formatCurrency(laborCost)}</span>
+                  <span>{formatCurrency(manualLaborCost)}</span>
                 </div>
               </>
             )}
@@ -408,7 +771,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         </div>
 
         {/* Missing data prompts */}
-        {(!event.cost_amount && !event.duration_hours && !event.parts_used) && (
+        {receiptItems.length === 0 && !event.cost_amount && !event.duration_hours && !event.parts_used && (
           <div style={{
             padding: '16px',
             background: '#fffbeb',
@@ -420,8 +783,56 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
               ⚠️ Incomplete Work Order
             </div>
             <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
-              Add cost, labor hours, or parts to complete this receipt
+              {documentId && processingStatus === 'pending' 
+                ? '🤖 AI extraction pending - refresh to see extracted data'
+                : 'Add cost, labor hours, or parts to complete this receipt'
+              }
             </div>
+            {documentId && processingStatus === 'pending' && (
+              <button
+                onClick={async () => {
+                  setProcessingStatus('processing');
+                  try {
+                    const { data: doc } = await supabase
+                      .from('vehicle_documents')
+                      .select('document_url, vehicle_id')
+                      .eq('id', documentId)
+                      .single();
+                    
+                    if (doc) {
+                      await supabase.functions.invoke('smart-receipt-linker', {
+                        body: {
+                          documentId,
+                          vehicleId: doc.vehicle_id,
+                          documentUrl: doc.document_url
+                        }
+                      });
+                      
+                      // Reload data after 3 seconds
+                      setTimeout(() => {
+                        loadEventData();
+                      }, 3000);
+                    }
+                  } catch (error) {
+                    console.error('Error triggering receipt processing:', error);
+                    setProcessingStatus('failed');
+                  }
+                }}
+                style={{
+                  marginTop: '8px',
+                  padding: '4px 8px',
+                  border: '1px solid #f59e0b',
+                  background: '#ffffff',
+                  color: '#f59e0b',
+                  fontSize: '8pt',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  borderRadius: '2px'
+                }}
+              >
+                🤖 Extract Receipt Data Now
+              </button>
+            )}
           </div>
         )}
       </div>

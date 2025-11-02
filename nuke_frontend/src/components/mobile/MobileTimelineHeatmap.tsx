@@ -90,9 +90,9 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
       console.log('[MobileTimelineHeatmap] Vehicle ID type:', typeof vehicleId);
 
       // Load all timeline events with image_urls array from enriched view
-      // vehicle_timeline_events is a VIEW that includes participant_count, verification_count, and service_info
+      // timeline_events is the canonical table for all vehicle timeline data
       const { data: events, error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .select(`
           id,
           vehicle_id,

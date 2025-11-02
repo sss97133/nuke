@@ -34,7 +34,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'masonry' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'primary' | 'likes' | 'views' | 'interactions'>('primary');
+  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc'>('date_desc');
   const [showFilters, setShowFilters] = useState(false);
   const [showImages, setShowImages] = useState(false);
   const [imagesPerPage] = useState(25);
@@ -46,6 +46,8 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   const [imageTagTextsById, setImageTagTextsById] = useState<Record<string, string[]>>({});
   const [imageViewCounts, setImageViewCounts] = useState<Record<string, number>>({});
   const [uploaderOrgNames, setUploaderOrgNames] = useState<Record<string, string>>({});
+  const [imageAttributions, setImageAttributions] = useState<Record<string, any>>({});
+  const [showDropZone, setShowDropZone] = useState(false);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
 
   // Tagging state
@@ -177,11 +179,6 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         setAllImages(images);
         // Load an initial batch (50 or fewer) immediately
         const sorted = [...images].sort((a: any, b: any) => {
-          if (sortBy === 'primary') {
-            if (a.is_primary && !b.is_primary) return -1;
-            if (!a.is_primary && b.is_primary) return 1;
-            return 0;
-          }
           const da = new Date(a.taken_at || a.created_at).getTime();
           const db = new Date(b.taken_at || b.created_at).getTime();
           return sortBy === 'date_desc' ? db - da : da - db;
@@ -349,6 +346,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
           loadImageTagTexts(newImages.map(img => img.id));
           loadImageViewCounts(newImages.map(img => img.id));
           loadUploaderOrgNames(newImages.map(img => img.user_id).filter(Boolean));
+          loadImageAttributions(newImages.map(img => img.id));
         }, 120);
         return newImages;
       });
@@ -358,37 +356,14 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
 
   const getSortedImages = () => {
     return allImages.sort((a, b) => {
-      switch (sortBy) {
-        case 'primary':
-          if (a.is_primary && !b.is_primary) return -1;
-          if (!a.is_primary && b.is_primary) return 1;
-          return 0;
-
-        case 'date_desc':
+      if (sortBy === 'date_desc') {
           const dateDescA = new Date(a.taken_at || a.created_at);
           const dateDescB = new Date(b.taken_at || b.created_at);
           return dateDescB.getTime() - dateDescA.getTime();
-
-        case 'date_asc':
+      }
           const dateAscA = new Date(a.taken_at || a.created_at);
           const dateAscB = new Date(b.taken_at || b.created_at);
           return dateAscA.getTime() - dateAscB.getTime();
-
-        case 'likes':
-          // Placeholder: sort by creation date until likes_count column exists
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-
-        case 'views':
-          // Placeholder: sort by creation date until views_count column exists
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-
-        case 'interactions':
-          // Placeholder: sort by creation date until interactions_count column exists
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-
-        default:
-          return 0;
-      }
     });
   };
 
@@ -459,6 +434,48 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
       setImageUploaderNames(prev => ({ ...prev, ...byId }));
     } catch (e) {
       // ignore
+    }
+  };
+
+  // Load full attribution including ghost users, organizations, and location
+  const loadImageAttributions = async (imageIds: string[]) => {
+    const ids = Array.from(new Set(imageIds.filter(Boolean)));
+    if (ids.length === 0) return;
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_images')
+        .select(`
+          id,
+          exif_data,
+          uploaded_by,
+          device_attributions (
+            ghost_users (
+              display_name,
+              camera_make,
+              camera_model
+            )
+          )
+        `)
+        .in('id', ids);
+
+      if (error) throw error;
+
+      const attributionMap: Record<string, any> = {};
+      (data || []).forEach((img: any) => {
+        const attr = img.device_attributions?.[0];
+        const gps = img.exif_data?.gps;
+        const location = gps ? `${gps.latitude?.toFixed(4)}, ${gps.longitude?.toFixed(4)}` : null;
+
+        attributionMap[img.id] = {
+          photographer: attr?.ghost_users?.display_name || 
+                       (attr?.ghost_users ? `${attr.ghost_users.camera_make} ${attr.ghost_users.camera_model}`.trim() : null),
+          location: location
+        };
+      });
+
+      setImageAttributions(prev => ({ ...prev, ...attributionMap }));
+    } catch (e) {
+      console.error('Error loading attributions:', e);
     }
   };
 
@@ -703,19 +720,15 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
               </button>
             </div>
 
-            {/* Sort Options */}
+            {/* Sort Options (chronological only) */}
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'date_desc' | 'date_asc' | 'primary' | 'likes' | 'views' | 'interactions')}
+              onChange={(e) => setSortBy(e.target.value as 'date_desc' | 'date_asc')}
               className="form-select"
               style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-2)' }}
             >
-              <option value="primary">Primary First</option>
               <option value="date_desc">Date (Newest)</option>
               <option value="date_asc">Date (Oldest)</option>
-              <option value="likes">Most Liked</option>
-              <option value="views">Most Viewed</option>
-              <option value="interactions">Most Interactions</option>
             </select>
           </div>
 
@@ -724,6 +737,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
             {showUpload && (
               <div className="relative">
                 <input
+                  id={`gallery-upload-${vehicleId}`}
                   type="file"
                   multiple
                   accept="image/*"
@@ -733,11 +747,13 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
                       e.target.value = '';
                     }
                   }}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  style={{ display: 'none' }}
                 />
-                <button className="button button-primary" style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-3)' }}>
+                <label htmlFor={`gallery-upload-${vehicleId}`}>
+                  <span className="button button-primary" style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-3)', display: 'inline-block', cursor: 'pointer' }}>
                   Upload Images
-                </button>
+                  </span>
+                </label>
               </div>
             )}
             <div className="text text-muted">

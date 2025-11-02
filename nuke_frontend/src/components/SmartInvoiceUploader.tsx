@@ -304,21 +304,97 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
       const saved = await receiptPersistService.saveForVehicleDoc({ vehicleId, documentId: (docData as any).id, parsed });
       if (saved.error) throw new Error(saved.error);
 
-      // Recalculate valuation
-      VehicleValuationService.clearCache(vehicleId);
-      const after = await VehicleValuationService.calculateValuation(vehicleId);
-      setValueDelta({ 
-        delta: Math.round((after.estimatedValue || 0) - (before.estimatedValue || 0)), 
-        newValue: Math.round(after.estimatedValue || 0), 
-        confidence: Math.round(after.confidence || 0) 
-      });
+      // Trigger smart-receipt-linker for AI extraction & image linking
+      try {
+        await supabase.functions.invoke('smart-receipt-linker', {
+          body: {
+            documentId: (docData as any).id,
+            vehicleId,
+            documentUrl: doc.prepared.publicUrl
+          }
+        });
+        console.log('[SmartInvoiceUploader] Triggered smart-receipt-linker for document', (docData as any).id);
+      } catch (linkerError) {
+        console.warn('[SmartInvoiceUploader] smart-receipt-linker failed (non-fatal):', linkerError);
+        // Non-fatal: continue with document save even if linker fails
+      }
+
+      // Create timeline event (now without circular dependency)
+      const { data: eventData, error: eventError } = await supabase
+        .from('timeline_events')
+        .insert({
+          vehicle_id: vehicleId,
+          user_id: user.id,
+          event_type: category === 'service_record' ? 'maintenance' : 'purchase',
+          event_category: 'maintenance',
+          title: `${category === 'receipt' ? 'Receipt' : category === 'invoice' ? 'Invoice' : 'Service Record'}: ${parsed.vendor_name || 'Document'}`,
+          description: `${parsed.items?.length || 0} items for ${parsed.total ? `$${parsed.total}` : 'unknown amount'}`,
+          event_date: parsed.receipt_date || new Date().toISOString().split('T')[0],
+          source_type: 'receipt',
+          receipt_amount: typeof parsed.total === 'number' ? parsed.total : null,
+          receipt_currency: 'USD',
+          affects_value: true,
+          metadata: {
+            document_id: (docData as any).id,
+            vendor: parsed.vendor_name,
+            item_count: parsed.items?.length || 0
+          }
+        })
+        .select()
+        .single();
+
+      if (!eventError && eventData) {
+        // Link document to timeline event (no more circular dependency!)
+        await supabase.from('timeline_event_documents').insert({
+          event_id: eventData.id,
+          document_id: (docData as any).id
+        });
+      }
+
+      // Trigger expert agent for AI-powered valuation (replaces legacy calculation)
+      setStatus('analyzing');
+      setMessage('Running AI valuation...');
+      
+      try {
+        const { data: expertResult, error: expertError } = await supabase.functions.invoke('vehicle-expert-agent', {
+          body: { vehicleId }
+        });
+
+        if (!expertError && expertResult) {
+          const newValue = expertResult.estimatedTotalValue || 0;
+          setValueDelta({ 
+            delta: Math.round(newValue - (before.estimatedValue || 0)), 
+            newValue: Math.round(newValue), 
+            confidence: Math.round(expertResult.confidence || 0) 
+          });
+        } else {
+          console.warn('Expert agent failed, using legacy calculation as fallback');
+          VehicleValuationService.clearCache(vehicleId);
+          const after = await VehicleValuationService.calculateValuation(vehicleId);
+          setValueDelta({ 
+            delta: Math.round((after.estimatedValue || 0) - (before.estimatedValue || 0)), 
+            newValue: Math.round(after.estimatedValue || 0), 
+            confidence: Math.round(after.confidence || 0) 
+          });
+        }
+      } catch (expertErr) {
+        console.error('Expert agent error:', expertErr);
+        // Fallback to legacy
+        VehicleValuationService.clearCache(vehicleId);
+        const after = await VehicleValuationService.calculateValuation(vehicleId);
+        setValueDelta({ 
+          delta: Math.round((after.estimatedValue || 0) - (before.estimatedValue || 0)), 
+          newValue: Math.round(after.estimatedValue || 0), 
+          confidence: Math.round(after.confidence || 0) 
+        });
+      }
 
       setStatus('success');
-      setMessage('✅ Saved!');
+      setMessage('✅ Saved & Analyzed!');
 
       try { window.dispatchEvent(new CustomEvent('valuation_updated', { detail: { vehicleId } } as any)); } catch {}
       onSaved?.({ receiptId: saved.receiptId });
-      setTimeout(() => onClose?.(), 1200);
+      setTimeout(() => onClose?.(), 1500);
     } catch (e: any) {
       setStatus('error');
       setMessage(e?.message || 'Save failed');

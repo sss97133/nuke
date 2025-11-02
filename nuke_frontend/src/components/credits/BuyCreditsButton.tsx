@@ -52,7 +52,7 @@ export const BuyCreditsButton: React.FC<BuyCreditsButtonProps> = ({
         className={className || 'btn-utility'}
         disabled={loading}
       >
-        💵 Deposit Cash
+        Deposit Cash
       </button>
 
       {showModal && (

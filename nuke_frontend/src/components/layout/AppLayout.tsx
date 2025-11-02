@@ -64,16 +64,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
   // Compute destination for Organizations nav
   useEffect(() => {
-    try {
-      if (session?.user && typeof window !== 'undefined') {
-        const id = window.localStorage.getItem('primaryShopId');
-        if (id) {
-          setOrgNavPath(`/org/${id}`);
-          return;
-        }
-      }
-    } catch {}
-    setOrgNavPath('/shops');
+    setOrgNavPath('/organizations');
   }, [session]);
 
   const fetchUserProfile = async (userId: string) => {

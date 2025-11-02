@@ -453,6 +453,49 @@ export class VehicleValuationService {
         valuation.estimatedValue = valuation.totalInvested + documentationBonus;
       }
 
+      // 5b. Apply AI condition caps/penalties using latest profile_image_insights checklist
+      try {
+        const { data: latestInsight } = await supabase
+          .from('profile_image_insights')
+          .select('confidence, condition_score, condition_label, checklist, summary_date')
+          .eq('vehicle_id', vehicleId)
+          .order('summary_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestInsight) {
+          const cl: any = latestInsight.checklist || {};
+          const isNonRunner = String(cl.rolling_state || '').toLowerCase() === 'non_runner';
+          const engineMissing = cl.engine_present === false;
+          const frameDamage = cl.frame_visible_damage === true;
+          const rustPerf = String(cl.rust_severity || '').toLowerCase() === 'perforation';
+
+          // Hard caps
+          let capMultiplier = 1.0;
+          if (isNonRunner || engineMissing) capMultiplier = Math.min(capMultiplier, 0.3);
+          if (frameDamage || rustPerf) capMultiplier = Math.min(capMultiplier, 0.4);
+
+          if (valuation.estimatedValue > 0 && capMultiplier < 1.0) {
+            // Prefer capping relative to market base when available
+            const anchor = marketBase > 0 ? marketBase : valuation.estimatedValue;
+            const capped = Math.round(anchor * capMultiplier + Math.max(0, valuation.totalInvested - anchor) * 0.25);
+            valuation.estimatedValue = Math.max(0, Math.min(valuation.estimatedValue, capped));
+            if (!valuation.dataSources.includes('AI Condition Assessment')) {
+              valuation.dataSources.push('AI Condition Assessment');
+            }
+            // Confidence adjustment: respect AI confidence when stricter
+            const aiConf = typeof latestInsight.confidence === 'number' ? Math.round(latestInsight.confidence * 100) : null;
+            if (aiConf !== null) {
+              valuation.confidence = Math.min(valuation.confidence, Math.max(50, aiConf));
+            } else {
+              valuation.confidence = Math.min(valuation.confidence, 75);
+            }
+          }
+        }
+      } catch {
+        // If insights unavailable, skip penalties silently
+      }
+
       // Set market range
       if (valuation.estimatedValue > 0) {
         valuation.marketLow = valuation.estimatedValue * 0.85;

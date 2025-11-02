@@ -1,6 +1,18 @@
 // Profile Service - Comprehensive profile data management
 import { supabase } from '../lib/supabase';
-import type { Profile, ProfileCompletion, ProfileAchievement, ProfileActivity, ProfileStats, UserContribution, ProfileData, ProfileEditForm } from '../types/profile';
+import { AIInsightsService, type ImageInsightResult, type ImageInsightRequest } from './aiInsightsService';
+import type {
+  Profile,
+  ProfileCompletion,
+  ProfileAchievement,
+  ProfileActivity,
+  ProfileStats,
+  UserContribution,
+  ProfileData,
+  ProfileEditForm,
+  DailyContributionSummary,
+  ContributionHighlight
+} from '../types/profile';
 
 export class ProfileService {
   
@@ -27,18 +39,24 @@ export class ProfileService {
         statsResult,
         vehicleTimelineResult,
         vehicleImagesResult,
-        verificationsResult
+        verificationsResult,
+        orgTimelineResult,
+        contractorWorkResult
       ] = await Promise.all([
         supabase.from('profile_completion').select('*').eq('user_id', userId).single(),
-        supabase.from('profile_achievements').select('*').eq('user_id', userId).order('earned_at', { ascending: false }),
-        supabase.from('profile_activity').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
+        supabase.from('profile_achievements').select('*').eq('user_id', userId).order('earned_at', { ascending: false }).limit(50),
+        supabase.from('profile_activity').select('*').eq('user_id', userId).order('created_at', { ascending: false}).limit(10),
         supabase.from('profile_stats').select('*').eq('user_id', userId).single(),
-        // Get real contribution data from timeline events with full metadata
-        supabase.from('vehicle_timeline_events').select('event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId),
-        // Get image uploads (include EXIF and vehicle_id for proper grouping) 
-        supabase.from('vehicle_images').select('created_at, exif_data, user_id, vehicle_id').eq('user_id', userId),
-        // Get verifications (no date limit to get full history)
-        supabase.from('user_verifications').select('created_at, status').eq('user_id', userId)
+        // Get real contribution data from timeline events with full metadata - LIMIT for performance
+        supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).order('event_date', { ascending: false }).limit(500),
+        // Get image uploads (include EXIF and vehicle_id for proper grouping) - LIMIT for performance
+        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('taken_at', { ascending: false }).limit(500),
+        // Get verifications (limited)
+        supabase.from('user_verifications').select('created_at, status').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+        // Get business timeline events created by this user (organization contributions) - LIMIT for performance
+        supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).order('event_date', { ascending: false }).limit(500),
+        // Get contractor work contributions (NEW - this will show FBM work)
+        supabase.from('contractor_work_contributions').select('id, work_date, work_description, work_category, labor_hours, total_value, organization_id, vehicle_id, metadata').eq('contractor_user_id', userId).eq('show_on_contractor_profile', true).order('work_date', { ascending: false }).limit(200)
       ]);
 
       // Debug: Log query results
@@ -47,6 +65,8 @@ export class ProfileService {
       console.log('- Timeline events:', vehicleTimelineResult.data?.length || 0, vehicleTimelineResult.error ? `(ERROR: ${vehicleTimelineResult.error.message})` : '');
       console.log('- Vehicle images:', vehicleImagesResult.data?.length || 0, vehicleImagesResult.error ? `(ERROR: ${vehicleImagesResult.error.message})` : '');
       console.log('- Verifications:', verificationsResult.data?.length || 0, verificationsResult.error ? `(ERROR: ${verificationsResult.error.message})` : '');
+      console.log('- Business timeline events:', orgTimelineResult.data?.length || 0, orgTimelineResult.error ? `(ERROR: ${orgTimelineResult.error.message})` : '');
+      console.log('- Contractor work:', contractorWorkResult.data?.length || 0, contractorWorkResult.error ? `(ERROR: ${contractorWorkResult.error.message})` : '');
 
       // Helper: normalize any date-ish value to YYYY-MM-DD without timezone shifting
       const toDateOnly = (raw: any): string => {
@@ -129,43 +149,29 @@ export class ProfileService {
       
       // Process image uploads (prefer EXIF capture date, normalized to date-only)
       // Group by vehicle_id AND date so each vehicle gets separate contributions
+      const imageGroupDetailMap = new Map<string, { date: string; vehicleId: string | null; images: any[] }>();
+
       if (vehicleImagesResult.data) {
         console.log(`ProfileService: Processing ${vehicleImagesResult.data.length} images into contributions`);
-        const dateVehicleCounts = new Map<string, number>();
-        
-        // Group by date+vehicle to create separate contribution entries per vehicle
-        const groupedByDateVehicle = new Map<string, Array<any>>();
-        
+
         vehicleImagesResult.data.forEach((img: any) => {
-          const takenRaw = (img?.exif_data?.dateTaken || img?.exif_data?.date_taken || img?.exif_data?.DateTimeOriginal || img?.created_at);
+          const takenRaw = img?.taken_at || img?.exif_data?.dateTaken || img?.exif_data?.date_taken || img?.exif_data?.DateTimeOriginal || img?.created_at;
           const date = toDateOnly(takenRaw);
-          const key = `${date}|${img.vehicle_id || 'unknown'}`;
-          
-          if (!groupedByDateVehicle.has(key)) {
-            groupedByDateVehicle.set(key, []);
+          const vehicleId = img.vehicle_id || null;
+          const key = `${date}|${vehicleId ?? 'none'}`;
+
+          if (!imageGroupDetailMap.has(key)) {
+            imageGroupDetailMap.set(key, { date, vehicleId, images: [] });
           }
-          groupedByDateVehicle.get(key)!.push(img);
-        });
-        
-        // Create separate contribution for each date+vehicle combination
-        groupedByDateVehicle.forEach((images, key) => {
-          const firstImg = images[0];
-          const date = key.split('|')[0];
-          const vehicleId = firstImg.vehicle_id;
-          const takenRaw = (firstImg?.exif_data?.dateTaken || firstImg?.exif_data?.date_taken || firstImg?.exif_data?.DateTimeOriginal || firstImg?.created_at);
-          
-          // Create one bump per image in this group so count is accurate
-          images.forEach(() => {
-            bump(date, 'image_upload', { 
-              created_at: takenRaw,
-              related_vehicle_id: vehicleId
-            });
+          imageGroupDetailMap.get(key)!.images.push({ ...img, takenRaw });
+
+          bump(date, 'image_upload', {
+            created_at: takenRaw,
+            related_vehicle_id: vehicleId
           });
-          
-          dateVehicleCounts.set(key, images.length);
         });
-        
-        console.log('ProfileService: Image uploads by date+vehicle:', Array.from(dateVehicleCounts.entries()).sort().slice(-5));
+
+        console.log('ProfileService: Image upload groups formed:', imageGroupDetailMap.size);
       }
       
       // Process verifications
@@ -192,6 +198,313 @@ export class ProfileService {
       console.log('ProfileService: Final contributions used:', finalContributions.length);
       console.log('ProfileService: Total contribution count:', finalContributions.reduce((sum, c) => sum + c.contribution_count, 0));
 
+      // ---- Build daily contribution summaries (report-style ledger) ----
+      const safeNumber = (value: any): number => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : 0;
+      };
+
+      const vehicleIdAccumulator = new Set<string>();
+      vehicleTimelineResult.data?.forEach((event: any) => {
+        if (event.vehicle_id) vehicleIdAccumulator.add(event.vehicle_id);
+      });
+      vehicleImagesResult.data?.forEach((img: any) => {
+        if (img.vehicle_id) vehicleIdAccumulator.add(img.vehicle_id);
+      });
+
+      const vehicleLookup = new Map<string, string>();
+      if (vehicleIdAccumulator.size > 0) {
+        const { data: vehicleInfo, error: vehicleLookupError } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, title')
+          .in('id', Array.from(vehicleIdAccumulator));
+
+        if (vehicleLookupError) {
+          console.warn('ProfileService: Unable to resolve vehicle names for profile summaries', vehicleLookupError.message);
+        } else if (vehicleInfo) {
+          vehicleInfo.forEach((vehicle: any) => {
+            const nameParts = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+            const preferredName = vehicle.title || nameParts || vehicle.id;
+            vehicleLookup.set(vehicle.id, preferredName);
+          });
+        }
+      }
+
+      const summaryMap = new Map<string, DailyContributionSummary>();
+      const ensureSummary = (date: string, vehicleId: string | null, fallbackLabel?: string): DailyContributionSummary => {
+        const key = `${date}|${vehicleId ?? 'none'}`;
+        if (!summaryMap.has(key)) {
+          summaryMap.set(key, {
+            id: key,
+            date,
+            vehicle_id: vehicleId,
+            vehicle_name: vehicleId ? (vehicleLookup.get(vehicleId) || null) : (fallbackLabel ?? null),
+            total_value_usd: 0,
+            total_hours: 0,
+            total_images: 0,
+            total_events: 0,
+            total_verifications: 0,
+            highlights: []
+          });
+        }
+        const summary = summaryMap.get(key)!;
+        if (vehicleId && !summary.vehicle_name) {
+          summary.vehicle_name = vehicleLookup.get(vehicleId) || summary.vehicle_name || null;
+        }
+        if (!vehicleId && fallbackLabel && !summary.vehicle_name) {
+          summary.vehicle_name = fallbackLabel;
+        }
+        return summary;
+      };
+
+      const addHighlight = (summary: DailyContributionSummary, highlight: ContributionHighlight) => {
+        summary.highlights.push({
+          ...highlight,
+          value_usd: Number((highlight.value_usd || 0).toFixed(2)),
+          hours: Number((highlight.hours || 0).toFixed(2))
+        });
+      };
+
+      // Vehicle timeline events (mechanical work, documentation, etc.)
+      vehicleTimelineResult.data?.forEach((event: any) => {
+        const raw = event.event_date || event.created_at;
+        if (!raw) return;
+        const date = toDateOnly(raw);
+        const vehicleId = event.vehicle_id || null;
+        const summary = ensureSummary(date, vehicleId, 'General Vehicle Work');
+        const costAmount = safeNumber(event.cost_amount ?? event.metadata?.cost_amount);
+        const durationMinutes = safeNumber(event.metadata?.duration_minutes);
+        const durationHours = durationMinutes / 60;
+
+        summary.total_events += 1;
+        summary.total_value_usd += costAmount;
+        summary.total_hours += durationHours;
+
+        addHighlight(summary, {
+          id: event.id || `${date}-${vehicleId ?? 'none'}-event-${summary.highlights.length}`,
+          type: 'vehicle_data',
+          title: event.title || event.event_type || 'Timeline Event',
+          description: event.description || null,
+          count: 1,
+          value_usd: costAmount,
+          hours: durationHours,
+          metadata: {
+            event_type: event.event_type,
+            vehicle_id: vehicleId,
+            cost_amount: costAmount,
+            duration_minutes: durationMinutes,
+            raw: event
+          }
+        });
+      });
+
+      // Business timeline events (shop/organization level)
+      orgTimelineResult.data?.forEach((event: any) => {
+        const raw = event.event_date || event.created_at;
+        if (!raw) return;
+        const date = toDateOnly(raw);
+        const summary = ensureSummary(date, null, 'Business Activity');
+        const costAmount = safeNumber(event.cost_amount ?? event.metadata?.cost_amount);
+
+        summary.total_events += 1;
+        summary.total_value_usd += costAmount;
+
+        addHighlight(summary, {
+          id: event.id || `${date}-business-${summary.highlights.length}`,
+          type: 'business_event',
+          title: event.title || event.event_type || 'Business Event',
+          description: event.description || null,
+          count: 1,
+          value_usd: costAmount,
+          hours: 0,
+          metadata: {
+            business_id: event.business_id,
+            event_type: event.event_type,
+            cost_amount: costAmount,
+            raw: event
+          }
+        });
+      });
+
+      // Contractor work contributions (NEW - FBM work, etc.)
+      contractorWorkResult.data?.forEach((work: any) => {
+        const date = toDateOnly(work.work_date);
+        const summary = ensureSummary(date, work.vehicle_id, 'Contractor Work');
+        const totalValue = safeNumber(work.total_value);
+        const hours = safeNumber(work.labor_hours);
+
+        summary.total_events += 1;
+        summary.total_value_usd += totalValue;
+        summary.total_hours += hours;
+
+        addHighlight(summary, {
+          id: work.id || `${date}-contractor-${summary.highlights.length}`,
+          type: 'contractor_work',
+          title: work.work_description || work.work_category || 'Contractor Work',
+          description: work.work_category ? `${work.work_category} work` : null,
+          count: 1,
+          value_usd: totalValue,
+          hours: hours,
+          metadata: {
+            organization_id: work.organization_id,
+            vehicle_id: work.vehicle_id,
+            work_category: work.work_category,
+            auto_generated: work.metadata?.auto_generated,
+            needs_review: work.metadata?.needs_review,
+            raw: work
+          }
+        });
+      });
+
+      // AI-enhanced image group summaries
+      let aiInsightsByKey = new Map<string, ImageInsightResult>();
+      if (imageGroupDetailMap.size > 0) {
+        const potentialBatches: ImageInsightRequest[] = [];
+        for (const [key, group] of imageGroupDetailMap) {
+          if (!group.images || group.images.length < 2) continue;
+          potentialBatches.push({
+            batchId: key,
+            vehicleId: group.vehicleId,
+            vehicleName: group.vehicleId ? vehicleLookup.get(group.vehicleId) || null : 'Multiple Vehicles',
+            userId,
+            date: group.date,
+            images: group.images.slice(0, 8).map((img: any) => ({
+              id: img.id,
+              url: img.image_url,
+              takenAt: img.taken_at || img.created_at || null
+            }))
+          });
+        }
+
+        const batches = potentialBatches
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 6);
+
+        if (batches.length) {
+          const batchIds = batches.map((batch) => batch.batchId);
+          const { data: cachedInsights } = await supabase
+            .from('profile_image_insights')
+            .select(`
+              batch_id,
+              summary,
+              condition_score,
+              condition_label,
+              estimated_value_usd,
+              labor_hours,
+              confidence,
+              key_findings,
+              recommendations
+            `)
+            .eq('user_id', userId)
+            .in('batch_id', batchIds);
+
+          aiInsightsByKey = new Map(
+            (cachedInsights || []).map((item: any) => [item.batch_id, {
+              batchId: item.batch_id,
+              summary: item.summary,
+              conditionScore: item.condition_score,
+              conditionLabel: item.condition_label,
+              estimatedValueUsd: item.estimated_value_usd,
+              laborHours: item.labor_hours,
+              confidence: item.confidence,
+              keyFindings: item.key_findings || [],
+              recommendations: item.recommendations || []
+            } as ImageInsightResult])
+          );
+
+          const missingBatches = batches.filter((batch) => !aiInsightsByKey.has(batch.batchId));
+          if (missingBatches.length) {
+            try {
+              const generated = await AIInsightsService.analyzeImageGroups(missingBatches);
+              generated.forEach((insight) => {
+                aiInsightsByKey.set(insight.batchId, insight);
+              });
+            } catch (error) {
+              console.warn('ProfileService: AI image insight generation failed', error);
+            }
+          }
+        }
+      }
+
+      imageGroupDetailMap.forEach((group, key) => {
+        const summary = ensureSummary(group.date, group.vehicleId, 'Media Uploads');
+        summary.total_images += group.images.length;
+
+        const aiInsight = aiInsightsByKey.get(key) || null;
+        const rawValueImpact = aiInsight?.estimatedValueUsd != null ? Number(aiInsight.estimatedValueUsd) : 0;
+        const rawLaborHours = aiInsight?.laborHours != null ? Number(aiInsight.laborHours) : 0;
+        const valueImpact = Number.isFinite(rawValueImpact) ? rawValueImpact : 0;
+        const laborHours = Number.isFinite(rawLaborHours) ? rawLaborHours : 0;
+
+        if (valueImpact) summary.total_value_usd += valueImpact;
+        if (laborHours) summary.total_hours += laborHours;
+
+        const keyFinding = aiInsight?.keyFindings?.[0];
+        const vehicleLabel = summary.vehicle_name || (group.vehicleId ? (vehicleLookup.get(group.vehicleId) || 'Vehicle') : 'Documentation');
+        const aiDescription = keyFinding
+          ? `${keyFinding.title}${keyFinding.detail ? ': ' + keyFinding.detail : ''}`
+          : null;
+        const fallbackDescription = aiInsight ? null : `${group.images.length} images documented for ${vehicleLabel}.`;
+
+        addHighlight(summary, {
+          id: `${key}-images`,
+          type: 'image_upload',
+          title: aiInsight?.summary || `Condition documentation – ${vehicleLabel}`,
+          description: aiDescription || fallbackDescription,
+          count: group.images.length,
+          value_usd: valueImpact,
+          hours: laborHours,
+          metadata: {
+            vehicle_id: group.vehicleId,
+            vehicle_name: vehicleLabel,
+            sample_images: group.images.slice(0, 4).map((img: any) => ({ id: img.id, url: img.image_url })),
+            ai_insight: aiInsight
+          }
+        });
+      });
+
+      // Verification history
+      verificationsResult.data?.forEach((verification: any, index: number) => {
+        const date = toDateOnly(verification.created_at);
+        const summary = ensureSummary(date, null, 'Account & Verification');
+
+        summary.total_verifications += 1;
+
+        addHighlight(summary, {
+          id: `verification-${date}-${index}`,
+          type: 'verification',
+          title: `Verification ${verification.status || 'update'}`,
+          description: null,
+          count: 1,
+          value_usd: 0,
+          hours: 0,
+          metadata: {
+            status: verification.status,
+            raw: verification
+          }
+        });
+      });
+
+      const dailyContributionSummaries = Array.from(summaryMap.values()).map((summary) => {
+        const orderedHighlights = summary.highlights.sort((a, b) => {
+          if (b.value_usd !== a.value_usd) return b.value_usd - a.value_usd;
+          if (b.hours !== a.hours) return b.hours - a.hours;
+          return b.count - a.count;
+        });
+
+        return {
+          ...summary,
+          total_value_usd: Number(summary.total_value_usd.toFixed(2)),
+          total_hours: Number(summary.total_hours.toFixed(2)),
+          highlights: orderedHighlights
+        };
+      }).sort((a, b) => {
+        if (a.date === b.date) {
+          return (b.total_value_usd || 0) - (a.total_value_usd || 0);
+        }
+        return b.date.localeCompare(a.date);
+      });
+
       return {
         profile: profileResult.data,
         completion: completionResult.data || null,
@@ -199,6 +512,7 @@ export class ProfileService {
         recentActivity: activityResult.data || [],
         stats: statsResult.data || null,
         recentContributions: finalContributions, // Prioritize timeline-built data over table data
+        dailyContributionSummaries,
         certifications: [],
         skills: [],
         experience: [],
@@ -475,6 +789,7 @@ export class ProfileService {
         recentActivity: activityResult.data || [],
         stats: statsResult.data || null,
         recentContributions: [], // Private data
+        dailyContributionSummaries: [],
         certifications: [],
         skills: [],
         experience: [],

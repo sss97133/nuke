@@ -59,7 +59,7 @@ export const TimelinePhotosView: React.FC<TimelinePhotosViewProps> = ({ images, 
           return (
             <div key="standalone" style={styles.standaloneSection}>
               <div style={styles.standaloneHeader}>
-                📷 Standalone Photos ({imageCount})
+                Standalone Photos ({imageCount})
               </div>
               <div style={styles.imageGrid}>
                 {group.images.map((img: any) => (
