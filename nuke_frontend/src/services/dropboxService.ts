@@ -1,17 +1,27 @@
 import { Dropbox } from 'dropbox';
 
-interface DropboxConfig {
+export interface DropboxConfig {
   clientId: string;
   accessToken?: string;
 }
 
-interface VehicleFolder {
+export interface VehicleFolder {
   name: string;
   path: string;
   images: DropboxImage[];
+  documents: DropboxDocument[];
+  extractedVIN?: string;
 }
 
-interface DropboxImage {
+export interface DropboxDocument {
+  name: string;
+  path: string;
+  size: number;
+  modified: string;
+  type: 'pdf' | 'image';
+}
+
+export interface DropboxImage {
   name: string;
   path: string;
   size: number;
@@ -31,6 +41,16 @@ export class DropboxService {
       accessToken: config.accessToken,
       fetch: fetch.bind(window)
     });
+  }
+
+  /**
+   * Extract VIN from text (folder name, filename, etc.)
+   * VIN format: 17 alphanumeric characters (no I, O, Q to avoid confusion with 1, 0)
+   */
+  private extractVIN(text: string): string | null {
+    const vinPattern = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
+    const matches = text.toUpperCase().match(vinPattern);
+    return matches ? matches[0] : null;
   }
 
   static getInstance(config?: DropboxConfig): DropboxService {
@@ -146,7 +166,9 @@ export class DropboxService {
         status: error.status,
         message: error.message,
         error: error.error,
-        response: error.response
+        response: error.response,
+        error_summary: error.error?.error_summary,
+        error_tag: error.error?.error?.['.tag']
       });
       
       // Check if it's an authentication error
@@ -156,8 +178,14 @@ export class DropboxService {
       
       // Check if it's a bad request with more details
       if (error.status === 400) {
-        const errorMsg = error.error?.error_summary || error.message || 'Bad request';
-        throw new Error(`Dropbox API error: ${errorMsg}`);
+        const errorTag = error.error?.error?.['.tag'];
+        const errorSummary = error.error?.error_summary || error.message;
+        
+        if (errorTag === 'path' || errorSummary?.includes('path/not_found')) {
+          throw new Error(`Folder not found: "${path}". Please check the folder exists in your Dropbox.`);
+        }
+        
+        throw new Error(`Dropbox API error: ${errorSummary || 'Bad request'}`);
       }
       
       throw new Error(`Failed to list folders: ${error.message || 'Unknown error'}`);
@@ -222,13 +250,18 @@ export class DropboxService {
       const vehicleFolders: VehicleFolder[] = [];
 
       for (const folder of folders) {
+        // Try to extract VIN from folder name
+        const extractedVIN = this.extractVIN(folder.name);
+
         const vehicleFolder: VehicleFolder = {
           name: folder.name,
           path: folder.path,
-          images: []
+          images: [],
+          documents: [],
+          extractedVIN: extractedVIN || undefined
         };
 
-        // Get images in each vehicle folder
+        // Get images and documents in each vehicle folder
         try {
           const folderContents = await this.dbx.filesListFolder({
             path: vehicleFolder.path,
@@ -248,6 +281,34 @@ export class DropboxService {
             path: file.path_lower || file.path_display || '',
             size: (file as any).size || 0,
             modified: (file as any).client_modified || (file as any).server_modified || ''
+          }));
+
+          // Filter for document files (PDFs and likely title/reg images)
+          const docExtensions = ['.pdf'];
+          const titleKeywords = ['title', 'registration', 'reg', 'vin', 'plate', 'ownership', 'document'];
+          
+          const documentFiles = folderContents.result.entries.filter(entry => {
+            if (entry['.tag'] !== 'file') return false;
+            const nameLower = entry.name.toLowerCase();
+            const ext = nameLower.substring(nameLower.lastIndexOf('.'));
+            
+            // Include PDFs
+            if (docExtensions.includes(ext)) return true;
+            
+            // Include JPG/PNG if filename suggests it's a document
+            if (imageExtensions.includes(ext) && titleKeywords.some(kw => nameLower.includes(kw))) {
+              return true;
+            }
+            
+            return false;
+          });
+
+          vehicleFolder.documents = documentFiles.map(file => ({
+            name: file.name,
+            path: file.path_lower || file.path_display || '',
+            size: (file as any).size || 0,
+            modified: (file as any).client_modified || (file as any).server_modified || '',
+            type: file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image'
           }));
 
         } catch (error) {

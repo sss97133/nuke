@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import MobileVehicleProfile from '../components/mobile/MobileVehicleProfile';
 import { TimelineEventService } from '../services/timelineEventService';
 import AddEventWizard from '../components/AddEventWizard';
@@ -15,7 +16,6 @@ import ConsignerManagement from '../components/ConsignerManagement';
 import VehicleTagExplorer from '../components/vehicle/VehicleTagExplorer';
 import EnhancedImageTagger from '../components/vehicle/EnhancedImageTagger';
 import { VisualValuationBreakdown } from '../components/vehicle/VisualValuationBreakdown';
-import VehicleProfileTrading from '../components/vehicle/VehicleProfileTrading';
 import {
   VehicleHeader,
   VehicleHeroImage,
@@ -47,9 +47,17 @@ const VehicleProfile: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [viewCount, setViewCount] = useState<number>(0);
-  const [hasContributorAccess, setHasContributorAccess] = useState(false);
   const [showCommentingGuide, setShowCommentingGuide] = useState(false);
   const [showContributors, setShowContributors] = useState(false);
+
+  // Use consolidated permissions hook
+  const { 
+    isOwner: isRowOwner, 
+    hasContributorAccess, 
+    contributorRole,
+    canEdit,
+    canUpload
+  } = useVehiclePermissions(vehicleId || null, session, vehicle);
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState<any[]>([]);
@@ -63,7 +71,6 @@ const VehicleProfile: React.FC = () => {
   const [recentCommentCount, setRecentCommentCount] = useState<number>(0);
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [contributorRole, setContributorRole] = useState<string | null>(null);
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
   const [showMap, setShowMap] = useState(false);
@@ -112,7 +119,6 @@ const VehicleProfile: React.FC = () => {
       const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       const isNarrowScreen = window.innerWidth < 768;
       const isMobileDevice = isNarrowScreen || (hasTouch && window.innerWidth < 1024);
-      console.log('[VehicleProfile] Mobile detection:', { isNarrowScreen, hasTouch, isMobileDevice, width: window.innerWidth });
       setIsMobile(isMobileDevice);
     };
     checkMobile();
@@ -145,9 +151,6 @@ const VehicleProfile: React.FC = () => {
     isDbUploader
   };
 
-  // Row-owner detection (DB owner of vehicle record)
-  const isRowOwner = !!(session?.user?.id && (vehicle as any)?.user_id && session?.user?.id === (vehicle as any).user_id);
-
   const loadSaleSettings = async (vehId: string) => {
     try {
       const { data, error } = await supabase
@@ -171,6 +174,8 @@ const VehicleProfile: React.FC = () => {
   };
 
   const shouldRunExpertAgent = useCallback((valuation: any | null) => {
+    // RE-ENABLED: Expert agent runs analysis but does NOT auto-update sale prices
+    // Analysis creates valuation records for review only
     const canTrigger = Boolean(isRowOwner || isVerifiedOwner || hasContributorAccess);
     if (!canTrigger) return false;
     if (!valuation) return true;
@@ -290,7 +295,6 @@ const VehicleProfile: React.FC = () => {
 
   useEffect(() => {
     if (!vehicleId) return;
-    console.log('VehicleProfile mounted with vehicleId:', vehicleId);
     checkAuth();
     loadOwnershipVerifications();
     // Don't load vehicle and timeline until we know auth status
@@ -317,16 +321,14 @@ const VehicleProfile: React.FC = () => {
   // Listen for auth state changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session);
       setSession(session);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Check contributor status when session or vehicle changes
+  // Load user profile when session or vehicle changes
   useEffect(() => {
-    checkContributorStatus();
     loadUserProfile();
   }, [session, vehicle]);
 
@@ -378,7 +380,6 @@ const VehicleProfile: React.FC = () => {
       loadLiveSession();
       loadPresenceCount();
       loadRecentComments();
-      checkContributorStatus();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]); // Only re-run when vehicle ID changes, not on every vehicle object change
@@ -671,41 +672,13 @@ const VehicleProfile: React.FC = () => {
     setSession(session);
   };
 
-  const checkContributorStatus = async () => {
-    if (!vehicle?.id || !session?.user?.id) return;
-
-    try {
-      // Check if user is a contributor (roles table)
-      const { data, error } = await supabase
-        .from('vehicle_contributor_roles')
-        .select('role')
-        .eq('vehicle_id', vehicle.id)
-        .eq('user_id', session?.user?.id)
-        .maybeSingle();
-
-      if (error) {
-        console.debug('Contributors table may not exist yet:', error);
-        return;
-      }
-
-      if (data) {
-        setContributorRole(data.role);
-        setHasContributorAccess(true);
-        // Give contributors with certain roles owner-like access
-        // Removed console.log to reduce noise
-      }
-    } catch (error) {
-      console.debug('Error checking contributor status:', error);
-    }
-  };
-
   const loadTimelineEvents = async () => {
+    // OPTIMIZED: Timeline events now loaded via RPC in loadVehicle()
+    // This function kept for manual refresh after updates
     if (!vehicleId) return;
     try {
-      // Query the enriched view once (includes participant_count, verification_count, service_info)
-      // vehicle_timeline_events is a VIEW over timeline_events with computed fields
       const { data: events, error: eventsError } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('event_date', { ascending: false });
@@ -715,37 +688,7 @@ const VehicleProfile: React.FC = () => {
         return;
       }
 
-      let merged = (events || []).map((e: any) => ({ ...e, __table: 'vehicle_timeline_events' }));
-
-      // If no events in DB yet, derive photo events from vehicle_images so timeline isn't empty
-      if (merged.length === 0) {
-        const { data: imgs, error: imgErr } = await supabase
-          .from('vehicle_images')
-          .select('id, image_url, exif_data, created_at')
-          .eq('vehicle_id', vehicleId)
-          .limit(500);
-        if (!imgErr && imgs && imgs.length > 0) {
-          const derived = imgs.map((r: any) => {
-            const dt = r?.exif_data?.dateTaken ? new Date(r.exif_data.dateTaken) : new Date(r.created_at);
-            const dateOnly = isNaN(dt.getTime()) ? new Date().toISOString().split('T')[0] : dt.toISOString().split('T')[0];
-            return {
-              id: `derived-${r.id}`,
-              vehicle_id: vehicleId,
-              event_type: 'photo_added',
-              source: 'derived_from_images',
-              event_date: dateOnly,
-              title: 'Photo Added',
-              description: 'Derived from uploaded photo',
-              image_urls: [r.image_url],
-              metadata: { derived: true, image_id: r.id, exif: r.exif_data },
-              __table: 'derived'
-            };
-          }).sort((x: any, y: any) => new Date(y.event_date).getTime() - new Date(x.event_date).getTime());
-          merged = derived;
-        }
-      }
-
-      setTimelineEvents(merged);
+      setTimelineEvents(events || []);
     } catch (error) {
       console.error('Error loading timeline events:', error);
     }
@@ -760,50 +703,65 @@ const VehicleProfile: React.FC = () => {
   const loadVehicle = async () => {
     try {
       setLoading(true);
-      console.log('Loading vehicle with ID:', vehicleId);
-
-      // Skip localStorage check - no hardcoded vehicles allowed
-      console.log('Skipping localStorage check to prevent hardcoded vehicles');
-
-      // Load from database with valid UUID
-      console.log('Attempting to load vehicle from database');
 
       // Accept both UUID format (with hyphens) and VIN format (17 chars alphanumeric)
       const isUUID = vehicleId && vehicleId.length >= 20 && vehicleId.includes('-');
       const isVIN = vehicleId && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vehicleId);
 
       if (!vehicleId || (!isUUID && !isVIN)) {
-        console.log('Invalid vehicle ID format:', vehicleId);
         navigate('/vehicles');
         return;
       }
 
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('*')
-        .eq('id', vehicleId)
-        .single();
+      // OPTIMIZED: Try RPC first for fast loading, fallback to direct query if RPC fails
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId });
 
-      if (error || !data) {
-        console.error('Vehicle not found or access denied:', error);
-        setVehicle(null);
-        setLoading(false);
-        return;
+      let vehicleData;
+      
+      if (rpcError || !rpcData || !rpcData.vehicle) {
+        console.warn('RPC load failed, using fallback query:', rpcError?.message);
+        
+        // Fallback to direct query
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('*')
+          .eq('id', vehicleId)
+          .single();
+
+        if (error || !data) {
+          console.error('Vehicle not found:', error);
+          setVehicle(null);
+          setLoading(false);
+          return;
+        }
+        
+        vehicleData = data;
+      } else {
+        vehicleData = rpcData.vehicle;
+        
+        // Set additional data from RPC (optimization)
+        if (rpcData.images) {
+          setVehicleImages(rpcData.images.map((img: any) => img.image_url));
+        }
+        if (rpcData.timeline_events) {
+          setTimelineEvents(rpcData.timeline_events);
+        }
+        
+        console.log(`[VehicleProfile] Loaded via RPC: ${rpcData.stats?.image_count || 0} images, ${rpcData.stats?.event_count || 0} events in single query`);
       }
 
       // For non-authenticated users, only show public vehicles
-      if (!session && !data.is_public) {
-        console.log('Vehicle is private, redirecting non-authenticated user');
+      if (!session && !vehicleData.is_public) {
         navigate('/login');
         return;
       }
 
-      // Preserve local API by mirroring DB snake_case to camel
-      const vehicleData = { ...data, isPublic: (data as any).is_public ?? data.isPublic };
-      console.log('Setting vehicle data:', vehicleData);
-      setVehicle(vehicleData);
-      setIsPublic(((data as any).is_public ?? data.isPublic) ?? true);
-      console.log('Vehicle state set successfully');
+      // Set vehicle state
+      const processedVehicle = { ...vehicleData, isPublic: vehicleData.is_public ?? vehicleData.isPublic };
+      setVehicle(processedVehicle);
+      setIsPublic(vehicleData.is_public ?? true);
+      
     } catch (error) {
       console.error('Error loading vehicle:', error);
       navigate('/vehicles');
@@ -1019,8 +977,6 @@ const VehicleProfile: React.FC = () => {
   };
 
   const handleImportComplete = async (results: any) => {
-    console.log('Vehicle import complete:', results);
-
     if (vehicle) {
       await loadVehicleImages();
       await runExpertAgent(vehicle.id);
@@ -1063,7 +1019,8 @@ const VehicleProfile: React.FC = () => {
 
         // Set lead image URL immediately using public URL (fast)
         if (leadImage) {
-          setLeadImageUrl(leadImage.image_url);
+          // Prefer large_url for hero image, fallback to image_url
+          setLeadImageUrl(leadImage.large_url || leadImage.image_url);
 
           // Signed URL upgrade disabled due to storage configuration issues
           // Would generate 400 errors - using direct public URL instead
@@ -1140,12 +1097,6 @@ const VehicleProfile: React.FC = () => {
     }
 
     setVehicleImages(images);
-
-    if (images.length === 0) {
-      console.log('No images found for vehicle:', vehicle.id);
-    } else {
-      console.log('Loaded images for vehicle:', images);
-    }
   };
 
   if (loading) {
@@ -1205,20 +1156,7 @@ const VehicleProfile: React.FC = () => {
           onPriceClick={handlePriceClick}
         />
 
-        {/* Live Stats Bar */}
-        <VehicleStats
-          viewCount={viewCount}
-          presenceCount={presenceCount}
-          recentCommentCount={recentCommentCount}
-          liveSession={liveSession && liveSession.stream_url ? {
-            id: liveSession.id,
-            platform: liveSession.platform,
-            stream_url: liveSession.stream_url,
-            title: liveSession.title || ''
-          } : null}
-          totalImages={vehicleImages.length}
-          totalEvents={timelineEvents.length}
-        />
+        {/* Live Stats Bar (MVP: hidden to reduce clutter) */}
 
         {/* Hero Image Section */}
         <VehicleHeroImage leadImageUrl={leadImageUrl} />
@@ -1277,6 +1215,7 @@ const VehicleProfile: React.FC = () => {
               <VehicleShareHolders
                 vehicleId={vehicle.id}
                 vehicleValue={vehicle.current_value || 0}
+                hideIfEmpty={true}
               />
 
               {/* Ownership Panel */}
@@ -1307,12 +1246,10 @@ const VehicleProfile: React.FC = () => {
                       imageUrl={vehicle.hero_image}
                       vehicleId={vehicle.id}
                       onTagAdded={(tag) => {
-                        console.log('Tag added:', tag);
                         // Reload the tag explorer to show updated data
                         window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
                       }}
                       onTagValidated={(tagId, action) => {
-                        console.log('Tag validated:', tagId, action);
                         // Reload the tag explorer to show validation changes
                         window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
                       }}
@@ -1321,148 +1258,15 @@ const VehicleProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Consigner Management Section — For Owners Only */}
-              {(isRowOwner || isVerifiedOwner) && (
-                <ConsignerManagement
-                  vehicleId={vehicle.id}
-                  isOwner={true}
-                  onConsignerUpdated={() => {
-                    checkContributorStatus();
-                  }}
-                />
-              )}
+              {/* MVP: Hide Consigner & Agreements sections */}
 
-              {/* Purchase Agreement Section — For Consigners and Owners */}
-              {userProfile && (contributorRole === 'consigner' || isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator'].includes(contributorRole || ''))) && (
-                <div className="card">
-                  <div className="card-header">Purchase Agreements</div>
-                  <div className="card-body">
-                    <PurchaseAgreementManager
-                      vehicle={vehicle as any}
-                      userProfile={userProfile}
-                      canCreateAgreement={Boolean(contributorRole === 'consigner' || isRowOwner || isVerifiedOwner)}
-                    />
-                  </div>
-                </div>
-              )}
+              {/* REMOVED: Request Consigner Access - showed "coming soon" alert, non-functional */}
 
-              {/* Consigner Access Request — Only for vehicles accepting consignments */}
-              {session?.user?.id && !contributorRole && !isRowOwner && !isVerifiedOwner &&
-               (vehicle.for_sale || vehicle.accepting_consignments) && (
-                <div className="card">
-                  <div className="card-header">Request Consigner Access</div>
-                  <div className="card-body">
-                    <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
-                      This vehicle owner is accepting consignment requests. Consigner access allows you to create purchase agreements and manage sales.
-                    </p>
-                    <button
-                      className="button button-secondary"
-                      onClick={() => {
-                        // This should send a request to the owner instead of auto-granting
-                        alert('Consignment request feature coming soon. Contact the owner directly for now.');
-                      }}
-                    >
-                      Request Consigner Access
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* MVP: Hide Tag Explorer */}
 
-              {/* AI Tag Data Explorer Section */}
-              <VehicleTagExplorer vehicleId={vehicle.id} />
+              {/* REMOVED: Sale & Distribution Card - fake partner integrations removed */}
 
-              {/* Sale & Distribution Card */}
-              {permissions?.isVerifiedOwner && (
-                <div className="card">
-                  <div className="card-header">Sale & Distribution</div>
-                  <div className="card-body">
-                    {/* For Sale Toggle */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                      <label className="text">
-                        <input
-                          type="checkbox"
-                          checked={saleSettings.for_sale}
-                          onChange={(e) => setSaleSettings({ ...saleSettings, for_sale: e.target.checked })}
-                        />
-                        <span style={{ marginLeft: 6 }}>For Sale</span>
-                      </label>
-                      <label className="text">
-                        <input
-                          type="checkbox"
-                          checked={saleSettings.live_auction}
-                          onChange={(e) => setSaleSettings({
-                            ...saleSettings,
-                            live_auction: e.target.checked,
-                            for_sale: e.target.checked || saleSettings.for_sale
-                          })}
-                        />
-                        <span style={{ marginLeft: 6 }}>Nuke Live Auction</span>
-                      </label>
-                    </div>
-
-                    {/* Reserve price */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span className="text-small text-muted">Reserve</span>
-                      <input
-                        type="number"
-                        className="text-xs border rounded px-2 py-1"
-                        placeholder="e.g. 25000"
-                        value={saleSettings.reserve}
-                        onChange={(e) => setSaleSettings({
-                          ...saleSettings,
-                          reserve: e.target.value === '' ? '' : Number(e.target.value)
-                        })}
-                        style={{ width: 140 }}
-                      />
-                    </div>
-
-                    {/* Partner checkboxes */}
-                    <div className="text-small text-muted" style={{ marginBottom: 6 }}>
-                      Submit listing package to partners
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
-                      {[
-                        { k: 'bring_a_trailer', l: 'Bring a Trailer' },
-                        { k: 'cars_and_bids', l: 'Cars & Bids' },
-                        { k: 'ebay_motors', l: 'eBay Motors' },
-                        { k: 'facebook_marketplace', l: 'Facebook Marketplace' },
-                        { k: 'hemmings', l: 'Hemmings' },
-                        { k: 'hagerty', l: 'Hagerty' },
-                        { k: 'sothebys', l: 'RM Sotheby\'s' },
-                        { k: 'christies', l: 'Christie\'s' },
-                        { k: 'pebble_beach', l: 'Pebble Beach' },
-                        { k: 'local_auctioneer_generic', l: 'Local Auctioneer' },
-                      ].map(p => (
-                        <label key={p.k} className="text" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input
-                            type="checkbox"
-                            checked={saleSettings.partners.includes(p.k)}
-                            onChange={(e) => setSaleSettings({
-                              ...saleSettings,
-                              partners: e.target.checked
-                                ? Array.from(new Set([...(saleSettings.partners || []), p.k]))
-                                : (saleSettings.partners || []).filter(x => x !== p.k)
-                            })}
-                          />
-                          <span>{p.l}</span>
-                        </label>
-                      ))}
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="button button-primary" disabled={savingSale} onClick={saveSaleSettings}>
-                        {savingSale ? 'Saving…' : 'Save Sale Settings'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Comments Section */}
-              <VehicleCommentsSection
-                ref={commentsSectionRef}
-                vehicleId={vehicle.id}
-              />
+              {/* Comments Section — deprecated on profile page */}
             </div>
 
             {/* Right Column: Image Gallery */}
@@ -1481,28 +1285,12 @@ const VehicleProfile: React.FC = () => {
           </div>
         </section>
 
-        {/* Vehicle Metadata & Privacy Settings */}
+        {/* Vehicle Metadata & Privacy Settings (MVP: hide Sale & Distribution card) */}
         <section className="section">
-          <VehicleSaleSettings
-            vehicle={vehicle}
-            session={session}
-            permissions={permissions}
-            saleSettings={saleSettings}
-            savingSale={savingSale}
-            viewCount={viewCount}
-            onSaleSettingsChange={setSaleSettings}
-            onSaveSaleSettings={saveSaleSettings}
-            onShowCompose={() => setShowCompose(true)}
-          />
 
-          {/* Trading Interface */}
-          {vehicle && (
-            <VehicleProfileTrading
-              vehicleId={vehicle.id}
-              vehicleTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-              userId={session?.user?.id}
-            />
-          )}
+          {/* REMOVED: VehicleProfileTrading - desktop trading card removed */}
+          {/* Trading is handled by MobileTradingPanel in mobile view */}
+          {/* Desktop trading will be added in Phase 7 with tab reorganization */}
 
           {/* Privacy Settings for non-anonymous vehicles */}
           {!vehicle.isAnonymous && session && (

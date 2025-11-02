@@ -42,15 +42,38 @@ interface Bond {
   status: string;
 }
 
+interface OwnedVehicle {
+  id: string;
+  year: number;
+  make: string;
+  model: string;
+  current_value: number | null;
+  vin: string | null;
+  image_url: string | null;
+}
+
+interface OrgHolding {
+  offering_id: string;
+  organization_name: string;
+  stock_symbol: string;
+  shares_owned: number;
+  entry_price: number;
+  current_mark: number;
+  unrealized_gain_loss: number;
+  unrealized_gain_loss_pct: number;
+}
+
 export default function Portfolio() {
   const navigate = useNavigate();
   const [cashBalance, setCashBalance] = useState<any>(null);
   const [holdings, setHoldings] = useState<ShareHolding[]>([]);
+  const [orgHoldings, setOrgHoldings] = useState<OrgHolding[]>([]);
   const [stakes, setStakes] = useState<Stake[]>([]);
   const [bonds, setBonds] = useState<Bond[]>([]);
+  const [ownedVehicles, setOwnedVehicles] = useState<OwnedVehicle[]>([]);
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'cash' | 'shares' | 'stakes' | 'bonds'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'cash' | 'shares' | 'orgs' | 'stakes' | 'bonds' | 'vehicles'>('overview');
 
   useEffect(() => {
     loadData();
@@ -68,7 +91,7 @@ export default function Portfolio() {
       const balance = await CashBalanceService.getUserBalance(user.id);
       setCashBalance(balance);
 
-      // Load share holdings
+      // Load vehicle share holdings
       const { data: holdingsData, error: holdingsError } = await supabase
         .from('share_holdings')
         .select(`
@@ -103,6 +126,42 @@ export default function Portfolio() {
           unrealized_gain_loss_pct: h.unrealized_gain_loss_pct
         }));
         setHoldings(formattedHoldings);
+      }
+
+      // Load organization stock/ETF holdings
+      const { data: orgHoldingsData } = await supabase
+        .from('organization_share_holdings')
+        .select(`
+          offering_id,
+          shares_owned,
+          entry_price,
+          current_mark,
+          unrealized_gain_loss,
+          unrealized_gain_loss_pct,
+          organization_offerings!inner(
+            stock_symbol,
+            offering_type,
+            organization_id,
+            businesses!inner(
+              business_name
+            )
+          )
+        `)
+        .eq('holder_id', user.id)
+        .order('unrealized_gain_loss', { ascending: false });
+
+      if (orgHoldingsData) {
+        const formattedOrgHoldings = orgHoldingsData.map((h: any) => ({
+          offering_id: h.offering_id,
+          organization_name: h.organization_offerings?.businesses?.business_name || 'Unknown Org',
+          stock_symbol: h.organization_offerings?.stock_symbol || 'N/A',
+          shares_owned: h.shares_owned,
+          entry_price: h.entry_price,
+          current_mark: h.current_mark,
+          unrealized_gain_loss: h.unrealized_gain_loss,
+          unrealized_gain_loss_pct: h.unrealized_gain_loss_pct
+        }));
+        setOrgHoldings(formattedOrgHoldings);
       }
 
       // Load transactions
@@ -193,6 +252,39 @@ export default function Portfolio() {
           };
         });
         setBonds(formattedBonds);
+      }
+
+      // Load owned vehicles (user is uploader or verified owner)
+      const { data: vehiclesData } = await supabase
+        .from('vehicles')
+        .select('id, year, make, model, current_value, vin')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (vehiclesData) {
+        // Load primary images for owned vehicles
+        const vehicleIds = vehiclesData.map((v: any) => v.id);
+        const { data: imagesData } = await supabase
+          .from('vehicle_images')
+          .select('vehicle_id, image_url')
+          .in('vehicle_id', vehicleIds)
+          .eq('is_primary', true);
+
+        const imagesByVehicle: Record<string, string> = {};
+        (imagesData || []).forEach((img: any) => {
+          imagesByVehicle[img.vehicle_id] = img.image_url;
+        });
+
+        const formatted = vehiclesData.map((v: any) => ({
+          id: v.id,
+          year: v.year,
+          make: v.make,
+          model: v.model,
+          current_value: v.current_value,
+          vin: v.vin,
+          image_url: imagesByVehicle[v.id] || null
+        }));
+        setOwnedVehicles(formatted);
       }
 
     } catch (error) {
@@ -481,6 +573,44 @@ export default function Portfolio() {
             }}
           >
             Bonds ({bonds.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('orgs')}
+            style={{
+              border: '2px solid var(--border)',
+              background: activeTab === 'orgs' ? 'var(--accent-dim)' : 'var(--surface)',
+              color: activeTab === 'orgs' ? 'var(--accent)' : 'var(--text)',
+              padding: '6px 12px',
+              fontSize: '9px',
+              fontWeight: 600,
+              fontFamily: 'Arial, sans-serif',
+              cursor: 'pointer',
+              transition: '0.12s',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Org Stocks ({orgHoldings.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('vehicles')}
+            style={{
+              border: '2px solid var(--border)',
+              background: activeTab === 'vehicles' ? 'var(--accent-dim)' : 'var(--surface)',
+              color: activeTab === 'vehicles' ? 'var(--accent)' : 'var(--text)',
+              padding: '6px 12px',
+              fontSize: '9px',
+              fontWeight: 600,
+              fontFamily: 'Arial, sans-serif',
+              cursor: 'pointer',
+              transition: '0.12s',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            My Vehicles ({ownedVehicles.length})
           </button>
         </div>
 
@@ -830,6 +960,146 @@ export default function Portfolio() {
                         <div style={{ fontSize: '9px', fontWeight: 600 }}>
                           {new Date(bond.maturity_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Organization Stocks Tab */}
+          {activeTab === 'orgs' && (
+            <>
+              {orgHoldings.length === 0 ? (
+                <div style={{
+                  padding: '48px 20px',
+                  textAlign: 'center',
+                  color: 'var(--text-secondary)',
+                  fontSize: '9px'
+                }}>
+                  No organization stocks yet. Trade stocks in organization profiles.
+                </div>
+              ) : (
+                <div>
+                  {orgHoldings.map((holding, index) => (
+                    <div
+                      key={holding.offering_id}
+                      onClick={() => {
+                        // TODO: navigate to org profile once we have org_id
+                        alert(`View ${holding.stock_symbol} - org profile integration pending`);
+                      }}
+                      style={{
+                        padding: '16px 20px',
+                        borderBottom: index < orgHoldings.length - 1 ? '1px solid var(--border)' : 'none',
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                        gap: '16px',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        transition: '0.12s',
+                        fontSize: '9px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: '2px', fontSize: '10px' }}>
+                          {holding.organization_name}
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '8px' }}>
+                          {holding.stock_symbol}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '10px' }}>
+                          {holding.shares_owned} shares
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '8px' }}>
+                          Entry: ${holding.entry_price.toFixed(2)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '10px' }}>
+                          ${holding.current_mark.toFixed(2)}
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '8px' }}>
+                          Current
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{
+                          fontWeight: 600,
+                          fontSize: '10px',
+                          color: holding.unrealized_gain_loss >= 0 ? '#006400' : '#b91c1c'
+                        }}>
+                          {holding.unrealized_gain_loss >= 0 ? '+' : ''}
+                          ${holding.unrealized_gain_loss.toFixed(2)}
+                        </div>
+                        <div style={{
+                          fontSize: '8px',
+                          color: holding.unrealized_gain_loss_pct >= 0 ? '#006400' : '#b91c1c'
+                        }}>
+                          {holding.unrealized_gain_loss_pct >= 0 ? '+' : ''}
+                          {holding.unrealized_gain_loss_pct.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Vehicles Tab */}
+          {activeTab === 'vehicles' && (
+            <>
+              {ownedVehicles.length === 0 ? (
+                <div style={{
+                  padding: '48px 20px',
+                  textAlign: 'center',
+                  color: 'var(--text-secondary)',
+                  fontSize: '9px'
+                }}>
+                  No vehicles yet. Add your first vehicle to get started.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', padding: '20px' }}>
+                  {ownedVehicles.map((v) => (
+                    <div
+                      key={v.id}
+                      onClick={() => navigate(`/vehicle/${v.id}`)}
+                      style={{
+                        border: '2px solid var(--border)',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: '0.12s',
+                        background: 'var(--bg)'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                    >
+                      {v.image_url && (
+                        <div style={{
+                          width: '100%',
+                          height: '160px',
+                          background: `url(${v.image_url}) center/cover`,
+                          borderBottom: '2px solid var(--border)'
+                        }} />
+                      )}
+                      <div style={{ padding: '12px' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, marginBottom: 4 }}>
+                          {v.year} {v.make} {v.model}
+                        </div>
+                        {v.current_value && (
+                          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginBottom: 4 }}>
+                            {CashBalanceService.formatCurrency(v.current_value * 100)}
+                          </div>
+                        )}
+                        {v.vin && (
+                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)' }}>
+                            VIN: {v.vin.slice(0, 8)}...
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -106,9 +106,10 @@ export const MobilePriceEditor: React.FC<MobilePriceEditorProps> = ({
       
       onSaved?.();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Save error:', error);
-      alert('Failed to save prices. Please try again.');
+      const errorMsg = error?.message || error?.toString() || 'Unknown error';
+      alert(`Failed to save prices: ${errorMsg}\n\nPlease try again or contact support.`);
     } finally {
       setSaving(false);
     }

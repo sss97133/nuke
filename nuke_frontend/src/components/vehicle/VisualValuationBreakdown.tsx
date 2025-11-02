@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ValuationEngine, ValuationResult } from '../../services/valuationEngine';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
+import CitationModal from '../valuation/CitationModal';
 
 interface VisualValuationBreakdownProps {
   vehicleId: string;
@@ -24,6 +25,8 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [showUploader, setShowUploader] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [selectedCitation, setSelectedCitation] = useState<{ type: string; name: string; value: number } | null>(null);
 
   const loadValuation = useCallback(async () => {
     try {
@@ -114,27 +117,54 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
     const environmental = expertValuation.environmental_context || {};
     const purchaseFloor = Math.max(0, (expertValuation.estimated_value || 0) - (expertValuation.documented_components || 0));
 
+  // Clickable value helper
+  const ClickableValue = ({ value, componentType, componentName }: { value: number; componentType: string; componentName: string }) => (
+    <span
+      onClick={(e) => {
+        e.stopPropagation();
+        setSelectedCitation({ type: componentType, name: componentName, value });
+      }}
+      style={{
+        cursor: 'pointer',
+        textDecoration: 'underline',
+        textDecorationStyle: 'dotted',
+        textDecorationColor: 'var(--accent)',
+        fontWeight: 'bold'
+      }}
+      title="Click to view source"
+    >
+      {formatCurrency(value)}
+    </span>
+  );
+
     return (
       <div className="card">
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>AI Expert Valuation</span>
+        <div
+          className="card-header"
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          <span>Valuation Breakdown</span>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {isOwner && (
+            {isOwner && !collapsed && (
               <button
                 className="button button-primary button-small"
-                onClick={() => setShowUploader(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowUploader(true);
+                }}
                 style={{ fontSize: '8pt', padding: '4px 8px' }}
               >
                 🧾 Add Receipt
               </button>
             )}
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-              {expertValuation.confidence_score || 0}% confidence · Updated {expertValuation.valuation_date ? new Date(expertValuation.valuation_date).toLocaleString() : 'recently'}
+              {expertValuation.confidence_score || 0}% confidence {collapsed ? '▼' : '▲'}
             </div>
           </div>
         </div>
 
-        <div className="card-body">
+        {!collapsed && <div className="card-body">
           {/* Summary */}
           <div style={{
             padding: '12px',
@@ -144,15 +174,15 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', fontSize: '9pt' }}>
               <div style={{ fontWeight: 'bold' }}>Purchase Floor:</div>
-              <div style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                {formatCurrency(purchaseFloor)}
+              <div style={{ textAlign: 'right' }}>
+                <ClickableValue value={purchaseFloor} componentType="purchase_price" componentName="Purchase Floor" />
               </div>
 
               {(expertValuation.documented_components || 0) > 0 && (
                 <>
                   <div style={{ color: 'var(--text-muted)' }}>+ Documented Components:</div>
-                  <div style={{ textAlign: 'right', color: '#10b981', fontWeight: 'bold' }}>
-                    {formatCurrency(expertValuation.documented_components)}
+                  <div style={{ textAlign: 'right', color: '#10b981' }}>
+                    <ClickableValue value={expertValuation.documented_components} componentType="part_purchase" componentName="Documented Components Total" />
                   </div>
                 </>
               )}
@@ -169,11 +199,10 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                 borderTop: '2px solid var(--border)',
                 paddingTop: '8px',
                 textAlign: 'right',
-                fontWeight: 'bold',
                 fontSize: '11pt',
                 color: 'var(--accent)'
               }}>
-                {formatCurrency(expertValuation.estimated_value || 0)}
+                <ClickableValue value={expertValuation.estimated_value || 0} componentType="current_value" componentName="Estimated Value" />
               </div>
             </div>
           </div>
@@ -274,8 +303,8 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
                       {photoCount} {photoCount === 1 ? 'photo' : 'photos'}
                     </div>
 
-                    <div style={{ fontWeight: 'bold', textAlign: 'right' }}>
-                      {formatCurrency(amount)}
+                    <div style={{ textAlign: 'right' }}>
+                      <ClickableValue value={amount} componentType="part_value_estimate" componentName={item.name} />
                     </div>
                   </div>
 
@@ -338,7 +367,30 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
               </div>
             </div>
           )}
-        </div>
+        </div>}
+        
+        {/* Smart Invoice Uploader Modal */}
+        {showUploader && (
+          <SmartInvoiceUploader
+            vehicleId={vehicleId}
+            onClose={() => setShowUploader(false)}
+            onSaved={() => {
+              setShowUploader(false);
+              loadValuation();
+            }}
+          />
+        )}
+        
+        {/* Citation Modal */}
+        {selectedCitation && (
+          <CitationModal
+            vehicleId={vehicleId}
+            componentType={selectedCitation.type}
+            componentName={selectedCitation.name}
+            valueUsd={selectedCitation.value}
+            onClose={() => setSelectedCitation(null)}
+          />
+        )}
       </div>
     );
   }
@@ -352,13 +404,19 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
 
   return (
     <div className="card">
-      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>Valuation Breakdown</span>
+      <div
+        className="card-header"
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+        onClick={() => setCollapsed(c => !c)}
+        title={collapsed ? 'Expand' : 'Collapse'}
+      >
+        <span>Valuation Breakdown{collapsed ? ` — ${formatCurrency(valuation.estimatedValue)}` : ''}</span>
         <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
           {valuation.overallConfidence}% confidence
         </div>
       </div>
       
+      {!collapsed && (
       <div className="card-body">
         {/* Summary */}
         <div style={{ 
@@ -613,6 +671,7 @@ export const VisualValuationBreakdown: React.FC<VisualValuationBreakdownProps> =
           />
         )}
       </div>
+      )}
     </div>
   );
 };

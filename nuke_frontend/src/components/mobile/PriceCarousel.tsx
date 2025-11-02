@@ -18,8 +18,30 @@ interface PriceCarouselProps {
 export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, session }) => {
   const [currentScreen, setCurrentScreen] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
+  const [priceHistory, setPriceHistory] = useState<{as_of: string; value: number}[]>([]);
 
   const screens = 4; // AuctionVoteScreen now properly handles session
+  
+  // Load price history
+  useEffect(() => {
+    const loadPriceHistory = async () => {
+      if (!vehicle?.id) return;
+      
+      const { data, error } = await supabase
+        .from('vehicle_price_history')
+        .select('as_of, value')
+        .eq('vehicle_id', vehicle.id)
+        .eq('price_type', 'current')
+        .order('as_of', { ascending: true })
+        .limit(20);
+      
+      if (!error && data && data.length > 0) {
+        setPriceHistory(data);
+      }
+    };
+    
+    loadPriceHistory();
+  }, [vehicle?.id]);
   
   // Calculate market data
   const baseValue = vehicle.current_value || vehicle.purchase_price || 25000;
@@ -31,6 +53,32 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, se
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
   };
+
+  // Generate SVG points from price history
+  const chartPoints = React.useMemo(() => {
+    if (priceHistory.length === 0) {
+      // Fallback: flat line at current value
+      return "0,30 200,30";
+    }
+    
+    const values = priceHistory.map(p => p.value);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const range = maxValue - minValue || 1;
+    
+    const width = 200;
+    const height = 60;
+    const padding = 10;
+    
+    const points = priceHistory.map((point, index) => {
+      const x = (index / (priceHistory.length - 1)) * width;
+      const normalizedValue = (point.value - minValue) / range;
+      const y = height - padding - (normalizedValue * (height - 2 * padding));
+      return `${x},${y}`;
+    });
+    
+    return points.join(' ');
+  }, [priceHistory]);
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     const touchEnd = e.changedTouches[0].clientX;
@@ -57,7 +105,7 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, se
       >
         {/* Screen Content */}
         <div style={styles.screenContainer}>
-          {currentScreen === 0 && <SharePriceScreen sharePrice={sharePrice} gainPercent={gainPercent} />}
+          {currentScreen === 0 && <SharePriceScreen sharePrice={sharePrice} gainPercent={gainPercent} chartPoints={chartPoints} />}
           {currentScreen === 1 && <TotalValueScreen baseValue={baseValue} purchasePrice={purchasePrice} gain={gain} gainPercent={gainPercent} />}
           {currentScreen === 2 && <BettingScreen vehicleId={vehicle.id} baseValue={baseValue} />}
           {currentScreen === 3 && <AuctionVoteScreen vehicle={vehicle} session={session} />}
@@ -81,36 +129,56 @@ export const PriceCarousel: React.FC<PriceCarouselProps> = ({ vehicle, stats, se
   );
 };
 
-// Screen 1: Share Price
-const SharePriceScreen: React.FC<{ sharePrice: number; gainPercent: number }> = ({ sharePrice, gainPercent }) => (
+// Screen 1: Share Price - PROFESSIONAL TRADING VIEW
+const SharePriceScreen: React.FC<{ sharePrice: number; gainPercent: number; chartPoints: string }> = ({ sharePrice, gainPercent, chartPoints }) => (
   <div style={styles.screen}>
-    <div style={styles.mainMetric}>
-      <div style={styles.label}>Share Price</div>
-      <div style={styles.bigValue}>
-        ${sharePrice.toFixed(2)}
-        <span style={{
-          ...styles.changeIndicator,
+    {/* Top stats row - dense */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+      <div>
+        <div style={{ fontSize: '10px', color: '#808080' }}>SHARE PRICE</div>
+        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>${sharePrice.toFixed(2)}</div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontSize: '10px', color: '#808080' }}>TODAY</div>
+        <div style={{
+          fontSize: '16px',
+          fontWeight: 'bold',
           color: gainPercent >= 0 ? '#008000' : '#ff0000'
         }}>
-          {gainPercent >= 0 ? ' ↑ ' : ' ↓ '}
-          {Math.abs(gainPercent).toFixed(1)}%
-        </span>
+          {gainPercent >= 0 ? '+' : ''}{gainPercent.toFixed(2)}%
+        </div>
       </div>
     </div>
-    <div style={styles.divider} />
-    <div style={styles.subMetrics}>
-      <div style={styles.subMetric}>
-        <span style={styles.subLabel}>Volatility:</span>
-        <span style={styles.subValue}>●●○○○ Med</span>
-      </div>
-      <div style={styles.subMetric}>
-        <span style={styles.subLabel}>Trading:</span>
-        <span style={styles.subValue}>🟢 Active</span>
-      </div>
+    
+    {/* Chart - larger */}
+    <div style={{ width: '100%', height: '80px', marginBottom: '8px' }}>
+      <svg width="100%" height="80" viewBox="0 0 200 80" preserveAspectRatio="none">
+        <polyline
+          points={chartPoints}
+          fill="none"
+          stroke={gainPercent >= 0 ? '#008000' : '#ff0000'}
+          strokeWidth="1.5"
+        />
+      </svg>
     </div>
-    <div style={styles.buySection}>
-      <BuyCreditsButton presetAmounts={[3, 10, 25]} />
+    
+    {/* Time range selector */}
+    <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', fontSize: '9px' }}>
+      {['1D', '1W', '1M', '3M', '1Y', 'MAX'].map(range => (
+        <button key={range} style={{
+          flex: 1,
+          padding: '4px 0',
+          background: range === '1D' ? '#000080' : '#c0c0c0',
+          color: range === '1D' ? '#ffffff' : '#000000',
+          border: '1px solid #808080',
+          fontSize: '9px',
+          cursor: 'pointer'
+        }}>
+          {range}
+        </button>
+      ))}
     </div>
+    
   </div>
 );
 
@@ -482,6 +550,15 @@ const styles = {
     cursor: 'pointer',
     border: '1px solid #000000',
     transition: 'background 0.2s'
+  },
+  chartContainer: {
+    width: '100%',
+    padding: '8px 0',
+    display: 'flex',
+    justifyContent: 'center'
+  },
+  chart: {
+    display: 'block'
   }
 };
 

@@ -24,9 +24,10 @@ interface HypeVehicle {
   image_url?: string;
   mileage?: number;
   vin?: string;
+  all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
 }
 
-type TimePeriod = 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
+type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
 type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
 
@@ -80,6 +81,8 @@ interface FilterState {
   priceMax: number | null;
   hasImages: boolean;
   forSale: boolean;
+  zipCode: string;
+  radiusMiles: number;
 }
 
 const CursorHomepage: React.FC = () => {
@@ -99,18 +102,42 @@ const CursorHomepage: React.FC = () => {
     priceMin: null,
     priceMax: null,
     hasImages: false,
-    forSale: false
+    forSale: false,
+    zipCode: '',
+    radiusMiles: 50
   });
   const [stats, setStats] = useState({
     totalBuilds: 0,
     totalValue: 0,
     activeToday: 0
   });
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [filterBarMinimized, setFilterBarMinimized] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     loadSession();
-  }, []);
+    
+    // Scroll listener for sticky filter bar and scroll-to-top button
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setScrollY(currentScrollY);
+      
+      // Show scroll-to-top button after scrolling down 500px
+      setShowScrollTop(currentScrollY > 500);
+      
+      // Minimize filter bar after scrolling down 200px (if filters are shown)
+      if (showFilters && currentScrollY > 200) {
+        setFilterBarMinimized(true);
+      } else if (currentScrollY < 100) {
+        setFilterBarMinimized(false);
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [showFilters]);
 
   useEffect(() => {
     // Load feed for all users (authenticated and unauthenticated)
@@ -152,6 +179,8 @@ const CursorHomepage: React.FC = () => {
   const getTimePeriodFilter = () => {
     const now = new Date();
     switch (timePeriod) {
+      case 'ALL':
+        return null; // No time filter - show everything
       case 'D':
         return new Date(now.setDate(now.getDate() - 1)).toISOString();
       case 'W':
@@ -162,8 +191,9 @@ const CursorHomepage: React.FC = () => {
         return new Date(now.setFullYear(now.getFullYear() - 1)).toISOString();
       case 'RT':
         return new Date(now.setHours(now.getHours() - 1)).toISOString();
+      case 'AT':
       default:
-        return null;
+        return null; // Active = no strict time filter
     }
   };
 
@@ -172,13 +202,16 @@ const CursorHomepage: React.FC = () => {
       setLoading(true);
       const timeFilter = getTimePeriodFilter();
 
+      // OPTIMIZED: Single query with LEFT join (includes vehicles without images)
       let query = supabase
         .from('vehicles')
-        .select('id, year, make, model, current_value, purchase_price, view_count, created_at, updated_at, mileage, vin')
+        .select(`
+          id, year, make, model, current_value, purchase_price, view_count, created_at, updated_at, mileage, vin,
+          vehicle_images(id, thumbnail_url, medium_url, image_url, is_primary, created_at)
+        `)
         .eq('is_public', true)
-        .not('current_value', 'is', null)
         .order('updated_at', { ascending: false })
-        .limit(50);
+        .limit(timePeriod === 'ALL' ? 500 : 100);
 
       if (timeFilter) {
         query = query.gte('updated_at', timeFilter);
@@ -187,34 +220,31 @@ const CursorHomepage: React.FC = () => {
       const { data: vehicles } = await query;
       if (!vehicles) return;
 
-      const enriched = await Promise.all(
-        vehicles.map(async (v) => {
-          const [recentActivity, imageCount, primaryImage] = await Promise.all([
-            supabase
-              .from('vehicle_timeline_events')
-              .select('id', { count: 'exact', head: true })
-              .eq('vehicle_id', v.id)
-              .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-            supabase
-              .from('vehicle_images')
-              .select('id', { count: 'exact', head: true })
-              .eq('vehicle_id', v.id),
-            supabase
-              .from('vehicle_images')
-              .select('variants, image_url')
-              .eq('vehicle_id', v.id)
-              .order('is_primary', { ascending: false })
-              .order('created_at', { ascending: true })
-              .limit(1)
-              .maybeSingle()
-          ]);
+      // Process joined data: each vehicle has vehicle_images array
+      const enriched = vehicles.map((v: any) => {
+        // Extract and sort images
+        const images = Array.isArray(v.vehicle_images) ? v.vehicle_images : (v.vehicle_images ? [v.vehicle_images] : []);
+        
+        const all_images = images
+          .map((img: any) => ({
+            id: img.id,
+            url: img.thumbnail_url || img.medium_url || img.image_url,
+            is_primary: img.is_primary,
+            created_at: img.created_at
+          }))
+          .sort((a: any, b: any) => {
+            if (a.is_primary) return -1;
+            if (b.is_primary) return 1;
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          })
+          .slice(0, 5); // Limit to 5 for performance
 
           const roi = v.current_value && v.purchase_price
             ? ((v.current_value - v.purchase_price) / v.purchase_price) * 100
             : 0;
 
-          const activity7d = recentActivity.count || 0;
-          const totalImages = imageCount.count || 0;
+          const activity7d = 0; // Removed for performance
+          const totalImages = all_images.length;
           const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
           const update_hours = (Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60);
           const is_new = age_hours < 24;
@@ -253,10 +283,8 @@ const CursorHomepage: React.FC = () => {
             hypeReason = hypeReason || 'TRENDING';
           }
 
-          // Use thumbnail variant for optimized loading in technical view
-          const variants = primaryImage?.data?.variants;
-          const fallbackImageUrl = primaryImage?.data?.image_url || null;
-          const thumbnailUrl = variants?.thumbnail || variants?.medium || variants?.full || fallbackImageUrl;
+          // Primary image is already sorted first
+          const primaryImageUrl = all_images[0]?.url || null;
 
           return {
             ...v,
@@ -266,13 +294,12 @@ const CursorHomepage: React.FC = () => {
             activity_7d: activity7d,
             hype_score: hypeScore,
             hype_reason: hypeReason,
-            primary_image_url: thumbnailUrl,
-            image_url: fallbackImageUrl,
-            image_variants: variants || {}
+            primary_image_url: primaryImageUrl,
+            image_url: primaryImageUrl,
+            all_images: all_images
           };
-        })
-      );
-
+        });
+      
       const sorted = enriched.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
       setFeedVehicles(sorted);
 
@@ -318,6 +345,17 @@ const CursorHomepage: React.FC = () => {
     }
     if (filters.forSale) {
       result = result.filter(v => v.is_for_sale);
+    }
+    
+    // Location filter (ZIP code + radius)
+    // Note: This requires vehicles to have zip_code or GPS coordinates stored
+    if (filters.zipCode && filters.zipCode.length === 5) {
+      // For now, filter by exact ZIP match
+      // TODO: Implement haversine distance calculation with GPS coordinates
+      result = result.filter(v => {
+        const vehicleZip = (v as any).zip_code || (v as any).location_zip;
+        return vehicleZip === filters.zipCode;
+      });
     }
     
     // Apply sorting
@@ -463,7 +501,8 @@ const CursorHomepage: React.FC = () => {
             {/* Time Period Selector */}
             <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
               {[
-                { id: 'AT', label: 'All' },
+                { id: 'ALL', label: 'All Time' },
+                { id: 'AT', label: 'Active' },
                 { id: '1Y', label: 'Yr' },
                 { id: 'Q', label: 'Qtr' },
                 { id: 'W', label: 'Wk' },
@@ -534,15 +573,45 @@ const CursorHomepage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter Panel */}
+        {/* Filter Panel - Sticky with minimize */}
         {showFilters && (
           <div style={{ 
-            background: 'var(--grey-50)',
+            position: filterBarMinimized ? 'sticky' : 'relative',
+            top: filterBarMinimized ? 0 : 'auto',
+            background: filterBarMinimized ? 'rgba(255, 255, 255, 0.95)' : 'var(--grey-50)',
+            backdropFilter: filterBarMinimized ? 'blur(10px)' : 'none',
             border: '1px solid var(--border)',
-            padding: '12px',
-            marginBottom: '12px'
+            padding: filterBarMinimized ? '8px 12px' : '12px',
+            marginBottom: '12px',
+            zIndex: 100,
+            boxShadow: filterBarMinimized ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+            transition: 'all 0.2s ease'
           }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', fontSize: '8pt' }}>
+            {/* Minimized header bar */}
+            {filterBarMinimized && (
+              <div 
+                onClick={() => setFilterBarMinimized(false)}
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  fontSize: '8pt',
+                  fontWeight: 'bold'
+                }}
+              >
+                <span>Filters Active ({Object.values(filters).filter(v => v && v !== '' && v !== false && (Array.isArray(v) ? v.length > 0 : true)).length})</span>
+                <span style={{ fontSize: '10pt' }}>▼</span>
+              </div>
+            )}
+            
+            {/* Full filter controls */}
+            <div style={{ 
+              display: filterBarMinimized ? 'none' : 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '12px', 
+              fontSize: '8pt' 
+            }}>
               {/* Year Range */}
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Year Range</label>
@@ -572,45 +641,6 @@ const CursorHomepage: React.FC = () => {
                       fontSize: '8pt'
                     }}
                   />
-                </div>
-                {/* Quick presets */}
-                <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => setFilters({...filters, yearMin: 1964, yearMax: 1991})}
-                    style={{
-                      padding: '2px 6px',
-                      background: 'var(--white)',
-                      border: '1px solid var(--border)',
-                      cursor: 'pointer',
-                      fontSize: '7pt'
-                    }}
-                  >
-                    64-91
-                  </button>
-                  <button
-                    onClick={() => setFilters({...filters, yearMin: 1992, yearMax: 2005})}
-                    style={{
-                      padding: '2px 6px',
-                      background: 'var(--white)',
-                      border: '1px solid var(--border)',
-                      cursor: 'pointer',
-                      fontSize: '7pt'
-                    }}
-                  >
-                    92-05
-                  </button>
-                  <button
-                    onClick={() => setFilters({...filters, yearMin: 2006, yearMax: new Date().getFullYear()})}
-                    style={{
-                      padding: '2px 6px',
-                      background: 'var(--white)',
-                      border: '1px solid var(--border)',
-                      cursor: 'pointer',
-                      fontSize: '7pt'
-                    }}
-                  >
-                    Modern
-                  </button>
                 </div>
               </div>
 
@@ -646,24 +676,53 @@ const CursorHomepage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Toggles */}
+              {/* Location Filter */}
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Options</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', cursor: 'pointer' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Location</label>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '4px' }}>
                   <input
-                    type="checkbox"
-                    checked={filters.hasImages}
-                    onChange={(e) => setFilters({...filters, hasImages: e.target.checked})}
+                    type="text"
+                    placeholder="ZIP code"
+                    value={filters.zipCode}
+                    onChange={(e) => setFilters({...filters, zipCode: e.target.value})}
+                    maxLength={5}
+                    style={{
+                      width: '70px',
+                      padding: '4px 6px',
+                      border: '1px solid var(--border)',
+                      fontSize: '8pt'
+                    }}
                   />
-                  <span>Has Images</span>
-                </label>
+                  <span>within</span>
+                  <select
+                    value={filters.radiusMiles}
+                    onChange={(e) => setFilters({...filters, radiusMiles: parseInt(e.target.value)})}
+                    style={{
+                      padding: '4px 6px',
+                      border: '1px solid var(--border)',
+                      fontSize: '8pt'
+                    }}
+                  >
+                    <option value="10">10 mi</option>
+                    <option value="25">25 mi</option>
+                    <option value="50">50 mi</option>
+                    <option value="100">100 mi</option>
+                    <option value="250">250 mi</option>
+                    <option value="500">500 mi</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* For Sale Toggle */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Status</label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={filters.forSale}
                     onChange={(e) => setFilters({...filters, forSale: e.target.checked})}
                   />
-                  <span>For Sale</span>
+                  <span>For Sale Only</span>
                 </label>
               </div>
 
@@ -677,7 +736,9 @@ const CursorHomepage: React.FC = () => {
                     priceMin: null,
                     priceMax: null,
                     hasImages: false,
-                    forSale: false
+                    forSale: false,
+                    zipCode: '',
+                    radiusMiles: 50
                   })}
                   style={{
                     padding: '4px 12px',
@@ -700,21 +761,27 @@ const CursorHomepage: React.FC = () => {
           <div style={{ 
             background: 'var(--white)',
             border: '1px solid var(--border)',
-            overflow: 'auto'
+            overflow: 'auto',
+            maxHeight: '80vh',
+            position: 'relative'
           }}>
             <table style={{ 
               width: '100%', 
               fontSize: '8pt', 
               borderCollapse: 'collapse'
             }}>
-              <thead>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ background: 'var(--grey-50)', borderBottom: '2px solid var(--border)' }}>
                   <th style={{ 
                     padding: '8px', 
                     textAlign: 'left',
                     fontWeight: 'bold',
                     whiteSpace: 'nowrap',
-                    borderRight: '1px solid var(--border)'
+                    borderRight: '1px solid var(--border)',
+                    position: 'sticky',
+                    left: 0,
+                    background: 'var(--grey-50)',
+                    zIndex: 11
                   }}>
                     Image
                   </th>
@@ -863,10 +930,14 @@ const CursorHomepage: React.FC = () => {
                       onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-50)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      {/* Image - Responsive, 100px default, scales down */}
+                      {/* Image - Sticky left column */}
                       <td style={{ 
                         padding: '4px',
-                        borderRight: '1px solid var(--border)'
+                        borderRight: '1px solid var(--border)',
+                        position: 'sticky',
+                        left: 0,
+                        background: 'var(--white)',
+                        zIndex: 1
                       }}>
                         {vehicle.primary_image_url ? (
                           <img 
@@ -889,10 +960,9 @@ const CursorHomepage: React.FC = () => {
                             border: '1px solid var(--border)',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '16px'
+                            justifyContent: 'center'
                           }}>
-                            🚗
+                            <img src="/n-zero.png" alt="N-Zero" style={{ width: '60%', opacity: 0.3, objectFit: 'contain' }} />
                           </div>
                         )}
                       </td>
@@ -1093,6 +1163,46 @@ const CursorHomepage: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* Scroll to Top Button - Appears after scrolling down */}
+      {showScrollTop && (
+        <button
+          onClick={() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(10px)',
+            border: '2px solid rgba(255, 255, 255, 0.3)',
+            color: 'white',
+            fontSize: '20px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.9)';
+            e.currentTarget.style.transform = 'scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          ↑
+        </button>
+      )}
     </div>
   );
 };

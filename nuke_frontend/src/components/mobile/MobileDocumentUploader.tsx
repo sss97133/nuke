@@ -122,8 +122,8 @@ export const MobileDocumentUploader: React.FC<MobileDocumentUploaderProps> = ({
         .from('vehicle-data')
         .getPublicUrl(filePath);
 
-      // Save document record
-      const { error: docError } = await supabase
+      // Save document record (Step 1: no timeline_event_id needed)
+      const { data: docData, error: docError } = await supabase
         .from('vehicle_documents')
         .insert({
           vehicle_id: vehicleId,
@@ -141,36 +141,77 @@ export const MobileDocumentUploader: React.FC<MobileDocumentUploaderProps> = ({
           amount: extractedData?.total || null,
           currency: 'USD',
           uploaded_by: session.user.id
-        });
+        })
+        .select()
+        .single();
 
       if (docError) throw docError;
 
-      // Create timeline event for receipts using DOCUMENT DATE, not upload date
-      if ((category === 'receipt' || category === 'service_record') && extractedData) {
-        // CRITICAL: Use receipt_date from the document, NOT today's date
-        const documentDate = extractedData.receipt_date || extractedData.date || new Date().toISOString().split('T')[0];
-        
-        await supabase.from('vehicle_timeline_events').insert({
+      // Create timeline event (Step 2: now without circular dependency)
+      const { data: eventData, error: eventError } = await supabase
+        .from('timeline_events')
+        .insert({
           vehicle_id: vehicleId,
           user_id: session.user.id,
-          event_type: 'service',
-          source: 'mobile_document_upload',
-          title: extractedData.vendor_name || 'Service',
-          description: notes || 'Service documented from receipt',
-          event_date: documentDate, // Use parsed date from receipt
-          cost_amount: extractedData.total || null,
-          duration_hours: extractedData.estimated_hours || null,
-          service_provider_name: extractedData.vendor_name || null,
-          metadata: { 
-            extracted_data: extractedData,
-            document_date: documentDate,
-            upload_date: new Date().toISOString()
+          event_type: category === 'service_record' ? 'maintenance' : 'purchase',
+          event_category: 'maintenance',
+          title: title || `${category} uploaded`,
+          description: notes || `Document uploaded via mobile`,
+          event_date: extractedData?.date || new Date().toISOString().split('T')[0],
+          source_type: 'receipt',
+          receipt_amount: extractedData?.total || null,
+          receipt_currency: 'USD',
+          affects_value: (category === 'receipt' || category === 'service_record') && extractedData?.total,
+          metadata: {
+            document_id: (docData as any).id,
+            mobile_upload: true
           }
+        })
+        .select()
+        .single();
+
+      // Link document to timeline event (Step 3: create association)
+      if (!eventError && eventData && docData) {
+        await supabase.from('timeline_event_documents').insert({
+          event_id: eventData.id,
+          document_id: (docData as any).id
         });
+      }
+
+      // Create receipt if this is a receipt/service_record with extracted data
+      if ((category === 'receipt' || category === 'service_record') && extractedData && extractedData.total) {
+        const { error: receiptError } = await supabase.from('receipts').insert({
+          vehicle_id: vehicleId,
+          user_id: session.user.id,
+          vendor_name: extractedData.vendor_name || null,
+          transaction_date: extractedData.date || extractedData.receipt_date || null,
+          total_amount: extractedData.total || null,
+          subtotal: extractedData.subtotal || null,
+          tax_amount: extractedData.tax || null,
+          file_url: urlData.publicUrl,
+          file_name: selectedFile.name,
+          file_type: selectedFile.type,
+          processing_status: 'completed',
+          scope_type: 'vehicle',
+          scope_id: vehicleId,
+          confidence_score: extractedData.confidence || 0.8
+        });
+
+        if (receiptError) console.error('Receipt save failed:', receiptError);
+      }
+
+      // Trigger expert valuation to recalculate vehicle value
+      try {
+        await supabase.functions.invoke('vehicle-expert-agent', {
+          body: { vehicleId }
+        });
+      } catch (err) {
+        console.log('Expert agent not triggered:', err);
       }
 
       // Trigger refresh
       window.dispatchEvent(new Event('vehicle_documents_updated'));
+      window.dispatchEvent(new Event('vehicle_valuation_updated'));
       
       onSuccess?.();
       onClose();

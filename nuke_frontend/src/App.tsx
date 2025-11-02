@@ -23,9 +23,13 @@ import Dashboard from './pages/Dashboard';
 import VehicleMakeModelDemo from './pages/VehicleMakeModelDemo';
 import VehicleDataNormalization from './pages/VehicleDataNormalization';
 import Profile from './pages/Profile';
+import GhostUserProfile from './pages/GhostUserProfile';
 import Login from './components/auth/Login';
 import OAuthCallback from './components/auth/OAuthCallback';
 import DropboxImport from './pages/DropboxImport';
+import DealerDropboxImport from './pages/DealerDropboxImport';
+import DealerBulkEditor from './pages/DealerBulkEditor';
+import DealerAIAssistant from './pages/DealerAIAssistant';
 import DropboxCallback from './pages/DropboxCallback';
 import DropboxAIProcess from './pages/DropboxAIProcess';
 import VehicleApproval from './pages/VehicleApproval';
@@ -54,8 +58,10 @@ import AdminDashboard from './pages/AdminDashboard';
 import OwnershipVerificationDashboard from './components/admin/OwnershipVerificationDashboard';
 import Shops from './pages/Shops';
 import ShopOnboarding from './pages/ShopOnboarding';
-import CreateOrganization from './pages/CreateOrganization';
+import Organizations from './pages/Organizations';
 import OrganizationProfile from './pages/OrganizationProfile';
+import OrganizationProfileNew from './pages/OrganizationProfileNew';
+import CreateOrganization from './pages/CreateOrganization';
 import ErrorBoundary from './components/util/ErrorBoundary';
 import AcceptInvite from './pages/AcceptInvite';
 import Notifications from './pages/Notifications';
@@ -74,6 +80,7 @@ import Legal from './pages/Legal';
 import SignDocument from './pages/SignDocument';
 import ShippingSettings from './pages/admin/ShippingSettings';
 import { MobileOrg } from './pages/mobile/MobileOrg';
+import InvestorDashboardPage from './pages/InvestorDashboard';
 
 // Auth components
 import ResetPassword from './pages/ResetPassword';
@@ -239,6 +246,9 @@ function App() {
             {/* Media & Content Tools */}
             <Route path="/photo-categorizer" element={<PhotoLibraryCategorizer />} />
             <Route path="/dropbox-import" element={<DropboxImport />} />
+            <Route path="/dealer/:orgId/dropbox-import" element={<DealerDropboxImport />} />
+          <Route path="/dealer/:orgId/bulk-editor" element={<DealerBulkEditor />} />
+          <Route path="/dealer/:orgId/ai-assistant" element={<DealerAIAssistant />} />
             <Route path="/dropbox-callback" element={<DropboxCallback />} />
             <Route path="/dropbox-ai-process" element={<DropboxAIProcess />} />
             <Route path="/live-feed" element={<LiveFeed />} />
@@ -261,6 +271,7 @@ function App() {
             
             {/* Browse Investments - Legacy route, use Market instead */}
             <Route path="/browse-investments" element={<BrowseInvestments />} />
+            <Route path="/investor/dashboard" element={<InvestorDashboardPage />} />
             
             {/* Vehicle Management */}
             <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
@@ -283,9 +294,11 @@ function App() {
             
             {/* Transaction & Signature Routes */}
             <Route path="/sign/:token" element={<SignDocument />} />
-            <Route path="/shops" element={<Shops />} />
-            <Route path="/shops/onboarding" element={<ShopOnboarding />} />
+            <Route path="/shops" element={<Navigate to="/organizations" replace />} />
+            <Route path="/shops/onboarding" element={<Navigate to="/org/create" replace />} />
             <Route path="/shops/new" element={<CreateOrganization />} />
+            <Route path="/organizations" element={<Organizations />} />
+            <Route path="/org/create" element={<CreateOrganization />} />
             <Route path="/org/:id" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} />
             <Route path="/mobile/org/:orgId" element={<MobileOrg />} />
             <Route path="/mobile/org" element={<MobileOrg />} />
@@ -318,6 +331,7 @@ function App() {
 
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/:userId" element={<Profile />} />
+            <Route path="/ghost-user/:ghostUserId" element={<GhostUserProfile />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 

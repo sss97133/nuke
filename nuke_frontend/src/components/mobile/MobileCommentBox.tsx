@@ -121,7 +121,7 @@ export const MobileCommentBox: React.FC<MobileCommentBoxProps> = ({
         onClick={() => setExpanded(!expanded)}
         style={styles.countBtn}
       >
-        💬 {comments.length} {comments.length === 1 ? 'Comment' : 'Comments'}
+        {comments.length} {comments.length === 1 ? 'Comment' : 'Comments'}
         <span style={styles.expandIcon}>{expanded ? '▼' : '▶'}</span>
       </button>
 
@@ -173,92 +173,101 @@ export const MobileCommentBox: React.FC<MobileCommentBoxProps> = ({
 
 const styles = {
   container: {
-    marginTop: '16px',
-    borderTop: '2px solid #c0c0c0',
-    paddingTop: '12px'
+    marginTop: '12px',
+    borderTop: '1px solid #e0e0e0',
+    paddingTop: '8px'
   },
   countBtn: {
     width: '100%',
-    background: '#f0f0f0',
-    border: '2px solid #c0c0c0',
-    padding: '12px',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    background: 'transparent',
+    border: 'none',
+    padding: '8px 0',
+    fontSize: '8pt',
+    fontWeight: 600,
+    fontFamily: 'system-ui, -apple-system, sans-serif',
     cursor: 'pointer',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    color: '#666'
   },
   expandIcon: {
-    fontSize: '10px'
+    fontSize: '8pt',
+    color: '#999'
   },
   thread: {
-    marginTop: '12px',
-    maxHeight: '300px',
+    marginTop: '8px',
+    maxHeight: '400px',
     overflowY: 'auto' as const,
-    border: '2px inset #c0c0c0',
-    borderRadius: '4px',
     background: '#ffffff'
   },
   emptyState: {
-    padding: '20px',
+    padding: '16px',
     textAlign: 'center' as const,
     color: '#999',
-    fontSize: '13px'
+    fontSize: '8pt'
   },
   comment: {
-    padding: '12px',
-    borderBottom: '1px solid #e0e0e0'
+    padding: '8px 0',
+    borderBottom: '1px solid #f0f0f0'
   },
   commentHeader: {
     display: 'flex',
-    justifyContent: 'space-between',
-    marginBottom: '6px'
+    gap: '6px',
+    marginBottom: '4px',
+    alignItems: 'center'
   },
   commentAuthor: {
-    fontSize: '10px',
-    fontWeight: 'bold',
-    color: '#000080'
+    fontSize: '8pt',
+    fontWeight: 600,
+    color: '#000',
+    fontFamily: 'system-ui, -apple-system, sans-serif'
   },
   commentTime: {
-    fontSize: '10px',
-    color: '#666'
+    fontSize: '7pt',
+    color: '#999'
   },
   commentText: {
-    fontSize: '10px',
+    fontSize: '8pt',
     lineHeight: '1.4',
-    wordWrap: 'break-word' as const
+    wordWrap: 'break-word' as const,
+    color: '#000',
+    fontFamily: 'system-ui, -apple-system, sans-serif'
   },
   inputBox: {
     display: 'flex',
     gap: '8px',
-    marginTop: '12px',
-    alignItems: 'flex-end'
+    marginTop: '8px',
+    alignItems: 'center',
+    padding: '8px',
+    border: '1px solid #e0e0e0',
+    borderRadius: '20px',
+    background: '#f8f8f8'
   },
   textarea: {
     flex: 1,
-    padding: '12px',
-    border: '2px inset #c0c0c0',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontFamily: '"MS Sans Serif", sans-serif',
-    resize: 'none' as const
+    padding: '6px 12px',
+    border: 'none',
+    background: 'transparent',
+    fontSize: '8pt',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    resize: 'none' as const,
+    outline: 'none'
   },
   submitBtn: {
-    width: '48px',
-    height: '48px',
-    background: '#000080',
+    width: '32px',
+    height: '32px',
+    background: '#008000',
     color: '#ffffff',
-    border: '2px outset #ffffff',
+    border: 'none',
     borderRadius: '50%',
-    fontSize: '12px',
+    fontSize: '14px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0
+    flexShrink: 0,
+    transition: 'all 0.2s'
   }
 };
 

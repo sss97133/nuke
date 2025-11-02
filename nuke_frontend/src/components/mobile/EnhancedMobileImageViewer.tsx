@@ -7,6 +7,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { UserInteractionService } from '../../services/userInteractionService';
+import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
+import MobileBottomToolbar from './MobileBottomToolbar';
+import ImageTagPlacer from './ImageTagPlacer';
 
 interface EnhancedMobileImageViewerProps {
   images: any[];
@@ -15,6 +18,7 @@ interface EnhancedMobileImageViewerProps {
   session: any;
   onClose: () => void;
   onDelete?: (imageId: string) => void;
+  vehicle?: any;
 }
 
 export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps> = ({
@@ -23,7 +27,8 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
   vehicleId,
   session,
   onClose,
-  onDelete
+  onDelete,
+  vehicle
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [scale, setScale] = useState(1);
@@ -33,6 +38,7 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
   const [showAnimation, setShowAnimation] = useState<'like' | 'save' | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [tagMode, setTagMode] = useState(false);
   
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -40,7 +46,9 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
   const lastTap = useRef(0);
 
   const currentImage = images[currentIndex];
-  const isUploader = currentImage?.user_id === session?.user?.id;
+  const isUploader = currentImage?.uploaded_by === session?.user?.id;
+  
+  const { isOwner, hasContributorAccess } = useVehiclePermissions(vehicleId, session, vehicle);
 
   // Load user interactions for current image
   useEffect(() => {
@@ -131,17 +139,14 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
           setIsTransitioning(false);
         }
       }
-    } else if (Math.abs(deltaY) > 50) {
-      // Vertical swipe
+    } else if (Math.abs(deltaY) > 80) {
+      // Vertical swipe - Twitter/Instagram style (higher threshold for less accidental triggers)
       if (deltaY > 0) {
-        // Swipe down → Close (Instagram style)
+        // Swipe down → Close
         onClose();
         vibrate(20);
-      } else {
-        // Swipe up → Show details
-        setShowDetails(true);
-        vibrate(15);
       }
+      // Removed swipe up → details (buggy, use toolbar instead)
     }
   };
 
@@ -219,71 +224,81 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
 
   return ReactDOM.createPortal(
     <div style={styles.overlay}>
-      {/* Main Image with Gestures */}
-      <div
-        style={styles.imageContainer}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <img
-          src={currentImage.medium_url || currentImage.large_url || currentImage.image_url}
-          alt=""
-          style={{
-            ...styles.image,
-            transform: `translateX(${swipeOffset}px) scale(${scale})`,
-            transition: swipeOffset === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-            opacity: Math.max(0.3, 1 - Math.abs(swipeOffset) / 400) // Fade slightly during swipe
+      {/* Main Image with Gestures and Tag Placement */}
+      {tagMode ? (
+        <ImageTagPlacer
+          imageId={currentImage.id}
+          imageUrl={currentImage.large_url || currentImage.image_url}
+          isActive={tagMode}
+          onTagPlaced={() => {
+            setTagMode(false);
           }}
         />
+      ) : (
+        <div
+          style={styles.imageContainer}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <img
+            src={currentImage.medium_url || currentImage.large_url || currentImage.image_url}
+            alt=""
+            style={{
+              ...styles.image,
+              transform: `translateX(${swipeOffset}px) scale(${scale})`,
+              transition: swipeOffset === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+              opacity: Math.max(0.3, 1 - Math.abs(swipeOffset) / 400) // Fade slightly during swipe
+            }}
+          />
+          {/* Work Order Badge (if part of timeline event) */}
+          {workOrderContext && (
+            <div style={styles.workOrderBadge}>
+              {new Date(workOrderContext.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              {workOrderImageCount > 1 && ` • ${workOrderImageIndex}/${workOrderImageCount}`}
+            </div>
+          )}
 
-        {/* Work Order Badge (if part of timeline event) */}
-        {workOrderContext && (
-          <div style={styles.workOrderBadge}>
-            📅 {new Date(workOrderContext.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            {workOrderImageCount > 1 && ` • ${workOrderImageIndex}/${workOrderImageCount}`}
-          </div>
-        )}
+          {/* Like Animation */}
+          {showAnimation === 'like' && (
+            <div style={styles.heartAnimation}>♥</div>
+          )}
 
-        {/* Like Animation */}
-        {showAnimation === 'like' && (
-          <div style={styles.heartAnimation}>❤️</div>
-        )}
+          {/* Save Animation */}
+          {showAnimation === 'save' && (
+            <div style={styles.starAnimation}>★</div>
+          )}
+        </div>
+      )}
 
-        {/* Save Animation */}
-        {showAnimation === 'save' && (
-          <div style={styles.starAnimation}>⭐</div>
-        )}
-      </div>
-
-      {/* Top Bar - Minimal */}
+      {/* Top Bar - Twitter style */}
       <div style={styles.topBar}>
-        <button onClick={onClose} style={styles.closeButton}>✕</button>
-        {isUploader && (
-          <button onClick={handleDeleteImage} style={styles.deleteButton}>🗑️</button>
-        )}
-      </div>
-
-      {/* Bottom Bar - Info Button + Image Counter + Help Text */}
-      <div style={styles.bottomBar}>
-        <div style={styles.imageCounter}>
-          {currentIndex + 1} / {images.length}
-        </div>
-        
-        <div style={styles.helpText}>
-          Double-tap to like • Swipe to navigate
-        </div>
-        
-        <button 
-          onClick={() => setShowDetails(!showDetails)}
+        <button
+          onClick={onClose}
           style={{
-            ...styles.infoButton,
-            background: showDetails ? '#000080' : '#c0c0c0'
+            background: 'rgba(0, 0, 0, 0.5)',
+            border: 'none',
+            color: 'white',
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            fontSize: '16px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(10px)'
           }}
         >
-          ℹ️
+          ×
         </button>
+        <div style={{ fontSize: '8pt', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+          {currentIndex + 1} / {images.length}
+        </div>
+        <div style={{ width: '32px' }} /> {/* Spacer for centering */}
       </div>
+
+      {/* Bottom Toolbar removed - using single instance below */}
 
       {/* Detail Panel - Slides up from bottom */}
       {showDetails && (
@@ -296,9 +311,9 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
               <div style={styles.contextCard}>
                 <h3 style={styles.contextTitle}>{workOrderContext.title}</h3>
                 <div style={styles.contextMeta}>
-                  <span>📅 {new Date(workOrderContext.date).toLocaleDateString()}</span>
-                  {workOrderContext.cost && <span>💰 ${workOrderContext.cost}</span>}
-                  {workOrderContext.hours && <span>⏱️ {workOrderContext.hours}h</span>}
+                  <span>Date: {new Date(workOrderContext.date).toLocaleDateString()}</span>
+                  {workOrderContext.cost && <span>Cost: ${workOrderContext.cost}</span>}
+                  {workOrderContext.hours && <span>Hours: {workOrderContext.hours}h</span>}
                 </div>
                 {workOrderContext.description && (
                   <p style={styles.contextDescription}>{workOrderContext.description}</p>
@@ -319,51 +334,38 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
               <h4 style={styles.sectionTitle}>Image Details</h4>
               {currentImage.taken_at && (
                 <div style={styles.metaRow}>
-                  <span>📸 Taken</span>
+                  <span>Taken</span>
                   <span>{new Date(currentImage.taken_at).toLocaleString()}</span>
                 </div>
               )}
               {currentImage.exif_data?.camera && (
                 <div style={styles.metaRow}>
-                  <span>📷 Camera</span>
+                  <span>Camera</span>
                   <span>{currentImage.exif_data.camera}</span>
                 </div>
               )}
               {currentImage.file_size && (
                 <div style={styles.metaRow}>
-                  <span>📦 Size</span>
+                  <span>Size</span>
                   <span>{(currentImage.file_size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
               )}
               <div style={styles.metaRow}>
-                <span>👁️ Views</span>
+                <span>Views</span>
                 <span>{currentImage.view_count || 0}</span>
               </div>
               <div style={styles.metaRow}>
-                <span>❤️ Likes</span>
+                <span>Likes</span>
                 <span>{currentImage.like_count || 0}</span>
               </div>
             </div>
 
-            {/* Gesture Guide */}
-            <div style={styles.gestureGuide}>
-              <h4 style={styles.sectionTitle}>Gestures</h4>
-              <div style={styles.gestureList}>
-                <div>Double-tap → Like ❤️</div>
-                <div>Swipe left/right → Navigate images 👈👉</div>
-                <div>Swipe down → Close viewer ⬇️</div>
-                <div>Swipe up → Show details ⬆️</div>
-                <div>Long-press → Quick tag 🏷️</div>
-              </div>
-            </div>
+            {/* Gesture Guide - Removed for cleaner interface */}
           </div>
         </div>
       )}
 
-      {/* Gesture Hint (fades out after 3s) */}
-      <div style={styles.gestureHint}>
-        Double-tap = Like • Swipe left/right = Navigate • Swipe down = Close
-      </div>
+      {/* Gesture Hint - Removed for clean interface */}
       
       {/* Instagram-like progress dots */}
       {images.length > 1 && (
@@ -381,6 +383,29 @@ export const EnhancedMobileImageViewer: React.FC<EnhancedMobileImageViewerProps>
           ))}
         </div>
       )}
+
+      {/* Bottom Toolbar for comment/tag/camera tools */}
+      <MobileBottomToolbar
+        vehicleId={vehicleId}
+        session={session}
+        isOwner={isOwner}
+        hasContributorAccess={hasContributorAccess}
+        currentImage={currentImage}
+        vehicle={vehicle}
+        onToolSelect={(tool) => {
+          if (tool === 'tag') {
+            setTagMode(!tagMode);
+          }
+          if (tool === 'comment') {
+            // Scroll to comment box and focus
+            const commentBox = document.querySelector('[data-comment-box="true"]') as HTMLTextAreaElement;
+            if (commentBox) {
+              commentBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              commentBox.focus();
+            }
+          }
+        }}
+      />
     </div>,
     document.body
   );
@@ -418,11 +443,13 @@ const styles = {
     top: 0,
     left: 0,
     right: 0,
-    padding: '16px',
+    padding: '12px 16px',
     display: 'flex',
     justifyContent: 'space-between',
-    background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
-    zIndex: 10
+    alignItems: 'center',
+    background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)',
+    zIndex: 10,
+    paddingBottom: '40px' // Extend gradient fade
   },
   closeButton: {
     background: 'rgba(192, 192, 192, 0.9)',
@@ -489,36 +516,40 @@ const styles = {
   },
   workOrderBadge: {
     position: 'absolute' as const,
-    top: '80px',
-    left: '16px',
-    background: 'rgba(0, 0, 128, 0.9)',
+    top: '60px',
+    left: '12px',
+    background: 'rgba(0, 0, 0, 0.6)',
     color: '#ffffff',
-    padding: '8px 12px',
-    borderRadius: '4px',
-    fontSize: '12px',
-    fontFamily: '"MS Sans Serif", sans-serif',
-    border: '2px outset #ffffff',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+    padding: '6px 10px',
+    borderRadius: '6px',
+    fontSize: '11px',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(255,255,255,0.1)'
   },
   heartAnimation: {
     position: 'absolute' as const,
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    fontSize: '120px',
-    animation: 'heartBurst 1s ease-out',
+    fontSize: '80px',
+    animation: 'heartBurst 0.6s ease-out',
     pointerEvents: 'none' as const,
-    zIndex: 100
+    zIndex: 100,
+    color: '#22c55e',
+    fontWeight: 'normal' as const
   },
   starAnimation: {
     position: 'absolute' as const,
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    fontSize: '120px',
-    animation: 'starSparkle 1s ease-out',
+    fontSize: '80px',
+    animation: 'starSparkle 0.6s ease-out',
     pointerEvents: 'none' as const,
-    zIndex: 100
+    zIndex: 100,
+    color: '#fbbf24',
+    fontWeight: 'normal' as const
   },
   detailPanel: {
     position: 'absolute' as const,
@@ -526,124 +557,127 @@ const styles = {
     left: 0,
     right: 0,
     maxHeight: '70vh',
-    background: '#c0c0c0',
-    border: '2px outset #ffffff',
-    borderRadius: '12px 12px 0 0',
+    background: 'rgba(0, 0, 0, 0.95)',
+    backdropFilter: 'blur(20px)',
+    borderRadius: '16px 16px 0 0',
     overflow: 'auto',
     zIndex: 20,
-    animation: 'slideUp 0.3s ease-out'
+    animation: 'slideUp 0.3s ease-out',
+    border: '1px solid rgba(255,255,255,0.1)'
   },
   detailHandle: {
     width: '40px',
     height: '4px',
-    background: '#808080',
+    background: 'rgba(255,255,255,0.3)',
     borderRadius: '2px',
-    margin: '8px auto',
+    margin: '10px auto',
     cursor: 'pointer'
   },
   detailContent: {
     padding: '16px',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '12px'
+    gap: '16px'
   },
   contextCard: {
-    background: '#ffffff',
-    border: '2px inset #808080',
-    padding: '12px',
-    borderRadius: '4px'
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    padding: '14px',
+    borderRadius: '8px'
   },
   contextTitle: {
-    margin: '0 0 8px 0',
+    margin: '0 0 10px 0',
     fontSize: '16px',
-    fontWeight: 'bold' as const,
-    color: '#000080',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontWeight: '600' as const,
+    color: '#ffffff',
+    fontFamily: 'system-ui, -apple-system, sans-serif'
   },
   contextMeta: {
     display: 'flex',
     gap: '12px',
     fontSize: '12px',
-    color: '#000',
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: '8px',
     flexWrap: 'wrap' as const
   },
   contextDescription: {
     fontSize: '13px',
-    color: '#000',
+    color: 'rgba(255,255,255,0.9)',
     margin: '8px 0',
-    lineHeight: '1.4'
+    lineHeight: '1.5'
   },
   contextBadge: {
-    background: '#000080',
-    color: '#ffffff',
-    padding: '4px 8px',
-    borderRadius: '2px',
+    background: 'rgba(34, 197, 94, 0.2)',
+    color: '#22c55e',
+    padding: '6px 10px',
+    borderRadius: '6px',
     fontSize: '11px',
     display: 'inline-block',
-    marginTop: '4px'
+    marginTop: '6px',
+    border: '1px solid rgba(34, 197, 94, 0.3)'
   },
   metadataCard: {
-    background: '#ffffff',
-    border: '2px inset #808080',
-    padding: '12px',
-    borderRadius: '4px'
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    padding: '14px',
+    borderRadius: '8px'
   },
   sectionTitle: {
-    margin: '0 0 8px 0',
+    margin: '0 0 12px 0',
     fontSize: '14px',
-    fontWeight: 'bold' as const,
-    color: '#000',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontWeight: '600' as const,
+    color: '#ffffff',
+    fontFamily: 'system-ui, -apple-system, sans-serif'
   },
   metaRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '6px 0',
+    padding: '8px 0',
     fontSize: '12px',
-    color: '#000',
-    borderBottom: '1px solid #e0e0e0'
+    color: 'rgba(255,255,255,0.9)',
+    borderBottom: '1px solid rgba(255,255,255,0.05)'
   },
   gestureGuide: {
-    background: '#ffffff',
-    border: '2px inset #808080',
-    padding: '12px',
-    borderRadius: '4px'
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    padding: '14px',
+    borderRadius: '8px'
   },
   gestureList: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '6px',
+    gap: '8px',
     fontSize: '12px',
-    color: '#000'
+    color: 'rgba(255,255,255,0.8)'
   },
   gestureHint: {
     position: 'absolute' as const,
-    bottom: '80px',
+    bottom: '100px',
     left: '50%',
     transform: 'translateX(-50%)',
-    background: 'rgba(0, 0, 0, 0.7)',
+    background: 'rgba(0, 0, 0, 0.8)',
     color: '#ffffff',
-    padding: '8px 16px',
-    borderRadius: '20px',
+    padding: '6px 12px',
+    borderRadius: '16px',
     fontSize: '11px',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
     pointerEvents: 'none' as const,
-    animation: 'fadeOut 3s ease-out forwards'
+    animation: 'fadeOut 2s ease-out forwards',
+    backdropFilter: 'blur(10px)'
   },
   dotsContainer: {
     position: 'absolute' as const,
-    top: '70px',
+    top: '50px',
     left: '50%',
     transform: 'translateX(-50%)',
     display: 'flex',
-    gap: '4px',
+    gap: '6px',
     zIndex: 10
   },
   dot: {
     borderRadius: '50%',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.5)'
+    transition: 'all 0.2s ease',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
   }
 };
 

@@ -220,6 +220,26 @@ const VehicleTimeline: React.FC<{
     return { hours, valueUSD, anchor, pct, ts };
   };
 
+  // Group photo_added events in a single day into one evidence set
+  const groupDayEvents = (dayEvents: TimelineEvent[]): TimelineEvent[] => {
+    if (!Array.isArray(dayEvents) || dayEvents.length === 0) return dayEvents;
+    const photos: TimelineEvent[] = [];
+    const others: TimelineEvent[] = [];
+    for (const e of dayEvents) {
+      const t = String((e as any).event_type || '').toLowerCase();
+      if (t === 'photo_added') photos.push(e); else others.push(e);
+    }
+    if (photos.length <= 1) return dayEvents;
+    const merged: TimelineEvent = {
+      ...(photos[0] as any),
+      id: `merged-${photos[0].id}`,
+      title: 'Evidence set',
+      description: undefined,
+      image_urls: photos.flatMap((p: any) => Array.isArray(p.image_urls) ? p.image_urls : []).slice(0, 24),
+    } as any;
+    return [merged, ...others];
+  };
+
   const toggleComments = (eventId: string) => {
     const newExpanded = new Set(expandedComments);
     if (newExpanded.has(eventId)) {
@@ -473,30 +493,15 @@ const VehicleTimeline: React.FC<{
     <div className="card">
       <div className="card-body" style={{ paddingTop: '12px', position: 'relative' }}>
 
-        {/* Timeline Header with Add Event Button */}
-        {events.length > 0 && isOwner && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-            <button
-              className="button button-primary"
-              onClick={() => setShowWizard(true)}
-              style={{ fontSize: '12px', padding: '4px 12px' }}
-            >
-              Add Event
-            </button>
-          </div>
-        )}
+        {/* Events auto-generated from images, receipts, work orders */}
 
         {/* Events Display (Grid only) */}
         {events.length === 0 ? (
           <div className="text-center p-6">
             <div className="text-sm text-gray-600 mb-4">No timeline events yet</div>
             <div className="text-xs text-gray-500 mb-4">
-              Timeline shows vehicle photos by date taken (from EXIF data) and manual events.
-              Upload images to automatically populate the timeline.
+              Timeline auto-populates from uploaded images, receipts, and work orders.
             </div>
-            {isOwner && (
-              <button className="button button-primary" onClick={() => setShowWizard(true)}>Add Event</button>
-            )}
           </div>
         ) : (
           <div className="timeline-container" style={{ position: 'relative' }}>
@@ -926,7 +931,7 @@ const VehicleTimeline: React.FC<{
               </div>
               <div className="card-body">
               <div className="space-y-2">
-                {Array.from(new Map((selectedDayEvents || []).map(ev => [ev.id, ev])).values()).map((ev) => {
+                {groupDayEvents(selectedDayEvents || []).map((ev) => {
                   // If event has no images but it's a photo event, try to get image from metadata
                   let urls: string[] = Array.isArray(ev.image_urls) ? ev.image_urls : [];
                   
@@ -985,24 +990,37 @@ const VehicleTimeline: React.FC<{
                             </div>
                           ) : (
                             <>
-                              <h4 className="text" style={{ marginBottom: 'var(--space-1)' }}>
-                                {ev.title || 'Work Session'}
-                                {shown.length > 1 && <span className="text-muted"> - {shown.length} photos</span>}
-                              </h4>
-                              {(ev.description || ev.metadata?.work_description) && (
-                                <p className="text-small text-muted" style={{ marginBottom: 'var(--space-2)' }}>
-                                  {ev.description || ev.metadata?.work_description}
-                                </p>
-                              )}
+                              {(() => {
+                                const isPhoto = String(ev.event_type || '').toLowerCase() === 'photo_added' || String(ev.title || '').toLowerCase().includes('photo') || String(ev.title || '').toLowerCase().includes('evidence');
+                                const title = isPhoto ? `Evidence set (${shown.length} photos)` : (ev.title || 'Work Session');
+                                return (
+                                  <h4 className="text" style={{ marginBottom: 'var(--space-1)' }}>
+                                    {title}
+                                  </h4>
+                                );
+                              })()}
+                              {(() => {
+                                const isPhoto = String(ev.event_type || '').toLowerCase() === 'photo_added' || String(ev.title || '').toLowerCase().includes('photo');
+                                const desc = ev.metadata?.work_description || ev.description || '';
+                                if (isPhoto) return null; // suppress generic "Vehicle photo uploaded"
+                                if (!desc) return null;
+                                return (
+                                  <p className="text-small text-muted" style={{ marginBottom: 'var(--space-2)' }}>
+                                    {desc}
+                                  </p>
+                                );
+                              })()}
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
                                 <span className="badge badge-secondary">
                                   {String(ev.event_type || 'event').replace('_', ' ')}
                                 </span>
                                 {(() => {
                                   const met = calcEventImpact(ev);
-                                  return met.hours > 0 ? (
-                                    <span className="badge">{met.hours.toFixed(1)}h work</span>
-                                  ) : null;
+                                  const tags: React.ReactNode[] = [];
+                                  if (met.valueUSD > 0) tags.push(<span key="val" className="badge">${Math.round(met.valueUSD).toLocaleString()}</span>);
+                                  if (met.hours > 0) tags.push(<span key="hrs" className="badge">{met.hours.toFixed(1)}h</span>);
+                                  if (shown.length > 1) tags.push(<span key="cnt" className="badge">{shown.length} photos</span>);
+                                  return <>{tags}</>;
                                 })()}
                               </div>
                             </>
@@ -1080,11 +1098,7 @@ const VehicleTimeline: React.FC<{
                           />
                         </div>
                       )}
-                      {!expandedComments.has(ev.id) && (
-                        <div className="text-small text-muted" style={{ marginTop: 'var(--space-2)' }}>
-                          Click for comments
-                        </div>
-                      )}
+                      {/* MVP: comments hint hidden to reduce clutter */}
                     </div>
                   );
                 })}

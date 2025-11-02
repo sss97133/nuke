@@ -188,13 +188,16 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
   if (showPlaceholder || simple) {
     return (
       <div className={className} style={containerStyle} onClick={onClick}>
-        <div style={{
-          textAlign: 'center',
-          color: '#666',
-          fontSize: size === 'small' ? '16px' : '24px'
-        }}>
-          🚗
-        </div>
+        <img 
+          src="/n-zero.png" 
+          alt="N-Zero"
+          style={{
+            width: size === 'small' ? '32px' : '48px',
+            height: size === 'small' ? '32px' : '48px',
+            opacity: 0.3,
+            objectFit: 'contain'
+          }}
+        />
       </div>
     );
   }

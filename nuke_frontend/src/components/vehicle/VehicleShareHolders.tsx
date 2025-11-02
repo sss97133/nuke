@@ -24,9 +24,10 @@ interface Props {
   vehicleId: string;
   vehicleValue?: number;
   compact?: boolean;
+  hideIfEmpty?: boolean;
 }
 
-export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compact = false }: Props) {
+export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compact = false, hideIfEmpty = false }: Props) {
   const [shareHolders, setShareHolders] = useState<ShareHolder[]>([]);
   const [supporters, setSupporters] = useState<VehicleSupporter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +118,10 @@ export default function VehicleShareHolders({ vehicleId, vehicleValue = 0, compa
   const totalSupport = supporters.reduce((sum, s) => sum + s.credits_allocated, 0);
   const totalShareHolders = shareHolders.length;
   const totalSharesOwned = shareHolders.reduce((sum, sh) => sum + sh.shares_owned, 0);
+
+  if (!loading && hideIfEmpty && totalSupporters === 0 && totalShareHolders === 0) {
+    return null;
+  }
 
   if (loading) {
     return (

@@ -7,6 +7,15 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+export const SUPABASE_URL = supabaseUrl;
+export const SUPABASE_ANON_KEY = supabaseAnonKey;
+
+// Utility to get Supabase Functions URL
+export const getSupabaseFunctionsUrl = () => {
+  if (!supabaseUrl) throw new Error('VITE_SUPABASE_URL is not defined');
+  return `${supabaseUrl}/functions/v1`;
+};
+
 // Optional environment debug logging
 const ENABLE_DEBUG = (import.meta as any).env?.VITE_ENABLE_DEBUG === 'true';
 if (ENABLE_DEBUG) {
@@ -18,13 +27,14 @@ if (ENABLE_DEBUG) {
   if (!supabaseAnonKey) console.warn('Missing VITE_SUPABASE_ANON_KEY - check your .env file');
 }
 
-// Validate required environment variables
+// Validate required environment variables (fail fast if missing)
 if (!supabaseUrl || !supabaseAnonKey) {
-  const missingVars = [];
+  const missingVars: string[] = [];
   if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
   if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
-  console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
-  console.error('Please check your .env file and ensure all Supabase configuration is properly set');
+  const message = `Missing required Supabase configuration: ${missingVars.join(', ')}`;
+  console.error(message);
+  throw new Error(`${message}. Configure these environment variables before running the app.`);
 }
 
 // Suppress 404 errors for missing optional tables
@@ -40,8 +50,8 @@ console.error = (...args) => {
 
 // Create and export the Supabase client
 export const supabase = createClient(
-  supabaseUrl || '',  // Fallback to empty string to prevent crashes
-  supabaseAnonKey || '', // Fallback to empty string to prevent crashes
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       autoRefreshToken: true,

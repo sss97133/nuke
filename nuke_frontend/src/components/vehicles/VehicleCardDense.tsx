@@ -28,6 +28,11 @@ interface VehicleCardDenseProps {
     uploader_name?: string;
     event_count?: number;
     image_count?: number;
+    view_count?: number;
+    active_viewers?: number;
+    is_streaming?: boolean;
+    price_change?: number;
+    all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -173,128 +178,231 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     );
   }
 
-  // GALLERY VIEW: Full-width, information-dense overlay
+  // GALLERY VIEW: Horizontal swipeable card
   if (viewMode === 'gallery') {
-    // Only calculate profit if data makes sense
-    const profit = vehicle.current_value && vehicle.purchase_price &&
-                   vehicle.purchase_price > 0 &&
-                   vehicle.purchase_price < vehicle.current_value * 5
-      ? vehicle.current_value - vehicle.purchase_price 
-      : null;
+    const sharePrice = vehicle.current_value ? vehicle.current_value / 100 : null;
     
     return (
       <Link
         to={`/vehicle/${vehicle.id}`}
         style={{
           display: 'block',
-          background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          borderRadius: '0px',
+          background: 'rgba(255, 255, 255, 0.75)',
+          backdropFilter: 'blur(15px)',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          borderRadius: '8px',
           overflow: 'hidden',
           textDecoration: 'none',
           color: 'inherit',
           transition: 'all 0.12s ease',
-          marginBottom: '4px',
+          marginBottom: '8px',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'var(--text)';
-          e.currentTarget.style.transform = 'translateX(4px)';
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--border)';
-          e.currentTarget.style.transform = 'translateX(0)';
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.75)';
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = 'none';
         }}
       >
-        {/* Large hero image (uses large variant) */}
+        {/* Image preview */}
         <div style={{
           width: '100%',
-          height: '300px',
-          background: imageUrl ? `url(${imageUrl}) center/cover` : 'var(--grey-200)',
+          height: '200px',
+          background: imageUrl ? `url(${imageUrl}) center/cover` : 'url(/n-zero.png) center/contain',
+          backgroundSize: imageUrl ? 'cover' : 'contain',
+          backgroundColor: '#f5f5f5',
           position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '48px',
         }}>
-          {!imageUrl && '🚗'}
-          
-          {/* Data overlay - bottom */}
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            background: 'rgba(0,0,0,0.85)',
-            padding: '12px 16px',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              {/* Left: Vehicle info */}
-              <div>
-                <div style={{ fontSize: '13pt', fontWeight: 700, color: 'white', marginBottom: '2px' }}>
-                  {vehicle.year} {vehicle.make} {vehicle.model}
-                </div>
-                <div style={{ fontSize: '8pt', color: 'rgba(255,255,255,0.7)' }}>
-                  {vehicle.uploader_name && `by ${vehicle.uploader_name}`}
-                  {vehicle.mileage && ` • ${vehicle.mileage.toLocaleString()} mi`}
-                  {vehicle.vin && ` • VIN: ${vehicle.vin.slice(-6)}`}
-                </div>
-              </div>
-              
-              {/* Right: Finance */}
-              <div style={{ textAlign: 'right' }}>
-                {vehicle.current_value && (
-                  <div style={{ fontSize: '12pt', fontWeight: 700, color: 'white' }}>
-                    {formatPrice(vehicle.current_value)}
-                  </div>
-                )}
-                {profit !== null && (
-                  <div style={{ 
-                    fontSize: '9pt', 
-                    fontWeight: 600,
-                    color: profit > 0 ? '#10b981' : '#ef4444'
-                  }}>
-                    {profit > 0 ? '+' : ''}{formatPrice(profit)}
-                  </div>
-                )}
-              </div>
+          {/* LIVE badge - top left */}
+          {vehicle.is_streaming && (
+            <div style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              background: '#ef4444',
+              color: 'white',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              fontSize: '7pt',
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
+            }}>
+              LIVE
             </div>
-          </div>
+          )}
+          
+          {/* Price - top right */}
+          {vehicle.current_value && (
+            <div style={{
+              position: 'absolute',
+              top: '8px',
+              right: '8px',
+              background: 'rgba(0, 0, 0, 0.8)',
+              backdropFilter: 'blur(8px)',
+              color: 'white',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              fontSize: '9pt',
+              fontWeight: 700,
+            }}>
+              {formatPrice(vehicle.current_value)}
+            </div>
+          )}
+          
+          {/* Active viewers - bottom left */}
+          {vehicle.active_viewers > 0 && (
+            <div style={{
+              position: 'absolute',
+              bottom: '8px',
+              left: '8px',
+              background: 'rgba(0, 0, 0, 0.7)',
+              color: 'white',
+              padding: '3px 8px',
+              borderRadius: '12px',
+              fontSize: '7pt',
+              fontWeight: 600,
+            }}>
+              {vehicle.active_viewers} watching
+            </div>
+          )}
         </div>
         
-        {/* Bottom bar with counts */}
-        <div style={{
-          padding: '8px 16px',
-          background: 'var(--surface)',
-          borderTop: '1px solid var(--border)',
-          display: 'flex',
-          gap: '12px',
-          fontSize: '8pt',
-          color: 'var(--text-secondary)',
+        {/* Info panel - compact, all key data */}
+        <div style={{ 
+          padding: '10px 12px',
+          background: 'transparent'
         }}>
-          {vehicle.image_count ? <span>{vehicle.image_count} images</span> : null}
-          {vehicle.event_count ? <span>{vehicle.event_count} events</span> : null}
-          {vehicle.condition_rating && <span>Condition: {vehicle.condition_rating}/10</span>}
+          {/* Share price line */}
+          {sharePrice && (
+            <div style={{
+              fontSize: '7pt',
+              color: '#888',
+              marginBottom: '6px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottom: '1px solid rgba(0,0,0,0.05)',
+              paddingBottom: '4px'
+            }}>
+              <span>Share: ${sharePrice.toFixed(2)}</span>
+              {vehicle.price_change && (
+                <span style={{ 
+                  color: vehicle.price_change > 0 ? '#10b981' : '#ef4444',
+                  fontWeight: 700
+                }}>
+                  {vehicle.price_change > 0 ? '+' : ''}{vehicle.price_change.toFixed(1)}%
+                </span>
+              )}
+            </div>
+          )}
+          
+          {/* Vehicle name */}
+          <div style={{ 
+            fontSize: '10pt', 
+            fontWeight: 700, 
+            lineHeight: 1.2,
+            marginBottom: '6px',
+            color: '#000'
+          }}>
+            {vehicle.year} {vehicle.make} {vehicle.model}
+          </div>
+          
+          {/* Metadata row - shop, views, rating, update */}
+          <div style={{
+            fontSize: '7pt',
+            color: '#666',
+            display: 'flex',
+            gap: '6px',
+            flexWrap: 'wrap',
+            alignItems: 'center'
+          }}>
+            {/* Shop/User */}
+            {vehicle.uploader_name && (
+              <span style={{ fontWeight: 600 }}>{vehicle.uploader_name}</span>
+            )}
+            {vehicle.uploader_name && <span>•</span>}
+            
+            {/* Views */}
+            {vehicle.view_count > 0 && (
+              <span>{vehicle.view_count} views</span>
+            )}
+            
+            {/* Letter rating */}
+            {vehicle.condition_rating && (
+              <>
+                <span>•</span>
+                <span style={{ 
+                  fontWeight: 700, 
+                  color: vehicle.condition_rating >= 8 ? '#10b981' : vehicle.condition_rating >= 6 ? '#f59e0b' : '#ef4444'
+                }}>
+                  Grade: {vehicle.condition_rating >= 9 ? 'A+' : 
+                          vehicle.condition_rating >= 8 ? 'A' :
+                          vehicle.condition_rating >= 7 ? 'B+' :
+                          vehicle.condition_rating >= 6 ? 'B' :
+                          vehicle.condition_rating >= 5 ? 'C' : 'D'}
+                </span>
+              </>
+            )}
+            
+            {/* Recent update */}
+            {timeAgo && (
+              <>
+                <span>•</span>
+                <span style={{ opacity: 0.7 }}>
+                  {timeAgo}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </Link>
     );
   }
 
-  // GRID VIEW: Compact but information-dense
-  // Only calculate profit if data makes sense
-  const profit = vehicle.current_value && vehicle.purchase_price &&
-                 vehicle.purchase_price > 0 &&
-                 vehicle.purchase_price < vehicle.current_value * 5
-    ? vehicle.current_value - vehicle.purchase_price 
-    : null;
+  // GRID VIEW: Mobile-optimized card with horizontal swipeable image carousel
+  // Shows multiple images in a grid that user can swipe through
+  const sharePrice = vehicle.current_value ? vehicle.current_value / 100 : null;
+  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  const [touchStart, setTouchStart] = React.useState(0);
+  
+  // Use all_images array from homepage query (up to 5 images)
+  const vehicleImages = vehicle.all_images?.map(img => img.url) || [imageUrl].filter(Boolean);
+  const currentImageUrl = vehicleImages[currentImageIndex] || imageUrl;
+  
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientX);
+  };
+  
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+    
+    if (Math.abs(diff) > 50) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (diff > 0 && currentImageIndex < vehicleImages.length - 1) {
+        setCurrentImageIndex(currentImageIndex + 1);
+      } else if (diff < 0 && currentImageIndex > 0) {
+        setCurrentImageIndex(currentImageIndex - 1);
+      }
+    }
+  };
   
   return (
     <Link
       to={`/vehicle/${vehicle.id}`}
       style={{
         display: 'block',
-        background: 'var(--surface)',
-        border: '2px solid var(--border)',
-        borderRadius: '2px',
+        background: 'rgba(255, 255, 255, 0.7)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(0, 0, 0, 0.1)',
+        borderRadius: '4px',
         overflow: 'hidden',
         textDecoration: 'none',
         color: 'inherit',
@@ -302,144 +410,169 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         cursor: 'pointer',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--text)';
+        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
         e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--border)';
+        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.7)';
         e.currentTarget.style.transform = 'translateY(0)';
         e.currentTarget.style.boxShadow = 'none';
       }}
     >
-      {/* Square image (uses medium variant) */}
-      <div style={{
-        width: '100%',
-        paddingBottom: '75%', // 4:3 aspect ratio for better content fit
-        background: imageUrl ? `url(${imageUrl}) center/cover` : 'linear-gradient(135deg, var(--grey-100) 0%, var(--grey-200) 100%)',
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '48px',
-      }}>
-        {!imageUrl && (
-          <div style={{ 
-            fontSize: '48px', 
-            opacity: 0.3,
+      {/* Horizontal swipeable image grid (1:1 ratio) */}
+      <div 
+        style={{
+          width: '100%',
+          paddingBottom: '100%',
+          background: currentImageUrl ? `url(${currentImageUrl}) center/cover` : 'url(/n-zero.png) center/contain',
+          backgroundSize: currentImageUrl ? 'cover' : 'contain',
+          backgroundColor: '#f5f5f5',
+          position: 'relative',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Image dots indicator (if multiple images) */}
+        {vehicleImages.length > 1 && (
+          <div style={{
             position: 'absolute',
-            top: '50%',
+            bottom: '8px',
             left: '50%',
-            transform: 'translate(-50%, -50%)'
-          }}>
-            🚗
-          </div>
-        )}
-        
-        {/* Activity badge */}
-        {(vehicle.image_count && vehicle.image_count > 0) && (
-          <div style={{
-            position: 'absolute',
-            top: '8px',
-            left: '8px',
-            background: 'rgba(0,0,0,0.75)',
-            color: 'white',
-            padding: '3px 6px',
-            borderRadius: '2px',
-            fontSize: '7pt',
-            fontWeight: 600,
+            transform: 'translateX(-50%)',
             display: 'flex',
-            gap: '6px',
-            alignItems: 'center'
+            gap: '4px',
+            zIndex: 2
           }}>
-            <span>📸 {vehicle.image_count}</span>
-            {vehicle.event_count && vehicle.event_count > 0 && (
-              <span style={{ opacity: 0.7 }}>• {vehicle.event_count} 📅</span>
-            )}
+            {vehicleImages.map((_, idx) => (
+              <div key={idx} style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: idx === currentImageIndex ? 'white' : 'rgba(255,255,255,0.5)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                transition: 'all 0.2s ease'
+              }} />
+            ))}
           </div>
         )}
         
-        {/* Profit badge (top right - highest priority) */}
-        {profit !== null && profit !== 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
-            background: profit > 0 ? '#10b981' : '#ef4444',
-            color: 'white',
-            padding: '4px 10px',
-            borderRadius: '2px',
-            fontSize: '9pt',
-            fontWeight: 700,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-          }}>
-            {profit > 0 ? '+' : ''}{formatPrice(profit)}
-          </div>
-        )}
-      </div>
-      
-      {/* Dense info panel - prioritize critical data */}
-      <div style={{ 
-        padding: '10px 12px', 
-        borderTop: '2px solid var(--border)',
-        background: 'var(--surface)'
-      }}>
-        {/* Vehicle name - largest */}
-        <div style={{ 
-          fontSize: '11pt', 
-          fontWeight: 700, 
-          lineHeight: 1.2,
-          marginBottom: '4px',
-          color: 'var(--text)'
-        }}>
-          {vehicle.year} {vehicle.make}
-        </div>
-        <div style={{ 
-          fontSize: '9pt', 
-          color: 'var(--text-secondary)',
-          marginBottom: '8px',
-          lineHeight: 1.2,
-          overflow: 'hidden', 
-          textOverflow: 'ellipsis', 
-          whiteSpace: 'nowrap'
-        }}>
-          {vehicle.model}
-        </div>
-        
-        {/* Value - prominent display */}
+        {/* Price overlay - top right */}
         {vehicle.current_value && (
           <div style={{
-            fontSize: '13pt',
+            position: 'absolute',
+            top: '6px',
+            right: '6px',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(5px)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '8pt',
             fontWeight: 700,
-            color: 'var(--text)',
-            marginBottom: '6px'
           }}>
             {formatPrice(vehicle.current_value)}
           </div>
         )}
         
-        {/* Secondary stats grid */}
-        <div style={{
-          fontSize: '8pt',
-          color: 'var(--text-muted)',
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap',
-          paddingTop: '6px',
-          borderTop: '1px solid var(--border)'
+        {/* LIVE badge - top left */}
+        {vehicle.is_streaming && (
+          <div style={{
+            position: 'absolute',
+            top: '6px',
+            left: '6px',
+            background: '#ef4444',
+            color: 'white',
+            padding: '3px 8px',
+            borderRadius: '3px',
+            fontSize: '7pt',
+            fontWeight: 700,
+            letterSpacing: '0.5px',
+            animation: 'pulse 2s ease-in-out infinite'
+          }}>
+            LIVE
+          </div>
+        )}
+      </div>
+      
+      {/* Compact info panel */}
+      <div style={{ 
+        padding: '8px',
+        background: 'transparent'
+      }}>
+        {/* Share price line */}
+        {sharePrice && (
+          <div style={{
+            fontSize: '7pt',
+            color: '#666',
+            marginBottom: '4px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>Share: ${sharePrice.toFixed(2)}</span>
+            {vehicle.price_change && (
+              <span style={{ 
+                color: vehicle.price_change > 0 ? '#10b981' : '#ef4444',
+                fontWeight: 600
+              }}>
+                {vehicle.price_change > 0 ? '+' : ''}{vehicle.price_change.toFixed(1)}%
+              </span>
+            )}
+          </div>
+        )}
+        
+        {/* Vehicle name */}
+        <div style={{ 
+          fontSize: '9pt', 
+          fontWeight: 700, 
+          lineHeight: 1.1,
+          marginBottom: '4px',
+          color: '#000'
         }}>
-          {vehicle.mileage && (
-            <span style={{ fontWeight: 500 }}>
-              {(vehicle.mileage / 1000).toFixed(0)}k mi
-            </span>
+          {vehicle.year} {vehicle.make} {vehicle.model}
+        </div>
+        
+        {/* Metadata row - all small, single line */}
+        <div style={{
+          fontSize: '7pt',
+          color: '#666',
+          display: 'flex',
+          gap: '6px',
+          flexWrap: 'wrap',
+          alignItems: 'center'
+        }}>
+          {/* Shop/User responsible */}
+          {vehicle.uploader_name && (
+            <span style={{ fontWeight: 500 }}>{vehicle.uploader_name}</span>
           )}
+          {vehicle.uploader_name && <span>•</span>}
+          
+          {/* Views / Active viewers */}
+          {vehicle.view_count > 0 && (
+            <span>{vehicle.view_count} views</span>
+          )}
+          {vehicle.active_viewers > 0 && (
+            <span>({vehicle.active_viewers} watching)</span>
+          )}
+          
+          {/* Letter rating */}
           {vehicle.condition_rating && (
-            <span style={{ opacity: 0.8 }}>
-              C:{vehicle.condition_rating}/10
+            <span style={{ 
+              fontWeight: 700, 
+              color: vehicle.condition_rating >= 8 ? '#10b981' : vehicle.condition_rating >= 6 ? '#f59e0b' : '#ef4444'
+            }}>
+              {vehicle.condition_rating >= 9 ? 'A+' : 
+               vehicle.condition_rating >= 8 ? 'A' :
+               vehicle.condition_rating >= 7 ? 'B+' :
+               vehicle.condition_rating >= 6 ? 'B' :
+               vehicle.condition_rating >= 5 ? 'C' : 'D'}
             </span>
           )}
+          
+          {/* Recent update note */}
           {timeAgo && (
-            <span style={{ opacity: 0.6, marginLeft: 'auto' }}>
+            <span style={{ opacity: 0.7, marginLeft: 'auto' }}>
               {timeAgo}
             </span>
           )}

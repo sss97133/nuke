@@ -10,14 +10,26 @@ import { supabase } from '../../lib/supabase';
 import EventDetailModal from './EventDetailModal';
 import { MobileImageCarousel } from './MobileImageCarousel';
 import { PriceCarousel } from './PriceCarousel';
-import { MobileTimelineVisual } from './MobileTimelineVisual';
 import SpecResearchModal from './SpecResearchModal';
 import { EnhancedMobileImageViewer } from './EnhancedMobileImageViewer';
-import { TimelinePhotosView } from './TimelinePhotosView';
+import VehicleTimeline from '../VehicleTimeline';
 import { MobileDocumentUploader } from './MobileDocumentUploader';
 import { MobilePriceEditor } from './MobilePriceEditor';
 import { MobileCommentBox } from './MobileCommentBox';
 import { MobileVehicleDataEditor } from './MobileVehicleDataEditor';
+import { useImageUpload } from '../../hooks/useImageUpload';
+import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
+import { MobileTradingPanel } from './MobileTradingPanel';
+import InlineVINEditor from '../vehicle/InlineVINEditor';
+import BaTURLDrop from '../vehicle/BaTURLDrop';
+import ComprehensiveVehicleEditor from '../vehicle/ComprehensiveVehicleEditor';
+import MobileBottomToolbar from './MobileBottomToolbar';
+
+const FONT_BASE = '8pt';
+const FONT_SMALL = '7pt';
+const FONT_TINY = '6pt';
+
+type VehicleTab = 'overview' | 'timeline' | 'images' | 'specs';
 
 interface MobileVehicleProfileProps {
   vehicleId: string;
@@ -25,16 +37,19 @@ interface MobileVehicleProfileProps {
 }
 
 export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehicleId, isMobile }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'images' | 'specs'>('overview');
+  const [activeTab, setActiveTab] = useState<VehicleTab>('overview');
   const [vehicle, setVehicle] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  const [uploading, setUploading] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
-  const [hasContributorAccess, setHasContributorAccess] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [showDocUploader, setShowDocUploader] = useState(false);
   const [showPriceEditor, setShowPriceEditor] = useState(false);
+
+  // Use consolidated permissions hook
+  const { isOwner, hasContributorAccess, canEdit, canUpload } = useVehiclePermissions(vehicleId, session, vehicle);
+  
+  // Use consolidated image upload hook
+  const { uploading, upload } = useImageUpload(session, isOwner, hasContributorAccess);
 
   useEffect(() => {
     console.log('[MobileVehicleProfile] Component mounted, isMobile:', isMobile);
@@ -43,12 +58,6 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
       setSession(session);
     });
   }, [vehicleId]);
-
-  useEffect(() => {
-    if (session && vehicle) {
-      checkOwnership();
-    }
-  }, [session, vehicle]);
 
   useEffect(() => {
     console.log('[MobileVehicleProfile] Active tab changed to:', activeTab);
@@ -64,71 +73,8 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
     setVehicle(data);
   };
 
-  const checkOwnership = async () => {
-    if (!session?.user || !vehicle) {
-      setIsOwner(false);
-      setHasContributorAccess(false);
-      return;
-    }
-
-    const isVehicleOwner = vehicle.uploaded_by === session.user.id || vehicle.user_id === session.user.id;
-    setIsOwner(isVehicleOwner);
-
-    // Check for contributor access
-    try {
-      const { data, error } = await supabase
-        .from('vehicle_contributors')
-        .select('role')
-        .eq('vehicle_id', vehicleId)
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        const allowedRoles = ['owner', 'co_owner', 'restorer', 'moderator', 'consigner'];
-        setHasContributorAccess(allowedRoles.includes(data.role));
-      }
-    } catch (err) {
-      console.error('Error checking contributor access:', err);
-    }
-  };
-
   const handleQuickUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    if (!session?.user?.id) {
-      alert('Please log in to upload images');
-      return;
-    }
-
-    // Check ownership
-    if (!isOwner && !hasContributorAccess) {
-      alert('Only the vehicle owner or contributors can upload images');
-      return;
-    }
-
-    setUploading(true);
-    
-    try {
-      const { ImageUploadService } = await import('../../services/imageUploadService');
-      
-      for (let i = 0; i < files.length; i++) {
-        const result = await ImageUploadService.uploadImage(vehicleId, files[i], 'general');
-        if (!result.success) {
-          console.error('Upload failed:', result.error);
-          alert(`Upload failed: ${result.error}`);
-        }
-      }
-      
-      // Trigger refresh on images tab
-      window.dispatchEvent(new Event('vehicle_images_updated'));
-      
-      // Show success message
-      alert(`✓ ${files.length} photo${files.length > 1 ? 's' : ''} uploaded successfully!`);
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
-    } finally {
-      setUploading(false);
-    }
+    await upload(vehicleId, files, 'general');
   };
 
   if (!isMobile) {
@@ -151,7 +97,7 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
               border: '2px outset #ffffff',
               color: '#000000',
               padding: '4px 8px',
-              fontSize: '12px',
+              fontSize: FONT_BASE,
               cursor: 'pointer',
               fontFamily: 'Arial, sans-serif',
               marginRight: '8px'
@@ -186,12 +132,31 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
       {/* Scrollable Content */}
       <div style={styles.content}>
         {activeTab === 'overview' && (
-          <MobileOverviewTab vehicleId={vehicleId} vehicle={vehicle} onTabChange={setActiveTab} session={session} />
+          <MobileOverviewTab
+            vehicleId={vehicleId}
+            vehicle={vehicle}
+            onTabChange={setActiveTab}
+            session={session}
+            onVehicleUpdated={loadVehicle}
+          />
         )}
         {activeTab === 'timeline' && (
-          <div>
-            <MobileTimelineVisual vehicleId={vehicleId} />
-            <MobileCommentBox vehicleId={vehicleId} session={session} targetType="vehicle" />
+          <div style={{ background: '#ffffff' }}>
+            {/* Horizontally scrollable timeline */}
+            <div style={{
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              WebkitOverflowScrolling: 'touch',
+              padding: '12px',
+              scrollbarWidth: 'thin'
+            }}>
+              <div style={{ minWidth: '700px' }}>
+                <VehicleTimeline vehicleId={vehicleId} isOwner={isOwner} />
+              </div>
+            </div>
+            <div style={{ padding: '12px', paddingTop: 0 }}>
+              <MobileCommentBox vehicleId={vehicleId} session={session} targetType="vehicle" />
+            </div>
           </div>
         )}
         {activeTab === 'images' && (
@@ -203,53 +168,20 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
       </div>
 
       {/* Floating Action Button (FAB) for Camera - Only for owners/contributors */}
-      {(session?.user && (isOwner || hasContributorAccess)) && (
-        <>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            style={{ display: 'none' }}
-            onChange={(e) => handleQuickUpload(e.target.files)}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            style={{
-              position: 'fixed',
-              bottom: '24px',
-              right: '24px',
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              background: uploading ? '#bdbdbd' : '#0066cc',
-              color: '#ffffff',
-              border: '3px outset #ffffff',
-              fontSize: '28px',
-              cursor: uploading ? 'wait' : 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              zIndex: 1000,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: 'Arial, sans-serif',
-              transition: 'transform 0.2s',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            onTouchStart={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onTouchEnd={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            title="Take photo"
-          >
-            {uploading ? '⏳' : '📷'}
-          </button>
-        </>
-      )}
+      {/* Bottom Toolbar with Camera, Comment, Tag tools */}
+      <MobileBottomToolbar
+        vehicleId={vehicleId}
+        session={session}
+        isOwner={isOwner}
+        hasContributorAccess={hasContributorAccess}
+        onToolSelect={(tool) => {
+          if (tool === 'comment') {
+            // Auto-scroll to comment box
+          } else if (tool === 'tag') {
+            // Enable pinpoint tagging mode on images
+          }
+        }}
+      />
 
       {/* Event Detail Modal */}
       {selectedEvent && (
@@ -262,54 +194,99 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
   );
 };
 
-const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange: (tab: string) => void; session: any }> = ({ vehicleId, vehicle, onTabChange, session }) => {
+interface MobileOverviewTabProps {
+  vehicleId: string;
+  vehicle: any;
+  onTabChange: (tab: VehicleTab) => void;
+  session: any;
+  onVehicleUpdated?: () => void;
+}
+
+const MobileOverviewTab: React.FC<MobileOverviewTabProps> = ({ vehicleId, vehicle, onTabChange, session, onVehicleUpdated }) => {
   const [stats, setStats] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [showPriceEditor, setShowPriceEditor] = useState(false);
   const [showDocUploader, setShowDocUploader] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
-  const [hasContributorAccess, setHasContributorAccess] = useState(false);
+  const expertAnalysisRunningRef = React.useRef(false);
+
+  // Use consolidated permissions hook
+  const { isOwner, hasContributorAccess } = useVehiclePermissions(vehicleId, session, vehicle);
 
   useEffect(() => {
     loadStats();
     loadImages();
-    checkOwnership();
-  }, [vehicleId, session]);
+    checkAndRunExpertValuation();
+    
+    // Listen for document uploads to trigger revaluation
+    const handleDocUpdate = () => {
+      loadStats();
+      checkAndRunExpertValuation();
+    };
+    window.addEventListener('vehicle_documents_updated', handleDocUpdate);
+    window.addEventListener('vehicle_images_updated', handleDocUpdate);
+    
+    return () => {
+      window.removeEventListener('vehicle_documents_updated', handleDocUpdate);
+      window.removeEventListener('vehicle_images_updated', handleDocUpdate);
+    };
+  }, [vehicleId, session, isOwner, hasContributorAccess]);
 
-  const checkOwnership = async () => {
-    if (!session?.user || !vehicle) {
-      setIsOwner(false);
-      setHasContributorAccess(false);
+  const checkAndRunExpertValuation = async () => {
+    if (!session?.user || !vehicleId || !(isOwner || hasContributorAccess)) {
       return;
     }
 
-    // Check if user is the vehicle owner (uploaded_by or user_id)
-    const isVehicleOwner = vehicle.uploaded_by === session.user.id || vehicle.user_id === session.user.id;
-    setIsOwner(isVehicleOwner);
-
-    // Check for contributor access
     try {
-      const { data, error } = await supabase
-        .from('vehicle_contributors')
-        .select('role')
+      // Check if we need to run expert valuation
+      const { data: latestValuation } = await supabase
+        .from('vehicle_valuations')
+        .select('valuation_date')
         .eq('vehicle_id', vehicleId)
-        .eq('user_id', session.user.id)
+        .order('valuation_date', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (!error && data) {
-        // Allow edit access for these roles
-        const allowedRoles = ['owner', 'co_owner', 'restorer', 'moderator', 'consigner'];
-        setHasContributorAccess(allowedRoles.includes(data.role));
+      // RE-ENABLED: Expert agent runs analysis but does NOT auto-update sale prices
+      // Run if no valuation exists or if older than 24 hours
+      const shouldRun = !latestValuation || 
+        (Date.now() - new Date(latestValuation.valuation_date).getTime()) > (24 * 60 * 60 * 1000);
+
+      if (shouldRun) {
+        await runExpertAgent();
       }
     } catch (err) {
-      console.error('Error checking contributor access:', err);
+      console.error('Error checking expert valuation:', err);
+    }
+  };
+
+  const runExpertAgent = async () => {
+    if (expertAnalysisRunningRef.current) return;
+    expertAnalysisRunningRef.current = true;
+
+    try {
+      console.log('[MobileOverviewTab] Triggering vehicle-expert-agent for', vehicleId);
+      const { error } = await supabase.functions.invoke('vehicle-expert-agent', {
+        body: { vehicleId }
+      });
+
+      if (error) {
+        console.error('Expert agent error:', error);
+      } else {
+        console.log('[MobileOverviewTab] Expert agent completed successfully');
+        // Dispatch event to refresh UI
+        window.dispatchEvent(new Event('vehicle_valuation_updated'));
+      }
+    } catch (err) {
+      console.error('Expert agent failed:', err);
+    } finally {
+      expertAnalysisRunningRef.current = false;
     }
   };
 
   const loadStats = async () => {
     const [images, events, tags, workSessions] = await Promise.all([
       supabase.from('vehicle_images').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
-      supabase.from('vehicle_timeline_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
+      supabase.from('timeline_events').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
       supabase.from('image_tags').select('id', { count: 'exact' }).eq('vehicle_id', vehicleId),
       supabase.from('work_sessions').select('duration_minutes').eq('vehicle_id', vehicleId)
     ]);
@@ -349,34 +326,29 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
         />
       )}
 
-      {/* Price Carousel - Clickable to Edit (owners only) */}
-      <div 
-        onClick={() => (isOwner || hasContributorAccess) && setShowPriceEditor(true)} 
-        style={{ cursor: (isOwner || hasContributorAccess) ? 'pointer' : 'default' }}
-      >
-        <PriceCarousel vehicle={vehicle} stats={stats} session={session} />
+      {/* Price Carousel */}
+      <PriceCarousel vehicle={vehicle} stats={stats} session={session} />
+
+      {/* Professional Trading Panel - COMING SOON */}
+      <div style={styles.tradingPanel}>
+        {/* Trading Panel - LIVE SYSTEM */}
+        <MobileTradingPanel
+          vehicleId={vehicle.id}
+          offeringId={vehicle.offering_id || vehicle.id}
+          currentSharePrice={vehicle.current_value ? vehicle.current_value / 1000 : 50}
+          vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+          session={session}
+        />
       </div>
 
-      {/* Action Buttons - Only visible to owners/contributors */}
+      {/* Owner Management Actions - SEPARATE from trading */}
       {(session?.user && (isOwner || hasContributorAccess)) && (
-        <div style={styles.actionButtonsRow}>
-          <button
-            onClick={() => {
-              setShowPriceEditor(true);
-            }}
-            style={styles.actionBtn}
-            data-testid="edit-price-button"
-          >
-            💰 Edit Price
+        <div style={styles.ownerControls}>
+          <button onClick={() => setShowPriceEditor(true)} style={styles.ownerControlBtn}>
+            Edit Price
           </button>
-          <button
-            onClick={() => {
-              setShowDocUploader(true);
-            }}
-            style={styles.actionBtn}
-            data-testid="upload-doc-button"
-          >
-            📄 Upload Doc
+          <button onClick={() => setShowDocUploader(true)} style={styles.ownerControlBtn}>
+            Upload Doc
           </button>
         </div>
       )}
@@ -390,7 +362,10 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
           onClose={() => setShowPriceEditor(false)}
           onSaved={() => {
             setShowPriceEditor(false);
-            window.location.reload(); // Refresh to show new prices
+            // Refresh data without full page reload
+            onVehicleUpdated?.();
+            loadStats();
+            window.dispatchEvent(new Event('vehicle_valuation_updated'));
           }}
         />
       )}
@@ -402,6 +377,7 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
           onClose={() => setShowDocUploader(false)}
           onSuccess={() => {
             setShowDocUploader(false);
+            onVehicleUpdated?.();
             window.dispatchEvent(new Event('vehicle_documents_updated'));
           }}
         />
@@ -434,21 +410,6 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
         </div>
       </div>
 
-      {/* Comments Section */}
-      <div style={styles.commentsSection}>
-        <div style={styles.commentsHeader}>
-          <span style={styles.commentsTitle}>💬 Vehicle Comments</span>
-          <span style={styles.commentsCount}>View all</span>
-        </div>
-        <div style={styles.commentInput}>
-          <input 
-            type="text" 
-            placeholder="Add a comment about this vehicle..."
-            style={styles.input}
-          />
-        </div>
-      </div>
-
       {/* VIN */}
       {vehicle.vin && (
         <div style={styles.card}>
@@ -473,17 +434,17 @@ const MobileOverviewTab: React.FC<{ vehicleId: string; vehicle: any; onTabChange
 const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicleId, session }) => {
   const [images, setImages] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<any>(null);
-  const [uploading, setUploading] = useState(false);
-  const [viewMode, setViewMode] = useState<'feed' | 'timeline' | 'discover'>('timeline');
-  const [isOwner, setIsOwner] = useState(false);
-  const [hasContributorAccess, setHasContributorAccess] = useState(false);
   const [vehicle, setVehicle] = useState<any>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Use consolidated permissions hook
+  const { isOwner, hasContributorAccess } = useVehiclePermissions(vehicleId, session, vehicle);
+  
+  // Use consolidated image upload hook
+  const { uploading, upload } = useImageUpload(session, isOwner, hasContributorAccess);
 
   useEffect(() => {
     loadVehicle();
     loadImages();
-    checkOwnership();
     
     // Listen for image updates
     const handler = () => loadImages();
@@ -523,57 +484,10 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     setVehicle(data);
   };
 
-  const checkOwnership = async () => {
-    if (!session?.user || !vehicleId) {
-      setIsOwner(false);
-      setHasContributorAccess(false);
-      return;
-    }
-
-    // Load vehicle to check ownership
-    const { data: vehicleData } = await supabase
-      .from('vehicles')
-      .select('uploaded_by, user_id')
-      .eq('id', vehicleId)
-      .single();
-
-    if (vehicleData) {
-      const isVehicleOwner = vehicleData.uploaded_by === session.user.id || vehicleData.user_id === session.user.id;
-      setIsOwner(isVehicleOwner);
-    }
-
-    // Check for contributor access
-    try {
-      const { data, error } = await supabase
-        .from('vehicle_contributors')
-        .select('role')
-        .eq('vehicle_id', vehicleId)
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        const allowedRoles = ['owner', 'co_owner', 'restorer', 'moderator', 'consigner'];
-        setHasContributorAccess(allowedRoles.includes(data.role));
-      }
-    } catch (err) {
-      console.error('Error checking contributor access:', err);
-    }
-  };
-
   const loadImages = async () => {
     const { data } = await supabase
       .from('vehicle_images')
-      .select(`
-        *,
-        timeline_events:timeline_event_id(
-          id,
-          title,
-          event_date,
-          cost_amount,
-          duration_hours,
-          description
-        )
-      `)
+      .select('*')
       .eq('vehicle_id', vehicleId)
       .order('taken_at', { ascending: false });
 
@@ -581,38 +495,9 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
   };
 
   const handleFileUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    if (!session?.user?.id) {
-      alert('Please log in to upload images');
-      return;
-    }
-
-    // Check ownership
-    if (!isOwner && !hasContributorAccess) {
-      alert('Only the vehicle owner or contributors can upload images');
-      return;
-    }
-
-    setUploading(true);
-    
-    try {
-      const { ImageUploadService } = await import('../../services/imageUploadService');
-      
-      for (let i = 0; i < files.length; i++) {
-        const result = await ImageUploadService.uploadImage(vehicleId, files[i], 'general');
-        if (!result.success) {
-          console.error('Upload failed:', result.error);
-          alert(`Upload failed: ${result.error}`);
-        }
-      }
-      
-      // Refresh images
+    const success = await upload(vehicleId, files, 'general');
+    if (success) {
       await loadImages();
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -701,72 +586,124 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     return { ...img, isVertical };
   });
 
-  const viewModes = [
-    { id: 'feed', label: 'Feed' },
-    { id: 'timeline', label: 'Timeline Photos' },
-    { id: 'discover', label: 'Discover' }
-  ];
+  const [imageFilter, setImageFilter] = React.useState<string>('all');
+  const [imageSortBy, setImageSortBy] = React.useState<string>('date_desc');
+
+  // Filter and sort images
+  const getFilteredImages = () => {
+    let filtered = [...images];
+    
+    // Apply filters
+    if (imageFilter === 'primary') {
+      filtered = filtered.filter(img => img.is_primary);
+    } else if (imageFilter === 'recent') {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      filtered = filtered.filter(img => img.taken_at && new Date(img.taken_at) > weekAgo);
+    }
+    
+    // Apply sorting
+    if (imageSortBy === 'date_desc') {
+      filtered.sort((a, b) => new Date(b.taken_at || b.created_at).getTime() - new Date(a.taken_at || a.created_at).getTime());
+    } else if (imageSortBy === 'date_asc') {
+      filtered.sort((a, b) => new Date(a.taken_at || a.created_at).getTime() - new Date(b.taken_at || b.created_at).getTime());
+    }
+    
+    return filtered;
+  };
+
+  const filteredImages = getFilteredImages();
 
   return (
     <div style={styles.tabContent}>
-      {/* Upload Button - Only for owners/contributors */}
-      {(session?.user && (isOwner || hasContributorAccess)) && (
-        <div style={{ marginBottom: '12px' }}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            style={{ display: 'none' }}
-            onChange={(e) => handleFileUpload(e.target.files)}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            style={{
-              width: '100%',
-              background: '#0066cc',
-              color: '#ffffff',
-              border: '2px outset #ffffff',
-              padding: '12px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              fontFamily: 'Arial, sans-serif'
-            }}
-          >
-            {uploading ? 'Uploading...' : '📷 Add Photos'}
-          </button>
-        </div>
-      )}
-
-      {/* View Mode Selector */}
-      <div style={styles.viewModeBar}>
-        {viewModes.map(mode => (
-          <button
-            key={mode.id}
-            onClick={() => setViewMode(mode.id as any)}
-            style={{
-              ...styles.viewModeButton,
-              ...(viewMode === mode.id ? styles.viewModeButtonActive : {})
-            }}
-          >
-            {mode.label}
-          </button>
-        ))}
+      {/* Filter & Sort Bar */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        padding: '8px',
+        background: 'rgba(255, 255, 255, 0.9)',
+        borderBottom: '1px solid #ddd',
+        position: 'sticky',
+        top: 0,
+        zIndex: 5
+      }}>
+        <select
+          value={imageFilter}
+          onChange={(e) => setImageFilter(e.target.value)}
+          style={{
+            flex: 1,
+            padding: '6px',
+            fontSize: '8pt',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            background: 'white'
+          }}
+        >
+          <option value="all">All Images ({images.length})</option>
+          <option value="primary">Primary Only</option>
+          <option value="recent">Recent (7 days)</option>
+        </select>
+        <select
+          value={imageSortBy}
+          onChange={(e) => setImageSortBy(e.target.value)}
+          style={{
+            flex: 1,
+            padding: '6px',
+            fontSize: '8pt',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            background: 'white'
+          }}
+        >
+          <option value="date_desc">Newest First</option>
+          <option value="date_asc">Oldest First</option>
+        </select>
       </div>
 
-      {/* Dynamic Layout Based on View Mode */}
-      {viewMode === 'feed' && (
-        <InstagramFeedView images={imagesWithOrientation} onImageClick={setSelectedImage} />
-      )}
-      {viewMode === 'timeline' && (
-        <TimelinePhotosView images={images} onImageClick={setSelectedImage} session={session} />
-      )}
-      {viewMode === 'discover' && (
-        <DiscoverGridView images={imagesWithOrientation} onImageClick={setSelectedImage} />
-      )}
+      {/* Optimized 3-column image grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px' }}>
+        {filteredImages.map((image: any) => (
+          <div
+            key={image.id}
+            onClick={() => setSelectedImage(image)}
+            style={{
+              position: 'relative',
+              paddingBottom: '100%',
+              cursor: 'pointer',
+              border: '1px solid #bdbdbd',
+              background: '#000'
+            }}
+          >
+            <img
+              src={image.thumbnail_url || image.image_url}
+              alt=""
+              loading="lazy"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
+              }}
+            />
+            {image.is_primary && (
+              <div style={{
+                position: 'absolute',
+                top: '4px',
+                left: '4px',
+                background: '#c0c0c0',
+                color: '#000',
+                padding: '2px 4px',
+                fontSize: '6pt',
+                fontWeight: 'bold',
+                border: '1px solid #000'
+              }}>
+                PRIMARY
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* Enhanced fullscreen image viewer with gestures and context */}
       {selectedImage && (
@@ -775,6 +712,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
           initialIndex={images.findIndex(img => img.id === selectedImage.id)}
           vehicleId={vehicleId}
           session={session}
+          vehicle={vehicle}
           onClose={() => setSelectedImage(null)}
           onDelete={(imageId) => handleDelete(imageId, selectedImage)}
         />
@@ -827,7 +765,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
                 onClick={() => handleSave(selectedImage.id)}
                 style={{
                   ...styles.actionButton,
-                  background: savedImages.has(selectedImage.id) ? '#0066cc' : '#e0e0e0',
+                  background: savedImages.has(selectedImage.id) ? '#008000' : '#c0c0c0',
                   color: savedImages.has(selectedImage.id) ? '#ffffff' : '#000000'
                 }}
               >
@@ -883,8 +821,8 @@ const InstagramFeedView: React.FC<{ images: any[]; onImageClick: (img: any) => v
           onClick={() => onImageClick(image)}
         />
         <div style={styles.feedActions}>
-          <button style={styles.feedActionButton}>❤️ Like</button>
-          <button style={styles.feedActionButton}>💬 Comment</button>
+          <button style={styles.feedActionButton}>Like</button>
+          <button style={styles.feedActionButton}>Comment</button>
         </div>
       </div>
     ))}
@@ -1015,19 +953,29 @@ const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }
           style={{
             width: '100%',
             padding: '14px',
-            background: '#0066cc',
+            background: '#008000',
             color: '#ffffff',
             border: '2px outset #ffffff',
             borderRadius: '4px',
-            fontSize: '14px',
+            fontSize: FONT_BASE,
             fontWeight: 'bold',
             cursor: 'pointer',
             fontFamily: 'Arial, sans-serif',
             marginBottom: '12px'
           }}
         >
-          ✏️ Edit Vehicle Data
+          Edit Vehicle Data
         </button>
+      )}
+
+      {/* Comprehensive Vehicle Editor - ALL fields editable */}
+      {(session?.user && (isOwner || hasContributorAccess)) && (
+        <ComprehensiveVehicleEditor
+          vehicleId={vehicleId}
+          vehicle={vehicle}
+          canEdit={true}
+          onDataUpdated={() => window.location.reload()}
+        />
       )}
 
       {importantSpecs.map(spec => {
@@ -1046,7 +994,6 @@ const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }
           >
             <div style={styles.cardLabel}>
               {spec.label}
-              {spec.researchable && <span style={{ marginLeft: '6px', fontSize: '10px' }}>🔍</span>}
             </div>
             <div style={styles.cardValue}>{String(value)}</div>
           </div>
@@ -1088,8 +1035,9 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    background: '#e0e0e0', // var(--grey-200)
-    fontFamily: 'Arial, sans-serif'
+    background: '#f5f5f5',
+    fontFamily: '"MS Sans Serif", Arial, sans-serif',
+    fontSize: FONT_BASE
   },
   loading: {
     display: 'flex',
@@ -1097,14 +1045,15 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     height: '100dvh',
     minHeight: '100vh',
-    fontSize: '10px', // Design system standard
-    fontFamily: 'Arial, sans-serif'
+    fontSize: FONT_BASE,
+    fontFamily: '"MS Sans Serif", Arial, sans-serif',
+    background: '#f5f5f5'
   },
   header: {
-    background: '#0066cc', // Primary blue (better contrast than navy)
-    color: '#ffffff',
+    background: '#c0c0c0',
+    color: '#000000',
     padding: '12px',
-    borderBottom: '2px solid #ffffff'
+    borderBottom: '2px solid #bdbdbd'
   },
   headerContent: {
     display: 'flex',
@@ -1112,27 +1061,27 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center'
   },
   title: {
-    fontSize: '10px', // Design system standard
+    fontSize: FONT_BASE,
     fontWeight: 'bold',
     margin: 0
   },
   price: {
-    fontSize: '12px', // Slightly larger for importance
+    fontSize: FONT_BASE,
     fontWeight: 'bold'
   },
   tabBar: {
     display: 'flex',
-    background: '#e0e0e0', // var(--grey-200)
-    borderBottom: '2px solid #bdbdbd', // var(--border-medium)
+    background: '#c0c0c0',
+    borderBottom: '2px solid #bdbdbd',
     padding: '2px'
   },
   tab: {
     flex: 1,
     padding: '8px 4px',
-    background: '#e0e0e0', // var(--grey-200)
+    background: '#c0c0c0',
     border: '2px outset #ffffff',
     color: '#000000',
-    fontSize: '10px', // Design system standard
+    fontSize: FONT_BASE,
     fontWeight: 'bold',
     cursor: 'pointer',
     fontFamily: 'Arial, sans-serif'
@@ -1165,13 +1114,13 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center'
   },
   statValue: {
-    fontSize: '24px',
+    fontSize: FONT_BASE,
     fontWeight: 'bold',
     color: '#0066cc',
     marginBottom: '4px'
   },
   statLabel: {
-    fontSize: '10px',
+    fontSize: FONT_SMALL,
     color: '#000000',
     textTransform: 'uppercase'
   },
@@ -1182,13 +1131,13 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '4px'
   },
   cardLabel: {
-    fontSize: '9px',
+    fontSize: FONT_SMALL,
     color: '#000000',
     marginBottom: '2px',
     fontWeight: 'bold'
   },
   cardValue: {
-    fontSize: '12px',
+    fontSize: FONT_BASE,
     color: '#000000'
   },
   commentsSection: {
@@ -1205,12 +1154,12 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '8px'
   },
   commentsTitle: {
-    fontSize: '12px',
+    fontSize: FONT_BASE,
     fontWeight: 'bold' as const,
     color: '#0066cc'
   },
   commentsCount: {
-    fontSize: '10px',
+    fontSize: FONT_SMALL,
     color: '#bdbdbd',
     cursor: 'pointer'
   },
@@ -1221,7 +1170,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     padding: '8px',
     border: '1px inset #808080',
-    fontSize: '12px',
+    fontSize: FONT_BASE,
     fontFamily: 'Arial, sans-serif',
     boxSizing: 'border-box' as const
   },
@@ -1232,18 +1181,18 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '8px'
   },
   eventDate: {
-    fontSize: '10px',
+    fontSize: FONT_SMALL,
     color: '#bdbdbd',
     marginBottom: '4px'
   },
   eventTitle: {
-    fontSize: '13px',
+    fontSize: FONT_BASE,
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: '4px'
   },
   eventMeta: {
-    fontSize: '11px',
+    fontSize: FONT_SMALL,
     color: '#0066cc'
   },
   imageGrid: {
@@ -1288,7 +1237,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#e0e0e0',
     border: '2px outset #ffffff',
     color: '#000000',
-    fontSize: '20px',
+    fontSize: FONT_BASE,
     cursor: 'pointer',
     fontFamily: 'Arial, sans-serif'
   },
@@ -1299,7 +1248,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(0, 0, 0, 0.7)',
     color: '#ffffff',
     padding: '4px 8px',
-    fontSize: '12px',
+    fontSize: FONT_BASE,
     fontFamily: 'Arial, sans-serif',
     borderRadius: '2px'
   },
@@ -1316,7 +1265,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '48px',
     height: '48px',
     border: '2px outset #ffffff',
-    fontSize: '20px',
+    fontSize: FONT_BASE,
     cursor: 'pointer',
     fontFamily: 'Arial, sans-serif',
     transition: 'all 0.1s ease'
@@ -1332,7 +1281,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   hintText: {
     color: '#ffffff',
-    fontSize: '11px',
+    fontSize: FONT_SMALL,
     fontFamily: 'Arial, sans-serif',
     textAlign: 'center'
   },
@@ -1348,7 +1297,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#e0e0e0',
     border: '2px outset #ffffff',
     padding: '10px',
-    fontSize: '12px',
+    fontSize: FONT_BASE,
     fontWeight: 'bold' as const,
     cursor: 'pointer',
     fontFamily: 'Arial, sans-serif',
@@ -1386,7 +1335,7 @@ const styles: Record<string, React.CSSProperties> = {
   feedActionButton: {
     background: 'transparent',
     border: 'none',
-    fontSize: '14px',
+    fontSize: FONT_BASE,
     cursor: 'pointer',
     fontFamily: 'Arial, sans-serif'
   },
@@ -1435,7 +1384,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '2px'
   },
   technicalStat: {
-    fontSize: '9px',
+    fontSize: FONT_SMALL,
     color: '#ffffff',
     fontFamily: 'Arial, sans-serif',
     textShadow: '1px 1px 2px #000000'
@@ -1453,11 +1402,219 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ffffff',
     border: '2px outset #ffffff',
     borderRadius: '4px',
-    fontSize: '14px',
+    fontSize: FONT_BASE,
     fontWeight: 'bold' as const,
     cursor: 'pointer',
     fontFamily: 'Arial, sans-serif',
     transition: 'transform 0.1s'
+  },
+  // Professional Trading Panel (Robinhood Futures-style)
+  tradingPanel: {
+    background: '#1e1e1e',
+    borderRadius: '12px',
+    marginTop: '12px',
+    overflow: 'hidden'
+  },
+  tradingTabs: {
+    display: 'flex',
+    borderBottom: '1px solid #333'
+  },
+  tradingTab: {
+    flex: 1,
+    padding: '14px',
+    background: 'transparent',
+    color: '#999',
+    border: 'none',
+    fontSize: FONT_BASE,
+    fontWeight: '600' as const,
+    cursor: 'pointer',
+    borderBottom: '2px solid transparent'
+  },
+  tradingTabActive: {
+    color: '#00c853',
+    borderBottom: '2px solid #00c853'
+  },
+  orderForm: {
+    padding: '16px'
+  },
+  formRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '16px'
+  },
+  formLabel: {
+    color: '#fff',
+    fontSize: FONT_BASE,
+    fontWeight: '500' as const
+  },
+  formSubLabel: {
+    color: '#666',
+    fontSize: FONT_SMALL,
+    marginTop: '2px'
+  },
+  formSelect: {
+    background: '#2a2a2a',
+    color: '#fff',
+    border: '1px solid #444',
+    borderRadius: '6px',
+    padding: '10px 12px',
+    fontSize: FONT_BASE,
+    minWidth: '140px',
+    cursor: 'pointer'
+  },
+  inputGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  formInput: {
+    background: '#2a2a2a',
+    color: '#fff',
+    border: '1px solid #444',
+    borderRadius: '6px',
+    padding: '10px 12px',
+    fontSize: FONT_BASE,
+    fontWeight: '600' as const,
+    width: '120px',
+    textAlign: 'right' as const
+  },
+  inputButtons: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px'
+  },
+  inputBtn: {
+    background: '#2a2a2a',
+    color: '#fff',
+    border: '1px solid #444',
+    borderRadius: '4px',
+    width: '32px',
+    height: '20px',
+    fontSize: FONT_BASE,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  formDivider: {
+    height: '1px',
+    background: '#333',
+    margin: '16px 0'
+  },
+  costBreakdown: {
+    marginBottom: '16px'
+  },
+  costRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px'
+  },
+  costLabel: {
+    color: '#999',
+    fontSize: FONT_BASE
+  },
+  costValue: {
+    color: '#fff',
+    fontSize: FONT_BASE,
+    fontWeight: '600' as const
+  },
+  reviewOrderBtn: {
+    width: '100%',
+    background: '#00c853',
+    color: '#000',
+    border: 'none',
+    borderRadius: '24px',
+    padding: '14px',
+    fontSize: FONT_BASE,
+    fontWeight: '700' as const,
+    cursor: 'pointer',
+    marginBottom: '16px'
+  },
+  availableCash: {
+    textAlign: 'center' as const,
+    color: '#999',
+    fontSize: FONT_BASE,
+    marginBottom: '8px'
+  },
+  accountType: {
+    textAlign: 'center' as const,
+    color: '#fff',
+    fontSize: FONT_BASE,
+    marginBottom: '16px'
+  },
+  quickActions: {
+    display: 'flex',
+    gap: '8px',
+    borderTop: '1px solid #333',
+    paddingTop: '16px'
+  },
+  quickActionBtn: {
+    flex: 1,
+    background: '#2a2a2a',
+    color: '#00c853',
+    border: '1px solid #444',
+    borderRadius: '8px',
+    padding: '10px',
+    fontSize: FONT_BASE,
+    fontWeight: '600' as const,
+    cursor: 'pointer'
+  },
+  // Professional About & Disclosure Section
+  aboutSection: {
+    borderTop: '1px solid #d0d0d0',
+    marginTop: '16px',
+    paddingTop: '16px'
+  },
+  aboutHeader: {
+    fontSize: FONT_BASE,
+    fontWeight: 'bold' as const,
+    marginBottom: '8px',
+    color: '#000'
+  },
+  aboutText: {
+    fontSize: FONT_SMALL,
+    lineHeight: '1.5',
+    marginBottom: '8px',
+    color: '#666'
+  },
+  riskDisclosure: {
+    fontSize: FONT_SMALL,
+    lineHeight: '1.4',
+    marginBottom: '8px',
+    color: '#666',
+    marginTop: '12px'
+  },
+  disclosureLink: {
+    color: '#0066cc',
+    textDecoration: 'underline',
+    cursor: 'pointer'
+  },
+  legalFooter: {
+    fontSize: FONT_TINY,
+    lineHeight: '1.4',
+    color: '#999',
+    marginTop: '8px'
+  },
+  // Owner Controls - Separate from trading
+  ownerControls: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '12px',
+    marginBottom: '12px'
+  },
+  ownerControlBtn: {
+    flex: 1,
+    padding: '12px',
+    background: '#c0c0c0',
+    color: '#000',
+    border: '2px outset #ffffff',
+    borderRadius: '4px',
+    fontSize: FONT_BASE,
+    fontWeight: 'bold' as const,
+    cursor: 'pointer',
+    fontFamily: 'Arial, sans-serif'
   }
 };
 

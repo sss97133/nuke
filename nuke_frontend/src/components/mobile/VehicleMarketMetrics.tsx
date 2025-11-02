@@ -30,7 +30,7 @@ export const VehicleMarketMetrics: React.FC<VehicleMarketMetricsProps> = ({ vehi
     
     // Get recent events to calculate volatility and day change
     const { data: recentEvents } = await supabase
-      .from('vehicle_timeline_events')
+      .from('timeline_events')
       .select('event_date, cost_amount, value_impact_amount, created_at')
       .eq('vehicle_id', vehicle.id)
       .order('event_date', { ascending: false })
@@ -123,7 +123,7 @@ export const VehicleMarketMetrics: React.FC<VehicleMarketMetricsProps> = ({ vehi
             <div style={styles.metricValue}>
               {volatilityLevel}
               <div style={styles.volatilityDots}>
-                {['●', '●', '●', '●', '●'].map((dot, idx) => (
+                {['○', '○', '○', '○', '○'].map((dot, idx) => (
                   <span 
                     key={idx}
                     style={{
@@ -143,7 +143,7 @@ export const VehicleMarketMetrics: React.FC<VehicleMarketMetricsProps> = ({ vehi
             <div style={styles.metricLabel}>Trading</div>
             <div style={styles.metricValue}>
               <span style={{color: tradingStatus === 'Active' ? '#00ff00' : '#808080'}}>
-                {tradingStatus === 'Active' ? '🟢' : '⚫'} {tradingStatus}
+                {tradingStatus}
               </span>
             </div>
           </div>

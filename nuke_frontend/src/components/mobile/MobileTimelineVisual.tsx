@@ -60,7 +60,7 @@ export const MobileTimelineVisual: React.FC<MobileTimelineVisualProps> = ({ vehi
       setLoading(true);
 
       const { data: events, error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .select(`
           id,
           vehicle_id,

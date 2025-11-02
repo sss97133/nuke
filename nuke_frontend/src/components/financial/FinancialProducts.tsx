@@ -11,6 +11,11 @@ interface FinancialProductsProps {
 }
 
 export default function FinancialProducts({ vehicleId, vehicleName, vehicleValue }: FinancialProductsProps) {
+  // HIDDEN: Financial products not ready for production
+  // Bonds, stakes, and whole vehicle purchase are in development
+  // Trading shares is handled by MobileTradingPanel in mobile view
+  return null;
+
   const [activeTab, setActiveTab] = useState<'shares' | 'bonds' | 'stakes' | 'whole'>('stakes');
 
   const tabs = [
