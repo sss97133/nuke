@@ -17,7 +17,6 @@ interface DealerVehicle {
     id: string;
     year: number;
     make: string;
-    make;
     model: string;
     trim?: string;
     vin?: string;
