@@ -112,6 +112,7 @@ export default function OrganizationProfile() {
   const [contributors, setContributors] = useState<any[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<OrgImage | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number>(0);
@@ -267,6 +268,10 @@ export default function OrganizationProfile() {
         const currentUserContributor = enrichedContributors.find(c => c.user_id === user.id);
         const userRole = currentUserContributor?.role || null;
         setCurrentUserRole(userRole);
+        
+        // Set canEdit based on role
+        const editRoles = ['owner', 'co_founder', 'board_member', 'manager', 'employee', 'technician', 'moderator', 'contractor', 'contributor'];
+        setCanEdit(userRole !== null && editRoles.includes(userRole));
 
         // First check if there's any verified owner
         const { data: anyOwner } = await supabase
@@ -298,12 +303,19 @@ export default function OrganizationProfile() {
             .maybeSingle();
 
           // User has control if they're the first contributor AND have owner/manager role
-          setIsOwner(
-            firstContributor?.user_id === user.id &&
+          const isFirstOwner = firstContributor?.user_id === user.id &&
             firstContributor?.role &&
-            ['owner', 'co_founder', 'board_member', 'manager'].includes(firstContributor.role)
-          );
+            ['owner', 'co_founder', 'board_member', 'manager'].includes(firstContributor.role);
+          setIsOwner(isFirstOwner);
+          
+          // If first contributor, grant edit access
+          if (firstContributor?.user_id === user.id) {
+            setCanEdit(true);
+          }
         }
+      } else {
+        // Not logged in - no edit access
+        setCanEdit(false);
       }
 
       // Load timeline for attribution tracking
