@@ -98,8 +98,10 @@ const PendingContributionApprovals: React.FC = () => {
       if (error) throw error;
 
       alert('✅ Contribution approved!');
-      loadPendingApprovals();
+      await loadPendingApprovals();
       setShowingImagesFor(null);
+      // Trigger parent refresh if callback provided
+      window.dispatchEvent(new CustomEvent('contribution-approved'));
     } catch (error) {
       console.error('Error approving:', error);
       alert('Failed to approve contribution');
