@@ -1204,6 +1204,9 @@ const VehicleProfile: React.FC = () => {
                 onEditClick={handleEditClick}
               />
 
+              {/* External Listings (BaT, Cars & Bids, etc.) - Auto-displayed if exists */}
+              <ExternalListingCard vehicleId={vehicle.id} />
+
               {/* Financial Products */}
               <FinancialProducts
                 vehicleId={vehicle.id}
