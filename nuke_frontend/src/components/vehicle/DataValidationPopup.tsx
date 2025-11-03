@@ -78,20 +78,8 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
   };
 
   const getSourceIcon = (source: string) => {
-    const icons: Record<string, string> = {
-      'bat_listing': '🏛️',
-      'deal_jacket': '📋',
-      'title_document': '📜',
-      'vin_decoder': '🔍',
-      'expert_appraisal': '👔',
-      'receipt': '🧾',
-      'maintenance_record': '🔧',
-      'insurance_doc': '🛡️',
-      'registration': '🚗',
-      'user_input': '✏️',
-      'crowdsourced_consensus': '👥'
-    };
-    return icons[source] || '📄';
+    // NO EMOJIS - use text labels only
+    return '';
   };
 
   const getSourceLabel = (source: string) => {
@@ -220,8 +208,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '14pt' }}>{getSourceIcon(validation.validation_source)}</span>
-                          <span style={{ fontSize: '9pt', fontWeight: 700 }}>
+                          <span style={{ fontSize: '9pt', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
                             {getSourceLabel(validation.validation_source)}
                           </span>
                         </div>
