@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS contribution_submissions (
   
   -- Link to actual contributions (pending approval)
   image_ids UUID[] DEFAULT '{}', -- Array of vehicle_images.id
-  timeline_event_id UUID REFERENCES vehicle_timeline_events(id),
+  timeline_event_id UUID, -- Link to timeline event (no FK since it's a view)
   document_url TEXT,
   
   -- Context about the work
