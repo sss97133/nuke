@@ -37,6 +37,7 @@ import type {
 import '../design-system.css';
 import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
 import FinancialProducts from '../components/financial/FinancialProducts';
+import ExternalListingCard from '../components/vehicle/ExternalListingCard';
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
