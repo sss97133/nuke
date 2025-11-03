@@ -126,15 +126,43 @@ export default function OrganizationProfile() {
   const [selectedWorkOrderImage, setSelectedWorkOrderImage] = useState<OrgImage | null>(null);
   const [showOrganizationEditor, setShowOrganizationEditor] = useState(false);
   const [showBaTImporter, setShowBaTImporter] = useState(false);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const ownershipUploadId = `org-ownership-${id}`;
 
   useEffect(() => {
     loadOrganization();
+    loadPendingApprovalsCount();
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
+    
+    // Listen for contribution approval events to refresh count
+    const handleApprovalEvent = () => {
+      loadPendingApprovalsCount();
+    };
+    window.addEventListener('contribution-approved', handleApprovalEvent);
+    
+    return () => {
+      window.removeEventListener('contribution-approved', handleApprovalEvent);
+    };
   }, [id]);
+
+  const loadPendingApprovalsCount = async () => {
+    if (!id) return;
+    
+    try {
+      const { count } = await supabase
+        .from('contribution_submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('responsible_party_org_id', id)
+        .eq('status', 'pending');
+      
+      setPendingApprovalsCount(count || 0);
+    } catch (error) {
+      console.error('Error loading pending approvals count:', error);
+    }
+  };
 
   const loadImageTags = async (imageIds: string[]) => {
     try {
@@ -694,10 +722,30 @@ export default function OrganizationProfile() {
               cursor: 'pointer',
               fontFamily: 'Arial, sans-serif',
               textTransform: 'capitalize',
-              color: activeTab === tab ? 'var(--accent)' : 'var(--text)'
+              color: activeTab === tab ? 'var(--accent)' : 'var(--text)',
+              position: 'relative'
             }}
           >
             {tab}
+            {tab === 'contributors' && pendingApprovalsCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '4px',
+                right: '4px',
+                background: '#DC2626',
+                color: '#fff',
+                borderRadius: '50%',
+                width: '16px',
+                height: '16px',
+                fontSize: '7pt',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700
+              }}>
+                {pendingApprovalsCount}
+              </span>
+            )}
           </button>
         ))}
               </div>
@@ -706,13 +754,6 @@ export default function OrganizationProfile() {
       <div style={{ padding: '16px' }}>
         {activeTab === 'overview' && (
           <>
-            {/* Pending Contribution Approvals (for owners/managers) */}
-            {(isOwner || currentUserRole === 'manager') && (
-              <div style={{ marginBottom: '16px' }}>
-                <PendingContributionApprovals />
-              </div>
-            )}
-
             {/* GitHub-Style Activity Heatmap */}
             <div style={{ marginBottom: '16px' }}>
               <OrganizationTimelineHeatmap organizationId={id!} />
@@ -1326,8 +1367,16 @@ export default function OrganizationProfile() {
 
         {/* CONTRIBUTORS TAB - Attribution Chain */}
         {activeTab === 'contributors' && (
-          <div className="card">
-            <div className="card-header">Contributors ({contributors.length})</div>
+          <>
+            {/* Pending Contribution Approvals (for owners/managers/moderators) */}
+            {(isOwner || currentUserRole === 'manager' || currentUserRole === 'moderator') && (
+              <div style={{ marginBottom: '16px' }}>
+                <PendingContributionApprovals />
+              </div>
+            )}
+            
+            <div className="card">
+              <div className="card-header">Contributors ({contributors.length})</div>
             <div className="card-body">
               {contributors.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)', fontSize: '9pt' }}>
