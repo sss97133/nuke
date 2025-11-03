@@ -38,6 +38,7 @@ import '../design-system.css';
 import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
 import FinancialProducts from '../components/financial/FinancialProducts';
 import ExternalListingCard from '../components/vehicle/ExternalListingCard';
+import ImageCoverageChecklist from '../components/vehicle/ImageCoverageChecklist';
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -1207,6 +1208,9 @@ const VehicleProfile: React.FC = () => {
 
               {/* External Listings (BaT, Cars & Bids, etc.) - Auto-displayed if exists */}
               <ExternalListingCard vehicleId={vehicle.id} />
+
+              {/* Image Coverage Checklist - Shows missing angles */}
+              <ImageCoverageChecklist vehicleId={vehicle.id} />
 
               {/* Financial Products */}
               <FinancialProducts
