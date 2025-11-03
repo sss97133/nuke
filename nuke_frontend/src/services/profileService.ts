@@ -47,16 +47,16 @@ export class ProfileService {
         supabase.from('profile_achievements').select('*').eq('user_id', userId).order('earned_at', { ascending: false }).limit(50),
         supabase.from('profile_activity').select('*').eq('user_id', userId).order('created_at', { ascending: false}).limit(10),
         supabase.from('profile_stats').select('*').eq('user_id', userId).single(),
-        // Get real contribution data from timeline events with full metadata - LIMIT for performance
-        supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).order('event_date', { ascending: false }).limit(500),
-        // Get image uploads (include EXIF and vehicle_id for proper grouping) - LIMIT for performance
-        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('taken_at', { ascending: false }).limit(500),
+        // Get real contribution data from timeline events with full metadata - REDUCED LIMIT for fast loading
+        supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).order('event_date', { ascending: false }).limit(100),
+        // Get image uploads (include EXIF and vehicle_id for proper grouping) - REDUCED LIMIT for fast loading
+        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('taken_at', { ascending: false }).limit(100),
         // Get verifications (limited)
-        supabase.from('user_verifications').select('created_at, status').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
-        // Get business timeline events created by this user (organization contributions) - LIMIT for performance
-        supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).order('event_date', { ascending: false }).limit(500),
-        // Get contractor work contributions (NEW - this will show FBM work)
-        supabase.from('contractor_work_contributions').select('id, work_date, work_description, work_category, labor_hours, total_value, organization_id, vehicle_id, metadata').eq('contractor_user_id', userId).eq('show_on_contractor_profile', true).order('work_date', { ascending: false }).limit(200)
+        supabase.from('user_verifications').select('created_at, status').eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
+        // Get business timeline events created by this user (organization contributions) - REDUCED LIMIT for fast loading
+        supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).order('event_date', { ascending: false }).limit(100),
+        // Get contractor work contributions (NEW - this will show FBM work) - REDUCED LIMIT for fast loading
+        supabase.from('contractor_work_contributions').select('id, work_date, work_description, work_category, labor_hours, total_value, organization_id, vehicle_id, metadata').eq('contractor_user_id', userId).eq('show_on_contractor_profile', true).order('work_date', { ascending: false }).limit(50)
       ]);
 
       // Debug: Log query results
