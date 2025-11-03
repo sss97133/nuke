@@ -14,6 +14,7 @@ import MobileVINScanner from '../components/dealer/MobileVINScanner';
 import ContractorWorkInput from '../components/contractor/ContractorWorkInput';
 import OrganizationEditor from '../components/organization/OrganizationEditor';
 import EnhancedDealerInventory from '../components/organization/EnhancedDealerInventory';
+import BaTBulkImporter from '../components/dealer/BaTBulkImporter';
 import '../design-system.css';
 
 interface Organization {
@@ -123,6 +124,7 @@ export default function OrganizationProfile() {
   const [showContractorWorkInput, setShowContractorWorkInput] = useState(false);
   const [selectedWorkOrderImage, setSelectedWorkOrderImage] = useState<OrgImage | null>(null);
   const [showOrganizationEditor, setShowOrganizationEditor] = useState(false);
+  const [showBaTImporter, setShowBaTImporter] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const ownershipUploadId = `org-ownership-${id}`;
 
@@ -1888,6 +1890,19 @@ export default function OrganizationProfile() {
             setShowOrganizationEditor(false);
           }}
           onClose={() => setShowOrganizationEditor(false)}
+        />
+      )}
+
+      {/* BaT Bulk Importer Modal */}
+      {showBaTImporter && organization && (
+        <BaTBulkImporter
+          organizationId={organization.id}
+          organizationName={organization.business_name}
+          onComplete={() => {
+            loadOrganization();
+            setShowBaTImporter(false);
+          }}
+          onClose={() => setShowBaTImporter(false)}
         />
       )}
     </div>
