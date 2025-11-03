@@ -1446,6 +1446,13 @@ export default function OrganizationProfile() {
                     >
                       Bulk Editor
                     </a>
+                    <button
+                      onClick={() => setShowBaTImporter(true)}
+                      className="button button-secondary"
+                      style={{ fontSize: '9pt' }}
+                    >
+                      Import BaT Sales
+                    </button>
                     <a
                       href={`/dealer/${id}/dropbox-import`}
                       className="button button-secondary"
