@@ -706,6 +706,13 @@ export default function OrganizationProfile() {
       <div style={{ padding: '16px' }}>
         {activeTab === 'overview' && (
           <>
+            {/* Pending Contribution Approvals (for owners/managers) */}
+            {(isOwner || currentUserRole === 'manager') && (
+              <div style={{ marginBottom: '16px' }}>
+                <PendingContributionApprovals />
+              </div>
+            )}
+
             {/* GitHub-Style Activity Heatmap */}
             <div style={{ marginBottom: '16px' }}>
               <OrganizationTimelineHeatmap organizationId={id!} />
