@@ -39,6 +39,7 @@ import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
 import FinancialProducts from '../components/financial/FinancialProducts';
 import ExternalListingCard from '../components/vehicle/ExternalListingCard';
 import ImageCoverageChecklist from '../components/vehicle/ImageCoverageChecklist';
+import DataValidationPopup from '../components/vehicle/DataValidationPopup';
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -861,9 +862,25 @@ const VehicleProfile: React.FC = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  // Granular validation popup state
+  const [validationPopup, setValidationPopup] = useState<{
+    open: boolean;
+    fieldName: string;
+    fieldValue: string;
+  }>({
+    open: false,
+    fieldName: '',
+    fieldValue: ''
+  });
+
   const handleDataPointClick = (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => {
     event.preventDefault();
-    openFieldAudit(dataType, label);
+    // Show granular validation popup
+    setValidationPopup({
+      open: true,
+      fieldName: dataType,
+      fieldValue: dataValue
+    });
   };
 
   const openFieldAudit = async (fieldName: string, fieldLabel: string) => {
@@ -1328,66 +1345,14 @@ const VehicleProfile: React.FC = () => {
           )}
         </section>
 
-        {/* Field Audit Modal */}
-        {fieldAudit.open && (
-          <div className="modal-overlay">
-            <div className="modal">
-              <div className="modal-header">
-                <h3 className="modal-title">{fieldAudit.fieldLabel} — Data History</h3>
-                <button
-                  onClick={() => setFieldAudit(prev => ({ ...prev, open: false }))}
-                  className="modal-close"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="modal-body">
-                {typeof fieldAudit.score === 'number' && (
-                  <div className="mb-3">
-                    <div className="text-sm"><strong>Score:</strong> {fieldAudit.score}/100</div>
-                    {fieldAudit.met && fieldAudit.met.length > 0 && (
-                      <div className="text-xs text-gray-600 mt-1">
-                        <strong>Met:</strong> {fieldAudit.met.join(', ')}
-                      </div>
-                    )}
-                    {fieldAudit.next && fieldAudit.next.length > 0 && (
-                      <div className="text-xs text-gray-600 mt-1">
-                        <strong>To reach 100:</strong> {fieldAudit.next.join('; ')}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {fieldAudit.entries.length === 0 ? (
-                  <p className="text-muted">No provenance recorded yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {fieldAudit.entries.map((e, idx) => (
-                      <div key={idx} className="border rounded p-2 flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium">{e.field_value}</div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(e.updated_at).toLocaleString()} • {e.source_type || 'unknown source'}
-                            {e.is_verified ? ' • verified' : ''}
-                          </div>
-                        </div>
-                        {e.user_id && (
-                          <span className="text-xs text-gray-400">by {e.user_id.slice(0,8)}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button
-                  onClick={() => setFieldAudit(prev => ({ ...prev, open: false }))}
-                  className="button button-primary"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* Granular Validation Popup */}
+        {validationPopup.open && vehicle && (
+          <DataValidationPopup
+            vehicleId={vehicle.id}
+            fieldName={validationPopup.fieldName}
+            fieldValue={validationPopup.fieldValue}
+            onClose={() => setValidationPopup(prev => ({ ...prev, open: false }))}
+          />
         )}
 
         {/* Event Modal */}
