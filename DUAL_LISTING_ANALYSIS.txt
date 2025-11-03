@@ -1,0 +1,36 @@
+# 1966 C10 - DUAL BaT LISTING ANALYSIS
+
+## Timeline of Events:
+
+### First Attempt (2021)
+- **Listed:** March 29, 2021
+- **Ended:** April 5, 2021  
+- **Result:** Reserve not met
+- **Evidence:** Image filename `1617661905` = April 5, 2021
+- **Seller Decision:** Hold onto vehicle
+
+### Gap Period (3 years)
+- **Duration:** April 2021 - April 2024
+- **What happened?** 
+  - Seller held vehicle, possibly used it
+  - Market conditions changed
+  - Waited for right time to relist
+  - May have made improvements (?)
+
+### Second Attempt (2024)
+- **Listed:** April 26, 2024
+- **Ended:** May 3, 2024
+- **High Bid:** $40,000 (significant increase)
+- **Engagement:** 653 watchers, 8,487 views, 91 comments
+- **Result:** Reserve STILL not met
+- **Current Status:** Available for direct purchase
+
+## Key Insights:
+1. Seller is PATIENT - held 3 years between attempts
+2. Market interest GREW - 653 watchers is strong
+3. Reserve is ABOVE $40k (seller values it higher than market)
+4. This is a HIGH-QUALITY hold - worth more to seller than $40k
+
+## Data Sources to Find:
+1. ✅ 2024 listing (current): https://bringatrailer.com/listing/1966-chevrolet-c10-pickup-105/
+2. 🔍 2021 listing: Need to find original URL

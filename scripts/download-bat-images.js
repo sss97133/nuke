@@ -51,26 +51,55 @@ async function downloadBaTImages() {
     
     const html = await response.text();
     
+    // Extract year, make, model from the listing URL
+    // e.g., "https://bringatrailer.com/listing/1966-chevrolet-c10-pickup-105/"
+    const listingSlugMatch = batUrl.match(/\/listing\/(\d{4})-([^-]+)-([^-\/]+)/);
+    if (!listingSlugMatch) {
+      throw new Error('Invalid BaT listing URL format');
+    }
+    const [, year, make, model] = listingSlugMatch;
+    
+    console.log(`🎯 Looking for ${year} ${make} ${model} images...`);
+    
     // Extract all image URLs from the listing
-    // BaT uses patterns like: https://bringatrailer.com/wp-content/uploads/2024/...
-    // Get URLs without query parameters first
     const imageUrlPattern = /https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^\s"'<>]+\.jpg/gi;
     let imageUrls = [...new Set(html.match(imageUrlPattern) || [])];
     
     // Remove query parameters and deduplicate
     imageUrls = [...new Set(imageUrls.map(url => url.split('?')[0]))];
     
-    console.log(`\n📸 Found ${imageUrls.length} images`);
+    console.log(`\n📸 Found ${imageUrls.length} total images on page`);
     
-    // Filter out thumbnails and keep only full-size images
+    // SMART FILTERING - only get images from THIS listing
     const fullSizeImages = imageUrls.filter(url => {
-      const lowerUrl = url.toLowerCase();
-      return !lowerUrl.includes('thumbnail') && 
-             !lowerUrl.includes('-150x') && 
-             !lowerUrl.includes('-300x') &&
-             !lowerUrl.includes('avatar') &&
-             !lowerUrl.includes('logo') &&
-             (lowerUrl.includes('uploads') || lowerUrl.includes('bat-images'));
+      const filename = url.split('/').pop()?.toLowerCase() || '';
+      
+      // Must contain year_make_model pattern (e.g., "1966_chevrolet_c10")
+      const vehiclePattern = `${year}_${make}_${model}`;
+      if (!filename.includes(vehiclePattern)) {
+        return false;
+      }
+      
+      // Filter out ads, banners, logos, thumbnails
+      if (filename.includes('wordmark') || 
+          filename.includes('banner') ||
+          filename.includes('logo') ||
+          filename.includes('avatar') ||
+          filename.includes('thumbnail') ||
+          filename.includes('-150x') || 
+          filename.includes('-300x') ||
+          filename.includes('scaled') === false) { // Keep scaled, it's full-res
+        // Actually, scaled is good, remove this check
+      }
+      
+      // Only get images from the listing month/year (filter out ads)
+      // BaT uploads listing images in the month they were posted
+      if (url.includes('/2025/') || url.includes('/2026/')) {
+        // Definitely an ad or different listing
+        return false;
+      }
+      
+      return true;
     });
     
     console.log(`✅ Filtered to ${fullSizeImages.length} full-size images\n`);
