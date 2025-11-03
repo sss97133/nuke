@@ -13,6 +13,7 @@ import DropboxImporter from '../components/dealer/DropboxImporter';
 import MobileVINScanner from '../components/dealer/MobileVINScanner';
 import ContractorWorkInput from '../components/contractor/ContractorWorkInput';
 import OrganizationEditor from '../components/organization/OrganizationEditor';
+import PendingContributionApprovals from '../components/contribution/PendingContributionApprovals';
 import EnhancedDealerInventory from '../components/organization/EnhancedDealerInventory';
 import BaTBulkImporter from '../components/dealer/BaTBulkImporter';
 import '../design-system.css';
