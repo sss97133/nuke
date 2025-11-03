@@ -96,6 +96,11 @@ Return valid JSON only.`
     });
     
     const result = await response.json();
+    
+    if (!result.choices || !result.choices[0]) {
+      throw new Error('OpenAI returned no choices: ' + JSON.stringify(result));
+    }
+    
     const extracted = JSON.parse(result.choices[0].message.content);
     
     return new Response(JSON.stringify({
