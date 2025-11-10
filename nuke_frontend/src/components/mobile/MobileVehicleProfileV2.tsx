@@ -326,6 +326,7 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
         <MobilePhotoDump 
           onClose={handlePhotoDumpClose}
           session={session}
+          vehicleId={vehicleId}
         />
       )}
 
