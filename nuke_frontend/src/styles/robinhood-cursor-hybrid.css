@@ -1,0 +1,630 @@
+/**
+ * ROBINHOOD × CURSOR HYBRID FOR AUTOMOTIVE
+ * 
+ * X-style flow (minimal, feed-based navigation)
+ * + Robinhood feel (financial data viz, real-time values)
+ * + Cursor feel (dark mode, code-like precision)
+ * = Professional automotive data platform
+ */
+
+:root {
+  /* Dark Theme (Cursor/Robinhood default) */
+  --rh-bg: #0d0d0d;
+  --rh-surface: #1a1a1a;
+  --rh-surface-elevated: #222222;
+  --rh-border: #2a2a2a;
+  
+  /* Text (High contrast on dark) */
+  --rh-text-primary: #f5f5f5;
+  --rh-text-secondary: #a8a8a8;
+  --rh-text-tertiary: #6e6e6e;
+  
+  /* Financial Colors (Robinhood style) */
+  --rh-green: #00c805; /* Gains, appreciation */
+  --rh-red: #ff5050;   /* Losses, depreciation */
+  --rh-orange: #ff8c42; /* Warnings, pending */
+  --rh-blue: #5ac8fa;  /* Info, links */
+  
+  /* Accent (Minimal use) */
+  --rh-accent: #5ac8fa;
+  --rh-accent-dim: rgba(90, 200, 250, 0.1);
+  
+  /* Chart Colors */
+  --rh-chart-green: #00c805;
+  --rh-chart-red: #ff5050;
+  --rh-chart-grid: #2a2a2a;
+  --rh-chart-axis: #6e6e6e;
+  
+  /* Typography */
+  --rh-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  --rh-font-mono: 'SF Mono', 'Roboto Mono', 'Consolas', monospace;
+  
+  /* Spacing (Tight, data-dense) */
+  --rh-space-1: 4px;
+  --rh-space-2: 8px;
+  --rh-space-3: 12px;
+  --rh-space-4: 16px;
+  
+  /* Transitions (Snappy) */
+  --rh-transition: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Light mode (optional, but Robinhood is dark-first) */
+:root[data-theme="light"] {
+  --rh-bg: #ffffff;
+  --rh-surface: #fafafa;
+  --rh-surface-elevated: #f5f5f5;
+  --rh-border: #e5e5e5;
+  --rh-text-primary: #0d0d0d;
+  --rh-text-secondary: #6e6e6e;
+  --rh-text-tertiary: #a8a8a8;
+}
+
+/* ================================================
+   LAYOUT: X-STYLE FEED + ROBINHOOD DATA CARDS
+   ================================================ */
+
+body {
+  font-family: var(--rh-font-sans);
+  background: var(--rh-bg);
+  color: var(--rh-text-primary);
+  margin: 0;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Main feed container (X-style vertical scroll) */
+.rh-feed {
+  max-width: 600px;
+  margin: 0 auto;
+  padding-bottom: 80px; /* Space for bottom nav */
+}
+
+/* ================================================
+   VEHICLE VALUE CARD (Robinhood-style)
+   Hero section showing real-time value like stock price
+   ================================================ */
+
+.rh-value-hero {
+  background: var(--rh-surface);
+  border-bottom: 1px solid var(--rh-border);
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.rh-value-label {
+  font-size: 13px;
+  color: var(--rh-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.rh-value-price {
+  font-family: var(--rh-font-mono);
+  font-size: 36px;
+  font-weight: 300;
+  color: var(--rh-text-primary);
+  letter-spacing: -1px;
+  margin-bottom: 4px;
+}
+
+.rh-value-change {
+  font-family: var(--rh-font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rh-value-change.positive {
+  color: var(--rh-green);
+}
+
+.rh-value-change.negative {
+  color: var(--rh-red);
+}
+
+.rh-value-change.neutral {
+  color: var(--rh-text-secondary);
+}
+
+/* Mini chart (Robinhood spark line) */
+.rh-spark-chart {
+  width: 100%;
+  height: 80px;
+  margin-top: 16px;
+}
+
+/* ================================================
+   TIMELINE FEED (X-style list + Cursor-style code)
+   ================================================ */
+
+.rh-timeline-item {
+  border-bottom: 1px solid var(--rh-border);
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  cursor: pointer;
+  transition: background var(--rh-transition);
+}
+
+.rh-timeline-item:hover {
+  background: var(--rh-surface-elevated);
+}
+
+.rh-timeline-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--rh-surface-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+}
+
+.rh-timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.rh-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.rh-timeline-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--rh-text-primary);
+}
+
+.rh-timeline-date {
+  font-size: 13px;
+  color: var(--rh-text-tertiary);
+  font-family: var(--rh-font-mono);
+}
+
+.rh-timeline-desc {
+  font-size: 14px;
+  color: var(--rh-text-secondary);
+  line-height: 1.4;
+}
+
+.rh-timeline-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--rh-text-tertiary);
+}
+
+/* Cost indicator (financial) */
+.rh-cost {
+  font-family: var(--rh-font-mono);
+  color: var(--rh-text-primary);
+}
+
+.rh-cost.expense {
+  color: var(--rh-red);
+}
+
+.rh-cost.gain {
+  color: var(--rh-green);
+}
+
+/* ================================================
+   STAT CARDS (Robinhood portfolio-style)
+   ================================================ */
+
+.rh-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  background: var(--rh-border);
+  border-top: 1px solid var(--rh-border);
+  border-bottom: 1px solid var(--rh-border);
+}
+
+.rh-stat-card {
+  background: var(--rh-surface);
+  padding: 16px;
+  text-align: center;
+}
+
+.rh-stat-label {
+  font-size: 11px;
+  color: var(--rh-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.rh-stat-value {
+  font-family: var(--rh-font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--rh-text-primary);
+}
+
+.rh-stat-change {
+  font-family: var(--rh-font-mono);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.rh-stat-change.positive {
+  color: var(--rh-green);
+}
+
+.rh-stat-change.negative {
+  color: var(--rh-red);
+}
+
+/* ================================================
+   SPECS SHEET (Cursor code editor style)
+   ================================================ */
+
+.rh-specs {
+  background: var(--rh-surface);
+  border: 1px solid var(--rh-border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: var(--rh-font-mono);
+  font-size: 13px;
+  margin: 16px;
+}
+
+.rh-spec-row {
+  display: flex;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rh-border);
+}
+
+.rh-spec-row:last-child {
+  border-bottom: none;
+}
+
+.rh-spec-row:hover {
+  background: var(--rh-surface-elevated);
+}
+
+.rh-spec-key {
+  color: var(--rh-text-tertiary);
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.rh-spec-value {
+  color: var(--rh-text-primary);
+  flex: 1;
+}
+
+.rh-spec-value.number {
+  color: var(--rh-blue); /* Numbers highlighted like in code */
+}
+
+.rh-spec-value.string {
+  color: var(--rh-text-primary);
+}
+
+/* ================================================
+   BUTTONS (Minimal, Robinhood-style)
+   ================================================ */
+
+.rh-btn {
+  background: none;
+  border: 1px solid var(--rh-border);
+  color: var(--rh-text-primary);
+  padding: 12px 24px;
+  border-radius: 24px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--rh-transition);
+  font-family: var(--rh-font-sans);
+}
+
+.rh-btn:hover {
+  background: var(--rh-surface-elevated);
+}
+
+.rh-btn:active {
+  transform: scale(0.98);
+}
+
+.rh-btn-primary {
+  background: var(--rh-text-primary);
+  color: var(--rh-bg);
+  border-color: var(--rh-text-primary);
+}
+
+.rh-btn-primary:hover {
+  background: var(--rh-text-secondary);
+}
+
+.rh-btn-success {
+  background: var(--rh-green);
+  color: var(--rh-bg);
+  border-color: var(--rh-green);
+}
+
+.rh-btn-danger {
+  background: var(--rh-red);
+  color: var(--rh-bg);
+  border-color: var(--rh-red);
+}
+
+/* Icon-only button (X-style) */
+.rh-btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--rh-text-secondary);
+  cursor: pointer;
+  transition: all var(--rh-transition);
+}
+
+.rh-btn-icon:hover {
+  background: var(--rh-surface-elevated);
+  color: var(--rh-text-primary);
+}
+
+/* ================================================
+   BOTTOM NAV (X-style but Robinhood aesthetic)
+   ================================================ */
+
+.rh-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--rh-surface);
+  border-top: 1px solid var(--rh-border);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.rh-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--rh-text-tertiary);
+  transition: color var(--rh-transition);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rh-nav-item:active {
+  color: var(--rh-text-primary);
+}
+
+.rh-nav-item.active {
+  color: var(--rh-text-primary);
+}
+
+.rh-nav-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.rh-nav-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ================================================
+   IMAGE GALLERY (Minimal, full-bleed)
+   ================================================ */
+
+.rh-gallery {
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: var(--rh-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.rh-gallery-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rh-gallery-controls {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.rh-gallery-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transition: all var(--rh-transition);
+}
+
+.rh-gallery-dot.active {
+  width: 20px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* ================================================
+   AI INSIGHTS (Cursor inline diagnostics style)
+   ================================================ */
+
+.rh-insight {
+  background: var(--rh-accent-dim);
+  border-left: 3px solid var(--rh-accent);
+  padding: 12px 16px;
+  margin: 16px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.rh-insight-label {
+  font-size: 11px;
+  color: var(--rh-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.rh-insight-text {
+  color: var(--rh-text-primary);
+  line-height: 1.5;
+}
+
+.rh-insight.warning {
+  background: rgba(255, 140, 66, 0.1);
+  border-left-color: var(--rh-orange);
+}
+
+.rh-insight.warning .rh-insight-label {
+  color: var(--rh-orange);
+}
+
+.rh-insight.success {
+  background: rgba(0, 200, 5, 0.1);
+  border-left-color: var(--rh-green);
+}
+
+.rh-insight.success .rh-insight-label {
+  color: var(--rh-green);
+}
+
+/* ================================================
+   CHART CONTAINER (Robinhood-style)
+   ================================================ */
+
+.rh-chart-container {
+  background: var(--rh-surface);
+  border-top: 1px solid var(--rh-border);
+  border-bottom: 1px solid var(--rh-border);
+  padding: 24px 16px;
+}
+
+.rh-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.rh-chart-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--rh-text-primary);
+}
+
+.rh-chart-range {
+  display: flex;
+  gap: 8px;
+}
+
+.rh-chart-range-btn {
+  background: none;
+  border: none;
+  color: var(--rh-text-tertiary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all var(--rh-transition);
+}
+
+.rh-chart-range-btn.active {
+  background: var(--rh-surface-elevated);
+  color: var(--rh-text-primary);
+}
+
+/* ================================================
+   RESPONSIVE
+   ================================================ */
+
+@media (max-width: 768px) {
+  .rh-value-price {
+    font-size: 32px;
+  }
+  
+  .rh-spec-key {
+    width: 100px;
+    font-size: 12px;
+  }
+  
+  .rh-spec-value {
+    font-size: 12px;
+  }
+}
+
+/* ================================================
+   ANIMATIONS (Smooth, not flashy)
+   ================================================ */
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.rh-animate-in {
+  animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ================================================
+   PULL-TO-REFRESH (Robinhood-style)
+   ================================================ */
+
+.rh-pull-indicator {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--rh-text-tertiary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: translateX(-50%) rotate(360deg); }
+}
+

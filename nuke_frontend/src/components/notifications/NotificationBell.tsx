@@ -63,9 +63,18 @@ const NotificationBell: React.FC = () => {
   }, []);
 
   return (
-    <button className="button button-small" onClick={() => navigate('/notifications')} title="Notifications">
-      Notifications
-      {count > 0 && <span className="badge" style={{ marginLeft: 6 }}>{count}</span>}
+    <button 
+      onClick={() => navigate('/notifications')} 
+      title="Notifications"
+      className="relative p-2 hover:bg-gray-100 rounded transition-colors"
+    >
+      {/* Simple red dot, no bell icon bullshit */}
+      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
     </button>
   );
 };

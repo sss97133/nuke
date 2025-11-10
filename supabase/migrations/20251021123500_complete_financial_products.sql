@@ -40,14 +40,14 @@ CREATE TABLE IF NOT EXISTS vehicle_bonds (
   -- Metadata
   description TEXT,
   use_of_funds TEXT,
-  metadata JSONB DEFAULT '{}',
+  metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_vehicle_bonds_vehicle ON vehicle_bonds(vehicle_id);
-CREATE INDEX idx_vehicle_bonds_issuer ON vehicle_bonds(issuer_id);
-CREATE INDEX idx_vehicle_bonds_status ON vehicle_bonds(status);
+CREATE INDEX IF NOT EXISTS idx_vehicle_bonds_vehicle ON vehicle_bonds(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_bonds_issuer ON vehicle_bonds(issuer_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_bonds_status ON vehicle_bonds(status);
 
 -- Bond Holdings (who owns bonds)
 CREATE TABLE IF NOT EXISTS bond_holdings (
@@ -75,9 +75,9 @@ CREATE TABLE IF NOT EXISTS bond_holdings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_bond_holdings_bond ON bond_holdings(bond_id);
-CREATE INDEX idx_bond_holdings_holder ON bond_holdings(holder_id);
-CREATE INDEX idx_bond_holdings_redeemed ON bond_holdings(redeemed);
+CREATE INDEX IF NOT EXISTS idx_bond_holdings_bond ON bond_holdings(bond_id);
+CREATE INDEX IF NOT EXISTS idx_bond_holdings_holder ON bond_holdings(holder_id);
+CREATE INDEX IF NOT EXISTS idx_bond_holdings_redeemed ON bond_holdings(redeemed);
 
 -- =====================================================
 -- PRODUCT 3: PROFIT-SHARING STAKES
@@ -119,14 +119,14 @@ CREATE TABLE IF NOT EXISTS vehicle_funding_rounds (
   description TEXT,
   use_of_funds TEXT,
   estimated_completion_date DATE,
-  metadata JSONB DEFAULT '{}',
+  metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_funding_rounds_vehicle ON vehicle_funding_rounds(vehicle_id);
-CREATE INDEX idx_funding_rounds_builder ON vehicle_funding_rounds(builder_id);
-CREATE INDEX idx_funding_rounds_status ON vehicle_funding_rounds(status);
+CREATE INDEX IF NOT EXISTS idx_funding_rounds_vehicle ON vehicle_funding_rounds(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_funding_rounds_builder ON vehicle_funding_rounds(builder_id);
+CREATE INDEX IF NOT EXISTS idx_funding_rounds_status ON vehicle_funding_rounds(status);
 
 -- Individual Stakes
 CREATE TABLE IF NOT EXISTS profit_share_stakes (
@@ -161,9 +161,9 @@ CREATE TABLE IF NOT EXISTS profit_share_stakes (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_profit_stakes_round ON profit_share_stakes(funding_round_id);
-CREATE INDEX idx_profit_stakes_staker ON profit_share_stakes(staker_id);
-CREATE INDEX idx_profit_stakes_cashed_out ON profit_share_stakes(cashed_out);
+CREATE INDEX IF NOT EXISTS idx_profit_stakes_round ON profit_share_stakes(funding_round_id);
+CREATE INDEX IF NOT EXISTS idx_profit_stakes_staker ON profit_share_stakes(staker_id);
+CREATE INDEX IF NOT EXISTS idx_profit_stakes_cashed_out ON profit_share_stakes(cashed_out);
 
 -- =====================================================
 -- PRODUCT 4: WHOLE VEHICLE SALES (Traditional)
@@ -202,17 +202,17 @@ CREATE TABLE IF NOT EXISTS vehicle_listings (
   -- Metadata
   description TEXT,
   terms_conditions TEXT,
-  metadata JSONB DEFAULT '{}',
+  metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   
   UNIQUE(vehicle_id, status) -- One active listing per vehicle
 );
 
-CREATE INDEX idx_vehicle_listings_vehicle ON vehicle_listings(vehicle_id);
-CREATE INDEX idx_vehicle_listings_seller ON vehicle_listings(seller_id);
-CREATE INDEX idx_vehicle_listings_status ON vehicle_listings(status);
-CREATE INDEX idx_vehicle_listings_sale_type ON vehicle_listings(sale_type);
+CREATE INDEX IF NOT EXISTS idx_vehicle_listings_vehicle ON vehicle_listings(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_listings_seller ON vehicle_listings(seller_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_listings_status ON vehicle_listings(status);
+CREATE INDEX IF NOT EXISTS idx_vehicle_listings_sale_type ON vehicle_listings(sale_type);
 
 -- Offers (for best_offer listings)
 CREATE TABLE IF NOT EXISTS vehicle_offers (
@@ -243,53 +243,131 @@ CREATE TABLE IF NOT EXISTS vehicle_offers (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_vehicle_offers_listing ON vehicle_offers(listing_id);
-CREATE INDEX idx_vehicle_offers_buyer ON vehicle_offers(buyer_id);
-CREATE INDEX idx_vehicle_offers_status ON vehicle_offers(status);
+CREATE INDEX IF NOT EXISTS idx_vehicle_offers_listing ON vehicle_offers(listing_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_offers_buyer ON vehicle_offers(buyer_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_offers_status ON vehicle_offers(status);
 
 -- =====================================================
 -- RLS POLICIES
 -- =====================================================
 
-ALTER TABLE vehicle_bonds ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bond_holdings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE vehicle_funding_rounds ENABLE ROW LEVEL SECURITY;
-ALTER TABLE profit_share_stakes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE vehicle_listings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE vehicle_offers ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'vehicle_bonds'
+  ) THEN
+    EXECUTE 'ALTER TABLE vehicle_bonds ENABLE ROW LEVEL SECURITY';
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'vehicle_bonds'
+        AND policyname = 'Anyone can view bonds'
+    ) THEN
+      EXECUTE 'DROP POLICY "Anyone can view bonds" ON vehicle_bonds';
+    END IF;
+    EXECUTE 'CREATE POLICY "Anyone can view bonds" ON vehicle_bonds FOR SELECT USING (true)';
+  ELSE
+    RAISE NOTICE 'Skipping RLS setup for vehicle_bonds: table does not exist.';
+  END IF;
 
--- Anyone can view bonds
-CREATE POLICY "Anyone can view bonds"
-  ON vehicle_bonds FOR SELECT
-  USING (true);
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'bond_holdings'
+  ) THEN
+    EXECUTE 'ALTER TABLE bond_holdings ENABLE ROW LEVEL SECURITY';
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'bond_holdings'
+        AND policyname = 'Users can view own bond holdings'
+    ) THEN
+      EXECUTE 'DROP POLICY "Users can view own bond holdings" ON bond_holdings';
+    END IF;
+    EXECUTE 'CREATE POLICY "Users can view own bond holdings" ON bond_holdings FOR SELECT USING (auth.uid() = holder_id)';
+  ELSE
+    RAISE NOTICE 'Skipping RLS setup for bond_holdings: table does not exist.';
+  END IF;
 
--- Users can view their bond holdings
-CREATE POLICY "Users can view own bond holdings"
-  ON bond_holdings FOR SELECT
-  USING (auth.uid() = holder_id);
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'vehicle_funding_rounds'
+  ) THEN
+    EXECUTE 'ALTER TABLE vehicle_funding_rounds ENABLE ROW LEVEL SECURITY';
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'vehicle_funding_rounds'
+        AND policyname = 'Anyone can view funding rounds'
+    ) THEN
+      EXECUTE 'DROP POLICY "Anyone can view funding rounds" ON vehicle_funding_rounds';
+    END IF;
+    EXECUTE 'CREATE POLICY "Anyone can view funding rounds" ON vehicle_funding_rounds FOR SELECT USING (true)';
+  ELSE
+    RAISE NOTICE 'Skipping RLS setup for vehicle_funding_rounds: table does not exist.';
+  END IF;
 
--- Anyone can view funding rounds
-CREATE POLICY "Anyone can view funding rounds"
-  ON vehicle_funding_rounds FOR SELECT
-  USING (true);
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'profit_share_stakes'
+  ) THEN
+    EXECUTE 'ALTER TABLE profit_share_stakes ENABLE ROW LEVEL SECURITY';
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'profit_share_stakes'
+        AND policyname = 'Users can view own stakes'
+    ) THEN
+      EXECUTE 'DROP POLICY "Users can view own stakes" ON profit_share_stakes';
+    END IF;
+    EXECUTE 'CREATE POLICY "Users can view own stakes" ON profit_share_stakes FOR SELECT USING (auth.uid() = staker_id)';
+  ELSE
+    RAISE NOTICE 'Skipping RLS setup for profit_share_stakes: table does not exist.';
+  END IF;
 
--- Users can view their stakes
-CREATE POLICY "Users can view own stakes"
-  ON profit_share_stakes FOR SELECT
-  USING (auth.uid() = staker_id);
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'vehicle_listings'
+  ) THEN
+    EXECUTE 'ALTER TABLE vehicle_listings ENABLE ROW LEVEL SECURITY';
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'vehicle_listings'
+        AND policyname = 'Anyone can view listings'
+    ) THEN
+      EXECUTE 'DROP POLICY "Anyone can view listings" ON vehicle_listings';
+    END IF;
+    EXECUTE 'CREATE POLICY "Anyone can view listings" ON vehicle_listings FOR SELECT USING (true)';
+  ELSE
+    RAISE NOTICE 'Skipping RLS setup for vehicle_listings: table does not exist.';
+  END IF;
 
--- Anyone can view listings
-CREATE POLICY "Anyone can view listings"
-  ON vehicle_listings FOR SELECT
-  USING (true);
-
--- Users can view offers they made or received
-CREATE POLICY "Users can view relevant offers"
-  ON vehicle_offers FOR SELECT
-  USING (
-    auth.uid() = buyer_id OR 
-    auth.uid() IN (SELECT seller_id FROM vehicle_listings WHERE id = listing_id)
-  );
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'vehicle_offers'
+  ) THEN
+    EXECUTE 'ALTER TABLE vehicle_offers ENABLE ROW LEVEL SECURITY';
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'vehicle_offers'
+        AND policyname = 'Users can view relevant offers'
+    ) THEN
+      EXECUTE 'DROP POLICY "Users can view relevant offers" ON vehicle_offers';
+    END IF;
+    EXECUTE 'CREATE POLICY "Users can view relevant offers" ON vehicle_offers FOR SELECT USING (auth.uid() = buyer_id OR auth.uid() IN (SELECT seller_id FROM vehicle_listings WHERE id = listing_id))';
+  ELSE
+    RAISE NOTICE 'Skipping RLS setup for vehicle_offers: table does not exist.';
+  END IF;
+END
+$$;
 
 -- =====================================================
 -- BOND FUNCTIONS

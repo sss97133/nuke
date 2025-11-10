@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 import DiscoveryFeed from '../components/feed/DiscoveryFeed';
 import AddVehicle from './add-vehicle/AddVehicle';
 import { MobileAddVehicle } from '../components/mobile/MobileAddVehicle';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { VehicleCardLive } from '../components/cards/VehicleCardLive';
+import DealAlertPanel from '../components/marketplace/DealAlertPanel';
 import '../design-system.css';
 
 interface BuildAnalysisResult {
@@ -112,7 +111,7 @@ const Discovery: React.FC = () => {
 
         {/* Content Area */}
         <section className="section">
-
+          <DealAlertPanel />
           <DiscoveryFeed
             viewMode={viewMode}
             denseMode={denseModeEnabled}

@@ -305,14 +305,21 @@ const OrganizationInventoryTab: React.FC<Props> = ({ organizationId, isOwner }) 
                       <div style={{
                         width: '60px',
                         height: '45px',
-                        backgroundImage: v.vehicle_image_url ? `url(${v.vehicle_image_url})` : 'url(/n-zero.png)',
-                        backgroundSize: v.vehicle_image_url ? 'cover' : 'contain',
+                        backgroundImage: v.vehicle_image_url ? `url(${v.vehicle_image_url})` : 'none',
+                        backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        backgroundColor: '#f5f5f5',
-                        border: '1px solid var(--border)',
+                        backgroundColor: v.vehicle_image_url ? '#f5f5f5' : '#333',
+                        border: '2px solid var(--border)',
                         borderRadius: '3px',
-                        opacity: v.vehicle_image_url ? 1 : 0.3
-                      }} />
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        fontSize: '7pt',
+                        fontWeight: 'bold'
+                      }}>
+                        {!v.vehicle_image_url && 'NO PHOTO'}
+                      </div>
                     </td>
                     <td style={{ padding: '10px' }}>
                       <div style={{ fontWeight: 600 }}>

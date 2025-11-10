@@ -9,6 +9,7 @@ export interface VehicleFormData {
   year?: number;
   vin?: string;
   license_plate?: string;
+  location?: string;
 
   // Physical Specifications
   color?: string;
@@ -48,11 +49,16 @@ export interface VehicleFormData {
   is_for_sale?: boolean;
   asking_price?: number;
   sale_price?: number;
+  listing_posted_at?: string;
+  listing_updated_at?: string;
+  listing_source?: string;
+  listing_url?: string;
 
   // Ownership & History
   mileage?: number;
   previous_owners?: number;
   condition_rating?: number;
+  title_status?: string;
 
   // Modifications
   is_modified?: boolean;
@@ -78,6 +84,7 @@ export interface VehicleFormData {
   scanned_fields?: string[];
   import_url?: string;
   contributor_roles?: ('consigner' | 'mechanic' | 'technician' | 'painter' | 'appraiser' | 'dealer' | 'broker' | 'other')[];
+  discoverer_opinion?: string;
 
   // BAT Integration Fields
   bat_auction_url?: string;

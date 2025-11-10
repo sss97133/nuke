@@ -2,7 +2,7 @@
 -- Immutable vehicle history with confidence scoring and multi-source verification
 
 -- Timeline Events Table
-CREATE TABLE timeline_events (
+CREATE TABLE IF NOT EXISTS timeline_events (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     vehicle_id UUID REFERENCES vehicles(id) ON DELETE CASCADE,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -56,7 +56,7 @@ CREATE TABLE timeline_events (
 );
 
 -- Timeline Event Verifications
-CREATE TABLE timeline_event_verifications (
+CREATE TABLE IF NOT EXISTS timeline_event_verifications (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     timeline_event_id UUID REFERENCES timeline_events(id) ON DELETE CASCADE,
     verifier_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -88,7 +88,7 @@ CREATE TABLE timeline_event_verifications (
 );
 
 -- Timeline Event Conflicts
-CREATE TABLE timeline_event_conflicts (
+CREATE TABLE IF NOT EXISTS timeline_event_conflicts (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     primary_event_id UUID REFERENCES timeline_events(id) ON DELETE CASCADE,
     conflicting_event_id UUID REFERENCES timeline_events(id) ON DELETE CASCADE,
@@ -113,13 +113,33 @@ CREATE TABLE timeline_event_conflicts (
 );
 
 -- Indexes for Performance
-CREATE INDEX idx_timeline_events_vehicle_id ON timeline_events(vehicle_id);
-CREATE INDEX idx_timeline_events_event_date ON timeline_events(event_date DESC);
-CREATE INDEX idx_timeline_events_event_type ON timeline_events(event_type);
-CREATE INDEX idx_timeline_events_verification_status ON timeline_events(verification_status);
-CREATE INDEX idx_timeline_events_confidence_score ON timeline_events(confidence_score DESC);
-CREATE INDEX idx_timeline_event_verifications_event_id ON timeline_event_verifications(timeline_event_id);
-CREATE INDEX idx_timeline_event_conflicts_primary ON timeline_event_conflicts(primary_event_id);
+CREATE INDEX IF NOT EXISTS idx_timeline_events_vehicle_id ON timeline_events(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_timeline_events_event_date ON timeline_events(event_date DESC);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'timeline_events' AND column_name = 'event_type'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_timeline_events_event_type ON timeline_events(event_type)';
+  END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'timeline_events' AND column_name = 'verification_status'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_timeline_events_verification_status ON timeline_events(verification_status)';
+  END IF;
+END;
+$$;
+
+CREATE INDEX IF NOT EXISTS idx_timeline_events_confidence_score ON timeline_events(confidence_score DESC);
+CREATE INDEX IF NOT EXISTS idx_timeline_event_verifications_event_id ON timeline_event_verifications(timeline_event_id);
+CREATE INDEX IF NOT EXISTS idx_timeline_event_conflicts_primary ON timeline_event_conflicts(primary_event_id);
 
 -- Row Level Security
 ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
@@ -127,6 +147,7 @@ ALTER TABLE timeline_event_verifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timeline_event_conflicts ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for timeline_events
+DROP POLICY IF EXISTS "Users can view timeline events for vehicles they own" ON timeline_events;
 CREATE POLICY "Users can view timeline events for vehicles they own" ON timeline_events
     FOR SELECT USING (
         EXISTS (
@@ -136,6 +157,7 @@ CREATE POLICY "Users can view timeline events for vehicles they own" ON timeline
         )
     );
 
+DROP POLICY IF EXISTS "Users can create timeline events for their vehicles" ON timeline_events;
 CREATE POLICY "Users can create timeline events for their vehicles" ON timeline_events
     FOR INSERT WITH CHECK (
         auth.uid() = user_id AND
@@ -146,6 +168,7 @@ CREATE POLICY "Users can create timeline events for their vehicles" ON timeline_
         )
     );
 
+DROP POLICY IF EXISTS "Users can update their own timeline events" ON timeline_events;
 CREATE POLICY "Users can update their own timeline events" ON timeline_events
     FOR UPDATE USING (
         auth.uid() = user_id AND
@@ -157,6 +180,7 @@ CREATE POLICY "Users can update their own timeline events" ON timeline_events
     );
 
 -- RLS Policies for timeline_event_verifications
+DROP POLICY IF EXISTS "Users can view verifications for events they can see" ON timeline_event_verifications;
 CREATE POLICY "Users can view verifications for events they can see" ON timeline_event_verifications
     FOR SELECT USING (
         EXISTS (
@@ -167,10 +191,12 @@ CREATE POLICY "Users can view verifications for events they can see" ON timeline
         )
     );
 
+DROP POLICY IF EXISTS "Users can create verifications" ON timeline_event_verifications;
 CREATE POLICY "Users can create verifications" ON timeline_event_verifications
     FOR INSERT WITH CHECK (auth.uid() = verifier_id);
 
 -- RLS Policies for timeline_event_conflicts
+DROP POLICY IF EXISTS "Users can view conflicts for their events" ON timeline_event_conflicts;
 CREATE POLICY "Users can view conflicts for their events" ON timeline_event_conflicts
     FOR SELECT USING (
         EXISTS (
@@ -203,6 +229,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to update confidence scores
+DROP TRIGGER IF EXISTS update_timeline_confidence_trigger ON timeline_event_verifications;
 CREATE TRIGGER update_timeline_confidence_trigger
     AFTER INSERT OR UPDATE ON timeline_event_verifications
     FOR EACH ROW
@@ -235,6 +262,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to detect conflicts
+DROP TRIGGER IF EXISTS detect_timeline_conflicts_trigger ON timeline_events;
 CREATE TRIGGER detect_timeline_conflicts_trigger
     AFTER INSERT OR UPDATE ON timeline_events
     FOR EACH ROW
@@ -249,6 +277,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_timeline_events_updated_at ON timeline_events;
 CREATE TRIGGER update_timeline_events_updated_at 
     BEFORE UPDATE ON timeline_events 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS vehicle_images (
 ALTER TABLE vehicle_images ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for vehicle_images
+DROP POLICY IF EXISTS "Users can view images for vehicles they own" ON vehicle_images;
 CREATE POLICY "Users can view images for vehicles they own" ON vehicle_images
     FOR SELECT USING (
         EXISTS (
@@ -27,6 +28,7 @@ CREATE POLICY "Users can view images for vehicles they own" ON vehicle_images
         )
     );
 
+DROP POLICY IF EXISTS "Users can view images for public vehicles" ON vehicle_images;
 CREATE POLICY "Users can view images for public vehicles" ON vehicle_images
     FOR SELECT USING (
         EXISTS (
@@ -36,6 +38,7 @@ CREATE POLICY "Users can view images for public vehicles" ON vehicle_images
         )
     );
 
+DROP POLICY IF EXISTS "Users can insert images for their own vehicles" ON vehicle_images;
 CREATE POLICY "Users can insert images for their own vehicles" ON vehicle_images
     FOR INSERT WITH CHECK (
         EXISTS (
@@ -46,6 +49,7 @@ CREATE POLICY "Users can insert images for their own vehicles" ON vehicle_images
         AND auth.uid() = user_id
     );
 
+DROP POLICY IF EXISTS "Users can update images for their own vehicles" ON vehicle_images;
 CREATE POLICY "Users can update images for their own vehicles" ON vehicle_images
     FOR UPDATE USING (
         EXISTS (
@@ -56,6 +60,7 @@ CREATE POLICY "Users can update images for their own vehicles" ON vehicle_images
         AND auth.uid() = user_id
     );
 
+DROP POLICY IF EXISTS "Users can delete images for their own vehicles" ON vehicle_images;
 CREATE POLICY "Users can delete images for their own vehicles" ON vehicle_images
     FOR DELETE USING (
         EXISTS (
@@ -73,6 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_vehicle_images_position ON vehicle_images(positio
 CREATE INDEX IF NOT EXISTS idx_vehicle_images_primary ON vehicle_images(is_primary);
 
 -- Create trigger to automatically update updated_at
+DROP TRIGGER IF EXISTS update_vehicle_images_updated_at ON vehicle_images;
 CREATE TRIGGER update_vehicle_images_updated_at
     BEFORE UPDATE ON vehicle_images
     FOR EACH ROW

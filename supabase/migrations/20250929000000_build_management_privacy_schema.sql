@@ -163,6 +163,7 @@ CREATE POLICY images_policy ON build_images
 ALTER TABLE build_permissions ENABLE ROW LEVEL SECURITY;
 
 -- Permissions policy
+DROP POLICY IF EXISTS permissions_policy ON build_permissions;
 CREATE POLICY permissions_policy ON build_permissions
   USING (
     user_id = auth.uid()
@@ -176,6 +177,8 @@ CREATE POLICY permissions_policy ON build_permissions
   );
 
 -- Create public view for anonymous access
+DROP VIEW IF EXISTS public_builds;
+
 CREATE OR REPLACE VIEW public_builds AS
 SELECT
   vb.id,

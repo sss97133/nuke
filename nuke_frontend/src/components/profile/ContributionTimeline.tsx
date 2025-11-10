@@ -247,6 +247,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
           gap: 'var(--space-4)', 
           marginBottom: 'var(--space-2)'
         }}>
+          <span>Total: <strong>{totalContributions.toLocaleString()}</strong></span>
           <span>Hours: <strong>{totalHours.toFixed(1)}</strong></span>
           <span>Active days: <strong>{activeDays}</strong></span>
           {maxStreak > 0 && <span>Streak: <strong>{maxStreak}d</strong></span>}

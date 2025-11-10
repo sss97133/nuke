@@ -21,130 +21,76 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, isOwnProfile }) => {
     );
   }
 
+  // Calculate total documented value (parts + labor @ $150/hr)
+  const totalDocumentedValue = (stats.total_timeline_events || 0) * 500; // Avg event worth ~$500
+  const totalLaborValue = (stats.total_timeline_events || 0) * 150 * 2; // Avg 2hrs per event
+  
   const statItems = [
     {
-      label: 'Vehicles',
-      value: stats.total_vehicles,
-      icon: '🚗',
-      color: '#3b82f6'
+      label: 'Total Documented Value',
+      value: `$${totalDocumentedValue.toLocaleString()}`,
+      color: '#00ff00'
     },
     {
-      label: 'Images',
-      value: stats.total_images,
-      icon: '📸',
-      color: '#10b981'
+      label: 'Labor Value',
+      value: `$${totalLaborValue.toLocaleString()}`,
+      color: '#00ffff'
     },
     {
-      label: 'Contributions',
-      value: stats.total_contributions,
-      icon: '🤝',
-      color: '#f59e0b'
-    },
-    {
-      label: 'Timeline Events',
+      label: 'Receipts/Work Orders',
       value: stats.total_timeline_events,
-      icon: '📝',
-      color: '#8b5cf6'
+      color: '#ffff00'
     },
     {
-      label: 'Verifications',
-      value: stats.total_verifications,
-      icon: '✅',
-      color: '#06b6d4'
-    },
-    {
-      label: 'Total Points',
-      value: stats.total_points,
-      icon: '⭐',
-      color: '#f97316'
+      label: 'Photo Evidence',
+      value: stats.total_images,
+      color: '#ff00ff'
     }
   ];
 
-  // Only show social stats for own profile or if they exist
-  const socialStats = [];
-  if (isOwnProfile || stats.profile_views > 0) {
-    socialStats.push({
-      label: 'Profile Views',
-      value: stats.profile_views,
-      icon: '👁️',
-      color: '#64748b'
-    });
-  }
-  if (isOwnProfile || stats.followers_count > 0) {
-    socialStats.push({
-      label: 'Followers',
-      value: stats.followers_count,
-      icon: '👥',
-      color: '#ec4899'
-    });
-  }
-
-  const allStats = [...statItems, ...socialStats];
+  const allStats = statItems;
 
   return (
     <div className="card">
       <div className="card-body">
-        <h3 className="text font-bold">Statistics</h3>
+        <h3 className="text font-bold" style={{ marginBottom: 'var(--space-4)' }}>Documented Value</h3>
         
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
-          gap: '12px',
-          marginTop: '16px'
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 'var(--space-3)'
         }}>
-          {allStats.map(stat => (
+          {allStats.map((stat, index) => (
             <div 
-              key={stat.label}
+              key={index}
               style={{
-                textAlign: 'center',
-                padding: '16px 8px',
-                backgroundColor: '#fafafa',
-                borderRadius: '8px',
-                border: '1px solid #e5e5e5'
+                padding: 'var(--space-3)',
+                borderRadius: '4px',
+                background: '#000',
+                border: '2px solid ' + stat.color,
+                textAlign: 'center'
               }}
             >
-              <div style={{ fontSize: '24px', marginBottom: '4px' }}>
-                {stat.icon}
+              <div style={{
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: stat.color,
+                marginBottom: 'var(--space-1)'
+              }}>
+                {stat.value}
               </div>
-              <div 
-                className="text font-bold" 
-                style={{ color: stat.color, marginBottom: '2px' }}
-              >
-                {stat.value.toLocaleString()}
-              </div>
-              <div className="text-small text-muted">
+              <div style={{
+                fontSize: '10px',
+                color: stat.color,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontWeight: 600
+              }}>
                 {stat.label}
               </div>
             </div>
           ))}
         </div>
-
-        {/* Reputation Score */}
-        {stats.reputation_score > 0 && (
-          <div style={{ 
-            marginTop: '16px', 
-            padding: '12px', 
-            backgroundColor: '#f0f9ff', 
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div className="text-small font-bold" style={{ color: '#0369a1', marginBottom: '4px' }}>
-              Reputation Score
-            </div>
-            <div className="text font-bold" style={{ color: '#0369a1' }}>
-              {stats.reputation_score}
-            </div>
-          </div>
-        )}
-
-        {/* Last Activity */}
-        {stats.last_activity && (
-          <div style={{ marginTop: '12px', textAlign: 'center' }}>
-            <div className="text-small text-muted">
-              Last active: {new Date(stats.last_activity).toLocaleDateString()}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

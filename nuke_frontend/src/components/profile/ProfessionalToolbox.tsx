@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../../lib/supabase';
 import { ProfessionalToolsService } from '../../services/professionalToolsService';
 import { ToolProductEnrichmentService } from '../../services/toolProductEnrichmentService';
 import { ToolImageService } from '../../services/toolImageService';
@@ -29,6 +30,8 @@ interface UserTool {
   metadata?: any;
   created_at?: string;
   updated_at?: string;
+  usage_count?: number;
+  last_used_at?: string;
 }
 
 interface ProfessionalToolboxProps {
@@ -58,6 +61,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [fetchingImages, setFetchingImages] = useState(false);
   const [showReceiptManager, setShowReceiptManager] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   // File upload ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,10 +76,29 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
       
       console.log(`Database returned ${toolsData?.length || 0} tools`);
       
+      // Load usage stats for each tool
+      const { data: usageStats } = await supabase
+        .from('tool_usage_stats')
+        .select('part_number, brand, tool_description, total_uses, last_used_at');
+      
+      // Enrich tools with usage data
+      const enrichedTools = (toolsData || []).map(tool => {
+        const usage = usageStats?.find(u => 
+          (u.part_number && u.part_number === tool.part_number) ||
+          (u.brand === tool.brand && u.tool_description?.toLowerCase().includes(tool.description?.toLowerCase().substring(0, 20)))
+        );
+        
+        return {
+          ...tool,
+          usage_count: usage?.total_uses || 0,
+          last_used_at: usage?.last_used_at
+        };
+      });
+      
       // Force clear and set fresh data
       setTools([]); // Clear first
       setTimeout(() => {
-        setTools(toolsData || []);
+        setTools(enrichedTools);
       }, 10);
 
       // Get stats
@@ -550,6 +573,13 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
                 }}>PART #</th>
                 <th style={{ 
                   padding: '6px 8px',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  borderRight: '1px solid var(--border-medium)',
+                  width: '60px'
+                }}>USES</th>
+                <th style={{ 
+                  padding: '6px 8px',
                   textAlign: 'right',
                   fontWeight: 'bold',
                   width: '80px'
@@ -572,18 +602,27 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
                       borderRight: '1px solid var(--border-light)',
                       textAlign: 'center'
                     }}>
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        border: '1px inset var(--border-medium)',
-                        background: 'var(--white)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '9px',
-                        color: 'var(--text-muted)',
-                        padding: '2px'
-                      }}>
+                      <div 
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          border: '1px inset var(--border-medium)',
+                          background: 'var(--white)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '9px',
+                          color: 'var(--text-muted)',
+                          padding: '2px',
+                          cursor: tool.image_url ? 'pointer' : 'default'
+                        }}
+                        onClick={(e) => {
+                          if (tool.image_url) {
+                            e.stopPropagation();
+                            setSelectedImage(tool.image_url);
+                          }
+                        }}
+                      >
                         {tool.image_url ? (
                           <img 
                             src={tool.image_url} 
@@ -668,6 +707,15 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
                       fontFamily: 'monospace'
                     }}>
                       {tool.part_number || '-'}
+                    </td>
+                    <td style={{ 
+                      padding: '4px 8px',
+                      borderRight: '1px solid var(--border-light)',
+                      textAlign: 'center',
+                      fontWeight: tool.usage_count && tool.usage_count > 0 ? 'bold' : 'normal',
+                      color: tool.usage_count && tool.usage_count > 0 ? 'var(--green-500)' : 'var(--text-muted)'
+                    }}>
+                      {tool.usage_count || 0}
                     </td>
                     <td style={{ 
                       padding: '4px 8px',
@@ -825,6 +873,38 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
         }}
         canClose={!importing || progressStatus.progress === 100 || progressStatus.error !== ''}
       />
+
+      {/* Image Popup */}
+      {selectedImage && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            cursor: 'pointer'
+          }}
+          onClick={() => setSelectedImage(null)}
+        >
+          <img 
+            src={selectedImage} 
+            alt="Tool" 
+            style={{
+              maxWidth: '90%',
+              maxHeight: '90%',
+              objectFit: 'contain',
+              border: '2px solid var(--white)',
+              boxShadow: '0 0 20px rgba(0,0,0,0.8)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

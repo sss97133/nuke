@@ -88,13 +88,39 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
   };
 
   const loadParts = async () => {
-    const { data, error } = await supabase
+    // Load manual work order parts
+    const { data: workOrderParts, error } = await supabase
       .from('work_order_parts')
       .select('*')
       .eq('timeline_event_id', event.id)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true});
+
+    // Load AI-identified shoppable products from image tags
+    const imageUrls = images.length > 0 ? images : [];
+    console.log('🔍 loadParts() - Querying for', imageUrls.length, 'image URLs');
     
-    if (data) setParts(data);
+    const { data: imageProducts, error: tagsError } = await supabase
+      .from('image_tags')
+      .select('*')
+      .in('image_url', imageUrls)
+      .eq('is_shoppable', true)
+      .order('confidence', { ascending: false });
+    
+    console.log('✅ Found', imageProducts?.length || 0, 'shoppable products from image_tags');
+    if (tagsError) console.error('❌ Error loading products:', tagsError);
+    
+    // Combine both sources
+    const combined = [
+      ...(workOrderParts || []),
+      ...(imageProducts || []).map(tag => ({
+        ...tag,
+        is_ai_detected: true,
+        buy_link: tag.affiliate_links?.amazon || `https://amazon.com/s?k=${encodeURIComponent(tag.tag_name)}`
+      }))
+    ];
+    
+    console.log('🎯 Total parts to display:', combined.length);
+    setParts(combined);
   };
 
   const loadLabor = async () => {
@@ -549,14 +575,14 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                         marginBottom: '12px',
                         border: '2px solid var(--border)',
                         borderRadius: '6px',
-                        background: 'var(--white)'
+                        background: part.is_ai_detected ? '#f0fdf4' : 'var(--white)'
                       }}
                     >
                       <div style={{ display: 'flex', gap: '12px' }}>
                         {part.image_url && (
                           <img
                             src={part.image_url}
-                            alt={part.part_name}
+                            alt={part.part_name || part.tag_name}
                             style={{
                               width: '80px',
                               height: '80px',
@@ -568,10 +594,27 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                         )}
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
-                            {part.part_name}
+                            {part.part_name || part.tag_name}
+                            {part.is_ai_detected && (
+                              <span style={{ 
+                                fontSize: '7pt', 
+                                background: '#10b981', 
+                                color: 'white', 
+                                padding: '2px 6px', 
+                                borderRadius: '3px',
+                                marginLeft: '8px'
+                              }}>
+                                AI DETECTED
+                              </span>
+                            )}
                             {part.quantity > 1 && (
                               <span style={{ fontSize: '8pt', color: 'var(--text-muted)', marginLeft: '8px' }}>
                                 × {part.quantity}
+                              </span>
+                            )}
+                            {part.confidence && (
+                              <span style={{ fontSize: '7pt', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                                {part.confidence}% confidence
                               </span>
                             )}
                           </div>
@@ -585,24 +628,29 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                               Part #: {part.part_number}
                             </div>
                           )}
+                          {part.oem_part_number && (
+                            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                              OEM #: {part.oem_part_number}
+                            </div>
+                          )}
                           <div style={{ fontSize: '11pt', fontWeight: 700, color: 'var(--accent)' }}>
-                            ${parseFloat(part.total_price || 0).toLocaleString()}
+                            ${parseFloat(part.total_price || part.lowest_price_cents / 100 || 0).toLocaleString()}
                           </div>
-                          {part.buy_url && (
+                          {(part.buy_url || part.buy_link) && (
                             <a
-                              href={part.buy_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="button button-small button-primary"
-                            style={{
-                              marginTop: '8px',
-                              fontSize: '8pt',
-                              display: 'inline-block',
-                              textDecoration: 'none'
-                            }}
-                          >
-                            Buy on {part.supplier || 'Supplier'}
-                          </a>
+                              href={part.buy_url || part.buy_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="button button-small button-primary"
+                              style={{
+                                marginTop: '8px',
+                                fontSize: '8pt',
+                                display: 'inline-block',
+                                textDecoration: 'none'
+                              }}
+                            >
+                              BUY ON AMAZON
+                            </a>
                           )}
                         </div>
                       </div>

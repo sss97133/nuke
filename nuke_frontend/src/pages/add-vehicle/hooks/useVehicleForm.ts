@@ -31,7 +31,10 @@ const DEFAULT_FORM_DATA: VehicleFormData = {
   is_public: true,
   status: 'active',
   scanned_fields: [],
-  import_url: ''
+  import_url: '',
+  discoverer_opinion: '',
+  listing_source: '',
+  listing_url: ''
 };
 
 export function useVehicleForm(initialData: Partial<VehicleFormData> = {}): UseVehicleFormResult {
@@ -162,10 +165,13 @@ export function useVehicleForm(initialData: Partial<VehicleFormData> = {}): UseV
     localStorage.removeItem(AUTOSAVE_KEY);
   }, []);
 
-  // Clear autosave data
+  // Clear autosave data and reset form
   const clearAutosave = useCallback(() => {
     localStorage.removeItem(AUTOSAVE_KEY);
-    setAutoSaveState(prev => ({ ...prev, hasUnsavedChanges: false }));
+    setFormData(DEFAULT_FORM_DATA);
+    setVerificationProgress(calculateVerificationProgress(DEFAULT_FORM_DATA));
+    setAutoSaveState({ lastSaved: '', hasUnsavedChanges: false });
+    setError(null);
   }, []);
 
   // Validate required fields

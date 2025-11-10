@@ -361,12 +361,23 @@ export class TimelineEventService {
 
       // Extract meaningful data from EXIF for timeline event
       // Prefer explicit dateTaken, then EXIF DateTimeOriginal/dateTime, else now
-      const rawDate = imageMetadata?.dateTaken || imageMetadata?.DateTimeOriginal || imageMetadata?.dateTime;
+      const listingCapturedAt = imageMetadata?.listingCapturedAt || imageMetadata?.listingCapturedAtIso || imageMetadata?.listingCapturedAt?.toISOString?.();
+      const rawDate = listingCapturedAt || imageMetadata?.dateTaken || imageMetadata?.DateTimeOriginal || imageMetadata?.dateTime;
       const eventDate = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
 
       // Determine event title based on available metadata
       let title = 'Photo Added';
       let description = 'Vehicle photo uploaded';
+
+      if (listingCapturedAt || imageMetadata?.listingSource) {
+        title = 'Listing Photo Imported';
+        const readableDate = listingCapturedAt ? new Date(listingCapturedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : undefined;
+        const sourceLabel = imageMetadata?.listingSource || 'External listing';
+        description = `Captured from ${sourceLabel}${readableDate ? ` on ${readableDate}` : ''}.`;
+        if (imageMetadata?.listingOriginalUrl) {
+          description += ` Source: ${imageMetadata.listingOriginalUrl}`;
+        }
+      }
       
       if (imageMetadata.gpsDecimal) {
         title = 'Photo Added with Location';
@@ -431,6 +442,22 @@ export class TimelineEventService {
           source: 'image_upload'
         }
       };
+
+      if (listingCapturedAt || imageMetadata?.listingSource || imageMetadata?.listingOriginalUrl) {
+        const listingIso = listingCapturedAt ? new Date(listingCapturedAt).toISOString() : null;
+        (metadata.what as any).listing_context = {
+          captured_at: listingIso,
+          listing_source: imageMetadata?.listingSource || null,
+          original_url: imageMetadata?.listingOriginalUrl || null
+        };
+        if (listingIso) {
+          metadata.when.photo_taken = listingIso;
+          metadata.what.exif.date_taken = listingIso;
+        }
+        metadata.why.reason = 'Vehicle documentation from external listing';
+        metadata.why.context = 'Imported listing imagery to preserve marketplace record';
+        metadata.why.source = 'listing_import';
+      }
 
       const eventData: any = {
         vehicle_id: vehicleId,

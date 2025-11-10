@@ -105,7 +105,7 @@ const VehiclesInner: React.FC = () => {
       console.log('Loading vehicle relationships for user:', session.user.id);
       
       // Load vehicles and their relationships
-      // Get all vehicles the user has added to the platform (check both user_id AND uploaded_by)
+      // Get all vehicles the user uploaded (for "Uploaded" tab, not "Owned")
       const { data: userAddedVehicles, error: addedError } = await supabase
         .from('vehicles')
         .select('*, vehicle_images(image_url, is_primary, variants)')
@@ -121,7 +121,7 @@ const VehiclesInner: React.FC = () => {
         .eq('user_id', session.user.id)
         .eq('is_active', true);
 
-      // Get verified ownership
+      // Get verified ownership (LEGAL ownership with documents)
       const { data: verifiedOwnerships, error: verifiedError } = await supabase
         .from('ownership_verifications')
         .select(`
@@ -130,6 +130,9 @@ const VehiclesInner: React.FC = () => {
         `)
         .eq('user_id', session.user.id)
         .eq('status', 'approved');
+      
+      console.log('[Vehicles] Verified ownerships:', verifiedOwnerships?.length || 0);
+      console.log('[Vehicles] Uploaded vehicles:', userAddedVehicles?.length || 0);
 
       if (addedError) console.error('Error loading added vehicles:', addedError);
       if (discoveredError) console.error('Error loading discovered vehicles:', discoveredError);

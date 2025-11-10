@@ -2,18 +2,37 @@
 -- Implements user-specific AI processing boundaries and preferences
 
 -- Create enum types for guardrail settings
-CREATE TYPE user_profession AS ENUM ('mechanic', 'dealer', 'enthusiast', 'collector', 'other');
-CREATE TYPE part_id_level AS ENUM ('none', 'basic', 'intermediate', 'expert');
-CREATE TYPE filing_structure AS ENUM ('by_vehicle', 'by_date', 'by_type', 'by_project');
-CREATE TYPE privacy_mode AS ENUM ('none', 'blur_plates', 'full');
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_profession') THEN
+  CREATE TYPE user_profession AS ENUM ('mechanic', 'dealer', 'enthusiast', 'collector', 'other');
+END IF; END $$;
+
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'part_id_level') THEN
+  CREATE TYPE part_id_level AS ENUM ('none', 'basic', 'intermediate', 'expert');
+END IF; END $$;
+
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'filing_structure') THEN
+  CREATE TYPE filing_structure AS ENUM ('by_vehicle', 'by_date', 'by_type', 'by_project');
+END IF; END $$;
+
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'privacy_mode') THEN
+  CREATE TYPE privacy_mode AS ENUM ('none', 'blur_plates', 'full');
+END IF; END $$;
 
 -- Extend user_profiles with AI guardrail preferences
-ALTER TABLE user_profiles 
-ADD COLUMN IF NOT EXISTS profession user_profession DEFAULT 'enthusiast',
-ADD COLUMN IF NOT EXISTS expertise_areas TEXT[] DEFAULT '{}',
-ADD COLUMN IF NOT EXISTS business_name TEXT,
-ADD COLUMN IF NOT EXISTS business_license TEXT,
-ADD COLUMN IF NOT EXISTS dealer_license TEXT; -- For dealer profiles like DLR000053625
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'profiles'
+  ) THEN
+    EXECUTE 'ALTER TABLE profiles
+      ADD COLUMN IF NOT EXISTS profession user_profession DEFAULT ''enthusiast'',
+      ADD COLUMN IF NOT EXISTS expertise_areas TEXT[] DEFAULT ''{}'',
+      ADD COLUMN IF NOT EXISTS business_name TEXT,
+      ADD COLUMN IF NOT EXISTS business_license TEXT,
+      ADD COLUMN IF NOT EXISTS dealer_license TEXT';
+  END IF;
+END $$;
 
 -- Create table for user AI guardrails
 CREATE TABLE IF NOT EXISTS user_ai_guardrails (
@@ -109,10 +128,10 @@ CREATE TABLE IF NOT EXISTS offline_capture_queue (
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
     error_message TEXT,
     
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    INDEX idx_offline_queue_user_status (user_id, status)
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_offline_queue_user_status ON offline_capture_queue(user_id, status);
 
 -- Create table for guardrail learning/feedback
 CREATE TABLE IF NOT EXISTS guardrail_feedback (
@@ -132,10 +151,10 @@ CREATE TABLE IF NOT EXISTS guardrail_feedback (
     -- Context at time of correction
     context_data JSONB,
     
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    INDEX idx_feedback_user_created (user_id, created_at DESC)
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_feedback_user_created ON guardrail_feedback(user_id, created_at DESC);
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_guardrails_user ON user_ai_guardrails(user_id);
@@ -152,7 +171,7 @@ DECLARE
     v_profile RECORD;
 BEGIN
     -- Get user profile
-    SELECT * INTO v_profile FROM user_profiles WHERE user_id = p_user_id;
+    SELECT * INTO v_profile FROM profiles WHERE id = p_user_id;
     
     -- Get or create guardrails
     SELECT * INTO v_guardrails FROM user_ai_guardrails WHERE user_id = p_user_id;
@@ -285,40 +304,65 @@ ALTER TABLE capture_contexts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE offline_capture_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guardrail_feedback ENABLE ROW LEVEL SECURITY;
 
--- Guardrails policies
+DROP POLICY IF EXISTS "Users can view own guardrails" ON user_ai_guardrails;
 CREATE POLICY "Users can view own guardrails"
     ON user_ai_guardrails FOR SELECT
     USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own guardrails" ON user_ai_guardrails;
 CREATE POLICY "Users can update own guardrails"
     ON user_ai_guardrails FOR UPDATE
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own guardrails" ON user_ai_guardrails;
 CREATE POLICY "Users can insert own guardrails"
     ON user_ai_guardrails FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
--- Context policies
+DROP POLICY IF EXISTS "Users can manage own contexts" ON capture_contexts;
 CREATE POLICY "Users can manage own contexts"
     ON capture_contexts FOR ALL
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
--- Offline queue policies
+DROP POLICY IF EXISTS "Users can manage own offline queue" ON offline_capture_queue;
 CREATE POLICY "Users can manage own offline queue"
     ON offline_capture_queue FOR ALL
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
--- Feedback policies
+DROP POLICY IF EXISTS "Users can manage own feedback" ON guardrail_feedback;
 CREATE POLICY "Users can manage own feedback"
     ON guardrail_feedback FOR ALL
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
 -- Create triggers for updated_at
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc WHERE proname = 'update_updated_at_column'
+  ) THEN
+    EXECUTE format(
+      'CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+        RETURNS trigger AS %L
+      LANGUAGE plpgsql;',
+      'BEGIN
+         NEW.updated_at = NOW();
+         RETURN NEW;
+       END;'
+    );
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS update_guardrails_updated_at ON user_ai_guardrails;
 CREATE TRIGGER update_guardrails_updated_at
     BEFORE UPDATE ON user_ai_guardrails
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_contexts_updated_at ON capture_contexts;
 CREATE TRIGGER update_contexts_updated_at
     BEFORE UPDATE ON capture_contexts
     FOR EACH ROW
@@ -330,37 +374,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON capture_contexts TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON offline_capture_queue TO authenticated;
 GRANT SELECT, INSERT ON guardrail_feedback TO authenticated;
 
--- Add sample guardrails for different user types
--- Mechanic profile
-INSERT INTO user_ai_guardrails (
-    user_id, 
-    part_identification_level, 
-    include_part_numbers,
-    problem_diagnosis,
-    suggest_next_steps,
-    blur_license_plates
-) VALUES (
-    '00000000-0000-0000-0000-000000000001'::uuid, -- Sample mechanic user
-    'expert',
-    true,
-    true,
-    true,
-    true
-) ON CONFLICT (user_id) DO NOTHING;
-
--- Dealer profile (like Viva! Las Vegas Autos)
-INSERT INTO user_ai_guardrails (
-    user_id,
-    part_identification_level,
-    estimate_condition,
-    categorize_by_angle,
-    categorize_by_quality,
-    make_cost_estimates
-) VALUES (
-    '00000000-0000-0000-0000-000000000002'::uuid, -- Sample dealer user
-    'intermediate',
-    true,
-    true,
-    true,
-    true
-) ON CONFLICT (user_id) DO NOTHING;
+-- Sample data removed in production migration

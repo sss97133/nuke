@@ -20,7 +20,7 @@ BEGIN
   EXECUTE 'DROP VIEW IF EXISTS public.organization_activity_view';
 
   IF v_exists THEN
-    EXECUTE $$
+    EXECUTE $create_view$
       CREATE VIEW public.organization_activity_view AS
       WITH vehicle_events AS (
         SELECT 
@@ -61,9 +61,9 @@ BEGIN
       SELECT * FROM vehicle_events
       UNION ALL
       SELECT * FROM license_events;
-    $$;
+    $create_view$;
   ELSE
-    EXECUTE $$
+    EXECUTE $create_view$
       CREATE VIEW public.organization_activity_view AS
       SELECT 
         l.shop_id               AS org_id,
@@ -83,7 +83,7 @@ BEGIN
           'expiration_date', l.expiration_date
         ) AS metadata
       FROM public.shop_licenses l;
-    $$;
+    $create_view$;
   END IF;
 END $$;
 

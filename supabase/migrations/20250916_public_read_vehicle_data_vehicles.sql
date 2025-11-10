@@ -1,55 +1,72 @@
 -- Make vehicles/* publicly readable in vehicle-data bucket while keeping other paths private
 -- This migration sets bucket to private and adds RLS policies to allow anonymous read for vehicles/* only.
 
-begin;
-
 -- Ensure bucket exists and is private (public flag off so RLS governs access)
-update storage.buckets
-set public = false
-where id = 'vehicle-data';
+UPDATE storage.buckets
+SET public = false
+WHERE id = 'vehicle-data';
 
--- Enable RLS on storage.objects (usually enabled by default)
-alter table if exists storage.objects enable row level security;
+-- Attempt to enable RLS; skip silently if insufficient privilege
+DO $$
+BEGIN
+  BEGIN
+    EXECUTE 'ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'Skipping RLS enable on storage.objects (insufficient privilege)';
+  END;
+END;
+$$;
 
 -- Drop old broad policies if they exist to avoid overexposure
-do $$
-begin
-  if exists (
-    select 1 from pg_policies 
-    where schemaname = 'storage' and tablename = 'objects' and policyname = 'Public access to vehicle-data'
-  ) then
-    drop policy "Public access to vehicle-data" on storage.objects;
-  end if;
-end$$;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'Public access to vehicle-data'
+  ) THEN
+    EXECUTE 'DROP POLICY "Public access to vehicle-data" ON storage.objects';
+  END IF;
+END;
+$$;
 
--- Allow anonymous and authenticated SELECT for vehicle-data objects under vehicles/*
-create policy if not exists "public read vehicle-data vehicles/*" on storage.objects
-for select
-using (
-  bucket_id = 'vehicle-data'
-  and (name like 'vehicles/%')
-);
+-- Create/replace desired policies
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'public read vehicle-data vehicles/*'
+  ) THEN
+    EXECUTE 'CREATE POLICY "public read vehicle-data vehicles/*" ON storage.objects
+      FOR SELECT
+      USING (bucket_id = ''vehicle-data'' AND name LIKE ''vehicles/%'')';
+  END IF;
 
--- Maintain existing authenticated write access to vehicle-data (idempotent-safe)
-create policy if not exists "auth write vehicle-data" on storage.objects
-for insert
-with check (
-  bucket_id = 'vehicle-data'
-);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'auth write vehicle-data'
+  ) THEN
+    EXECUTE 'CREATE POLICY "auth write vehicle-data" ON storage.objects
+      FOR INSERT
+      WITH CHECK (bucket_id = ''vehicle-data'')';
+  END IF;
 
-create policy if not exists "auth update vehicle-data" on storage.objects
-for update
-using (
-  bucket_id = 'vehicle-data'
-)
-with check (
-  bucket_id = 'vehicle-data'
-);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'auth update vehicle-data'
+  ) THEN
+    EXECUTE 'CREATE POLICY "auth update vehicle-data" ON storage.objects
+      FOR UPDATE
+      USING (bucket_id = ''vehicle-data'')
+      WITH CHECK (bucket_id = ''vehicle-data'')';
+  END IF;
 
-create policy if not exists "auth delete vehicle-data" on storage.objects
-for delete
-using (
-  bucket_id = 'vehicle-data'
-);
-
-commit;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'auth delete vehicle-data'
+  ) THEN
+    EXECUTE 'CREATE POLICY "auth delete vehicle-data" ON storage.objects
+      FOR DELETE
+      USING (bucket_id = ''vehicle-data'')';
+  END IF;
+END;
+$$;

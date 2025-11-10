@@ -30,34 +30,29 @@ export class ProfileService {
         return null;
       }
 
-      // Force cache bypass - timestamp: ${Date.now()}
-      console.log('ProfileService: Loading REAL data (cache bypass active)');
+      // OPTIMIZED: Reduced initial load, full data loads lazily
+      console.log('[ProfileService] Fast load - essential data only');
       const [
         completionResult,
-        achievementsResult,
-        activityResult,
         statsResult,
         vehicleTimelineResult,
         vehicleImagesResult,
-        verificationsResult,
-        orgTimelineResult,
-        contractorWorkResult
+        orgTimelineResult
       ] = await Promise.all([
         supabase.from('profile_completion').select('*').eq('user_id', userId).single(),
-        supabase.from('profile_achievements').select('*').eq('user_id', userId).order('earned_at', { ascending: false }).limit(50),
-        supabase.from('profile_activity').select('*').eq('user_id', userId).order('created_at', { ascending: false}).limit(10),
         supabase.from('profile_stats').select('*').eq('user_id', userId).single(),
-        // Get real contribution data from timeline events with full metadata - REDUCED LIMIT for fast loading
-        supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).order('event_date', { ascending: false }).limit(100),
-        // Get image uploads (include EXIF and vehicle_id for proper grouping) - REDUCED LIMIT for fast loading
-        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('taken_at', { ascending: false }).limit(100),
-        // Get verifications (limited)
-        supabase.from('user_verifications').select('created_at, status').eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
-        // Get business timeline events created by this user (organization contributions) - REDUCED LIMIT for fast loading
-        supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).order('event_date', { ascending: false }).limit(100),
-        // Get contractor work contributions (NEW - this will show FBM work) - REDUCED LIMIT for fast loading
-        supabase.from('contractor_work_contributions').select('id, work_date, work_description, work_category, labor_hours, total_value, organization_id, vehicle_id, metadata').eq('contractor_user_id', userId).eq('show_on_contractor_profile', true).order('work_date', { ascending: false }).limit(50)
+        // Get recent timeline events (last 365 days) - OPTIMIZED with index
+        supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).gte('event_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]).order('event_date', { ascending: false }).limit(1000),
+        // Get recent images (last 365 days) - OPTIMIZED with index  
+        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).gte('taken_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()).order('taken_at', { ascending: false }).limit(2000),
+        // Get recent business events (last 365 days) - OPTIMIZED with index
+        supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).gte('event_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]).order('event_date', { ascending: false }).limit(1000)
       ]);
+      
+      // Skip achievements, activity, verifications (not displayed on optimized profile)
+      const achievementsResult = { data: [], error: null };
+      const activityResult = { data: [], error: null };
+      const verificationsResult = { data: [], error: null };
 
       // Debug: Log query results
       console.log('ProfileService: Query results:');
@@ -66,7 +61,6 @@ export class ProfileService {
       console.log('- Vehicle images:', vehicleImagesResult.data?.length || 0, vehicleImagesResult.error ? `(ERROR: ${vehicleImagesResult.error.message})` : '');
       console.log('- Verifications:', verificationsResult.data?.length || 0, verificationsResult.error ? `(ERROR: ${verificationsResult.error.message})` : '');
       console.log('- Business timeline events:', orgTimelineResult.data?.length || 0, orgTimelineResult.error ? `(ERROR: ${orgTimelineResult.error.message})` : '');
-      console.log('- Contractor work:', contractorWorkResult.data?.length || 0, contractorWorkResult.error ? `(ERROR: ${contractorWorkResult.error.message})` : '');
 
       // Helper: normalize any date-ish value to YYYY-MM-DD without timezone shifting
       const toDateOnly = (raw: any): string => {
@@ -326,35 +320,6 @@ export class ProfileService {
         });
       });
 
-      // Contractor work contributions (NEW - FBM work, etc.)
-      contractorWorkResult.data?.forEach((work: any) => {
-        const date = toDateOnly(work.work_date);
-        const summary = ensureSummary(date, work.vehicle_id, 'Contractor Work');
-        const totalValue = safeNumber(work.total_value);
-        const hours = safeNumber(work.labor_hours);
-
-        summary.total_events += 1;
-        summary.total_value_usd += totalValue;
-        summary.total_hours += hours;
-
-        addHighlight(summary, {
-          id: work.id || `${date}-contractor-${summary.highlights.length}`,
-          type: 'contractor_work',
-          title: work.work_description || work.work_category || 'Contractor Work',
-          description: work.work_category ? `${work.work_category} work` : null,
-          count: 1,
-          value_usd: totalValue,
-          hours: hours,
-          metadata: {
-            organization_id: work.organization_id,
-            vehicle_id: work.vehicle_id,
-            work_category: work.work_category,
-            auto_generated: work.metadata?.auto_generated,
-            needs_review: work.metadata?.needs_review,
-            raw: work
-          }
-        });
-      });
 
       // AI-enhanced image group summaries
       let aiInsightsByKey = new Map<string, ImageInsightResult>();

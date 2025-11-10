@@ -8,10 +8,10 @@ import { MobileImageControls } from '../image/MobileImageControls';
 import { UserInteractionService } from '../../services/userInteractionService';
 import { supabase } from '../../lib/supabase';
 import EventDetailModal from './EventDetailModal';
-import { MobileImageCarousel } from './MobileImageCarousel';
+import { SmoothImageCarousel } from './SmoothImageCarousel';
 import { PriceCarousel } from './PriceCarousel';
 import SpecResearchModal from './SpecResearchModal';
-import { EnhancedMobileImageViewer } from './EnhancedMobileImageViewer';
+import { SmoothFullscreenViewer } from './SmoothFullscreenViewer';
 import VehicleTimeline from '../VehicleTimeline';
 import { MobileDocumentUploader } from './MobileDocumentUploader';
 import { MobilePriceEditor } from './MobilePriceEditor';
@@ -29,7 +29,7 @@ const FONT_BASE = '8pt';
 const FONT_SMALL = '7pt';
 const FONT_TINY = '6pt';
 
-type VehicleTab = 'overview' | 'timeline' | 'images' | 'specs';
+type VehicleTab = 'overview' | 'timeline' | 'images' | 'specs' | 'trading';
 
 interface MobileVehicleProfileProps {
   vehicleId: string;
@@ -115,16 +115,21 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
 
       {/* Tab Bar - Sticky */}
       <div style={styles.tabBar}>
-        {['overview', 'timeline', 'images', 'specs'].map((tab) => (
+        {[
+          { key: 'overview', label: 'OVERVIEW' },
+          { key: 'timeline', label: 'TIMELINE' },
+          { key: 'images', label: 'IMAGES' },
+          { key: 'trading', label: 'TRADING' },
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab as any)}
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as any)}
             style={{
               ...styles.tab,
-              ...(activeTab === tab ? styles.activeTab : {})
+              ...(activeTab === tab.key ? styles.activeTab : {})
             }}
           >
-            {tab.toUpperCase()}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -162,8 +167,12 @@ export const MobileVehicleProfile: React.FC<MobileVehicleProfileProps> = ({ vehi
         {activeTab === 'images' && (
           <MobileImagesTab vehicleId={vehicleId} session={session} />
         )}
-        {activeTab === 'specs' && (
-          <MobileSpecsTab vehicle={vehicle} session={session} vehicleId={vehicleId} />
+        {activeTab === 'trading' && (
+          <MobileTradingTab 
+            vehicleId={vehicleId}
+            vehicle={vehicle}
+            session={session}
+          />
         )}
       </div>
 
@@ -202,7 +211,7 @@ interface MobileOverviewTabProps {
   onVehicleUpdated?: () => void;
 }
 
-const MobileOverviewTab: React.FC<MobileOverviewTabProps> = ({ vehicleId, vehicle, onTabChange, session, onVehicleUpdated }) => {
+const MobileOverviewTab: React.FC<MobileOverviewTabProps> = React.memo(({ vehicleId, vehicle, onTabChange, session, onVehicleUpdated }) => {
   const [stats, setStats] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [showPriceEditor, setShowPriceEditor] = useState(false);
@@ -318,30 +327,35 @@ const MobileOverviewTab: React.FC<MobileOverviewTabProps> = ({ vehicleId, vehicl
 
   return (
     <div style={styles.tabContent}>
-      {/* Image Carousel */}
+      {/* Hero Image - Full width, smooth */}
       {vehicleImages.length > 0 && (
-        <MobileImageCarousel 
+        <SmoothImageCarousel 
           images={vehicleImages}
-          liveStreamUrl={vehicle.live_stream_url}
+          onImageChange={(index) => {
+            // Could track which image user is viewing
+          }}
         />
       )}
 
-      {/* Price Carousel */}
-      <PriceCarousel vehicle={vehicle} stats={stats} session={session} />
-
-      {/* Professional Trading Panel - COMING SOON */}
-      <div style={styles.tradingPanel}>
-        {/* Trading Panel - LIVE SYSTEM */}
-        <MobileTradingPanel
-          vehicleId={vehicle.id}
-          offeringId={vehicle.offering_id || vehicle.id}
-          currentSharePrice={vehicle.current_value ? vehicle.current_value / 1000 : 50}
-          vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-          session={session}
-        />
+      {/* Inline Stats - Clean and simple */}
+      <div style={styles.inlineStats}>
+        <div style={styles.statItem}>
+          <span style={styles.statValue}>${(vehicle.current_value || 0).toLocaleString()}</span>
+          <span style={styles.statLabel}>Value</span>
+        </div>
+        <div style={styles.statDivider}>•</div>
+        <div style={styles.statItem}>
+          <span style={styles.statValue}>{stats?.images || 0}</span>
+          <span style={styles.statLabel}>Photos</span>
+        </div>
+        <div style={styles.statDivider}>•</div>
+        <div style={styles.statItem}>
+          <span style={styles.statValue}>{stats?.events || 0}</span>
+          <span style={styles.statLabel}>Events</span>
+        </div>
       </div>
 
-      {/* Owner Management Actions - SEPARATE from trading */}
+      {/* Owner Management Actions - Clean buttons */}
       {(session?.user && (isOwner || hasContributorAccess)) && (
         <div style={styles.ownerControls}>
           <button onClick={() => setShowPriceEditor(true)} style={styles.ownerControlBtn}>
@@ -383,58 +397,70 @@ const MobileOverviewTab: React.FC<MobileOverviewTabProps> = ({ vehicleId, vehicl
         />
       )}
 
+      {/* Quick Actions - Clean grid */}
+      <div style={styles.quickActionsGrid}>
+        <button onClick={() => onTabChange('timeline')} style={styles.quickActionCard}>
+          <div style={styles.quickActionValue}>{stats?.events || 0}</div>
+          <div style={styles.quickActionLabel}>Timeline</div>
+        </button>
+        <button onClick={() => onTabChange('images')} style={styles.quickActionCard}>
+          <div style={styles.quickActionValue}>{stats?.images || 0}</div>
+          <div style={styles.quickActionLabel}>Photos</div>
+        </button>
+        <button onClick={() => onTabChange('trading')} style={styles.quickActionCard}>
+          <div style={styles.quickActionValue}>{stats?.labor_hours || 0}h</div>
+          <div style={styles.quickActionLabel}>Work</div>
+        </button>
+      </div>
+
+      {/* Key Specs - Minimal */}
+      <div style={styles.specsBox}>
+        {vehicle.vin && (
+          <div style={styles.specRow}>
+            <span style={styles.specLabel}>VIN</span>
+            <span style={styles.specValue}>{vehicle.vin}</span>
+          </div>
+        )}
+        {vehicle.mileage && (
+          <div style={styles.specRow}>
+            <span style={styles.specLabel}>Mileage</span>
+            <span style={styles.specValue}>{vehicle.mileage.toLocaleString()} mi</span>
+          </div>
+        )}
+      </div>
+
       {/* Comment Section */}
       <MobileCommentBox 
         vehicleId={vehicleId}
         session={session}
         targetType="vehicle"
       />
-      
-      {/* Quick Stats - Touch Friendly & Clickable */}
-      <div style={styles.statsGrid}>
-        <div style={{...styles.statCard, cursor: 'pointer'}} onClick={() => onTabChange('images')}>
-          <div style={styles.statValue}>{stats?.images || 0}</div>
-          <div style={styles.statLabel}>Photos</div>
-        </div>
-        <div style={{...styles.statCard, cursor: 'pointer'}} onClick={() => onTabChange('timeline')}>
-          <div style={styles.statValue}>{stats?.events || 0}</div>
-          <div style={styles.statLabel}>Events</div>
-        </div>
-        <div style={{...styles.statCard, cursor: 'pointer'}}>
-          <div style={styles.statValue}>{stats?.tags || 0}</div>
-          <div style={styles.statLabel}>Tags</div>
-        </div>
-        <div style={{...styles.statCard, cursor: 'pointer'}}>
-          <div style={styles.statValue}>{stats?.labor_hours || 0}</div>
-          <div style={styles.statLabel}>Hours</div>
-        </div>
-      </div>
-
-      {/* VIN */}
-      {vehicle.vin && (
-        <div style={styles.card}>
-          <div style={styles.cardLabel}>VIN</div>
-          <div style={styles.cardValue}>{vehicle.vin}</div>
-        </div>
-      )}
-
-      {/* Mileage */}
-      {vehicle.mileage && (
-        <div style={styles.card}>
-          <div style={styles.cardLabel}>Mileage</div>
-          <div style={styles.cardValue}>{vehicle.mileage.toLocaleString()} miles</div>
-        </div>
-      )}
     </div>
   );
-};
+});
+
+// Trading Tab - Moved from Overview
+const MobileTradingTab: React.FC<{ vehicleId: string; vehicle: any; session: any }> = React.memo(({ vehicleId, vehicle, session }) => {
+  return (
+    <div style={styles.tabContent}>
+      <MobileTradingPanel
+        vehicleId={vehicle.id}
+        offeringId={vehicle.offering_id || vehicle.id}
+        currentSharePrice={vehicle.current_value ? vehicle.current_value / 1000 : 50}
+        vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+        session={session}
+      />
+    </div>
+  );
+});
 
 // Old MobileTimelineTab component removed - replaced by MobileTimelineHeatmap
 
-const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicleId, session }) => {
+const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = React.memo(({ vehicleId, session }) => {
   const [images, setImages] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [vehicle, setVehicle] = useState<any>(null);
+  const galleryInputRef = React.useRef<HTMLInputElement>(null);
 
   // Use consolidated permissions hook
   const { isOwner, hasContributorAccess } = useVehiclePermissions(vehicleId, session, vehicle);
@@ -498,6 +524,13 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
     const success = await upload(vehicleId, files, 'general');
     if (success) {
       await loadImages();
+    }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      await handleFileUpload(e.target.files);
+      e.target.value = ''; // Reset input
     }
   };
 
@@ -612,9 +645,36 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
   };
 
   const filteredImages = getFilteredImages();
+  const canUpload = session?.user && (isOwner || hasContributorAccess);
 
   return (
     <div style={styles.tabContent}>
+      {/* Hidden file input for gallery upload */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        style={{ display: 'none' }}
+        onChange={handleGalleryUpload}
+      />
+
+      {/* Upload Button */}
+      {canUpload && (
+        <button
+          onClick={() => galleryInputRef.current?.click()}
+          disabled={uploading}
+          className="cursor-button"
+          style={{
+            width: '100%',
+            marginBottom: '8px',
+            fontSize: '9pt'
+          }}
+        >
+          {uploading ? 'UPLOADING...' : 'UPLOAD'}
+        </button>
+      )}
+
       {/* Filter & Sort Bar */}
       <div style={{
         display: 'flex',
@@ -705,14 +765,13 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
         ))}
       </div>
 
-      {/* Enhanced fullscreen image viewer with gestures and context */}
+      {/* Smooth fullscreen viewer - Instagram level */}
       {selectedImage && (
-        <EnhancedMobileImageViewer
+        <SmoothFullscreenViewer
           images={images}
           initialIndex={images.findIndex(img => img.id === selectedImage.id)}
           vehicleId={vehicleId}
           session={session}
-          vehicle={vehicle}
           onClose={() => setSelectedImage(null)}
           onDelete={(imageId) => handleDelete(imageId, selectedImage)}
         />
@@ -806,7 +865,7 @@ const MobileImagesTab: React.FC<{ vehicleId: string; session: any }> = ({ vehicl
       />
     </div>
   );
-};
+});
 
 // Instagram Feed View - Single column, full engagement
 const InstagramFeedView: React.FC<{ images: any[]; onImageClick: (img: any) => void }> = ({ images, onImageClick }) => (
@@ -886,7 +945,7 @@ const TechnicalGridView: React.FC<{ images: any[]; onImageClick: (img: any) => v
   </div>
 );
 
-const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }> = ({ vehicle, session, vehicleId }) => {
+const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }> = React.memo(({ vehicle, session, vehicleId }) => {
   const [selectedSpec, setSelectedSpec] = useState<{name: string; value: any} | null>(null);
   const [showDataEditor, setShowDataEditor] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
@@ -1024,7 +1083,7 @@ const MobileSpecsTab: React.FC<{ vehicle: any; session: any; vehicleId: string }
       )}
     </div>
   );
-};
+});
 
 // Windows 95 Mobile Styles
 const styles: Record<string, React.CSSProperties> = {
@@ -1113,13 +1172,13 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px',
     textAlign: 'center'
   },
-  statValue: {
+  statCardValue: {
     fontSize: FONT_BASE,
     fontWeight: 'bold',
     color: '#0066cc',
     marginBottom: '4px'
   },
-  statLabel: {
+  statCardLabel: {
     fontSize: FONT_SMALL,
     color: '#000000',
     textTransform: 'uppercase'
@@ -1615,7 +1674,86 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 'bold' as const,
     cursor: 'pointer',
     fontFamily: 'Arial, sans-serif'
-  }
+  },
+  // New clean inline stats
+  inlineStats: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '16px',
+    background: '#f5f5f5',
+    borderBottom: '1px solid #ddd',
+  },
+  statItem: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+  },
+  statDivider: {
+    color: '#ccc',
+    margin: '0 16px',
+    fontSize: '16px',
+  },
+  statValue: {
+    fontSize: '16px',
+    fontWeight: 'bold' as const,
+    color: '#000',
+  },
+  statLabel: {
+    fontSize: '11px',
+    color: '#666',
+    marginTop: '2px',
+  },
+  // Quick action cards
+  quickActionsGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gap: '8px',
+    padding: '12px',
+  },
+  quickActionCard: {
+    background: '#fff',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
+    padding: '16px 8px',
+    textAlign: 'center' as const,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  quickActionValue: {
+    fontSize: '18px',
+    fontWeight: 'bold' as const,
+    color: '#00ff00',
+    marginBottom: '4px',
+  },
+  quickActionLabel: {
+    fontSize: '11px',
+    color: '#666',
+    textTransform: 'uppercase' as const,
+  },
+  // Minimal specs box
+  specsBox: {
+    background: '#fff',
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px',
+    padding: '12px',
+    margin: '0 12px',
+  },
+  specRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '8px 0',
+    borderBottom: '1px solid #f0f0f0',
+  },
+  specLabel: {
+    fontSize: '12px',
+    color: '#888',
+  },
+  specValue: {
+    fontSize: '12px',
+    fontWeight: 'bold' as const,
+    color: '#000',
+  },
 };
 
 export default MobileVehicleProfile;
