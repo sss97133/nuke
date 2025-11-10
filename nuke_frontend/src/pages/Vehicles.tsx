@@ -105,11 +105,11 @@ const VehiclesInner: React.FC = () => {
       console.log('Loading vehicle relationships for user:', session.user.id);
       
       // Load vehicles and their relationships
-      // Get all vehicles the user has added to the platform
+      // Get all vehicles the user has added to the platform (check both user_id AND uploaded_by)
       const { data: userAddedVehicles, error: addedError } = await supabase
         .from('vehicles')
         .select('*, vehicle_images(image_url, is_primary, variants)')
-        .eq('uploaded_by', session.user.id);
+        .or(`user_id.eq.${session.user.id},uploaded_by.eq.${session.user.id}`);
 
       // Get explicit relationships from discovered_vehicles table
       const { data: discoveredVehicles, error: discoveredError } = await supabase
