@@ -21,14 +21,48 @@ const Notifications: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase
-        .from('user_notifications')
-        .select('id, type, title, message, is_read, created_at')
-        .order('created_at', { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      setRows((data as any[]) || []);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setRows([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Load from ALL notification tables
+      const [userNotifs, generalNotifs, duplicateNotifs] = await Promise.all([
+        supabase
+          .from('user_notifications')
+          .select('id, type, title, message, is_read, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        
+        supabase
+          .from('notifications')
+          .select('id, type, title, message, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+          
+        supabase
+          .from('duplicate_notifications')
+          .select('id, title, message, status, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50)
+      ]);
+      
+      // Combine all notifications
+      const combined = [
+        ...((userNotifs.data || []).map(n => ({ ...n, source: 'user_notifications' }))),
+        ...((generalNotifs.data || []).map(n => ({ ...n, is_read: false, source: 'notifications' }))),
+        ...((duplicateNotifs.data || []).map(n => ({ ...n, is_read: n.status === 'read', source: 'duplicate_notifications' })))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setRows(combined as any);
     } catch (e: any) {
+      console.error('Failed to load notifications:', e);
       setError(e?.message || 'Failed to load notifications');
       setRows([]);
     } finally {
