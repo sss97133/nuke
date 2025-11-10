@@ -9,18 +9,18 @@
 -- Add missing fields to businesses table (now the canonical org table)
 DO $$ 
 BEGIN
-  ALTER TABLE businesses
-    ADD COLUMN IF NOT EXISTS latitude NUMERIC(10, 8),
-    ADD COLUMN IF NOT EXISTS longitude NUMERIC(11, 8),
-    ADD COLUMN IF NOT EXISTS discovered_by UUID REFERENCES auth.users(id),
-    ADD COLUMN IF NOT EXISTS logo_url TEXT,
-    ADD COLUMN IF NOT EXISTS banner_url TEXT,
-    ADD COLUMN IF NOT EXISTS total_vehicles INTEGER DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS total_images INTEGER DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS total_events INTEGER DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS current_value NUMERIC(12,2),
-    ADD COLUMN IF NOT EXISTS is_tradable BOOLEAN DEFAULT false,
-    ADD COLUMN IF NOT EXISTS uploaded_by UUID REFERENCES auth.users(id);
+ALTER TABLE businesses
+  ADD COLUMN IF NOT EXISTS latitude NUMERIC(10, 8),
+  ADD COLUMN IF NOT EXISTS longitude NUMERIC(11, 8),
+  ADD COLUMN IF NOT EXISTS discovered_by UUID REFERENCES auth.users(id),
+  ADD COLUMN IF NOT EXISTS logo_url TEXT,
+  ADD COLUMN IF NOT EXISTS banner_url TEXT,
+  ADD COLUMN IF NOT EXISTS total_vehicles INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_images INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_events INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS current_value NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS is_tradable BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS uploaded_by UUID REFERENCES auth.users(id);
     
   -- stock_symbol needs special handling for UNIQUE constraint
   IF NOT EXISTS (
@@ -117,9 +117,9 @@ CREATE TABLE IF NOT EXISTS organization_ownership_verifications (
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_org_ownership_unique_active') THEN
-    CREATE UNIQUE INDEX idx_org_ownership_unique_active 
-      ON organization_ownership_verifications(user_id, organization_id, status)
-      WHERE status IN ('pending', 'approved');
+CREATE UNIQUE INDEX idx_org_ownership_unique_active 
+  ON organization_ownership_verifications(user_id, organization_id, status)
+  WHERE status IN ('pending', 'approved');
   END IF;
 END $$;
 
@@ -137,12 +137,12 @@ COMMENT ON TABLE organization_ownership_verifications IS 'Like ownership_verific
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'business_timeline_events') THEN
-    ALTER TABLE business_timeline_events
-      ADD COLUMN IF NOT EXISTS image_urls TEXT[] DEFAULT ARRAY[]::TEXT[],
-      ADD COLUMN IF NOT EXISTS labor_hours NUMERIC(6,2),
-      ADD COLUMN IF NOT EXISTS confidence_score INTEGER DEFAULT 50 CHECK (confidence_score >= 0 AND confidence_score <= 100);
-      
-    COMMENT ON COLUMN business_timeline_events.image_urls IS 'Photo evidence for this event (like timeline_events.image_urls)';
+ALTER TABLE business_timeline_events
+  ADD COLUMN IF NOT EXISTS image_urls TEXT[] DEFAULT ARRAY[]::TEXT[],
+  ADD COLUMN IF NOT EXISTS labor_hours NUMERIC(6,2),
+  ADD COLUMN IF NOT EXISTS confidence_score INTEGER DEFAULT 50 CHECK (confidence_score >= 0 AND confidence_score <= 100);
+
+COMMENT ON COLUMN business_timeline_events.image_urls IS 'Photo evidence for this event (like timeline_events.image_urls)';
   END IF;
 END $$;
 
@@ -475,25 +475,25 @@ $$;
 -- Trigger on vehicle_images for GPS-based org tagging
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trg_auto_tag_org_from_gps ON vehicle_images;
-  CREATE TRIGGER trg_auto_tag_org_from_gps
-    AFTER INSERT OR UPDATE OF latitude, longitude
-    ON vehicle_images
-    FOR EACH ROW
-    WHEN (NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL)
-    EXECUTE FUNCTION auto_tag_organization_from_gps();
+DROP TRIGGER IF EXISTS trg_auto_tag_org_from_gps ON vehicle_images;
+CREATE TRIGGER trg_auto_tag_org_from_gps
+  AFTER INSERT OR UPDATE OF latitude, longitude
+  ON vehicle_images
+  FOR EACH ROW
+  WHEN (NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL)
+  EXECUTE FUNCTION auto_tag_organization_from_gps();
 END $$;
 
 -- Also trigger on organization_images
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trg_auto_tag_org_from_org_image ON organization_images;
-  CREATE TRIGGER trg_auto_tag_org_from_org_image
-    AFTER INSERT OR UPDATE OF latitude, longitude
-    ON organization_images
-    FOR EACH ROW
-    WHEN (NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL)
-    EXECUTE FUNCTION auto_tag_organization_from_gps();
+DROP TRIGGER IF EXISTS trg_auto_tag_org_from_org_image ON organization_images;
+CREATE TRIGGER trg_auto_tag_org_from_org_image
+  AFTER INSERT OR UPDATE OF latitude, longitude
+  ON organization_images
+  FOR EACH ROW
+  WHEN (NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL)
+  EXECUTE FUNCTION auto_tag_organization_from_gps();
 END $$;
 
 -- ==========================
@@ -559,13 +559,13 @@ $$;
 -- Trigger on vehicle_documents for receipt-based org tagging
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trg_auto_tag_org_from_receipt ON vehicle_documents;
-  CREATE TRIGGER trg_auto_tag_org_from_receipt
-    AFTER INSERT OR UPDATE OF vendor_name
-    ON vehicle_documents
-    FOR EACH ROW
-    WHEN (NEW.vendor_name IS NOT NULL AND NEW.vehicle_id IS NOT NULL)
-    EXECUTE FUNCTION auto_tag_organization_from_receipt();
+DROP TRIGGER IF EXISTS trg_auto_tag_org_from_receipt ON vehicle_documents;
+CREATE TRIGGER trg_auto_tag_org_from_receipt
+  AFTER INSERT OR UPDATE OF vendor_name
+  ON vehicle_documents
+  FOR EACH ROW
+  WHEN (NEW.vendor_name IS NOT NULL AND NEW.vehicle_id IS NOT NULL)
+  EXECUTE FUNCTION auto_tag_organization_from_receipt();
 EXCEPTION
   WHEN undefined_table THEN
     -- vehicle_documents doesn't exist yet, skip trigger
@@ -581,35 +581,35 @@ ALTER TABLE businesses ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  DROP POLICY IF EXISTS "Anyone views public orgs" ON businesses;
-  CREATE POLICY "Anyone views public orgs" ON businesses
-    FOR SELECT
-    USING (is_public = true);
+DROP POLICY IF EXISTS "Anyone views public orgs" ON businesses;
+CREATE POLICY "Anyone views public orgs" ON businesses
+  FOR SELECT
+  USING (is_public = true);
 
-  DROP POLICY IF EXISTS "Users create orgs" ON businesses;
-  CREATE POLICY "Users create orgs" ON businesses
-    FOR INSERT
-    WITH CHECK (auth.uid() = discovered_by OR auth.uid() = uploaded_by);
+DROP POLICY IF EXISTS "Users create orgs" ON businesses;
+CREATE POLICY "Users create orgs" ON businesses
+  FOR INSERT
+  WITH CHECK (auth.uid() = discovered_by OR auth.uid() = uploaded_by);
 
-  DROP POLICY IF EXISTS "Owners/contributors update orgs" ON businesses;
-  CREATE POLICY "Owners/contributors update orgs" ON businesses
-    FOR UPDATE
-    USING (
-      auth.uid() = discovered_by OR 
-      EXISTS (
-        SELECT 1 FROM organization_contributors oc
-        WHERE oc.organization_id = businesses.id 
-          AND oc.user_id = auth.uid() 
-          AND oc.status = 'active'
-          AND oc.role IN ('owner', 'co_founder', 'board_member', 'manager')
-      ) OR
-      EXISTS (
-        SELECT 1 FROM organization_ownership_verifications oov
-        WHERE oov.organization_id = businesses.id
-          AND oov.user_id = auth.uid()
-          AND oov.status = 'approved'
-      )
-    );
+DROP POLICY IF EXISTS "Owners/contributors update orgs" ON businesses;
+CREATE POLICY "Owners/contributors update orgs" ON businesses
+  FOR UPDATE
+  USING (
+    auth.uid() = discovered_by OR 
+    EXISTS (
+      SELECT 1 FROM organization_contributors oc
+      WHERE oc.organization_id = businesses.id 
+        AND oc.user_id = auth.uid() 
+        AND oc.status = 'active'
+        AND oc.role IN ('owner', 'co_founder', 'board_member', 'manager')
+    ) OR
+    EXISTS (
+      SELECT 1 FROM organization_ownership_verifications oov
+      WHERE oov.organization_id = businesses.id
+        AND oov.user_id = auth.uid()
+        AND oov.status = 'approved'
+    )
+  );
 END $$;
 
 -- Contributors
@@ -617,23 +617,23 @@ ALTER TABLE organization_contributors ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  DROP POLICY IF EXISTS "Anyone views org contributors" ON organization_contributors;
-  CREATE POLICY "Anyone views org contributors" ON organization_contributors
-    FOR SELECT
-    USING (true);
+DROP POLICY IF EXISTS "Anyone views org contributors" ON organization_contributors;
+CREATE POLICY "Anyone views org contributors" ON organization_contributors
+  FOR SELECT
+  USING (true);
 
-  DROP POLICY IF EXISTS "Owners manage contributors" ON organization_contributors;
-  CREATE POLICY "Owners manage contributors" ON organization_contributors
-    FOR ALL
-    USING (
-      user_id = auth.uid() OR
-      EXISTS (
-        SELECT 1 FROM organization_contributors oc
-        WHERE oc.organization_id = organization_contributors.organization_id
-          AND oc.user_id = auth.uid()
-          AND oc.role IN ('owner', 'co_founder', 'board_member')
-      )
-    );
+DROP POLICY IF EXISTS "Owners manage contributors" ON organization_contributors;
+CREATE POLICY "Owners manage contributors" ON organization_contributors
+  FOR ALL
+  USING (
+    user_id = auth.uid() OR
+    EXISTS (
+      SELECT 1 FROM organization_contributors oc
+      WHERE oc.organization_id = organization_contributors.organization_id
+        AND oc.user_id = auth.uid()
+        AND oc.role IN ('owner', 'co_founder', 'board_member')
+    )
+  );
 END $$;
 
 -- Ownership verifications
@@ -641,21 +641,21 @@ ALTER TABLE organization_ownership_verifications ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  DROP POLICY IF EXISTS "Users view own org verifications" ON organization_ownership_verifications;
-  CREATE POLICY "Users view own org verifications" ON organization_ownership_verifications
-    FOR SELECT
-    USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users view own org verifications" ON organization_ownership_verifications;
+CREATE POLICY "Users view own org verifications" ON organization_ownership_verifications
+  FOR SELECT
+  USING (user_id = auth.uid());
 
-  DROP POLICY IF EXISTS "Users submit org ownership claims" ON organization_ownership_verifications;
-  CREATE POLICY "Users submit org ownership claims" ON organization_ownership_verifications
-    FOR INSERT
-    WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users submit org ownership claims" ON organization_ownership_verifications;
+CREATE POLICY "Users submit org ownership claims" ON organization_ownership_verifications
+  FOR INSERT
+  WITH CHECK (user_id = auth.uid());
 
-  DROP POLICY IF EXISTS "Service role manages org verifications" ON organization_ownership_verifications;
-  CREATE POLICY "Service role manages org verifications" ON organization_ownership_verifications
-    FOR ALL
-    USING (auth.role() = 'service_role')
-    WITH CHECK (auth.role() = 'service_role');
+DROP POLICY IF EXISTS "Service role manages org verifications" ON organization_ownership_verifications;
+CREATE POLICY "Service role manages org verifications" ON organization_ownership_verifications
+  FOR ALL
+  USING (auth.role() = 'service_role')
+  WITH CHECK (auth.role() = 'service_role');
 END $$;
 
 -- Images
@@ -663,15 +663,15 @@ ALTER TABLE organization_images ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  DROP POLICY IF EXISTS "Anyone views org images" ON organization_images;
-  CREATE POLICY "Anyone views org images" ON organization_images
-    FOR SELECT
-    USING (true);
+DROP POLICY IF EXISTS "Anyone views org images" ON organization_images;
+CREATE POLICY "Anyone views org images" ON organization_images
+  FOR SELECT
+  USING (true);
 
-  DROP POLICY IF EXISTS "Users upload org images" ON organization_images;
-  CREATE POLICY "Users upload org images" ON organization_images
-    FOR INSERT
-    WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users upload org images" ON organization_images;
+CREATE POLICY "Users upload org images" ON organization_images
+  FOR INSERT
+  WITH CHECK (user_id = auth.uid());
 END $$;
 
 -- Org-vehicle links
@@ -679,28 +679,28 @@ ALTER TABLE organization_vehicles ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  DROP POLICY IF EXISTS "Anyone views org-vehicle links" ON organization_vehicles;
-  CREATE POLICY "Anyone views org-vehicle links" ON organization_vehicles
-    FOR SELECT
-    USING (true);
+DROP POLICY IF EXISTS "Anyone views org-vehicle links" ON organization_vehicles;
+CREATE POLICY "Anyone views org-vehicle links" ON organization_vehicles
+  FOR SELECT
+  USING (true);
 
-  DROP POLICY IF EXISTS "Users/owners manage links" ON organization_vehicles;
-  CREATE POLICY "Users/owners manage links" ON organization_vehicles
-    FOR ALL
-    USING (
-      linked_by_user_id = auth.uid() OR
-      EXISTS (
-        SELECT 1 FROM vehicles v
-        WHERE v.id = organization_vehicles.vehicle_id
-          AND v.user_id = auth.uid()
-      ) OR
-      EXISTS (
-        SELECT 1 FROM organization_contributors oc
-        WHERE oc.organization_id = organization_vehicles.organization_id
-          AND oc.user_id = auth.uid()
-          AND oc.role IN ('owner', 'manager')
-      )
-    );
+DROP POLICY IF EXISTS "Users/owners manage links" ON organization_vehicles;
+CREATE POLICY "Users/owners manage links" ON organization_vehicles
+  FOR ALL
+  USING (
+    linked_by_user_id = auth.uid() OR
+    EXISTS (
+      SELECT 1 FROM vehicles v
+      WHERE v.id = organization_vehicles.vehicle_id
+        AND v.user_id = auth.uid()
+    ) OR
+    EXISTS (
+      SELECT 1 FROM organization_contributors oc
+      WHERE oc.organization_id = organization_vehicles.organization_id
+        AND oc.user_id = auth.uid()
+        AND oc.role IN ('owner', 'manager')
+    )
+  );
 END $$;
 
 -- Trading tables
@@ -711,23 +711,23 @@ ALTER TABLE organization_market_trades ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  DROP POLICY IF EXISTS "Anyone views org offerings" ON organization_offerings;
-  CREATE POLICY "Anyone views org offerings" ON organization_offerings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Anyone views org offerings" ON organization_offerings;
+CREATE POLICY "Anyone views org offerings" ON organization_offerings FOR SELECT USING (true);
 
-  DROP POLICY IF EXISTS "Users view own org holdings" ON organization_share_holdings;
-  CREATE POLICY "Users view own org holdings" ON organization_share_holdings FOR SELECT USING (holder_id = auth.uid());
+DROP POLICY IF EXISTS "Users view own org holdings" ON organization_share_holdings;
+CREATE POLICY "Users view own org holdings" ON organization_share_holdings FOR SELECT USING (holder_id = auth.uid());
 
-  DROP POLICY IF EXISTS "Users view own org orders" ON organization_market_orders;
-  CREATE POLICY "Users view own org orders" ON organization_market_orders FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users view own org orders" ON organization_market_orders;
+CREATE POLICY "Users view own org orders" ON organization_market_orders FOR SELECT USING (user_id = auth.uid());
 
-  DROP POLICY IF EXISTS "Users insert own org orders" ON organization_market_orders;
-  CREATE POLICY "Users insert own org orders" ON organization_market_orders FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users insert own org orders" ON organization_market_orders;
+CREATE POLICY "Users insert own org orders" ON organization_market_orders FOR INSERT WITH CHECK (user_id = auth.uid());
 
-  DROP POLICY IF EXISTS "Users update own org orders" ON organization_market_orders;
-  CREATE POLICY "Users update own org orders" ON organization_market_orders FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users update own org orders" ON organization_market_orders;
+CREATE POLICY "Users update own org orders" ON organization_market_orders FOR UPDATE USING (user_id = auth.uid());
 
-  DROP POLICY IF EXISTS "Anyone views org trades" ON organization_market_trades;
-  CREATE POLICY "Anyone views org trades" ON organization_market_trades FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Anyone views org trades" ON organization_market_trades;
+CREATE POLICY "Anyone views org trades" ON organization_market_trades FOR SELECT USING (true);
 END $$;
 
 -- ETF holdings
@@ -735,8 +735,8 @@ ALTER TABLE organization_etf_holdings ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  DROP POLICY IF EXISTS "Anyone views ETF composition" ON organization_etf_holdings;
-  CREATE POLICY "Anyone views ETF composition" ON organization_etf_holdings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Anyone views ETF composition" ON organization_etf_holdings;
+CREATE POLICY "Anyone views ETF composition" ON organization_etf_holdings FOR SELECT USING (true);
 END $$;
 
 -- ==========================
@@ -778,22 +778,22 @@ DO $$
 BEGIN
   -- Only create triggers if business_timeline_events exists
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'business_timeline_events') THEN
-    DROP TRIGGER IF EXISTS trg_update_org_stats_events ON business_timeline_events;
-    CREATE TRIGGER trg_update_org_stats_events
-      AFTER INSERT OR DELETE ON business_timeline_events
-      FOR EACH ROW
-      EXECUTE FUNCTION update_organization_stats();
+DROP TRIGGER IF EXISTS trg_update_org_stats_events ON business_timeline_events;
+CREATE TRIGGER trg_update_org_stats_events
+  AFTER INSERT OR DELETE ON business_timeline_events
+  FOR EACH ROW
+  EXECUTE FUNCTION update_organization_stats();
   END IF;
 
-  DROP TRIGGER IF EXISTS trg_update_org_stats_images ON organization_images;
-  CREATE TRIGGER trg_update_org_stats_images
-    AFTER INSERT OR DELETE ON organization_images
-    FOR EACH ROW
-    EXECUTE FUNCTION update_organization_stats();
+DROP TRIGGER IF EXISTS trg_update_org_stats_images ON organization_images;
+CREATE TRIGGER trg_update_org_stats_images
+  AFTER INSERT OR DELETE ON organization_images
+  FOR EACH ROW
+  EXECUTE FUNCTION update_organization_stats();
 
-  DROP TRIGGER IF EXISTS trg_update_org_stats_vehicles ON organization_vehicles;
-  CREATE TRIGGER trg_update_org_stats_vehicles
-    AFTER INSERT OR UPDATE OF status OR DELETE ON organization_vehicles
-    FOR EACH ROW
-    EXECUTE FUNCTION update_organization_stats();
+DROP TRIGGER IF EXISTS trg_update_org_stats_vehicles ON organization_vehicles;
+CREATE TRIGGER trg_update_org_stats_vehicles
+  AFTER INSERT OR UPDATE OF status OR DELETE ON organization_vehicles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_organization_stats();
 END $$;

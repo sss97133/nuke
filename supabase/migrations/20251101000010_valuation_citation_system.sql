@@ -249,14 +249,14 @@ ALTER TABLE labor_rate_sources ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  -- Anyone can view citations (transparency)
-  DROP POLICY IF EXISTS "Anyone views valuation citations" ON valuation_citations;
-  CREATE POLICY "Anyone views valuation citations" ON valuation_citations
-    FOR SELECT USING (true);
+-- Anyone can view citations (transparency)
+DROP POLICY IF EXISTS "Anyone views valuation citations" ON valuation_citations;
+CREATE POLICY "Anyone views valuation citations" ON valuation_citations
+  FOR SELECT USING (true);
 
-  -- Users can submit citations for vehicles they have access to
-  DROP POLICY IF EXISTS "Users submit citations" ON valuation_citations;
-  CREATE POLICY "Users submit citations" ON valuation_citations
+-- Users can submit citations for vehicles they have access to
+DROP POLICY IF EXISTS "Users submit citations" ON valuation_citations;
+CREATE POLICY "Users submit citations" ON valuation_citations
   FOR INSERT
   WITH CHECK (
     auth.uid() = submitted_by AND (
@@ -265,52 +265,52 @@ BEGIN
     )
   );
 
-  -- Users can update their own citations
-  DROP POLICY IF EXISTS "Users update own citations" ON valuation_citations;
-  CREATE POLICY "Users update own citations" ON valuation_citations
-    FOR UPDATE
-    USING (auth.uid() = submitted_by);
+-- Users can update their own citations
+DROP POLICY IF EXISTS "Users update own citations" ON valuation_citations;
+CREATE POLICY "Users update own citations" ON valuation_citations
+  FOR UPDATE
+  USING (auth.uid() = submitted_by);
 
-  -- User valuation inputs
-  DROP POLICY IF EXISTS "Users view own inputs" ON user_valuation_inputs;
-  CREATE POLICY "Users view own inputs" ON user_valuation_inputs
-    FOR SELECT USING (user_id = auth.uid());
+-- User valuation inputs
+DROP POLICY IF EXISTS "Users view own inputs" ON user_valuation_inputs;
+CREATE POLICY "Users view own inputs" ON user_valuation_inputs
+  FOR SELECT USING (user_id = auth.uid());
 
-  DROP POLICY IF EXISTS "Users insert own inputs" ON user_valuation_inputs;
-  CREATE POLICY "Users insert own inputs" ON user_valuation_inputs
-    FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users insert own inputs" ON user_valuation_inputs;
+CREATE POLICY "Users insert own inputs" ON user_valuation_inputs
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
-  -- User accuracy scores (public read)
-  DROP POLICY IF EXISTS "Anyone views user accuracy" ON user_valuation_accuracy;
-  CREATE POLICY "Anyone views user accuracy" ON user_valuation_accuracy
-    FOR SELECT USING (true);
+-- User accuracy scores (public read)
+DROP POLICY IF EXISTS "Anyone views user accuracy" ON user_valuation_accuracy;
+CREATE POLICY "Anyone views user accuracy" ON user_valuation_accuracy
+  FOR SELECT USING (true);
 
-  -- Valuation blanks (anyone can see, contributors can fill)
-  DROP POLICY IF EXISTS "Anyone views blanks" ON valuation_blanks;
-  CREATE POLICY "Anyone views blanks" ON valuation_blanks
-    FOR SELECT USING (true);
+-- Valuation blanks (anyone can see, contributors can fill)
+DROP POLICY IF EXISTS "Anyone views blanks" ON valuation_blanks;
+CREATE POLICY "Anyone views blanks" ON valuation_blanks
+  FOR SELECT USING (true);
 
-  DROP POLICY IF EXISTS "Contributors fill blanks" ON valuation_blanks;
-  CREATE POLICY "Contributors fill blanks" ON valuation_blanks
+DROP POLICY IF EXISTS "Contributors fill blanks" ON valuation_blanks;
+CREATE POLICY "Contributors fill blanks" ON valuation_blanks
   FOR UPDATE
   USING (
     EXISTS (SELECT 1 FROM vehicles v WHERE v.id = vehicle_id AND v.user_id = auth.uid()) OR
     EXISTS (SELECT 1 FROM vehicle_contributors vc WHERE vc.vehicle_id = valuation_blanks.vehicle_id AND vc.user_id = auth.uid())
   );
 
-  -- Labor rate sources (anyone views, verified contributors submit)
-  DROP POLICY IF EXISTS "Anyone views labor rates" ON labor_rate_sources;
-  CREATE POLICY "Anyone views labor rates" ON labor_rate_sources
-    FOR SELECT USING (true);
+-- Labor rate sources (anyone views, verified contributors submit)
+DROP POLICY IF EXISTS "Anyone views labor rates" ON labor_rate_sources;
+CREATE POLICY "Anyone views labor rates" ON labor_rate_sources
+  FOR SELECT USING (true);
 
-  DROP POLICY IF EXISTS "Users submit labor rates" ON labor_rate_sources;
-  CREATE POLICY "Users submit labor rates" ON labor_rate_sources
-    FOR INSERT
-    WITH CHECK (
-      auth.uid() = laborer_user_id OR
-      EXISTS (SELECT 1 FROM shops s WHERE s.id = shop_id AND s.owner_user_id = auth.uid()) OR
-      EXISTS (SELECT 1 FROM shop_members sm WHERE sm.shop_id = labor_rate_sources.shop_id AND sm.user_id = auth.uid() AND sm.role IN ('owner', 'admin'))
-    );
+DROP POLICY IF EXISTS "Users submit labor rates" ON labor_rate_sources;
+CREATE POLICY "Users submit labor rates" ON labor_rate_sources
+  FOR INSERT
+  WITH CHECK (
+    auth.uid() = laborer_user_id OR
+    EXISTS (SELECT 1 FROM shops s WHERE s.id = shop_id AND s.owner_user_id = auth.uid()) OR
+    EXISTS (SELECT 1 FROM shop_members sm WHERE sm.shop_id = labor_rate_sources.shop_id AND sm.user_id = auth.uid() AND sm.role IN ('owner', 'admin'))
+  );
 END $$;
 
 -- ==========================
@@ -321,14 +321,14 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'image_tags') THEN
-    ALTER TABLE image_tags
+ALTER TABLE image_tags
       ADD COLUMN IF NOT EXISTS receipt_line_item_id UUID,
       ADD COLUMN IF NOT EXISTS labor_record_id UUID,
       ADD COLUMN IF NOT EXISTS part_installed_by UUID,
       ADD COLUMN IF NOT EXISTS install_shop_id UUID,
-      ADD COLUMN IF NOT EXISTS install_labor_hours NUMERIC(6,2),
-      ADD COLUMN IF NOT EXISTS install_labor_rate NUMERIC(8,2);
-    
+  ADD COLUMN IF NOT EXISTS install_labor_hours NUMERIC(6,2),
+  ADD COLUMN IF NOT EXISTS install_labor_rate NUMERIC(8,2);
+
     -- Add FK constraints if target tables exist
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'receipt_items') THEN
       IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'image_tags_receipt_line_item_id_fkey') THEN
@@ -417,12 +417,12 @@ $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'vehicle_documents') THEN
-    DROP TRIGGER IF EXISTS trg_create_citation_from_receipt ON vehicle_documents;
-    CREATE TRIGGER trg_create_citation_from_receipt
-      AFTER INSERT ON vehicle_documents
-      FOR EACH ROW
-      WHEN (NEW.amount IS NOT NULL AND NEW.vehicle_id IS NOT NULL)
-      EXECUTE FUNCTION create_citation_from_receipt();
+DROP TRIGGER IF EXISTS trg_create_citation_from_receipt ON vehicle_documents;
+CREATE TRIGGER trg_create_citation_from_receipt
+  AFTER INSERT ON vehicle_documents
+  FOR EACH ROW
+  WHEN (NEW.amount IS NOT NULL AND NEW.vehicle_id IS NOT NULL)
+  EXECUTE FUNCTION create_citation_from_receipt();
   END IF;
 END $$;
 
@@ -485,12 +485,12 @@ $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ai_component_detections') THEN
-    DROP TRIGGER IF EXISTS trg_create_citation_from_ai ON ai_component_detections;
-    CREATE TRIGGER trg_create_citation_from_ai
-      AFTER INSERT ON ai_component_detections
-      FOR EACH ROW
-      WHEN (NEW.component_name IS NOT NULL AND NEW.vehicle_image_id IS NOT NULL)
-      EXECUTE FUNCTION create_citation_from_ai_component();
+DROP TRIGGER IF EXISTS trg_create_citation_from_ai ON ai_component_detections;
+CREATE TRIGGER trg_create_citation_from_ai
+  AFTER INSERT ON ai_component_detections
+  FOR EACH ROW
+  WHEN (NEW.component_name IS NOT NULL AND NEW.vehicle_image_id IS NOT NULL)
+  EXECUTE FUNCTION create_citation_from_ai_component();
   END IF;
 END $$;
 
@@ -570,11 +570,11 @@ $$;
 
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trg_update_user_accuracy ON valuation_citations;
-  CREATE TRIGGER trg_update_user_accuracy
-    AFTER UPDATE OF verification_status ON valuation_citations
-    FOR EACH ROW
-    EXECUTE FUNCTION update_user_valuation_accuracy();
+DROP TRIGGER IF EXISTS trg_update_user_accuracy ON valuation_citations;
+CREATE TRIGGER trg_update_user_accuracy
+  AFTER UPDATE OF verification_status ON valuation_citations
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_valuation_accuracy();
 END $$;
 
 -- ==========================
