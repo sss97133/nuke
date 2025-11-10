@@ -57,3 +57,4 @@ browser/node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Fra
 
 .env.supabase
 .env*.local
+.auth-state.json

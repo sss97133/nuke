@@ -12,8 +12,21 @@ import VehicleFormFields from './components/VehicleFormFields';
 import VerificationProgress from './components/VerificationProgress';
 import type { VehicleFormData, DetailLevel, ImageUploadProgress, ImageUploadStatus } from './types/index';
 import { extractImageMetadata, reverseGeocode, getEventDateFromImages, getEventLocationFromImages, type ImageMetadata } from '../../utils/imageMetadata';
+import { generateCraigslistEmail } from '../../utils/generateCraigslistEmail';
 import { MobileAddVehicle } from '../../components/mobile/MobileAddVehicle';
 import { useIsMobile } from '../../hooks/useIsMobile';
+
+const toDateTimeLocalString = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (num: number) => String(num).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
 
 interface AddVehicleProps {
   mode?: 'modal' | 'page';
@@ -49,11 +62,26 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [autoFilledFields, setAutoFilledFields] = useState<string[]>([]);
+  const [lastScrapedData, setLastScrapedData] = useState<any | null>(null);
+  const [emailDraft, setEmailDraft] = useState<{ subject: string; body: string } | null>(null);
+  const [showEmailDraft, setShowEmailDraft] = useState(false);
+  const [copiedField, setCopiedField] = useState<'subject' | 'body' | null>(null);
 
   // URL scraping state
   const [isScrapingUrl, setIsScrapingUrl] = useState(false);
   const [scrapingError, setScrapingError] = useState<string | null>(null);
   const [lastScrapedUrl, setLastScrapedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (autoFilledFields.length === 0) return;
+    const timeoutId = window.setTimeout(() => setAutoFilledFields([]), 6000);
+    return () => window.clearTimeout(timeoutId);
+  }, [autoFilledFields]);
+
+  const autoFilledDisplay = autoFilledFields
+    .slice(0, 8)
+    .map((field) => field.replace(/_/g, ' '));
 
   // Image upload state
   const [uploadProgress, setUploadProgress] = useState<ImageUploadProgress>({});
@@ -282,38 +310,122 @@ Redirecting to vehicle profile...`);
 
       if (result.success && result.data) {
         const scrapedData = result.data;
+        console.log('Full scraped data received:', scrapedData);
 
-        // Map scraped data to form fields
+        // Map ALL scraped data to form fields
         const updates: Partial<VehicleFormData> = {};
 
+        // Basic vehicle info
         if (scrapedData.make) updates.make = scrapedData.make;
         if (scrapedData.model) updates.model = scrapedData.model;
         if (scrapedData.year) updates.year = parseInt(scrapedData.year);
         if (scrapedData.vin) updates.vin = scrapedData.vin;
-        if (scrapedData.mileage) updates.mileage = parseInt(scrapedData.mileage.replace(/,/g, ''));
+        
+        // Mileage (handle both string and number)
+        if (scrapedData.mileage) {
+          const mileageStr = typeof scrapedData.mileage === 'string' 
+            ? scrapedData.mileage 
+            : String(scrapedData.mileage);
+          updates.mileage = parseInt(mileageStr.replace(/,/g, ''));
+        }
+        
+        // Appearance
         if (scrapedData.color) updates.color = scrapedData.color;
+        if (scrapedData.body_style) updates.body_style = scrapedData.body_style;
+        
+        // Mechanical (careful with types - displacement is STRING in form)
         if (scrapedData.transmission) updates.transmission = scrapedData.transmission;
         if (scrapedData.engine_size) updates.engine_size = scrapedData.engine_size;
+        if (scrapedData.displacement) updates.displacement = String(scrapedData.displacement);
+        if (scrapedData.engine_liters) updates.displacement = String(scrapedData.engine_liters);
+        if (scrapedData.drivetrain) updates.drivetrain = scrapedData.drivetrain;
+        if (scrapedData.fuel_type) updates.fuel_type = scrapedData.fuel_type;
+        
+        // Pricing
         if (scrapedData.sale_price) updates.sale_price = scrapedData.sale_price;
+        if (scrapedData.asking_price) updates.asking_price = scrapedData.asking_price;
+        if (scrapedData.price) updates.asking_price = scrapedData.price;
+        
+        // Condition & Status
+        if (scrapedData.condition) updates.condition = scrapedData.condition;
+        if (scrapedData.title_status) updates.title_status = scrapedData.title_status;
+        
+        // Location
+        if (scrapedData.location) updates.location = scrapedData.location;
+        
+        // Description & Notes
+        if (scrapedData.description) {
+          updates.description = scrapedData.description;
+        }
+        
+        // Advanced fields from description parsing
+        if (scrapedData.trim) updates.trim = scrapedData.trim;
+        if (scrapedData.transmission_subtype) updates.transmission = scrapedData.transmission_subtype;
+        
+        // Build comprehensive notes with ALL extracted data
+        const notesLines = [];
+        notesLines.push(`Source: ${scrapedData.source || 'Unknown'}`);
+        notesLines.push(`Imported from: ${url}`);
+        if (scrapedData.posted_date) notesLines.push(`Posted: ${scrapedData.posted_date}`);
+        if (scrapedData.updated_date) notesLines.push(`Updated: ${scrapedData.updated_date}`);
+        
+        if (scrapedData.title) notesLines.push(`\nOriginal Title: ${scrapedData.title}`);
+        if (scrapedData.location) notesLines.push(`Location: ${scrapedData.location}`);
+        
+        if (scrapedData.description) {
+          notesLines.push(`\nSELLER DESCRIPTION:\n${scrapedData.description}`);
+        }
+        
+        // Condition notes
+        notesLines.push(`\nCONDITION NOTES:`);
+        if (scrapedData.condition) notesLines.push(`- Overall: ${scrapedData.condition}`);
+        if (scrapedData.known_issues) notesLines.push(`- Issues: ${scrapedData.known_issues.join(', ')}`);
+        if (scrapedData.paint_history) notesLines.push(`- Paint: ${scrapedData.paint_history}${scrapedData.paint_age_years ? ` (${scrapedData.paint_age_years} years ago)` : ''}`);
+        if (scrapedData.has_ac === false) notesLines.push(`- No A/C`);
+        else if (scrapedData.has_ac === true) notesLines.push(`- Has A/C`);
+        
+        // Seller info
+        if (scrapedData.seller_motivated) notesLines.push(`- Seller is motivated`);
+        if (scrapedData.negotiable) notesLines.push(`- Price negotiable`);
+        if (scrapedData.price_firm) notesLines.push(`- Price is firm`);
+        if (scrapedData.trade_interests) notesLines.push(`- Trades for: ${scrapedData.trade_interests}`);
+        
+        // Technical specs
+        notesLines.push(`\nTECHNICAL:`);
+        if (scrapedData.cylinders) notesLines.push(`- ${scrapedData.cylinders} cylinders`);
+        if (scrapedData.engine_type) notesLines.push(`- ${scrapedData.engine_type}`);
+        if (scrapedData.transmission_subtype) notesLines.push(`- ${scrapedData.transmission_subtype}`);
+        if (scrapedData.drivetrain) notesLines.push(`- ${scrapedData.drivetrain}`);
+        
+        // Append to existing notes or create new
+        updates.notes = formData.notes 
+          ? `${formData.notes}\n\n--- Scraped Data ---\n${notesLines.join('\n')}`
+          : notesLines.join('\n');
 
-        // BAT specific fields
-        updates.bat_auction_url = url;
-        updates.source = 'Bring a Trailer';
+        // Source attribution
         updates.discovery_source = 'user_import';
         updates.discovery_url = url;
-        if (scrapedData.title) updates.bat_listing_title = scrapedData.title;
+        
+        // Platform-specific fields
+        if (scrapedData.source === 'Bring a Trailer') {
+          updates.bat_auction_url = url;
+          updates.source = 'Bring a Trailer';
+          if (scrapedData.title) updates.bat_listing_title = scrapedData.title;
+        } else if (scrapedData.source === 'Craigslist') {
+          updates.source = 'Craigslist';
+        }
 
         // Set relationship as discovered since importing from external source
         updates.relationship_type = 'discovered';
 
-        // Add acquisition context for business users
-        if (scrapedData.sale_price || scrapedData.asking_price) {
-          updates.notes = `Discovered on ${scrapedData.source || 'marketplace'} - potential acquisition candidate`;
-        }
-
-        console.log('Updating form with scraped data:', updates);
+        const updatedKeys = Object.keys(updates);
         updateFormData(updates);
-
+        setAutoFilledFields(updatedKeys);
+        setLastScrapedData(scrapedData);
+        setEmailDraft(null);
+        setShowEmailDraft(false);
+        setCopiedField(null);
+ 
         // Download images directly from source URLs (no CORS proxy needed for Craigslist)
         if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0) {
           console.log(`Found ${scrapedData.images.length} images, downloading directly...`);
@@ -386,11 +498,68 @@ Redirecting to vehicle profile...`);
 
     } catch (error: any) {
       console.error('URL scraping error:', error);
+      setLastScrapedData(null);
+      setEmailDraft(null);
+      setShowEmailDraft(false);
       setScrapingError(error.message || 'Failed to import from URL');
     } finally {
       setIsScrapingUrl(false);
     }
   }, [updateFormData, lastScrapedUrl]);
+
+  const handleGenerateSellerEmail = useCallback(() => {
+    if (!lastScrapedData) return;
+
+    const listingUrl = lastScrapedData.listing_url
+      || lastScrapedData.url
+      || lastScrapedUrl
+      || formData.import_url
+      || undefined;
+
+    const scrapedPrice = typeof lastScrapedData.asking_price === 'number'
+      ? lastScrapedData.asking_price
+      : typeof lastScrapedData.price === 'number'
+        ? lastScrapedData.price
+        : null;
+
+    const formPrice = typeof formData.asking_price === 'number' ? formData.asking_price : null;
+
+    const sellerLocation = lastScrapedData.location
+      || lastScrapedData.city
+      || lastScrapedData.region
+      || lastScrapedData.state
+      || null;
+
+    const descriptionSnippet = lastScrapedData.description
+      || lastScrapedData.title
+      || null;
+
+    const draft = generateCraigslistEmail({
+      vehicle: formData,
+      listingUrl,
+      askingPrice: scrapedPrice ?? formPrice ?? null,
+      sellerLocation,
+      descriptionSnippet,
+    });
+
+    setEmailDraft(draft);
+    setShowEmailDraft(true);
+    setCopiedField(null);
+  }, [formData, lastScrapedData, lastScrapedUrl]);
+
+  const handleCopyEmailField = useCallback(async (field: 'subject' | 'body') => {
+    if (!emailDraft) return;
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(emailDraft[field]);
+        setCopiedField(field);
+        window.setTimeout(() => setCopiedField(null), 2000);
+      }
+    } catch (error) {
+      console.error('Failed to copy email draft field:', error);
+    }
+  }, [emailDraft]);
 
   // Watch for import_url changes
   React.useEffect(() => {
@@ -934,6 +1103,105 @@ Redirecting to vehicle profile...`);
                           >
                             Clear Draft
                           </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {autoFilledFields.length > 0 && (
+                      <div className="alert alert-success mb-4">
+                        <div className="text-small">
+                          Auto-filled {autoFilledFields.length} field{autoFilledFields.length === 1 ? '' : 's'}:
+                          {' '}
+                          {autoFilledDisplay.join(', ')}
+                          {autoFilledFields.length > autoFilledDisplay.length && (
+                            <span> +{autoFilledFields.length - autoFilledDisplay.length} more</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {lastScrapedData && (
+                      <div className="alert alert-info mb-4">
+                        <div className="flex items-center justify-between gap-2" style={{ flexWrap: 'wrap' }}>
+                          <div className="text-small">
+                            Need more detail from the seller? Generate a personalized email that asks for VIN, title photo, ownership history, and hi-res shots.
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={handleGenerateSellerEmail}
+                              className="button button-small button-secondary"
+                            >
+                              Generate seller email
+                            </button>
+                            {emailDraft && (
+                              <button
+                                type="button"
+                                onClick={() => setShowEmailDraft((prev) => !prev)}
+                                className="button button-small"
+                              >
+                                {showEmailDraft ? 'Hide draft' : 'View last draft'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {showEmailDraft && emailDraft && (
+                      <div className="card mb-4">
+                        <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+                          <h3 className="text font-bold" style={{ margin: 0 }}>Seller Email Draft</h3>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyEmailField('subject')}
+                              className="button button-small button-secondary"
+                            >
+                              {copiedField === 'subject' ? 'Subject copied' : 'Copy subject'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyEmailField('body')}
+                              className="button button-small button-secondary"
+                            >
+                              {copiedField === 'body' ? 'Body copied' : 'Copy body'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleGenerateSellerEmail}
+                              className="button button-small"
+                            >
+                              Regenerate
+                            </button>
+                          </div>
+                        </div>
+                        <div className="card-body" style={{ display: 'grid', gap: 'var(--space-3)' }}>
+                          <div>
+                            <label className="form-label" htmlFor="seller-email-subject">Subject</label>
+                            <input
+                              id="seller-email-subject"
+                              className="form-input"
+                              value={emailDraft.subject}
+                              readOnly
+                              onFocus={(e) => e.target.select()}
+                            />
+                          </div>
+                          <div>
+                            <label className="form-label" htmlFor="seller-email-body">Body</label>
+                            <textarea
+                              id="seller-email-body"
+                              className="form-input"
+                              value={emailDraft.body}
+                              readOnly
+                              rows={12}
+                              style={{ whiteSpace: 'pre-wrap' }}
+                              onFocus={(e) => e.target.select()}
+                            />
+                          </div>
+                          <div className="text-small text-muted">
+                            Tip: paste this into your mail client, tweak anything personal, then send it directly through Craigslist reply or SMS.
+                          </div>
                         </div>
                       </div>
                     )}
