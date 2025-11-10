@@ -48,6 +48,7 @@ import AdminVerifications from './pages/AdminVerifications';
 import TestContributions from './pages/TestContributions';
 import LiveFeed from './pages/LiveFeed';
 import Discovery from './pages/Discovery';
+import CurationQueue from './pages/CurationQueue';
 // Debug pages removed during cleanup
 import BrowseProfessionals from './pages/BrowseProfessionals';
 import PhotoLibraryCategorizer from './components/PhotoLibraryCategorizer';
