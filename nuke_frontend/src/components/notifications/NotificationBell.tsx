@@ -16,12 +16,27 @@ const NotificationBell: React.FC = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { if (mounted) setCount(0); return; }
         userIdRef.current = user.id;
-        const { count: unread } = await supabase
-          .from('user_notifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_read', false);
-        if (mounted) setCount(unread || 0);
+        // Count unread from ALL notification tables
+        const [userNotifs, generalNotifs, duplicateNotifs] = await Promise.all([
+          supabase
+            .from('user_notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('is_read', false),
+          supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('status', 'unread'),
+          supabase
+            .from('duplicate_notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('status', 'unread')
+        ]);
+        
+        const totalUnread = (userNotifs.count || 0) + (generalNotifs.count || 0) + (duplicateNotifs.count || 0);
+        if (mounted) setCount(totalUnread);
 
         // Realtime: new notifications and read updates
         channel = supabase.channel('user-notifications-bell')
