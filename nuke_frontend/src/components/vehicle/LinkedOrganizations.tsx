@@ -63,6 +63,8 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId }) 
 
   const loadOrganizations = async () => {
     try {
+      console.log('[LinkedOrganizations] Loading for vehicle:', vehicleId);
+      
       const { data, error } = await supabase
         .from('organization_vehicles')
         .select(`
@@ -83,7 +85,12 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId }) 
         .eq('vehicle_id', vehicleId)
         .eq('status', 'active');
 
-      if (error) throw error;
+      if (error) {
+        console.error('[LinkedOrganizations] Query error:', error);
+        throw error;
+      }
+      
+      console.log('[LinkedOrganizations] Found', data?.length || 0, 'organizations');
 
       const enriched = (data || []).map((ov: any) => ({
         id: ov.id,
@@ -99,8 +106,9 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId }) 
       }));
 
       setOrganizations(enriched);
+      console.log('[LinkedOrganizations] Rendered', enriched.length, 'org cards');
     } catch (error) {
-      console.error('Failed to load organizations:', error);
+      console.error('[LinkedOrganizations] Failed to load:', error);
     } finally {
       setLoading(false);
     }
@@ -120,8 +128,11 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId }) 
   }
 
   if (organizations.length === 0) {
+    console.log('[LinkedOrganizations] No organizations found, hiding component');
     return null; // Don't show card if no organizations
   }
+  
+  console.log('[LinkedOrganizations] Rendering card with', organizations.length, 'organizations');
 
   return (
     <div className="card">
