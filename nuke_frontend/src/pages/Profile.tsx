@@ -505,6 +505,7 @@ const Profile: React.FC = () => {
                 {/* Contribution Heatmap */}
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <ContributionTimeline
+                    key={`contributions-${(profileData.recentContributions || []).length}`}
                     contributions={profileData.recentContributions || []}
                   />
                 </div>
