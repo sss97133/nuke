@@ -75,12 +75,15 @@ import CreditsSuccess from './pages/CreditsSuccess';
 import Portfolio from './pages/Portfolio';
 import BuilderDashboard from './pages/BuilderDashboard';
 import BrowseInvestments from './pages/BrowseInvestments';
-import Market from './pages/Market';
 import Legal from './pages/Legal';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import DataDeletion from './pages/DataDeletion';
 import SignDocument from './pages/SignDocument';
 import ShippingSettings from './pages/admin/ShippingSettings';
 import { MobileOrg } from './pages/mobile/MobileOrg';
 import InvestorDashboardPage from './pages/InvestorDashboard';
+import MergeProposalsDashboard from './pages/MergeProposalsDashboard';
 
 // Auth components
 import ResetPassword from './pages/ResetPassword';
@@ -189,7 +192,11 @@ function App() {
   const isPublicRoute = window.location.pathname === '/' ||
                        window.location.pathname === '/discover' ||
                        window.location.pathname.startsWith('/vehicle/') ||
-                       window.location.pathname.startsWith('/invite/');
+                       window.location.pathname.startsWith('/invite/') ||
+                       window.location.pathname === '/legal' ||
+                       window.location.pathname === '/privacy' ||
+                       window.location.pathname === '/terms' ||
+                       window.location.pathname === '/data-deletion';
 
   // If not authenticated, show login for protected routes
   if (!session && !isPublicRoute) {
@@ -255,9 +262,10 @@ function App() {
             <Route path="/book" element={<BookService />} />
             <Route path="/order-parts" element={<OrderParts />} />
             
-            {/* Market - Unified Investment Hub */}
-            <Route path="/market" element={<Market />} />
             <Route path="/legal" element={<Legal />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/data-deletion" element={<DataDeletion />} />
             
             {/* Portfolio & Trading - Legacy routes redirect to Market */}
             <Route path="/portfolio/success" element={<CreditsSuccess />} />
@@ -284,10 +292,15 @@ function App() {
               </Suspense>
             } />
             
+            {/* Secretary Mode - Rapid Curation */}
+            <Route path="/curation/queue" element={<CurationQueue />} />
+            <Route path="/review/ai-detections" element={<CurationQueue />} />
+            
             {/* Admin & Development */}
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/verifications" element={<AdminVerifications />} />
             <Route path="/admin/ownership-verifications" element={<OwnershipVerificationDashboard />} />
+            <Route path="/admin/merge-proposals" element={<MergeProposalsDashboard />} />
             <Route path="/admin/price-editor" element={<BulkPriceEditor />} />
             <Route path="/admin/price-import" element={<PriceCsvImport />} />
             <Route path="/admin/shipping-settings" element={<ShippingSettings />} />
