@@ -26,9 +26,10 @@ interface PhotoSession {
 interface MobilePhotoDumpProps {
   onClose: () => void;
   session: any;
+  vehicleId?: string;  // Pre-select vehicle if on vehicle page
 }
 
-export function MobilePhotoDump({ onClose, session }: MobilePhotoDumpProps) {
+export function MobilePhotoDump({ onClose, session, vehicleId }: MobilePhotoDumpProps) {
   const user = session?.user;
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [sessions, setSessions] = useState<PhotoSession[]>([]);
@@ -86,6 +87,11 @@ export function MobilePhotoDump({ onClose, session }: MobilePhotoDumpProps) {
       const analyzedSessions = await Promise.all(
         clusteredSessions.map(session => analyzeSession(session))
       );
+      
+      // If vehicleId provided, auto-assign to that vehicle
+      if (vehicleId) {
+        analyzedSessions.forEach(s => s.manualVehicleId = vehicleId);
+      }
 
       setSessions(analyzedSessions);
     } catch (error) {
