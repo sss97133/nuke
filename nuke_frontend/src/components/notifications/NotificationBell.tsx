@@ -19,9 +19,9 @@ const NotificationBell: React.FC = () => {
         // Count unread from ALL notification tables
         const [userNotifs, generalNotifs, duplicateNotifs] = await Promise.all([
           supabase
-            .from('user_notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id)
+          .from('user_notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
             .eq('is_read', false),
           supabase
             .from('notifications')

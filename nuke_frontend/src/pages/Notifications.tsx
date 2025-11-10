@@ -32,8 +32,8 @@ const Notifications: React.FC = () => {
       // Load from ALL notification tables
       const [userNotifs, generalNotifs, duplicateNotifs] = await Promise.all([
         supabase
-          .from('user_notifications')
-          .select('id, type, title, message, is_read, created_at')
+        .from('user_notifications')
+        .select('id, type, title, message, is_read, created_at')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -49,7 +49,7 @@ const Notifications: React.FC = () => {
           .from('duplicate_notifications')
           .select('id, title, message, status, created_at')
           .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false })
           .limit(50)
       ]);
       

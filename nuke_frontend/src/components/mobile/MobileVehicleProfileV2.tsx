@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { SmoothImageCarousel } from './SmoothImageCarousel';
 import { SmoothFullscreenViewer } from './SmoothFullscreenViewer';
-import { MobilePhotoDump } from './MobilePhotoDump';
+import { UniversalImageUpload } from '../UniversalImageUpload';
 import { MobileCommentBox } from './MobileCommentBox';
 import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useImageUpload } from '../../hooks/useImageUpload';
@@ -170,7 +170,7 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
               onClick={() => setShowPhotoDump(true)}
               style={styles.primaryAction}
             >
-              PHOTO DUMP
+              Upload Images
             </button>
             <button 
               onClick={() => cameraInputRef.current?.click()}
@@ -323,7 +323,7 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
 
       {/* Photo Dump Modal */}
       {showPhotoDump && (
-        <MobilePhotoDump 
+        <UniversalImageUpload 
           onClose={handlePhotoDumpClose}
           session={session}
           vehicleId={vehicleId}
