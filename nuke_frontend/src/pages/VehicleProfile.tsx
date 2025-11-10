@@ -43,6 +43,7 @@ import LinkedOrganizations from '../components/vehicle/LinkedOrganizations';
 import ValuationCitations from '../components/vehicle/ValuationCitations';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import DataValidationPopup from '../components/vehicle/DataValidationPopup';
+import { BaTURLDrop } from '../components/vehicle/BaTURLDrop';
 import MergeProposalsPanel from '../components/vehicle/MergeProposalsPanel';
 
 const VehicleProfile: React.FC = () => {
@@ -1240,6 +1241,15 @@ const VehicleProfile: React.FC = () => {
 
               {/* External Listings (BaT, Cars & Bids, etc.) - Auto-displayed if exists */}
               <ExternalListingCard vehicleId={vehicle.id} />
+              
+              {/* BaT URL Drop - Paste listing URL to import data */}
+              {(isVerifiedOwner || hasContributorAccess) && (
+                <BaTURLDrop 
+                  vehicleId={vehicle.id}
+                  canEdit={true}
+                  onDataImported={() => window.location.reload()}
+                />
+              )}
 
               {/* Linked Organizations (Shops, Dealers, etc.) */}
               <LinkedOrganizations vehicleId={vehicle.id} />
