@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import MobileVehicleProfile from '../components/mobile/MobileVehicleProfile';
+import MobileVehicleProfileV2 from '../components/mobile/MobileVehicleProfileV2';
 import { TimelineEventService } from '../services/timelineEventService';
 import AddEventWizard from '../components/AddEventWizard';
 import EventMap from '../components/EventMap';
@@ -38,8 +39,11 @@ import '../design-system.css';
 import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
 import FinancialProducts from '../components/financial/FinancialProducts';
 import ExternalListingCard from '../components/vehicle/ExternalListingCard';
-import ImageCoverageChecklist from '../components/vehicle/ImageCoverageChecklist';
+import LinkedOrganizations from '../components/vehicle/LinkedOrganizations';
+import ValuationCitations from '../components/vehicle/ValuationCitations';
+import TransactionHistory from '../components/vehicle/TransactionHistory';
 import DataValidationPopup from '../components/vehicle/DataValidationPopup';
+import MergeProposalsPanel from '../components/vehicle/MergeProposalsPanel';
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -1163,7 +1167,7 @@ const VehicleProfile: React.FC = () => {
   return (
     <>
       {isMobile && vehicleId ? (
-        <MobileVehicleProfile vehicleId={vehicleId} isMobile={isMobile} />
+        <MobileVehicleProfileV2 vehicleId={vehicleId} isMobile={isMobile} />
       ) : (
       <div>
         {/* Vehicle Header with Price */}
@@ -1174,6 +1178,17 @@ const VehicleProfile: React.FC = () => {
           responsibleName={responsibleName}
           onPriceClick={handlePriceClick}
         />
+
+        {/* Merge Proposals Panel - Only visible to verified owners */}
+        {isVerifiedOwner && (
+          <MergeProposalsPanel
+            vehicleId={vehicle.id}
+            onMergeComplete={() => {
+              // Reload the vehicle after merge
+              loadVehicle();
+            }}
+          />
+        )}
 
         {/* Live Stats Bar (MVP: hidden to reduce clutter) */}
 
@@ -1226,8 +1241,14 @@ const VehicleProfile: React.FC = () => {
               {/* External Listings (BaT, Cars & Bids, etc.) - Auto-displayed if exists */}
               <ExternalListingCard vehicleId={vehicle.id} />
 
-              {/* Image Coverage Checklist - Shows missing angles */}
-              <ImageCoverageChecklist vehicleId={vehicle.id} />
+              {/* Linked Organizations (Shops, Dealers, etc.) */}
+              <LinkedOrganizations vehicleId={vehicle.id} />
+
+              {/* Valuation Citations - Transparent breakdown */}
+              <ValuationCitations vehicleId={vehicle.id} />
+
+              {/* Transaction History Timeline */}
+              <TransactionHistory vehicleId={vehicle.id} />
 
               {/* Financial Products */}
               <FinancialProducts
