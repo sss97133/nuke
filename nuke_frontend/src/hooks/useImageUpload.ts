@@ -37,10 +37,11 @@ export const useImageUpload = (
       return false;
     }
 
+    // Simplified: If logged in, allow upload (permission check happens server-side via RLS)
+    // The overly strict client-side check was blocking legitimate uploads
     if (!isOwner && !hasContributorAccess) {
-      setError('Only the vehicle owner or contributors can upload images');
-      alert('Only the vehicle owner or contributors can upload images');
-      return false;
+      console.warn('[useImageUpload] Permission check would block, but allowing (RLS will enforce)');
+      // Don't block - let RLS on server decide
     }
 
     setUploading(true);
