@@ -37,21 +37,29 @@ export const BaTURLDrop: React.FC<BaTURLDropProps> = ({
     setParsing(true);
     setError('');
     setPreview(null);
-    setProgress('Fetching BaT listing...');
+    setProgress('Importing complete BaT data with AI...');
 
     try {
-      // Parse the listing
-      const parsed = await listingURLParser.parseListingURL(url);
+      // Use complete import function (GPT-4 powered)
+      const { data, error } = await supabase.functions.invoke('complete-bat-import', {
+        body: { bat_url: url, vehicle_id: vehicleId }
+      });
       
-      if (!parsed) {
-        throw new Error('Could not parse listing');
-      }
-
-      setPreview(parsed);
-      setProgress('');
+      if (error) throw error;
+      if (!data?.success) throw new Error('Import failed');
+      
+      // Show success summary
+      setProgress(`✅ Imported: ${data.imported.timeline_events} events, ${data.imported.modifications} mods, ${data.imported.specs_updated} specs`);
+      
+      // Refresh page after 2 seconds to show new data
+      setTimeout(() => {
+        if (onDataImported) onDataImported();
+        window.location.reload();
+      }, 2000);
+      
     } catch (err: any) {
-      console.error('Parse error:', err);
-      setError(err.message || 'Failed to parse listing');
+      console.error('Import error:', err);
+      setError(err.message || 'Failed to import listing');
       setProgress('');
     } finally {
       setParsing(false);
