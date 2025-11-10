@@ -146,11 +146,18 @@ class ListingURLParserService {
     const source = this.identifySource(url);
 
     try {
-      // Fetch the listing page
+      // Fetch via edge function (avoids CORS)
       console.log(`Fetching listing from ${source}:`, url);
       
-      const response = await fetch(url);
-      const html = await response.text();
+      const { data, error } = await supabase.functions.invoke('scrape-vehicle', {
+        body: { url }
+      });
+      
+      if (error || !data) {
+        throw new Error(`Failed to fetch listing: ${error?.message || 'Unknown error'}`);
+      }
+      
+      const html = data.html || data.content || '';
 
       let parsed: Partial<ParsedListing> = {
         source,
