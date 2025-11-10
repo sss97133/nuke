@@ -1,0 +1,36 @@
+import React, { useEffect, useState } from 'react';
+import '../design-system.css';
+
+const DataDeletion: React.FC = () => {
+  const [content, setContent] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/DATA_DELETION.md')
+      .then((res) => res.text())
+      .then((text) => {
+        setContent(text);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load data deletion instructions:', err);
+        setContent('# Data Deletion\n\nFailed to load instructions. Please contact privacy@n-zero.dev');
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontSize: '8pt' }}>Loading data deletion instructions…</div>;
+  }
+
+  return (
+    <div style={{ padding: 'var(--space-4)', maxWidth: 900, margin: '0 auto' }}>
+      <div style={{ background: 'var(--white)', border: '2px solid var(--border-medium)', padding: 'var(--space-4)' }}>
+        <pre style={{ fontFamily: 'Arial, sans-serif', fontSize: '8pt', whiteSpace: 'pre-wrap', lineHeight: 1.4, margin: 0 }}>{content}</pre>
+      </div>
+    </div>
+  );
+};
+
+export default DataDeletion;
+

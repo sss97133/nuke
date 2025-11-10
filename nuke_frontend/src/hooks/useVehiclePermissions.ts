@@ -47,21 +47,51 @@ export const useVehiclePermissions = (
         
         setIsOwner(isVehicleOwner);
 
-        // Check for contributor access
-        const { data, error } = await supabase
+        // Check for contributor access (vehicle-level)
+        const { data: vehicleContrib, error: vcError } = await supabase
           .from('vehicle_contributors')
           .select('role')
           .eq('vehicle_id', vehicleId)
           .eq('user_id', session.user.id)
           .maybeSingle();
 
-        if (!error && data) {
+        if (!vcError && vehicleContrib) {
           const allowedRoles = ['owner', 'co_owner', 'restorer', 'moderator', 'consigner'];
-          setHasContributorAccess(allowedRoles.includes(data.role));
-          setContributorRole(data.role);
+          setHasContributorAccess(allowedRoles.includes(vehicleContrib.role));
+          setContributorRole(vehicleContrib.role);
         } else {
-          setHasContributorAccess(false);
-          setContributorRole(null);
+          // Check for organization-level contributor access
+          // Use a simpler query that definitely works
+          const { data: orgContrib, error: ocError } = await supabase
+            .from('organization_vehicles')
+            .select('organization_id')
+            .eq('vehicle_id', vehicleId)
+            .limit(1)
+            .maybeSingle();
+
+          if (!ocError && orgContrib) {
+            // Now check if user is contributor to this org
+            const { data: userInOrg } = await supabase
+              .from('organization_contributors')
+              .select('role, status')
+              .eq('organization_id', orgContrib.organization_id)
+              .eq('user_id', session.user.id)
+              .eq('status', 'active')
+              .maybeSingle();
+
+            if (userInOrg) {
+              console.log('[useVehiclePermissions] User is org contributor:', userInOrg.role);
+              setHasContributorAccess(true);
+              setContributorRole(userInOrg.role);
+            } else {
+              console.log('[useVehiclePermissions] User not in org contributors');
+              setHasContributorAccess(false);
+              setContributorRole(null);
+            }
+          } else {
+            setHasContributorAccess(false);
+            setContributorRole(null);
+          }
         }
       } catch (err) {
         console.error('[useVehiclePermissions] Error checking permissions:', err);

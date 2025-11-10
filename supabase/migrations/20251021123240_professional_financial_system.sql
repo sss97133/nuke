@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS user_cash_balances (
   CONSTRAINT balance_invariant CHECK (balance_cents = available_cents + reserved_cents)
 );
 
-CREATE INDEX idx_user_cash_balances_user_id ON user_cash_balances(user_id);
-CREATE INDEX idx_user_cash_balances_balance ON user_cash_balances(balance_cents DESC);
+CREATE INDEX IF NOT EXISTS idx_user_cash_balances_user_id ON user_cash_balances(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_cash_balances_balance ON user_cash_balances(balance_cents DESC);
 
 -- Cash Transactions (replaces credit_transactions)
 CREATE TABLE IF NOT EXISTS cash_transactions (
@@ -45,81 +45,143 @@ CREATE TABLE IF NOT EXISTS cash_transactions (
   completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_cash_transactions_user_id ON cash_transactions(user_id);
-CREATE INDEX idx_cash_transactions_type ON cash_transactions(transaction_type);
-CREATE INDEX idx_cash_transactions_created ON cash_transactions(created_at DESC);
-CREATE INDEX idx_cash_transactions_stripe_payment ON cash_transactions(stripe_payment_id) WHERE stripe_payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_user_id ON cash_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_type ON cash_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_created ON cash_transactions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cash_transactions_stripe_payment ON cash_transactions(stripe_payment_id) WHERE stripe_payment_id IS NOT NULL;
 
 -- =====================================================
 -- DATA MIGRATION FROM OLD SYSTEM
 -- =====================================================
 
 -- Migrate user_credits → user_cash_balances
-INSERT INTO user_cash_balances (user_id, balance_cents, available_cents, reserved_cents)
-SELECT 
-  user_id,
-  balance as balance_cents, -- Already in cents
-  balance as available_cents,
-  0 as reserved_cents
-FROM user_credits
-ON CONFLICT (user_id) DO UPDATE SET
-  balance_cents = EXCLUDED.balance_cents,
-  available_cents = EXCLUDED.available_cents,
-  updated_at = NOW();
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'user_credits'
+  ) THEN
+    INSERT INTO user_cash_balances (user_id, balance_cents, available_cents, reserved_cents)
+    SELECT 
+      user_id,
+      balance AS balance_cents, -- Already in cents
+      balance AS available_cents,
+      0 AS reserved_cents
+    FROM user_credits
+    ON CONFLICT (user_id) DO UPDATE SET
+      balance_cents = EXCLUDED.balance_cents,
+      available_cents = EXCLUDED.available_cents,
+      updated_at = NOW();
+  ELSE
+    RAISE NOTICE 'Skipping user_credits migration: table does not exist.';
+  END IF;
+END
+$$;
 
 -- Migrate credit_transactions → cash_transactions
-INSERT INTO cash_transactions (
-  user_id, 
-  amount_cents, 
-  transaction_type, 
-  reference_id, 
-  metadata, 
-  created_at,
-  completed_at
-)
-SELECT 
-  user_id,
-  amount,
-  CASE 
-    WHEN transaction_type = 'purchase' THEN 'deposit'
-    WHEN transaction_type = 'allocation' THEN 'trade_buy'
-    WHEN transaction_type = 'payout' THEN 'withdrawal'
-    ELSE transaction_type
-  END,
-  reference_id,
-  metadata,
-  created_at,
-  created_at
-FROM credit_transactions
-ON CONFLICT DO NOTHING;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'credit_transactions'
+  ) THEN
+    INSERT INTO cash_transactions (
+      user_id, 
+      amount_cents, 
+      transaction_type, 
+      reference_id, 
+      metadata, 
+      created_at,
+      completed_at
+    )
+    SELECT 
+      user_id,
+      amount,
+      CASE 
+        WHEN transaction_type = 'purchase' THEN 'deposit'
+        WHEN transaction_type = 'allocation' THEN 'trade_buy'
+        WHEN transaction_type = 'payout' THEN 'withdrawal'
+        ELSE transaction_type
+      END,
+      reference_id,
+      metadata,
+      created_at,
+      created_at
+    FROM credit_transactions
+    ON CONFLICT DO NOTHING;
+  ELSE
+    RAISE NOTICE 'Skipping credit_transactions migration: table does not exist.';
+  END IF;
+END
+$$;
 
 -- =====================================================
 -- RLS POLICIES
 -- =====================================================
 
-ALTER TABLE user_cash_balances ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cash_transactions ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'user_cash_balances'
+  ) THEN
+    EXECUTE 'ALTER TABLE user_cash_balances ENABLE ROW LEVEL SECURITY';
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'user_cash_balances'
+        AND policyname = 'Users can view own cash balance'
+    ) THEN
+      EXECUTE 'DROP POLICY "Users can view own cash balance" ON user_cash_balances';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'user_cash_balances'
+        AND policyname = 'System can modify cash balances'
+    ) THEN
+      EXECUTE 'DROP POLICY "System can modify cash balances" ON user_cash_balances';
+    END IF;
+    EXECUTE 'CREATE POLICY "Users can view own cash balance" ON user_cash_balances FOR SELECT USING (auth.uid() = user_id)';
+    EXECUTE 'CREATE POLICY "System can modify cash balances" ON user_cash_balances FOR ALL USING (false) WITH CHECK (false)';
+  ELSE
+    RAISE NOTICE 'Skipping RLS setup for user_cash_balances: table does not exist.';
+  END IF;
 
--- Users can view their own balance
-CREATE POLICY "Users can view own cash balance"
-  ON user_cash_balances FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Users can view their own transactions
-CREATE POLICY "Users can view own cash transactions"
-  ON cash_transactions FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Only system can modify balances (via functions)
-CREATE POLICY "System can modify cash balances"
-  ON user_cash_balances FOR ALL
-  USING (false)
-  WITH CHECK (false);
-
--- Only system can insert transactions (via functions)
-CREATE POLICY "System can insert cash transactions"
-  ON cash_transactions FOR INSERT
-  WITH CHECK (false);
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'cash_transactions'
+  ) THEN
+    EXECUTE 'ALTER TABLE cash_transactions ENABLE ROW LEVEL SECURITY';
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'cash_transactions'
+        AND policyname = 'Users can view own cash transactions'
+    ) THEN
+      EXECUTE 'DROP POLICY "Users can view own cash transactions" ON cash_transactions';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public'
+        AND tablename = 'cash_transactions'
+        AND policyname = 'System can insert cash transactions'
+    ) THEN
+      EXECUTE 'DROP POLICY "System can insert cash transactions" ON cash_transactions';
+    END IF;
+    EXECUTE 'CREATE POLICY "Users can view own cash transactions" ON cash_transactions FOR SELECT USING (auth.uid() = user_id)';
+    EXECUTE 'CREATE POLICY "System can insert cash transactions" ON cash_transactions FOR INSERT WITH CHECK (false)';
+  ELSE
+    RAISE NOTICE 'Skipping RLS setup for cash_transactions: table does not exist.';
+  END IF;
+END
+$$;
 
 -- =====================================================
 -- CASH MANAGEMENT FUNCTIONS

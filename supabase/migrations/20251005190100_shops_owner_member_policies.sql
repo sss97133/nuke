@@ -120,10 +120,12 @@ DROP POLICY IF EXISTS shop_locations_admin_write ON public.shop_locations;
 CREATE POLICY shop_locations_admin_write ON public.shop_locations
   FOR INSERT TO authenticated
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_locations_admin_update ON public.shop_locations;
 CREATE POLICY shop_locations_admin_update ON public.shop_locations
   FOR UPDATE TO authenticated
   USING (public.is_shop_admin(shop_id))
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_locations_admin_delete ON public.shop_locations;
 CREATE POLICY shop_locations_admin_delete ON public.shop_locations
   FOR DELETE TO authenticated
   USING (public.is_shop_admin(shop_id));
@@ -133,10 +135,12 @@ DROP POLICY IF EXISTS shop_licenses_admin_write ON public.shop_licenses;
 CREATE POLICY shop_licenses_admin_write ON public.shop_licenses
   FOR INSERT TO authenticated
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_licenses_admin_update ON public.shop_licenses;
 CREATE POLICY shop_licenses_admin_update ON public.shop_licenses
   FOR UPDATE TO authenticated
   USING (public.is_shop_admin(shop_id))
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_licenses_admin_delete ON public.shop_licenses;
 CREATE POLICY shop_licenses_admin_delete ON public.shop_licenses
   FOR DELETE TO authenticated
   USING (public.is_shop_admin(shop_id));
@@ -146,10 +150,12 @@ DROP POLICY IF EXISTS shop_departments_admin_write ON public.shop_departments;
 CREATE POLICY shop_departments_admin_write ON public.shop_departments
   FOR INSERT TO authenticated
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_departments_admin_update ON public.shop_departments;
 CREATE POLICY shop_departments_admin_update ON public.shop_departments
   FOR UPDATE TO authenticated
   USING (public.is_shop_admin(shop_id))
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_departments_admin_delete ON public.shop_departments;
 CREATE POLICY shop_departments_admin_delete ON public.shop_departments
   FOR DELETE TO authenticated
   USING (public.is_shop_admin(shop_id));
@@ -159,10 +165,12 @@ DROP POLICY IF EXISTS shop_documents_admin_write ON public.shop_documents;
 CREATE POLICY shop_documents_admin_write ON public.shop_documents
   FOR INSERT TO authenticated
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_documents_admin_update ON public.shop_documents;
 CREATE POLICY shop_documents_admin_update ON public.shop_documents
   FOR UPDATE TO authenticated
   USING (public.is_shop_admin(shop_id))
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_documents_admin_delete ON public.shop_documents;
 CREATE POLICY shop_documents_admin_delete ON public.shop_documents
   FOR DELETE TO authenticated
   USING (public.is_shop_admin(shop_id));
@@ -177,10 +185,12 @@ DROP POLICY IF EXISTS shop_invitations_admin_write ON public.shop_invitations;
 CREATE POLICY shop_invitations_admin_write ON public.shop_invitations
   FOR INSERT TO authenticated
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_invitations_admin_update ON public.shop_invitations;
 CREATE POLICY shop_invitations_admin_update ON public.shop_invitations
   FOR UPDATE TO authenticated
   USING (public.is_shop_admin(shop_id))
   WITH CHECK (public.is_shop_admin(shop_id));
+DROP POLICY IF EXISTS shop_invitations_admin_delete ON public.shop_invitations;
 CREATE POLICY shop_invitations_admin_delete ON public.shop_invitations
   FOR DELETE TO authenticated
   USING (public.is_shop_admin(shop_id));

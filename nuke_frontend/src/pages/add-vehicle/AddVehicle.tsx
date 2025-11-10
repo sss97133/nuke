@@ -28,6 +28,51 @@ const toDateTimeLocalString = (value: string): string => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
+const parseCurrencyValue = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const cleaned = trimmed.replace(/[^0-9.,-]+/g, '');
+    if (!cleaned) return null;
+    // If multiple commas and a dot, assume dot is decimal separator
+    const normalized = cleaned.includes('.')
+      ? cleaned.replace(/,/g, '')
+      : cleaned.replace(/,(?=\d{3}\b)/g, '').replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const formatCurrency = (value: number | null | undefined): string | null => {
+  if (value === null || value === undefined || Number.isNaN(value)) return null;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0
+    }).format(value);
+  } catch (error) {
+    console.warn('Failed to format currency value:', value, error);
+    return `$${value}`;
+  }
+};
+
+const mapDiscoverySourceToCategory = (source?: string | null): 'search' | 'recommendation' | 'social_share' | 'direct_link' | 'auction_site' | 'dealer_listing' | 'user_submission' => {
+  if (!source) return 'direct_link';
+  const normalized = source.toLowerCase();
+  if (normalized.includes('bring a trailer') || normalized.includes('bat') || normalized.includes('auction')) {
+    return 'auction_site';
+  }
+  if (normalized.includes('craigslist') || normalized.includes('marketplace') || normalized.includes('dealer') || normalized.includes('autotrader') || normalized.includes('cars.com')) {
+    return 'dealer_listing';
+  }
+  return 'direct_link';
+};
+
 interface AddVehicleProps {
   mode?: 'modal' | 'page';
   onClose?: () => void;
@@ -277,6 +322,20 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
               discovered_at: new Date().toISOString()
             }
           });
+
+          try {
+            await supabase.from('discovered_vehicles').upsert({
+              user_id: user.id,
+              vehicle_id: existingVehicle.id,
+              discovery_source: mapDiscoverySourceToCategory(formData.listing_source),
+              discovery_context: formData.discoverer_opinion || '',
+              interest_level: 'high',
+              is_active: true,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'vehicle_id,user_id' });
+          } catch (err) {
+            console.warn('Failed to upsert discovered_vehicles entry:', err);
+          }
         }
 
         // Show notification and navigate to existing vehicle
@@ -342,17 +401,62 @@ Redirecting to vehicle profile...`);
         if (scrapedData.fuel_type) updates.fuel_type = scrapedData.fuel_type;
         
         // Pricing
-        if (scrapedData.sale_price) updates.sale_price = scrapedData.sale_price;
-        if (scrapedData.asking_price) updates.asking_price = scrapedData.asking_price;
-        if (scrapedData.price) updates.asking_price = scrapedData.price;
+        const salePrice = parseCurrencyValue(scrapedData.sale_price);
+        const askingPrice = parseCurrencyValue(scrapedData.asking_price ?? scrapedData.price);
+        if (salePrice !== null) updates.sale_price = salePrice;
+        if (askingPrice !== null) updates.asking_price = askingPrice;
         
         // Condition & Status
-        if (scrapedData.condition) updates.condition = scrapedData.condition;
         if (scrapedData.title_status) updates.title_status = scrapedData.title_status;
         
-        // Location
+        // Location & Listing Metadata
         if (scrapedData.location) updates.location = scrapedData.location;
-        
+        if (scrapedData.listing_url) {
+          updates.listing_url = scrapedData.listing_url;
+        } else if (!updates.listing_url) {
+          updates.listing_url = url;
+        }
+
+        if (scrapedData.source) {
+          updates.listing_source = scrapedData.source;
+        }
+
+        const parseListingDateText = (value?: string): string | null => {
+          if (!value) return null;
+          const trimmed = value.trim();
+          if (!trimmed) return null;
+          const normalized = trimmed.replace(' ', 'T');
+          const candidates = [
+            `${normalized}Z`,
+            normalized,
+            trimmed
+          ];
+          for (const candidate of candidates) {
+            const parsed = new Date(candidate);
+            if (!Number.isNaN(parsed.getTime())) {
+              return parsed.toISOString();
+            }
+          }
+          return null;
+        };
+
+        const postedIso = scrapedData.listing_posted_at || parseListingDateText(scrapedData.posted_date);
+        const updatedIso = scrapedData.listing_updated_at || parseListingDateText(scrapedData.updated_date);
+
+        if (postedIso) {
+          const localValue = toDateTimeLocalString(postedIso);
+          if (localValue) {
+            updates.listing_posted_at = localValue;
+          }
+        }
+
+        if (updatedIso) {
+          const localValue = toDateTimeLocalString(updatedIso);
+          if (localValue) {
+            updates.listing_updated_at = localValue;
+          }
+        }
+
         // Description & Notes
         if (scrapedData.description) {
           updates.description = scrapedData.description;
@@ -396,11 +500,58 @@ Redirecting to vehicle profile...`);
         if (scrapedData.engine_type) notesLines.push(`- ${scrapedData.engine_type}`);
         if (scrapedData.transmission_subtype) notesLines.push(`- ${scrapedData.transmission_subtype}`);
         if (scrapedData.drivetrain) notesLines.push(`- ${scrapedData.drivetrain}`);
+
+        const listingDateForNotes = postedIso || updatedIso;
+        if (listingDateForNotes) {
+          notesLines.push(`\nIMAGE CONTEXT:`);
+          notesLines.push(`- Captured from ${scrapedData.source || 'external listing'} on ${listingDateForNotes}`);
+          notesLines.push(`- Original photo EXIF data may differ; treat listing timestamp as capture reference`);
+        }
         
         // Append to existing notes or create new
         updates.notes = formData.notes 
           ? `${formData.notes}\n\n--- Scraped Data ---\n${notesLines.join('\n')}`
           : notesLines.join('\n');
+
+        // Build a structured discovery opinion so it can appear as the first comment
+        const discoverySummary: string[] = [];
+        if (scrapedData.source || scrapedData.listing_url) {
+          const sourceLabel = scrapedData.source || 'External listing';
+          const capturedDate = listingDateForNotes ? new Date(listingDateForNotes).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+          discoverySummary.push(`Pulled from ${sourceLabel}${capturedDate ? ` on ${capturedDate}` : ''}`);
+        }
+
+        const primaryPrice = updates.asking_price ?? updates.sale_price;
+        const formattedPrice = formatCurrency(primaryPrice ?? null);
+        if (formattedPrice) {
+          discoverySummary.push(`Listed at ${formattedPrice}`);
+        }
+
+        if (updates.location) {
+          discoverySummary.push(`Location: ${updates.location}`);
+        }
+
+        if (scrapedData.known_issues && scrapedData.known_issues.length > 0) {
+          const issuesPreview = scrapedData.known_issues.slice(0, 3).join(', ');
+          discoverySummary.push(`Seller notes issues: ${issuesPreview}${scrapedData.known_issues.length > 3 ? '…' : ''}`);
+        } else if (scrapedData.condition) {
+          discoverySummary.push(`Condition described as ${scrapedData.condition}`);
+        }
+
+        if (scrapedData.description) {
+          const trimmed = scrapedData.description.trim();
+          if (trimmed.length > 0) {
+            const snippet = trimmed.length > 180 ? `${trimmed.slice(0, 180)}…` : trimmed;
+            discoverySummary.push(`Seller pitch: "${snippet.replace(/\s+/g, ' ')}"`);
+          }
+        }
+
+        if (discoverySummary.length > 0) {
+          const composedOpinion = discoverySummary.join(' • ');
+          updates.discoverer_opinion = formData.discoverer_opinion && formData.discoverer_opinion.trim().length > 0
+            ? `${formData.discoverer_opinion.trim()}\n${composedOpinion}`
+            : composedOpinion;
+        }
 
         // Source attribution
         updates.discovery_source = 'user_import';
@@ -426,61 +577,90 @@ Redirecting to vehicle profile...`);
         setShowEmailDraft(false);
         setCopiedField(null);
  
-        // Download images directly from source URLs (no CORS proxy needed for Craigslist)
-        if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0) {
-          console.log(`Found ${scrapedData.images.length} images, downloading directly...`);
+        // Download images directly from source URLs (hi-res when available)
+        const processedImages: any[] = Array.isArray(scrapedData.processed_images) ? scrapedData.processed_images : [];
+        const rawImages: any[] = Array.isArray(scrapedData.images) ? scrapedData.images : [];
+        const imageCandidates = processedImages.length > 0 ? processedImages : rawImages;
+
+        if (imageCandidates.length > 0) {
+          console.log(`Found ${imageCandidates.length} images (processed=${processedImages.length > 0})`);
           setExtracting(true);
-          
+
           try {
             const imageFiles: File[] = [];
-            const maxImages = Math.min(scrapedData.images.length, 10);
-            
+            const maxImages = Math.min(imageCandidates.length, 10);
+
             for (let i = 0; i < maxImages; i++) {
               try {
-                const imageUrl = scrapedData.images[i];
-                console.log(`Downloading image ${i + 1}/${maxImages}: ${imageUrl}`);
-                
-                // Use Supabase image proxy to bypass CORS
-                const proxyUrl = `${getSupabaseFunctionsUrl()}/image-proxy`;
-                const response = await fetch(proxyUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ url: imageUrl }),
-                  signal: AbortSignal.timeout(15000),
-                });
-                
-                if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
-                
-                const blob = await response.blob();
-                if (blob.size > 10 * 1024 * 1024) {
-                  console.warn(`Image too large: ${blob.size} bytes`);
-                  continue;
+                if (processedImages.length > 0) {
+                  const processed = processedImages[i];
+                  if (!processed?.s3_url) continue;
+                  console.log(`Downloading processed image ${i + 1}/${maxImages}: ${processed.s3_url}`);
+                  const response = await fetch(processed.s3_url, { signal: AbortSignal.timeout(15000) });
+                  if (!response.ok) throw new Error(`S3 fetch error: ${response.status}`);
+                  const blob = await response.blob();
+                  if (blob.size > 15 * 1024 * 1024) {
+                    console.warn(`Processed image too large: ${blob.size} bytes`);
+                    continue;
+                  }
+                  const extMatch = processed.original_url?.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i);
+                  const ext = extMatch?.[1] || 'jpg';
+                  const filename = `${scrapedData.source?.toLowerCase().replace(/\s+/g, '_') || 'listing'}_${processed.index != null ? processed.index + 1 : i + 1}.${ext}`;
+                  const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+                  Object.defineProperty(file, 'listingContext', {
+                    value: {
+                      listingCapturedAt: postedIso || updatedIso || new Date().toISOString(),
+                      listingSource: scrapedData.source || 'External Listing',
+                      originalUrl: processed.original_url || processed.s3_url
+                    },
+                    enumerable: false
+                  });
+                  imageFiles.push(file);
+                } else {
+                  const imageUrl = imageCandidates[i];
+                  console.log(`Downloading image ${i + 1}/${maxImages}: ${imageUrl}`);
+                  const proxyUrl = `${getSupabaseFunctionsUrl()}/image-proxy`;
+                  const response = await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: imageUrl }),
+                    signal: AbortSignal.timeout(15000),
+                  });
+                  if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
+                  const blob = await response.blob();
+                  if (blob.size > 10 * 1024 * 1024) {
+                    console.warn(`Image too large: ${blob.size} bytes`);
+                    continue;
+                  }
+                  const ext = imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)?.[1] || 'jpg';
+                  const filename = `${scrapedData.source?.toLowerCase().replace(/\s+/g, '_') || 'listing'}_${i + 1}.${ext}`;
+                  const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+                  Object.defineProperty(file, 'listingContext', {
+                    value: {
+                      listingCapturedAt: postedIso || updatedIso || new Date().toISOString(),
+                      listingSource: scrapedData.source || 'External Listing',
+                      originalUrl: imageUrl
+                    },
+                    enumerable: false
+                  });
+                  imageFiles.push(file);
                 }
-                
-                const ext = imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)?.[1] || 'jpg';
-                const filename = `${scrapedData.source?.toLowerCase().replace(/\s+/g, '_')}_${i + 1}.${ext}`;
-                const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
-                
-                imageFiles.push(file);
               } catch (err) {
                 console.error(`Failed to download image ${i + 1}:`, err);
-                // Continue with next image
               }
             }
-            
+
             if (imageFiles.length > 0) {
-              console.log(`Successfully downloaded ${imageFiles.length}/${maxImages} images`);
-              setExtractedImages(prev => [...prev, ...imageFiles]);
-              
+              await processImages(imageFiles);
               if (imageFiles.length === maxImages) {
                 setScrapingError(null);
               } else {
                 setScrapingError(`✓ Data imported! Downloaded ${imageFiles.length}/${maxImages} images (some failed)`);
               }
             } else {
-              setScrapingError(`✓ Data imported! ${scrapedData.images.length} image URLs found (download them manually if needed)`);
+              setScrapingError(`✓ Data imported! ${imageCandidates.length} image URLs found (download manually if needed).`);
             }
           } catch (imgError: any) {
             console.error('Image download error:', imgError);
@@ -626,9 +806,44 @@ Redirecting to vehicle profile...`);
         discovery_url: formData.import_url || undefined
       };
       
+      const numericColumns = new Set([
+        'year',
+        'mileage',
+        'asking_price',
+        'sale_price',
+        'purchase_price',
+        'current_value',
+        'msrp',
+        'weight_lbs',
+        'length_inches',
+        'width_inches',
+        'height_inches',
+        'wheelbase_inches',
+        'fuel_capacity_gallons',
+        'mpg_city',
+        'mpg_highway',
+        'mpg_combined',
+        'horsepower',
+        'torque',
+        'previous_owners',
+        'condition_rating'
+      ]);
+
       validColumns.forEach(col => {
-        if (formData[col as keyof typeof formData] !== undefined) {
-          vehicleData[col] = formData[col as keyof typeof formData];
+        const rawValue = formData[col as keyof typeof formData];
+        if (rawValue === undefined || rawValue === null || rawValue === '') {
+          return;
+        }
+
+        if (numericColumns.has(col)) {
+          const numericValue = typeof rawValue === 'number'
+            ? rawValue
+            : parseCurrencyValue(rawValue);
+          if (numericValue !== null) {
+            vehicleData[col] = numericValue;
+          }
+        } else {
+          vehicleData[col] = rawValue;
         }
       });
 
@@ -671,6 +886,23 @@ Redirecting to vehicle profile...`);
           }
         } catch (error) {
           console.error('Failed to create vehicle creation timeline event:', error);
+        }
+
+        if (user?.id) {
+          try {
+            await supabase.from('discovered_vehicles').upsert({
+              user_id: user.id,
+              vehicle_id: vehicleId,
+              discovery_source: mapDiscoverySourceToCategory(formData.listing_source || scrapedData?.source),
+              discovery_context: formData.discoverer_opinion || '',
+              interest_level: 'high',
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'vehicle_id,user_id' });
+          } catch (err) {
+            console.warn('Failed to upsert discovered_vehicles entry:', err);
+          }
         }
         
         // If we have a title document from scanning, save it and check ownership
@@ -832,8 +1064,14 @@ Redirecting to vehicle profile...`);
           metadataResults.push(...batchResults);
         } catch (error) {
           console.warn(`EXIF extraction failed for batch ${i}-${i + BATCH_SIZE}, continuing with empty metadata:`, error);
-          // Push empty metadata for failed batch
-          metadataResults.push(...batch.map(() => ({ dateTaken: null, location: null } as ImageMetadata)));
+          metadataResults.push(
+            ...batch.map((file) => ({
+              fileName: file.name,
+              fileSize: file.size,
+              dateTaken: undefined,
+              location: undefined
+            } as ImageMetadata))
+          );
         }
       }
       
@@ -842,9 +1080,26 @@ Redirecting to vehicle profile...`);
       // Store metadata keyed by filename (merge with existing metadata)
       const metadataMap = new Map<string, ImageMetadata>(imageMetadata);
       imageFiles.forEach((file, index) => {
-        if (metadataResults[index]) {
-          metadataMap.set(file.name, metadataResults[index]);
+        const metadataResult = metadataResults[index] || { fileName: file.name, fileSize: file.size } as ImageMetadata;
+        const listingContext = (file as any)?.listingContext;
+        const metadataEntry: ImageMetadata = {
+          ...metadataResult,
+          fileName: metadataResult.fileName ?? file.name,
+          fileSize: metadataResult.fileSize ?? file.size,
+        };
+
+        if (listingContext?.listingCapturedAt) {
+          const captureDate = new Date(listingContext.listingCapturedAt);
+          if (!Number.isNaN(captureDate.getTime())) {
+            metadataEntry.listingCapturedAt = captureDate;
+          }
         }
+
+        if (listingContext?.listingSource) {
+          metadataEntry.listingSource = listingContext.listingSource;
+        }
+
+        metadataMap.set(file.name, metadataEntry);
       });
       setImageMetadata(metadataMap);
 

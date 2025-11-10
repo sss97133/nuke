@@ -119,9 +119,37 @@ export class ImageUploadService {
       let metadata: any = {};
       let optimizationResult: any = { success: false };
 
+      const rawListingContext: any = (file as any)?.listingContext;
+      let listingCapturedAt: Date | undefined;
+      let listingSource: string | undefined;
+      let listingOriginalUrl: string | undefined;
+
+      if (rawListingContext?.listingCapturedAt) {
+        const parsed = new Date(rawListingContext.listingCapturedAt);
+        if (!Number.isNaN(parsed.getTime())) {
+          listingCapturedAt = parsed;
+        }
+      }
+
+      if (rawListingContext?.listingSource && typeof rawListingContext.listingSource === 'string') {
+        listingSource = rawListingContext.listingSource;
+      }
+
+      if (rawListingContext?.originalUrl && typeof rawListingContext.originalUrl === 'string') {
+        listingOriginalUrl = rawListingContext.originalUrl;
+      }
+
       if (isImage) {
         console.log('Extracting EXIF metadata from:', file.name);
         metadata = await extractImageMetadata(file);
+
+        if (listingCapturedAt) {
+          metadata.listingCapturedAt = listingCapturedAt;
+        }
+
+        if (listingSource) {
+          metadata.listingSource = listingSource;
+        }
 
         // Generate optimized variants for images (use compressed file)
         console.log('Generating image variants...');
@@ -141,7 +169,9 @@ export class ImageUploadService {
       const storagePath = `${vehicleId}/${fileName}`;
 
       // Use photo date if available, otherwise use current time or file modified date
-      const photoDate = metadata.dateTaken || new Date(file.lastModified) || new Date();
+      const photoDate = listingCapturedAt 
+        || metadata.dateTaken 
+        || (file.lastModified ? new Date(file.lastModified) : new Date());
       console.log('File date:', photoDate);
       console.log('Using date for timeline:', photoDate.toISOString());
 
@@ -208,6 +238,22 @@ export class ImageUploadService {
         .eq('vehicle_id', vehicleId);
 
       // Save to database with correct data, EXIF metadata, and variants
+      const exifPayload: Record<string, any> = {
+        DateTimeOriginal: metadata.dateTaken?.toISOString(),
+        camera: metadata.camera,
+        technical: metadata.technical,
+        location: metadata.location,
+        dimensions: metadata.dimensions
+      };
+
+      if (listingCapturedAt || listingSource || listingOriginalUrl) {
+        exifPayload.listing_context = {
+          captured_at: listingCapturedAt ? listingCapturedAt.toISOString() : null,
+          listing_source: listingSource ?? null,
+          original_url: listingOriginalUrl ?? null
+        };
+      }
+
       const { data: dbResult, error: dbError } = await supabase
         .from('vehicle_images')
         .insert({
@@ -224,13 +270,7 @@ export class ImageUploadService {
           is_sensitive: false, // Required field
           taken_at: photoDate.toISOString(), // Use actual photo date for timeline
           variants: variants, // Store all variant URLs
-          exif_data: {
-            DateTimeOriginal: metadata.dateTaken?.toISOString(),
-            camera: metadata.camera,
-            technical: metadata.technical,
-            location: metadata.location,
-            dimensions: metadata.dimensions
-          }
+          exif_data: exifPayload
         })
         .select('id')
         .single();
@@ -263,7 +303,10 @@ export class ImageUploadService {
               fileSize: file.size,
               imageUrl: urlData.publicUrl,
               dateTaken: photoDate,
-              gps: metadata.gps
+              gps: metadata.gps,
+              listingCapturedAt,
+              listingSource,
+              listingOriginalUrl
             },
             user.id
           );

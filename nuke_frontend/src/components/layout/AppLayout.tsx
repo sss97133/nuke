@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
-import NotificationBell from '../notifications/NotificationBell';
 import CashBalanceWidget from '../CashBalanceWidget';
 import '../../design-system.css';
 
@@ -132,12 +131,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 Vehicles
               </Link>
               <Link 
-                to="/market" 
-                className={`nav-link ${isActivePage('/market') || isActivePage('/portfolio') || isActivePage('/browse-investments') || isActivePage('/builder') ? 'active' : ''}`}
-              >
-                Market
-              </Link>
-              <Link 
                 to={orgNavPath}
                 className={`nav-link ${isActivePage('/shops') ? 'active' : ''}`}
               >
@@ -198,13 +191,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               onClick={() => setMobileMenuOpen(false)}
             >
               Vehicles
-            </Link>
-            <Link 
-              to="/market" 
-              className={`mobile-nav-link ${isActivePage('/market') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Market
             </Link>
             <Link 
               to="/shops" 
@@ -283,7 +269,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
       {/* Footer */}
       <footer className="app-footer">
-        NUKE © 2025
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'center', fontSize: '8pt' }}>
+          <span>NUKE © 2025</span>
+          <a href="/privacy" style={{ color: 'inherit', textDecoration: 'underline' }}>Privacy Policy</a>
+          <a href="/terms" style={{ color: 'inherit', textDecoration: 'underline' }}>Terms of Service</a>
+          <a href="/data-deletion" style={{ color: 'inherit', textDecoration: 'underline' }}>Data Deletion</a>
+        </div>
       </footer>
     </div>
   );

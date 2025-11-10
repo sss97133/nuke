@@ -4,6 +4,8 @@ export interface ImageMetadata {
   fileName: string;
   fileSize: number;
   dateTaken?: Date;
+  listingCapturedAt?: Date;
+  listingSource?: string;
   location?: {
     latitude: number;
     longitude: number;

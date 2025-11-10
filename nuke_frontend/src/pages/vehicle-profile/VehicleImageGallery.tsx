@@ -21,6 +21,18 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({
     )
   );
 
+  // DEBUG: Log permissions
+  console.log('[VehicleImageGallery] Upload permissions:', {
+    hasSession: !!session?.user,
+    userId: session?.user?.id,
+    vehicleUserId: vehicle.user_id,
+    hasContributorAccess: permissions.hasContributorAccess,
+    isVerifiedOwner: permissions.isVerifiedOwner,
+    isDbUploader: permissions.isDbUploader,
+    canUpload,
+    showUploadProp: canUpload
+  });
+
   return (
     <div className="card" style={{ gridColumn: '2 / span 1' }}>
       <div className="card-body">

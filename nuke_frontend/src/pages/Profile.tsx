@@ -38,8 +38,7 @@ import { ProfileVerification } from '../components/ProfileVerification';
 import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
 import LivePlayer from '../components/profile/LivePlayer';
-import DailyContributionReport from '../components/profile/DailyContributionReport';
-import ContractorProfileCard from '../components/contractor/ContractorProfileCard';
+import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -48,7 +47,7 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'achievements' | 'stats' | 'professional' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'achievements' | 'stats' | 'professional' | 'organizations' | 'settings'>('overview');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
@@ -80,8 +79,9 @@ const Profile: React.FC = () => {
     }
   }, [user]);
 
-  // Load profile data
+  // Load profile data - OPTIMIZED with fast RPC
   const loadProfileData = async () => {
+    const startTime = performance.now();
     try {
       setLoading(true);
       setError(null);
@@ -92,28 +92,45 @@ const Profile: React.FC = () => {
         return;
       }
 
-      let data: ProfileData | null;
-      
-      if (userId && userId !== currentUserId) {
-        // Loading another user's public profile
-        data = await ProfileService.getPublicProfile(userId);
-      } else {
-        // Loading own profile with full data
-        data = await ProfileService.getProfileData(targetUserId);
+      console.log('[Profile] Starting fast load...');
+
+      // Try fast RPC first
+      const { data: fastData, error: rpcError } = await supabase
+        .rpc('get_user_profile_fast', { p_user_id: targetUserId });
+
+      if (!rpcError && fastData) {
+        console.log('[Profile] Fast RPC succeeded in', (performance.now() - startTime).toFixed(0), 'ms');
         
-        // Backfill activities for own profile if no activities exist
-        if (data && data.recentActivity.length === 0) {
-          console.log('No activities found, attempting to backfill...');
-          const backfilledCount = await ProfileActivityService.backfillVehicleActivities(targetUserId);
-          if (backfilledCount > 0) {
-            console.log(`Backfilled ${backfilledCount} vehicle activities`);
-            // Reload profile data to show new activities
-            data = await ProfileService.getProfileData(targetUserId);
+        // Load contributions separately (lazy)
+        const contributionsPromise = ProfileService.getProfileData(targetUserId);
+        
+        // Use fast data immediately
+        setProfileData({
+          profile: fastData.profile,
+          stats: fastData.stats,
+          recentContributions: [], // Will be loaded lazily
+          recentActivity: [],
+          dailySummaries: []
+        } as any);
+        
+        // Load full contributions in background
+        contributionsPromise.then(fullData => {
+          if (fullData) {
+            setProfileData(fullData);
+            console.log('[Profile] Full data loaded in', (performance.now() - startTime).toFixed(0), 'ms');
           }
-        }
+        });
+        
+      } else {
+        // Fallback to full load
+        console.log('[Profile] Using fallback load method');
+        const data = userId && userId !== currentUserId
+          ? await ProfileService.getPublicProfile(userId)
+          : await ProfileService.getProfileData(targetUserId);
+        
+        setProfileData(data);
       }
 
-      setProfileData(data);
     } catch (err: any) {
       console.error('Error loading profile:', err);
       setError(err.message || 'Failed to load profile');
@@ -447,14 +464,10 @@ const Profile: React.FC = () => {
           borderBottom: '2px solid var(--border-dark)'
         }}>
           {[
-            { 
-              key: 'overview', 
-              label: profileData?.recentContributions 
-                ? `${profileData.recentContributions.reduce((sum, c) => sum + c.contribution_count, 0)} Contributions`
-                : 'Overview' 
-            },
+            { key: 'overview', label: 'Overview' },
             { key: 'activity', label: 'Activity' },
             { key: 'professional', label: 'Professional' },
+            { key: 'organizations', label: 'Organizations' },
             ...(isOwnProfile ? [{ key: 'settings', label: 'Settings' }] : [])
           ].map((tab) => (
             <button
@@ -489,16 +502,6 @@ const Profile: React.FC = () => {
         <div className="profile-content">
             {activeTab === 'overview' && (
               <div className="section">
-                {/* Contractor Profile (if applicable) */}
-                {profileData.profile?.id && (
-                  <div style={{ marginBottom: 'var(--space-4)' }}>
-                    <ContractorProfileCard
-                      userId={profileData.profile.id}
-                      isOwnProfile={isOwnProfile}
-                    />
-                  </div>
-                )}
-                
                 {/* Contribution Heatmap */}
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <ContributionTimeline
@@ -506,13 +509,6 @@ const Profile: React.FC = () => {
                   />
                 </div>
 
-                {/* Daily Ledger */}
-                <div style={{ marginBottom: 'var(--space-4)' }}>
-                  <DailyContributionReport
-                    summaries={dailySummaries}
-                    isOwnProfile={isOwnProfile}
-                  />
-                </div>
                 
                 {/* Live Player */}
                 <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -531,6 +527,10 @@ const Profile: React.FC = () => {
             
             {activeTab === 'professional' && (
               <ProfessionalToolbox userId={userId || currentUserId || ''} isOwnProfile={isOwnProfile} />
+            )}
+            
+            {activeTab === 'organizations' && (
+              <OrganizationAffiliations userId={profile.id} isOwnProfile={isOwnProfile} />
             )}
             
             {activeTab === 'settings' && isOwnProfile && (

@@ -15,6 +15,8 @@ import ContractorWorkInput from '../components/contractor/ContractorWorkInput';
 import OrganizationEditor from '../components/organization/OrganizationEditor';
 import EnhancedDealerInventory from '../components/organization/EnhancedDealerInventory';
 import BaTBulkImporter from '../components/dealer/BaTBulkImporter';
+import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowser';
+import MarketplaceComplianceForm from '../components/organization/MarketplaceComplianceForm';
 import '../design-system.css';
 
 interface Organization {
@@ -104,7 +106,7 @@ export default function OrganizationProfile() {
   const [offering, setOffering] = useState<Offering | null>(null);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'vehicles' | 'images' | 'inventory' | 'contributors'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'vehicles' | 'images' | 'inventory' | 'contributors' | 'marketplace'>('overview');
   const [showTrade, setShowTrade] = useState(false);
   const [showOwnershipModal, setShowOwnershipModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState(false);
@@ -680,7 +682,7 @@ export default function OrganizationProfile() {
         borderBottom: '2px solid var(--border)',
         padding: '0 16px'
       }}>
-        {(['overview', 'vehicles', 'images', 'inventory', 'contributors'] as const).map(tab => (
+        {(['overview', 'vehicles', 'images', 'inventory', 'contributors', 'marketplace'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -859,6 +861,19 @@ export default function OrganizationProfile() {
                     })()}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* SOLD INVENTORY BROWSER - Reference for buyers */}
+            <div className="card" style={{ marginBottom: '16px' }}>
+              <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
+                Sold Inventory Archive
+              </div>
+              <div className="card-body" style={{ padding: '16px' }}>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                  Browse previously sold vehicles with sale prices and platform information. Perfect for market research and value references.
+                </div>
+                <SoldInventoryBrowser organizationId={id!} />
               </div>
             </div>
 
@@ -1417,6 +1432,16 @@ export default function OrganizationProfile() {
             </div>
               </div>
             )}
+
+        {activeTab === 'marketplace' && (
+          <div>
+            {organization ? (
+              <MarketplaceComplianceForm organizationId={organization.id} canEdit={canEdit} />
+            ) : (
+              <div className="text text-small text-muted">Loading organization…</div>
+            )}
+          </div>
+        )}
 
         {/* Inventory Tab */}
         {activeTab === 'inventory' && organization && (

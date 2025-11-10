@@ -20,7 +20,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
   const [event, setEvent] = useState<TimelineEvent | null>(null);
   const [images, setImages] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
+  const [shoppableProducts, setShoppableProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bookmarked, setBookmarked] = useState(false);
 
   useEffect(() => {
     loadEventDetails();
@@ -55,16 +57,33 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
       if (imageData) {
         setImages(imageData);
 
-        // Load tags for these images
+        // Load SHOPPABLE tags for these images
         const imageIds = imageData.map(img => img.id);
         const { data: tagData } = await supabase
           .from('image_tags')
           .select('*')
           .in('image_id', imageIds)
-          .eq('source_type', 'ai');
+          .eq('is_shoppable', true)
+          .order('lowest_price_cents', { ascending: false });
 
         if (tagData) {
           setTags(tagData);
+          
+          // Extract unique shoppable products
+          const products = tagData
+            .filter((t: any) => t.tag_type === 'part' || t.tag_type === 'tool')
+            .map((t: any) => ({
+              id: t.id,
+              name: t.tag_name,
+              brand: t.metadata?.brand || 'Unknown',
+              partNumber: t.oem_part_number,
+              price: t.lowest_price_cents ? (t.lowest_price_cents / 100) : null,
+              buyLinks: typeof t.affiliate_links === 'string' ? JSON.parse(t.affiliate_links) : (t.affiliate_links || []),
+              confidence: t.confidence
+            }))
+            .filter((p: any) => p.buyLinks.length > 0);
+          
+          setShoppableProducts(products);
         }
       }
     }
@@ -89,9 +108,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
     );
   }
 
-  const aiSupervisedTags = tags.filter(t => t.metadata?.ai_supervised === true);
-  const parts = aiSupervisedTags.filter(t => t.tag_type === 'part' || t.metadata?.category?.includes('part'));
-  const tools = aiSupervisedTags.filter(t => t.tag_type === 'tool' || t.metadata?.category?.includes('tool'));
+  const parts = tags.filter(t => t.tag_type === 'part');
+  const tools = tags.filter(t => t.tag_type === 'tool');
+  const estimatedValue = shoppableProducts.reduce((sum, p) => sum + (p.price || 0), 0);
 
   return (
     <div
@@ -189,8 +208,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
             )}
           </div>
 
-          {/* AI Detected Parts */}
-          {parts.length > 0 && (
+          {/* SHOPPABLE PRODUCTS - BUY LINKS */}
+          {shoppableProducts.length > 0 && (
             <div style={{
               background: '#ffffff',
               border: '2px solid',
@@ -200,26 +219,73 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
               fontSize: '11px'
             }}>
               <div style={{
-                fontSize: '10px',
-                fontWeight: 'bold',
-                marginBottom: '8px',
-                color: '#000080'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px'
               }}>
-                PARTS DETECTED ({parts.length})
+                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#000080' }}>
+                  PRODUCTS USED ({shoppableProducts.length}) - ${estimatedValue.toFixed(2)} VALUE
+                </div>
+                <button
+                  onClick={() => setBookmarked(!bookmarked)}
+                  style={{
+                    background: bookmarked ? '#000' : 'transparent',
+                    border: '1px solid #000',
+                    color: bookmarked ? '#fff' : '#000',
+                    padding: '4px 8px',
+                    fontSize: '9px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {bookmarked ? '■ SAVED' : '□ SAVE'}
+                </button>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {parts.map(part => (
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {shoppableProducts.map(product => (
                   <div
-                    key={part.id}
+                    key={product.id}
                     style={{
-                      background: '#c0c0c0',
-                      border: '1px solid #808080',
-                      padding: '4px 8px',
-                      fontSize: '10px'
+                      background: '#f5f5f5',
+                      border: '1px solid #ccc',
+                      padding: '8px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
                     }}
                   >
-                    {part.tag_name}
-                    {part.confidence && <span style={{ color: '#008000', marginLeft: '4px' }}>{part.confidence}%</span>}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '2px' }}>
+                        {product.name}
+                      </div>
+                      <div style={{ fontSize: '9px', color: '#666' }}>
+                        {product.brand} {product.partNumber ? `• ${product.partNumber}` : ''}
+                        {product.price && ` • $${product.price.toFixed(2)}`}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {product.buyLinks.map((link: any, idx: number) => (
+                        <a
+                          key={idx}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            background: link.provider === 'amazon' ? '#FF9900' : '#0066CC',
+                            color: '#fff',
+                            padding: '4px 8px',
+                            fontSize: '9px',
+                            fontWeight: 'bold',
+                            textDecoration: 'none',
+                            borderRadius: '2px',
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          BUY {link.provider}
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

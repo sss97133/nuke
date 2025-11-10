@@ -53,22 +53,47 @@ CREATE TABLE IF NOT EXISTS public.image_tags (
   created_at timestamptz DEFAULT now()
 );
 
+ALTER TABLE public.image_tags
+  ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+
+ALTER TABLE public.image_tags
+  ALTER COLUMN created_at SET DEFAULT now();
+
 -- RLS
 ALTER TABLE public.image_tags ENABLE ROW LEVEL SECURITY;
 -- Public read (images are public); tighten later if needed
-CREATE POLICY IF NOT EXISTS image_tags_select_all ON public.image_tags
+DROP POLICY IF EXISTS image_tags_select_all ON public.image_tags;
+CREATE POLICY image_tags_select_all ON public.image_tags
   FOR SELECT USING (true);
 -- Authenticated users can insert their own tags
-CREATE POLICY IF NOT EXISTS image_tags_insert_own ON public.image_tags
-  FOR INSERT WITH CHECK (auth.uid() = created_by);
+DROP POLICY IF EXISTS image_tags_insert_own ON public.image_tags;
+CREATE POLICY image_tags_insert_own ON public.image_tags
+  FOR INSERT WITH CHECK (auth.uid()::text = created_by::text);
 -- Owners can update/delete their tags
-CREATE POLICY IF NOT EXISTS image_tags_update_own ON public.image_tags
-  FOR UPDATE USING (auth.uid() = created_by);
-CREATE POLICY IF NOT EXISTS image_tags_delete_own ON public.image_tags
-  FOR DELETE USING (auth.uid() = created_by);
+DROP POLICY IF EXISTS image_tags_update_own ON public.image_tags;
+CREATE POLICY image_tags_update_own ON public.image_tags
+  FOR UPDATE USING (auth.uid()::text = created_by::text);
+DROP POLICY IF EXISTS image_tags_delete_own ON public.image_tags;
+CREATE POLICY image_tags_delete_own ON public.image_tags
+  FOR DELETE USING (auth.uid()::text = created_by::text);
 
 CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON public.image_tags(image_id);
-CREATE INDEX IF NOT EXISTS idx_image_tags_created_at ON public.image_tags(created_at DESC);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public' AND tablename = 'image_tags' AND indexname = 'idx_image_tags_created_at'
+  ) THEN
+    EXECUTE 'DROP INDEX IF EXISTS public.idx_image_tags_created_at';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'image_tags' AND column_name = 'created_at'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_image_tags_created_at ON public.image_tags(created_at DESC)';
+  END IF;
+END $$;
 
 -- 3) Create vehicle_listing_archives table for full listing preservation
 CREATE TABLE IF NOT EXISTS public.vehicle_listing_archives (
@@ -89,14 +114,16 @@ CREATE TABLE IF NOT EXISTS public.vehicle_listing_archives (
 
 ALTER TABLE public.vehicle_listing_archives ENABLE ROW LEVEL SECURITY;
 -- Public read for now (listings are public provenance); revisit if needed
-CREATE POLICY IF NOT EXISTS vehicle_listing_archives_select_all ON public.vehicle_listing_archives
+DROP POLICY IF EXISTS vehicle_listing_archives_select_all ON public.vehicle_listing_archives;
+CREATE POLICY vehicle_listing_archives_select_all ON public.vehicle_listing_archives
   FOR SELECT USING (true);
 -- Only vehicle owners can insert archive rows
-CREATE POLICY IF NOT EXISTS vehicle_listing_archives_insert_owner ON public.vehicle_listing_archives
+DROP POLICY IF EXISTS vehicle_listing_archives_insert_owner ON public.vehicle_listing_archives;
+CREATE POLICY vehicle_listing_archives_insert_owner ON public.vehicle_listing_archives
   FOR INSERT WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.vehicles v
-      WHERE v.id = vehicle_id AND v.user_id = auth.uid()
+      WHERE v.id::text = vehicle_id::text AND v.user_id::text = auth.uid()::text
     )
   );
 

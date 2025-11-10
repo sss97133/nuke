@@ -200,6 +200,21 @@ async function uploadToS3(imageBytes: Uint8Array, source: string, index: number,
   return key
 }
 
+function upgradeCraigslistImageUrl(url: string): string {
+  if (!url) return url;
+
+  try {
+    const sizePattern = /_(\d+x\d+)([a-z]*)\.(jpg|jpeg|png|webp)$/i;
+    if (sizePattern.test(url)) {
+      return url.replace(sizePattern, '_1200x900.$3');
+    }
+  } catch (error) {
+    console.warn('Failed to normalize Craigslist image URL, using original:', error);
+  }
+
+  return url;
+}
+
 function scrapeCraigslist(doc: any, url: string): any {
   const data: any = {
     source: 'Craigslist',
@@ -326,7 +341,84 @@ function scrapeCraigslist(doc: any, url: string): any {
   const descElement = doc.querySelector('#postingbody')
   if (descElement) {
     data.description = descElement.textContent.trim().substring(0, 5000)
+    
+    // Parse additional details from description
+    const descText = data.description.toUpperCase();
+    
+    // Extract trim/series (K1500, K20, C10, etc.)
+    const trimMatch = descText.match(/\b(K1500|K10|K20|K30|C1500|C10|C20|C30|K5)\b/);
+    if (trimMatch) data.trim = trimMatch[1];
+    
+    // Extract displacement from engine code (350 = 5.7L, 454 = 7.4L, etc.)
+    const engineMap: Record<string, number> = {
+      '250': 4.1, '283': 4.6, '305': 5.0, '307': 5.0,
+      '327': 5.4, '350': 5.7, '396': 6.5, '400': 6.6,
+      '427': 7.0, '454': 7.4, '460': 7.5, '302': 5.0
+    };
+    
+    const engineCodeMatch = descText.match(/\b(250|283|305|307|327|350|396|400|427|454|460|302)\b/);
+    if (engineCodeMatch) {
+      const code = engineCodeMatch[1];
+      data.displacement = engineMap[code];
+      if (!data.engine_size) {
+        data.engine_size = `${engineMap[code]}L V${data.cylinders || 8}`;
+      }
+    }
+    
+    // Check for A/C
+    if (descText.includes('NO A/C') || descText.includes('NOT AN A/C')) {
+      data.has_ac = false;
+    } else if (descText.includes('A/C') || descText.includes('AIR CONDITIONING')) {
+      data.has_ac = true;
+    }
+    
+    // Extract speed from transmission description
+    const speedMatch = descText.match(/(\d)\s*SPEED/);
+    if (speedMatch && !data.transmission_subtype) {
+      const speed = speedMatch[1];
+      data.transmission_subtype = `${speed}-Speed Manual`;
+    }
+    
+    // Detect known issues
+    const knownIssues: string[] = [];
+    if (descText.includes('RUST')) knownIssues.push('rust_present');
+    if (descText.includes('ODOMETER ROLLED')) knownIssues.push('odometer_rolled_over');
+    if (descText.includes('NEEDS WORK') || descText.includes('NOT PERFECT')) knownIssues.push('needs_work');
+    if (descText.includes('SALVAGE')) knownIssues.push('salvage_title');
+    if (knownIssues.length > 0) data.known_issues = knownIssues;
+    
+    // Extract paint history
+    if (descText.includes('PAINTED') || descText.includes('REPAINT')) {
+      data.paint_history = 'repainted';
+      const paintYearsMatch = descText.match(/PAINTED\s+(\d+)\s+YEARS?\s+(?:AGO|BACK)/);
+      if (paintYearsMatch) {
+        data.paint_age_years = parseInt(paintYearsMatch[1]);
+      }
+    }
+    
+    // Detect seller motivation
+    if (descText.includes('MOTIVATED') || descText.includes('MUST SELL')) {
+      data.seller_motivated = true;
+    }
+    if (descText.includes('NO LOWBALLERS') || descText.includes('PRICE IS FIRM')) {
+      data.price_firm = true;
+    } else if (descText.includes('LOW BALLERS WELCOME') || descText.includes('OBO')) {
+      data.negotiable = true;
+    }
+    
+    // Extract trade interests
+    const tradeMatch = descText.match(/TRADE[S]?\s+FOR\s+([A-Z\s,]+?)(?:\.|$|BUT)/);
+    if (tradeMatch) {
+      data.trade_interests = tradeMatch[1].trim();
+    }
   }
+
+  // Extract posting dates
+  const postedMatch = fullText.match(/posted:\s*([\d-]+\s+[\d:]+)/i);
+  if (postedMatch) data.posted_date = postedMatch[1];
+  
+  const updatedMatch = fullText.match(/updated:\s*([\d-]+\s+[\d:]+)/i);
+  if (updatedMatch) data.updated_date = updatedMatch[1];
 
   // Extract images - Craigslist uses thumbnail links
   const images: string[] = []
@@ -336,7 +428,7 @@ function scrapeCraigslist(doc: any, url: string): any {
   thumbLinks.forEach((link: any) => {
     const href = link.getAttribute('href')
     if (href && href.startsWith('http')) {
-      images.push(href)
+      images.push(upgradeCraigslistImageUrl(href))
     }
   })
   
@@ -347,9 +439,10 @@ function scrapeCraigslist(doc: any, url: string): any {
       const src = img.getAttribute('src')
       if (src) {
         // Convert thumbnail URLs to full-size
-        const fullSrc = src.replace(/_\d+x\d+[a-z]*\.jpg$/i, '.jpg').replace(/_thumb_/i, '_')
-        if (!images.includes(fullSrc)) {
-          images.push(fullSrc)
+        const normalizedSrc = src.replace(/_thumb_/i, '_')
+        const upgraded = upgradeCraigslistImageUrl(normalizedSrc)
+        if (!images.includes(upgraded)) {
+          images.push(upgraded)
         }
       }
     })
@@ -366,7 +459,9 @@ function scrapeCraigslist(doc: any, url: string): any {
         if (imgMatch) {
           const urls = imgMatch[1].match(/https?:\/\/[^"'\s]+/g)
           if (urls) {
-            images.push(...urls)
+            urls.forEach((candidate) => {
+              images.push(upgradeCraigslistImageUrl(candidate))
+            })
             break
           }
         }
@@ -377,7 +472,9 @@ function scrapeCraigslist(doc: any, url: string): any {
   }
 
   if (images.length > 0) {
-    data.images = Array.from(new Set(images)).slice(0, 50)
+    // Ensure we only keep unique hi-res URLs
+    const uniqueImages = Array.from(new Set(images.map(upgradeCraigslistImageUrl)))
+    data.images = uniqueImages.slice(0, 50)
   }
 
   return data
@@ -430,7 +527,8 @@ function scrapeBringATrailer(doc: any, url: string): any {
         if (pattern.source.includes('k\\s')) {
           mileage = mileage + '000'
         }
-        data.mileage = mileage
+        // Return as number for consistent type
+        data.mileage = parseInt(mileage, 10)
         break
       }
     }

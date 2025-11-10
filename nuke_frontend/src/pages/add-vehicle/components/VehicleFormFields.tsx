@@ -23,7 +23,8 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
     required: boolean = false
   ) => {
     const isUrlField = name === 'import_url';
-    const fieldValue = formData[name] || '';
+    const rawValue = formData[name];
+    const fieldValue = rawValue === undefined || rawValue === null ? '' : String(rawValue);
 
     return (
       <div className="form-group">
@@ -87,7 +88,7 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
       <select
         id={name}
         name={name}
-        value={formData[name] || ''}
+        value={formData[name] === undefined || formData[name] === null ? '' : String(formData[name])}
         onChange={(e) => onFieldChange(name, e.target.value)}
         className="form-input"
         required={required}
@@ -115,8 +116,16 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
         id={name}
         name={name}
         type="number"
-        value={formData[name] || ''}
-        onChange={(e) => onFieldChange(name, e.target.value)}
+        value={typeof formData[name] === 'number' || typeof formData[name] === 'string' ? formData[name] : ''}
+        onChange={(e) => {
+          const { value } = e.target;
+          if (value === '') {
+            onFieldChange(name, '');
+            return;
+          }
+          const numeric = Number(value);
+          onFieldChange(name, Number.isNaN(numeric) ? value : numeric);
+        }}
         placeholder={placeholder}
         min={min}
         max={max}
@@ -152,6 +161,11 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
           {renderNumberField('year', 'Year', 'e.g., 1972', 1900, new Date().getFullYear() + 1)}
           {renderField('vin', 'VIN', 'text', '17-character VIN number')}
           {renderField('license_plate', 'License Plate')}
+        </div>
+
+        <div className="form-grid grid-2">
+          {renderField('location', 'Listing Location / Region', 'text', 'Auto-filled from listing when available')}
+          {renderField('listing_url', 'Original Listing URL', 'url', 'Import URL or external listing link')}
         </div>
 
         <div className="form-grid grid-1">
@@ -299,6 +313,36 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
         </>
       )}
 
+      {/* Discovery Context */}
+      <div className="form-section">
+        <h3 className="section-title">Discovery Context</h3>
+        <div className="form-grid grid-1">
+          <div className="form-group">
+            <label htmlFor="discoverer_opinion" className="form-label">
+              Your Notes / Opinion
+            </label>
+            <textarea
+              id="discoverer_opinion"
+              name="discoverer_opinion"
+              value={formData.discoverer_opinion || ''}
+              onChange={(e) => onFieldChange('discoverer_opinion', e.target.value)}
+              placeholder="Drop your analysis, negotiation posture, or context you want the team to see first. This posts as your top comment once the vehicle is created."
+              rows={5}
+              className="form-input"
+            />
+            <div className="text-small text-muted" style={{ marginTop: 'var(--space-1)' }}>
+              We’ll send this as the first comment on the vehicle so everyone sees your take immediately.
+            </div>
+          </div>
+        </div>
+
+        <div className="form-grid grid-3">
+          {renderField('listing_source', 'Listing Source', 'text', 'Craigslist, Bring a Trailer, Facebook Marketplace, etc.')}
+          {renderField('listing_posted_at', 'Listing Posted (auto)', 'datetime-local')}
+          {renderField('listing_updated_at', 'Listing Updated (auto)', 'datetime-local')}
+        </div>
+      </div>
+
       {/* Common Fields for all levels */}
       <div className="form-section">
         <h3 className="section-title">Additional Information</h3>
@@ -362,7 +406,7 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .form-section {
           margin-bottom: 2rem;
           padding-bottom: 1.5rem;

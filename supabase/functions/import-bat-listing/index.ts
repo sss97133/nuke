@@ -233,6 +233,26 @@ serve(async (req) => {
       .from('data_validations')
       .insert(validations);
 
+    // Create timeline event for the sale with the actual sale date (not upload date)
+    await supabase
+      .from('timeline_events')
+      .insert({
+        vehicle_id: vehicleId,
+        event_type: 'sale',
+        event_date: saleDate, // Use actual BaT sale date
+        title: `Sold on Bring a Trailer for $${salePrice.toLocaleString()}`,
+        description: `${year} ${make} ${model} sold on BaT auction #${lotNumber}. Seller: ${seller}${buyer ? `, Buyer: ${buyer}` : ''}`,
+        cost_amount: salePrice,
+        metadata: {
+          source: 'bat_import',
+          bat_url: batUrl,
+          lot_number: lotNumber,
+          seller,
+          buyer
+        },
+        user_id: null // System-generated event
+      });
+
     return new Response(
       JSON.stringify({
         success: true,

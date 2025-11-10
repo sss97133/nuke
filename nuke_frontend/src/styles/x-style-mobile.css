@@ -1,0 +1,388 @@
+/**
+ * X (Twitter) Style Mobile UI
+ * Minimal, monochromatic, thumb-zone optimized
+ */
+
+:root {
+  /* X Color Palette - Minimal */
+  --x-bg: #ffffff;
+  --x-surface: #fafafa;
+  --x-border: #eff3f4;
+  --x-text: #0f1419;
+  --x-text-secondary: #536471;
+  --x-text-tertiary: #8b98a5;
+  --x-link: #1d9bf0;
+  --x-hover: #f7f9f9;
+  
+  /* Dark mode */
+  --x-dark-bg: #000000;
+  --x-dark-surface: #16181c;
+  --x-dark-border: #2f3336;
+  --x-dark-text: #e7e9ea;
+  --x-dark-text-secondary: #71767b;
+  --x-dark-hover: #181818;
+}
+
+/* ================================================
+   X-STYLE BUTTONS (Icon-first, minimal text)
+   ================================================ */
+
+.x-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: 9999px; /* Full circle for icons */
+  cursor: pointer;
+  transition: background 0.15s ease;
+  color: var(--x-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  font-size: 15px;
+}
+
+.x-btn:hover {
+  background: var(--x-hover);
+}
+
+.x-btn:active {
+  background: var(--x-border);
+  transform: scale(0.95);
+}
+
+.x-btn-primary {
+  background: var(--x-text);
+  color: var(--x-bg);
+  padding: 0 16px;
+  border-radius: 20px;
+  height: 36px;
+  font-size: 15px;
+  font-weight: 700;
+  min-width: auto;
+}
+
+.x-btn-primary:hover {
+  background: #272c30;
+}
+
+.x-btn-icon-text {
+  background: none;
+  border: 1px solid var(--x-border);
+  color: var(--x-text);
+  padding: 0 16px;
+  border-radius: 20px;
+  height: 36px;
+  font-size: 15px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.x-btn-icon-text:hover {
+  background: var(--x-hover);
+}
+
+/* ================================================
+   X-STYLE CARDS (Minimal borders, generous padding)
+   ================================================ */
+
+.x-card {
+  background: var(--x-bg);
+  border: 1px solid var(--x-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.x-card-content {
+  padding: 16px;
+}
+
+.x-card-row {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--x-border);
+}
+
+.x-card-row:last-child {
+  border-bottom: none;
+}
+
+.x-card-row:hover {
+  background: var(--x-hover);
+}
+
+/* ================================================
+   X-STYLE TYPOGRAPHY (Crisp, hierarchy)
+   ================================================ */
+
+.x-text-primary {
+  color: var(--x-text);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.x-text-secondary {
+  color: var(--x-text-secondary);
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.x-text-tertiary {
+  color: var(--x-text-tertiary);
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.x-text-bold {
+  font-weight: 700;
+}
+
+.x-text-semibold {
+  font-weight: 600;
+}
+
+.x-link {
+  color: var(--x-link);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.x-link:hover {
+  text-decoration: underline;
+}
+
+/* ================================================
+   THUMB ZONE OPTIMIZATION
+   Mobile screen divided into zones:
+   - Top 20%: Header (view only)
+   - Middle 50%: Content (scroll/view)
+   - Bottom 30%: Actions (thumb zone)
+   ================================================ */
+
+.x-thumb-zone {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--x-bg);
+  border-top: 1px solid var(--x-border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 8px;
+  z-index: 1000;
+  /* Add backdrop blur for modern feel */
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.x-thumb-action {
+  flex: 1;
+  max-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  background: none;
+  border: none;
+}
+
+.x-thumb-action:active {
+  background: var(--x-hover);
+  transform: scale(0.95);
+}
+
+.x-thumb-action-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--x-text);
+}
+
+.x-thumb-action-label {
+  font-size: 11px;
+  color: var(--x-text-secondary);
+  font-weight: 500;
+}
+
+/* ================================================
+   BOTTOM SHEET (X-style modal)
+   ================================================ */
+
+.x-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  animation: fadeIn 0.15s ease;
+}
+
+.x-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--x-bg);
+  border-radius: 16px 16px 0 0;
+  max-height: 90vh;
+  z-index: 2001;
+  animation: slideUp 0.2s ease;
+  overflow: hidden;
+}
+
+.x-sheet-handle {
+  width: 32px;
+  height: 4px;
+  background: var(--x-text-tertiary);
+  border-radius: 2px;
+  margin: 12px auto 8px;
+  opacity: 0.3;
+}
+
+.x-sheet-content {
+  overflow-y: auto;
+  max-height: calc(90vh - 28px);
+  padding: 0 16px 32px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* ================================================
+   LIST ITEMS (X feed style)
+   ================================================ */
+
+.x-list-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--x-border);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.x-list-item:hover {
+  background: var(--x-hover);
+}
+
+.x-list-item:active {
+  background: var(--x-border);
+}
+
+.x-list-item-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--x-border);
+  flex-shrink: 0;
+}
+
+.x-list-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.x-list-item-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.x-list-item-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--x-text);
+}
+
+.x-list-item-meta {
+  font-size: 13px;
+  color: var(--x-text-secondary);
+}
+
+.x-list-item-body {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--x-text);
+  margin-bottom: 8px;
+}
+
+/* ================================================
+   STAT BADGES (Minimal, inline)
+   ================================================ */
+
+.x-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--x-text-secondary);
+  margin-right: 12px;
+}
+
+.x-stat-value {
+  font-weight: 700;
+  color: var(--x-text);
+}
+
+.x-stat-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ================================================
+   RESPONSIVE (Mobile-first)
+   ================================================ */
+
+@media (max-width: 768px) {
+  .x-btn {
+    min-width: 44px; /* iOS minimum touch target */
+    min-height: 44px;
+  }
+  
+  .x-card {
+    border-radius: 0; /* Full bleed on mobile */
+    border-left: none;
+    border-right: none;
+  }
+  
+  .x-text-primary {
+    font-size: 17px; /* iOS default text size */
+  }
+}
+
+/* ================================================
+   DARK MODE
+   ================================================ */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --x-bg: var(--x-dark-bg);
+    --x-surface: var(--x-dark-surface);
+    --x-border: var(--x-dark-border);
+    --x-text: var(--x-dark-text);
+    --x-text-secondary: var(--x-dark-text-secondary);
+    --x-hover: var(--x-dark-hover);
+  }
+  
+  .x-thumb-zone {
+    background: rgba(0, 0, 0, 0.85);
+  }
+}
+

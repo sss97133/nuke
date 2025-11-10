@@ -50,86 +50,58 @@ ALTER TABLE public.component_installations ENABLE ROW LEVEL SECURITY;
 -- RLS policies (separate per operation; specify roles)
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.component_installations TO authenticated;
 
-CREATE POLICY "Public vehicle read" ON public.component_installations
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'component_installations' AND policyname = 'Public vehicle read'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Public vehicle read" ON public.component_installations
     FOR SELECT TO authenticated
     USING (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = component_installations.vehicle_id
-            AND v.is_public = true
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = component_installations.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = component_installations.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-        )
-    );
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = component_installations.vehicle_id AND v.is_public = true)
+        OR EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = component_installations.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = component_installations.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''mechanic'',''appraiser'',''moderator''))
+      )';
+  END IF;
 
-CREATE POLICY "Owner insert" ON public.component_installations
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'component_installations' AND policyname = 'Owner insert'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Owner insert" ON public.component_installations
     FOR INSERT TO authenticated
     WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = component_installations.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = component_installations.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-            AND vc.permission_level IN ('write','admin')
-        )
-    );
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = component_installations.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = component_installations.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''mechanic'',''appraiser'',''moderator''))
+      )';
+  END IF;
 
-CREATE POLICY "Owner update" ON public.component_installations
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'component_installations' AND policyname = 'Owner update'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Owner update" ON public.component_installations
     FOR UPDATE TO authenticated
     USING (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = component_installations.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = component_installations.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-            AND vc.permission_level IN ('write','admin')
-        )
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = component_installations.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = component_installations.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''mechanic'',''appraiser'',''moderator''))
     )
     WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = component_installations.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = component_installations.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-            AND vc.permission_level IN ('write','admin')
-        )
-    );
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = component_installations.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = component_installations.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''mechanic'',''appraiser'',''moderator''))
+      )';
+  END IF;
 
-CREATE POLICY "Owner delete" ON public.component_installations
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'component_installations' AND policyname = 'Owner delete'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Owner delete" ON public.component_installations
     FOR DELETE TO authenticated
     USING (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = component_installations.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = component_installations.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-            AND vc.permission_level IN ('admin')
-        )
-    );
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = component_installations.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = component_installations.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''moderator''))
+      )';
+  END IF;
+END;
+$$;
 
 -- Create atomic_events table
 CREATE TABLE IF NOT EXISTS public.atomic_events (
@@ -167,86 +139,58 @@ ALTER TABLE public.atomic_events ENABLE ROW LEVEL SECURITY;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.atomic_events TO authenticated;
 
-CREATE POLICY "Public vehicle events read" ON public.atomic_events
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'atomic_events' AND policyname = 'Public vehicle events read'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Public vehicle events read" ON public.atomic_events
     FOR SELECT TO authenticated
     USING (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = atomic_events.vehicle_id
-            AND v.is_public = true
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = atomic_events.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = atomic_events.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-        )
-    );
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = atomic_events.vehicle_id AND v.is_public = true)
+        OR EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = atomic_events.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = atomic_events.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''mechanic'',''appraiser'',''moderator''))
+      )';
+  END IF;
 
-CREATE POLICY "Owner events insert" ON public.atomic_events
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'atomic_events' AND policyname = 'Owner events insert'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Owner events insert" ON public.atomic_events
     FOR INSERT TO authenticated
     WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = atomic_events.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = atomic_events.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-            AND vc.permission_level IN ('write','admin')
-        )
-    );
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = atomic_events.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = atomic_events.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''mechanic'',''appraiser'',''moderator''))
+      )';
+  END IF;
 
-CREATE POLICY "Owner events update" ON public.atomic_events
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'atomic_events' AND policyname = 'Owner events update'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Owner events update" ON public.atomic_events
     FOR UPDATE TO authenticated
     USING (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = atomic_events.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = atomic_events.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-            AND vc.permission_level IN ('write','admin')
-        )
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = atomic_events.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = atomic_events.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''mechanic'',''appraiser'',''moderator''))
     )
     WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = atomic_events.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = atomic_events.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-            AND vc.permission_level IN ('write','admin')
-        )
-    );
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = atomic_events.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = atomic_events.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''mechanic'',''appraiser'',''moderator''))
+      )';
+  END IF;
 
-CREATE POLICY "Owner events delete" ON public.atomic_events
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'atomic_events' AND policyname = 'Owner events delete'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Owner events delete" ON public.atomic_events
     FOR DELETE TO authenticated
     USING (
-        EXISTS (
-            SELECT 1 FROM public.vehicles v
-            WHERE v.id = atomic_events.vehicle_id
-            AND v.user_id = (SELECT auth.uid())
-        )
-        OR EXISTS (
-            SELECT 1 FROM public.vehicle_contributors vc
-            WHERE vc.vehicle_id = atomic_events.vehicle_id
-            AND vc.user_id = (SELECT auth.uid())
-            AND vc.permission_level = 'admin'
-        )
-    );
+        EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = atomic_events.vehicle_id AND v.user_id = (SELECT auth.uid()))
+        OR EXISTS (SELECT 1 FROM public.vehicle_user_permissions vup WHERE vup.vehicle_id = atomic_events.vehicle_id AND vup.user_id = (SELECT auth.uid()) AND vup.is_active = true AND vup.role IN (''owner'',''co_owner'',''moderator''))
+      )';
+  END IF;
+END;
+$$;
 
 -- Trigger function: recalc component_value; safe for INSERT/UPDATE/DELETE
 CREATE OR REPLACE FUNCTION public.update_vehicle_component_value()

@@ -32,6 +32,9 @@ ON public.ownership_verifications
 USING gin ((supporting_documents -> 'type'));
 
 -- Update RLS policies to ensure users can only update their own verification documents
+DROP POLICY IF EXISTS "Users can update their own verification documents"
+ON public.ownership_verifications;
+
 CREATE POLICY "Users can update their own verification documents"
 ON public.ownership_verifications
 FOR UPDATE
@@ -50,6 +53,7 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Create RLS policies for the storage bucket
+DROP POLICY IF EXISTS "Users can upload their own ownership documents" ON storage.objects;
 CREATE POLICY "Users can upload their own ownership documents"
 ON storage.objects
 FOR INSERT
@@ -58,6 +62,7 @@ WITH CHECK (
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
+DROP POLICY IF EXISTS "Users can view their own ownership documents" ON storage.objects;
 CREATE POLICY "Users can view their own ownership documents"
 ON storage.objects
 FOR SELECT
@@ -66,6 +71,7 @@ USING (
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
+DROP POLICY IF EXISTS "Users can delete their own ownership documents" ON storage.objects;
 CREATE POLICY "Users can delete their own ownership documents"
 ON storage.objects
 FOR DELETE

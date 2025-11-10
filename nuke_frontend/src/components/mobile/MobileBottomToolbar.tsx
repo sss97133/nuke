@@ -5,6 +5,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useImageUpload } from '../../hooks/useImageUpload';
+import { MobilePhotoDump } from './MobilePhotoDump';
 
 interface MobileBottomToolbarProps {
   vehicleId: string;
@@ -24,6 +25,7 @@ export const MobileBottomToolbar: React.FC<MobileBottomToolbarProps> = ({
   currentImage
 }) => {
   const [activeTool, setActiveTool] = useState<'camera' | 'comment' | 'tag' | null>(null);
+  const [showPhotoDump, setShowPhotoDump] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploading, upload } = useImageUpload(session, isOwner, hasContributorAccess);
   
@@ -60,15 +62,32 @@ export const MobileBottomToolbar: React.FC<MobileBottomToolbarProps> = ({
 
   const canUpload = session?.user && (isOwner || hasContributorAccess);
 
+  // DEBUG: Log upload permissions
+  console.log('[MobileBottomToolbar] Upload check:', {
+    hasSession: !!session?.user,
+    userId: session?.user?.id,
+    isOwner,
+    hasContributorAccess,
+    canUpload,
+    willShowCameraButton: canUpload
+  });
+
   return (
     <>
-      {/* Hidden file input for camera */}
+      {/* Photo Dump Modal */}
+      {showPhotoDump && (
+        <MobilePhotoDump 
+          onClose={() => setShowPhotoDump(false)}
+          session={session}
+        />
+      )}
+
+      {/* Hidden file input for camera/library */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
         multiple
-        capture="environment"
         style={{ display: 'none' }}
         onChange={(e) => handleFileUpload(e.target.files)}
       />
@@ -88,6 +107,27 @@ export const MobileBottomToolbar: React.FC<MobileBottomToolbarProps> = ({
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </button>
+
+        {/* Photo Dump Tool - Upload Multiple Photos */}
+        {canUpload && (
+          <button
+            onClick={() => setShowPhotoDump(true)}
+            style={{
+              ...styles.toolButton,
+              opacity: 0.8
+            }}
+            title="Photo Dump - Upload Multiple"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: 'absolute', top: 2, right: 2 }}>
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            </svg>
+          </button>
+        )}
 
         {/* Camera Tool - Center (only for contributors) */}
         {canUpload && (

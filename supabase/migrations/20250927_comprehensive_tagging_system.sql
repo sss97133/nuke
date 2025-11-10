@@ -280,58 +280,127 @@ ALTER TABLE tag_analytics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_training_exports ENABLE ROW LEVEL SECURITY;
 
 -- Brands - Public read, authenticated write
-CREATE POLICY "Brands are publicly viewable" ON brands
-    FOR SELECT TO public USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'brands' AND policyname = 'Brands are publicly viewable'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Brands are publicly viewable" ON brands FOR SELECT TO public USING (true)';
+  END IF;
 
-CREATE POLICY "Authenticated users can create brands" ON brands
-    FOR INSERT TO authenticated WITH CHECK (true);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'brands' AND policyname = 'Authenticated users can create brands'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Authenticated users can create brands" ON brands FOR INSERT TO authenticated WITH CHECK (true)';
+  END IF;
 
-CREATE POLICY "Brand owners can update their brands" ON brands
-    FOR UPDATE TO authenticated USING (claimed_by = auth.uid());
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'brands' AND policyname = 'Brand owners can update their brands'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Brand owners can update their brands" ON brands FOR UPDATE TO authenticated USING (claimed_by = auth.uid())';
+  END IF;
+END;
+$$;
 
 -- Brand aliases follow brand permissions
-CREATE POLICY "Brand aliases are publicly viewable" ON brand_aliases
-    FOR SELECT TO public USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'brand_aliases' AND policyname = 'Brand aliases are publicly viewable'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Brand aliases are publicly viewable" ON brand_aliases FOR SELECT TO public USING (true)';
+  END IF;
 
-CREATE POLICY "Brand owners can manage aliases" ON brand_aliases
-    FOR ALL TO authenticated USING (
-        brand_id IN (SELECT id FROM brands WHERE claimed_by = auth.uid())
-    );
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'brand_aliases' AND policyname = 'Brand owners can manage aliases'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Brand owners can manage aliases" ON brand_aliases FOR ALL TO authenticated USING (brand_id IN (SELECT id FROM brands WHERE claimed_by = auth.uid()))';
+  END IF;
+END;
+$$;
 
 -- Brand tags - Public read for analytics, authenticated write
-CREATE POLICY "Brand tags are publicly viewable" ON brand_tags
-    FOR SELECT TO public USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'brand_tags' AND policyname = 'Brand tags are publicly viewable'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Brand tags are publicly viewable" ON brand_tags FOR SELECT TO public USING (true)';
+  END IF;
 
-CREATE POLICY "Authenticated users can create brand tags" ON brand_tags
-    FOR INSERT TO authenticated WITH CHECK (true);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'brand_tags' AND policyname = 'Authenticated users can create brand tags'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Authenticated users can create brand tags" ON brand_tags FOR INSERT TO authenticated WITH CHECK (true)';
+  END IF;
+END;
+$$;
 
 -- Verifications - Public read, authenticated write
-CREATE POLICY "Tag verifications are publicly viewable" ON tag_verifications
-    FOR SELECT TO public USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'tag_verifications' AND policyname = 'Tag verifications are publicly viewable'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Tag verifications are publicly viewable" ON tag_verifications FOR SELECT TO public USING (true)';
+  END IF;
 
-CREATE POLICY "Authenticated users can create verifications" ON tag_verifications
-    FOR INSERT TO authenticated WITH CHECK (verifier_user_id = auth.uid());
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'tag_verifications' AND policyname = 'Authenticated users can create verifications'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Authenticated users can create verifications" ON tag_verifications FOR INSERT TO authenticated WITH CHECK (verifier_user_id = auth.uid())';
+  END IF;
+END;
+$$;
 
 -- User expertise - Users can manage their own
-CREATE POLICY "Users can view all expertise profiles" ON user_expertise
-    FOR SELECT TO public USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'user_expertise' AND policyname = 'Users can view all expertise profiles'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Users can view all expertise profiles" ON user_expertise FOR SELECT TO public USING (true)';
+  END IF;
 
-CREATE POLICY "Users can manage their own expertise" ON user_expertise
-    FOR ALL TO authenticated USING (user_id = auth.uid());
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'user_expertise' AND policyname = 'Users can manage their own expertise'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Users can manage their own expertise" ON user_expertise FOR ALL TO authenticated USING (user_id = auth.uid())';
+  END IF;
+END;
+$$;
 
 -- Analytics - Public read
-CREATE POLICY "Tag analytics are publicly viewable" ON tag_analytics
-    FOR SELECT TO public USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'tag_analytics' AND policyname = 'Tag analytics are publicly viewable'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Tag analytics are publicly viewable" ON tag_analytics FOR SELECT TO public USING (true)';
+  END IF;
+END;
+$$;
 
 -- AI exports - Restricted access
-CREATE POLICY "Users can view their own exports" ON ai_training_exports
-    FOR SELECT TO authenticated USING (exported_by = auth.uid());
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'ai_training_exports' AND policyname = 'Users can view their own exports'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Users can view their own exports" ON ai_training_exports FOR SELECT TO authenticated USING (exported_by = auth.uid())';
+  END IF;
+END;
+$$;
 
 -- =====================================================================================
 -- FUNCTIONS & TRIGGERS
 -- =====================================================================================
 
 -- Function to update brand statistics when tags are added/verified
+DROP TRIGGER IF EXISTS trigger_update_brand_statistics ON brand_tags;
+
+DROP FUNCTION IF EXISTS update_brand_statistics();
+
 CREATE OR REPLACE FUNCTION update_brand_statistics()
 RETURNS TRIGGER AS $$
 BEGIN
