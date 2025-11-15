@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CashBalanceService } from '../services/cashBalanceService';
+import VehicleSearch from '../components/VehicleSearch';
 import '../design-system.css';
 
 interface ActionItem {
@@ -250,6 +251,11 @@ export default function Dashboard() {
           <p style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
             What needs your attention today
           </p>
+        </div>
+
+        {/* Global Vehicle Search */}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <VehicleSearch />
         </div>
 
         {/* Portfolio Summary */}

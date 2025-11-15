@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
+import VehicleSearch from '../components/VehicleSearch';
 
 interface HypeVehicle {
   id: string;
@@ -24,6 +25,7 @@ interface HypeVehicle {
   image_url?: string;
   mileage?: number;
   vin?: string;
+  is_for_sale?: boolean;
   all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
 }
 
@@ -431,9 +433,8 @@ const CursorHomepage: React.FC = () => {
         'vehicle',
         'time-period-filter',
         {
-          source_page: '/homepage',
-          time_period: period
-        }
+          source_page: '/homepage'
+        } as any
       );
 
       await supabase
@@ -479,6 +480,15 @@ const CursorHomepage: React.FC = () => {
         margin: '0 auto',
         padding: 'var(--space-4)'
       }}>
+        {/* Global Vehicle Search */}
+        <div style={{ 
+          marginBottom: 'var(--space-4)',
+          display: 'flex',
+          justifyContent: 'center'
+        }}>
+          <VehicleSearch />
+        </div>
+
         {/* Feed Header */}
         <div style={{
           display: 'flex',
@@ -488,8 +498,8 @@ const CursorHomepage: React.FC = () => {
           flexWrap: 'wrap',
           gap: '12px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0, minWidth: '120px' }}>
               <span style={{ 
                 transition: 'opacity 0.3s ease',
                 display: 'inline-block'
