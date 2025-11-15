@@ -163,30 +163,30 @@ export const MobileOrgDashboard: React.FC<MobileOrgDashboardProps> = ({ session 
 const styles = {
   container: {
     padding: '16px',
-    background: '#f5f5f5',
+    background: 'var(--bg)',
     minHeight: '100vh',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   emptyState: {
     padding: '40px 20px',
     textAlign: 'center' as const,
-    color: '#666'
+    color: 'var(--text-muted)'
   },
   createLink: {
     display: 'inline-block',
     marginTop: '16px',
     padding: '12px 24px',
-    background: '#000080',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     textDecoration: 'none',
-    borderRadius: '4px',
-    border: '2px outset #ffffff',
+    borderRadius: '0px',
+    border: '2px outset var(--white)',
     fontWeight: 'bold'
   },
   orgHeader: {
-    background: '#ffffff',
-    border: '2px solid #c0c0c0',
-    borderRadius: '8px',
+    background: 'var(--white)',
+    border: '2px solid var(--border)',
+    borderRadius: '0px',
     padding: '16px',
     display: 'flex',
     gap: '16px',
@@ -195,26 +195,26 @@ const styles = {
   orgLogo: {
     width: '64px',
     height: '64px',
-    borderRadius: '8px',
+    borderRadius: '0px',
     objectFit: 'cover' as const,
-    border: '2px solid #c0c0c0'
+    border: '2px solid var(--border)'
   },
   orgDetails: {
     flex: 1
   },
   orgName: {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '12px',
     fontWeight: 'bold'
   },
   orgMeta: {
-    fontSize: '12px',
-    color: '#666',
+    fontSize: '10px',
+    color: 'var(--text-muted)',
     marginTop: '4px'
   },
   verifiedBadge: {
     marginLeft: '8px',
-    color: '#008000',
+    color: 'var(--primary)',
     fontWeight: 'bold'
   },
   statsGrid: {
@@ -224,32 +224,32 @@ const styles = {
     marginBottom: '16px'
   },
   statCard: {
-    background: '#ffffff',
-    border: '2px solid #c0c0c0',
-    borderRadius: '4px',
+    background: 'var(--white)',
+    border: '2px solid var(--border)',
+    borderRadius: '0px',
     padding: '16px',
     textAlign: 'center' as const
   },
   statValue: {
-    fontSize: '24px',
+    fontSize: '12px',
     fontWeight: 'bold',
     fontFamily: 'monospace'
   },
   statLabel: {
-    fontSize: '11px',
-    color: '#666',
+    fontSize: '10px',
+    color: 'var(--text-muted)',
     marginTop: '4px',
     textTransform: 'uppercase' as const
   },
   section: {
-    background: '#ffffff',
-    border: '2px solid #c0c0c0',
-    borderRadius: '8px',
+    background: 'var(--white)',
+    border: '2px solid var(--border)',
+    borderRadius: '0px',
     padding: '16px',
     marginBottom: '16px'
   },
   sectionTitle: {
-    fontSize: '15px',
+    fontSize: '10px',
     fontWeight: 'bold',
     marginBottom: '12px'
   },
@@ -260,18 +260,18 @@ const styles = {
   },
   emptyTeam: {
     textAlign: 'center' as const,
-    color: '#999',
+    color: 'var(--text-muted)',
     padding: '20px',
-    fontSize: '13px'
+    fontSize: '10px'
   },
   teamCard: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     padding: '12px',
-    background: '#f9f9f9',
-    border: '1px solid #e0e0e0',
-    borderRadius: '4px'
+    background: 'var(--bg)',
+    border: '1px solid var(--border)',
+    borderRadius: '0px'
   },
   avatar: {
     width: '40px',
@@ -283,12 +283,12 @@ const styles = {
     flex: 1
   },
   memberName: {
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: 'bold'
   },
   memberRole: {
-    fontSize: '12px',
-    color: '#666',
+    fontSize: '10px',
+    color: 'var(--text-muted)',
     textTransform: 'capitalize' as const
   },
   actions: {
@@ -298,14 +298,14 @@ const styles = {
   },
   actionBtn: {
     padding: '14px',
-    background: '#000080',
-    color: '#ffffff',
-    border: '2px outset #ffffff',
-    borderRadius: '4px',
-    fontSize: '14px',
+    background: 'var(--primary)',
+    color: 'var(--white)',
+    border: '2px outset var(--white)',
+    borderRadius: '0px',
+    fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   }
 };
 

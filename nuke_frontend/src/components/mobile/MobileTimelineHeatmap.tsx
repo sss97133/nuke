@@ -350,8 +350,8 @@ export const MobileTimelineHeatmap: React.FC<MobileTimelineHeatmapProps> = ({ ve
                       style={{
                         gridColumn: `${2 + idx * 4} / span 4`,
                         textAlign: 'center',
-                        fontSize: '8pt',
-                        color: '#888',
+                        fontSize: '10px',
+                        color: 'var(--text-muted)',
                         lineHeight: '8px'
                       }}
                     >
@@ -495,23 +495,23 @@ const styles = {
     flexDirection: 'column' as const,
     gap: '8px',
     padding: '8px',
-    background: '#ffffff'
+    background: 'var(--white)'
   },
   loading: {
     textAlign: 'center' as const,
     padding: '24px',
-    color: '#888',
+    color: 'var(--text-muted)',
     fontSize: '10px',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   yearSection: {
     marginBottom: '4px'
   },
   yearHeader: {
-    background: '#000080',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     padding: '12px',
-    border: '2px outset #ffffff',
+    border: '2px outset var(--white)',
     marginBottom: '4px',
     cursor: 'pointer',
     display: 'flex',
@@ -519,15 +519,15 @@ const styles = {
     alignItems: 'center',
     fontSize: '10px',
     fontWeight: 'bold' as const,
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   expandIcon: {
     fontSize: '10px',
     lineHeight: '1'
   },
   heatmapContainer: {
-    background: '#c0c0c0',
-    border: '2px inset #808080',
+    background: 'var(--grey-200)',
+    border: '2px inset var(--border)',
     padding: '8px',
     marginBottom: '8px'
   },
@@ -550,10 +550,10 @@ const styles = {
   },
   dayLabel: {
     textAlign: 'center' as const,
-    fontSize: '7pt',
-    color: '#888',
+    fontSize: '10px',
+    color: 'var(--text-muted)',
     lineHeight: '8px',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   weeksGrid: {
     display: 'grid',
@@ -569,7 +569,7 @@ const styles = {
   dayCell: {
     width: '8px',
     height: '8px',
-    borderRadius: '1px',
+    borderRadius: '0px',
     transition: 'all 0.2s'
   },
   modalOverlay: {
@@ -586,22 +586,22 @@ const styles = {
     padding: '16px'
   },
   modal: {
-    background: '#c0c0c0',
-    border: '2px outset #ffffff',
+    background: 'var(--grey-200)',
+    border: '2px outset var(--white)',
     maxWidth: '90vw',
     maxHeight: '80vh',
     display: 'flex',
     flexDirection: 'column' as const,
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   modalHeader: {
-    background: '#000080',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     padding: '8px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '2px solid #ffffff'
+    borderBottom: '2px solid var(--white)'
   },
   modalTitle: {
     margin: 0,
@@ -609,16 +609,16 @@ const styles = {
     fontWeight: 'bold' as const
   },
   closeButton: {
-    background: '#c0c0c0',
-    border: '2px outset #ffffff',
-    color: '#000',
+    background: 'var(--grey-200)',
+    border: '2px outset var(--white)',
+    color: 'var(--text)',
     width: '24px',
     height: '24px',
     cursor: 'pointer',
     fontSize: '10px',
     fontWeight: 'bold' as const,
     lineHeight: '1',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   modalContent: {
     padding: '12px',
@@ -628,19 +628,19 @@ const styles = {
     gap: '8px'
   },
   eventCard: {
-    background: '#ffffff',
-    border: '2px inset #808080',
+    background: 'var(--white)',
+    border: '2px inset var(--border)',
     padding: '8px'
   },
   eventTitle: {
     fontSize: '10px',
     fontWeight: 'bold' as const,
     marginBottom: '4px',
-    color: '#000'
+    color: 'var(--text)'
   },
   eventDescription: {
     fontSize: '10px',
-    color: '#000',
+    color: 'var(--text)',
     marginBottom: '8px'
   },
   imageGrid: {
@@ -653,52 +653,52 @@ const styles = {
     width: '100%',
     height: '60px',
     objectFit: 'cover' as const,
-    border: '1px solid #808080',
+    border: '1px solid var(--border)',
     cursor: 'pointer'
   },
   eventMeta: {
     display: 'flex',
     gap: '8px',
     fontSize: '10px',
-    color: '#000'
+    color: 'var(--text)'
   },
   eventType: {
-    background: '#000080',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     padding: '2px 6px',
-    borderRadius: '2px'
+    borderRadius: '0px'
   },
   imageCount: {
-    background: '#008000',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     padding: '2px 6px',
-    borderRadius: '2px'
+    borderRadius: '0px'
   },
   durationBadge: {
-    background: '#800080',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     padding: '2px 6px',
-    borderRadius: '2px'
+    borderRadius: '0px'
   },
   participantBadge: {
-    background: '#808000',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     padding: '2px 6px',
-    borderRadius: '2px'
+    borderRadius: '0px'
   },
   costBadge: {
-    background: '#008000',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     padding: '2px 6px',
-    borderRadius: '2px',
+    borderRadius: '0px',
     fontWeight: 'bold',
     fontFamily: 'monospace',
-    fontSize: '11px'
+    fontSize: '10px'
   },
   valueImpactBadge: {
     marginTop: '8px',
     padding: '8px 12px',
-    borderRadius: '12px',
+    borderRadius: '0px',
     fontSize: '10px',
     fontWeight: 'bold',
     textAlign: 'center' as const,

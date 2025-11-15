@@ -174,7 +174,7 @@ export const MobileCommentBox: React.FC<MobileCommentBoxProps> = ({
 const styles = {
   container: {
     marginTop: '12px',
-    borderTop: '1px solid #e0e0e0',
+    borderTop: '1px solid var(--border)',
     paddingTop: '8px'
   },
   countBtn: {
@@ -182,34 +182,34 @@ const styles = {
     background: 'transparent',
     border: 'none',
     padding: '8px 0',
-    fontSize: '8pt',
-    fontWeight: 600,
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontSize: '10px',
+    fontWeight: 'bold',
+    fontFamily: 'Arial, sans-serif',
     cursor: 'pointer',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    color: '#666'
+    color: 'var(--text-muted)'
   },
   expandIcon: {
-    fontSize: '8pt',
-    color: '#999'
+    fontSize: '10px',
+    color: 'var(--text-muted)'
   },
   thread: {
     marginTop: '8px',
     maxHeight: '400px',
     overflowY: 'auto' as const,
-    background: '#ffffff'
+    background: 'var(--white)'
   },
   emptyState: {
     padding: '16px',
     textAlign: 'center' as const,
-    color: '#999',
-    fontSize: '8pt'
+    color: 'var(--text-muted)',
+    fontSize: '10px'
   },
   comment: {
     padding: '8px 0',
-    borderBottom: '1px solid #f0f0f0'
+    borderBottom: '1px solid var(--border)'
   },
   commentHeader: {
     display: 'flex',
@@ -218,21 +218,21 @@ const styles = {
     alignItems: 'center'
   },
   commentAuthor: {
-    fontSize: '8pt',
-    fontWeight: 600,
-    color: '#000',
-    fontFamily: 'system-ui, -apple-system, sans-serif'
+    fontSize: '10px',
+    fontWeight: 'bold',
+    color: 'var(--text)',
+    fontFamily: 'Arial, sans-serif'
   },
   commentTime: {
-    fontSize: '7pt',
-    color: '#999'
+    fontSize: '10px',
+    color: 'var(--text-muted)'
   },
   commentText: {
-    fontSize: '8pt',
+    fontSize: '10px',
     lineHeight: '1.4',
     wordWrap: 'break-word' as const,
-    color: '#000',
-    fontFamily: 'system-ui, -apple-system, sans-serif'
+    color: 'var(--text)',
+    fontFamily: 'Arial, sans-serif'
   },
   inputBox: {
     display: 'flex',
@@ -240,28 +240,28 @@ const styles = {
     marginTop: '8px',
     alignItems: 'center',
     padding: '8px',
-    border: '1px solid #e0e0e0',
-    borderRadius: '20px',
-    background: '#f8f8f8'
+    border: '1px solid var(--border)',
+    borderRadius: '0px',
+    background: 'var(--bg)'
   },
   textarea: {
     flex: 1,
     padding: '6px 12px',
     border: 'none',
     background: 'transparent',
-    fontSize: '8pt',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontSize: '10px',
+    fontFamily: 'Arial, sans-serif',
     resize: 'none' as const,
     outline: 'none'
   },
   submitBtn: {
     width: '32px',
     height: '32px',
-    background: '#008000',
-    color: '#ffffff',
+    background: 'var(--primary)',
+    color: 'var(--white)',
     border: 'none',
     borderRadius: '50%',
-    fontSize: '14px',
+    fontSize: '12px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
