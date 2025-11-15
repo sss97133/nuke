@@ -1,8 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import VehicleDataQualityRating from '../../components/VehicleDataQualityRating';
-import VehicleInteractionPanel from '../../components/vehicle/VehicleInteractionPanel';
-import VehicleOwnershipPanel from '../../components/ownership/VehicleOwnershipPanel';
 import URLDataDrop from '../../components/vehicle/URLDataDrop';
 import InlineVINEditor from '../../components/vehicle/InlineVINEditor';
 import BaTURLDrop from '../../components/vehicle/BaTURLDrop';
@@ -147,16 +145,16 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
 
   return (
     <div style={{
-      background: '#f5f5f5',
-      border: '1px solid #bdbdbd',
+      background: 'var(--bg)',
+      border: '1px solid var(--border)',
       padding: '0px',
       margin: '16px',
       fontFamily: 'Arial, sans-serif'
     }}>
       <div style={{
-        background: '#e0e0e0',
+        background: 'var(--grey-200)',
         padding: '8px 12px',
-        borderBottom: '1px solid #bdbdbd',
+        borderBottom: '1px solid var(--border)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -169,9 +167,9 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); navigate(`/vehicle/${vehicle.id}/edit`); }}
             style={{
-              background: '#424242',
-              color: 'white',
-              border: '1px solid #bdbdbd',
+              background: 'var(--primary)',
+              color: 'var(--white)',
+              border: '1px solid var(--border)',
               borderRadius: '0px',
               padding: '4px 8px',
               fontSize: '8pt',
@@ -185,7 +183,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       {!collapsed && (
       <>
       {/* Data Quality Rating */}
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
         <VehicleDataQualityRating vehicleId={vehicle.id} />
       </div>
 
@@ -220,7 +218,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '4px 0',
-            borderBottom: '1px solid #e0e0e0',
+            borderBottom: '1px solid var(--border)',
             fontSize: '8pt'
           }}>
             <span>Year</span>
@@ -314,55 +312,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         </div>
       </div>
 
-      {/* Vehicle Interactions */}
-      <div className="card-body" style={{ borderTop: '1px solid #e5e7eb' }}>
-        <VehicleInteractionPanel
-          vehicleId={vehicle.id}
-          isOwner={isVerifiedOwner || contributorRole === 'owner' || contributorRole === 'restorer' || contributorRole === 'previous_owner'}
-          currentUser={session?.user}
-          vehicle={{
-            id: vehicle.id,
-            make: vehicle.make,
-            model: vehicle.model,
-            year: vehicle.year,
-            user_id: vehicle.uploaded_by || ''
-          }}
-          onInteractionUpdate={onEditClick}
-        />
-
-        {/* Show contributor role if applicable */}
-        {contributorRole && (
-          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-            <div className="text-sm font-medium text-blue-900">
-              Your Role: {contributorRole.charAt(0).toUpperCase() + contributorRole.slice(1).replace('_', ' ')}
-            </div>
-            {contributorRole === 'restorer' && (
-              <div className="text-xs text-blue-700 mt-1">
-                You have contributed to the restoration of this vehicle
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Ownership Panel */}
-      <div
-        className="card-body"
-        style={{
-          borderTop: '1px solid #e5e7eb',
-          padding: '12px',
-          marginBottom: '0'
-        }}
-      >
-        <VehicleOwnershipPanel
-          vehicle={vehicle}
-          session={session}
-          isOwner={isVerifiedOwner}
-          hasContributorAccess={hasContributorAccess}
-          contributorRole={contributorRole}
-          responsibleName={undefined}
-        />
-      </div>
+      {/* Vehicle Interactions & Ownership - DISABLED (missing DB tables) */}
 
       </>
       )}
