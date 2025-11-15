@@ -10,7 +10,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl }) => 
 
   return (
     <section className="section">
-      <div className="card">
+      <div className="card" style={{ border: 'none', overflow: 'hidden' }}>
         <div
           className="hero-image"
           style={{
@@ -18,7 +18,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl }) => 
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             height: '400px',
-            borderRadius: 'var(--radius)',
+            borderRadius: '0px',
             position: 'relative'
           }}
         />
