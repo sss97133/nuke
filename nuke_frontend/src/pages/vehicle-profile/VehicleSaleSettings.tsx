@@ -161,7 +161,7 @@ const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
 
           {/* Show buy button to non-owners when vehicle is for sale */}
           {!permissions?.isVerifiedOwner && vehicle.is_for_sale && vehicle.asking_price && (
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
               <BuyVehicleButton
                 vehicleId={vehicle.id}
                 salePrice={vehicle.asking_price}
@@ -171,7 +171,7 @@ const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
           )}
 
           {/* Existing market summary (read-only) */}
-          <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 12, paddingTop: 12 }}>
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
             <VehicleResults
               vehicleId={vehicle.id}
               salePrice={vehicle.sale_price}
