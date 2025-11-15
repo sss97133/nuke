@@ -12,7 +12,6 @@ RETURNS TABLE (
   id UUID,
   year INTEGER,
   make TEXT,
-  make TEXT,
   model TEXT,
   distance_meters DOUBLE PRECISION
 ) AS $$
