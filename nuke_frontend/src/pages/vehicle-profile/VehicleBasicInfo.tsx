@@ -192,9 +192,12 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         <div style={{ padding: '12px', borderBottom: '1px solid #bdbdbd' }}>
           <InlineVINEditor
             vehicleId={vehicle.id}
-            currentVIN={vehicle.vin}
+            currentVIN={vehicle.vin || undefined}
             canEdit={true}
-            onVINUpdated={() => window.location.reload()}
+            onVINUpdated={() => {
+              // refresh basic info
+              window.dispatchEvent(new Event('vehicle_data_updated'));
+            }}
           />
         </div>
       )}
