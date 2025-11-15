@@ -165,7 +165,7 @@ const styles = {
     zIndex: 999999
   },
   modal: {
-    background: '#ffffff',
+    background: 'var(--white)',
     width: '100%',
     height: '100%',
     display: 'flex',
@@ -177,13 +177,13 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px',
-    borderBottom: '2px solid #000080',
-    background: '#f0f0f0'
+    borderBottom: '2px solid var(--border)',
+    background: 'var(--bg)'
   },
   title: {
     margin: 0,
     fontSize: '10px',
-    fontFamily: '"MS Sans Serif", sans-serif',
+    fontFamily: 'Arial, sans-serif',
     fontWeight: 'bold'
   },
   closeBtn: {
@@ -198,13 +198,13 @@ const styles = {
     padding: '0'
   },
   section: {
-    borderBottom: '2px solid #c0c0c0'
+    borderBottom: '2px solid var(--border)'
   },
   sectionHeader: {
     width: '100%',
-    background: '#e0e0e0',
+    background: 'var(--grey-200)',
     border: 'none',
-    borderBottom: '2px solid #c0c0c0',
+    borderBottom: '2px solid var(--border)',
     padding: '16px',
     fontSize: '10px',
     fontWeight: 'bold',
@@ -212,7 +212,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   sectionContent: {
     padding: '16px',
@@ -228,26 +228,26 @@ const styles = {
   label: {
     fontSize: '10px',
     fontWeight: 'bold',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   input: {
     padding: '14px',
-    border: '2px inset #c0c0c0',
-    borderRadius: '4px',
+    border: '2px inset var(--border)',
+    borderRadius: '0px',
     fontSize: '10px',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   saveBtn: {
     margin: '16px',
     padding: '18px',
-    background: '#000080',
-    color: '#ffffff',
-    border: '2px outset #ffffff',
-    borderRadius: '4px',
+    background: 'var(--primary)',
+    color: 'var(--white)',
+    border: '2px outset var(--white)',
+    borderRadius: '0px',
     fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   }
 };
 

@@ -105,7 +105,7 @@ export const MobileOrgSwitcher: React.FC<MobileOrgSwitcherProps> = ({ session, o
               onClick={() => handleOrgChange(org.id)}
               style={{
                 ...styles.dropdownItem,
-                background: org.id === selectedOrg ? '#d0d0f0' : '#ffffff'
+                background: org.id === selectedOrg ? 'var(--grey-200)' : 'var(--white)'
               }}
             >
               {org.logo_url && (
@@ -133,12 +133,12 @@ const styles = {
   },
   button: {
     width: '100%',
-    background: '#ffffff',
-    border: '2px solid #c0c0c0',
-    borderRadius: '4px',
+    background: 'var(--white)',
+    border: '2px solid var(--border)',
+    borderRadius: '0px',
     padding: '12px',
     cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   buttonContent: {
     display: 'flex',
@@ -148,9 +148,9 @@ const styles = {
   logo: {
     width: '36px',
     height: '36px',
-    borderRadius: '4px',
+    borderRadius: '0px',
     objectFit: 'cover' as const,
-    border: '1px solid #c0c0c0'
+    border: '1px solid var(--border)'
   },
   orgInfo: {
     flex: 1,
@@ -161,13 +161,13 @@ const styles = {
     fontWeight: 'bold'
   },
   orgRole: {
-    fontSize: '11px',
-    color: '#666',
+    fontSize: '10px',
+    color: 'var(--text-muted)',
     textTransform: 'capitalize' as const
   },
   arrow: {
     fontSize: '10px',
-    color: '#666'
+    color: 'var(--text-muted)'
   },
   dropdown: {
     position: 'absolute' as const,
@@ -175,9 +175,9 @@ const styles = {
     left: 0,
     right: 0,
     marginTop: '4px',
-    background: '#ffffff',
-    border: '2px solid #000080',
-    borderRadius: '4px',
+    background: 'var(--white)',
+    border: '2px solid var(--border)',
+    borderRadius: '0px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
     zIndex: 1000,
     maxHeight: '300px',
@@ -187,31 +187,31 @@ const styles = {
     width: '100%',
     padding: '12px',
     border: 'none',
-    borderBottom: '1px solid #e0e0e0',
-    background: '#ffffff',
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--white)',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     textAlign: 'left' as const,
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'Arial, sans-serif'
   },
   dropdownLogo: {
     width: '32px',
     height: '32px',
-    borderRadius: '4px',
+    borderRadius: '0px',
     objectFit: 'cover' as const
   },
   dropdownInfo: {
     flex: 1
   },
   dropdownName: {
-    fontSize: '13px',
+    fontSize: '10px',
     fontWeight: 'bold'
   },
   dropdownMeta: {
-    fontSize: '11px',
-    color: '#666'
+    fontSize: '10px',
+    color: 'var(--text-muted)'
   }
 };
 
