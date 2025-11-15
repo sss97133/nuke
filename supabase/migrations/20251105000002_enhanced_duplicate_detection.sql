@@ -1,6 +1,29 @@
 -- Enhanced Duplicate Detection with GPS + Time Analysis
 -- Detects duplicates based on photos taken at same location + time
 
+-- Ensure merge proposals table exists for downstream references
+CREATE TABLE IF NOT EXISTS vehicle_merge_proposals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  primary_vehicle_id UUID REFERENCES vehicles(id),
+  duplicate_vehicle_id UUID REFERENCES vehicles(id),
+  match_type TEXT,
+  confidence_score INTEGER,
+  match_reasoning JSONB,
+  ai_summary TEXT,
+  recommended_primary UUID,
+  recommendation_reason TEXT,
+  status TEXT DEFAULT 'proposed',
+  visible_to_user_ids UUID[],
+  requires_approval_from UUID,
+  reviewed_by UUID,
+  reviewed_at TIMESTAMPTZ,
+  merged_by UUID,
+  merged_at TIMESTAMPTZ,
+  detected_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Function: Calculate GPS distance between two lat/lng points in meters
 CREATE OR REPLACE FUNCTION calculate_gps_distance(
   lat1 DOUBLE PRECISION,
