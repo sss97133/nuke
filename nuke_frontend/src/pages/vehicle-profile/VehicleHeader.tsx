@@ -1,25 +1,46 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { VehicleHeaderProps } from './types';
-import { computePrimaryPrice, computeDelta, formatCurrency } from '../../services/priceSignalService';
+import { computePrimaryPrice, formatCurrency } from '../../services/priceSignalService';
 import { supabase } from '../../lib/supabase';
 // Deprecated modals (history/analysis/tag review) intentionally removed from UI
 import { VehicleValuationService } from '../../services/vehicleValuationService';
 import TradePanel from '../../components/trading/TradePanel';
+
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  owner: 'Owner',
+  consigner: 'Consignment',
+  collaborator: 'Collaborator',
+  service_provider: 'Service',
+  work_location: 'Work site',
+  seller: 'Seller',
+  buyer: 'Buyer',
+  parts_supplier: 'Parts',
+  fabricator: 'Fabricator',
+  painter: 'Paint',
+  upholstery: 'Upholstery',
+  transport: 'Transport',
+  storage: 'Storage',
+  inspector: 'Inspector'
+};
 
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
   session,
   permissions,
   responsibleName,
-  onPriceClick
+  onPriceClick,
+  initialValuation,
+  initialPriceSignal,
+  organizationLinks = []
 }) => {
   const { isVerifiedOwner, contributorRole } = permissions;
-  const [rpcSignal, setRpcSignal] = useState<any | null>(null);
+  const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
   const [trendPct30d, setTrendPct30d] = useState<number | null>(null);
   const [displayMode, setDisplayMode] = useState<'auto'|'estimate'|'auction'|'asking'|'sale'|'purchase'|'msrp'>('auto');
   const [responsibleMode, setResponsibleMode] = useState<'auto'|'owner'|'consigner'|'uploader'|'listed_by'|'custom'>('auto');
   const [responsibleCustom, setResponsibleCustom] = useState<string>('');
-  const [valuation, setValuation] = useState<any | null>(null);
+  const [valuation, setValuation] = useState<any | null>(initialValuation || null);
   const [showTrade, setShowTrade] = useState(false);
   const [showOwnerCard, setShowOwnerCard] = useState(false);
   const [ownerProfile, setOwnerProfile] = useState<any | null>(null);
@@ -28,7 +49,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [priceMenuOpen, setPriceMenuOpen] = useState(false);
   const priceMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // Only fetch if not provided via props (eliminates duplicate query)
   useEffect(() => {
+    if (initialPriceSignal) {
+      setRpcSignal(initialPriceSignal);
+      return; // Skip fetch if provided
+    }
     (async () => {
       try {
         if (!vehicle?.id) { setRpcSignal(null); return; }
@@ -42,10 +68,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         setRpcSignal(null);
       }
     })();
-  }, [vehicle?.id]);
+  }, [vehicle?.id, initialPriceSignal]);
 
-  // Load valuation for Crown Jewel display
+  // Only fetch if not provided via props (eliminates duplicate query)
   useEffect(() => {
+    if (initialValuation) {
+      setValuation(initialValuation);
+      return; // Skip fetch if provided
+    }
     (async () => {
       try {
         if (!vehicle?.id) { setValuation(null); return; }
@@ -56,7 +86,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       } finally {
       }
     })();
-  }, [vehicle?.id]);
+  }, [vehicle?.id, initialValuation]);
 
   // Load owner's preferred display settings (if the table/columns exist)
   useEffect(() => {
@@ -290,12 +320,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       || 'Listed by';
   };
 
-  const formatVinStub = (vin?: string | null) => {
-    if (!vin) return 'VIN pending';
-    if (vin.length <= 8) return vin.toUpperCase();
-    return `${vin.slice(0, 4).toUpperCase()}···${vin.slice(-4).toUpperCase()}`;
-  };
-
   const formatShortDate = (value?: string | null) => {
     if (!value) return undefined;
     try {
@@ -309,6 +333,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const fieldConfidence = (field: string) => {
     const value = (vehicle as any)?.[`${field}_confidence`];
     return typeof value === 'number' ? value : undefined;
+  };
+
+  const visibleOrganizations = useMemo(() => {
+    return (organizationLinks || []).slice(0, 3);
+  }, [organizationLinks]);
+
+  const extraOrgCount = Math.max(0, (organizationLinks?.length || 0) - visibleOrganizations.length);
+
+  const formatRelationship = (relationship?: string | null) => {
+    if (!relationship) return 'Partner';
+    return RELATIONSHIP_LABELS[relationship] || relationship.replace(/_/g, ' ');
   };
 
   type PriceEntry = {
@@ -412,27 +447,40 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       .sort((a, b) => priority(a.id) - priority(b.id));
   }, [vehicle, valuation]);
 
+  const saleDate = (vehicle as any)?.sale_date || (vehicle as any)?.bat_sale_date || null;
   const primaryPrice = getDisplayValue();
   const primaryAmount = typeof primaryPrice.amount === 'number' ? primaryPrice.amount : null;
   const primaryLabel = primaryPrice.label || 'Price pending';
   const priceText = primaryAmount !== null ? formatCurrency(primaryAmount) : 'Set a price';
-
-  const saleDate = (vehicle as any)?.sale_date || (vehicle as any)?.bat_sale_date || null;
-  const statusText = vehicle.is_for_sale
-    ? 'For sale'
-    : saleDate
-      ? `Sold ${formatShortDate(saleDate)}`
-      : 'Not listed';
-
-  const metaRows = [
-    { label: 'VIN', value: formatVinStub(vehicle.vin) },
-    { label: computeResponsibleLabel(), value: responsibleName || 'Unassigned' },
-    { label: 'Status', value: statusText },
-    trendPct30d !== null ? { label: '30d Δ', value: `${trendPct30d >= 0 ? '+' : ''}${trendPct30d.toFixed(1)}%` } : null,
-  ].filter(Boolean) as Array<{ label: string; value: string }>;
+  const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
+  const identityLabel = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ').trim() || 'Vehicle';
+  const lastSoldText = saleDate ? `Last sold ${formatShortDate(saleDate)}` : 'Off-market estimate';
+  const canOpenOwnerCard = Boolean(responsibleName);
 
   const baseTextColor = 'var(--text)';
   const mutedTextColor = 'var(--text-muted)';
+  const trendIndicator = useMemo(() => {
+    if (trendPct30d === null) return null;
+    const positive = trendPct30d >= 0;
+    const color = positive ? '#22c55e' : '#ef4444';
+    const triangleStyle = positive
+      ? {
+          borderLeft: '5px solid transparent',
+          borderRight: '5px solid transparent',
+          borderBottom: `7px solid ${color}`
+        }
+      : {
+          borderLeft: '5px solid transparent',
+          borderRight: '5px solid transparent',
+          borderTop: `7px solid ${color}`
+        };
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '10px', color }}>
+        <span style={{ width: 0, height: 0, ...triangleStyle }} />
+        {`${positive ? '+' : ''}${trendPct30d.toFixed(1)}%`}
+      </span>
+    );
+  }, [trendPct30d]);
 
   const handleViewValuation = () => {
     setPriceMenuOpen(false);
@@ -444,153 +492,147 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     setShowTrade(true);
   };
 
+  const responsibleLabel = computeResponsibleLabel();
+
   return (
     <div
       className="vehicle-price-header"
       style={{
-        background: 'var(--white)',
+        background: 'var(--surface)',
         border: 'none',
-        padding: '12px 16px',
-        margin: '0',
-        fontFamily: 'Arial, sans-serif',
+        padding: '10px 16px',
+        margin: 0,
         position: 'sticky',
         top: 48,
         zIndex: 10,
         borderBottom: '1px solid var(--border)',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16 }}>
-        {/* Vehicle identity */}
-        <div style={{ flex: '1 1 320px', minWidth: 0, color: baseTextColor }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+        <div style={{ flex: '1 1 320px', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: mutedTextColor }}>
             Vehicle
           </div>
-          <div style={{ fontSize: '8pt', fontWeight: 600, marginTop: 4 }}>
-            {vehicle.year} {vehicle.make} {vehicle.model}
+          <div style={{ fontSize: '20px', fontWeight: 700, lineHeight: 1.1 }}>
+            {identityLabel}
           </div>
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {metaRows.map((row) => {
-              const isResponsibleRow = row.label === computeResponsibleLabel();
-              return (
-                <div key={`${row.label}-${row.value}`} style={{ fontSize: '8pt', display: 'flex', gap: 6, alignItems: 'baseline', position: isResponsibleRow ? 'relative' : 'static' }}>
-                  <span style={{ color: mutedTextColor, minWidth: 64 }}>
-                    {row.label}
-                  </span>
-                  <span
-                    style={{
-                      color: baseTextColor,
-                      fontWeight: isResponsibleRow ? 600 : 400,
-                      cursor: isResponsibleRow && responsibleName ? 'pointer' : 'default'
-                    }}
-                    onClick={async (e) => {
-                      if (!isResponsibleRow || !responsibleName) return;
-                      e.preventDefault();
-                      if (showOwnerCard) {
-                        window.location.href = `/profile/${(vehicle as any).uploaded_by || (vehicle as any).user_id || ''}`;
-                      } else {
-                        setShowOwnerCard(true);
-                      }
-                    }}
-                  >
-                    {row.value}
-                  </span>
-                  {isResponsibleRow && showOwnerCard && ownerProfile && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '120%',
-                        left: 0,
-                        background: 'white',
-                        border: '1px solid var(--border)',
-                        borderRadius: 4,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                        padding: 12,
-                        width: 260,
-                        zIndex: 50
-                      }}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                        {ownerProfile.avatar_url && (
-                          <img src={ownerProfile.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--border)' }} />
-                        )}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: '8pt' }}>
-                            {ownerProfile.full_name || ownerProfile.username || 'Profile'}
-                          </div>
-                          <div style={{ fontSize: '7pt', color: mutedTextColor }}>
-                            @{ownerProfile.username || ownerProfile.id.slice(0, 8)}
-                          </div>
-                        </div>
-                      </div>
-                      {ownerStats && (
-                        <div style={{ display: 'flex', gap: 12, fontSize: '7pt', color: mutedTextColor }}>
-                          <span>{ownerStats.contributions} contributions</span>
-                          <span>{ownerStats.vehicles} vehicles</span>
-                        </div>
-                      )}
-                      <button
-                        className="button button-small"
-                        style={{ width: '100%', marginTop: 8, fontSize: '8pt' }}
-                        onClick={async () => {
-                          if (!session?.user?.id) return;
-                          const ownerId = ownerProfile.id;
-                          if (isFollowing) {
-                            await supabase.from('user_follows').delete().eq('follower_id', session.user.id).eq('following_id', ownerId);
-                            setIsFollowing(false);
-                          } else {
-                            await supabase.from('user_follows').insert({ follower_id: session.user.id, following_id: ownerId });
-                            setIsFollowing(true);
-                          }
-                        }}
-                      >
-                        {isFollowing ? 'Following' : 'Follow'}
-                      </button>
-                      <div style={{ fontSize: '7pt', color: mutedTextColor, marginTop: 6, textAlign: 'center' }}>
-                        Click name again to open full profile
-                      </div>
-                    </div>
+          <div style={{ position: 'relative', fontSize: '10px', color: mutedTextColor, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <span>{responsibleLabel}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!canOpenOwnerCard) return;
+                if (showOwnerCard) {
+                  window.location.href = `/profile/${(vehicle as any).uploaded_by || (vehicle as any).user_id || ''}`;
+                } else {
+                  setShowOwnerCard(true);
+                }
+              }}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: baseTextColor,
+                fontWeight: 600,
+                padding: 0,
+                cursor: canOpenOwnerCard ? 'pointer' : 'default',
+                textDecoration: canOpenOwnerCard ? 'underline dotted' : 'none'
+              }}
+              disabled={!canOpenOwnerCard}
+            >
+              {responsibleName || 'Unassigned'}
+            </button>
+            {canOpenOwnerCard && showOwnerCard && ownerProfile && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '130%',
+                  left: 0,
+                  background: 'white',
+                  border: '1px solid var(--border)',
+                  borderRadius: 6,
+                  boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
+                  padding: 12,
+                  width: 260,
+                  zIndex: 50
+                }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                  {ownerProfile.avatar_url && (
+                    <img src={ownerProfile.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--border)' }} />
                   )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '9px' }}>
+                      {ownerProfile.full_name || ownerProfile.username || 'Profile'}
+                    </div>
+                    <div style={{ fontSize: '8px', color: mutedTextColor }}>
+                      @{ownerProfile.username || ownerProfile.id.slice(0, 8)}
+                    </div>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-
-          {isOwnerLike && (
-            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: '7pt', color: mutedTextColor }}>
-                Responsible label
-              </label>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <select
-                  value={responsibleMode}
-                  onChange={(e) => persistResponsibleSettings(e.target.value as any)}
-                  className="form-select"
-                  style={{ fontSize: '8pt', padding: '2px 4px' }}
-                >
-                  <option value="auto">Auto</option>
-                  <option value="owner">Owner</option>
-                  <option value="consigner">Consigner</option>
-                  <option value="uploader">Uploader</option>
-                  <option value="listed_by">Listed by</option>
-                  <option value="custom">Custom</option>
-                </select>
-                {responsibleMode === 'custom' && (
-                  <input
-                    value={responsibleCustom}
-                    onChange={(e) => persistResponsibleSettings('custom', e.target.value)}
-                    placeholder="Label"
-                    className="form-input"
-                    style={{ fontSize: '8pt', padding: '2px 4px' }}
-                  />
+                {ownerStats && (
+                  <div style={{ display: 'flex', gap: 12, fontSize: '8px', color: mutedTextColor }}>
+                    <span>{ownerStats.contributions} contributions</span>
+                    <span>{ownerStats.vehicles} vehicles</span>
+                  </div>
                 )}
+                <button
+                  className="button button-small"
+                  style={{ width: '100%', marginTop: 8, fontSize: '8pt' }}
+                  onClick={async () => {
+                    if (!session?.user?.id) return;
+                    const ownerId = ownerProfile.id;
+                    if (isFollowing) {
+                      await supabase.from('user_follows').delete().eq('follower_id', session.user.id).eq('following_id', ownerId);
+                      setIsFollowing(false);
+                    } else {
+                      await supabase.from('user_follows').insert({ follower_id: session.user.id, following_id: ownerId });
+                      setIsFollowing(true);
+                    }
+                  }}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+                <div style={{ fontSize: '8px', color: mutedTextColor, marginTop: 6, textAlign: 'center' }}>
+                  Click name again to open full profile
+                </div>
               </div>
+            )}
+          </div>
+          {visibleOrganizations.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: '10px' }}>
+              <span style={{ color: mutedTextColor }}>Linked:</span>
+              {visibleOrganizations.map((org) => (
+                <Link
+                  key={org.id}
+                  to={`/org/${org.organization_id}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    border: '1px solid var(--border)',
+                    borderRadius: 999,
+                    padding: '2px 10px',
+                    fontWeight: 600,
+                    color: baseTextColor,
+                    textDecoration: 'none'
+                  }}
+                >
+                  {org.business_name}
+                  <span style={{ fontSize: '9px', color: mutedTextColor }}>
+                    {formatRelationship(org.relationship_type)}
+                  </span>
+                </Link>
+              ))}
+              {extraOrgCount > 0 && (
+                <span style={{ fontSize: '9px', color: mutedTextColor }}>+{extraOrgCount} more</span>
+              )}
             </div>
           )}
         </div>
 
-        {/* Price band */}
         <div ref={priceMenuRef} style={{ flex: '0 0 auto', minWidth: 220, textAlign: 'right' }}>
           <button
             type="button"
@@ -599,16 +641,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               width: '100%',
               background: 'white',
               border: '1px solid #d1d5db',
-              borderRadius: 4,
-              padding: '10px 12px',
+              borderRadius: 8,
+              padding: '12px 14px',
               cursor: 'pointer'
             }}
           >
-            <div style={{ fontSize: '12pt', fontWeight: 700, color: baseTextColor }}>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: baseTextColor }}>
               {priceText}
             </div>
-            <div style={{ fontSize: '8pt', color: mutedTextColor, marginTop: 2 }}>
-              {primaryLabel}
+            <div style={{ fontSize: '11px', color: mutedTextColor, marginTop: 2 }}>
+              {priceDescriptor}
+            </div>
+            <div style={{ marginTop: 4, fontSize: '10px', color: mutedTextColor, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <span>{lastSoldText}</span>
+              {trendIndicator}
             </div>
           </button>
 
@@ -659,7 +705,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               </div>
 
               {isOwnerLike && (
-                <div style={{ marginTop: 12, borderTop: '1px solid #e5e7eb', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ marginTop: 12, borderTop: '1px solid #e5e7eb', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ fontWeight: 600 }}>Display price</div>
                   <select
                     value={displayMode}
@@ -675,6 +721,29 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     <option value="purchase">Purchase</option>
                     <option value="msrp">MSRP</option>
                   </select>
+                  <div style={{ fontWeight: 600 }}>Responsible label</div>
+                  <select
+                    value={responsibleMode}
+                    onChange={(e) => persistResponsibleSettings(e.target.value as any)}
+                    className="form-select"
+                    style={{ fontSize: '8pt', padding: '2px 4px' }}
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="owner">Owner</option>
+                    <option value="consigner">Consigner</option>
+                    <option value="uploader">Uploader</option>
+                    <option value="listed_by">Listed by</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                  {responsibleMode === 'custom' && (
+                    <input
+                      value={responsibleCustom}
+                      onChange={(e) => persistResponsibleSettings('custom', e.target.value)}
+                      placeholder="Label"
+                      className="form-input"
+                      style={{ fontSize: '8pt', padding: '2px 4px' }}
+                    />
+                  )}
                 </div>
               )}
 
@@ -701,7 +770,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </div>
       </div>
 
-      {/* Trade Modal */}
       {showTrade && (
         <div
           style={{
@@ -731,8 +799,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           </div>
         </div>
       )}
-
-      {/* Valuation Crown Jewel REMOVED - Redundant with VehiclePricingWidget below */}
     </div>
   );
 };

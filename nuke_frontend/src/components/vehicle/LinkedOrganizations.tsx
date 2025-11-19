@@ -5,9 +5,10 @@ import { FiMapPin, FiTool, FiDollarSign, FiTruck, FiShoppingCart } from 'react-i
 
 interface LinkedOrganizationsProps {
   vehicleId: string;
+  initialOrganizations?: LinkedOrg[];
 }
 
-interface LinkedOrg {
+export interface LinkedOrg {
   id: string;
   organization_id: string;
   relationship_type: string;
@@ -53,13 +54,18 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   consigner: 'Consignment'
 };
 
-const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId }) => {
-  const [organizations, setOrganizations] = useState<LinkedOrg[]>([]);
-  const [loading, setLoading] = useState(true);
+const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId, initialOrganizations }) => {
+  const [organizations, setOrganizations] = useState<LinkedOrg[]>(initialOrganizations ?? []);
+  const [loading, setLoading] = useState(initialOrganizations === undefined);
 
   useEffect(() => {
+    if (initialOrganizations !== undefined) {
+      setOrganizations(initialOrganizations);
+      setLoading(false);
+      return;
+    }
     loadOrganizations();
-  }, [vehicleId]);
+  }, [vehicleId, initialOrganizations]);
 
   const loadOrganizations = async () => {
     try {
