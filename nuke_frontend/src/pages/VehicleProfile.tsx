@@ -2,19 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
-import MobileVehicleProfile from '../components/mobile/MobileVehicleProfile';
+import { useValuationIntel } from '../hooks/useValuationIntel';
 import MobileVehicleProfileV2 from '../components/mobile/MobileVehicleProfileV2';
 import { TimelineEventService } from '../services/timelineEventService';
 import AddEventWizard from '../components/AddEventWizard';
 import EventMap from '../components/EventMap';
 // AppLayout now provided globally by App.tsx
-import CommentPopup from '../components/CommentPopup';
-import CommentingGuide from '../components/CommentingGuide';
 import VehicleDataEditor from '../components/vehicle/VehicleDataEditor';
-import VehicleStats from '../components/vehicle/VehicleStats';
-import PurchaseAgreementManager from '../components/PurchaseAgreementManager';
-import ConsignerManagement from '../components/ConsignerManagement';
-import VehicleTagExplorer from '../components/vehicle/VehicleTagExplorer';
 import EnhancedImageTagger from '../components/vehicle/EnhancedImageTagger';
 import { VisualValuationBreakdown } from '../components/vehicle/VisualValuationBreakdown';
 import {
@@ -22,10 +16,7 @@ import {
   VehicleHeroImage,
   VehicleBasicInfo,
   VehicleTimelineSection,
-  VehicleCommentsSection,
-  VehicleImageGallery,
   VehiclePricingSection,
-  VehicleSaleSettings,
   WorkMemorySection
 } from './vehicle-profile';
 import type {
@@ -39,12 +30,25 @@ import '../design-system.css';
 import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
 import FinancialProducts from '../components/financial/FinancialProducts';
 import ExternalListingCard from '../components/vehicle/ExternalListingCard';
-import LinkedOrganizations from '../components/vehicle/LinkedOrganizations';
+import LinkedOrganizations, { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 import ValuationCitations from '../components/vehicle/ValuationCitations';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import DataValidationPopup from '../components/vehicle/DataValidationPopup';
-import { BaTURLDrop } from '../components/vehicle/BaTURLDrop';
+import { BATListingManager } from '../components/vehicle/BATListingManager';
 import MergeProposalsPanel from '../components/vehicle/MergeProposalsPanel';
+import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
+import type { Session } from '@supabase/supabase-js';
+
+const WORKSPACE_TABS = [
+  { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
+  { id: 'facts', label: 'Facts', helper: 'AI confidence & valuations' },
+  { id: 'commerce', label: 'Commerce', helper: 'Listings, supporters, offers' },
+  { id: 'financials', label: 'Financials', helper: 'Pricing, history & docs' }
+] as const;
+
+type WorkspaceTabId = typeof WORKSPACE_TABS[number]['id'];
+import ImageGalleryV2 from '../components/image/ImageGalleryV2';
+import { UniversalImageUpload } from '../components/UniversalImageUpload';
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -55,21 +59,25 @@ const VehicleProfile: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [viewCount, setViewCount] = useState<number>(0);
-  const [showCommentingGuide, setShowCommentingGuide] = useState(false);
-  const [showContributors, setShowContributors] = useState(false);
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabId>('evidence');
 
   // Use consolidated permissions hook
-  const { 
-    isOwner: isRowOwner, 
-    hasContributorAccess, 
+  const {
+    isOwner: isRowOwner,
+    hasContributorAccess,
     contributorRole,
     canEdit,
     canUpload
   } = useVehiclePermissions(vehicleId || null, session, vehicle);
+  const {
+    valuation: valuationIntel,
+    components: valuationComponents,
+    readiness: readinessSnapshot,
+    loading: valuationIntelLoading
+  } = useValuationIntel(vehicle?.id || null);
+  const valuationPayload = valuationIntelLoading ? undefined : valuationIntel;
+  const valuationComponentsPayload = valuationIntelLoading ? undefined : valuationComponents;
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedDateEvents, setSelectedDateEvents] = useState<any[]>([]);
-  const [showEventModal, setShowEventModal] = useState(false);
   const [responsibleName, setResponsibleName] = useState<string | null>(null);
   const [showDataEditor, setShowDataEditor] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
@@ -82,7 +90,6 @@ const VehicleProfile: React.FC = () => {
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
   const [showMap, setShowMap] = useState(false);
-  const commentsSectionRef = React.useRef<HTMLDivElement | null>(null);
   const presenceAvailableRef = React.useRef<boolean>(true);
   const liveAvailableRef = React.useRef<boolean>(true);
   const [fieldAudit, setFieldAudit] = useState<FieldAudit>({
@@ -90,17 +97,6 @@ const VehicleProfile: React.FC = () => {
     fieldName: '',
     fieldLabel: '',
     entries: []
-  });
-  const [commentPopup, setCommentPopup] = useState<{
-    isOpen: boolean;
-    targetId: string;
-    targetType: 'vehicle' | 'profile' | 'timeline_event';
-    targetLabel: string;
-  }>({
-    isOpen: false,
-    targetId: '',
-    targetType: 'vehicle',
-    targetLabel: ''
   });
 
   // For Sale settings
@@ -118,6 +114,7 @@ const VehicleProfile: React.FC = () => {
   const [authChecked, setAuthChecked] = useState(false);
   const [latestExpertValuation, setLatestExpertValuation] = useState<any | null>(null);
   const expertAnalysisRunningRef = React.useRef(false);
+  const [linkedOrganizations, setLinkedOrganizations] = useState<LinkedOrg[]>([]);
   
   // Detect mobile device - but DON'T use early return (breaks React hooks rules)
   const [isMobile, setIsMobile] = useState(false);
@@ -180,6 +177,7 @@ const VehicleProfile: React.FC = () => {
       }
     } catch {}
   };
+
 
   const shouldRunExpertAgent = useCallback((valuation: any | null) => {
     // RE-ENABLED: Expert agent runs analysis but does NOT auto-update sale prices
@@ -392,6 +390,11 @@ const VehicleProfile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]); // Only re-run when vehicle ID changes, not on every vehicle object change
 
+  useEffect(() => {
+    if (!vehicle?.id) return;
+    loadLinkedOrgs(vehicle.id);
+  }, [vehicle?.id, loadLinkedOrgs]);
+
   // Refresh hero/gallery when images update elsewhere
   useEffect(() => {
     const handler = (e: any) => {
@@ -426,86 +429,57 @@ const VehicleProfile: React.FC = () => {
   const recomputeScoresForVehicle = async (vehId: string) => {
     try {
       const fields = ['make','model','year','vin','color','mileage','engine','transmission','body_style','doors','seats'];
-      // get current sources
-      const { data: sources } = await supabase
-        .from('vehicle_field_sources')
-        .select('field_name, field_value, source_type, user_id, is_verified')
-        .eq('vehicle_id', vehId);
-      // get images
-      const { data: imgs } = await supabase
-        .from('vehicle_images')
-        .select('area, labels, sensitive_type')
-        .eq('vehicle_id', vehId);
-      const labelsList = (imgs || []).flatMap((r: any) => Array.isArray(r.labels) ? r.labels : []);
-      const areaList = (imgs || []).map((r: any) => r.area).filter(Boolean);
-      const hasTitle = (imgs || []).some((r: any) => r.sensitive_type === 'title' || (Array.isArray(r.labels) && r.labels.includes('paperwork')));
-      const hasVinImg = labelsList.includes('vin') || areaList.includes('dash');
-      const hasExteriorSet = labelsList.filter((l: string) => l === 'exterior').length;
-      const hasSpeedo = labelsList.includes('speedometer') || areaList.includes('dash');
-      const hasEngineImgs = areaList.includes('engine_bay');
+      
+      // Get current sources and images
+      const [sourcesResult, imagesResult] = await Promise.all([
+        supabase
+          .from('vehicle_field_sources')
+          .select('field_name, field_value, source_type, user_id, is_verified')
+          .eq('vehicle_id', vehId),
+        supabase
+          .from('vehicle_images')
+          .select('area, labels, sensitive_type')
+          .eq('vehicle_id', vehId)
+      ]);
 
+      const sources: FieldSource[] = (sourcesResult.data || []).map((s: any) => ({
+        field_name: s.field_name,
+        field_value: s.field_value,
+        source_type: s.source_type,
+        user_id: s.user_id
+      }));
+
+      const images = (imagesResult.data || []).map((img: any) => ({
+        labels: img.labels,
+        area: img.area,
+        sensitive_type: img.sensitive_type
+      }));
+
+      // Use shared utility to calculate scores
+      const scores = calculateFieldScores(fields, sources, images);
+
+      // Build upserts from calculated scores
       const byField: Record<string, any> = {};
-      (sources || []).forEach((s: any) => { byField[s.field_name] = s; });
+      (sourcesResult.data || []).forEach((s: any) => { byField[s.field_name] = s; });
 
       const upserts: any[] = [];
       for (const fieldName of fields) {
         const entry = byField[fieldName];
-        const userProvided = !!entry?.user_id || entry?.source_type === 'human_input';
         const valuePresent = !!entry?.field_value;
-        let score = 0; const met: string[] = []; const next: string[] = [];
-        const boost = (pts: number, why: string) => { score += pts; met.push(why); };
-        const want = (why: string) => { next.push(why); };
-
-        switch (fieldName) {
-          case 'make':
-          case 'model':
-          case 'year':
-          case 'vin': {
-            if (userProvided) boost(90, 'Provided by signed-in user'); else if (valuePresent) boost(70, 'Provided');
-            if (hasTitle || hasVinImg) boost(10, 'Paperwork/VIN image evidence'); else want('Add title or VIN/frame-stamp image');
-            break;
-          }
-          case 'color': {
-            if (valuePresent) boost(40, 'Color provided'); else want('Provide color');
-            const extScore = Math.min(60, hasExteriorSet * 8);
-            if (extScore > 0) boost(extScore, `Exterior coverage (${hasExteriorSet} angles)`); else want('Add exterior images from multiple angles');
-            break;
-          }
-          case 'mileage': {
-            if (valuePresent) boost(50, 'Mileage provided'); else want('Enter mileage');
-            if (hasSpeedo) boost(50, 'Speedometer image evidence'); else want('Add speedometer photo');
-            break;
-          }
-          case 'engine': {
-            if (valuePresent) boost(50, 'Engine info provided'); else want('Enter engine details');
-            if (hasEngineImgs) boost(50, 'Engine bay images'); else want('Add engine bay photos');
-            break;
-          }
-          case 'body_style':
-          case 'doors':
-          case 'seats': {
-            if (valuePresent) boost(100, 'Field complete'); else want('Fill this field');
-            break;
-          }
-          case 'transmission': {
-            if (valuePresent) boost(80, 'Provided'); else want('Provide transmission');
-            break;
-          }
-          default: {
-            if (valuePresent) boost(60, 'Provided'); else want('Provide this data');
-          }
-        }
-        score = Math.max(0, Math.min(100, score));
+        
         if (valuePresent) {
-          upserts.push({
-            vehicle_id: vehId,
-            field_name: fieldName,
-            field_value: entry?.field_value || '',
-            source_type: entry?.source_type || 'computed',
-            confidence_score: score,
-            criteria: { met, next },
-            updated_at: new Date().toISOString()
-          });
+          const result = scores.get(fieldName);
+          if (result) {
+            upserts.push({
+              vehicle_id: vehId,
+              field_name: fieldName,
+              field_value: entry.field_value || '',
+              source_type: entry.source_type || 'computed',
+              confidence_score: result.score,
+              criteria: { met: result.met, next: result.next },
+              updated_at: new Date().toISOString()
+            });
+          }
         }
       }
 
@@ -681,9 +655,17 @@ const VehicleProfile: React.FC = () => {
   };
 
   const loadTimelineEvents = async () => {
-    // OPTIMIZED: Timeline events now loaded via RPC in loadVehicle()
-    // This function kept for manual refresh after updates
+    // OPTIMIZED: Timeline events loaded via RPC in loadVehicle()
+    // This function used for manual refresh after updates
     if (!vehicleId) return;
+    
+    // Check if RPC data is available (avoid duplicate query)
+    const rpcData = (window as any).__vehicleProfileRpcData;
+    if (rpcData?.timeline_events) {
+      setTimelineEvents(rpcData.timeline_events);
+      return;
+    }
+    
     try {
       const { data: events, error: eventsError } = await supabase
         .from('timeline_events')
@@ -702,11 +684,6 @@ const VehicleProfile: React.FC = () => {
     }
   };
 
-  const handleDateClick = (date: string, events: any[]) => {
-    setSelectedDate(date);
-    setSelectedDateEvents(events);
-    setShowEventModal(true);
-  };
 
   const loadVehicle = async () => {
     try {
@@ -748,7 +725,7 @@ const VehicleProfile: React.FC = () => {
       } else {
         vehicleData = rpcData.vehicle;
         
-        // Set additional data from RPC (optimization)
+        // Set additional data from RPC (optimization) - pass to children to avoid duplicate queries
         if (rpcData.images) {
           setVehicleImages(rpcData.images.map((img: any) => img.image_url));
         }
@@ -756,7 +733,17 @@ const VehicleProfile: React.FC = () => {
           setTimelineEvents(rpcData.timeline_events);
         }
         
-        console.log(`[VehicleProfile] Loaded via RPC: ${rpcData.stats?.image_count || 0} images, ${rpcData.stats?.event_count || 0} events in single query`);
+        // Store RPC data for passing to children (eliminates duplicate queries)
+        (window as any).__vehicleProfileRpcData = {
+          images: rpcData.images,
+          timeline_events: rpcData.timeline_events,
+          latest_valuation: rpcData.latest_valuation,
+          price_signal: rpcData.price_signal,
+          external_listings: rpcData.external_listings,
+          comments: rpcData.comments
+        };
+        
+        console.log(`[VehicleProfile] Loaded via RPC: ${rpcData.stats?.image_count || 0} images, ${rpcData.stats?.event_count || 0} events, valuation: ${rpcData.latest_valuation ? 'yes' : 'no'}`);
       }
 
       // For non-authenticated users, only show public vehicles
@@ -905,66 +892,30 @@ const VehicleProfile: React.FC = () => {
         return;
       }
 
-      // Compute score based on entries and evidence images
+      // Compute score using shared utility
       const { data: imgs } = await supabase
         .from('vehicle_images')
         .select('area, labels, sensitive_type')
         .eq('vehicle_id', vehicle.id);
 
-      const labelsList = (imgs || []).flatMap((r: any) => Array.isArray(r.labels) ? r.labels : []);
-      const areaList = (imgs || []).map((r: any) => r.area).filter(Boolean);
-      const hasTitle = (imgs || []).some((r: any) => r.sensitive_type === 'title' || (Array.isArray(r.labels) && r.labels.includes('paperwork')));
-      const hasVinImg = labelsList.includes('vin') || areaList.includes('dash');
-      const hasExteriorSet = labelsList.filter((l: string) => l === 'exterior').length;
-      const hasSpeedo = labelsList.includes('speedometer') || areaList.includes('dash');
-      const hasEngineImgs = areaList.includes('engine_bay');
+      const sources: FieldSource[] = (data || []).map((e: any) => ({
+        field_name: fieldName,
+        field_value: e.field_value,
+        source_type: e.source_type,
+        user_id: e.user_id
+      }));
 
-      const userProvided = (data || []).some((e: any) => e.source_type === 'user_input' && !!e.user_id);
-      const valuePresent = (data || []).length > 0;
+      const images = (imgs || []).map((img: any) => ({
+        labels: img.labels,
+        area: img.area,
+        sensitive_type: img.sensitive_type
+      }));
 
-      let score = 0; const met: string[] = []; const next: string[] = [];
-      const boost = (pts: number, why: string) => { score += pts; met.push(why); };
-      const want = (why: string) => { next.push(why); };
+      // Use shared utility to calculate score
+      const imageEvidence = analyzeImageEvidence(images);
+      const result = calculateFieldScore(fieldName, sources, imageEvidence);
 
-      switch (fieldName) {
-        case 'make':
-        case 'model':
-        case 'year':
-        case 'vin': {
-          if (userProvided) boost(90, 'Provided by signed-in user'); else if (valuePresent) boost(70, 'Provided');
-          if (hasTitle || hasVinImg) boost(10, 'Paperwork/VIN image evidence'); else want('Add title or VIN/frame-stamp image');
-          break;
-        }
-        case 'color': {
-          if (valuePresent) boost(40, 'Color provided'); else want('Provide color');
-          const extCount = hasExteriorSet;
-          const extScore = Math.min(60, extCount * 8);
-          if (extScore > 0) boost(extScore, `Exterior coverage (${extCount} angles)`); else want('Add exterior images from multiple angles');
-          break;
-        }
-        case 'mileage': {
-          if (valuePresent) boost(50, 'Mileage provided'); else want('Enter mileage');
-          if (hasSpeedo) boost(50, 'Speedometer image evidence'); else want('Add speedometer photo');
-          break;
-        }
-        case 'engine': {
-          if (valuePresent) boost(50, 'Engine info provided'); else want('Enter engine details');
-          if (hasEngineImgs) boost(50, 'Engine bay images'); else want('Add engine bay photos');
-          break;
-        }
-        case 'body_style':
-        case 'doors':
-        case 'seats': {
-          if (valuePresent) boost(100, 'Field complete'); else want('Fill this field');
-          break;
-        }
-        default: {
-          if (valuePresent) boost(60, 'Provided'); else want('Provide this data');
-        }
-      }
-      score = Math.max(0, Math.min(100, score));
-
-      setFieldAudit({ open: true, fieldName, fieldLabel, entries: data || [], score, met, next });
+      setFieldAudit({ open: true, fieldName, fieldLabel, entries: data || [], score: result.score, met: result.met, next: result.next });
 
       // Persist score and criteria back to vehicle_field_sources (best-effort)
       try {
@@ -974,8 +925,8 @@ const VehicleProfile: React.FC = () => {
           field_name: fieldName,
           field_value: latestVal,
           source_type: (data && data[0]?.source_type) || 'computed',
-          confidence_score: score,
-          criteria: { met, next }
+          confidence_score: result.score,
+          criteria: { met: result.met, next: result.next }
         };
         // Prefer upsert if unique constraint on (vehicle_id, field_name), else fallback to insert
         const { error: upErr } = await supabase.from('vehicle_field_sources').upsert(payload, { onConflict: 'vehicle_id,field_name' });
@@ -1020,8 +971,68 @@ const VehicleProfile: React.FC = () => {
     }
   };
 
+  const loadLinkedOrgs = useCallback(async (vehId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('organization_vehicles')
+        .select(`
+          id,
+          organization_id,
+          relationship_type,
+          auto_tagged,
+          gps_match_confidence,
+          businesses!inner (
+            id,
+            business_name,
+            business_type,
+            city,
+            state,
+            logo_url
+          )
+        `)
+        .eq('vehicle_id', vehId)
+        .eq('status', 'active');
+
+      if (error) {
+        console.warn('Unable to load linked orgs:', error.message);
+        setLinkedOrganizations([]);
+        return;
+      }
+
+      const enriched = (data || []).map((ov: any) => ({
+        id: ov.id,
+        organization_id: ov.organization_id,
+        relationship_type: ov.relationship_type,
+        auto_tagged: ov.auto_tagged,
+        gps_match_confidence: ov.gps_match_confidence,
+        business_name: ov.businesses?.business_name || 'Unknown org',
+        business_type: ov.businesses?.business_type,
+        city: ov.businesses?.city,
+        state: ov.businesses?.state,
+        logo_url: ov.businesses?.logo_url
+      })) as LinkedOrg[];
+
+      setLinkedOrganizations(enriched);
+    } catch (err) {
+      console.warn('Linked org load failed:', err);
+      setLinkedOrganizations([]);
+    }
+  }, []);
+
   const loadVehicleImages = async () => {
     if (!vehicle) return;
+
+    // Check if RPC data is available (avoid duplicate query)
+    const rpcData = (window as any).__vehicleProfileRpcData;
+    if (rpcData?.images && Array.isArray(rpcData.images) && rpcData.images.length > 0) {
+      const images = rpcData.images.map((img: any) => img.image_url);
+      setVehicleImages(images);
+      const leadImage = rpcData.images.find((img: any) => img.is_primary) || rpcData.images[0];
+      if (leadImage) {
+        setLeadImageUrl(leadImage.large_url || leadImage.image_url);
+      }
+      return;
+    }
 
     let images: string[] = [];
 
@@ -1164,6 +1175,190 @@ const VehicleProfile: React.FC = () => {
     });
   }
 
+  const readinessScore = typeof readinessSnapshot?.readiness_score === 'number'
+    ? readinessSnapshot.readiness_score
+    : null;
+
+  const renderWorkspaceContent = () => {
+    if (!vehicle) {
+      return (
+        <div className="card">
+          <div className="card-body">
+            Vehicle data is still loading...
+          </div>
+        </div>
+      );
+    }
+
+    switch (activeWorkspaceTab) {
+      case 'facts':
+        return (
+          <>
+            <FactExplorerPanel vehicleId={vehicle.id} readinessScore={readinessScore} />
+            <section className="section">
+              <VisualValuationBreakdown
+                vehicleId={vehicle.id}
+                isOwner={Boolean(isRowOwner || isVerifiedOwner)}
+                prefetchedValuation={valuationPayload}
+                prefetchedComponents={valuationComponentsPayload}
+              />
+            </section>
+            <section className="section">
+              <ValuationCitations vehicleId={vehicle.id} />
+            </section>
+          </>
+        );
+      case 'commerce':
+        return (
+          <>
+            <section className="section">
+              <div style={{ display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <ExternalListingCard vehicleId={vehicle.id} />
+                  {(isVerifiedOwner || hasContributorAccess) && (
+                    <BATListingManager
+                      vehicleId={vehicle.id}
+                      canEdit={true}
+                      onDataImported={() => window.location.reload()}
+                    />
+                  )}
+                  <LinkedOrganizations
+                    vehicleId={vehicle.id}
+                    initialOrganizations={linkedOrganizations}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <ReadinessGate
+                    title="Financial Products"
+                    score={readinessScore}
+                    threshold={60}
+                    missing={readinessSnapshot?.missing_items}
+                  >
+                    <FinancialProducts
+                      vehicleId={vehicle.id}
+                      vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                      vehicleValue={valuationPayload?.estimated_value || vehicle.current_value || 0}
+                    />
+                  </ReadinessGate>
+                  <ReadinessGate
+                    title="Share Holders"
+                    score={readinessScore}
+                    threshold={45}
+                    missing={readinessSnapshot?.missing_items}
+                  >
+                    <VehicleShareHolders
+                      vehicleId={vehicle.id}
+                      vehicleValue={vehicle.current_value || 0}
+                      hideIfEmpty={true}
+                    />
+                  </ReadinessGate>
+                </div>
+              </div>
+            </section>
+          </>
+        );
+      case 'financials':
+        return (
+          <>
+            <section className="section">
+              <VehiclePricingSection
+                vehicle={vehicle}
+                permissions={permissions}
+                initialValuation={valuationPayload || (window as any).__vehicleProfileRpcData?.latest_valuation}
+              />
+            </section>
+            <section className="section">
+              <TransactionHistory vehicleId={vehicle.id} />
+            </section>
+          </>
+        );
+      case 'evidence':
+      default:
+        return (
+          <>
+            <section className="section">
+              <div style={{ display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <VehicleBasicInfo
+                    vehicle={vehicle}
+                    session={session}
+                    permissions={permissions}
+                    onDataPointClick={handleDataPointClick}
+                    onEditClick={handleEditClick}
+                  />
+                  <VehicleTimelineSection
+                    vehicle={vehicle}
+                    session={session}
+                    permissions={permissions}
+                    onAddEventClick={() => setShowAddEvent(true)}
+                  />
+                  <div className="card">
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Coverage Map</span>
+                      <button className="btn-utility" style={{ fontSize: '10px' }} onClick={() => setShowMap(prev => !prev)}>
+                        {showMap ? 'Hide map' : 'Show map'}
+                      </button>
+                    </div>
+                    {showMap && (
+                      <div className="card-body">
+                        <EventMap vehicleId={vehicle.id} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <EvidenceIntakeDrawer
+                    vehicleId={vehicle.id}
+                    session={session}
+                    canUpload={Boolean(canUpload || hasContributorAccess)}
+                    onUploadComplete={() => {
+                      loadVehicle();
+                      loadTimelineEvents();
+                    }}
+                  />
+                  {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
+                    <div className="card">
+                      <div className="card-header">Image Tagging & AI Validation</div>
+                      <div className="card-body">
+                        <EnhancedImageTagger
+                          imageUrl={vehicle.hero_image}
+                          vehicleId={vehicle.id}
+                          onTagAdded={() => {
+                            window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
+                          }}
+                          onTagValidated={() => {
+                            window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {(isVerifiedOwner || hasContributorAccess) && (
+                    <WorkMemorySection
+                      vehicleId={vehicle.id}
+                      permissions={permissions}
+                    />
+                  )}
+                </div>
+              </div>
+            </section>
+            <section className="section">
+              <ImageGalleryV2
+                vehicleId={vehicle.id}
+                vehicleYMM={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
+                onImagesUpdated={() => {
+                  loadVehicle();
+                  loadTimelineEvents();
+                }}
+              />
+            </section>
+          </>
+        );
+    }
+  };
+
+  const activeTabMeta = WORKSPACE_TABS.find(tab => tab.id === activeWorkspaceTab);
+
   // Render mobile or desktop version (no early return to avoid hook errors)
   return (
     <>
@@ -1178,6 +1373,9 @@ const VehicleProfile: React.FC = () => {
           permissions={permissions}
           responsibleName={responsibleName}
           onPriceClick={handlePriceClick}
+          initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
+          initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
+          organizationLinks={linkedOrganizations}
         />
 
         {/* Merge Proposals Panel - Only visible to verified owners */}
@@ -1196,150 +1394,36 @@ const VehicleProfile: React.FC = () => {
         {/* Hero Image Section */}
         <VehicleHeroImage leadImageUrl={leadImageUrl} />
 
-        {/* Vehicle Timeline Section */}
-        <VehicleTimelineSection
-          vehicle={vehicle}
-          session={session}
-          permissions={permissions}
-          onAddEventClick={() => setShowAddEvent(true)}
-        />
-
-        {/* Image Upload Section removed - unified under EnhancedImageViewer */}
-
-        {/* Map Section (no header; toggle is in gallery toolbar) */}
-        <section className="section">
-          {showMap && (
-            <EventMap vehicleId={vehicle.id} />
-          )}
-        </section>
-
-        {/* Visual Valuation Breakdown - Truth-Based Pricing */}
-        <section className="section">
-          <VisualValuationBreakdown
-            vehicleId={vehicle.id}
-            isOwner={Boolean(isRowOwner || isVerifiedOwner)}
-        />
-        </section>
-
-        {/* Data Sources moved to VehiclePricingWidget */}
-
-
-        {/* Main Content Grid: Left Column (data) + Right Column (image gallery) */}
-        <section className="section">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', alignItems: 'start' }}>
-            {/* Left Column: All vehicle data and details */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-
-              {/* Basic Vehicle Information */}
-              <VehicleBasicInfo
-                vehicle={vehicle}
-                session={session}
-                permissions={permissions}
-                onDataPointClick={handleDataPointClick}
-                onEditClick={handleEditClick}
-              />
-
-              {/* External Listings (BaT, Cars & Bids, etc.) - Auto-displayed if exists */}
-              <ExternalListingCard vehicleId={vehicle.id} />
-              
-              {/* BaT URL Drop - Paste listing URL to import data */}
-              {(isVerifiedOwner || hasContributorAccess) && (
-                <BaTURLDrop 
-                  vehicleId={vehicle.id}
-                  canEdit={true}
-                  onDataImported={() => window.location.reload()}
-                />
-              )}
-
-              {/* Linked Organizations (Shops, Dealers, etc.) */}
-              <LinkedOrganizations vehicleId={vehicle.id} />
-
-              {/* Valuation Citations - Transparent breakdown */}
-              <ValuationCitations vehicleId={vehicle.id} />
-
-              {/* Transaction History Timeline */}
-              <TransactionHistory vehicleId={vehicle.id} />
-
-              {/* Financial Products */}
-              <FinancialProducts
-                vehicleId={vehicle.id}
-                vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                vehicleValue={vehicle.current_value || 0}
-              />
-
-              {/* Share Holders & Supporters */}
-              <VehicleShareHolders
-                vehicleId={vehicle.id}
-                vehicleValue={vehicle.current_value || 0}
-                hideIfEmpty={true}
-              />
-
-              {/* Ownership Panel */}
-              {/* (Ownership verification is already embedded in VehicleBasicInfo) */}
-
-              {/* Memories Section - Owner/Moderator/Consigner Access Only */}
-              {(isVerifiedOwner || hasContributorAccess) && (
-                <WorkMemorySection
-                  vehicleId={vehicle.id}
-                  permissions={permissions}
-                />
-              )}
-
-              {/* REMOVED: VehicleDocumentManager - replaced with SmartInvoiceUploader integrated into Valuation */}
-
-              {/* REMOVED: ReceiptManager card - now integrated into VisualValuationBreakdown */}
-
-              {/* Enhanced Photo Tagging System */}
-              {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
-                <div id="image-tagging" className="card">
-                  <div className="card-header">🏷️ Image Tagging & AI Validation</div>
-                  <div className="card-body">
-                    <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
-                      Tag vehicle components, damage, or features. AI tags show as 🤖 (validate them), manual tags as 👤.
-                      Click and drag to create bounding boxes or click to place point tags.
-                    </p>
-                    <EnhancedImageTagger
-                      imageUrl={vehicle.hero_image}
-                      vehicleId={vehicle.id}
-                      onTagAdded={(tag) => {
-                        // Reload the tag explorer to show updated data
-                        window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
-                      }}
-                      onTagValidated={(tagId, action) => {
-                        // Reload the tag explorer to show validation changes
-                        window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* MVP: Hide Consigner & Agreements sections */}
-
-              {/* REMOVED: Request Consigner Access - showed "coming soon" alert, non-functional */}
-
-              {/* MVP: Hide Tag Explorer */}
-
-              {/* REMOVED: Sale & Distribution Card - fake partner integrations removed */}
-
-              {/* Comments Section — deprecated on profile page */}
-            </div>
-
-            {/* Right Column: Image Gallery */}
-            <div>
-              <VehicleImageGallery
-                vehicle={vehicle}
-                session={session}
-                permissions={permissions}
-                showMap={showMap}
-                onToggleMap={() => setShowMap(s => !s)}
-                onImageUpdate={() => {
-                  void handleImportComplete(null);
+        <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {WORKSPACE_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                className="btn-utility"
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '999px',
+                  fontSize: '11px',
+                  backgroundColor: activeWorkspaceTab === tab.id ? 'var(--text)' : 'transparent',
+                  color: activeWorkspaceTab === tab.id ? 'var(--surface)' : 'var(--text)',
+                  borderColor: activeWorkspaceTab === tab.id ? 'var(--text)' : 'var(--border)'
                 }}
-              />
-            </div>
+                onClick={() => setActiveWorkspaceTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-        </section>
+          {activeTabMeta?.helper && (
+            <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text-muted)' }}>
+              {activeTabMeta.helper}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          {renderWorkspaceContent()}
+        </div>
 
         {/* Vehicle Metadata & Privacy Settings (MVP: hide Sale & Distribution card) */}
         <section className="section">
@@ -1386,55 +1470,6 @@ const VehicleProfile: React.FC = () => {
           />
         )}
 
-        {/* Event Modal */}
-        {showEventModal && (
-          <div className="modal-overlay">
-            <div className="modal">
-              <div className="modal-header">
-                <h3 className="modal-title">
-                  Events for {selectedDate && new Date(selectedDate).toLocaleDateString()}
-                </h3>
-                <button
-                  onClick={() => setShowEventModal(false)}
-                  className="modal-close"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="modal-body">
-                {selectedDateEvents.length > 0 ? (
-                  <div className="event-list">
-                    {selectedDateEvents.map((event, index) => (
-                      <div key={event.id || index} className="event-item">
-                        <h4 className="event-title">{event.title}</h4>
-                        <p className="event-type">{event.event_type}</p>
-                        {event.description && (
-                          <p className="event-description">{event.description}</p>
-                        )}
-                        <p className="event-timestamp">
-                          {new Date(event.event_date).toLocaleString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted">No events found for this date.</p>
-                )}
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  onClick={() => setShowEventModal(false)}
-                  className="button button-primary"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
       {/* Add Event Wizard Modal */}
       {showAddEvent && (
         <AddEventWizard
@@ -1469,6 +1504,229 @@ const VehicleProfile: React.FC = () => {
       </div>
       )}
     </>
+  );
+};
+
+interface EvidenceIntakeDrawerProps {
+  vehicleId: string;
+  session: Session | null;
+  canUpload: boolean;
+  onUploadComplete: () => void;
+}
+
+const EvidenceIntakeDrawer: React.FC<EvidenceIntakeDrawerProps> = ({
+  vehicleId,
+  session,
+  canUpload,
+  onUploadComplete
+}) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="card">
+      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+            Evidence Intake
+          </div>
+          <strong style={{ fontSize: '12px' }}>Photo & Document Uploader</strong>
+        </div>
+        {canUpload && (
+          <button className="btn-utility" style={{ fontSize: '10px' }} onClick={() => setOpen(prev => !prev)}>
+            {open ? 'Close Intake' : 'Open Intake'}
+          </button>
+        )}
+      </div>
+      <div className="card-body">
+        <p className="text-small text-muted" style={{ marginBottom: '12px' }}>
+          Everything uploaded here flows through the Vehicle Image Fact Fabric so AI guardrails can extract facts,
+          link timeline events, and score readiness.
+        </p>
+        {open && canUpload ? (
+          <UniversalImageUpload
+            session={session}
+            vehicleId={vehicleId}
+            onClose={() => {
+              setOpen(false);
+              onUploadComplete();
+            }}
+          />
+        ) : (
+          <>
+            {!canUpload && (
+              <div className="text-small text-muted">
+                You need contributor or owner access to upload new evidence.
+              </div>
+            )}
+            {canUpload && (
+              <button className="button button-primary" style={{ fontSize: '11px' }} onClick={() => setOpen(true)}>
+                Start Intake
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface FactExplorerPanelProps {
+  vehicleId: string;
+  readinessScore: number | null;
+}
+
+interface FactRow {
+  id: string;
+  fact_type: string;
+  label?: string;
+  answer_text?: string;
+  created_at: string;
+  evidence_urls?: string[];
+  image_fact_confidence?: Array<{ score: number; state: string; consumer: string }>;
+}
+
+const FactExplorerPanel: React.FC<FactExplorerPanelProps> = ({ vehicleId, readinessScore }) => {
+  const [facts, setFacts] = useState<FactRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadFacts = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('vehicle_image_facts')
+          .select(`
+            id,
+            fact_type,
+            label,
+            answer_text,
+            created_at,
+            evidence_urls,
+            image_fact_confidence(score,state,consumer)
+          `)
+          .eq('vehicle_id', vehicleId)
+          .order('created_at', { ascending: false })
+          .limit(25);
+
+        if (error) {
+          console.warn('Fact explorer query failed', error);
+          if (isMounted) setFacts([]);
+          return;
+        }
+
+        if (isMounted) {
+          setFacts(data as FactRow[] || []);
+        }
+      } catch (error) {
+        console.warn('Fact explorer load failed', error);
+        if (isMounted) setFacts([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadFacts();
+    return () => {
+      isMounted = false;
+    };
+  }, [vehicleId]);
+
+  return (
+    <section className="section">
+      <div className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '12px' }}>Fact Explorer</h3>
+            <p className="text-small text-muted" style={{ margin: 0 }}>
+              Guardrailed AI outputs mapped to the vehicle profile
+            </p>
+          </div>
+          {typeof readinessScore === 'number' && (
+            <span className="badge badge-secondary">
+              Readiness {readinessScore}%
+            </span>
+          )}
+        </div>
+        <div className="card-body">
+          {loading ? (
+            <div className="text-small text-muted">Loading facts...</div>
+          ) : facts.length === 0 ? (
+            <div className="text-small text-muted">
+              No VIFF facts yet — upload evidence from the Evidence tab to kick off the pipeline.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Label</th>
+                    <th>Answer</th>
+                    <th>Confidence</th>
+                    <th>Captured</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {facts.map(fact => {
+                    const scores = Array.isArray(fact.image_fact_confidence)
+                      ? fact.image_fact_confidence.map(entry => Number(entry.score) || 0)
+                      : [];
+                    const bestScore = scores.length ? Math.max(...scores) : null;
+                    return (
+                      <tr key={fact.id}>
+                        <td style={{ textTransform: 'capitalize' }}>{fact.fact_type}</td>
+                        <td>{fact.label || '—'}</td>
+                        <td>{fact.answer_text || '—'}</td>
+                        <td>{bestScore !== null ? `${(bestScore * 100).toFixed(0)}%` : 'pending'}</td>
+                        <td>{new Date(fact.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+interface ReadinessGateProps {
+  title: string;
+  score: number | null;
+  threshold: number;
+  missing?: string[] | null;
+  children: React.ReactNode;
+}
+
+const ReadinessGate: React.FC<ReadinessGateProps> = ({ title, score, threshold, missing, children }) => {
+  if (score !== null && score >= threshold) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">{title}</div>
+      <div className="card-body">
+        <p className="text-small text-muted">
+          {score === null
+            ? 'Readiness score not computed yet. Upload photos/documents in the Evidence tab to unlock this module.'
+            : `Need readiness score of ${threshold}+ (current ${score}). Continue building evidence to unlock.`}
+        </p>
+        {!!missing?.length && (
+          <div className="text-small text-muted">
+            Outstanding requirements:
+            <ul>
+              {missing.slice(0, 3).map(item => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

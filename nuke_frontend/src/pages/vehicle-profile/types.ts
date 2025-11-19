@@ -1,3 +1,5 @@
+import type { LinkedOrg } from '../../components/vehicle/LinkedOrganizations';
+
 // TypeScript interfaces for VehicleProfile component breakdown
 
 export interface Vehicle {
@@ -90,6 +92,9 @@ export interface VehicleBaseProps {
 export interface VehicleHeaderProps extends VehicleBaseProps {
   responsibleName: string | null;
   onPriceClick: () => void;
+  initialValuation?: any | null; // From RPC to avoid duplicate query
+  initialPriceSignal?: any | null; // From RPC to avoid duplicate query
+  organizationLinks?: LinkedOrg[];
 }
 
 export interface VehicleHeroImageProps {
