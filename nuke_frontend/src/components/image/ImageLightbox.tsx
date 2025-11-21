@@ -418,16 +418,41 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     }
   };
 
-  // Key Handlers
+  // Lock body scroll and handle keyboard/wheel navigation
   useEffect(() => {
+    // Lock body scroll when lightbox is open
+    document.body.style.overflow = 'hidden';
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowLeft' && onPrev) onPrev();
       if (e.key === 'ArrowRight' && onNext) onNext();
     };
+    
+    // Use scroll wheel for image navigation
+    const handleWheel = (e: WheelEvent) => {
+      // Only navigate if not in tagging mode and not typing in input
+      if (isTagging || showTagInput || showProTagger) return;
+      
+      if (e.deltaY > 0 && onNext) {
+        e.preventDefault();
+        onNext();
+      } else if (e.deltaY < 0 && onPrev) {
+        e.preventDefault();
+        onPrev();
+      }
+    };
+    
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, onPrev, onNext]);
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      // Restore body scroll when lightbox closes
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, [onClose, onPrev, onNext, isTagging, showTagInput, showProTagger]);
 
   if (!isOpen) return null;
 
