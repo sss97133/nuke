@@ -479,52 +479,86 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[10000] bg-black/95 flex flex-col text-white font-sans">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-black/50 border-b border-white/10">
-        <div className="flex items-center gap-4">
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕ Close</button>
-          <span className="text-sm text-gray-400">
-            {title || 'Image Viewer'}
+    <div className="fixed inset-0 z-[10000] bg-[#0a0a0a] flex flex-col text-white" style={{ fontFamily: 'Arial, sans-serif' }}>
+      {/* Header - Cursor Style */}
+      <div className="flex items-center justify-between px-6 py-3 bg-[#111] border-b-2 border-white/20">
+        <div className="flex items-center gap-6">
+          <button 
+            onClick={onClose}
+            className="text-white/60 hover:text-white text-[11px] font-semibold transition-all duration-150 hover:translate-y-[-1px]"
+            style={{ fontFamily: 'Arial, sans-serif' }}
+          >
+            CLOSE
+          </button>
+          <div className="h-4 w-[2px] bg-white/20"></div>
+          <span className="text-[10px] text-white/50 font-medium tracking-wide uppercase">
+            {title || 'IMAGE VIEWER'}
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {onPrev && <button onClick={onPrev} className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs">← Prev</button>}
-          {onNext && <button onClick={onNext} className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs">Next →</button>}
+        <div className="flex items-center gap-2">
+          {/* Navigation - Prominent Cursor Style */}
+          {onPrev && (
+            <button 
+              onClick={onPrev}
+              className="px-4 py-2 bg-[#1a1a1a] border-2 border-white/30 text-white text-[10px] font-bold uppercase tracking-wide hover:border-white hover:bg-white/10 transition-all duration-150 hover:translate-y-[-2px] hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)]"
+              style={{ fontFamily: 'Arial, sans-serif' }}
+            >
+              ← PREV
+            </button>
+          )}
+          {onNext && (
+            <button 
+              onClick={onNext}
+              className="px-4 py-2 bg-[#1a1a1a] border-2 border-white/30 text-white text-[10px] font-bold uppercase tracking-wide hover:border-white hover:bg-white/10 transition-all duration-150 hover:translate-y-[-2px] hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)]"
+              style={{ fontFamily: 'Arial, sans-serif' }}
+            >
+              NEXT →
+            </button>
+          )}
           
           {canEdit && (
             <>
+              <div className="h-6 w-[2px] bg-white/20 mx-1"></div>
               <button
                 onClick={() => setShowProTagger(true)}
-                className="px-3 py-1 rounded text-xs font-medium border bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                className="px-4 py-2 bg-white text-black border-2 border-white text-[10px] font-bold uppercase tracking-wide hover:bg-white/90 transition-all duration-150 hover:translate-y-[-2px] hover:shadow-[0_0_0_3px_rgba(255,255,255,0.2)]"
+                style={{ fontFamily: 'Arial, sans-serif' }}
                 title="Professional annotation tools with intelligent selection"
               >
                 PRO TAG
               </button>
               <button
-              onClick={() => setIsTagging(!isTagging)}
-              className={`px-3 py-1 rounded text-xs font-medium border ${isTagging ? 'bg-green-500 text-black border-green-500' : 'bg-transparent border-white/30 text-white hover:bg-white/10'}`}
+                onClick={() => setIsTagging(!isTagging)}
+                className={`px-4 py-2 border-2 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 hover:translate-y-[-2px] ${
+                  isTagging 
+                    ? 'bg-white text-black border-white hover:shadow-[0_0_0_3px_rgba(255,255,255,0.2)]' 
+                    : 'bg-transparent border-white/30 text-white hover:border-white hover:bg-white/10 hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)]'
+                }`}
+                style={{ fontFamily: 'Arial, sans-serif' }}
                 title="Quick tagging mode"
-            >
+              >
                 {isTagging ? 'TAGGING' : 'QUICK TAG'}
-            </button>
+              </button>
             </>
-        )}
+          )}
 
+          <div className="h-6 w-[2px] bg-white/20 mx-1"></div>
+          
           <button 
             onClick={() => setRotation((r) => (r + 90) % 360)}
-            className="px-3 py-1 bg-transparent border border-white/30 text-white hover:bg-white/10 rounded text-xs"
+            className="px-4 py-2 bg-transparent border-2 border-white/30 text-white text-[10px] font-bold uppercase tracking-wide hover:border-white hover:bg-white/10 transition-all duration-150 hover:translate-y-[-2px] hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)]"
+            style={{ fontFamily: 'Arial, sans-serif' }}
             title="Rotate Image"
           >
-            ↻ Rotate
+            ROTATE
           </button>
+          
           <button 
             onClick={async () => {
               if (!imageUrl || !vehicleId) return;
               const result = await triggerAIAnalysis(imageUrl, timelineEventId, vehicleId);
               if (result.success) {
-                // Reload tags and metadata after analysis
                 setTimeout(() => {
                   loadTags();
                   loadImageMetadata();
@@ -532,17 +566,28 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }
             }}
             disabled={analyzing || !imageUrl || !vehicleId}
-            className={`px-3 py-1 rounded text-xs font-medium border ${analyzing ? 'bg-gray-600 text-gray-300 border-gray-600 cursor-not-allowed' : 'bg-transparent border-white/30 text-white hover:bg-white/10'}`}
+            className={`px-4 py-2 border-2 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 ${
+              analyzing 
+                ? 'bg-[#2a2a2a] text-white/40 border-white/10 cursor-not-allowed' 
+                : 'bg-transparent border-white/30 text-white hover:border-white hover:bg-white/10 hover:translate-y-[-2px] hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)]'
+            }`}
+            style={{ fontFamily: 'Arial, sans-serif' }}
             title="Run AI Analysis"
           >
             {analyzing ? `AI ${analysisProgress ? `(${analysisProgress})` : '...'}` : 'AI'}
           </button>
+          
           <button 
             onClick={() => setShowSidebar(!showSidebar)}
-            className={`px-3 py-1 rounded text-xs font-medium border ${showSidebar ? 'bg-white text-black border-white' : 'bg-transparent border-white/30 text-white hover:bg-white/10'}`}
-        >
-          INFO
-        </button>
+            className={`px-4 py-2 border-2 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 hover:translate-y-[-2px] ${
+              showSidebar 
+                ? 'bg-white text-black border-white hover:shadow-[0_0_0_3px_rgba(255,255,255,0.2)]' 
+                : 'bg-transparent border-white/30 text-white hover:border-white hover:bg-white/10 hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)]'
+            }`}
+            style={{ fontFamily: 'Arial, sans-serif' }}
+          >
+            INFO
+          </button>
         </div>
       </div>
 
@@ -660,28 +705,43 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         </div>
       </div>
 
-        {/* Sidebar */}
+        {/* Sidebar - Cursor Style */}
         {showSidebar && (
-          <div className="w-80 bg-[#111] border-l border-white/10 flex flex-col animate-slide-in-right">
-            {/* Tabs */}
-            <div className="flex border-b border-white/10">
+          <div className="w-80 bg-[#111] border-l-2 border-white/20 flex flex-col">
+            {/* Tabs - Cursor Style */}
+            <div className="flex border-b-2 border-white/20">
               <button 
                 onClick={() => setActiveTab('info')}
-                className={`flex-1 py-3 text-xs font-medium ${activeTab === 'info' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
+                className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 ${
+                  activeTab === 'info' 
+                    ? 'text-white border-b-2 border-white bg-white/5' 
+                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+                style={{ fontFamily: 'Arial, sans-serif' }}
               >
-                Details
+                DETAILS
               </button>
               <button 
                 onClick={() => setActiveTab('comments')}
-                className={`flex-1 py-3 text-xs font-medium ${activeTab === 'comments' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
+                className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 ${
+                  activeTab === 'comments' 
+                    ? 'text-white border-b-2 border-white bg-white/5' 
+                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+                style={{ fontFamily: 'Arial, sans-serif' }}
               >
-                Comments ({comments.length})
+                COMMENTS ({comments.length})
               </button>
               <button 
                 onClick={() => setActiveTab('tags')}
-                className={`flex-1 py-3 text-xs font-medium ${activeTab === 'tags' ? 'text-white border-b-2 border-blue-500' : 'text-gray-400 hover:text-white'}`}
+                className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 ${
+                  activeTab === 'tags' 
+                    ? 'text-white border-b-2 border-white bg-white/5' 
+                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+                style={{ fontFamily: 'Arial, sans-serif' }}
               >
-                Tags ({tags.length})
+                TAGS ({tags.length})
               </button>
             </div>
 
