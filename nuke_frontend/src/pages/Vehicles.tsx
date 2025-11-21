@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 // AppLayout now provided globally by App.tsx
 import VehicleThumbnail from '../components/VehicleThumbnail';
+import GarageVehicleCard from '../components/vehicles/GarageVehicleCard';
 import '../design-system.css';
 
 interface Vehicle {
@@ -632,8 +633,8 @@ const VehiclesInner: React.FC = () => {
                   <div 
                     style={{ 
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(2, 1fr)',
-                      gap: '8px',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                      gap: '12px',
                       padding: '8px'
                     }}
                   >
@@ -641,95 +642,12 @@ const VehiclesInner: React.FC = () => {
                       const vehicle = relationship?.vehicle;
                       if (!vehicle || !relationship) return null;
                       return (
-                        <div
+                        <GarageVehicleCard
                           key={vehicle.id}
-                          className="vehicle-card"
-                          onClick={() => navigate(`/vehicle/${vehicle.id}`)}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <div className="vehicle-thumbnail">
-                            <VehicleThumbnail vehicleId={vehicle.id} />
-                          </div>
-
-                          <div className="vehicle-info">
-                            <h3 className="vehicle-title">
-                              {vehicle.year} {vehicle.make} {vehicle.model}
-                            </h3>
-
-                            {/* Relationship Badge */}
-                            <div style={{ marginBottom: '8px' }}>
-                              {relationship?.relationshipType === 'owned' && (
-                                <span className="badge badge-success">
-                                  {relationship?.role || 'Owner'}
-                                </span>
-                              )}
-                              {relationship?.relationshipType === 'contributing' && (
-                                <span className="badge badge-primary">
-                                  {relationship?.role || 'Contributor'}
-                                </span>
-                              )}
-                              {relationship?.relationshipType === 'interested' && (
-                                <span className="badge badge-secondary">
-                                  {relationship?.context || 'Interested'}
-                                </span>
-                              )}
-                              {relationship?.relationshipType === 'discovered' && (
-                                <span className="badge badge-info">
-                                  Discovered
-                                </span>
-                              )}
-                              {relationship?.relationshipType === 'curated' && (
-                                <span className="badge badge-warning">
-                                  Curated
-                                </span>
-                              )}
-                              {relationship?.relationshipType === 'consigned' && (
-                                <span className="badge badge-info">
-                                  Consigned
-                                </span>
-                              )}
-                              {relationship?.relationshipType === 'previously_owned' && (
-                                <span className="badge badge-secondary">
-                                  Previous Owner
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="vehicle-details">
-                              <div className="detail-item">
-                                <span className="detail-label">ROI:</span>
-                                <span className="detail-value" style={{
-                                  color: vehicle.current_value && vehicle.purchase_price && vehicle.current_value > vehicle.purchase_price ? '#008000' : 
-                                         vehicle.current_value && vehicle.purchase_price && vehicle.current_value < vehicle.purchase_price ? '#800000' : 
-                                         'var(--text)'
-                                }}>
-                                  {vehicle.current_value && vehicle.purchase_price ? (
-                                    <>
-                                      {vehicle.current_value > vehicle.purchase_price ? '+' : ''}
-                                      ${(vehicle.current_value - vehicle.purchase_price).toLocaleString()} 
-                                      ({((vehicle.current_value - vehicle.purchase_price) / vehicle.purchase_price * 100).toFixed(0)}%)
-                                    </>
-                                  ) : vehicle.current_value ? `$${vehicle.current_value.toLocaleString()}` : 'Add purchase price'}
-                                </span>
-                              </div>
-                              <div className="detail-item">
-                                <span className="detail-label">Build:</span>
-                                <span className="detail-value">
-                                  {vehicle.image_count || 0} photos · {vehicle.event_count || 0} events
-                                  {vehicle.build_hours ? ` · ${vehicle.build_hours}h` : ''}
-                                </span>
-                              </div>
-                              <div className="detail-item">
-                                <span className="detail-label">Interest:</span>
-                                <span className="detail-value">
-                                  {vehicle.view_count ? `${vehicle.view_count} views` : '0 views'}
-                                  {vehicle.inquiries_count ? ` · ${vehicle.inquiries_count} inquiries` : ''}
-                                  {vehicle.current_bid ? ` · $${vehicle.current_bid.toLocaleString()} bid` : ''}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                          vehicle={vehicle}
+                          relationship={relationship}
+                          onRefresh={loadVehicleRelationships}
+                        />
                       );
                     })}
                   </div>
