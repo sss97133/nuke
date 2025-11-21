@@ -179,18 +179,6 @@ export const IntelligentImageTagger: React.FC<IntelligentImageTaggerProps> = ({
         ]}
         onExit={onClose}
         onChange={handleChange}
-        taskDescription={
-          <div className="p-4 bg-gray-800 text-white">
-            <h3 className="text-lg font-bold mb-2">Image Annotation Tools</h3>
-            <ul className="text-sm space-y-1">
-              <li>🟦 <strong>Box Tool</strong>: Click and drag to create bounding box</li>
-              <li>🔺 <strong>Polygon Tool</strong>: Click points to draw shape, double-click to finish</li>
-              <li>📍 <strong>Point Tool</strong>: Single click to mark location</li>
-              <li>✨ <strong>Auto-segment</strong>: Available with some regions (intelligent selection)</li>
-              <li>⌨️ <strong>Hotkeys</strong>: B=Box, P=Polygon, Pt=Point, S=Select, ESC=Cancel</li>
-            </ul>
-          </div>
-        }
       />
     </div>
   );
