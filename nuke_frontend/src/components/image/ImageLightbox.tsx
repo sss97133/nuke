@@ -110,14 +110,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   } = useImageAnalysis();
 
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [isTagging, setIsTagging] = useState(false);
   const [session, setSession] = useState<any>(null);
-  const [showTagInput, setShowTagInput] = useState(false);
-  const [currentSelection, setCurrentSelection] = useState<{x: number, y: number, width: number, height: number} | null>(null);
-  const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
-  const [tagName, setTagName] = useState('');
   const [rotation, setRotation] = useState(0);
-  const [showProTagger, setShowProTagger] = useState(false);
+  const [showTagger, setShowTagger] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [attribution, setAttribution] = useState<any>(null);
@@ -294,81 +289,6 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     loadImageMetadata();
   }, [loadImageMetadata]);
 
-  // Tagging Logic
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isTagging || !imageRef.current) return;
-    
-    const rect = imageRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    // Only process if click is within image bounds
-    if (x < 0 || x > 100 || y < 0 || y > 100) return;
-    
-    setDragStart({ x, y });
-    setCurrentSelection({ x, y, width: 0, height: 0 });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isTagging || !dragStart || !imageRef.current) return;
-    
-    const rect = imageRef.current.getBoundingClientRect();
-    const currentX = ((e.clientX - rect.left) / rect.width) * 100;
-    const currentY = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    const width = Math.abs(currentX - dragStart.x);
-    const height = Math.abs(currentY - dragStart.y);
-    const x = Math.min(dragStart.x, currentX);
-    const y = Math.min(dragStart.y, currentY);
-    
-      setCurrentSelection({ x, y, width, height });
-  };
-
-  const handleMouseUp = () => {
-    if (!isTagging || !dragStart || !currentSelection) return;
-    
-    // If it's just a point click (no drag), still show input
-    if (currentSelection.width < 1 && currentSelection.height < 1) {
-      // Make it a small point marker
-      setCurrentSelection({
-        x: dragStart.x - 1,
-        y: dragStart.y - 1,
-        width: 2,
-        height: 2
-      });
-    }
-    
-    setShowTagInput(true);
-    setDragStart(null);
-  };
-
-  const createTag = async () => {
-    if (!currentSelection || !tagName.trim() || !imageId || !vehicleId) return;
-    
-    try {
-    await createTagFn(vehicleId, {
-        tag_name: tagName.trim(),
-      tag_type: 'part',
-        x_position: currentSelection.x,
-        y_position: currentSelection.y,
-        width: currentSelection.width,
-        height: currentSelection.height
-    });
-      
-      // Success - clear state and reload tags
-      setTagName('');
-      setShowTagInput(false);
-      setCurrentSelection(null);
-    setIsTagging(false);
-      
-      // Reload tags to show the new one
-      await loadTags();
-    } catch (error) {
-      console.error('Error creating tag:', error);
-      alert('Failed to create tag. Please try again.');
-    }
-  };
-
   // Comments Logic
   const addComment = async () => {
     if (!newComment.trim() || !imageId || !session?.user) return;
@@ -424,15 +344,21 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     document.body.style.overflow = 'hidden';
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft' && onPrev) onPrev();
-      if (e.key === 'ArrowRight' && onNext) onNext();
+      if (e.key === 'Escape') {
+        if (showTagger) {
+          setShowTagger(false);
+        } else {
+          onClose();
+        }
+      }
+      if (e.key === 'ArrowLeft' && onPrev && !showTagger) onPrev();
+      if (e.key === 'ArrowRight' && onNext && !showTagger) onNext();
     };
     
     // Use scroll wheel for image navigation
     const handleWheel = (e: WheelEvent) => {
-      // Only navigate if not in tagging mode and not typing in input
-      if (isTagging || showTagInput || showProTagger) return;
+      // Only navigate if not in tagger
+      if (showTagger) return;
       
       if (e.deltaY > 0 && onNext) {
         e.preventDefault();
@@ -452,20 +378,20 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [onClose, onPrev, onNext, isTagging, showTagInput, showProTagger]);
+  }, [onClose, onPrev, onNext, showTagger]);
 
   if (!isOpen) return null;
 
-  // If Pro Tagger is open, show it fullscreen
-  if (showProTagger) {
+  // If Tagger is open, show it fullscreen
+  if (showTagger) {
     return createPortal(
-      <div className="fixed inset-0 z-[10000] bg-black">
+      <div className="fixed inset-0 z-[10000] bg-[#0a0a0a]">
         <IntelligentImageTagger
           imageUrl={imageUrl}
           imageId={imageId}
           vehicleId={vehicleId}
           onClose={() => {
-            setShowProTagger(false);
+            setShowTagger(false);
             loadTags();
           }}
           onTagsUpdate={() => {
@@ -521,24 +447,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             <>
               <div className="h-6 w-[2px] bg-white/20 mx-1"></div>
               <button
-                onClick={() => setShowProTagger(true)}
+                onClick={() => setShowTagger(true)}
                 className="px-4 py-2 bg-white text-black border-2 border-white text-[10px] font-bold uppercase tracking-wide hover:bg-white/90 transition-all duration-150 hover:translate-y-[-2px] hover:shadow-[0_0_0_3px_rgba(255,255,255,0.2)]"
                 style={{ fontFamily: 'Arial, sans-serif' }}
                 title="Professional annotation tools with intelligent selection"
               >
-                PRO TAG
-              </button>
-              <button
-                onClick={() => setIsTagging(!isTagging)}
-                className={`px-4 py-2 border-2 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 hover:translate-y-[-2px] ${
-                  isTagging 
-                    ? 'bg-white text-black border-white hover:shadow-[0_0_0_3px_rgba(255,255,255,0.2)]' 
-                    : 'bg-transparent border-white/30 text-white hover:border-white hover:bg-white/10 hover:shadow-[0_0_0_3px_rgba(255,255,255,0.1)]'
-                }`}
-                style={{ fontFamily: 'Arial, sans-serif' }}
-                title="Quick tagging mode"
-              >
-                {isTagging ? 'TAGGING' : 'QUICK TAG'}
+                TAG
               </button>
             </>
           )}
@@ -601,27 +515,23 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         <div
           style={{
             position: 'relative',
-            cursor: isTagging ? 'crosshair' : 'default',
             maxWidth: '100%',
             maxHeight: '100%'
           }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-      >
-        <img
-          ref={imageRef}
-          src={imageUrl}
+        >
+          <img
+            ref={imageRef}
+            src={imageUrl}
             alt="Vehicle"
-          onLoad={() => setImageLoaded(true)}
+            onLoad={() => setImageLoaded(true)}
             className="max-w-full max-h-full object-contain select-none"
             style={{ 
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
               transform: `rotate(${rotation}deg)`,
               transition: 'transform 0.3s ease',
               display: 'block'
             }}
-        />
+          />
 
           {/* Markers */}
           {imageLoaded && tags.map(tag => (
@@ -640,68 +550,6 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
             />
           ))}
-          
-          {/* Selection Box */}
-        {currentSelection && (
-          <div style={{
-            position: 'absolute',
-            left: `${currentSelection.x}%`,
-            top: `${currentSelection.y}%`,
-            width: `${currentSelection.width}%`,
-            height: `${currentSelection.height}%`,
-              border: '2px solid rgba(255, 255, 255, 0.9)',
-              background: 'rgba(255, 255, 255, 0.1)',
-              pointerEvents: 'none',
-              boxShadow: '0 0 20px rgba(255, 255, 255, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(2px)'
-          }} />
-        )}
-
-          {/* Tag Input Popup */}
-          {showTagInput && currentSelection && (
-            <div 
-              style={{
-                position: 'absolute',
-                left: `${currentSelection.x + currentSelection.width / 2}%`,
-                top: `${currentSelection.y + currentSelection.height + 2}%`,
-                transform: 'translateX(-50%)',
-                zIndex: 10002
-              }}
-              className="bg-[#0a0a0a] p-4 rounded-lg border-2 border-white/20 shadow-2xl w-72"
-            >
-              <h4 className="text-white text-sm font-bold mb-3 tracking-tight">Label this area</h4>
-              <input
-                autoFocus
-                className="w-full border-2 border-white/30 bg-black/50 p-2.5 text-white text-sm mb-3 rounded focus:border-white focus:outline-none transition-all duration-150 placeholder:text-gray-500"
-                placeholder="e.g. Front Bumper, Rust Spot, Dent"
-                value={tagName}
-                onChange={e => setTagName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && tagName.trim()) {
-                    createTag();
-                  } else if (e.key === 'Escape') {
-                    setShowTagInput(false);
-                    setCurrentSelection(null);
-                  }
-                }}
-              />
-              <div className="flex justify-end gap-2">
-                <button 
-                  onClick={() => { 
-                    setShowTagInput(false); 
-                    setCurrentSelection(null);
-                    setTagName('');
-                  }}
-                  className="px-4 py-2 text-xs text-white/60 hover:text-white font-medium transition-all duration-150"
-                >Cancel</button>
-                <button 
-                  onClick={createTag}
-                  disabled={!tagName.trim()}
-                  className="px-4 py-2 bg-white text-black text-xs rounded font-bold hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 border-2 border-white"
-                >Save Tag</button>
-              </div>
-            </div>
-        )}
         </div>
       </div>
 
