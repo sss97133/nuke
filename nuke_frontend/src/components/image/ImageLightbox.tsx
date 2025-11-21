@@ -604,10 +604,11 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               top: `${currentSelection.y}%`,
               width: `${currentSelection.width}%`,
               height: `${currentSelection.height}%`,
-              border: '3px dashed #00ff00',
-              background: 'rgba(0, 255, 0, 0.15)',
+              border: '2px solid rgba(255, 255, 255, 0.9)',
+              background: 'rgba(255, 255, 255, 0.1)',
               pointerEvents: 'none',
-              boxShadow: '0 0 10px rgba(0, 255, 0, 0.3)'
+              boxShadow: '0 0 20px rgba(255, 255, 255, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(2px)'
             }} />
           )}
 
@@ -621,13 +622,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 transform: 'translateX(-50%)',
                 zIndex: 10002
               }}
-              className="bg-white p-4 rounded shadow-xl w-64 border-2 border-blue-500"
+              className="bg-[#0a0a0a] p-4 rounded-lg border-2 border-white/20 shadow-2xl w-72"
             >
-              <h4 className="text-black text-sm font-bold mb-2">Label this area</h4>
+              <h4 className="text-white text-sm font-bold mb-3 tracking-tight">Label this area</h4>
               <input
                 autoFocus
-                className="w-full border-2 border-gray-300 p-2 text-black text-sm mb-2 rounded focus:border-blue-500 focus:outline-none"
-                placeholder="e.g. Front Bumper"
+                className="w-full border-2 border-white/30 bg-black/50 p-2.5 text-white text-sm mb-3 rounded focus:border-white focus:outline-none transition-all duration-150 placeholder:text-gray-500"
+                placeholder="e.g. Front Bumper, Rust Spot, Dent"
                 value={tagName}
                 onChange={e => setTagName(e.target.value)}
                 onKeyDown={e => {
@@ -646,13 +647,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     setCurrentSelection(null);
                     setTagName('');
                   }}
-                  className="px-3 py-1 text-xs text-gray-600 hover:text-gray-800 font-medium"
+                  className="px-4 py-2 text-xs text-white/60 hover:text-white font-medium transition-all duration-150"
                 >Cancel</button>
                 <button 
                   onClick={createTag}
                   disabled={!tagName.trim()}
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                >Save</button>
+                  className="px-4 py-2 bg-white text-black text-xs rounded font-bold hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 border-2 border-white"
+                >Save Tag</button>
               </div>
             </div>
           )}
