@@ -191,7 +191,7 @@ export class VehicleValuationService {
         .from('vehicle_builds')
         .select('id, total_spent, total_budget')
         .eq('vehicle_id', vehicleId)
-        .single();
+        .maybeSingle();
 
       if (buildData) {
         valuation.totalInvested = Math.max(valuation.totalInvested, buildData.total_spent || 0);
@@ -389,6 +389,54 @@ export class VehicleValuationService {
         .from('vehicle_images')
         .select('id, image_url')
         .eq('vehicle_id', vehicleId);
+      
+      // 3b. Check structured vehicle documents (Receipts, Invoices, etc.)
+      // Fetch all documents and filter client-side to avoid enum type issues with .in()
+      let documents: any[] = [];
+      try {
+        const { data: allDocs, error: docsError } = await supabase
+          .from('vehicle_documents')
+          .select('document_type, title, amount, vendor_name, description')
+          .eq('vehicle_id', vehicleId);
+        
+        if (!docsError && allDocs) {
+          // Filter client-side to avoid .in() syntax issues with enum types
+          const validTypes = ['receipt', 'invoice', 'estimate', 'appraisal', 'service_record'];
+          documents = allDocs.filter((doc: any) => 
+            doc.document_type && validTypes.includes(String(doc.document_type))
+          );
+        }
+      } catch (err) {
+        console.warn('Error loading vehicle_documents:', err);
+        documents = [];
+      }
+
+      if (documents && documents.length > 0) {
+        const docTotal = documents.reduce((sum, doc) => sum + (doc.amount || 0), 0);
+        if (docTotal > 0) {
+          valuation.totalInvested += docTotal;
+          valuation.hasRealData = true;
+          if (!valuation.dataSources.includes('Verified Documents')) {
+            valuation.dataSources.push('Verified Documents');
+          }
+          valuation.confidence = Math.min(valuation.confidence + 10, 95);
+          
+          // Add high-value docs to top parts list if not already there
+          const docItems = documents
+            .filter(d => d.amount && d.amount > 100)
+            .map(d => ({
+              name: d.title || d.description || d.vendor_name || 'Document',
+              price: d.amount,
+              images: [] // Documents might not have image previews in this context yet
+            }))
+            .sort((a, b) => b.price - a.price)
+            .slice(0, 3);
+            
+          valuation.topParts = [...valuation.topParts, ...docItems]
+            .sort((a, b) => b.price - a.price)
+            .slice(0, 5);
+        }
+      }
       
       // Get AI-extracted part values from image tags
       const { data: valueTags } = await supabase

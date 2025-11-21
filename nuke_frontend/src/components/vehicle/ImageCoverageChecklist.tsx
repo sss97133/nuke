@@ -35,59 +35,66 @@ const ImageCoverageChecklist: React.FC<Props> = ({ vehicleId }) => {
 
   const loadCoverage = async () => {
     try {
-      // Get all essential angles with their coverage status
-      const { data: angles, error } = await supabase
-        .from('image_coverage_angles')
+      // Get ALL images for this vehicle
+      const { data: allImages, error: imagesError } = await supabase
+        .from('vehicle_images')
+        .select('id')
+        .eq('vehicle_id', vehicleId);
+
+      if (imagesError) throw imagesError;
+      const totalImages = allImages?.length || 0;
+
+      // Get ALL labeled images with their angles (not just essential)
+      const { data: labeledImages, error: labeledError } = await supabase
+        .from('vehicle_image_angles')
         .select(`
-          id,
-          category,
-          angle_name,
-          display_name,
-          is_essential,
-          vehicle_image_angles!inner (
+          image_id,
+          angle_id,
+          image_coverage_angles (
             id,
-            vehicle_id
+            category,
+            angle_name,
+            display_name,
+            is_essential
           )
         `)
-        .eq('vehicle_image_angles.vehicle_id', vehicleId)
-        .eq('is_essential', true)
-        .order('priority_order');
+        .eq('vehicle_id', vehicleId);
 
-      if (error) throw error;
+      if (labeledError) throw labeledError;
 
-      // Also get all essential angles (to show missing ones)
-      const { data: allEssential } = await supabase
-        .from('image_coverage_angles')
-        .select('*')
-        .eq('is_essential', true)
-        .order('priority_order');
-
-      // Merge to show covered + missing
-      const coverageMap = new Map<string, CoverageAngle>();
+      // Count images per angle
+      const angleCounts = new Map<string, { angle: any; count: number }>();
       
-      allEssential?.forEach(angle => {
-        coverageMap.set(angle.id, {
-          ...angle,
-          has_image: false,
-          image_count: 0
-        });
+      labeledImages?.forEach((link: any) => {
+        const angle = link.image_coverage_angles;
+        if (angle) {
+          const key = angle.id;
+          if (!angleCounts.has(key)) {
+            angleCounts.set(key, { angle, count: 0 });
+          }
+          angleCounts.get(key)!.count++;
+        }
       });
 
-      angles?.forEach((angle: any) => {
-        coverageMap.set(angle.id, {
-          ...angle,
+      // Convert to array and sort by count (most images first)
+      const coverageArray = Array.from(angleCounts.values())
+        .map(({ angle, count }) => ({
+          id: angle.id,
+          category: angle.category,
+          angle_name: angle.angle_name,
+          display_name: angle.display_name || angle.angle_name,
+          is_essential: angle.is_essential,
           has_image: true,
-          image_count: angle.vehicle_image_angles?.length || 0
-        });
-      });
+          image_count: count
+        }))
+        .sort((a, b) => b.image_count - a.image_count);
 
-      const coverageArray = Array.from(coverageMap.values());
       setCoverage(coverageArray);
 
-      // Calculate coverage percent
-      const covered = coverageArray.filter(a => a.has_image).length;
-      const total = coverageArray.length;
-      setCoveragePercent(Math.round((covered / total) * 100));
+      // Calculate labeled percentage
+      const labeledCount = labeledImages?.length || 0;
+      const labeledPercent = totalImages > 0 ? Math.round((labeledCount / totalImages) * 100) : 0;
+      setCoveragePercent(labeledPercent);
 
     } catch (error) {
       console.error('Error loading coverage:', error);
@@ -111,37 +118,17 @@ const ImageCoverageChecklist: React.FC<Props> = ({ vehicleId }) => {
     <div className="card" style={{ marginBottom: '16px' }}>
       <div className="card-header">
         <h3 style={{ margin: 0, fontSize: '11pt', fontWeight: 700 }}>
-          Image Coverage Checklist
+          Image Coverage Analysis
         </h3>
         <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Essential angles documented: {coveragePercent}%
+          {coverage.length > 0 ? `${coverage.reduce((sum, a) => sum + a.image_count, 0)} images labeled` : 'No images labeled yet'}
         </div>
       </div>
       <div className="card-body">
-        {/* Progress bar */}
-        <div style={{
-          width: '100%',
-          height: '8px',
-          background: 'var(--background-secondary)',
-          borderRadius: '4px',
-          marginBottom: '16px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            width: `${coveragePercent}%`,
-            height: '100%',
-            background: coveragePercent >= 80 ? 'var(--color-success)' : 
-                       coveragePercent >= 50 ? 'var(--color-warning)' : 
-                       'var(--color-danger)',
-            transition: 'width 0.3s ease'
-          }} />
-        </div>
-
-        {/* Category breakdown */}
+        {/* Category breakdown - show actual image counts */}
         {Object.entries(byCategory).map(([category, angles]) => {
-          const covered = angles.filter(a => a.has_image).length;
-          const total = angles.length;
-          const percent = Math.round((covered / total) * 100);
+          const totalImagesInCategory = angles.reduce((sum, a) => sum + a.image_count, 0);
+          const uniqueAngles = angles.length;
 
           return (
             <div key={category} style={{ marginBottom: '16px' }}>
@@ -155,7 +142,7 @@ const ImageCoverageChecklist: React.FC<Props> = ({ vehicleId }) => {
                   {categoryNames[category] || category}
                 </div>
                 <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                  {covered}/{total} ({percent}%)
+                  {totalImagesInCategory} images across {uniqueAngles} {uniqueAngles === 1 ? 'angle' : 'angles'}
                 </div>
               </div>
 
@@ -165,15 +152,18 @@ const ImageCoverageChecklist: React.FC<Props> = ({ vehicleId }) => {
                     key={angle.id}
                     style={{
                       padding: '4px 8px',
-                      background: angle.has_image ? 'var(--color-success)' : 'var(--background-secondary)',
-                      color: angle.has_image ? '#fff' : 'var(--text-muted)',
+                      background: 'var(--color-success)',
+                      color: '#fff',
                       borderRadius: '2px',
                       fontSize: '8pt',
-                      border: angle.has_image ? 'none' : '1px dashed var(--border)'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
-                    title={angle.has_image ? `${angle.image_count} image(s)` : 'Missing'}
+                    title={`${angle.image_count} ${angle.image_count === 1 ? 'image' : 'images'} labeled as ${angle.display_name}`}
                   >
-                    {angle.has_image ? '✓' : '○'} {angle.display_name}
+                    <span>{angle.image_count}</span>
+                    <span>{angle.display_name}</span>
                   </div>
                 ))}
               </div>
@@ -181,8 +171,8 @@ const ImageCoverageChecklist: React.FC<Props> = ({ vehicleId }) => {
           );
         })}
 
-        {/* Missing angles alert */}
-        {coveragePercent < 100 && (
+        {/* Info about labeling */}
+        {coverage.length === 0 ? (
           <div style={{
             marginTop: '16px',
             padding: '12px',
@@ -192,37 +182,33 @@ const ImageCoverageChecklist: React.FC<Props> = ({ vehicleId }) => {
             fontSize: '8pt'
           }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>
-              Missing Essential Angles:
+              No images labeled yet
             </div>
-            <div>
-              {coverage.filter(a => !a.has_image).map(a => a.display_name).join(', ')}
+            <div style={{ marginTop: '4px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+              Run the image labeling script to categorize all images with specific angles (taillight_driver, brake_caliper, etc.)
             </div>
-            <div style={{ marginTop: '8px', fontSize: '7pt', color: 'var(--text-muted)' }}>
-              Upload images to fill these gaps and increase documentation quality.
+          </div>
+        ) : (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px',
+            background: 'var(--background-secondary)',
+            borderRadius: '4px',
+            fontSize: '8pt',
+            color: 'var(--text-muted)'
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+              Labeling System:
             </div>
+            <ul style={{ margin: 0, paddingLeft: '20px' }}>
+              <li>Every image is labeled with specific angles (taillight_driver, brake_caliper, etc.)</li>
+              <li>Multiple images can share the same angle label</li>
+              <li>Granular labels help find specific parts quickly</li>
+              <li>AI automatically detects and labels visible parts in each image</li>
+              <li>As you import thousands of images, all will be properly categorized</li>
+            </ul>
           </div>
         )}
-
-        {/* Perspective breakdown (if we have tagged images) */}
-        <div style={{
-          marginTop: '16px',
-          padding: '12px',
-          background: 'var(--background-secondary)',
-          borderRadius: '4px',
-          fontSize: '8pt',
-          color: 'var(--text-muted)'
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: '4px' }}>
-            How Coverage Works:
-          </div>
-          <ul style={{ margin: 0, paddingLeft: '20px' }}>
-            <li>Each angle is a blank to fill (just like VIN, engine, etc.)</li>
-            <li>Multiple images can fill the same angle (different perspectives/quality)</li>
-            <li>Essential angles needed for complete documentation</li>
-            <li>AI auto-tags images with angles + perspective type</li>
-            <li>Wide angle vs telephoto vs standard all tracked</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

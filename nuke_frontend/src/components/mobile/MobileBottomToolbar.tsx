@@ -5,7 +5,8 @@
 
 import React, { useState, useRef } from 'react';
 import { useImageUpload } from '../../hooks/useImageUpload';
-import { MobilePhotoDump } from './MobilePhotoDump';
+import CursorButton from '../CursorButton';
+// import { MobilePhotoDump } from './MobilePhotoDump'; // Component not yet implemented
 
 interface MobileBottomToolbarProps {
   vehicleId: string;
@@ -76,10 +77,33 @@ export const MobileBottomToolbar: React.FC<MobileBottomToolbarProps> = ({
     <>
       {/* Photo Dump Modal */}
       {showPhotoDump && (
-        <MobilePhotoDump 
-          onClose={() => setShowPhotoDump(false)}
-          session={session}
-        />
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{ 
+            background: 'var(--surface)', 
+            padding: 'var(--space-5)', 
+            borderRadius: 'var(--radius)',
+            border: '2px solid var(--border)',
+            maxWidth: '90%'
+          }}>
+            <p style={{ fontSize: '10px', color: 'var(--text)', marginBottom: 'var(--space-3)' }}>
+              Photo Dump feature coming soon
+            </p>
+            <CursorButton onClick={() => setShowPhotoDump(false)} variant="secondary" size="sm">
+              Close
+            </CursorButton>
+          </div>
+        </div>
       )}
 
       {/* Hidden file input for camera/library */}
@@ -92,73 +116,62 @@ export const MobileBottomToolbar: React.FC<MobileBottomToolbarProps> = ({
         onChange={(e) => handleFileUpload(e.target.files)}
       />
 
-      {/* Bottom Toolbar - X/Twitter Style */}
+      {/* Bottom Toolbar - Design System Style */}
       <div style={styles.toolbar}>
         {/* Comment Tool - Left */}
-        <button
+        <CursorButton
           onClick={() => handleToolClick('comment')}
-          style={{
-            ...styles.toolButton,
-            opacity: activeTool === 'comment' ? 1 : 0.6
-          }}
+          variant={activeTool === 'comment' ? 'primary' : 'secondary'}
+          size="md"
           title="Comment"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
-        </button>
+        </CursorButton>
 
         {/* Photo Dump Tool - Upload Multiple Photos */}
         {canUpload && (
-          <button
+          <CursorButton
             onClick={() => setShowPhotoDump(true)}
-            style={{
-              ...styles.toolButton,
-              opacity: 0.8
-            }}
+            variant="secondary"
+            size="md"
             title="Photo Dump - Upload Multiple"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
               <circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
             </svg>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: 'absolute', top: 2, right: 2 }}>
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            </svg>
-          </button>
+          </CursorButton>
         )}
 
         {/* Camera Tool - Center (only for contributors) */}
         {canUpload && (
-          <button
+          <CursorButton
             onClick={() => handleToolClick('camera')}
             disabled={uploading}
-            style={{
-              ...styles.cameraButton,
-              opacity: uploading ? 0.5 : 1
-            }}
+            variant="primary"
+            size="lg"
             title="Take Photo"
           >
-            <span style={{ fontSize: '24px', lineHeight: 1 }}>+</span>
+            <span style={{ fontSize: '20px', lineHeight: 1 }}>+</span>
             {uploading && <div style={styles.uploadingDot} />}
-          </button>
+          </CursorButton>
         )}
 
         {/* Tag/Question Tool - Right */}
-        <button
+        <CursorButton
           onClick={() => handleToolClick('tag')}
-          style={{
-            ...styles.toolButton,
-            opacity: activeTool === 'tag' ? 1 : 0.6
-          }}
+          variant={activeTool === 'tag' ? 'primary' : 'secondary'}
+          size="md"
           title="Pin Question"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="3" />
             <path d="M12 1v6m0 6v10m10-10h-6m-6 0H0" />
           </svg>
-        </button>
+        </CursorButton>
       </div>
 
       {/* Tool Status/Instructions */}
@@ -182,72 +195,42 @@ const styles: Record<string, React.CSSProperties> = {
     bottom: 0,
     left: 0,
     right: 0,
-    height: '56px',
-    background: 'transparent',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    borderTop: 'none',
+    height: '64px',
+    background: 'var(--surface)',
+    borderTop: '2px solid var(--border)',
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    padding: '0 32px',
-    zIndex: 1000
-  },
-  toolButton: {
-    width: '44px',
-    height: '44px',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'opacity 0.2s',
-    color: '#fff',
-    WebkitTapHighlightColor: 'transparent'
-  },
-  cameraButton: {
-    width: '48px',
-    height: '48px',
-    background: 'rgba(0, 0, 0, 0.4)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    position: 'relative',
-    WebkitTapHighlightColor: 'transparent',
-    boxShadow: 'none'
+    padding: 'var(--space-3)',
+    zIndex: 1000,
+    gap: 'var(--space-2)'
   },
   uploadingDot: {
     position: 'absolute',
-    top: '6px',
-    right: '6px',
-    width: '10px',
-    height: '10px',
-    background: '#00ff00',
+    top: '4px',
+    right: '4px',
+    width: '8px',
+    height: '8px',
+    background: 'var(--success)',
     borderRadius: '50%',
     animation: 'pulse 1s infinite'
   },
   toolHint: {
     position: 'fixed',
-    bottom: '66px',
+    bottom: '76px',
     left: '50%',
     transform: 'translateX(-50%)',
-    background: 'rgba(0, 0, 0, 0.75)',
-    color: '#fff',
-    padding: '6px 12px',
-    borderRadius: '16px',
-    fontSize: '7pt',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    background: 'var(--text)',
+    color: 'var(--surface)',
+    padding: 'var(--space-2) var(--space-3)',
+    borderRadius: 'var(--radius)',
+    fontSize: '8px',
+    fontFamily: 'var(--font-family)',
     zIndex: 999,
     maxWidth: '85%',
     textAlign: 'center',
-    pointerEvents: 'none'
+    pointerEvents: 'none',
+    border: '2px solid var(--border)'
   }
 };
 

@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import VehicleRelationshipVerification from './VehicleRelationshipVerification';
 
 interface DealerVehicle {
   id: string;
   vehicle_id: string;
-  listing_status: string;
+  relationship_type: string;
+  status: string;
+  listing_status?: string | null;
   asking_price: number | null;
   cost_basis: number | null;
   days_on_lot: number;
   featured: boolean;
   sale_date: string | null;
   sale_price: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
   created_at: string;
   vehicles: {
     id: string;
@@ -22,6 +27,7 @@ interface DealerVehicle {
     vin?: string;
     current_value?: number;
     mileage?: number;
+    sale_status?: string | null;
   };
   thumbnail_url?: string;
 }
@@ -34,7 +40,7 @@ interface Props {
 }
 
 type ViewMode = 'grid' | 'list' | 'compact';
-type CategoryType = 'all' | 'for_sale' | 'sold' | 'new_arrival' | 'in_build' | 'auction_soon' | 'pending';
+type CategoryType = 'all' | 'for_sale' | 'sold' | 'new_arrival' | 'in_build' | 'auction_soon' | 'pending' | 'service' | 'historical';
 type SortBy = 'newest' | 'oldest' | 'price_high' | 'price_low' | 'days_lot';
 
 const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canEdit, isOwner }) => {
@@ -56,11 +62,14 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
   const loadVehicles = async () => {
     setLoading(true);
     try {
+      // Load ALL vehicles (active, sold, archived) - smart display will categorize them
       const { data, error } = await supabase
         .from('organization_vehicles')
         .select(`
           id,
           vehicle_id,
+          relationship_type,
+          status,
           listing_status,
           asking_price,
           cost_basis,
@@ -68,6 +77,8 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           featured,
           sale_date,
           sale_price,
+          start_date,
+          end_date,
           created_at,
           vehicles!inner(
             id,
@@ -77,11 +88,12 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             trim,
             vin,
             current_value,
-            mileage
+            mileage,
+            sale_status
           )
         `)
         .eq('organization_id', organizationId)
-        .eq('status', 'active')
+        .in('status', ['active', 'sold', 'archived'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -112,11 +124,51 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
     }
   };
 
+  // Smart categorization: Map relationship_type + status to display categories
+  // IMPORTANT: Only mark as "sold" if there's proof (BAT URL, sale_date, approved verification, etc.)
+  const getDisplayCategory = (v: DealerVehicle): string => {
+    // Sold vehicles - ONLY if there's proof
+    // Check for: sale_date, BAT listing (external_listings), or approved sale verification
+    const hasSaleProof = v.sale_date || 
+                        (v.vehicles.sale_status === 'sold' && v.sale_price) ||
+                        (v.status === 'sold' && (v.sale_date || v.sale_price)); // Only if status is explicitly set with proof
+    
+    if (hasSaleProof && v.status === 'sold') {
+      return 'sold';
+    }
+    
+    // If status says "sold" but no proof, treat as inventory (needs verification)
+    if (v.status === 'sold' && !hasSaleProof) {
+      return 'all'; // Show in "all" until verified
+    }
+    
+    // Service/work vehicles
+    if (v.relationship_type === 'work_location' || v.relationship_type === 'service_provider') {
+      return 'service';
+    }
+    
+    // Historical vehicles (past tenure)
+    if (v.end_date && new Date(v.end_date) < new Date()) {
+      return 'historical';
+    }
+    
+    // Active inventory
+    if (v.relationship_type === 'in_stock' || v.relationship_type === 'consigner' || v.relationship_type === 'owner') {
+      return v.listing_status || 'for_sale';
+    }
+    
+    // Default to listing_status if available
+    return v.listing_status || 'all';
+  };
+
   // Filter and sort
   const filteredAndSorted = vehicles
     .filter(v => {
-      // Category filter
-      if (category !== 'all' && v.listing_status !== category) return false;
+      // Category filter - use smart categorization
+      if (category !== 'all') {
+        const displayCategory = getDisplayCategory(v);
+        if (displayCategory !== category) return false;
+      }
       
       // Search filter
       if (searchTerm) {
@@ -138,15 +190,17 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       }
     });
 
-  // Calculate category counts
+  // Calculate category counts using smart categorization
   const counts = {
     all: vehicles.length,
-    for_sale: vehicles.filter(v => v.listing_status === 'for_sale').length,
-    new_arrival: vehicles.filter(v => v.listing_status === 'new_arrival').length,
-    in_build: vehicles.filter(v => v.listing_status === 'in_build').length,
-    auction_soon: vehicles.filter(v => v.listing_status === 'auction_soon').length,
-    pending: vehicles.filter(v => v.listing_status === 'pending').length,
-    sold: vehicles.filter(v => v.listing_status === 'sold').length
+    for_sale: vehicles.filter(v => getDisplayCategory(v) === 'for_sale').length,
+    new_arrival: vehicles.filter(v => getDisplayCategory(v) === 'new_arrival').length,
+    in_build: vehicles.filter(v => getDisplayCategory(v) === 'in_build').length,
+    auction_soon: vehicles.filter(v => getDisplayCategory(v) === 'auction_soon').length,
+    pending: vehicles.filter(v => getDisplayCategory(v) === 'pending').length,
+    sold: vehicles.filter(v => getDisplayCategory(v) === 'sold').length,
+    service: vehicles.filter(v => getDisplayCategory(v) === 'service').length,
+    historical: vehicles.filter(v => getDisplayCategory(v) === 'historical').length
   };
 
   const handleBulkStatusChange = async (newStatus: string) => {
@@ -365,7 +419,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
         overflowX: 'auto',
         paddingBottom: '8px'
       }}>
-        {(['all', 'for_sale', 'new_arrival', 'in_build', 'auction_soon', 'pending', 'sold'] as CategoryType[]).map(cat => (
+        {(['all', 'for_sale', 'sold', 'new_arrival', 'in_build', 'auction_soon', 'pending', 'service', 'historical'] as CategoryType[]).filter(cat => counts[cat] > 0 || cat === 'all').map(cat => (
           <button
             key={cat}
             onClick={() => setCategory(cat)}
@@ -413,7 +467,8 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
               gap: '16px'
             }}>
               {filteredAndSorted.map(v => {
-                const badge = getStatusBadge(v.listing_status);
+                const displayCategory = getDisplayCategory(v);
+                const badge = getStatusBadge(displayCategory);
                 const profit = v.sale_price && v.cost_basis ? v.sale_price - v.cost_basis : null;
                 const isSelected = selectedVehicles.has(v.id);
 
@@ -490,7 +545,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                       )}
 
                       {/* Days on Lot */}
-                      {v.listing_status !== 'sold' && v.days_on_lot > 0 && (
+                      {displayCategory !== 'sold' && v.days_on_lot > 0 && (
                         <div style={{
                           position: 'absolute',
                           bottom: '8px',
@@ -557,7 +612,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                       </div>
 
                       {/* Profit (for sold vehicles, owner only) */}
-                      {isOwner && v.listing_status === 'sold' && profit !== null && (
+                      {isOwner && displayCategory === 'sold' && profit !== null && (
                         <div style={{
                           marginTop: '8px',
                           padding: '6px',
@@ -568,6 +623,21 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           color: profit > 0 ? '#059669' : '#dc2626'
                         }}>
                           {profit > 0 ? '+' : ''}{profit.toLocaleString()} profit
+                        </div>
+                      )}
+
+                      {/* Verification Request Button */}
+                      {canEdit && (
+                        <div style={{ marginTop: '8px' }}>
+                          <VehicleRelationshipVerification
+                            organizationVehicleId={v.id}
+                            currentRelationshipType={v.relationship_type}
+                            currentStatus={v.status}
+                            vehicleId={v.vehicle_id}
+                            onVerificationSubmitted={() => {
+                              loadVehicles();
+                            }}
+                          />
                         </div>
                       )}
                     </div>
@@ -581,7 +651,8 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           {viewMode === 'list' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {filteredAndSorted.map(v => {
-                const badge = getStatusBadge(v.listing_status);
+                const displayCategory = getDisplayCategory(v);
+                const badge = getStatusBadge(displayCategory);
                 const isSelected = selectedVehicles.has(v.id);
 
                 return (
@@ -646,7 +717,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                             {v.vehicles.mileage && (
                               <span>{v.vehicles.mileage.toLocaleString()} mi</span>
                             )}
-                            {v.days_on_lot > 0 && v.listing_status !== 'sold' && (
+                            {v.days_on_lot > 0 && displayCategory !== 'sold' && (
                               <span>{v.days_on_lot} days on lot</span>
                             )}
                           </div>
@@ -701,7 +772,8 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                   </thead>
                   <tbody>
                     {filteredAndSorted.map(v => {
-                      const badge = getStatusBadge(v.listing_status);
+                      const displayCategory = getDisplayCategory(v);
+                      const badge = getStatusBadge(displayCategory);
                       const isSelected = selectedVehicles.has(v.id);
 
                       return (
@@ -745,7 +817,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                             {v.asking_price ? `$${v.asking_price.toLocaleString()}` : '—'}
                           </td>
                           <td style={{ padding: '8px', textAlign: 'center' }}>
-                            {v.listing_status !== 'sold' && v.days_on_lot > 0 ? v.days_on_lot : '—'}
+                            {displayCategory !== 'sold' && v.days_on_lot > 0 ? v.days_on_lot : '—'}
                           </td>
                           <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '7pt' }}>
                             {v.vehicles.vin || '—'}

@@ -16,6 +16,7 @@ import { MobileCommentBox } from './MobileCommentBox';
 import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import VehicleTimeline from '../VehicleTimeline';
+import CursorButton from '../CursorButton';
 
 interface MobileVehicleProfileV2Props {
   vehicleId: string;
@@ -74,13 +75,12 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
       .map(img => img.large_url || img.image_url);
     setHeroImages(heroUrls);
 
-    // Load timeline events (limited to recent 10 for preview)
+    // Load timeline events for 365 viewer
     const { data: eventsData } = await supabase
       .from('vehicle_timeline_events')
       .select('*')
       .eq('vehicle_id', vehicleId)
-      .order('event_date', { ascending: false })
-      .limit(10);
+      .order('event_date', { ascending: false });
     
     setTimelineEvents(eventsData || []);
 
@@ -114,6 +114,49 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
     loadVehicle(); // Refresh after bulk upload
   };
 
+  // Get correct price - prefer asking_price, then purchase_price, then current_value
+  const getDisplayPrice = () => {
+    if (vehicle?.asking_price && vehicle.asking_price > 0) return vehicle.asking_price;
+    if (vehicle?.purchase_price && vehicle.purchase_price > 0) return vehicle.purchase_price;
+    if (vehicle?.current_value && vehicle.current_value > 0) return vehicle.current_value;
+    return null;
+  };
+
+  // Create mini 365 viewer with 4 quarters (90 day sections)
+  const createQuarterlyView = () => {
+    const now = new Date();
+    const quarters = [
+      { label: 'Q1', start: new Date(now.getFullYear(), 0, 1), end: new Date(now.getFullYear(), 2, 31) },
+      { label: 'Q2', start: new Date(now.getFullYear(), 3, 1), end: new Date(now.getFullYear(), 5, 30) },
+      { label: 'Q3', start: new Date(now.getFullYear(), 6, 1), end: new Date(now.getFullYear(), 8, 30) },
+      { label: 'Q4', start: new Date(now.getFullYear(), 9, 1), end: new Date(now.getFullYear(), 11, 31) },
+    ];
+
+    return quarters.map((quarter, idx) => {
+      const eventsInQuarter = timelineEvents.filter(event => {
+        const eventDate = new Date(event.event_date);
+        return eventDate >= quarter.start && eventDate <= quarter.end;
+      });
+
+      const intensity = Math.min(eventsInQuarter.length / 10, 1); // Max 10 events = full intensity
+      const colorIntensity = Math.floor(intensity * 255);
+
+      return (
+        <div
+          key={idx}
+          style={{
+            ...styles.quarterCell,
+            background: `rgba(22, 130, 93, ${intensity * 0.3 + 0.1})`,
+            borderColor: `rgba(22, 130, 93, ${intensity * 0.5 + 0.3})`,
+          }}
+        >
+          <div style={styles.quarterLabel}>{quarter.label}</div>
+          <div style={styles.quarterCount}>{eventsInQuarter.length}</div>
+        </div>
+      );
+    });
+  };
+
   if (!isMobile) {
     return null; // Use desktop version
   }
@@ -126,13 +169,19 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
     );
   }
 
+  const displayPrice = getDisplayPrice();
+
   return (
     <div style={styles.container}>
       {/* Sticky Header - Minimal */}
       <div style={styles.header}>
-        <button onClick={() => window.history.back()} style={styles.backBtn}>
+        <CursorButton 
+          onClick={() => window.history.back()} 
+          variant="secondary"
+          size="sm"
+        >
           ← Back
-        </button>
+        </CursorButton>
         <h1 style={styles.vehicleTitle}>
           {vehicle.year} {vehicle.make} {vehicle.model}
         </h1>
@@ -154,48 +203,52 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
         )}
 
         {/* Price & Key Stats - Inline */}
-        <div style={styles.priceSection}>
-          <div style={styles.priceValue}>
-            ${(vehicle.current_value || 0).toLocaleString()}
+        {displayPrice && (
+          <div style={styles.priceSection}>
+            <div style={styles.priceValue}>
+              ${displayPrice.toLocaleString()}
+            </div>
+            <div style={styles.stats}>
+              {stats?.images || 0} photos • {stats?.events || 0} events
+            </div>
           </div>
-          <div style={styles.stats}>
-            {stats?.images || 0} photos • {stats?.events || 0} events
-          </div>
-        </div>
+        )}
 
         {/* Primary Actions - Upload Controls */}
         {canUpload && (
           <div style={styles.actionButtons}>
-            <button 
+            <CursorButton 
               onClick={() => setShowPhotoDump(true)}
-              style={styles.primaryAction}
+              variant="primary"
+              fullWidth
+              size="md"
             >
               Upload Images
-            </button>
-            <button 
+            </CursorButton>
+            <CursorButton 
               onClick={() => cameraInputRef.current?.click()}
               disabled={uploading}
-              style={styles.secondaryAction}
+              variant="secondary"
+              fullWidth
+              size="md"
             >
               {uploading ? 'UPLOADING...' : 'UPLOAD'}
-            </button>
+            </CursorButton>
           </div>
         )}
 
-        {/* Hidden file input for camera */}
+        {/* Hidden file input for camera and photo library */}
         <input
           ref={cameraInputRef}
           type="file"
           accept="image/*"
           multiple
-          capture="environment"
           style={{ display: 'none' }}
           onChange={(e) => handleCameraUpload(e.target.files)}
         />
 
-        {/* Key Specs - Collapsible */}
+        {/* Key Specs - Enhanced like desktop */}
         <div style={styles.specsSection}>
-          <div style={styles.sectionTitle}>SPECS</div>
           <div style={styles.specsGrid}>
             {vehicle.vin && (
               <div style={styles.specRow}>
@@ -215,35 +268,49 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
                 <span style={styles.specValue}>{vehicle.engine}</span>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Timeline Preview - Horizontal Scroll */}
-        <div style={styles.timelineSection}>
-          <div style={styles.sectionHeader}>
-            <div style={styles.sectionTitle}>TIMELINE</div>
-            <button style={styles.viewAllBtn}>View All →</button>
-          </div>
-          <div style={styles.timelinePreview}>
-            {timelineEvents.slice(0, 5).map((event) => (
-              <div key={event.id} style={styles.timelineCard}>
-                <div style={styles.eventDate}>
-                  {new Date(event.event_date).toLocaleDateString()}
-                </div>
-                <div style={styles.eventTitle}>{event.title}</div>
+            {vehicle.transmission && (
+              <div style={styles.specRow}>
+                <span style={styles.specLabel}>Transmission</span>
+                <span style={styles.specValue}>{vehicle.transmission}</span>
               </div>
-            ))}
+            )}
+            {vehicle.fuel_type && (
+              <div style={styles.specRow}>
+                <span style={styles.specLabel}>Fuel</span>
+                <span style={styles.specValue}>{vehicle.fuel_type}</span>
+              </div>
+            )}
+            {vehicle.drivetrain && (
+              <div style={styles.specRow}>
+                <span style={styles.specLabel}>Drivetrain</span>
+                <span style={styles.specValue}>{vehicle.drivetrain}</span>
+              </div>
+            )}
+            {vehicle.body_style && (
+              <div style={styles.specRow}>
+                <span style={styles.specLabel}>Body</span>
+                <span style={styles.specValue}>{vehicle.body_style}</span>
+              </div>
+            )}
+            {vehicle.color && (
+              <div style={styles.specRow}>
+                <span style={styles.specLabel}>Color</span>
+                <span style={styles.specValue}>{vehicle.color}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Photo Grid - Recent 9 */}
-        <div style={styles.photosSection}>
-          <div style={styles.sectionHeader}>
-            <div style={styles.sectionTitle}>PHOTOS</div>
-            <button style={styles.viewAllBtn}>
-              View All {stats?.images || 0} →
-            </button>
+        {/* Timeline - Mini 365 Viewer (4 Quarters) */}
+        <div style={styles.timelineSection}>
+          <div style={styles.sectionTitle}>TIMELINE</div>
+          <div style={styles.quarterlyViewer}>
+            {createQuarterlyView()}
           </div>
+        </div>
+
+        {/* Photo Grid - No label, just grid */}
+        <div style={styles.photosSection}>
           <div style={styles.photoGrid}>
             {images.slice(0, 9).map((img) => (
               <div
@@ -251,6 +318,12 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
                 onClick={() => setSelectedImage(img)}
                 style={styles.photoTile}
               >
+                <div 
+                  style={{ 
+                    ...styles.photoBlur, 
+                    backgroundImage: `url(${img.thumbnail_url || img.image_url})` 
+                  }} 
+                />
                 <img
                   src={img.thumbnail_url || img.image_url}
                   alt=""
@@ -289,35 +362,38 @@ export const MobileVehicleProfileV2: React.FC<MobileVehicleProfileV2Props> = ({ 
       {/* Floating Action Toolbar - Always Visible */}
       {canUpload && (
         <div style={styles.floatingToolbar}>
-          <button 
+          <CursorButton 
             onClick={() => cameraInputRef.current?.click()}
-            style={styles.toolbarBtn}
+            variant="secondary"
+            size="md"
             title="Camera"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
               <circle cx="12" cy="13" r="4"/>
             </svg>
-          </button>
-          <button 
+          </CursorButton>
+          <CursorButton 
             onClick={() => setShowPhotoDump(true)}
-            style={styles.toolbarBtn}
+            variant="secondary"
+            size="md"
             title="Photo Dump"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
             </svg>
-          </button>
-          <button 
-            style={styles.toolbarBtn}
+          </CursorButton>
+          <CursorButton 
+            variant="secondary"
+            size="md"
             title="Comment"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
-          </button>
+          </CursorButton>
         </div>
       )}
 
@@ -361,10 +437,15 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     height: '100dvh',
     minHeight: '100vh',
+    width: '100vw',
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    zIndex: 9999, // Overlay AppLayout
     display: 'flex',
     flexDirection: 'column',
-    background: '#c0c0c0',
-    fontFamily: '"MS Sans Serif", Arial, sans-serif',
+    background: 'var(--bg)',
+    fontFamily: 'var(--font-family)',
   },
   loading: {
     display: 'flex',
@@ -372,234 +453,203 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     height: '100dvh',
     minHeight: '100vh',
-    fontSize: '14px',
+    fontSize: '8pt',
+    color: 'var(--text)',
   },
   header: {
     position: 'sticky',
     top: 0,
     zIndex: 100,
-    background: '#c0c0c0',
-    borderBottom: '2px solid #808080',
-    padding: '12px',
+    background: 'var(--surface)',
+    borderBottom: '2px solid var(--border)',
+    padding: 'var(--space-3)',
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-  },
-  backBtn: {
-    background: '#c0c0c0',
-    border: '2px outset #ffffff',
-    color: '#000',
-    padding: '6px 12px',
-    fontSize: '14px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
+    gap: 'var(--space-3)',
   },
   vehicleTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
+    fontSize: '8pt',
+    fontWeight: 700,
     margin: 0,
     flex: 1,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    color: 'var(--text)',
   },
   content: {
     flex: 1,
     overflowY: 'auto',
     overflowX: 'hidden',
     WebkitOverflowScrolling: 'touch',
-    background: '#ffffff',
+    background: 'var(--bg)',
   },
   heroSection: {
     width: '100%',
-    background: '#000',
+    position: 'relative',
   },
   priceSection: {
-    padding: '20px',
+    padding: 'var(--space-5)',
     textAlign: 'center',
-    background: '#f5f5f5',
-    borderBottom: '2px solid #e0e0e0',
+    background: 'var(--surface)',
+    borderBottom: '2px solid var(--border)',
   },
   priceValue: {
-    fontSize: '32px',
-    fontWeight: 'bold',
-    color: '#00ff00',
-    fontFamily: 'monospace',
-    marginBottom: '8px',
+    fontSize: '8pt',
+    fontWeight: 700,
+    color: 'var(--text)',
+    fontFamily: 'var(--font-mono)',
+    marginBottom: 'var(--space-2)',
   },
   stats: {
-    fontSize: '13px',
-    color: '#666',
-    fontFamily: 'monospace',
+    fontSize: '8pt',
+    color: 'var(--text-secondary)',
+    fontFamily: 'var(--font-mono)',
   },
   actionButtons: {
     display: 'flex',
-    gap: '12px',
-    padding: '16px',
-    background: '#ffffff',
-    borderBottom: '1px solid #e0e0e0',
-  },
-  primaryAction: {
-    flex: 1,
-    background: '#00ff00',
-    color: '#000',
-    border: '2px outset #ffffff',
-    padding: '16px',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'transform 0.1s ease',
-  },
-  secondaryAction: {
-    flex: 1,
-    background: '#c0c0c0',
-    color: '#000',
-    border: '2px outset #ffffff',
-    padding: '16px',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'transform 0.1s ease',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-4)',
+    background: 'var(--bg)',
+    borderBottom: '2px solid var(--border)',
   },
   specsSection: {
-    padding: '16px',
-    background: '#ffffff',
-    borderBottom: '1px solid #e0e0e0',
+    padding: 'var(--space-4)',
+    background: 'var(--bg)',
+    borderBottom: '2px solid var(--border)',
   },
   sectionTitle: {
-    fontSize: '12px',
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: '12px',
+    fontSize: '8pt',
+    fontWeight: 700,
+    color: 'var(--text)',
+    marginBottom: 'var(--space-3)',
     letterSpacing: '0.5px',
+    textTransform: 'uppercase',
   },
   specsGrid: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: 'var(--space-2)',
   },
   specRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '8px',
-    background: '#f5f5f5',
-    border: '1px solid #e0e0e0',
+    padding: 'var(--space-2)',
+    background: 'var(--surface)',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)',
   },
   specLabel: {
-    fontSize: '12px',
-    color: '#666',
+    fontSize: '8pt',
+    color: 'var(--text-secondary)',
   },
   specValue: {
-    fontSize: '12px',
-    fontWeight: 'bold',
-    color: '#000',
-    fontFamily: 'monospace',
+    fontSize: '8pt',
+    fontWeight: 600,
+    color: 'var(--text)',
+    fontFamily: 'var(--font-mono)',
   },
   timelineSection: {
-    padding: '16px',
-    background: '#ffffff',
-    borderBottom: '1px solid #e0e0e0',
+    padding: 'var(--space-4)',
+    background: 'var(--bg)',
+    borderBottom: '2px solid var(--border)',
   },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '12px',
+  quarterlyViewer: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: 'var(--space-2)',
   },
-  viewAllBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#0066cc',
-    fontSize: '12px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-  },
-  timelinePreview: {
+  quarterCell: {
+    aspectRatio: '1',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '2px solid var(--success)',
+    borderRadius: 'var(--radius)',
+    padding: 'var(--space-2)',
   },
-  timelineCard: {
-    padding: '12px',
-    background: '#f9f9f9',
-    border: '1px solid #e0e0e0',
-    borderLeft: '3px solid #00ff00',
+  quarterLabel: {
+    fontSize: '8pt',
+    fontWeight: 700,
+    color: 'var(--text)',
+    marginBottom: 'var(--space-1)',
   },
-  eventDate: {
-    fontSize: '11px',
-    color: '#666',
-    marginBottom: '4px',
-    fontFamily: 'monospace',
-  },
-  eventTitle: {
-    fontSize: '13px',
-    color: '#000',
-    fontWeight: 'bold',
+  quarterCount: {
+    fontSize: '8pt',
+    fontFamily: 'var(--font-mono)',
+    color: 'var(--text)',
   },
   photosSection: {
-    padding: '16px',
-    background: '#ffffff',
-    borderBottom: '1px solid #e0e0e0',
+    padding: 'var(--space-4)',
+    background: 'var(--bg)',
+    borderBottom: '2px solid var(--border)',
   },
   photoGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '4px',
+    gap: 'var(--space-1)',
   },
   photoTile: {
     aspectRatio: '1',
     overflow: 'hidden',
     cursor: 'pointer',
-    background: '#000',
-    border: '1px solid #ccc',
+    position: 'relative',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    transition: 'var(--transition)',
   },
   photoImage: {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
+    objectPosition: 'center',
+    position: 'relative',
+    zIndex: 1,
+  },
+  photoBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    filter: 'blur(20px)',
+    opacity: 0.4,
+    zIndex: 0,
   },
   commentsSection: {
-    padding: '16px',
-    background: '#ffffff',
-    borderBottom: '1px solid #e0e0e0',
+    padding: 'var(--space-4)',
+    background: 'var(--bg)',
+    borderBottom: '2px solid var(--border)',
   },
   tradingSection: {
-    padding: '16px',
-    background: '#f5f5f5',
-    borderTop: '2px solid #e0e0e0',
+    padding: 'var(--space-4)',
+    background: 'var(--surface)',
+    borderTop: '2px solid var(--border)',
   },
   tradingPlaceholder: {
-    padding: '40px 20px',
+    padding: 'var(--space-6) var(--space-5)',
     textAlign: 'center',
-    color: '#999',
-    fontSize: '13px',
-    border: '1px dashed #ccc',
+    color: 'var(--text-disabled)',
+    fontSize: '8pt',
+    border: '2px dashed var(--border)',
+    borderRadius: 'var(--radius)',
   },
   floatingToolbar: {
     position: 'fixed',
     bottom: 0,
     left: 0,
     right: 0,
-    background: '#000',
-    borderTop: '2px solid #00ff00',
+    background: 'var(--surface)',
+    borderTop: '2px solid var(--border)',
     display: 'flex',
     justifyContent: 'space-around',
-    padding: '12px',
+    padding: 'var(--space-3)',
     zIndex: 1000,
-  },
-  toolbarBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#00ff00',
-    cursor: 'pointer',
-    padding: '8px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'transform 0.1s ease',
-    WebkitTapHighlightColor: 'transparent',
+    gap: 'var(--space-2)',
   },
 };
 
 export default MobileVehicleProfileV2;
-

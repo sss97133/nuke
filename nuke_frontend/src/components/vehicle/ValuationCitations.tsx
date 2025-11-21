@@ -65,6 +65,11 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
 
   const loadCitations = async () => {
     try {
+      // Use RPC data if available for valuation (eliminates duplicate query)
+      const rpcData = (window as any).__vehicleProfileRpcData;
+      // Note: valuation_citations is not in RPC yet, but we can use latest_valuation
+      // For now, still query citations separately (Phase 2: add to RPC)
+      
       const { data, error } = await supabase
         .from('valuation_citations')
         .select('*')

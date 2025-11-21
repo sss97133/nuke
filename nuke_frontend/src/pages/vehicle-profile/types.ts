@@ -7,6 +7,7 @@ export interface Vehicle {
   year: number;
   make: string;
   model: string;
+  series?: string | null;
   vin: string | null;
   color: string | null;
   mileage: number | null;
@@ -33,6 +34,11 @@ export interface Vehicle {
   purchase_price?: number;
   msrp?: number;
   uploaded_by?: string;
+  profile_origin?: string;
+  origin_organization_id?: string;
+  origin_metadata?: any;
+  bat_auction_url?: string;
+  discovery_url?: string;
   [key: string]: any;
 }
 
@@ -89,25 +95,78 @@ export interface VehicleBaseProps {
   permissions: VehiclePermissions;
 }
 
-export interface VehicleHeaderProps extends VehicleBaseProps {
-  responsibleName: string | null;
-  onPriceClick: () => void;
-  initialValuation?: any | null; // From RPC to avoid duplicate query
-  initialPriceSignal?: any | null; // From RPC to avoid duplicate query
-  organizationLinks?: LinkedOrg[];
+export interface VehicleHeaderProps {
+  vehicle: Vehicle | null;
+  isOwner: boolean;
+  canEdit: boolean;
+  session?: any;
+  permissions?: VehiclePermissions;
+  responsibleName?: string;
+  onPriceClick?: () => void;
+  initialValuation?: any;
+  initialPriceSignal?: any;
+  organizationLinks?: any[];
+  onClaimClick?: () => void;
 }
 
 export interface VehicleHeroImageProps {
   leadImageUrl: string | null;
 }
 
+// Removed duplicate - see VehicleBasicInfoProps below that extends VehicleBaseProps
+
+export interface VehicleBaseProps {
+  vehicle: Vehicle | null;
+  session?: any;
+  permissions?: any;
+}
+
+export interface VehiclePricingSectionProps {
+  vehicle: Vehicle | null;
+  saleSettings?: any;
+  isOwner: boolean;
+}
+
+export interface WorkMemorySectionProps {
+  vehicleId: string;
+  permissions: any;
+}
+
+export interface ImageGalleryV2Props {
+  vehicleId: string;
+  vehicleYMM?: { year?: number; make?: string; model?: string };
+  onImagesUpdated?: () => void;
+  showUpload?: boolean;
+}
+
+export interface FinancialProductsProps {
+  vehicleId: string;
+  vehicleName?: string;
+  vehicleValue?: number;
+}
+
+export interface MobilePhotoDumpProps {
+  onClose: () => void;
+  session: any;
+  vehicleId?: string;
+}
+
+export interface LinkedOrganizationsProps {
+  organizations: any[];
+}
+
+export interface MobileVehicleProfileV2Props {
+  vehicleId?: string;
+  isMobile?: boolean;
+}
+
 export interface VehicleBasicInfoProps extends VehicleBaseProps {
-  onDataPointClick: (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => void;
-  onEditClick: () => void;
+  onDataPointClick?: (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => void;
+  onEditClick?: () => void;
 }
 
 export interface VehicleTimelineSectionProps extends VehicleBaseProps {
-  onAddEventClick: () => void;
+  onAddEventClick?: () => void;
 }
 
 export interface VehicleImageGalleryProps extends VehicleBaseProps {

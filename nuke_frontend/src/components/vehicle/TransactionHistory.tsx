@@ -9,13 +9,14 @@ interface TransactionHistoryProps {
 interface Transaction {
   id: string;
   transaction_type: string;
-  transaction_date: string;
-  amount_usd: number;
+  transaction_date?: string;
+  amount: number;
+  currency?: string;
   from_party?: string;
   to_party?: string;
   notes?: string;
   logged_by?: string;
-  created_at: string;
+  inserted_at: string;
 }
 
 const TRANSACTION_TYPES: Record<string, { label: string; icon: React.ComponentType; color: string }> = {
@@ -39,7 +40,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
   const loadTransactions = async () => {
     try {
       const { data, error } = await supabase
-        .from('vehicle_transactions')
+        .from('vehicle_financial_transactions')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('transaction_date', { ascending: false });
@@ -73,8 +74,10 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
   // Calculate value change
   const firstTransaction = transactions[transactions.length - 1];
   const lastTransaction = transactions[0];
-  const valueChange = lastTransaction.amount_usd - firstTransaction.amount_usd;
-  const percentChange = ((valueChange / firstTransaction.amount_usd) * 100).toFixed(1);
+  const valueChange = lastTransaction.amount - firstTransaction.amount;
+  const percentChange = firstTransaction.amount !== 0
+    ? ((valueChange / firstTransaction.amount) * 100).toFixed(1)
+    : '0.0';
 
   return (
     <div className="card">
@@ -170,7 +173,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
                           <div className="flex items-center gap-3 text-xs text-gray-600">
                             <span className="flex items-center gap-1">
                               <FiCalendar className="w-3 h-3" />
-                              {new Date(transaction.transaction_date).toLocaleDateString()}
+                              {new Date(transaction.transaction_date || transaction.inserted_at).toLocaleDateString()}
                             </span>
                             {transaction.logged_by && (
                               <span className="flex items-center gap-1">
@@ -190,14 +193,17 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
 
                       <div className="ml-4 text-right">
                         <div className="text-2xl font-bold text-gray-900">
-                          ${transaction.amount_usd.toLocaleString()}
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: transaction.currency || 'USD'
+                          }).format(transaction.amount)}
                         </div>
                         {index > 0 && (
                           <div className="mt-1 text-xs">
                             {(() => {
-                              const prevAmount = transactions[index - 1].amount_usd;
-                              const diff = transaction.amount_usd - prevAmount;
-                              const pct = ((diff / prevAmount) * 100).toFixed(1);
+                              const prevAmount = transactions[index - 1].amount;
+                              const diff = transaction.amount - prevAmount;
+                              const pct = prevAmount !== 0 ? ((diff / prevAmount) * 100).toFixed(1) : '0.0';
                               return (
                                 <span className={diff >= 0 ? 'text-green-600' : 'text-red-600'}>
                                   {diff >= 0 ? '+' : ''}{pct}%

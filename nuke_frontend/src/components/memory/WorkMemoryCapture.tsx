@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from '../../lib/supabase';
 import type { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import type { Button } from '../ui/button';
 import type { Textarea } from '../ui/textarea';
@@ -49,19 +50,50 @@ const WorkMemoryCapture: React.FC<WorkMemoryCaptureProps> = ({
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/vehicles/${vehicleId}/memories`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memory_text: memoryText,
-          confidence_level: 'pretty_sure', // Default confidence
-          has_photos: false, // Default to false
-          has_receipts: false // Default to false
-        })
-      });
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
 
-      if (response.ok) {
-        const newMemory = await response.json();
+      const newMemoryEntry = {
+        vehicle_id: vehicleId,
+        user_id: user?.id,
+        event_type: 'work_note',
+        source: 'user_input',
+        event_date: new Date().toISOString().split('T')[0],
+        title: 'Work Note',
+        description: memoryText,
+        confidence_score: 100,
+        metadata: {
+          memory_text: memoryText,
+          confidence_level: 'pretty_sure',
+          has_photos: false,
+          has_receipts: false,
+          brands_mentioned: [],
+          parts_mentioned: [],
+          people_involved: []
+        }
+      };
+
+      const { data, error } = await supabase
+        .from('timeline_events')
+        .insert([newMemoryEntry])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const newMemory: WorkMemoryEntry = {
+          id: data.id,
+          memory_text: memoryText,
+          confidence_level: 'pretty_sure',
+          brands_mentioned: [],
+          parts_mentioned: [],
+          people_involved: [],
+          has_photos: false,
+          has_receipts: false,
+          created_at: data.created_at
+        };
+        
         setRecentMemories([newMemory, ...recentMemories.slice(0, 4)]);
         setMemoryText('');
         onMemoryAdded?.(newMemory);

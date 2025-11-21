@@ -15,7 +15,8 @@ interface VehicleImage {
   medium_url?: string;
   large_url?: string;
   taken_at?: string;
-  uploaded_at: string;
+  uploaded_at?: string;
+  created_at?: string;
   category?: string;
   is_sensitive?: boolean;
   sensitivity_type?: string;
@@ -31,7 +32,7 @@ interface VehicleImage {
 }
 
 // Essential angles that should be displayed first (the "money shots")
-const ESSENTIAL_ANGLE_PRIORITY: Record<string, number> = {
+export const ESSENTIAL_ANGLE_PRIORITY: Record<string, number> = {
   // Exterior hero shots (highest priority)
   'Front Quarter (Driver)': 100,
   'Front Quarter (Passenger)': 95,
@@ -72,12 +73,20 @@ const ESSENTIAL_ANGLE_PRIORITY: Record<string, number> = {
 function calculatePriorityScore(image: VehicleImage): number {
   let score = 0;
   
-  // 1. Check if it's a work documentation image (should be buried)
-  if (image.is_sensitive && (
+  // 1. Check if it's a work documentation image or low-quality type (should be buried)
+  const category = (image.category || '').toLowerCase();
+  const isDocument = category.includes('document') || category.includes('receipt') || category.includes('invoice') || category.includes('screenshot');
+  const isPart = category.includes('part') || category.includes('component') || category.includes('tool');
+  
+  if ((image.is_sensitive && (
     image.sensitivity_type === 'work_order' ||
     image.sensitivity_type === 'internal_only'
-  )) {
+  )) || isDocument) {
     return -1000; // Very low priority - buried at the end
+  }
+
+  if (isPart) {
+    return -500; // Low priority - below vehicle shots but above docs
   }
   
   // 2. Check for essential angles
@@ -107,7 +116,7 @@ function calculatePriorityScore(image: VehicleImage): number {
   
   // 3. Recency bonus for essential angles (newer is better for money shots)
   if (score > 50) { // Only for high-priority angles
-    const imageDate = new Date(image.taken_at || image.uploaded_at);
+    const imageDate = new Date(image.taken_at || image.uploaded_at || image.created_at || Date.now());
     const now = new Date();
     const daysSinceImage = (now.getTime() - imageDate.getTime()) / (1000 * 60 * 60 * 24);
     
@@ -134,7 +143,7 @@ export function sortImagesByPriority(images: VehicleImage[]): VehicleImage[] {
   const imagesWithScores = images.map(image => ({
     image,
     score: calculatePriorityScore(image),
-    date: new Date(image.taken_at || image.uploaded_at)
+    date: new Date(image.taken_at || image.uploaded_at || image.created_at || Date.now())
   }));
   
   // Sort by:

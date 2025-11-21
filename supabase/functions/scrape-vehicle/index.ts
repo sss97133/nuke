@@ -594,6 +594,36 @@ function scrapeBringATrailer(doc: any, url: string): any {
       data.sale_price = parseInt(priceMatch[1].replace(/,/g, ''))
     }
 
+    // Extract seller - look for "Sold by [seller]" or "by [seller] on"
+    const sellerPatterns = [
+      /Sold\s+by\s+([A-Za-z0-9\s&]+?)(?:\s+on|\s+for|$)/i,
+      /by\s+([A-Za-z0-9\s&]+?)\s+on\s+Bring\s+a\s+Trailer/i,
+      /Consignor[:\s]+([A-Za-z0-9\s&]+)/i,
+      /Seller[:\s]+([A-Za-z0-9\s&]+)/i
+    ]
+    for (const pattern of sellerPatterns) {
+      const match = bodyText.match(pattern)
+      if (match && match[1]) {
+        data.seller = match[1].trim()
+        break
+      }
+    }
+
+    // Extract buyer - look for "Sold to [buyer] for" or "won by [buyer]"
+    const buyerPatterns = [
+      /Sold\s+to\s+([A-Za-z0-9\s&]+?)\s+for/i,
+      /won\s+by\s+([A-Za-z0-9\s&]+?)(?:\s+for|$)/i,
+      /Buyer[:\s]+([A-Za-z0-9\s&]+)/i,
+      /Purchased\s+by\s+([A-Za-z0-9\s&]+)/i
+    ]
+    for (const pattern of buyerPatterns) {
+      const match = bodyText.match(pattern)
+      if (match && match[1]) {
+        data.buyer = match[1].trim()
+        break
+      }
+    }
+
     // Extract images from data-gallery-items JSON if present
     const images: string[] = []
     const galleryEl = doc.querySelector('[data-gallery-items]') as any

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import type { vehicleAPI } from '../../services/api';
+import { vehicleService } from '../../services/supabase/vehicleService';
+import { supabase } from '../../lib/supabase';
 import type { Vehicle } from '../../types';
 import VehicleMakeModelInput from '../forms/VehicleMakeModelInput';
 
@@ -47,8 +48,7 @@ const VehicleForm = () => {
       
       try {
         setLoading(true);
-        const response = await vehicleAPI.getVehicle(id);
-        const vehicle = response.data;
+        const vehicle = await vehicleService.getById(id);
         
         // Populate form with vehicle data
         setFormData({
@@ -103,18 +103,16 @@ const VehicleForm = () => {
       
       if (id) {
         // Update existing vehicle
-        await vehicleAPI.updateVehicle(id, vehicleData);
+        await vehicleService.update(id, vehicleData);
         // TODO: Update relationship if changed
       } else {
         // Create new vehicle
-        const response = await vehicleAPI.createVehicle(vehicleData);
+        const data = await vehicleService.create(vehicleData);
         
         // Set the relationship for the new vehicle
-        if (response.data?.id && relationship_type !== 'owned') {
-          // Import supabase here to avoid circular dependency
-          const { supabase } = await import('../../lib/supabase');
+        if (data?.id && relationship_type !== 'owned') {
           const { error: relationshipError } = await supabase.rpc('update_vehicle_relationship', {
-            p_vehicle_id: response.data.id,
+            p_vehicle_id: data.id,
             p_user_id: (await supabase.auth.getUser()).data.user?.id,
             p_relationship_type: relationship_type
           });

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import type { vehicleAPI } from '../../services/api';
 import VehicleThumbnail from '../VehicleThumbnail';
-import type { useVehiclesWithImages } from '../../hooks/useVehicleImages';
+import { useVehiclesWithImages } from '../../hooks/useVehicleImages';
 import type { Vehicle } from '../../types';
 
 const VehicleList = () => {

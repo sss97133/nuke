@@ -43,9 +43,10 @@ const RestorationFormsPanel: React.FC<RestorationFormsPanelProps> = ({ vehicleId
   const loadAvailableForms = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/vehicles/${vehicleId}/forms`);
-      const data = await response.json();
-      setForms(data.forms || []);
+      // TODO: Implement Supabase fetch for forms
+      // const response = await fetch(`/api/vehicles/${vehicleId}/forms`);
+      // const data = await response.json();
+      setForms([]); // Return empty list for now to prevent crash
     } catch (error) {
       console.error('Error loading restoration forms:', error);
     } finally {

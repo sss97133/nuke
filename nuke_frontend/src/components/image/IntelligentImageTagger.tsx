@@ -46,8 +46,7 @@ export const IntelligentImageTagger: React.FC<IntelligentImageTaggerProps> = ({
       const { data, error } = await supabase
         .from('vehicle_image_tags')
         .select('*')
-        .eq('image_id', imageId)
-        .eq('vehicle_id', vehicleId);
+        .eq('image_id', imageId);
 
       if (error) throw error;
 
@@ -56,13 +55,13 @@ export const IntelligentImageTagger: React.FC<IntelligentImageTaggerProps> = ({
         const convertedRegions = data.map((tag) => ({
           id: tag.id,
           cls: tag.tag_type || 'part',
-          comment: tag.tag_name,
-          tags: [tag.tag_name],
+          comment: tag.tag_text || tag.tag_name || 'Untitled',
+          tags: [tag.tag_text || tag.tag_name || 'Untitled'],
           type: 'box',
-          x: tag.x_position / 100, // Convert from percentage to decimal
-          y: tag.y_position / 100,
-          w: tag.width / 100,
-          h: tag.height / 100
+          x: tag.x_position ? tag.x_position / 100 : 0, // Convert from integer (0-10000) to decimal
+          y: tag.y_position ? tag.y_position / 100 : 0,
+          w: 0.02, // Default small width (not stored in schema)
+          h: 0.02  // Default small height (not stored in schema)
         }));
 
         setRegions(convertedRegions);
@@ -86,16 +85,11 @@ export const IntelligentImageTagger: React.FC<IntelligentImageTaggerProps> = ({
       if (newRegion) {
         // Save new annotation to database
         const { error } = await supabase.from('vehicle_image_tags').insert({
-          vehicle_id: vehicleId,
           image_id: imageId,
-          tag_name: newRegion.comment || newRegion.tags?.[0] || 'Untitled',
+          tag_text: newRegion.comment || newRegion.tags?.[0] || 'Untitled',
           tag_type: newRegion.cls || 'part',
-          x_position: (newRegion.x || 0) * 100, // Convert to percentage
-          y_position: (newRegion.y || 0) * 100,
-          width: (newRegion.w || 0) * 100,
-          height: (newRegion.h || 0) * 100,
-          source_type: 'manual',
-          verified: false
+          x_position: Math.round((newRegion.x || 0) * 100), // Convert to integer (0-10000)
+          y_position: Math.round((newRegion.y || 0) * 100)
         });
 
         if (error) throw error;
@@ -130,12 +124,10 @@ export const IntelligentImageTagger: React.FC<IntelligentImageTaggerProps> = ({
         const { error } = await supabase
           .from('vehicle_image_tags')
           .update({
-            tag_name: updatedRegion.comment || updatedRegion.tags?.[0] || 'Untitled',
+            tag_text: updatedRegion.comment || updatedRegion.tags?.[0] || 'Untitled',
             tag_type: updatedRegion.cls || 'part',
-            x_position: (updatedRegion.x || 0) * 100,
-            y_position: (updatedRegion.y || 0) * 100,
-            width: (updatedRegion.w || 0) * 100,
-            height: (updatedRegion.h || 0) * 100
+            x_position: Math.round((updatedRegion.x || 0) * 100),
+            y_position: Math.round((updatedRegion.y || 0) * 100)
           })
           .eq('id', updatedRegion.id);
 

@@ -61,7 +61,6 @@ import Shops from './pages/Shops';
 import ShopOnboarding from './pages/ShopOnboarding';
 import Organizations from './pages/Organizations';
 import OrganizationProfile from './pages/OrganizationProfile';
-import OrganizationProfileNew from './pages/OrganizationProfileNew';
 import CreateOrganization from './pages/CreateOrganization';
 import ErrorBoundary from './components/util/ErrorBoundary';
 import AcceptInvite from './pages/AcceptInvite';
@@ -85,6 +84,15 @@ import ShippingSettings from './pages/admin/ShippingSettings';
 import { MobileOrg } from './pages/mobile/MobileOrg';
 import InvestorDashboardPage from './pages/InvestorDashboard';
 import MergeProposalsDashboard from './pages/MergeProposalsDashboard';
+import Library from './pages/Library';
+import ExtractionReview from './pages/ExtractionReview';
+
+// Financial & Accounting components
+import InvoiceManager from './pages/InvoiceManager';
+import ShopFinancials from './pages/ShopFinancials';
+import SupplierDashboard from './pages/SupplierDashboard';
+import ContractManager from './pages/ContractManager';
+import KnowledgeBase from './pages/KnowledgeBase';
 
 // Auth components
 import ResetPassword from './pages/ResetPassword';
@@ -282,6 +290,13 @@ function App() {
             <Route path="/browse-investments" element={<BrowseInvestments />} />
             <Route path="/investor/dashboard" element={<InvestorDashboardPage />} />
             
+            {/* Financial & Accounting Management */}
+            <Route path="/invoices" element={<InvoiceManager />} />
+            <Route path="/financials" element={<ShopFinancials />} />
+            <Route path="/suppliers" element={<SupplierDashboard />} />
+            <Route path="/contracts" element={<ContractManager />} />
+            <Route path="/knowledge" element={<KnowledgeBase />} />
+            
             {/* Vehicle Management */}
             <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
             <Route path="/vehicle/:vehicleId/edit" element={<EditVehicle />} />
@@ -305,6 +320,7 @@ function App() {
             <Route path="/admin/price-editor" element={<BulkPriceEditor />} />
             <Route path="/admin/price-import" element={<PriceCsvImport />} />
             <Route path="/admin/shipping-settings" element={<ShippingSettings />} />
+            <Route path="/admin/extraction-review" element={<ExtractionReview />} />
             
             {/* Transaction & Signature Routes */}
             <Route path="/sign/:token" element={<SignDocument />} />
@@ -312,6 +328,7 @@ function App() {
             <Route path="/shops/onboarding" element={<Navigate to="/org/create" replace />} />
             <Route path="/shops/new" element={<CreateOrganization />} />
             <Route path="/organizations" element={<Organizations />} />
+            <Route path="/library" element={<Library />} />
             <Route path="/org/create" element={<CreateOrganization />} />
             <Route path="/org/:id" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} />
             <Route path="/mobile/org/:orgId" element={<MobileOrg />} />

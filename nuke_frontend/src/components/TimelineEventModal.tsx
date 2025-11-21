@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { generateTimelineEventDescription } from '../services/intelligentEventDescription';
+import type { IntelligentDescription } from '../services/intelligentEventDescription';
+import { EventFinancialService } from '../services/eventFinancialService';
+import type { 
+  EventFinancialSummary, 
+  PartDetail, 
+  ToolDetail,
+  KnowledgeDetail 
+} from '../services/eventFinancialService';
 
 interface TimelineEvent {
   id: string;
@@ -44,6 +53,17 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
   const [correctionData, setCorrectionData] = useState({ field: '', currentValue: '', correctedValue: '', reason: '' });
   const [taggedPeople, setTaggedPeople] = useState<string[]>([]);
   const [newPersonName, setNewPersonName] = useState('');
+  const [intelligentDescription, setIntelligentDescription] = useState<IntelligentDescription | null>(null);
+  const [loadingDescription, setLoadingDescription] = useState(false);
+  
+  // Financial data
+  const [financialSummary, setFinancialSummary] = useState<EventFinancialSummary | null>(null);
+  const [partDetails, setPartDetails] = useState<PartDetail[]>([]);
+  const [toolDetails, setToolDetails] = useState<ToolDetail[]>([]);
+  const [knowledgeDetails, setKnowledgeDetails] = useState<KnowledgeDetail[]>([]);
+  const [loadingFinancials, setLoadingFinancials] = useState(false);
+  const [showFinancials, setShowFinancials] = useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
 
   const currentEvent = events[selectedEventIndex];
 
@@ -97,6 +117,50 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
     };
 
     loadEventImages();
+    
+    // Load intelligent description
+    if (currentEvent) {
+      setLoadingDescription(true);
+      generateTimelineEventDescription(
+        currentEvent.id,
+        currentEvent.vehicle_id,
+        currentEvent.event_date
+      ).then(desc => {
+        setIntelligentDescription(desc);
+        setLoadingDescription(false);
+      }).catch(err => {
+        console.error('Error loading intelligent description:', err);
+        setLoadingDescription(false);
+      });
+    }
+  }, [currentEvent]);
+  
+  // Load financial data for current event
+  useEffect(() => {
+    if (!currentEvent) return;
+    
+    const loadFinancialData = async () => {
+      setLoadingFinancials(true);
+      try {
+        const [summary, parts, tools, knowledge] = await Promise.all([
+          EventFinancialService.getEventFinancialSummary(currentEvent.id),
+          EventFinancialService.getEventParts(currentEvent.id),
+          EventFinancialService.getEventTools(currentEvent.id),
+          EventFinancialService.getEventKnowledge(currentEvent.id)
+        ]);
+        
+        setFinancialSummary(summary);
+        setPartDetails(parts);
+        setToolDetails(tools);
+        setKnowledgeDetails(knowledge);
+      } catch (error) {
+        console.error('Error loading financial data:', error);
+      } finally {
+        setLoadingFinancials(false);
+      }
+    };
+    
+    loadFinancialData();
   }, [currentEvent]);
 
   const parseExifDate = (exifDateString: string): string | null => {
@@ -241,56 +305,76 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.75)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 50
+      }}
       onClick={onClose}
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       <div 
-        className="bg-white max-w-4xl max-h-[90vh] w-full mx-4 flex flex-col"
         style={{ 
-          fontFamily: 'Arial, sans-serif',
-          border: '1px solid #bdbdbd',
-          borderRadius: '2px'
+          background: 'var(--surface)',
+          maxWidth: '1200px',
+          maxHeight: '90vh',
+          width: '100%',
+          margin: '0 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          border: '2px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          overflow: 'hidden'
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b" style={{ 
-          padding: '8px', 
-          borderBottom: '1px solid #e0e0e0',
-          backgroundColor: '#f5f5f5'
+        <div style={{ 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: 'var(--space-2)', 
+          borderBottom: '2px solid var(--border)',
+          background: 'var(--bg)'
         }}>
-          <div className="flex items-center" style={{ gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <button
               onClick={() => onNavigate('prev')}
               disabled={selectedEventIndex === 0}
               style={{
-                padding: '4px',
-                border: '1px solid #bdbdbd',
-                backgroundColor: selectedEventIndex === 0 ? '#eeeeee' : '#ffffff',
-                borderRadius: '2px',
+                padding: '4px 8px',
+                border: '2px solid var(--border)',
+                background: selectedEventIndex === 0 ? 'var(--surface-hover)' : 'var(--surface)',
+                borderRadius: 'var(--radius)',
                 fontSize: '10px',
-                cursor: selectedEventIndex === 0 ? 'not-allowed' : 'pointer'
+                cursor: selectedEventIndex === 0 ? 'not-allowed' : 'pointer',
+                color: 'var(--text)',
+                opacity: selectedEventIndex === 0 ? 0.5 : 1,
+                transition: 'var(--transition)'
               }}
               title="Previous event (←)"
             >
-              ←
+              PREV
             </button>
             
             <div>
               <h2 style={{ 
-                fontSize: '9pt', 
-                fontWeight: 'bold', 
-                margin: '0',
-                color: '#000000'
+                fontSize: '10px', 
+                fontWeight: 700, 
+                margin: 0,
+                color: 'var(--text)'
               }}>
                 {currentEvent.title}
               </h2>
               <p style={{ 
-                fontSize: '8pt', 
-                margin: '0',
-                color: '#424242'
+                fontSize: '9px', 
+                margin: 0,
+                color: 'var(--text-secondary)'
               }}>
                 {formatDate(currentEvent.event_date)}
               </p>
@@ -300,59 +384,65 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
               onClick={() => onNavigate('next')}
               disabled={selectedEventIndex === events.length - 1}
               style={{
-                padding: '4px',
-                border: '1px solid #bdbdbd',
-                backgroundColor: selectedEventIndex === events.length - 1 ? '#eeeeee' : '#ffffff',
-                borderRadius: '2px',
+                padding: '4px 8px',
+                border: '2px solid var(--border)',
+                background: selectedEventIndex === events.length - 1 ? 'var(--surface-hover)' : 'var(--surface)',
+                borderRadius: 'var(--radius)',
                 fontSize: '10px',
-                cursor: selectedEventIndex === events.length - 1 ? 'not-allowed' : 'pointer'
+                cursor: selectedEventIndex === events.length - 1 ? 'not-allowed' : 'pointer',
+                color: 'var(--text)',
+                opacity: selectedEventIndex === events.length - 1 ? 0.5 : 1,
+                transition: 'var(--transition)'
               }}
               title="Next event (→)"
             >
-              →
+              NEXT
             </button>
           </div>
           
-          <div className="flex items-center" style={{ gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <span style={{ 
-              fontSize: '10px', 
-              color: '#424242' 
+              fontSize: '9px', 
+              color: 'var(--text-secondary)'
             }}>
               {selectedEventIndex + 1} of {events.length}
             </span>
             <button
               onClick={onClose}
               style={{
-                padding: '4px 8px',
-                border: '1px solid #bdbdbd',
-                backgroundColor: '#ffffff',
-                borderRadius: '2px',
+                padding: '4px 12px',
+                border: '2px solid var(--border)',
+                background: 'var(--surface)',
+                borderRadius: 'var(--radius)',
                 fontSize: '10px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                color: 'var(--text)',
+                fontWeight: 700,
+                transition: 'var(--transition)'
               }}
               title="Close (Esc)"
             >
-              ×
+              CLOSE
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden flex">
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
           {/* Images Section */}
-          <div className="flex-1 flex flex-col">
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             {loading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-gray-500">Loading images...</div>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>Loading images...</div>
               </div>
             ) : eventImages.length > 0 ? (
               <>
                 {/* Main Image */}
-                <div className="flex-1 relative bg-gray-100">
+                <div style={{ flex: 1, position: 'relative', background: 'var(--bg)' }}>
                   <img
                     src={eventImages[selectedImageIndex]?.image_url}
                     alt={`Photo ${selectedImageIndex + 1}`}
-                    className="w-full h-full object-contain"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   />
                   
                   {/* Image Navigation */}
@@ -361,24 +451,61 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                       <button
                         onClick={() => setSelectedImageIndex(Math.max(0, selectedImageIndex - 1))}
                         disabled={selectedImageIndex === 0}
-                        className="absolute left-2 top-1/2 transform -translate-y-1/2 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 disabled:opacity-25"
+                        style={{
+                          position: 'absolute',
+                          left: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          padding: '8px 12px',
+                          background: 'rgba(42, 42, 42, 0.85)',
+                          color: '#ffffff',
+                          border: '2px solid rgba(255, 255, 255, 0.3)',
+                          borderRadius: 'var(--radius)',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          cursor: selectedImageIndex === 0 ? 'not-allowed' : 'pointer',
+                          opacity: selectedImageIndex === 0 ? 0.3 : 1,
+                          transition: 'var(--transition)'
+                        }}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
+                        PREV
                       </button>
                       
                       <button
                         onClick={() => setSelectedImageIndex(Math.min(eventImages.length - 1, selectedImageIndex + 1))}
                         disabled={selectedImageIndex === eventImages.length - 1}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 disabled:opacity-25"
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          padding: '8px 12px',
+                          background: 'rgba(42, 42, 42, 0.85)',
+                          color: '#ffffff',
+                          border: '2px solid rgba(255, 255, 255, 0.3)',
+                          borderRadius: 'var(--radius)',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          cursor: selectedImageIndex === eventImages.length - 1 ? 'not-allowed' : 'pointer',
+                          opacity: selectedImageIndex === eventImages.length - 1 ? 0.3 : 1,
+                          transition: 'var(--transition)'
+                        }}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
+                        NEXT
                       </button>
                       
-                      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: 'rgba(42, 42, 42, 0.85)',
+                        color: '#ffffff',
+                        padding: '4px 8px',
+                        borderRadius: 'var(--radius)',
+                        fontSize: '9px',
+                        fontWeight: 700
+                      }}>
                         {selectedImageIndex + 1} / {eventImages.length}
                       </div>
                     </>
@@ -387,20 +514,27 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                 
                 {/* Image Thumbnails */}
                 {eventImages.length > 1 && (
-                  <div className="p-2 border-t bg-gray-50">
-                    <div className="flex gap-2 overflow-x-auto">
+                  <div style={{ padding: 'var(--space-2)', borderTop: '2px solid var(--border)', background: 'var(--bg)' }}>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', overflowX: 'auto' }}>
                       {eventImages.map((image, index) => (
                         <button
                           key={image.id}
                           onClick={() => setSelectedImageIndex(index)}
-                          className={`flex-shrink-0 w-16 h-16 rounded border-2 overflow-hidden ${
-                            index === selectedImageIndex ? 'border-blue-500' : 'border-gray-300'
-                          }`}
+                          style={{
+                            flexShrink: 0,
+                            width: '64px',
+                            height: '64px',
+                            borderRadius: 'var(--radius)',
+                            border: index === selectedImageIndex ? '2px solid var(--text)' : '2px solid var(--border)',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            transition: 'var(--transition)'
+                          }}
                         >
                           <img
                             src={image.image_url}
                             alt={`Thumbnail ${index + 1}`}
-                            className="w-full h-full object-cover"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           />
                         </button>
                       ))}
@@ -409,73 +543,73 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                 )}
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <p>No photos found for this date</p>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', marginTop: '8px' }}>No photos found for this date</div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Details Sidebar - Receipt Style */}
-          <div className="w-96 border-l overflow-y-auto" style={{ 
-            borderLeft: '2px solid #bdbdbd',
-            backgroundColor: '#ffffff',
-            padding: '12px',
-            fontSize: '8pt'
+          {/* Details Sidebar */}
+          <div style={{ 
+            width: '384px',
+            borderLeft: '2px solid var(--border)',
+            background: 'var(--surface)',
+            padding: 'var(--space-3)',
+            fontSize: '9px',
+            overflowY: 'auto'
           }}>
-            {/* WORK ORDER / RECEIPT HEADER */}
+            {/* WORK ORDER HEADER */}
             <div style={{
-              borderBottom: '2px solid #000',
-              paddingBottom: '8px',
-              marginBottom: '12px'
+              borderBottom: '2px solid var(--border)',
+              paddingBottom: 'var(--space-2)',
+              marginBottom: 'var(--space-3)'
             }}>
-              <div style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '2px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '2px', color: 'var(--text)' }}>
                 WORK ORDER
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                 {formatDate(currentEvent.event_date)}
-                {currentEvent.mileage_at_event && ` • ${currentEvent.mileage_at_event.toLocaleString()} mi`}
+                {(currentEvent as any).mileage_at_event && ` • ${(currentEvent as any).mileage_at_event.toLocaleString()} mi`}
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {/* Work Session Analysis */}
               {(() => {
                 const workSession = calculateWorkSession(eventImages);
                 return workSession && (
                   <div style={{ 
-                    border: '1px solid #e0e0e0',
-                    backgroundColor: '#ffffff',
-                    padding: '6px'
+                    border: '2px solid var(--border)',
+                    background: 'var(--bg)',
+                    padding: 'var(--space-2)',
+                    borderRadius: 'var(--radius)'
                   }}>
                     <h3 style={{ 
-                      fontSize: '9pt', 
-                      fontWeight: 'bold',
-                      margin: '0 0 4px 0',
-                      color: '#000000'
+                      fontSize: '10px', 
+                      fontWeight: 700,
+                      margin: '0 0 var(--space-2) 0',
+                      color: 'var(--text)'
                     }}>
                       Work Session
                     </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '9px' }}>
                       <div>
-                        <span style={{ fontWeight: 'bold', color: '#000000' }}>Duration:</span>
-                        <span style={{ marginLeft: '4px' }}>{workSession.duration.toFixed(1)} hours</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Duration:</span>
+                        <span style={{ marginLeft: 'var(--space-1)', color: 'var(--text-secondary)' }}>{workSession.duration.toFixed(1)} hours</span>
                       </div>
                       <div>
-                        <span style={{ fontWeight: 'bold', color: '#000000' }}>Type:</span>
-                        <span style={{ marginLeft: '4px' }}>{workSession.sessionType}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Type:</span>
+                        <span style={{ marginLeft: 'var(--space-1)', color: 'var(--text-secondary)' }}>{workSession.sessionType}</span>
                       </div>
                       <div>
-                        <span style={{ fontWeight: 'bold', color: '#000000' }}>Started:</span>
-                        <span style={{ marginLeft: '4px' }}>{workSession.startTime.toLocaleTimeString()}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Started:</span>
+                        <span style={{ marginLeft: 'var(--space-1)', color: 'var(--text-secondary)' }}>{workSession.startTime.toLocaleTimeString()}</span>
                       </div>
                       <div>
-                        <span style={{ fontWeight: 'bold', color: '#000000' }}>Ended:</span>
-                        <span style={{ marginLeft: '4px' }}>{workSession.endTime.toLocaleTimeString()}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Ended:</span>
+                        <span style={{ marginLeft: 'var(--space-1)', color: 'var(--text-secondary)' }}>{workSession.endTime.toLocaleTimeString()}</span>
                       </div>
                     </div>
                   </div>
@@ -485,24 +619,30 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
               {/* Location Analysis */}
               {eventImages.length > 0 && eventImages[selectedImageIndex]?.exif_data?.gps && (
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2" style={{ fontSize: '9pt' }}>Location</h3>
+                  <h3 style={{ fontSize: '10px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>Location</h3>
                   {(() => {
                     const location = identifyLocation(eventImages[selectedImageIndex].exif_data);
                     return (
-                      <div className="space-y-1">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '9px' }}>
                         <div>
-                          <span className="font-medium text-gray-600">Type:</span>
-                          <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                            location.type === 'professional' ? 'bg-blue-100 text-blue-800' : 
-                            location.type === 'home' ? 'bg-green-100 text-green-800' : 
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span style={{ fontWeight: 700, color: 'var(--text)' }}>Type:</span>
+                          <span style={{
+                            marginLeft: 'var(--space-2)',
+                            padding: '2px 6px',
+                            borderRadius: 'var(--radius)',
+                            fontSize: '8px',
+                            background: location.type === 'professional' ? 'var(--success-dim)' : 
+                                       location.type === 'home' ? 'var(--bg)' : 
+                                       'var(--surface)',
+                            color: location.type === 'professional' ? 'var(--success)' : 'var(--text)',
+                            border: '1px solid var(--border)'
+                          }}>
                             {location.description}
                           </span>
                         </div>
                         <div>
-                          <span className="font-medium text-gray-600">Coordinates:</span>
-                          <span className="ml-2 font-mono">{location.coordinates}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--text)' }}>Coordinates:</span>
+                          <span style={{ marginLeft: 'var(--space-2)', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{location.coordinates}</span>
                         </div>
                       </div>
                     );
@@ -512,30 +652,33 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
 
               {/* Technician/Contributor Info */}
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2" style={{ fontSize: '9pt' }}>Contributor</h3>
-                <div className="space-y-1">
+                <h3 style={{ fontSize: '10px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>Contributor</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '9px' }}>
                   <div>
-                    <span className="font-medium text-gray-600">Role:</span>
-                    <span className="ml-2">
+                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Role:</span>
+                    <span style={{ marginLeft: 'var(--space-2)', color: 'var(--text-secondary)' }}>
                       {eventImages.some(img => img.exif_data?.gps && identifyLocation(img.exif_data).type === 'professional') 
                         ? 'Professional Technician' 
                         : 'Enthusiast/Owner'}
                     </span>
                   </div>
                   <div>
-                    <span className="font-medium text-gray-600">Session ID:</span>
-                    <span className="ml-2 font-mono">{currentEvent.id.slice(0, 8)}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Session ID:</span>
+                    <span style={{ marginLeft: 'var(--space-2)', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{currentEvent.id.slice(0, 8)}</span>
                   </div>
                   <button
                     onClick={() => setShowTechnicianForm(true)}
                     style={{
-                      marginTop: '4px',
-                      padding: '2px 6px',
-                      border: '1px outset #bdbdbd',
-                      backgroundColor: '#f5f5f5',
-                      color: '#000000',
-                      fontSize: '8pt',
-                      cursor: 'pointer'
+                      marginTop: 'var(--space-1)',
+                      padding: '4px 8px',
+                      border: '2px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      fontSize: '9px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius)',
+                      transition: 'var(--transition)'
                     }}
                   >
                     Add Technician Details
@@ -543,24 +686,112 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                 </div>
               </div>
 
+              {/* Intelligent Description */}
+              {intelligentDescription && (
+                <div style={{ 
+                  border: '2px solid var(--border)',
+                  background: 'var(--bg)',
+                  padding: 'var(--space-2)',
+                  borderRadius: 'var(--radius)'
+                }}>
+                  <h3 style={{ 
+                    fontSize: '10px', 
+                    fontWeight: 700,
+                    margin: '0 0 var(--space-2) 0',
+                    color: 'var(--text)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-1)'
+                  }}>
+                    AI Analysis
+                    <span style={{ 
+                      fontSize: '8px',
+                      fontWeight: 600,
+                      color: intelligentDescription.quality === 'high' ? 'var(--success)' : 
+                              intelligentDescription.quality === 'medium' ? 'var(--warning)' : 'var(--error)',
+                      marginLeft: 'auto'
+                    }}>
+                      {intelligentDescription.quality.toUpperCase()}
+                    </span>
+                  </h3>
+                  <p style={{ 
+                    fontSize: '9px',
+                    margin: '0 0 var(--space-2) 0',
+                    color: 'var(--text)',
+                    lineHeight: '1.4'
+                  }}>
+                    {intelligentDescription.summary}
+                  </p>
+                  {intelligentDescription.details.length > 0 && (
+                    <div style={{ marginTop: 'var(--space-2)' }}>
+                      {intelligentDescription.details.map((detail, idx) => (
+                        <div key={idx} style={{ 
+                          fontSize: '8px',
+                          color: 'var(--text-secondary)',
+                          marginBottom: '2px',
+                          paddingLeft: 'var(--space-2)',
+                          position: 'relative'
+                        }}>
+                          <span style={{ position: 'absolute', left: 0 }}>-</span>
+                          {detail}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {intelligentDescription.detectedFeatures.length > 0 && (
+                    <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+                      {intelligentDescription.detectedFeatures.slice(0, 5).map((feature, idx) => (
+                        <span key={idx} style={{
+                          fontSize: '8px',
+                          padding: '2px 6px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius)',
+                          color: 'var(--text-secondary)',
+                          fontWeight: 600
+                        }}>
+                          {feature}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {loadingDescription && (
+                <div style={{ 
+                  padding: 'var(--space-2)',
+                  textAlign: 'center',
+                  color: 'var(--text-secondary)',
+                  fontSize: '9px'
+                }}>
+                  Analyzing images...
+                </div>
+              )}
+
               {/* Event Details */}
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2" style={{ fontSize: '9pt' }}>Event Details</h3>
-                <div className="space-y-1">
+                <h3 style={{ fontSize: '10px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>Event Details</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '9px' }}>
                   <div>
-                    <span className="font-medium text-gray-600">Type:</span>
-                    <span className="ml-2 capitalize">{currentEvent.event_type.replace('_', ' ')}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Type:</span>
+                    <span style={{ marginLeft: 'var(--space-2)', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                      {currentEvent.event_type.replace('_', ' ')}
+                    </span>
                   </div>
                   {currentEvent.description && (
                     <div>
-                      <span className="font-medium text-gray-600">Description:</span>
-                      <p className="ml-2 mt-1">{currentEvent.description}</p>
+                      <span style={{ fontWeight: 700, color: 'var(--text)' }}>Description:</span>
+                      <p style={{ marginLeft: 'var(--space-2)', marginTop: 'var(--space-1)', color: 'var(--text-secondary)' }}>
+                        {currentEvent.description}
+                      </p>
                     </div>
                   )}
                   {currentEvent.metadata?.count && (
                     <div>
-                      <span className="font-medium text-gray-600">Photos:</span>
-                      <span className="ml-2">{currentEvent.metadata.count} images</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text)' }}>Photos:</span>
+                      <span style={{ marginLeft: 'var(--space-2)', color: 'var(--text-secondary)' }}>
+                        {currentEvent.metadata.count} images
+                      </span>
                     </div>
                   )}
                 </div>
@@ -569,26 +800,28 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
               {/* Photo Details */}
               {eventImages.length > 0 && eventImages[selectedImageIndex] && (
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2" style={{ fontSize: '9pt' }}>Photo Details</h3>
-                  <div className="space-y-1">
+                  <h3 style={{ fontSize: '10px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>Photo Details</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '9px' }}>
                     {getCameraInfo(eventImages[selectedImageIndex].exif_data) && (
                       <div>
-                        <span className="font-medium text-gray-600">Camera:</span>
-                        <span className="ml-2">{getCameraInfo(eventImages[selectedImageIndex].exif_data)}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Camera:</span>
+                        <span style={{ marginLeft: 'var(--space-2)', color: 'var(--text-secondary)' }}>
+                          {getCameraInfo(eventImages[selectedImageIndex].exif_data)}
+                        </span>
                       </div>
                     )}
                     {eventImages[selectedImageIndex].exif_data?.dateTimeOriginal && (
                       <div>
-                        <span className="font-medium text-gray-600">Taken:</span>
-                        <span className="ml-2">
+                        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Taken:</span>
+                        <span style={{ marginLeft: 'var(--space-2)', color: 'var(--text-secondary)' }}>
                           {formatExifDateTime(eventImages[selectedImageIndex].exif_data.dateTimeOriginal)}
                         </span>
                       </div>
                     )}
                     {eventImages[selectedImageIndex].exif_data?.fNumber && (
                       <div>
-                        <span className="font-medium text-gray-600">Settings:</span>
-                        <span className="ml-2 font-mono">
+                        <span style={{ fontWeight: 700, color: 'var(--text)' }}>Settings:</span>
+                        <span style={{ marginLeft: 'var(--space-2)', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                           {eventImages[selectedImageIndex].exif_data.fNumber} • 
                           {eventImages[selectedImageIndex].exif_data.exposureTime} • 
                           ISO {eventImages[selectedImageIndex].exif_data.iso}
@@ -599,22 +832,355 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                 </div>
               )}
 
+              {/* Financial Summary Toggle */}
+              <div>
+                <button
+                  onClick={() => setShowFinancials(!showFinancials)}
+                  style={{
+                    width: '100%',
+                    padding: '6px var(--space-2)',
+                    border: '2px solid var(--border)',
+                    background: showFinancials ? 'var(--text)' : 'var(--surface)',
+                    color: showFinancials ? 'var(--surface)' : 'var(--text)',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    borderRadius: 'var(--radius)',
+                    transition: 'var(--transition)'
+                  }}
+                >
+                  {showFinancials ? 'HIDE FINANCIAL DATA' : 'SHOW FINANCIAL DATA'}
+                </button>
+              </div>
+
+              {/* Financial Data Sections */}
+              {showFinancials && financialSummary && (
+                <>
+                  {/* Client Info */}
+                  {financialSummary.clientDisplayName && (
+                    <div style={{ 
+                      border: '2px solid var(--border)',
+                      background: 'var(--bg)',
+                      padding: 'var(--space-2)',
+                      borderRadius: 'var(--radius)'
+                    }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
+                        Client: <span style={{ fontWeight: 700, color: 'var(--text)' }}>
+                          {financialSummary.clientDisplayName}
+                        </span>
+                        {financialSummary.isPrivate && (
+                          <span style={{ 
+                            marginLeft: 'var(--space-1)', 
+                            fontSize: '8px',
+                            color: 'var(--warning)',
+                            border: '1px solid var(--warning)',
+                            padding: '1px 4px',
+                            borderRadius: '2px'
+                          }}>
+                            PRIVATE
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* TCI Breakdown */}
+                  {financialSummary.tciTotal > 0 && (
+                    <div style={{ 
+                      border: '2px solid var(--border)',
+                      background: 'var(--bg)',
+                      padding: 'var(--space-2)',
+                      borderRadius: 'var(--radius)'
+                    }}>
+                      <h3 style={{ fontSize: '10px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>
+                        TCI (Total Cost Involved)
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '9px' }}>
+                        {financialSummary.laborCost > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Labor:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.laborCost)}
+                            </span>
+                          </div>
+                        )}
+                        {financialSummary.partsCost > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Parts:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.partsCost)}
+                            </span>
+                          </div>
+                        )}
+                        {financialSummary.suppliesCost > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Supplies:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.suppliesCost)}
+                            </span>
+                          </div>
+                        )}
+                        {financialSummary.overheadCost > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Overhead:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.overheadCost)}
+                            </span>
+                          </div>
+                        )}
+                        {financialSummary.toolDepreciationCost > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Tools:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.toolDepreciationCost)}
+                            </span>
+                          </div>
+                        )}
+                        {financialSummary.totalShopFees > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Shop Fees:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.totalShopFees)}
+                            </span>
+                          </div>
+                        )}
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '4px', marginTop: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                            <span style={{ color: 'var(--text)' }}>TOTAL:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.tciTotal)}
+                            </span>
+                          </div>
+                        </div>
+                        {financialSummary.customerPrice > 0 && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>Customer:</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                                {EventFinancialService.formatCurrency(financialSummary.customerPrice)}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                              <span style={{ color: financialSummary.profitMargin >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                                Profit:
+                              </span>
+                              <span style={{ 
+                                fontFamily: 'var(--font-mono)', 
+                                color: financialSummary.profitMargin >= 0 ? 'var(--success)' : 'var(--error)'
+                              }}>
+                                {EventFinancialService.formatCurrency(financialSummary.profitMargin)}
+                                {financialSummary.profitMarginPercent > 0 && (
+                                  <span style={{ fontSize: '8px', marginLeft: '4px' }}>
+                                    ({financialSummary.profitMarginPercent.toFixed(1)}%)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Parts with Supplier Ratings */}
+                  {partDetails.length > 0 && (
+                    <div style={{ 
+                      border: '2px solid var(--border)',
+                      background: 'var(--bg)',
+                      padding: 'var(--space-2)',
+                      borderRadius: 'var(--radius)'
+                    }}>
+                      <h3 style={{ fontSize: '10px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>
+                        Parts & Suppliers
+                      </h3>
+                      {partDetails.map(part => (
+                        <div key={part.id} style={{ marginBottom: 'var(--space-2)', fontSize: '9px' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--text)' }}>
+                            {part.partName}
+                            {part.partNumber && (
+                              <span style={{ fontWeight: 400, color: 'var(--text-secondary)', marginLeft: 'var(--space-1)' }}>
+                                #{part.partNumber}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--text-secondary)' }}>
+                            <span>
+                              {EventFinancialService.formatCurrency(part.costPrice)} → {EventFinancialService.formatCurrency(part.retailPrice)}
+                              {part.markupPercent > 0 && (
+                                <span style={{ marginLeft: '4px' }}>({part.markupPercent.toFixed(1)}%)</span>
+                              )}
+                            </span>
+                          </div>
+                          {part.supplierName && (
+                            <div style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                              {part.supplierName}
+                              {part.supplierRating && (
+                                <span style={{ marginLeft: 'var(--space-1)', color: part.supplierRating >= 95 ? 'var(--success)' : part.supplierRating >= 85 ? 'var(--warning)' : 'var(--error)' }}>
+                                  {EventFinancialService.formatStars(part.supplierRating)} {part.supplierRating.toFixed(1)}%
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Social Value */}
+                  {financialSummary.totalSocialValue > 0 && (
+                    <div style={{ 
+                      border: '2px solid var(--border)',
+                      background: 'var(--bg)',
+                      padding: 'var(--space-2)',
+                      borderRadius: 'var(--radius)'
+                    }}>
+                      <h3 style={{ fontSize: '10px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>
+                        Social Value
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '9px' }}>
+                        {financialSummary.views > 0 && (
+                          <div style={{ fontSize: '8px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                            {financialSummary.views.toLocaleString()} views • {financialSummary.engagementRate.toFixed(2)}% engagement
+                          </div>
+                        )}
+                        {financialSummary.partnershipRevenue > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Partnerships:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.partnershipRevenue)}
+                            </span>
+                          </div>
+                        )}
+                        {financialSummary.sponsorshipRevenue > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Sponsorships:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.sponsorshipRevenue)}
+                            </span>
+                          </div>
+                        )}
+                        {financialSummary.viewerRevenue > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>Viewer Tips:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.viewerRevenue)}
+                            </span>
+                          </div>
+                        )}
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '4px', marginTop: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                            <span style={{ color: 'var(--text)' }}>Total Social:</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--success)' }}>
+                              {EventFinancialService.formatCurrency(financialSummary.totalSocialValue)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Combined Profit */}
+                  {financialSummary.combinedProfit > 0 && (
+                    <div style={{ 
+                      border: '2px solid var(--success)',
+                      background: 'var(--success-dim)',
+                      padding: 'var(--space-2)',
+                      borderRadius: 'var(--radius)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 700 }}>
+                        <span style={{ color: 'var(--success)' }}>COMBINED PROFIT:</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--success)' }}>
+                          {EventFinancialService.formatCurrency(financialSummary.combinedProfit)}
+                        </span>
+                      </div>
+                      {financialSummary.customerPrice > 0 && (
+                        <div style={{ fontSize: '8px', color: 'var(--success)', marginTop: '2px' }}>
+                          {((financialSummary.combinedProfit / financialSummary.customerPrice) * 100).toFixed(1)}% margin
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Turnaround Metrics */}
+                  {financialSummary.totalTurnaroundHours && (
+                    <div style={{ 
+                      border: '2px solid var(--border)',
+                      background: 'var(--bg)',
+                      padding: 'var(--space-2)',
+                      borderRadius: 'var(--radius)'
+                    }}>
+                      <h3 style={{ fontSize: '10px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>
+                        Turnaround: {financialSummary.totalTurnaroundHours.toFixed(1)}hrs
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '8px', color: 'var(--text-secondary)' }}>
+                        {financialSummary.orderToDeliveryHours && (
+                          <div>Order→Delivery: {financialSummary.orderToDeliveryHours.toFixed(1)}hrs</div>
+                        )}
+                        {financialSummary.deliveryToInstallHours && (
+                          <div>Delivery→Install: {financialSummary.deliveryToInstallHours.toFixed(1)}hrs</div>
+                        )}
+                        {financialSummary.workDurationHours && (
+                          <div>Work Duration: {financialSummary.workDurationHours.toFixed(1)}hrs</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* Action Buttons */}
               <div style={{ 
-                paddingTop: '6px', 
-                borderTop: '1px solid #e0e0e0' 
+                paddingTop: 'var(--space-2)', 
+                borderTop: '2px solid var(--border)'
               }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                  {financialSummary && financialSummary.tciTotal > 0 && (
+                    <button
+                      onClick={async () => {
+                        setGeneratingInvoice(true);
+                        try {
+                          const invoiceId = await EventFinancialService.generateInvoice(currentEvent.id);
+                          if (invoiceId) {
+                            alert('Invoice generated! ID: ' + invoiceId);
+                          }
+                        } catch (err) {
+                          console.error('Error generating invoice:', err);
+                          alert('Failed to generate invoice');
+                        } finally {
+                          setGeneratingInvoice(false);
+                        }
+                      }}
+                      disabled={generatingInvoice}
+                      style={{
+                        width: '100%',
+                        padding: '6px var(--space-2)',
+                        border: '2px solid var(--text)',
+                        background: 'var(--text)',
+                        color: 'var(--surface)',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        cursor: generatingInvoice ? 'wait' : 'pointer',
+                        borderRadius: 'var(--radius)',
+                        transition: 'var(--transition)',
+                        opacity: generatingInvoice ? 0.6 : 1
+                      }}
+                    >
+                      {generatingInvoice ? 'GENERATING...' : 'GENERATE INVOICE'}
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowWorkDetailsForm(true)}
                     style={{
                       width: '100%',
-                      padding: '4px 6px',
-                      border: '1px outset #bdbdbd',
-                      backgroundColor: '#f5f5f5',
-                      color: '#000000',
-                      fontSize: '8pt',
-                      cursor: 'pointer'
+                      padding: '4px 8px',
+                      border: '2px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      fontSize: '9px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius)',
+                      transition: 'var(--transition)'
                     }}
                   >
                     Add Work Details
@@ -623,12 +1189,15 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                     onClick={() => setShowCorrectionForm(true)}
                     style={{
                       width: '100%',
-                      padding: '4px 6px',
-                      border: '1px outset #bdbdbd',
-                      backgroundColor: '#f5f5f5',
-                      color: '#000000',
-                      fontSize: '8pt',
-                      cursor: 'pointer'
+                      padding: '4px 8px',
+                      border: '2px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      fontSize: '9px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius)',
+                      transition: 'var(--transition)'
                     }}
                   >
                     Correct Information
@@ -637,12 +1206,15 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                     onClick={() => setShowTaggingForm(true)}
                     style={{
                       width: '100%',
-                      padding: '4px 6px',
-                      border: '1px outset #bdbdbd',
-                      backgroundColor: '#f5f5f5',
-                      color: '#000000',
-                      fontSize: '8pt',
-                      cursor: 'pointer'
+                      padding: '4px 8px',
+                      border: '2px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      fontSize: '9px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius)',
+                      transition: 'var(--transition)'
                     }}
                   >
                     Tag People
@@ -655,66 +1227,136 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
 
         {/* Footer */}
         <div style={{
-          padding: '6px',
-          borderTop: '1px solid #e0e0e0',
-          backgroundColor: '#f5f5f5',
+          padding: 'var(--space-2)',
+          borderTop: '2px solid var(--border)',
+          background: 'var(--bg)',
           textAlign: 'center',
-          fontSize: '8pt',
-          color: '#424242'
+          fontSize: '9px',
+          color: 'var(--text-secondary)'
         }}>
-          Use ← → arrow keys to navigate between events • ESC to close
+          Use arrow keys to navigate between events • ESC to close
         </div>
       </div>
 
       {/* Modal Forms */}
       {showTechnicianForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Add Technician Details</h3>
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 60
+        }}>
+          <div style={{
+            background: 'var(--surface)',
+            padding: 'var(--space-4)',
+            borderRadius: 'var(--radius)',
+            maxWidth: '400px',
+            width: '100%',
+            margin: '0 16px',
+            border: '2px solid var(--border)'
+          }}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-3)', color: 'var(--text)' }}>
+              Add Technician Details
+            </h3>
             <form onSubmit={(e) => {
               e.preventDefault();
               console.log('Technician data:', technicianData);
               setShowTechnicianForm(false);
               setTechnicianData({ name: '', certification: '', shopName: '' });
             }}>
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Technician Name</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Technician Name
+                  </label>
                   <input
                     type="text"
                     value={technicianData.name}
                     onChange={(e) => setTechnicianData({...technicianData, name: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Certification/License</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Certification/License
+                  </label>
                   <input
                     type="text"
                     value={technicianData.certification}
                     onChange={(e) => setTechnicianData({...technicianData, certification: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Shop/Business Name</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Shop/Business Name
+                  </label>
                   <input
                     type="text"
                     value={technicianData.shopName}
                     onChange={(e) => setTechnicianData({...technicianData, shopName: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                   />
                 </div>
               </div>
-              <div className="flex gap-2 mt-6">
-                <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+                <button type="submit" style={{
+                  flex: 1,
+                  padding: '6px 12px',
+                  border: '2px solid var(--text)',
+                  background: 'var(--text)',
+                  color: 'var(--surface)',
+                  borderRadius: 'var(--radius)',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}>
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowTechnicianForm(false)}
-                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                  style={{
+                    flex: 1,
+                    padding: '6px 12px',
+                    border: '2px solid var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    borderRadius: 'var(--radius)',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'var(--transition)'
+                  }}
                 >
                   Cancel
                 </button>
@@ -725,22 +1367,50 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
       )}
 
       {showWorkDetailsForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Add Work Details</h3>
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 60
+        }}>
+          <div style={{
+            background: 'var(--surface)',
+            padding: 'var(--space-4)',
+            borderRadius: 'var(--radius)',
+            maxWidth: '400px',
+            width: '100%',
+            margin: '0 16px',
+            border: '2px solid var(--border)'
+          }}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-3)', color: 'var(--text)' }}>
+              Add Work Details
+            </h3>
             <form onSubmit={(e) => {
               e.preventDefault();
               console.log('Work details:', workDetails);
               setShowWorkDetailsForm(false);
               setWorkDetails({ workType: '', description: '', partsUsed: '', laborHours: '' });
             }}>
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Work Type</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Work Type
+                  </label>
                   <select
                     value={workDetails.workType}
                     onChange={(e) => setWorkDetails({...workDetails, workType: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                     required
                   >
                     <option value="">Select work type</option>
@@ -752,43 +1422,99 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Description</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Description
+                  </label>
                   <textarea
                     value={workDetails.description}
                     onChange={(e) => setWorkDetails({...workDetails, description: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)',
+                      fontFamily: 'var(--font-family)',
+                      resize: 'vertical'
+                    }}
                     rows={3}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Parts Used</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Parts Used
+                  </label>
                   <textarea
                     value={workDetails.partsUsed}
                     onChange={(e) => setWorkDetails({...workDetails, partsUsed: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)',
+                      fontFamily: 'var(--font-family)',
+                      resize: 'vertical'
+                    }}
                     rows={2}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Labor Hours</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Labor Hours
+                  </label>
                   <input
                     type="number"
                     step="0.5"
                     value={workDetails.laborHours}
                     onChange={(e) => setWorkDetails({...workDetails, laborHours: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                   />
                 </div>
               </div>
-              <div className="flex gap-2 mt-6">
-                <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+                <button type="submit" style={{
+                  flex: 1,
+                  padding: '6px 12px',
+                  border: '2px solid var(--text)',
+                  background: 'var(--text)',
+                  color: 'var(--surface)',
+                  borderRadius: 'var(--radius)',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}>
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowWorkDetailsForm(false)}
-                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                  style={{
+                    flex: 1,
+                    padding: '6px 12px',
+                    border: '2px solid var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    borderRadius: 'var(--radius)',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'var(--transition)'
+                  }}
                 >
                   Cancel
                 </button>
@@ -799,22 +1525,50 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
       )}
 
       {showCorrectionForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Correct Information</h3>
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 60
+        }}>
+          <div style={{
+            background: 'var(--surface)',
+            padding: 'var(--space-4)',
+            borderRadius: 'var(--radius)',
+            maxWidth: '400px',
+            width: '100%',
+            margin: '0 16px',
+            border: '2px solid var(--border)'
+          }}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-3)', color: 'var(--text)' }}>
+              Correct Information
+            </h3>
             <form onSubmit={(e) => {
               e.preventDefault();
               console.log('Correction data:', correctionData);
               setShowCorrectionForm(false);
               setCorrectionData({ field: '', currentValue: '', correctedValue: '', reason: '' });
             }}>
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Field to Correct</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Field to Correct
+                  </label>
                   <select
                     value={correctionData.field}
                     onChange={(e) => setCorrectionData({...correctionData, field: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                     required
                   >
                     <option value="">Select field</option>
@@ -826,44 +1580,98 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Current Value</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Current Value
+                  </label>
                   <input
                     type="text"
                     value={correctionData.currentValue}
                     onChange={(e) => setCorrectionData({...correctionData, currentValue: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Corrected Value</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Corrected Value
+                  </label>
                   <input
                     type="text"
                     value={correctionData.correctedValue}
                     onChange={(e) => setCorrectionData({...correctionData, correctedValue: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Reason for Correction</label>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                    Reason for Correction
+                  </label>
                   <textarea
                     value={correctionData.reason}
                     onChange={(e) => setCorrectionData({...correctionData, reason: e.target.value})}
-                    className="w-full p-2 border rounded"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)',
+                      fontFamily: 'var(--font-family)',
+                      resize: 'vertical'
+                    }}
                     rows={2}
                     required
                   />
                 </div>
               </div>
-              <div className="flex gap-2 mt-6">
-                <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+                <button type="submit" style={{
+                  flex: 1,
+                  padding: '6px 12px',
+                  border: '2px solid var(--text)',
+                  background: 'var(--text)',
+                  color: 'var(--surface)',
+                  borderRadius: 'var(--radius)',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}>
                   Submit Correction
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowCorrectionForm(false)}
-                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                  style={{
+                    flex: 1,
+                    padding: '6px 12px',
+                    border: '2px solid var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    borderRadius: 'var(--radius)',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'var(--transition)'
+                  }}
                 >
                   Cancel
                 </button>
@@ -874,19 +1682,47 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
       )}
 
       {showTaggingForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Tag People</h3>
-            <div className="space-y-4">
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 60
+        }}>
+          <div style={{
+            background: 'var(--surface)',
+            padding: 'var(--space-4)',
+            borderRadius: 'var(--radius)',
+            maxWidth: '400px',
+            width: '100%',
+            margin: '0 16px',
+            border: '2px solid var(--border)'
+          }}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, marginBottom: 'var(--space-3)', color: 'var(--text)' }}>
+              Tag People
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div>
-                <label className="block text-sm font-medium mb-1">Add Person</label>
-                <div className="flex gap-2">
+                <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
+                  Add Person
+                </label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <input
                     type="text"
                     value={newPersonName}
                     onChange={(e) => setNewPersonName(e.target.value)}
                     placeholder="Enter name"
-                    className="flex-1 p-2 border rounded"
+                    style={{
+                      flex: 1,
+                      padding: 'var(--space-2)',
+                      border: '2px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      background: 'var(--bg)',
+                      color: 'var(--text)'
+                    }}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter' && newPersonName.trim()) {
                         setTaggedPeople([...taggedPeople, newPersonName.trim()]);
@@ -902,7 +1738,17 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                         setNewPersonName('');
                       }
                     }}
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    style={{
+                      padding: '6px 12px',
+                      border: '2px solid var(--text)',
+                      background: 'var(--text)',
+                      color: 'var(--surface)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'var(--transition)'
+                    }}
                   >
                     Add
                   </button>
@@ -911,15 +1757,32 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
 
               {taggedPeople.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tagged People</label>
-                  <div className="space-y-1">
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: 700, marginBottom: 'var(--space-2)', color: 'var(--text)' }}>
+                    Tagged People
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                     {taggedPeople.map((person, index) => (
-                      <div key={index} className="flex items-center justify-between bg-gray-100 p-2 rounded">
-                        <span>{person}</span>
+                      <div key={index} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'var(--bg)',
+                        padding: 'var(--space-2)',
+                        borderRadius: 'var(--radius)',
+                        border: '1px solid var(--border)'
+                      }}>
+                        <span style={{ fontSize: '9px', color: 'var(--text)' }}>{person}</span>
                         <button
                           type="button"
                           onClick={() => setTaggedPeople(taggedPeople.filter((_, i) => i !== index))}
-                          className="text-red-500 hover:text-red-700"
+                          style={{
+                            fontSize: '9px',
+                            color: 'var(--error)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontWeight: 600
+                          }}
                         >
                           Remove
                         </button>
@@ -930,7 +1793,7 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
               )}
             </div>
 
-            <div className="flex gap-2 mt-6">
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
               <button
                 onClick={() => {
                   console.log('Tagged people:', taggedPeople);
@@ -938,7 +1801,18 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                   setTaggedPeople([]);
                   setNewPersonName('');
                 }}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                style={{
+                  flex: 1,
+                  padding: '6px 12px',
+                  border: '2px solid var(--text)',
+                  background: 'var(--text)',
+                  color: 'var(--surface)',
+                  borderRadius: 'var(--radius)',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}
               >
                 Save Tags
               </button>
@@ -948,7 +1822,18 @@ const TimelineEventModal: React.FC<TimelineEventModalProps> = ({
                   setTaggedPeople([]);
                   setNewPersonName('');
                 }}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                style={{
+                  flex: 1,
+                  padding: '6px 12px',
+                  border: '2px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  borderRadius: 'var(--radius)',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}
               >
                 Cancel
               </button>

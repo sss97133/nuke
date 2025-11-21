@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { generateContributionEventDescription } from '../../services/intelligentEventDescription';
 import { supabase } from '../../lib/supabase';
 import type { UserContribution } from '../../types/profile';
 
@@ -429,8 +430,15 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
         {/* Day Contributions Popup */}
         {showDayPopup && selectedDayContributions.length > 0 && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-            style={{ zIndex: 1001 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1001
+            }}
             onClick={() => setShowDayPopup(false)}
           >
             <div
@@ -447,10 +455,11 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                       currentDate.setDate(currentDate.getDate() - 1);
                       handleDayClick(currentDate);
                     }}
+                    style={{ fontSize: '9px', fontWeight: 700 }}
                   >
-                    ← Prev Day
+                    PREV DAY
                   </button>
-                  <h4 className="text font-bold">
+                  <h4 style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
                     {new Date(selectedDayContributions[0].contribution_date).toLocaleDateString()}
                   </h4>
                   <button 
@@ -460,15 +469,17 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                       currentDate.setDate(currentDate.getDate() + 1);
                       handleDayClick(currentDate);
                     }}
+                    style={{ fontSize: '9px', fontWeight: 700 }}
                   >
-                    Next Day →
+                    NEXT DAY
                   </button>
                 </div>
                 <button 
                   className="button button-secondary button-small" 
                   onClick={() => setShowDayPopup(false)}
+                  style={{ fontSize: '9px', fontWeight: 700 }}
                 >
-                  ×
+                  CLOSE
                 </button>
               </div>
               
@@ -530,9 +541,31 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                           
                           {/* Event Title/Description */}
                           <div className="text" style={{ marginBottom: 'var(--space-1)' }}>
-                            {metadata.title || metadata.event_type?.replace('_', ' ') || contribution.contribution_type.replace('_', ' ')}
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                              {metadata.title || metadata.event_type?.replace('_', ' ') || contribution.contribution_type.replace('_', ' ')}
+                            </div>
                             {metadata.description && (
-                              <div className="text text-muted">{metadata.description}</div>
+                              <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>
+                                {metadata.description}
+                              </div>
+                            )}
+                            {/* Show intelligent analysis if available */}
+                            {metadata.ai_analysis && (
+                              <div style={{
+                                fontSize: '10px',
+                                padding: '6px',
+                                backgroundColor: '#e8f4f8',
+                                border: '1px solid #4a90e2',
+                                borderRadius: '3px',
+                                marginTop: '4px'
+                              }}>
+                                <div style={{ fontWeight: 'bold', color: '#1a5490', marginBottom: '2px' }}>
+                                  🧠 AI Analysis
+                                </div>
+                                <div style={{ color: '#475569', fontSize: '9px' }}>
+                                  {metadata.ai_analysis.summary}
+                                </div>
+                              </div>
                             )}
                           </div>
                           

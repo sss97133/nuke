@@ -5,10 +5,6 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://nuke-api.fly.dev/api/$1"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

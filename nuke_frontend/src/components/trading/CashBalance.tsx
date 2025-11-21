@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { CashBalanceService, CashBalance as CashBalanceType } from '../../services/cashBalanceService';
+import { CashBalanceService } from '../../services/cashBalanceService';
+import type { CashBalance as CashBalanceType } from '../../services/cashBalanceService';
 
 interface Props {
   compact?: boolean;

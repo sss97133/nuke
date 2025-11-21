@@ -321,7 +321,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     const x = Math.min(dragStart.x, currentX);
     const y = Math.min(dragStart.y, currentY);
     
-    setCurrentSelection({ x, y, width, height });
+      setCurrentSelection({ x, y, width, height });
   };
 
   const handleMouseUp = () => {
@@ -346,20 +346,20 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     if (!currentSelection || !tagName.trim() || !imageId || !vehicleId) return;
     
     try {
-      await createTagFn(vehicleId, {
+    await createTagFn(vehicleId, {
         tag_name: tagName.trim(),
-        tag_type: 'part',
+      tag_type: 'part',
         x_position: currentSelection.x,
         y_position: currentSelection.y,
         width: currentSelection.width,
         height: currentSelection.height
-      });
+    });
       
       // Success - clear state and reload tags
       setTagName('');
       setShowTagInput(false);
       setCurrentSelection(null);
-      setIsTagging(false);
+    setIsTagging(false);
       
       // Reload tags to show the new one
       await loadTags();
@@ -503,12 +503,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 PRO TAG
               </button>
               <button
-                onClick={() => setIsTagging(!isTagging)}
-                className={`px-3 py-1 rounded text-xs font-medium border ${isTagging ? 'bg-green-500 text-black border-green-500' : 'bg-transparent border-white/30 text-white hover:bg-white/10'}`}
+              onClick={() => setIsTagging(!isTagging)}
+              className={`px-3 py-1 rounded text-xs font-medium border ${isTagging ? 'bg-green-500 text-black border-green-500' : 'bg-transparent border-white/30 text-white hover:bg-white/10'}`}
                 title="Quick tagging mode"
-              >
+            >
                 {isTagging ? 'TAGGING' : 'QUICK TAG'}
-              </button>
+            </button>
             </>
         )}
 
@@ -560,15 +560,15 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             maxWidth: '100%',
             maxHeight: '100%'
           }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-        >
-          <img
-            ref={imageRef}
-            src={imageUrl}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      >
+        <img
+          ref={imageRef}
+          src={imageUrl}
             alt="Vehicle"
-            onLoad={() => setImageLoaded(true)}
+          onLoad={() => setImageLoaded(true)}
             className="max-w-full max-h-full object-contain select-none"
             style={{ 
               pointerEvents: 'none',
@@ -576,7 +576,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               transition: 'transform 0.3s ease',
               display: 'block'
             }}
-          />
+        />
 
           {/* Markers */}
           {imageLoaded && tags.map(tag => (
@@ -597,20 +597,20 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           ))}
           
           {/* Selection Box */}
-          {currentSelection && (
-            <div style={{
-              position: 'absolute',
-              left: `${currentSelection.x}%`,
-              top: `${currentSelection.y}%`,
-              width: `${currentSelection.width}%`,
-              height: `${currentSelection.height}%`,
+        {currentSelection && (
+          <div style={{
+            position: 'absolute',
+            left: `${currentSelection.x}%`,
+            top: `${currentSelection.y}%`,
+            width: `${currentSelection.width}%`,
+            height: `${currentSelection.height}%`,
               border: '2px solid rgba(255, 255, 255, 0.9)',
               background: 'rgba(255, 255, 255, 0.1)',
               pointerEvents: 'none',
               boxShadow: '0 0 20px rgba(255, 255, 255, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(2px)'
-            }} />
-          )}
+          }} />
+        )}
 
           {/* Tag Input Popup */}
           {showTagInput && currentSelection && (
@@ -656,7 +656,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 >Save Tag</button>
               </div>
             </div>
-          )}
+        )}
         </div>
       </div>
 

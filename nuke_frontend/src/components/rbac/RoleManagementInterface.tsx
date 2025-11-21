@@ -109,7 +109,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
             .select('score')
             .eq('user_id', contributor.user_id)
             .eq('vehicle_id', vehicleId)
-            .single();
+            .maybeSingle();
 
           // Get recent activity
           const { data: activityData } = await supabase

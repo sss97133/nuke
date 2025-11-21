@@ -3,7 +3,7 @@ import type { useForm } from 'react-hook-form';
 import type { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { timelineAPI } from '../../services/api';
+import { supabase } from '../../lib/supabase';
 
 // Zod schema for timeline event validation
 const timelineEventSchema = z.object({
@@ -58,7 +58,25 @@ const TimelineEventForm = () => {
       setSubmitting(true);
       setError(null);
       
-      await timelineAPI.createTimelineEvent(vehicleId, data);
+      const { data: userData } = await supabase.auth.getUser();
+      
+      const eventPayload = {
+        vehicle_id: vehicleId,
+        user_id: userData.user?.id,
+        event_type: data.event_type,
+        title: data.title,
+        description: data.description,
+        event_date: data.event_date,
+        source: data.source || 'user_input',
+        confidence_score: data.confidence_score,
+        metadata: data.metadata || {}
+      };
+      
+      const { error: insertError } = await supabase
+        .from('timeline_events')
+        .insert([eventPayload]);
+
+      if (insertError) throw insertError;
       
       // Navigate back to vehicle detail page
       navigate(`/vehicles/${vehicleId}`);

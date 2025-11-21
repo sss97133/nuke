@@ -84,11 +84,11 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
             .maybeSingle();
 
           if (!img) {
-            const { data: firstImg } = await supabase
+          const { data: firstImg } = await supabase
               .from('vehicle_images')
-              .select('image_url, thumbnail_url, medium_url')
+              .select('image_url, thumbnail_url, medium_url, created_at, taken_at')
               .eq('vehicle_id', v.id)
-              .order('uploaded_at', { ascending: false })
+              .order('created_at', { ascending: false })
               .limit(1)
               .maybeSingle();
             

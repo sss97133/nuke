@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import CursorButton from '../CursorButton';
 
 interface MobileCommentBoxProps {
   vehicleId: string;
@@ -117,13 +118,15 @@ export const MobileCommentBox: React.FC<MobileCommentBoxProps> = ({
   return (
     <div style={styles.container}>
       {/* Comment Count Button */}
-      <button
+      <CursorButton
         onClick={() => setExpanded(!expanded)}
-        style={styles.countBtn}
+        variant="secondary"
+        size="sm"
+        fullWidth
       >
         {comments.length} {comments.length === 1 ? 'Comment' : 'Comments'}
         <span style={styles.expandIcon}>{expanded ? '▼' : '▶'}</span>
-      </button>
+      </CursorButton>
 
       {/* Comment Thread (Expanded) */}
       {expanded && (
@@ -155,119 +158,92 @@ export const MobileCommentBox: React.FC<MobileCommentBoxProps> = ({
             style={styles.textarea}
             onFocus={() => setExpanded(true)}
           />
-          <button
+          <CursorButton
             onClick={handleSubmit}
             disabled={!newComment.trim() || submitting}
-            style={{
-              ...styles.submitBtn,
-              opacity: !newComment.trim() || submitting ? 0.5 : 1
-            }}
+            variant="primary"
+            size="sm"
           >
             {submitting ? '...' : '→'}
-          </button>
+          </CursorButton>
         </div>
       )}
     </div>
   );
 };
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   container: {
-    marginTop: '12px',
-    borderTop: '1px solid var(--border)',
-    paddingTop: '8px'
-  },
-  countBtn: {
-    width: '100%',
-    background: 'transparent',
-    border: 'none',
-    padding: '8px 0',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    fontFamily: 'Arial, sans-serif',
-    cursor: 'pointer',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    color: 'var(--text-muted)'
+    marginTop: 'var(--space-3)',
+    borderTop: '2px solid var(--border)',
+    paddingTop: 'var(--space-2)'
   },
   expandIcon: {
-    fontSize: '10px',
-    color: 'var(--text-muted)'
+    fontSize: '8pt',
+    color: 'var(--text-secondary)',
+    marginLeft: 'var(--space-2)'
   },
   thread: {
-    marginTop: '8px',
+    marginTop: 'var(--space-2)',
     maxHeight: '400px',
     overflowY: 'auto' as const,
-    background: 'var(--white)'
+    background: 'var(--bg)'
   },
   emptyState: {
-    padding: '16px',
+    padding: 'var(--space-4)',
     textAlign: 'center' as const,
-    color: 'var(--text-muted)',
-    fontSize: '10px'
+    color: 'var(--text-secondary)',
+    fontSize: '8pt'
   },
   comment: {
-    padding: '8px 0',
-    borderBottom: '1px solid var(--border)'
+    padding: 'var(--space-2) 0',
+    borderBottom: '2px solid var(--border)'
   },
   commentHeader: {
     display: 'flex',
-    gap: '6px',
-    marginBottom: '4px',
+    gap: 'var(--space-2)',
+    marginBottom: 'var(--space-1)',
     alignItems: 'center'
   },
   commentAuthor: {
-    fontSize: '10px',
-    fontWeight: 'bold',
+    fontSize: '8pt',
+    fontWeight: 600,
     color: 'var(--text)',
-    fontFamily: 'Arial, sans-serif'
+    fontFamily: 'var(--font-family)'
   },
   commentTime: {
-    fontSize: '10px',
-    color: 'var(--text-muted)'
+    fontSize: '8pt',
+    color: 'var(--text-secondary)',
+    fontFamily: 'var(--font-mono)'
   },
   commentText: {
-    fontSize: '10px',
-    lineHeight: '1.4',
+    fontSize: '8pt',
+    lineHeight: 1.4,
     wordWrap: 'break-word' as const,
     color: 'var(--text)',
-    fontFamily: 'Arial, sans-serif'
+    fontFamily: 'var(--font-family)'
   },
   inputBox: {
     display: 'flex',
-    gap: '8px',
-    marginTop: '8px',
+    gap: 'var(--space-2)',
+    marginTop: 'var(--space-2)',
     alignItems: 'center',
-    padding: '8px',
-    border: '1px solid var(--border)',
-    borderRadius: '0px',
-    background: 'var(--bg)'
+    padding: 'var(--space-2)',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    background: 'var(--surface)',
+    transition: 'var(--transition)'
   },
   textarea: {
     flex: 1,
-    padding: '6px 12px',
+    padding: 'var(--space-2)',
     border: 'none',
     background: 'transparent',
-    fontSize: '10px',
-    fontFamily: 'Arial, sans-serif',
+    fontSize: '8pt',
+    fontFamily: 'var(--font-family)',
     resize: 'none' as const,
-    outline: 'none'
-  },
-  submitBtn: {
-    width: '32px',
-    height: '32px',
-    background: 'var(--primary)',
-    color: 'var(--white)',
-    border: 'none',
-    borderRadius: '50%',
-    fontSize: '12px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    transition: 'all 0.2s'
+    outline: 'none',
+    color: 'var(--text)'
   }
 };
 

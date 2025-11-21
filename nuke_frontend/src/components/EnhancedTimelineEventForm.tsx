@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import type { imageAPI } from '../services/api';
 import { 
   PhotoIcon, 
   DocumentTextIcon, 
@@ -227,16 +226,37 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
             setUploadedImages(prev => new Set([...prev, fileId]));
 
             try {
-              const uploadFormData = new FormData();
-              uploadFormData.append('image', file);
-              uploadFormData.append('vehicleId', vehicleId);
-              uploadFormData.append('category', 'timeline_event');
-              uploadFormData.append('caption', `${formData.title} - ${file.name}`);
-              uploadFormData.append('timelineEventId', data.id);
+              // Upload directly to Supabase Storage
+              const fileName = `${currentUser.id}/${Date.now()}_${file.name}`;
+              const { error: uploadError } = await supabase.storage
+                .from('vehicle-images')
+                .upload(fileName, file);
+                
+              if (uploadError) throw uploadError;
 
-              const result = await imageAPI.uploadVehicleImage(uploadFormData);
+              // Get Public URL
+              const { data: { publicUrl } } = supabase.storage
+                .from('vehicle-images')
+                .getPublicUrl(fileName);
+                
+              // Create vehicle_image record
+              const { data: imgRecord, error: dbError } = await supabase
+                .from('vehicle_images')
+                .insert({
+                  vehicle_id: vehicleId,
+                  image_url: publicUrl,
+                  uploaded_by: currentUser.id,
+                  category: 'timeline_event',
+                  caption: `${formData.title} - ${file.name}`,
+                  timeline_event_id: data.id
+                })
+                .select()
+                .single();
+                
+              if (dbError) throw dbError;
+              
               console.log(`Successfully uploaded: ${file.name}`);
-              return result;
+              return imgRecord;
             } catch (error) {
               // Remove from uploaded set if upload failed
               setUploadedImages(prev => {

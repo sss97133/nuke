@@ -87,10 +87,10 @@ export class TagService {
    */
   static async getTagsForImage(imageId: string): Promise<Tag[]> {
     const { data, error } = await supabase
-      .from('image_tags')
-      .select('*')
+      .from('vehicle_image_tags')
+      .select('*, vehicle_images!inner(vehicle_id)')
       .eq('image_id', imageId)
-      .order('inserted_at', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error loading tags:', error);
@@ -101,14 +101,14 @@ export class TagService {
   }
 
   /**
-   * Get all tags for a vehicle
+   * Get all tags for a vehicle (via image join)
    */
   static async getTagsForVehicle(vehicleId: string): Promise<Tag[]> {
     const { data, error } = await supabase
-      .from('image_tags')
-      .select('*')
-      .eq('vehicle_id', vehicleId)
-      .order('inserted_at', { ascending: false });
+      .from('vehicle_image_tags')
+      .select('*, vehicle_images!inner(vehicle_id)')
+      .eq('vehicle_images.vehicle_id', vehicleId)
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error loading tags:', error);
@@ -123,10 +123,8 @@ export class TagService {
    */
   static async verifyTag(tagId: string, userId: string): Promise<boolean> {
     const { error } = await supabase
-      .from('image_tags')
+      .from('vehicle_image_tags')
       .update({
-        verified: true,
-        verified_by: userId,
         updated_at: new Date().toISOString()
       })
       .eq('id', tagId);
@@ -144,7 +142,7 @@ export class TagService {
    */
   static async rejectTag(tagId: string): Promise<boolean> {
     const { error } = await supabase
-      .from('image_tags')
+      .from('vehicle_image_tags')
       .delete()
       .eq('id', tagId);
 
@@ -172,24 +170,21 @@ export class TagService {
     },
     userId: string
   ): Promise<Tag | null> {
+    // Convert percentage to integer (0-10000 for 0.00-100.00)
+    const xPos = tagData.x_position ? Math.round(tagData.x_position * 100) : null;
+    const yPos = tagData.y_position ? Math.round(tagData.y_position * 100) : null;
+
     const { data, error } = await supabase
-      .from('image_tags')
+      .from('vehicle_image_tags')
       .insert({
         image_id: imageId,
-        vehicle_id: vehicleId,
-        tag_name: tagData.tag_name,
+        tag_text: tagData.tag_name,
         tag_type: tagData.tag_type,
-        x_position: tagData.x_position,
-        y_position: tagData.y_position,
-        width: tagData.width,
-        height: tagData.height,
-        source_type: 'manual',
-        confidence: 100,
-        verified: true,
-        created_by: userId,
-        metadata: {}
+        x_position: xPos,
+        y_position: yPos,
+        created_by: userId
       })
-      .select()
+      .select('*, vehicle_images!inner(vehicle_id)')
       .single();
 
     if (error) {
@@ -204,20 +199,27 @@ export class TagService {
    * Normalize database tag to frontend Tag interface
    */
   private static normalizeTagFromDB(dbTag: any): Tag {
+    // Get vehicle_id from joined vehicle_images if available
+    const vehicleId = dbTag.vehicle_images?.vehicle_id || null;
+    
+    // Convert integer positions back to percentages (0-10000 -> 0-100)
+    const xPos = dbTag.x_position != null ? dbTag.x_position / 100 : undefined;
+    const yPos = dbTag.y_position != null ? dbTag.y_position / 100 : undefined;
+
     return {
       id: dbTag.id,
       image_id: dbTag.image_id,
-      vehicle_id: dbTag.vehicle_id,
+      vehicle_id: vehicleId,
       timeline_event_id: dbTag.timeline_event_id,
-      tag_name: dbTag.tag_name || dbTag.text || 'Unknown',
+      tag_name: dbTag.tag_text || dbTag.tag_name || 'Unknown',
       tag_type: dbTag.tag_type || 'custom',
-      x_position: dbTag.x_position,
-      y_position: dbTag.y_position,
-      width: dbTag.width,
-      height: dbTag.height,
-      source_type: dbTag.source_type || 'manual',
-      confidence: typeof dbTag.confidence === 'number' ? dbTag.confidence : 100,
-      verified: dbTag.verified || false,
+      x_position: xPos,
+      y_position: yPos,
+      width: dbTag.width, // Not in schema, but keep for compatibility
+      height: dbTag.height, // Not in schema, but keep for compatibility
+      source_type: 'manual', // vehicle_image_tags doesn't have source_type
+      confidence: 100, // Default for manual tags
+      verified: true, // Manual tags are verified by default
       // Parts marketplace fields
       is_shoppable: dbTag.is_shoppable,
       oem_part_number: dbTag.oem_part_number,

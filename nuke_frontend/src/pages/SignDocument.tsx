@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SignaturePad from '../components/SignaturePad';
 import ShippingTracker from '../components/ShippingTracker';
-import { getTransactionByToken, submitSignature, VehicleTransaction } from '../services/vehicleTransactionService';
+import { getTransactionByToken, submitSignature } from '../services/vehicleTransactionService';
+import type { VehicleTransaction } from '../services/vehicleTransactionService';
 
 const SignDocument: React.FC = () => {
   const { token } = useParams<{ token: string }>();

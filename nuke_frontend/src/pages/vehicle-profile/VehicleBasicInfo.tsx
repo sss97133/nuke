@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import VehicleDataQualityRating from '../../components/VehicleDataQualityRating';
 import URLDataDrop from '../../components/vehicle/URLDataDrop';
 import InlineVINEditor from '../../components/vehicle/InlineVINEditor';
-import BaTURLDrop from '../../components/vehicle/BaTURLDrop';
+import { BATListingManager } from '../../components/vehicle/BATListingManager';
 import type { VehicleBasicInfoProps} from './types';
 import { useToast } from '../../components/ui/Toast';
 
@@ -21,13 +21,31 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   vehicle,
   session,
   permissions,
-  onDataPointClick,
+  onDataPointClick = () => {}, // Default no-op function
   onEditClick
 }) => {
+  // Ensure onDataPointClick is always a function - defensive wrapper
+  const safeOnDataPointClick = React.useMemo(() => {
+    if (onDataPointClick && typeof onDataPointClick === 'function') {
+      return onDataPointClick;
+    }
+    return () => {}; // Return no-op if not provided or invalid
+  }, [onDataPointClick]);
+
+  const handleDataPointClick = React.useCallback((e: React.MouseEvent, fieldName: string, fieldValue: string, fieldLabel: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      safeOnDataPointClick(e, fieldName, fieldValue, fieldLabel);
+    } catch (error) {
+      console.error('[VehicleBasicInfo] Error in handleDataPointClick:', error, { fieldName, fieldValue, fieldLabel });
+    }
+  }, [safeOnDataPointClick]);
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { isVerifiedOwner, hasContributorAccess, contributorRole } = permissions;
-  const [collapsed, setCollapsed] = React.useState(false);
+  const canEdit = isVerifiedOwner || hasContributorAccess;
+  const [collapsed, setCollapsed] = React.useState(false); // Always expanded - user preference
 
   const listingSourceLabel = React.useMemo(() => {
     const rawSource = (vehicle.listing_source || vehicle.discovery_source || '').toString();
@@ -103,7 +121,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         const showCraigslistFlag = isCraigslistListing && CRAIGSLIST_FIELD_KEYS.has(key);
 
         return (
-          <div key={key} className="vehicle-detail">
+          <div key={key} className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               {label}
               {showCraigslistFlag && (
@@ -115,15 +133,15 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '16px',
-                    height: '16px',
+                    width: '14px',
+                    height: '14px',
                     border: 'none',
                     background: 'transparent',
                     padding: 0,
                     cursor: 'pointer'
                   }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" role="img">
+                  <svg width="12" height="12" viewBox="0 0 20 20" fill="none" role="img">
                     <circle cx="10" cy="10" r="8.5" fill="#ede9fe" stroke="#7c3aed" strokeWidth="1.2" />
                     <path d="M12.3 6.4C11.6 5.8 10.8 5.5 9.9 5.5C8 5.5 6.5 7 6.5 8.9C6.5 10.8 8 12.3 9.9 12.3C10.8 12.3 11.6 12 12.3 11.4" stroke="#7c3aed" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M12.8 11.5L14.6 13.3" stroke="#22c55e" strokeWidth="1.2" strokeLinecap="round" />
@@ -134,7 +152,12 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             </span>
             <span
               className="commentable"
-              onClick={(e) => onDataPointClick(e, key, value, label)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, key, value, label);
+              }}
+              style={{ cursor: 'pointer' }}
             >
               {value}
             </span>
@@ -148,12 +171,12 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       background: 'var(--bg)',
       border: '1px solid var(--border)',
       padding: '0px',
-      margin: '16px',
+      margin: '0',
       fontFamily: 'Arial, sans-serif'
     }}>
       <div style={{
         background: 'var(--grey-200)',
-        padding: '8px 12px',
+        padding: '4px 6px',
         borderBottom: '1px solid var(--border)',
         display: 'flex',
         justifyContent: 'space-between',
@@ -161,18 +184,22 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         cursor: 'pointer'
       }} onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Expand' : 'Collapse'}>
         <span style={{ fontSize: '8pt', fontWeight: 'bold' }}>
-          Basic Information{collapsed ? ` — ${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.vin ? ' • ' + String(vehicle.vin).slice(0,8) + '…' : ''}` : ''}
+          {collapsed ? `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.vin ? ' • ' + String(vehicle.vin).slice(0,8) + '…' : ''}` : 'Basic Information'}
         </span>
-        {isVerifiedOwner && (
+        {canEdit && (
           <button
-            onClick={(e) => { e.stopPropagation(); navigate(`/vehicle/${vehicle.id}/edit`); }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              // Navigate to vehicle edit form
+              navigate(`/vehicle/${vehicle.id}/edit`);
+            }}
             style={{
               background: 'var(--primary)',
               color: 'var(--white)',
               border: '1px solid var(--border)',
               borderRadius: '0px',
-              padding: '4px 8px',
-              fontSize: '8pt',
+              padding: '2px 6px',
+              fontSize: '7pt',
               cursor: 'pointer'
             }}
           >
@@ -182,129 +209,181 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       </div>
       {!collapsed && (
       <>
-      {/* Data Quality Rating */}
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
-        <VehicleDataQualityRating vehicleId={vehicle.id} />
-      </div>
-
-      {/* Inline VIN Editor (for contributors/owners) */}
-      {hasContributorAccess && (
-        <div style={{ padding: '12px', borderBottom: '1px solid #bdbdbd' }}>
-          <InlineVINEditor
-            vehicleId={vehicle.id}
-            currentVIN={vehicle.vin || undefined}
-            canEdit={true}
-            onVINUpdated={() => {
-              // refresh basic info
-              window.dispatchEvent(new Event('vehicle_data_updated'));
-            }}
-          />
-        </div>
-      )}
-
-      {/* BaT URL Drop (for contributors/owners) */}
-      {hasContributorAccess && (
-        <div style={{ padding: '12px', borderBottom: '1px solid #bdbdbd' }}>
-          <BaTURLDrop
-            vehicleId={vehicle.id}
-            canEdit={true}
-            onDataImported={() => window.location.reload()}
-          />
-        </div>
-      )}
 
       {/* Vehicle Details */}
-      <div style={{ padding: '12px' }}>
+      <div style={{ padding: '8px' }}>
         <div>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '4px 0',
+            padding: '2px 0',
             borderBottom: '1px solid var(--border)',
-            fontSize: '8pt'
+            fontSize: '8pt',
+            marginBottom: '2px'
           }}>
             <span>Year</span>
             <span
               style={{ cursor: 'pointer', textDecoration: 'underline' }}
-              onClick={(e) => onDataPointClick(e, 'year', vehicle.year?.toString() || '', 'Year')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'year', vehicle.year?.toString() || '', 'Year');
+              }}
             >
               {vehicle.year}
             </span>
           </div>
-          <div className="vehicle-detail">
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Make</span>
             <span
               className="commentable"
-              onClick={(e) => onDataPointClick(e, 'make', vehicle.make, 'Make')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'make', vehicle.make || '', 'Make');
+              }}
+              style={{ cursor: 'pointer', userSelect: 'none' }}
             >
               {vehicle.make}
             </span>
           </div>
-          <div className="vehicle-detail">
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Model</span>
             <span
               className="commentable"
-              onClick={(e) => onDataPointClick(e, 'model', vehicle.model, 'Model')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'model', vehicle.model || '', 'Model');
+              }}
+              style={{ cursor: 'pointer' }}
             >
               {vehicle.model}
             </span>
           </div>
-          <div className="vehicle-detail">
+          {(vehicle as any).series && (
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+              <span>Series</span>
+              <span
+                className="commentable"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDataPointClick(e, 'series', (vehicle as any).series || '', 'Series');
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {(vehicle as any).series}
+              </span>
+            </div>
+          )}
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>VIN</span>
             <span
               className="commentable"
-              onClick={(e) => onDataPointClick(e, 'vin', vehicle.vin || '', 'VIN')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'vin', vehicle.vin || '', 'VIN');
+              }}
+              style={{ cursor: 'pointer' }}
             >
               {vehicle.vin || 'Not provided'}
             </span>
           </div>
-          <div className="vehicle-detail">
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Color</span>
             <span
               className="commentable"
-              onClick={(e) => onDataPointClick(e, 'color', vehicle.color || '', 'Color')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'color', vehicle.color || '', 'Color');
+              }}
+              style={{ cursor: 'pointer' }}
             >
               {vehicle.color || 'Not specified'}
             </span>
           </div>
-          <div className="vehicle-detail">
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Mileage</span>
             <span
               className="commentable"
-              onClick={(e) => onDataPointClick(e, 'mileage', vehicle.mileage?.toString() || '', 'Mileage')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'mileage', vehicle.mileage?.toString() || '', 'Mileage');
+              }}
+              style={{ cursor: 'pointer' }}
             >
               {vehicle.mileage ? `${vehicle.mileage.toLocaleString()} miles` : 'Not specified'}
             </span>
           </div>
+          {listingUrl && (
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+              <span>Source</span>
+              <span>
+                <a 
+                  href={listingUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--primary)', textDecoration: 'underline' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {listingSourceLabel || listingHost || 'External Listing'}
+                </a>
+                {listingCapturedDate && (
+                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
+                    ({new Date(listingCapturedDate).toLocaleDateString()})
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
           {vehicle.trim && (
-            <div className="vehicle-detail">
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
               <span>Trim</span>
               <span
                 className="commentable"
-                onClick={(e) => onDataPointClick(e, 'trim', vehicle.trim || '', 'Trim')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDataPointClick(e, 'trim', vehicle.trim || '', 'Trim');
+                }}
+                style={{ cursor: 'pointer' }}
               >
                 {vehicle.trim}
               </span>
             </div>
           )}
           {vehicle.engine && (
-            <div className="vehicle-detail">
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
               <span>Engine</span>
               <span
                 className="commentable"
-                onClick={(e) => onDataPointClick(e, 'engine', vehicle.engine || '', 'Engine')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDataPointClick(e, 'engine', vehicle.engine || '', 'Engine');
+                }}
+                style={{ cursor: 'pointer' }}
               >
                 {vehicle.engine}
               </span>
             </div>
           )}
           {vehicle.transmission && (
-            <div className="vehicle-detail">
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
               <span>Transmission</span>
               <span
                 className="commentable"
-                onClick={(e) => onDataPointClick(e, 'transmission', vehicle.transmission || '', 'Transmission')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDataPointClick(e, 'transmission', vehicle.transmission || '', 'Transmission');
+                }}
+                style={{ cursor: 'pointer' }}
               >
                 {vehicle.transmission}
               </span>

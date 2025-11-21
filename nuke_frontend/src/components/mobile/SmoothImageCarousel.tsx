@@ -53,16 +53,17 @@ export const SmoothImageCarousel: React.FC<SmoothImageCarouselProps> = ({
         style={{ 
           width: '100%', 
           height: '400px',
-          background: '#000'
+          background: 'var(--bg)'
         }}
       >
         {images.map((imageUrl, index) => (
           <SwiperSlide key={index}>
-            <div className="swiper-zoom-container">
+            <div className="swiper-zoom-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <div style={{ ...styles.imageBackground, backgroundImage: `url(${imageUrl})` }} />
               <img
                 src={imageUrl}
                 alt={`Image ${index + 1}`}
-                style={styles.image}
+                style={{ ...styles.image, position: 'relative', zIndex: 1 }}
                 loading={index === 0 ? 'eager' : 'lazy'}
               />
             </div>
@@ -77,30 +78,43 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     width: '100%',
     position: 'relative',
-    background: '#000',
+    background: 'var(--bg)',
     touchAction: 'pan-y pinch-zoom', // Better touch handling
   },
   image: {
     width: '100%',
     height: '400px',
-    objectFit: 'contain',
+    objectFit: 'cover',
+    objectPosition: 'center',
     display: 'block',
     userSelect: 'none',
     WebkitUserSelect: 'none',
     WebkitTouchCallout: 'none',
   },
+  imageBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    filter: 'blur(40px)',
+    opacity: 0.3,
+    zIndex: 0,
+  },
   empty: {
     width: '100%',
     height: '200px',
-    background: '#f0f0f0',
+    background: 'var(--surface)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '2px solid #ccc',
+    border: '2px solid var(--border)',
   },
   emptyText: {
-    color: '#888',
-    fontSize: '14px',
+    color: 'var(--text-secondary)',
+    fontSize: '8pt',
   },
 };
 

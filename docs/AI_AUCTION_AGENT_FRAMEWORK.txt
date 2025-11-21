@@ -1,0 +1,536 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    AI AUCTION AGENT - PROACTIVE MARKETPLACE INTELLIGENCE
+                    The AI Office That Never Sleeps
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CONCEPT OVERVIEW                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Instead of owners having to think about selling, the AI watches the
+    marketplace 24/7 and proactively suggests opportunities. It's like having
+    a sales agent that knows everything about your vehicle and the market.
+
+    KEY PRINCIPLE: Make it a simple YES/NO decision for owners.
+    
+    The AI does all the work:
+    • Analyzes market trends
+    • Matches vehicles to opportunities
+    • Generates personalized pitches
+    • Pre-fills all listing details
+    • Owner just says "yes" or "no"
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           HOW IT WORKS                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 1: AI WATCHES THE MARKETPLACE                          │
+    │  ────────────────────────────────────────────────────────  │
+    │  Background job runs every hour:                            │
+    │                                                              │
+    │  1. Analyzes recent sales (last 7 days)                     │
+    │     • What's selling?                                       │
+    │     • What prices?                                           │
+    │     • What categories?                                      │
+    │                                                              │
+    │  2. Monitors active auctions                                │
+    │     • Current bid levels                                     │
+    │     • Reserve prices                                         │
+    │     • Time remaining                                         │
+    │                                                              │
+    │  3. Tracks scheduled auctions                                │
+    │     • Upcoming live auctions                                 │
+    │     • Themed lots (trucks, classics, etc.)                    │
+    │     • Available slots                                        │
+    │                                                              │
+    │  4. Identifies patterns                                      │
+    │     • Trending makes/models                                  │
+    │     • Price ranges in demand                                 │
+    │     • Similar vehicles selling well                          │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 2: AI FINDS OPPORTUNITIES                              │
+    │  ────────────────────────────────────────────────────────  │
+    │                                                              │
+    │  OPPORTUNITY TYPE 1: Scheduled Lot Match                    │
+    │  ────────────────────────────────────────                   │
+    │  Scenario: "Truck auction scheduled for tomorrow"          │
+    │                                                              │
+    │  AI finds:                                                   │
+    │    • All trucks in database                                  │
+    │    • Not currently listed                                   │
+    │    • Owner hasn't declined recently                          │
+    │                                                              │
+    │  AI knows:                                                   │
+    │    • Vehicle details (make, model, year, condition)         │
+    │    • Owner's history (previous sales, listing patterns)      │
+    │    • Market value (current_value field)                      │
+    │                                                              │
+    │  AI generates:                                               │
+    │    "Upcoming truck auction scheduled for Nov 15.            │
+    │     Your 1972 Ford F-100 would be a perfect fit.            │
+    │     Suggested reserve: $25,000"                              │
+    │                                                              │
+    │  ────────────────────────────────────────────────────────  │
+    │                                                              │
+    │  OPPORTUNITY TYPE 2: Trending Category                      │
+    │  ────────────────────────────────────────                   │
+    │  Scenario: "3 Camaros sold this week"                       │
+    │                                                              │
+    │  AI finds:                                                   │
+    │    • All Camaros not listed                                  │
+    │    • Similar years/models                                    │
+    │                                                              │
+    │  AI generates:                                               │
+    │    "3 Chevrolet Camaros sold in the last week.              │
+    │     Your 1969 Camaro SS is in high demand right now.        │
+    │     Strike while the iron is hot!"                           │
+    │                                                              │
+    │  ────────────────────────────────────────────────────────  │
+    │                                                              │
+    │  OPPORTUNITY TYPE 3: Similar Vehicle Just Sold              │
+    │  ────────────────────────────────────────                   │
+    │  Scenario: "1969 Camaro sold for $85,000"                  │
+    │                                                              │
+    │  AI finds:                                                   │
+    │    • Other 1969 Camaros                                     │
+    │    • Similar condition/value                                 │
+    │                                                              │
+    │  AI generates:                                               │
+    │    "A 1969 Camaro just sold for $85,000.                    │
+    │     Your 1969 Camaro could fetch a similar price.            │
+    │     Suggested reserve: $76,500 (90% of similar sale)"       │
+    │                                                              │
+    │  ────────────────────────────────────────────────────────  │
+    │                                                              │
+    │  OPPORTUNITY TYPE 4: Price Match                            │
+    │  ────────────────────────────────────────                   │
+    │  Scenario: "Vehicles in $30-40k range selling well"         │
+    │                                                              │
+    │  AI finds:                                                   │
+    │    • Vehicles with current_value in that range              │
+    │    • Not currently listed                                   │
+    │                                                              │
+    │  AI generates:                                               │
+    │    "Vehicles in your price range ($35,000) are              │
+    │     actively selling. Your 2015 Mustang GT could be next."  │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 3: AI GENERATES PERSONALIZED PITCH                    │
+    │  ────────────────────────────────────────────────────────  │
+    │                                                              │
+    │  The AI has access to:                                       │
+    │    • Vehicle details (year, make, model, condition)          │
+    │    • Owner history (previous sales, listing patterns)       │
+    │    • Market data (similar sales, trends)                     │
+    │    • Timing (scheduled auctions, market windows)            │
+    │                                                              │
+    │  Generates pitch like:                                       │
+    │    "🚀 Perfect Timing: Your 1972 Ford F-100 would be        │
+    │     a great fit for an upcoming truck auction scheduled      │
+    │     for Nov 15. Suggested reserve: $25,000"                   │
+    │                                                              │
+    │  Includes:                                                   │
+    │    • Why this opportunity (reasoning)                        │
+    │    • Suggested reserve price                                │
+    │    • Suggested duration                                     │
+    │    • Confidence score (0-100)                                │
+    │    • Market data backing the suggestion                     │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 4: OWNER GETS NOTIFICATION                             │
+    │  ────────────────────────────────────────────────────────  │
+    │                                                              │
+    │  Owner receives:                                             │
+    │    • In-app notification: "Auction Opportunity"             │
+    │    • Email (optional): "Sell your truck?"                   │
+    │                                                              │
+    │  Owner sees:                                                 │
+    │    ┌─────────────────────────────────────────┐             │
+    │    │ 📅 Auction Opportunity                   │             │
+    │    │ 1972 Ford F-100                          │             │
+    │    │                                          │             │
+    │    │ Perfect Timing: Your 1972 Ford F-100      │             │
+    │    │ would be a great fit for an upcoming      │             │
+    │    │ truck auction scheduled for Nov 15.      │             │
+    │    │ Suggested reserve: $25,000               │             │
+    │    │                                          │             │
+    │    │ [Yes, Create Auction] [No Thanks]        │             │
+    │    └─────────────────────────────────────────┘             │
+    │                                                              │
+    │  That's it. Simple YES/NO decision.                          │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  STEP 5: OWNER RESPONDS                                      │
+    │  ────────────────────────────────────────────────────────  │
+    │                                                              │
+    │  IF OWNER CLICKS "YES":                                      │
+    │  ──────────────────────                                      │
+    │    1. System creates listing automatically                   │
+    │       • All details pre-filled from suggestion              │
+    │       • Reserve price set                                    │
+    │       • Duration set                                         │
+    │       • Scheduled for the auction slot (if applicable)       │
+    │                                                              │
+    │    2. Status: 'draft' (owner can review/edit)                │
+    │                                                              │
+    │    3. AI review runs automatically                          │
+    │                                                              │
+    │    4. Owner can activate when ready                          │
+    │                                                              │
+    │  IF OWNER CLICKS "NO":                                       │
+    │  ─────────────────────                                      │
+    │    1. Suggestion marked as 'declined'                        │
+    │                                                              │
+    │    2. AI won't suggest this vehicle again for 7 days        │
+    │                                                              │
+    │    3. AI learns from decline (future improvements)           │
+    └─────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      EXAMPLE SCENARIOS                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    SCENARIO 1: Scheduled Truck Auction
+    ───────────────────────────────────
+    
+    Monday 9:00 AM:
+    • Dealer schedules "Truck Auction" for Friday 2:00 PM
+    • Theme: "Classic Trucks 1970-1990"
+    
+    Monday 9:05 AM:
+    • AI Agent runs, finds scheduled auction
+    • Searches database for matching trucks
+    • Finds: 1972 Ford F-100 (owner: John)
+    • Checks: Not listed, owner hasn't declined recently
+    
+    Monday 9:06 AM:
+    • AI generates pitch:
+      "🚀 Perfect Timing: Your 1972 Ford F-100 would be
+       a great fit for an upcoming classic truck auction
+       scheduled for Friday, Nov 15 at 2:00 PM.
+       Suggested reserve: $25,000"
+    
+    Monday 9:07 AM:
+    • John gets notification
+    • Sees simple card with YES/NO buttons
+    
+    Monday 9:15 AM:
+    • John clicks "Yes, Create Auction"
+    • System creates listing automatically
+    • Scheduled for Friday 2:00 PM
+    • 10-minute live auction
+    • Reserve: $25,000
+    • Status: draft (John can review)
+    
+    Friday 2:00 PM:
+    • Auction goes live
+    • John's truck is in the scheduled lot
+    • Bidding begins
+
+
+    SCENARIO 2: Trending Category
+    ─────────────────────────────
+    
+    Tuesday:
+    • 3 Chevrolet Camaros sell in one day
+    • AI detects trend
+    
+    Wednesday 8:00 AM:
+    • AI Agent runs
+    • Finds all Camaros not listed
+    • Finds: 1969 Camaro SS (owner: Sarah)
+    • Market data: Average sale price $75,000
+    
+    Wednesday 8:01 AM:
+    • AI generates pitch:
+      "🔥 Hot Market: 3 Chevrolet Camaros sold in the
+       last week. Your 1969 Camaro SS is in high demand
+       right now. Strike while the iron is hot!
+       Suggested reserve: $70,000"
+    
+    Wednesday 8:02 AM:
+    • Sarah gets notification
+    
+    Wednesday 8:30 AM:
+    • Sarah clicks "Yes"
+    • Listing created
+    • 7-day auction
+    • Reserve: $70,000
+
+
+    SCENARIO 3: Similar Vehicle Sold
+    ─────────────────────────────────
+    
+    Thursday:
+    • 1970 Dodge Charger sells for $95,000
+    
+    Friday 9:00 AM:
+    • AI Agent runs
+    • Finds similar Chargers
+    • Finds: 1970 Dodge Charger R/T (owner: Mike)
+    • Similar condition, similar year
+    
+    Friday 9:01 AM:
+    • AI generates pitch:
+      "💰 Proven Demand: A 1970 Dodge Charger just
+       sold for $95,000. Your 1970 Dodge Charger R/T
+       could fetch a similar price. This is the perfect
+       time to list. Suggested reserve: $85,500"
+    
+    Friday 9:02 AM:
+    • Mike gets notification
+    
+    Friday 10:00 AM:
+    • Mike clicks "Yes"
+    • Listing created with suggested reserve
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      DATA FLOW DIAGRAM                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    AI AGENT RUNS (Every Hour)
+    ──────────────────────────
+           │
+           ├─→ Analyze recent sales
+           │   └─→ Find trending categories
+           │
+           ├─→ Monitor active auctions
+           │   └─→ Find price match opportunities
+           │
+           ├─→ Check scheduled auctions
+           │   └─→ Find matching vehicles
+           │
+           └─→ Find similar vehicles sold
+               └─→ Match to unsold vehicles
+           │
+           ▼
+    GENERATE OPPORTUNITIES
+    ──────────────────────
+           │
+           ├─→ Filter out:
+           │   • Already listed vehicles
+           │   • Recent declines (7 days)
+           │   • Expired suggestions
+           │
+           ├─→ Calculate confidence scores
+           │
+           └─→ Generate personalized pitches
+           │
+           ▼
+    CREATE SUGGESTIONS
+    ──────────────────
+           │
+           ├─→ Insert into auction_suggestions
+           │   • vehicle_id
+           │   • owner_id
+           │   • opportunity_type
+           │   • pitch_message
+           │   • suggested_reserve_cents
+           │   • confidence_score
+           │   • market_data
+           │
+           └─→ Create notification
+               • user_id: owner_id
+               • title: "Auction Opportunity"
+               • body: pitch_message
+               • action_url: /suggestions/{id}
+           │
+           ▼
+    OWNER SEES NOTIFICATION
+    ───────────────────────
+           │
+           ├─→ In-app notification bell
+           │
+           └─→ Suggestion card component
+               • Shows pitch
+               • Shows suggested reserve
+               • Shows market data
+               • YES/NO buttons
+           │
+           ▼
+    OWNER RESPONDS
+    ──────────────
+           │
+           ├─→ CLICKS "YES"
+           │   │
+           │   └─→ accept_auction_suggestion()
+           │       │
+           │       ├─→ Create vehicle_listing
+           │       │   • Pre-fill all details
+           │       │   • Set reserve
+           │       │   • Set duration
+           │       │   • Schedule if applicable
+           │       │
+           │       ├─→ Update suggestion
+           │       │   • status: 'accepted'
+           │       │   • listing_id: new listing
+           │       │
+           │       └─→ Trigger AI review
+           │           • Auto-approve if high confidence
+           │
+           │
+           └─→ CLICKS "NO"
+               │
+               └─→ decline_auction_suggestion()
+                   │
+                   └─→ Update suggestion
+                       • status: 'declined'
+                       • AI won't suggest again for 7 days
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      KEY FEATURES                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    1. PROACTIVE, NOT REACTIVE
+       ───────────────────────
+       • AI watches market 24/7
+       • Finds opportunities automatically
+       • Reaches out to owners
+       • No need for owners to think about selling
+
+    2. PERSONALIZED PITCHES
+       ────────────────────
+       • Uses vehicle details
+       • Uses owner history
+       • Uses market data
+       • Context-aware messaging
+
+    3. SIMPLE DECISION
+       ───────────────
+       • Owner just says YES or NO
+       • All details pre-filled
+       • One click to create listing
+       • No forms to fill out
+
+    4. INTELLIGENT FILTERING
+       ─────────────────────
+       • Won't suggest if already listed
+       • Won't spam (7-day cooldown)
+       • Respects owner preferences
+       • Learns from declines
+
+    5. MARKET-DRIVEN
+       ─────────────
+       • Based on real sales data
+       • Based on current trends
+       • Based on scheduled opportunities
+       • Confidence scores for transparency
+
+    6. AUTOMATED LISTING CREATION
+       ─────────────────────────
+       • Pre-fills everything
+       • Sets reserve price
+       • Sets duration
+       • Schedules if applicable
+       • Owner can review/edit before activating
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      DATABASE SCHEMA                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    auction_suggestions
+    ──────────────────
+    • id: UUID
+    • vehicle_id: UUID → vehicles
+    • owner_id: UUID → profiles
+    • opportunity_type: scheduled_lot | trending_category | price_match | similar_sold
+    • scheduled_auction_id: UUID → vehicle_listings (if applicable)
+    • pitch_message: TEXT (AI-generated)
+    • pitch_reason: TEXT (why this opportunity)
+    • suggested_reserve_cents: BIGINT
+    • suggested_duration_minutes: INTEGER
+    • confidence_score: INTEGER (0-100)
+    • market_data: JSONB (supporting data)
+    • status: pending | accepted | declined | expired
+    • owner_response_at: TIMESTAMPTZ
+    • listing_id: UUID → vehicle_listings (if accepted)
+    • created_at: TIMESTAMPTZ
+    • expires_at: TIMESTAMPTZ (7 days)
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      CRON JOB SETUP                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Run AI Agent every hour:
+    ────────────────────────
+    
+    Option 1: Supabase Cron (pg_cron)
+    ─────────────────────────────────
+    SELECT cron.schedule(
+      'ai-auction-agent',
+      '0 * * * *',  -- Every hour
+      $$
+      SELECT net.http_post(
+        url := 'https://your-project.supabase.co/functions/v1/ai-auction-agent',
+        headers := '{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
+      );
+      $$
+    );
+
+    Option 2: External Cron (Vercel Cron, GitHub Actions, etc.)
+    ───────────────────────────────────────────────────────────
+    Call: POST /functions/v1/ai-auction-agent
+    Headers: Authorization: Bearer SERVICE_ROLE_KEY
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      WHY THIS IS POWERFUL                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    1. REMOVES FRICTION
+       • Owner doesn't need to think about selling
+       • AI does all the research
+       • One click to list
+       • No forms, no decisions
+
+    2. MARKET TIMING
+       • AI knows when market is hot
+       • Suggests at optimal times
+       • Matches vehicles to opportunities
+       • Maximizes sale probability
+
+    3. SCALES INFINITELY
+       • One AI agent watches all vehicles
+       • Works 24/7
+       • Never gets tired
+       • Consistent quality
+
+    4. LEARNS AND IMPROVES
+       • Tracks which suggestions are accepted
+       • Learns owner preferences
+       • Improves pitch quality
+       • Better matching over time
+
+    5. FILLS AUCTION SLOTS
+       • Proactively fills scheduled auctions
+       • Ensures lots are full
+       • Better auction experience
+       • More sales
+
+    6. PERSONALIZED EXPERIENCE
+       • Each pitch is customized
+       • Uses owner's vehicle data
+       • Uses owner's history
+       • Feels personal, not automated
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF FRAMEWORK
+═══════════════════════════════════════════════════════════════════════════════
+

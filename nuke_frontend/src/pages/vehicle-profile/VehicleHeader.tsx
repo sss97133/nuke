@@ -32,11 +32,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   onPriceClick,
   initialValuation,
   initialPriceSignal,
-  organizationLinks = []
+  organizationLinks = [],
+  onClaimClick
 }) => {
-  const { isVerifiedOwner, contributorRole } = permissions;
+  const { isVerifiedOwner, contributorRole } = permissions || {};
   const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
-  const [trendPct30d, setTrendPct30d] = useState<number | null>(null);
+  const [trendPct, setTrendPct] = useState<number | null>(null);
+  const [trendPeriod, setTrendPeriod] = useState<'live' | '1w' | '30d' | '6m' | '1y' | '5y'>('30d');
+  
+  // Cycle through trend periods
+  const toggleTrendPeriod = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const periods: ('live' | '1w' | '30d' | '6m' | '1y' | '5y')[] = ['live', '1w', '30d', '6m', '1y', '5y'];
+    const currentIndex = periods.indexOf(trendPeriod);
+    const nextIndex = (currentIndex + 1) % periods.length;
+    setTrendPeriod(periods[nextIndex]);
+  };
   const [displayMode, setDisplayMode] = useState<'auto'|'estimate'|'auction'|'asking'|'sale'|'purchase'|'msrp'>('auto');
   const [responsibleMode, setResponsibleMode] = useState<'auto'|'owner'|'consigner'|'uploader'|'listed_by'|'custom'>('auto');
   const [responsibleCustom, setResponsibleCustom] = useState<string>('');
@@ -115,37 +126,88 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     })();
   }, [vehicle?.id]);
 
-  // Load 30d trend from price history (prefer current/asking/sale types)
+  // Load trend based on selected period
   useEffect(() => {
     (async () => {
       try {
-        if (!vehicle?.id) { setTrendPct30d(null); return; }
+        if (!vehicle?.id) { setTrendPct(null); return; }
+
+        // Calculate start date based on period
+        const now = Date.now();
+        let since = now;
+        
+        switch (trendPeriod) {
+          case 'live': since = now - 24 * 60 * 60 * 1000; break; // Last 24h
+          case '1w': since = now - 7 * 24 * 60 * 60 * 1000; break;
+          case '30d': since = now - 30 * 24 * 60 * 60 * 1000; break;
+          case '6m': since = now - 180 * 24 * 60 * 60 * 1000; break;
+          case '1y': since = now - 365 * 24 * 60 * 60 * 1000; break;
+          case '5y': since = now - 5 * 365 * 24 * 60 * 60 * 1000; break;
+        }
+
+        // Fetch price history
         const { data, error } = await supabase
           .from('vehicle_price_history')
           .select('price_type,value,as_of')
           .eq('vehicle_id', vehicle.id)
           .in('price_type', ['current','asking','sale'])
           .order('as_of', { ascending: false })
-          .limit(50);
+          .limit(100); // Fetch more for longer periods
+
         if (error || !Array.isArray(data) || data.length < 2) {
-          setTrendPct30d(null);
+          setTrendPct(null);
           return;
         }
-        const now = Date.now();
-        const since = now - 30 * 24 * 60 * 60 * 1000;
-        const within30 = (data as any[]).filter(d => new Date(d.as_of).getTime() >= since);
-        const arr = within30.length >= 2 ? within30 : (data as any[]);
-        if (arr.length < 2) { setTrendPct30d(null); return; }
+
+        // For 'live', we also check builds/receipts for active investment
+        if (trendPeriod === 'live') {
+          // Get build IDs for this vehicle first
+          const { data: builds } = await supabase
+            .from('vehicle_builds')
+            .select('id')
+            .eq('vehicle_id', vehicle.id);
+            
+          let recentInvestment = 0;
+          
+          if (builds && builds.length > 0) {
+            const buildIds = builds.map(b => b.id);
+            // Check for recent build items
+            const { data: recentItems } = await supabase
+              .from('build_line_items')
+              .select('total_price')
+              .in('build_id', buildIds)
+              .gte('created_at', new Date(since).toISOString());
+              
+            recentInvestment = recentItems?.reduce((sum, item) => sum + (item.total_price || 0), 0) || 0;
+          }
+          
+          // If there's investment today, show positive trend
+          if (recentInvestment > 0) {
+             const currentValue = vehicle.current_value || vehicle.purchase_price || 10000; // fallback base
+             const pct = (recentInvestment / currentValue) * 100;
+             setTrendPct(pct);
+             return;
+          }
+        }
+
+        const withinPeriod = (data as any[]).filter(d => new Date(d.as_of).getTime() >= since);
+        // Need at least start and end points, or fallback to closest outside range if needed
+        const arr = withinPeriod.length >= 2 ? withinPeriod : (data as any[]);
+        
+        if (arr.length < 2) { setTrendPct(null); return; }
+        
         const latest = arr[0];
-        const baseline = arr[arr.length - 1];
-        if (!latest?.value || !baseline?.value || baseline.value === 0) { setTrendPct30d(null); return; }
+        const baseline = arr[arr.length - 1]; // Earliest point in the period (or closest available)
+        
+        if (!latest?.value || !baseline?.value || baseline.value === 0) { setTrendPct(null); return; }
+        
         const pct = ((latest.value - baseline.value) / baseline.value) * 100;
-        setTrendPct30d(pct);
+        setTrendPct(pct);
       } catch {
-        setTrendPct30d(null);
+        setTrendPct(null);
       }
     })();
-  }, [vehicle?.id]);
+  }, [vehicle?.id, trendPeriod]);
 
   // Load owner profile and stats when owner card opens
   useEffect(() => {
@@ -213,7 +275,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return { amount: vehicle.current_bid, label: 'Current Bid' };
     }
     // Asking
-    if (vehicle.is_for_sale && typeof vehicle.asking_price === 'number') {
+    if (typeof vehicle.asking_price === 'number') {
       return { amount: vehicle.asking_price, label: 'Asking' };
     }
     // Sold
@@ -302,9 +364,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
   };
 
-  const isRowOwner = !!(session?.user?.id && (vehicle as any)?.user_id && session?.user?.id === (vehicle as any).user_id);
-  const isUploaderAsTempOwner = !!(session?.user?.id && !((vehicle as any)?.user_id) && session?.user?.id === vehicle.uploaded_by);
-  const isOwnerLike = isVerifiedOwner || contributorRole === 'owner' || isRowOwner || isUploaderAsTempOwner;
+  const isOwnerLike = isVerifiedOwner || contributorRole === 'owner';
 
   const computeResponsibleLabel = (): string => {
     const mode = responsibleMode || 'auto';
@@ -313,11 +373,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (mode === 'consigner') return 'Consigner';
     if (mode === 'uploader') return 'Uploader';
     if (mode === 'listed_by') return 'Listed by';
-    // auto
-    return ((isRowOwner || isVerifiedOwner || contributorRole === 'owner' || isUploaderAsTempOwner) && 'Owner')
-      || (contributorRole === 'consigner' && 'Consigner')
-      || (session?.user?.id === vehicle.uploaded_by && 'Uploader')
-      || 'Listed by';
+    
+    // Auto logic based on permissions
+    if (isVerifiedOwner || contributorRole === 'owner') return 'Owner';
+    if (contributorRole === 'consigner') return 'Consigner';
+    if (contributorRole === 'discovered') return 'Discoverer';
+    if (contributorRole === 'photographer') return 'Photographer';
+    if (contributorRole === 'restorer') return 'Restorer';
+    
+    // Fallback: if they are just the uploader without a specific role
+    if (session?.user?.id === vehicle?.uploaded_by) return 'Uploader';
+    
+    return 'Listed by';
   };
 
   const formatShortDate = (value?: string | null) => {
@@ -453,15 +520,28 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const primaryLabel = primaryPrice.label || 'Price pending';
   const priceText = primaryAmount !== null ? formatCurrency(primaryAmount) : 'Set a price';
   const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
-  const identityLabel = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ').trim() || 'Vehicle';
+  
+  // Build full vehicle identity with series/submodel and body style
+  // Example: "1973 GMC K5 JIMMY" instead of just "1973 GMC K5"
+  const identityParts = vehicle ? [
+    vehicle.year,
+    vehicle.make,
+    (vehicle as any).series || vehicle.model, // Prefer series (C10/K10/K5) over model
+    (vehicle as any).body_style && (vehicle as any).body_style !== vehicle.model 
+      ? (vehicle as any).body_style 
+      : null // Only show body_style if it's different from model
+  ].filter(Boolean) : [];
+  
+  const identityLabel = identityParts.join(' ').trim() || 'Vehicle';
+  
   const lastSoldText = saleDate ? `Last sold ${formatShortDate(saleDate)}` : 'Off-market estimate';
   const canOpenOwnerCard = Boolean(responsibleName);
 
   const baseTextColor = 'var(--text)';
   const mutedTextColor = 'var(--text-muted)';
   const trendIndicator = useMemo(() => {
-    if (trendPct30d === null) return null;
-    const positive = trendPct30d >= 0;
+    if (trendPct === null) return null;
+    const positive = trendPct >= 0;
     const color = positive ? '#22c55e' : '#ef4444';
     const triangleStyle = positive
       ? {
@@ -474,17 +554,37 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           borderRight: '5px solid transparent',
           borderTop: `7px solid ${color}`
         };
+    
+    const periodLabel = trendPeriod.toUpperCase();
+    
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '10px', color }}>
+      <span 
+        onClick={toggleTrendPeriod}
+        title={`Click to toggle period (Current: ${periodLabel})`}
+        style={{ 
+          display: 'inline-flex', 
+          alignItems: 'center', 
+          gap: 4, 
+          fontSize: '10px', 
+          color,
+          cursor: 'pointer',
+          userSelect: 'none'
+        }}
+      >
         <span style={{ width: 0, height: 0, ...triangleStyle }} />
-        {`${positive ? '+' : ''}${trendPct30d.toFixed(1)}%`}
+        {`${positive ? '+' : ''}${trendPct.toFixed(1)}%`}
+        <span style={{ fontSize: '8px', color: mutedTextColor, marginLeft: '2px' }}>
+          {periodLabel}
+        </span>
       </span>
     );
-  }, [trendPct30d]);
+  }, [trendPct, trendPeriod]);
 
   const handleViewValuation = () => {
     setPriceMenuOpen(false);
+    if (onPriceClick && typeof onPriceClick === 'function') {
     onPriceClick();
+    }
   };
 
   const handleTradeClick = () => {
@@ -500,30 +600,56 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       style={{
         background: 'var(--surface)',
         border: 'none',
-        padding: '10px 16px',
+        padding: '4px 12px',
         margin: 0,
         position: 'sticky',
         top: 48,
         zIndex: 10,
         borderBottom: '1px solid var(--border)',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
+        boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+        height: '32px',
+        display: 'flex',
+        alignItems: 'center'
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <div style={{ flex: '1 1 320px', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: mutedTextColor }}>
-            Vehicle
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 700, lineHeight: 1.1 }}>
+      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', gap: 16, width: '100%' }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          <div style={{ fontSize: '9pt', fontWeight: 700, lineHeight: 1.1, whiteSpace: 'nowrap' }}>
             {identityLabel}
           </div>
-          <div style={{ position: 'relative', fontSize: '10px', color: mutedTextColor, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-            <span>{responsibleLabel}</span>
+          <div style={{ position: 'relative', fontSize: '8pt', color: mutedTextColor, display: 'flex', gap: 6, alignItems: 'center' }}>
+            {isVerifiedOwner ? (
             <button
               type="button"
               onClick={(e) => {
                 e.preventDefault();
-                if (!canOpenOwnerCard) return;
+                  if (showOwnerCard) {
+                    window.location.href = `/profile/${session?.user?.id || ''}`;
+                  } else {
+                    setShowOwnerCard(true);
+                  }
+                }}
+                style={{
+                  border: '1px solid #22c55e',
+                  background: '#f0fdf4',
+                  color: '#15803d',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '8pt',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <span>✓</span> Your Vehicle
+              </button>
+            ) : responsibleName ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
                 if (showOwnerCard) {
                   window.location.href = `/profile/${(vehicle as any).uploaded_by || (vehicle as any).user_id || ''}`;
                 } else {
@@ -536,14 +662,37 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 color: baseTextColor,
                 fontWeight: 600,
                 padding: 0,
-                cursor: canOpenOwnerCard ? 'pointer' : 'default',
-                textDecoration: canOpenOwnerCard ? 'underline dotted' : 'none'
+                  cursor: 'pointer',
+                  textDecoration: 'underline dotted'
               }}
-              disabled={!canOpenOwnerCard}
             >
-              {responsibleName || 'Unassigned'}
+                {responsibleName}
             </button>
-            {canOpenOwnerCard && showOwnerCard && ownerProfile && (
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onClaimClick) {
+                    onClaimClick();
+                  }
+                }}
+                style={{
+                  border: '1px solid var(--primary)',
+                  background: 'var(--surface)',
+                  color: 'var(--primary)',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '8pt'
+                }}
+              >
+                Claim This Vehicle
+            </button>
+            )}
+            {responsibleName && showOwnerCard && ownerProfile && (
               <div
                 style={{
                   position: 'absolute',
@@ -602,65 +751,67 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             )}
           </div>
           {visibleOrganizations.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: '10px' }}>
-              <span style={{ color: mutedTextColor }}>Linked:</span>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               {visibleOrganizations.map((org) => (
                 <Link
                   key={org.id}
                   to={`/org/${org.organization_id}`}
+                  title={`${org.business_name} (${formatRelationship(org.relationship_type)})`}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 4,
+                    justifyContent: 'center',
+                    width: '20px',
+                    height: '20px',
                     border: '1px solid var(--border)',
-                    borderRadius: 999,
-                    padding: '2px 10px',
-                    fontWeight: 600,
+                    borderRadius: '50%',
+                    background: 'var(--surface)',
                     color: baseTextColor,
-                    textDecoration: 'none'
+                    textDecoration: 'none',
+                    fontSize: '10px',
+                    overflow: 'hidden'
                   }}
                 >
-                  {org.business_name}
-                  <span style={{ fontSize: '9px', color: mutedTextColor }}>
-                    {formatRelationship(org.relationship_type)}
-                  </span>
+                  {org.logo_url ? (
+                    <img src={org.logo_url} alt={org.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    org.business_name.charAt(0).toUpperCase()
+                  )}
                 </Link>
               ))}
               {extraOrgCount > 0 && (
-                <span style={{ fontSize: '9px', color: mutedTextColor }}>+{extraOrgCount} more</span>
+                <span style={{ fontSize: '8px', color: mutedTextColor }}>+{extraOrgCount}</span>
               )}
             </div>
           )}
         </div>
 
-        <div ref={priceMenuRef} style={{ flex: '0 0 auto', minWidth: 220, textAlign: 'right' }}>
+        <div ref={priceMenuRef} style={{ flex: '0 0 auto', textAlign: 'right', position: 'relative' }}>
           <button
             type="button"
             onClick={() => setPriceMenuOpen((open) => !open)}
             style={{
-              width: '100%',
-              background: 'white',
-              border: '1px solid #d1d5db',
-              borderRadius: 8,
-              padding: '12px 14px',
-              cursor: 'pointer'
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
             }}
           >
-            <div style={{ fontSize: '22px', fontWeight: 700, color: baseTextColor }}>
+            <div style={{ fontSize: '10pt', fontWeight: 700, color: baseTextColor }}>
               {priceText}
             </div>
-            <div style={{ fontSize: '11px', color: mutedTextColor, marginTop: 2 }}>
-              {priceDescriptor}
-            </div>
-            <div style={{ marginTop: 4, fontSize: '10px', color: mutedTextColor, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
-              <span>{lastSoldText}</span>
               {trendIndicator}
-            </div>
           </button>
 
           {priceMenuOpen && (
             <div
               style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
                 marginTop: 8,
                 background: 'white',
                 border: '1px solid #d1d5db',
@@ -668,7 +819,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 boxShadow: '0 12px 24px rgba(15, 23, 42, 0.15)',
                 padding: 12,
                 fontSize: '8pt',
-                color: baseTextColor
+                color: baseTextColor,
+                width: '280px',
+                zIndex: 100
               }}
             >
               <div style={{ fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
@@ -788,8 +941,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         >
           <div onClick={(e) => e.stopPropagation()} style={{ width: '520px', maxWidth: '95vw' }}>
             <TradePanel
-              vehicleId={vehicle.id}
-              vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              vehicleId={vehicle?.id || ''}
+              vehicleName={vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : 'Vehicle'}
               currentSharePrice={(valuation && typeof valuation.sharePrice === 'number') ? valuation.sharePrice : 1.00}
               totalShares={1000}
             />

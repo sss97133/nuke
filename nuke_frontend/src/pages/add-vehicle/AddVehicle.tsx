@@ -5,7 +5,7 @@ import { uploadQueue } from '../../services/globalUploadQueue';
 import { TimelineEventService } from '../../services/timelineEventService';
 // AppLayout now provided globally by App.tsx
 import TitleScan from '../../components/TitleScan';
-import UniversalImageUpload from '../../components/UniversalImageUpload';
+import { UniversalImageUpload } from '../../components/UniversalImageUpload';
 // Modular components
 import { useVehicleForm } from './hooks/useVehicleForm';
 import VehicleFormFields from './components/VehicleFormFields';
@@ -803,7 +803,21 @@ Redirecting to vehicle profile...`);
         // user_id is set by the database through auth context
         discovered_by: formData.import_url ? user.id : undefined,
         discovery_source: formData.import_url ? (formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External URL') : undefined,
-        discovery_url: formData.import_url || undefined
+        discovery_url: formData.import_url || undefined,
+        // ORIGIN TRACKING - Save to database
+        profile_origin: formData.bat_auction_url ? 'bat_import' : 
+                       formData.import_url ? 'url_scraper' : 
+                       'manual_entry',
+        bat_auction_url: formData.bat_auction_url || undefined,
+        origin_metadata: {
+          import_source: formData.bat_auction_url ? 'bat_manual_entry' : 
+                        formData.import_url ? 'url_scraper' : 
+                        'manual_entry',
+          import_date: new Date().toISOString().split('T')[0],
+          ...(formData.bat_auction_url && { bat_url: formData.bat_auction_url }),
+          ...(formData.import_url && { discovery_url: formData.import_url }),
+          ...(lastScrapedData?.source && { scraped_source: lastScrapedData.source })
+        }
       };
       
       const numericColumns = new Set([
@@ -890,15 +904,34 @@ Redirecting to vehicle profile...`);
 
         if (user?.id) {
           try {
+            // Determine relationship_type based on import source
+            // If it's from a Craigslist/external URL, it's 'discovered'
+            // Otherwise use formData.relationship_type or default to 'interested'
+            const relationshipType = formData.import_url && (formData.import_url.includes('craigslist.org') || formData.import_url.includes('marketplace') || formData.import_url.includes('autotrader') || formData.import_url.includes('cars.com'))
+              ? 'discovered'
+              : (formData.relationship_type || 'interested');
+            
+            // Determine discovery_source - use actual source name if available, otherwise use category
+            let discoverySource: string;
+            if (formData.import_url?.includes('craigslist.org')) {
+              discoverySource = 'Craigslist';
+            } else if (formData.listing_source) {
+              discoverySource = formData.listing_source;
+            } else if (lastScrapedData?.source) {
+              discoverySource = lastScrapedData.source;
+            } else {
+              discoverySource = mapDiscoverySourceToCategory(formData.listing_source || lastScrapedData?.source);
+            }
+            
             await supabase.from('discovered_vehicles').upsert({
               user_id: user.id,
               vehicle_id: vehicleId,
-              discovery_source: mapDiscoverySourceToCategory(formData.listing_source || scrapedData?.source),
-              discovery_context: formData.discoverer_opinion || '',
+              relationship_type: relationshipType,
+              discovery_source: discoverySource,
+              discovery_context: formData.import_url || formData.discoverer_opinion || '',
               interest_level: 'high',
               is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              created_at: new Date().toISOString()
             }, { onConflict: 'vehicle_id,user_id' });
           } catch (err) {
             console.warn('Failed to upsert discovered_vehicles entry:', err);

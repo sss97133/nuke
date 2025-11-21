@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 interface Photo {
   file: File;
@@ -42,6 +42,19 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
   React.useEffect(() => {
     loadVehicles();
   }, []);
+
+  // ESC key handler to close
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
 
   const loadVehicles = async () => {
     const { data } = await supabase
@@ -363,7 +376,17 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
     <div className="mobile-photo-dump">
       <div className="header">
         <h2>Photo Dump</h2>
-        <button onClick={onClose} className="close-btn">✕</button>
+        <button 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }} 
+          className="close-btn"
+          type="button"
+        >
+          ✕
+        </button>
       </div>
       
       <div className="content">

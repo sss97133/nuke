@@ -5,11 +5,13 @@ import type { Vehicle, VehiclePermissions } from './types';
 interface VehiclePricingSectionProps {
   vehicle: Vehicle;
   permissions: VehiclePermissions;
+  initialValuation?: any | null; // From RPC to avoid duplicate query
 }
 
 const VehiclePricingSection: React.FC<VehiclePricingSectionProps> = ({
   vehicle,
-  permissions
+  permissions,
+  initialValuation
 }) => {
   const { isVerifiedOwner, hasContributorAccess } = permissions;
 
@@ -24,6 +26,7 @@ const VehiclePricingSection: React.FC<VehiclePricingSectionProps> = ({
           mileage: vehicle.mileage || undefined
         }}
         isOwner={isVerifiedOwner || hasContributorAccess}
+        initialValuation={initialValuation}
       />
     </section>
   );
