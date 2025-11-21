@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { vehicleAPI } from '../services/api';
 // AppLayout now provided globally by App.tsx
 import VehicleMakeModelInput from '../components/forms/VehicleMakeModelInput';
 import { TimelineEventService } from '../services/timelineEventService';
@@ -13,6 +12,8 @@ interface VehicleFormData {
   // Core Identity
   make: string;
   model: string;
+  series?: string;
+  trim?: string;
   year?: number;
   vin?: string;
   license_plate?: string;
@@ -49,6 +50,7 @@ interface VehicleFormData {
   // Financial Information
   msrp?: number;
   current_value?: number;
+  asking_price?: number;
   purchase_price?: number;
   purchase_date?: string;
   purchase_location?: string;
@@ -97,6 +99,9 @@ const EditVehicle: React.FC = () => {
     make: '',
     model: '',
   });
+  const [importUrl, setImportUrl] = useState('');
+  const [isScraping, setIsScraping] = useState(false);
+  const [scrapingError, setScrapingError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -147,6 +152,8 @@ const EditVehicle: React.FC = () => {
       const vehicleData: VehicleFormData = {
         make: data.make || '',
         model: data.model || '',
+        series: data.series,
+        trim: data.trim,
         year: data.year,
         vin: data.vin,
         license_plate: data.license_plate,
@@ -206,6 +213,96 @@ const EditVehicle: React.FC = () => {
     }
   };
 
+  const handleImportUrl = async () => {
+    if (!importUrl.trim()) return;
+
+    const supportedSites = [
+      'bringatrailer.com',
+      'hagerty.com',
+      'classic.com',
+      'cars.com',
+      'autotrader.com',
+      'facebook.com/marketplace',
+      'craigslist.org'
+    ];
+
+    const isSupported = supportedSites.some(site => importUrl.includes(site));
+    if (!isSupported) {
+      setScrapingError(`Supported sites: ${supportedSites.join(', ')}`);
+      return;
+    }
+
+    try {
+      setIsScraping(true);
+      setScrapingError(null);
+
+      const { data: result, error: fnError } = await supabase.functions.invoke('scrape-vehicle', {
+        body: { url: importUrl }
+      });
+
+      if (fnError || !result?.success) {
+        throw new Error(fnError?.message || 'Scraping failed');
+      }
+
+      const scrapedData = result.data;
+      const updates: Partial<VehicleFormData> = {};
+
+      // Map scraped data to form fields
+      if (scrapedData.make) updates.make = scrapedData.make;
+      if (scrapedData.model) updates.model = scrapedData.model;
+      if (scrapedData.series) updates.series = scrapedData.series;
+      if (scrapedData.trim) updates.trim = scrapedData.trim;
+      if (scrapedData.year) updates.year = parseInt(scrapedData.year);
+      if (scrapedData.vin) updates.vin = scrapedData.vin;
+      
+      if (scrapedData.mileage) {
+        const mileageStr = typeof scrapedData.mileage === 'string' 
+          ? scrapedData.mileage 
+          : String(scrapedData.mileage);
+        updates.mileage = parseInt(mileageStr.replace(/,/g, ''));
+      }
+      
+      if (scrapedData.color) updates.color = scrapedData.color;
+      if (scrapedData.body_style) updates.body_style = scrapedData.body_style;
+      if (scrapedData.transmission) updates.transmission = scrapedData.transmission;
+      if (scrapedData.engine_size) updates.engine_size = scrapedData.engine_size;
+      if (scrapedData.displacement) updates.displacement = String(scrapedData.displacement);
+      if (scrapedData.drivetrain) updates.drivetrain = scrapedData.drivetrain;
+      if (scrapedData.fuel_type) updates.fuel_type = scrapedData.fuel_type;
+      
+      // Pricing - map to asking_price (sale price)
+      const parseCurrencyValue = (value: any): number | null => {
+        if (!value) return null;
+        if (typeof value === 'number') return value;
+        const str = String(value).replace(/[^0-9.]/g, '');
+        const parsed = parseFloat(str);
+        return isNaN(parsed) ? null : parsed;
+      };
+
+      const askingPrice = parseCurrencyValue(scrapedData.asking_price ?? scrapedData.price);
+      if (askingPrice !== null) {
+        // Map to asking_price field (which we renamed from current_value)
+        (updates as any).asking_price = askingPrice;
+        updates.is_for_sale = true;
+      }
+
+      const salePrice = parseCurrencyValue(scrapedData.sale_price);
+      if (salePrice !== null) updates.sale_price = salePrice;
+
+      if (scrapedData.trim) (updates as any).trim = scrapedData.trim;
+      if (scrapedData.description) updates.notes = scrapedData.description;
+
+      // Update form with scraped data
+      setFormData({ ...formData, ...updates });
+      setImportUrl('');
+      
+    } catch (error: any) {
+      setScrapingError(error.message || 'Failed to import data');
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     let processedValue: any;
@@ -253,11 +350,14 @@ const EditVehicle: React.FC = () => {
       delete updateData.scanned_fields;
       delete updateData.documentId;
 
-      // Use API layer instead of direct Supabase
-      const response = await vehicleAPI.updateVehicle(vehicleId, updateData);
+      // Update vehicle directly using Supabase (consistent with other components)
+      const { error: updateError } = await supabase
+        .from('vehicles')
+        .update(updateData)
+        .eq('id', vehicleId);
 
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to update vehicle');
+      if (updateError) {
+        throw new Error(updateError.message || 'Failed to update vehicle');
       }
 
       // Create timeline event for the edit
@@ -276,13 +376,21 @@ const EditVehicle: React.FC = () => {
 
       setSuccess(true);
       
-      // Navigate back to vehicle profile after short delay
+      // Navigate back to vehicle profile after short delay with state to trigger refresh
       setTimeout(() => {
-        navigate(`/vehicles/${vehicleId}`);
+        navigate(`/vehicle/${vehicleId}`, { state: { fromEdit: true, timestamp: Date.now() } });
       }, 1500);
       
     } catch (err: any) {
+      console.error('Error updating vehicle:', err);
+      // Provide more helpful error messages
+      if (err.message?.includes('network') || err.message?.includes('Network')) {
+        setError('Unable to connect to the server. Please check your internet connection and try again.');
+      } else if (err.message?.includes('permission') || err.message?.includes('denied')) {
+        setError('You do not have permission to edit this vehicle.');
+      } else {
       setError(err.message || 'An error occurred while updating the vehicle');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -362,6 +470,39 @@ const EditVehicle: React.FC = () => {
                 </div>
               </div>
 
+              {/* URL Import Section */}
+              <div className="card" style={{ marginBottom: '24px' }}>
+                <div className="card-header">
+                  <h3 className="text font-bold">Import Data from URL</h3>
+                </div>
+                <div className="card-body">
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                    <input
+                      type="url"
+                      value={importUrl}
+                      onChange={(e) => setImportUrl(e.target.value)}
+                      placeholder="Paste listing URL (Bring a Trailer, Hagerty, etc.)"
+                      className="form-input"
+                      style={{ flex: 1 }}
+                      disabled={isScraping}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleImportUrl}
+                      disabled={isScraping || !importUrl.trim()}
+                      className="button button-primary"
+                    >
+                      {isScraping ? 'Importing...' : 'Import'}
+                    </button>
+                  </div>
+                  {scrapingError && (
+                    <div style={{ marginTop: '8px', color: '#dc2626', fontSize: '12px' }}>
+                      {scrapingError}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6">
                 {/* Core Identity Section */}
                 <div className="card">
@@ -391,6 +532,32 @@ const EditVehicle: React.FC = () => {
                           className="form-input"
                           min="1900"
                           max={new Date().getFullYear() + 1}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="series" className="form-label">Series</label>
+                        <input
+                          type="text"
+                          id="series"
+                          name="series"
+                          value={formData.series || ''}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          placeholder="e.g., K5, C10, K10, K1500"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="trim" className="form-label">Trim</label>
+                        <input
+                          type="text"
+                          id="trim"
+                          name="trim"
+                          value={formData.trim || ''}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          placeholder="e.g., Silverado, Cheyenne, Scottsdale"
                         />
                       </div>
 
@@ -665,15 +832,15 @@ const EditVehicle: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
 
                       <div className="form-group">
-                        <label htmlFor="current_value" className="form-label">Estimated Current Value</label>
+                        <label htmlFor="asking_price" className="form-label">Sale Price</label>
                         <input
                           type="number"
-                          id="current_value"
-                          name="current_value"
-                          value={formData.current_value || ''}
+                          id="asking_price"
+                          name="asking_price"
+                          value={formData.asking_price || ''}
                           onChange={handleInputChange}
                           className="form-input"
-                          placeholder="$ Your estimate"
+                          placeholder="$ Asking price"
                           min="0"
                           step="100"
                         />

@@ -281,7 +281,7 @@ export class FeedService {
               title: `New ${image.image_category || 'image'} uploaded`,
               description: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
               imageUrl: image.image_url,
-              timestamp: image.uploaded_at,
+              timestamp: image.uploaded_at || image.created_at,
               user_id: vehicle.user_id,
               username: Array.isArray(vehicle.profiles) ? vehicle.profiles[0]?.username : (vehicle.profiles as any)?.username,
               vehicle_id: image.vehicle_id,

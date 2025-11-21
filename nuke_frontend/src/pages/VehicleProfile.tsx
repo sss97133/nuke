@@ -11,14 +11,12 @@ import EventMap from '../components/EventMap';
 import VehicleDataEditor from '../components/vehicle/VehicleDataEditor';
 import EnhancedImageTagger from '../components/vehicle/EnhancedImageTagger';
 import { VisualValuationBreakdown } from '../components/vehicle/VisualValuationBreakdown';
-import {
-  VehicleHeader,
-  VehicleHeroImage,
-  VehicleBasicInfo,
-  VehicleTimelineSection,
-  VehiclePricingSection,
-  WorkMemorySection
-} from './vehicle-profile';
+import VehicleHeader from './vehicle-profile/VehicleHeader';
+import VehicleHeroImage from './vehicle-profile/VehicleHeroImage';
+import VehicleBasicInfo from './vehicle-profile/VehicleBasicInfo';
+import VehicleTimelineSection from './vehicle-profile/VehicleTimelineSection';
+import VehiclePricingSection from './vehicle-profile/VehiclePricingSection';
+import WorkMemorySection from './vehicle-profile/WorkMemorySection';
 import type {
   Vehicle,
   VehiclePermissions,
@@ -33,11 +31,15 @@ import ExternalListingCard from '../components/vehicle/ExternalListingCard';
 import LinkedOrganizations, { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 import ValuationCitations from '../components/vehicle/ValuationCitations';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
-import DataValidationPopup from '../components/vehicle/DataValidationPopup';
+import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
 import { BATListingManager } from '../components/vehicle/BATListingManager';
+import VehicleDescriptionCard from '../components/vehicle/VehicleDescriptionCard';
+import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
 import MergeProposalsPanel from '../components/vehicle/MergeProposalsPanel';
 import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 import type { Session } from '@supabase/supabase-js';
+import ImageGallery from '../components/images/ImageGallery';
+import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -47,8 +49,6 @@ const WORKSPACE_TABS = [
 ] as const;
 
 type WorkspaceTabId = typeof WORKSPACE_TABS[number]['id'];
-import ImageGalleryV2 from '../components/image/ImageGalleryV2';
-import { UniversalImageUpload } from '../components/UniversalImageUpload';
 
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -59,24 +59,10 @@ const VehicleProfile: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [viewCount, setViewCount] = useState<number>(0);
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabId>('evidence');
+  // Tabs disabled until backend processing is ready
+  // const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabId>('evidence');
 
-  // Use consolidated permissions hook
-  const {
-    isOwner: isRowOwner,
-    hasContributorAccess,
-    contributorRole,
-    canEdit,
-    canUpload
-  } = useVehiclePermissions(vehicleId || null, session, vehicle);
-  const {
-    valuation: valuationIntel,
-    components: valuationComponents,
-    readiness: readinessSnapshot,
-    loading: valuationIntelLoading
-  } = useValuationIntel(vehicle?.id || null);
-  const valuationPayload = valuationIntelLoading ? undefined : valuationIntel;
-  const valuationComponentsPayload = valuationIntelLoading ? undefined : valuationComponents;
+  // STATE DECLARATIONS
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [responsibleName, setResponsibleName] = useState<string | null>(null);
   const [showDataEditor, setShowDataEditor] = useState(false);
@@ -98,8 +84,6 @@ const VehicleProfile: React.FC = () => {
     fieldLabel: '',
     entries: []
   });
-
-  // For Sale settings
   const [saleSettings, setSaleSettings] = useState<SaleSettings>({
     for_sale: false,
     live_auction: false,
@@ -115,12 +99,11 @@ const VehicleProfile: React.FC = () => {
   const [latestExpertValuation, setLatestExpertValuation] = useState<any | null>(null);
   const expertAnalysisRunningRef = React.useRef(false);
   const [linkedOrganizations, setLinkedOrganizations] = useState<LinkedOrg[]>([]);
-  
-  // Detect mobile device - but DON'T use early return (breaks React hooks rules)
   const [isMobile, setIsMobile] = useState(false);
+
+  // MOBILE DETECTION
   useEffect(() => {
     const checkMobile = () => {
-      // Check both screen width and touch capability for better mobile detection
       const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       const isNarrowScreen = window.innerWidth < 768;
       const isMobileDevice = isNarrowScreen || (hasTouch && window.innerWidth < 1024);
@@ -131,22 +114,28 @@ const VehicleProfile: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Calculate true legal ownership - requires verified title + matching legal ID
-  const isVerifiedOwner = React.useMemo(() => {
-    if (!session?.user?.id || !vehicle?.id) return false;
+  // VALUATION HOOK - Re-enabled after fixing TDZ
+  const {
+    valuation: valuationIntel,
+    components: valuationComponents,
+    readiness: readinessSnapshot,
+    loading: valuationIntelLoading
+  } = useValuationIntel(vehicle?.id || null);
+  const valuationPayload = valuationIntelLoading ? undefined : valuationIntel;
+  const valuationComponentsPayload = valuationIntelLoading ? undefined : valuationComponents;
 
-    // Check if user has approved ownership verification with both title and legal ID
-    const hasVerifiedOwnership = ownershipVerifications.some(verification =>
-      verification.user_id === session?.user?.id &&
-      verification.status === 'approved' &&
-      (verification.verification_type === 'title' || verification.verification_type === 'title_and_id')
-    );
+  // PERMISSIONS HOOK - Re-enabled after fixing TDZ (with safe fallbacks in OwnershipService)
+  const {
+    isOwner: isRowOwner,
+    hasContributorAccess,
+    contributorRole,
+    canEdit,
+    canUpload
+  } = useVehiclePermissions(vehicleId || null, session, vehicle);
 
-    return hasVerifiedOwnership;
-  }, [session?.user?.id, vehicle?.id, ownershipVerifications]);
-
-  // Legacy database uploader check (IMPORTANT: This is NOT ownership, just who uploaded)
-  const isDbUploader = session?.user?.id === vehicle?.uploaded_by;
+  // Additional permission checks
+  const isVerifiedOwner = false; // TODO: Implement when ownership_verifications table is ready
+  const isDbUploader = Boolean(session?.user?.id && vehicle?.uploaded_by === session.user.id);
 
   // Consolidated permissions object
   const permissions: VehiclePermissions = {
@@ -393,7 +382,7 @@ const VehicleProfile: React.FC = () => {
   useEffect(() => {
     if (!vehicle?.id) return;
     loadLinkedOrgs(vehicle.id);
-  }, [vehicle?.id, loadLinkedOrgs]);
+  }, [vehicle?.id]); // Removed loadLinkedOrgs from deps - it's useCallback with [] deps so never changes
 
   // Refresh hero/gallery when images update elsewhere
   useEffect(() => {
@@ -934,7 +923,7 @@ const VehicleProfile: React.FC = () => {
           // constraint issue; fallback: update last row
           await supabase
             .from('vehicle_field_sources')
-            .update({ confidence_score: score, criteria: { met, next } })
+            .update({ confidence_score: result.score, criteria: { met: result.met, next: result.next } })
             .eq('vehicle_id', vehicle.id)
             .eq('field_name', fieldName);
         }
@@ -1190,94 +1179,23 @@ const VehicleProfile: React.FC = () => {
       );
     }
 
-    switch (activeWorkspaceTab) {
-      case 'facts':
+    // Simplified view - tabs disabled until backend processing is ready
         return (
           <>
-            <FactExplorerPanel vehicleId={vehicle.id} readinessScore={readinessScore} />
+        {/* Timeline - Full width under hero image */}
             <section className="section">
-              <VisualValuationBreakdown
-                vehicleId={vehicle.id}
-                isOwner={Boolean(isRowOwner || isVerifiedOwner)}
-                prefetchedValuation={valuationPayload}
-                prefetchedComponents={valuationComponentsPayload}
-              />
-            </section>
-            <section className="section">
-              <ValuationCitations vehicleId={vehicle.id} />
-            </section>
-          </>
-        );
-      case 'commerce':
-        return (
-          <>
-            <section className="section">
-              <div style={{ display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  <ExternalListingCard vehicleId={vehicle.id} />
-                  {(isVerifiedOwner || hasContributorAccess) && (
-                    <BATListingManager
-                      vehicleId={vehicle.id}
-                      canEdit={true}
-                      onDataImported={() => window.location.reload()}
-                    />
-                  )}
-                  <LinkedOrganizations
-                    vehicleId={vehicle.id}
-                    initialOrganizations={linkedOrganizations}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  <ReadinessGate
-                    title="Financial Products"
-                    score={readinessScore}
-                    threshold={60}
-                    missing={readinessSnapshot?.missing_items}
-                  >
-                    <FinancialProducts
-                      vehicleId={vehicle.id}
-                      vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                      vehicleValue={valuationPayload?.estimated_value || vehicle.current_value || 0}
-                    />
-                  </ReadinessGate>
-                  <ReadinessGate
-                    title="Share Holders"
-                    score={readinessScore}
-                    threshold={45}
-                    missing={readinessSnapshot?.missing_items}
-                  >
-                    <VehicleShareHolders
-                      vehicleId={vehicle.id}
-                      vehicleValue={vehicle.current_value || 0}
-                      hideIfEmpty={true}
-                    />
-                  </ReadinessGate>
-                </div>
-              </div>
-            </section>
-          </>
-        );
-      case 'financials':
-        return (
-          <>
-            <section className="section">
-              <VehiclePricingSection
+          <VehicleTimelineSection
                 vehicle={vehicle}
+            session={session}
                 permissions={permissions}
-                initialValuation={valuationPayload || (window as any).__vehicleProfileRpcData?.latest_valuation}
+            onAddEventClick={() => setShowAddEvent(true)}
               />
             </section>
+
+        {/* Two column layout: Info on left, Images on right */}
             <section className="section">
-              <TransactionHistory vehicleId={vehicle.id} />
-            </section>
-          </>
-        );
-      case 'evidence':
-      default:
-        return (
-          <>
-            <section className="section">
-              <div style={{ display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: '320px 1fr' }}>
+            {/* Left Column: Vehicle Info & Tools */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <VehicleBasicInfo
                     vehicle={vehicle}
@@ -1286,12 +1204,32 @@ const VehicleProfile: React.FC = () => {
                     onDataPointClick={handleDataPointClick}
                     onEditClick={handleEditClick}
                   />
-                  <VehicleTimelineSection
-                    vehicle={vehicle}
+              <VehicleDescriptionCard
+                vehicleId={vehicle.id}
+                initialDescription={vehicle.description}
+                isEditable={canEdit}
+                onUpdate={() => loadVehicle()}
+              />
+              <VehicleCommentsCard
+                vehicleId={vehicle.id}
                     session={session}
-                    permissions={permissions}
-                    onAddEventClick={() => setShowAddEvent(true)}
+                collapsed={true}
+                maxVisible={2}
                   />
+                  
+                  {/* Reference Library Upload */}
+                  {session && (
+                    <ReferenceLibraryUpload
+                      vehicleId={vehicle.id}
+                      year={vehicle.year}
+                      make={vehicle.make}
+                      series={(vehicle as any).series}
+                      model={vehicle.model}
+                      bodyStyle={(vehicle as any).body_style}
+                      onUploadComplete={() => loadVehicle()}
+                    />
+                  )}
+                  
                   <div className="card">
                     <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>Coverage Map</span>
@@ -1305,17 +1243,6 @@ const VehicleProfile: React.FC = () => {
                       </div>
                     )}
                   </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  <EvidenceIntakeDrawer
-                    vehicleId={vehicle.id}
-                    session={session}
-                    canUpload={Boolean(canUpload || hasContributorAccess)}
-                    onUploadComplete={() => {
-                      loadVehicle();
-                      loadTimelineEvents();
-                    }}
-                  />
                   {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
                     <div className="card">
                       <div className="card-header">Image Tagging & AI Validation</div>
@@ -1340,24 +1267,23 @@ const VehicleProfile: React.FC = () => {
                     />
                   )}
                 </div>
-              </div>
-            </section>
-            <section className="section">
-              <ImageGalleryV2
+
+            {/* Right Column: Image Gallery with Infinite Scroll */}
+            <div>
+              <ImageGallery
                 vehicleId={vehicle.id}
-                vehicleYMM={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
+                showUpload={Boolean(session?.user?.id)}
                 onImagesUpdated={() => {
                   loadVehicle();
                   loadTimelineEvents();
                 }}
               />
+            </div>
+          </div>
             </section>
           </>
         );
-    }
   };
-
-  const activeTabMeta = WORKSPACE_TABS.find(tab => tab.id === activeWorkspaceTab);
 
   // Render mobile or desktop version (no early return to avoid hook errors)
   return (
@@ -1369,9 +1295,11 @@ const VehicleProfile: React.FC = () => {
         {/* Vehicle Header with Price */}
         <VehicleHeader
           vehicle={vehicle}
+          isOwner={isRowOwner || isVerifiedOwner}
+          canEdit={canEdit}
           session={session}
           permissions={permissions}
-          responsibleName={responsibleName}
+          responsibleName={responsibleName || undefined}
           onPriceClick={handlePriceClick}
           initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
           initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
@@ -1394,34 +1322,8 @@ const VehicleProfile: React.FC = () => {
         {/* Hero Image Section */}
         <VehicleHeroImage leadImageUrl={leadImageUrl} />
 
-        <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {WORKSPACE_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                className="btn-utility"
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '999px',
-                  fontSize: '11px',
-                  backgroundColor: activeWorkspaceTab === tab.id ? 'var(--text)' : 'transparent',
-                  color: activeWorkspaceTab === tab.id ? 'var(--surface)' : 'var(--text)',
-                  borderColor: activeWorkspaceTab === tab.id ? 'var(--text)' : 'var(--border)'
-                }}
-                onClick={() => setActiveWorkspaceTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          {activeTabMeta?.helper && (
-            <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text-muted)' }}>
-              {activeTabMeta.helper}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        {/* Main Content - Tabs disabled until backend processing is ready */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
           {renderWorkspaceContent()}
         </div>
 
@@ -1462,10 +1364,12 @@ const VehicleProfile: React.FC = () => {
 
         {/* Granular Validation Popup */}
         {validationPopup.open && vehicle && (
-          <DataValidationPopup
+          <ValidationPopupV2
             vehicleId={vehicle.id}
             fieldName={validationPopup.fieldName}
             fieldValue={validationPopup.fieldValue}
+            vehicleYear={vehicle.year}
+            vehicleMake={vehicle.make}
             onClose={() => setValidationPopup(prev => ({ ...prev, open: false }))}
           />
         )}
@@ -1504,69 +1408,6 @@ const VehicleProfile: React.FC = () => {
       </div>
       )}
     </>
-  );
-};
-
-interface EvidenceIntakeDrawerProps {
-  vehicleId: string;
-  session: Session | null;
-  canUpload: boolean;
-  onUploadComplete: () => void;
-}
-
-const EvidenceIntakeDrawer: React.FC<EvidenceIntakeDrawerProps> = ({
-  vehicleId,
-  session,
-  canUpload,
-  onUploadComplete
-}) => {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="card">
-      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-            Evidence Intake
-          </div>
-          <strong style={{ fontSize: '12px' }}>Photo & Document Uploader</strong>
-        </div>
-        {canUpload && (
-          <button className="btn-utility" style={{ fontSize: '10px' }} onClick={() => setOpen(prev => !prev)}>
-            {open ? 'Close Intake' : 'Open Intake'}
-          </button>
-        )}
-      </div>
-      <div className="card-body">
-        <p className="text-small text-muted" style={{ marginBottom: '12px' }}>
-          Everything uploaded here flows through the Vehicle Image Fact Fabric so AI guardrails can extract facts,
-          link timeline events, and score readiness.
-        </p>
-        {open && canUpload ? (
-          <UniversalImageUpload
-            session={session}
-            vehicleId={vehicleId}
-            onClose={() => {
-              setOpen(false);
-              onUploadComplete();
-            }}
-          />
-        ) : (
-          <>
-            {!canUpload && (
-              <div className="text-small text-muted">
-                You need contributor or owner access to upload new evidence.
-              </div>
-            )}
-            {canUpload && (
-              <button className="button button-primary" style={{ fontSize: '11px' }} onClick={() => setOpen(true)}>
-                Start Intake
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    </div>
   );
 };
 

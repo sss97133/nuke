@@ -1,0 +1,583 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    SECURE AUCTION BIDDING SYSTEM FRAMEWORK
+                    Production-Ready Architecture & Flow
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           SYSTEM ARCHITECTURE                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────┐
+    │   OWNER      │ Creates auction listing
+    │  (Seller)    │
+    └──────┬───────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  FRONTEND: OwnerAuctionDashboard                             │
+    │  • Create listing form                                      │
+    │  • Set reserve price                                        │
+    │  • Choose duration (5min - 30 days)                         │
+    │  • Write description                                        │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  DATABASE: vehicle_listings                                 │
+    │  • status: 'draft'                                          │
+    │  • ai_review_status: 'pending'                              │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  AI AGENT: review-auction-listing (Edge Function)          │
+    │  ┌─────────────────────────────────────────────────────┐   │
+    │  │ GUARDRAILS:                                          │   │
+    │  │ ✓ Required vehicle data (make/model/year)            │   │
+    │  │ ✓ Pricing validation (reserve reasonableness)        │   │
+    │  │ ✓ Description quality (length, suspicious content)    │   │
+    │  │ ✓ Image requirements (minimum 1, prefer 3+)           │   │
+    │  │ ✓ Seller history (spam detection)                    │   │
+    │  │ ✓ VIN validation (format, duplicates)                 │   │
+    │  └─────────────────────────────────────────────────────┘   │
+    │                                                             │
+    │  OUTPUT:                                                    │
+    │  • approved: true/false                                    │
+    │  • confidence: 0-100                                      │
+    │  • issues: []                                             │
+    │  • suggestions: []                                         │
+    │  • auto_approve: true/false                                │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  DATABASE: vehicle_listings                                 │
+    │  • ai_review_status: 'approved' | 'needs_review' | 'rejected'│
+    │  • ai_review_notes: {issues, suggestions, confidence}      │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  OWNER: Clicks "Start Auction"                              │
+    │  • System checks: can_activate_auction()                   │
+    │  • If approved → status: 'active'                          │
+    │  • Sets auction_start_time & auction_end_time              │
+    └─────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           BIDDING FLOW                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────┐
+    │   BUYER      │ Views active auction
+    │              │
+    └──────┬───────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  FRONTEND: AuctionBiddingInterface                          │
+    │  • Displays current high bid                                │
+    │  • Shows time remaining                                     │
+    │  • Shows minimum next bid                                   │
+    │  • Proxy bidding input field                                │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           │ User enters: $10,000 (max bid)
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  SERVICE: AuctionService.placeBid()                         │
+    │  • listing_id: "abc-123"                                    │
+    │  • proxy_max_bid_cents: 1000000                             │
+    │  • bid_source: "web"                                        │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  EDGE FUNCTION: place-auction-bid                            │
+    │  ┌─────────────────────────────────────────────────────┐   │
+    │  │ SECURITY CHECKS:                                     │   │
+    │  │ ✓ Authentication (valid JWT token)                  │   │
+    │  │ ✓ Input validation (bid amount > 0)                 │   │
+    │  │ ✓ IP address & user agent logging                    │   │
+    │  └─────────────────────────────────────────────────────┘   │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  DATABASE FUNCTION: place_auction_bid()                     │
+    │  ┌─────────────────────────────────────────────────────┐   │
+    │  │ STEP 1: Acquire Lock                                 │   │
+    │  │   SELECT * FROM vehicle_listings                     │   │
+    │  │   WHERE id = listing_id                              │   │
+    │  │   FOR UPDATE;  ← Prevents race conditions            │   │
+    │  │                                                       │   │
+    │  │ STEP 2: Validate                                     │   │
+    │  │   ✓ Auction is active                                │   │
+    │  │   ✓ Auction hasn't ended                             │   │
+    │  │   ✓ Bidder is not seller                              │   │
+    │  │   ✓ Bid amount >= minimum bid                         │   │
+    │  │                                                       │   │
+    │  │ STEP 3: Calculate Displayed Bid                      │   │
+    │  │   current_high_bid = $5,000                           │   │
+    │  │   increment = $250                                    │   │
+    │  │   min_bid = $5,250                                    │   │
+    │  │   user_max = $10,000                                  │   │
+    │  │   displayed_bid = $5,250  ← One increment above      │   │
+    │  │                                                       │   │
+    │  │ STEP 4: Sniping Protection                            │   │
+    │  │   IF (auction_end_time - NOW()) < 2 minutes:         │   │
+    │  │     auction_end_time = NOW() + 2 minutes              │   │
+    │  │     sniping_extensions += 1                           │   │
+    │  │     broadcast: "auction_extended"                     │   │
+    │  │                                                       │   │
+    │  │ STEP 5: Create Bid Record                            │   │
+    │  │   INSERT INTO auction_bids:                           │   │
+    │  │     proxy_max_bid_cents: 1000000  ← SECRET            │   │
+    │  │     displayed_bid_cents: 5250     ← PUBLIC           │   │
+    │  │     is_winning: true                                  │   │
+    │  │                                                       │   │
+    │  │ STEP 6: Update Listing                                │   │
+    │  │   current_high_bid_cents = 5250                       │   │
+    │  │   current_high_bidder_id = buyer_id                   │   │
+    │  │   bid_count += 1                                      │   │
+    │  │                                                       │   │
+    │  │ STEP 7: Mark Previous Bidder Outbid                   │   │
+    │  │   UPDATE auction_bids                                 │   │
+    │  │   SET is_winning = false, is_outbid = true            │   │
+    │  │   WHERE bidder_id = previous_winner                  │   │
+    │  │                                                       │   │
+    │  │ STEP 8: Release Lock                                  │   │
+    │  │   (Automatic on transaction commit)                   │   │
+    │  └─────────────────────────────────────────────────────┘   │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  REAL-TIME BROADCAST                                        │
+    │  ┌─────────────────────────────────────────────────────┐   │
+    │  │ Supabase Channel: auction:{listing_id}            │   │
+    │  │                                                     │   │
+    │  │ Message: {                                          │   │
+    │  │   type: "bid_placed",                               │   │
+    │  │   current_high_bid_cents: 5250,                     │   │
+    │  │   bid_count: 3,                                     │   │
+    │  │   auction_extended: false                           │   │
+    │  │ }                                                    │   │
+    │  └─────────────────────────────────────────────────────┘   │
+    └──────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  ALL CONNECTED USERS                                        │
+    │  • Frontend receives WebSocket update                      │
+    │  • UI updates automatically                                │
+    │  • Countdown resets if extended                             │
+    └─────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      PROXY BIDDING MECHANICS                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    SCENARIO: Current high bid is $5,000
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  BUYER A: Enters max bid $10,000                            │
+    │  ────────────────────────────────────────────────────────  │
+    │  System calculates:                                         │
+    │    • Current high: $5,000                                   │
+    │    • Increment: $250                                        │
+    │    • Minimum bid: $5,250                                    │
+    │    • Buyer's max: $10,000                                    │
+    │                                                              │
+    │  Result:                                                    │
+    │    • Displayed bid: $5,250  ← What others see              │
+    │    • Proxy max: $10,000     ← SECRET, stored in DB only    │
+    │    • Buyer A is winning                                     │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  BUYER B: Enters max bid $6,000                              │
+    │  ────────────────────────────────────────────────────────  │
+    │  System calculates:                                         │
+    │    • Current high: $5,250 (Buyer A's displayed)            │
+    │    • Increment: $250                                         │
+    │    • Minimum bid: $5,500                                     │
+    │    • Buyer B's max: $6,000                                   │
+    │                                                              │
+    │  Result:                                                    │
+    │    • Displayed bid: $5,500  ← One increment above A         │
+    │    • Proxy max: $6,000      ← SECRET                        │
+    │    • Buyer B is winning                                     │
+    │    • Buyer A notified: "You were outbid"                    │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  BUYER A's PROXY BID ACTIVATES                              │
+    │  ────────────────────────────────────────────────────────  │
+    │  System automatically bids for Buyer A:                     │
+    │    • Current high: $5,500 (Buyer B)                         │
+    │    • Increment: $250                                         │
+    │    • Buyer A's max: $10,000                                  │
+    │                                                              │
+    │  Result:                                                    │
+    │    • Displayed bid: $5,750  ← One increment above B         │
+    │    • Buyer A is winning again                               │
+    │    • Buyer B notified: "You were outbid"                     │
+    │                                                              │
+    │  This continues until:                                      │
+    │    • Buyer B's max ($6,000) is exceeded                     │
+    │    • Buyer A wins with $6,250                               │
+    └─────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      SNIPING PROTECTION FLOW                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Auction End Time: 10:00:00 AM
+    Sniping Protection: 2 minutes
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  9:58:00 AM - No bids in last 2 minutes                     │
+    │  • Auction will end at 10:00:00 AM                          │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  9:59:30 AM - Buyer places bid (30 seconds before end)      │
+    │  ────────────────────────────────────────────────────────  │
+    │  System checks:                                             │
+    │    time_until_end = 30 seconds                             │
+    │    IF time_until_end < 2 minutes:                           │
+    │      ✓ EXTEND AUCTION                                        │
+    │                                                              │
+    │  Result:                                                    │
+    │    • Old end time: 10:00:00 AM                               │
+    │    • New end time: 9:59:30 AM + 2 min = 10:01:30 AM         │
+    │    • sniping_extensions += 1                                 │
+    │    • Broadcast: "auction_extended"                           │
+    │    • All users see countdown reset to 2:00                  │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  10:01:00 AM - Another bid (30 seconds before new end)      │
+    │  ────────────────────────────────────────────────────────  │
+    │  System extends again:                                      │
+    │    • New end time: 10:01:00 AM + 2 min = 10:03:00 AM        │
+    │    • sniping_extensions += 1                                 │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  10:02:30 AM - No bids for 2 minutes                        │
+    │  ────────────────────────────────────────────────────────  │
+    │  Auction ends at 10:03:00 AM                                │
+    │  • process_auction_end() called                             │
+    │  • Check if reserve met                                      │
+    │  • Mark as 'sold' or 'expired'                               │
+    └─────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      REAL-TIME SUBSCRIPTION SYSTEM                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  FRONTEND: useAuctionSubscription(listingId)                │
+    │  ┌─────────────────────────────────────────────────────┐   │
+    │  │ useEffect(() => {                                    │   │
+    │  │   const channel = supabase                           │   │
+    │  │     .channel(`auction:${listingId}`)                 │   │
+    │  │     .on('postgres_changes', {                        │   │
+    │  │       event: 'INSERT',                               │   │
+    │  │       table: 'auction_bids',                          │   │
+    │  │       filter: `listing_id=eq.${listingId}`            │   │
+    │  │     }, (payload) => {                                │   │
+    │  │       // Update UI with new bid                       │   │
+    │  │       setCurrentHighBid(payload.new.displayed_bid)    │   │
+    │  │     })                                                │   │
+    │  │     .on('postgres_changes', {                        │   │
+    │  │       event: 'UPDATE',                                │   │
+    │  │       table: 'vehicle_listings',                      │   │
+    │  │       filter: `id=eq.${listingId}`                    │   │
+    │  │     }, (payload) => {                                │   │
+    │  │       // Update auction end time if extended           │   │
+    │  │       if (payload.new.auction_end_time) {             │   │
+    │  │         setAuctionEndTime(payload.new.auction_end_time) │   │
+    │  │       }                                                │   │
+    │  │     })                                                │   │
+    │  │     .subscribe();                                     │   │
+    │  │ }, [listingId]);                                       │   │
+    │  └─────────────────────────────────────────────────────┘   │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           │ WebSocket Connection
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  SUPABASE REALTIME                                          │
+    │  • Listens to database changes                             │
+    │  • Broadcasts to all subscribed clients                     │
+    │  • Low latency (< 200ms)                                    │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           │ Database Trigger
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  DATABASE: auction_bids                                     │
+    │  • INSERT triggers postgres_changes event                   │
+    │  • Supabase Realtime picks it up                            │
+    │  • Broadcasts to channel subscribers                        │
+    └─────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      NOTIFICATION SYSTEM                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  TRIGGER: trigger_notify_auction_bid                        │
+    │  ────────────────────────────────────────────────────────  │
+    │  Fires: AFTER INSERT ON auction_bids                        │
+    │                                                              │
+    │  Actions:                                                   │
+    │    1. Notify seller: "New bid received: $X"                 │
+    │    2. Notify previous high bidder: "You were outbid"        │
+    │    3. Insert into user_notifications table                  │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  TRIGGER: trigger_notify_auction_ended                      │
+    │  ────────────────────────────────────────────────────────  │
+    │  Fires: AFTER UPDATE ON vehicle_listings                    │
+    │  When: status changes from 'active' to 'sold'/'expired'     │
+    │                                                              │
+    │  Actions:                                                   │
+    │    1. Notify seller: "Auction sold for $X" or "Reserve not met"│
+    │    2. Notify winner: "You won! Final price: $X"            │
+    │    3. Notify all other bidders: "Auction ended"             │
+    └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  SCHEDULED: notify_auction_ending_soon()                    │
+    │  ────────────────────────────────────────────────────────  │
+    │  Call via: Cron job (every 5 minutes)                      │
+    │                                                              │
+    │  Finds: Auctions ending in next hour                        │
+    │                                                              │
+    │  Actions:                                                   │
+    │    1. Notify seller: "Auction ending in 1 hour"             │
+    │    2. Notify all bidders: "Auction ending in 1 hour"        │
+    │    3. Only sends once per hour per auction                  │
+    └─────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      DATA FLOW DIAGRAM                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    OWNER CREATES LISTING
+    ────────────────────
+           │
+           ▼
+    ┌─────────────────┐
+    │ vehicle_listings│ status: 'draft'
+    │                 │ ai_review_status: 'pending'
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ AI Review       │ Checks quality, pricing, etc.
+    │ Edge Function   │
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ vehicle_listings│ ai_review_status: 'approved'
+    │                 │ ai_review_notes: {...}
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ Owner activates  │ status: 'active'
+    │                 │ auction_start_time: NOW
+    │                 │ auction_end_time: NOW + duration
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ BUYER PLACES BID │
+    ───────────────────
+           │
+           ▼
+    ┌─────────────────┐
+    │ Edge Function    │ Validates auth, input
+    │ place-auction-bid│
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ DB Function      │ FOR UPDATE lock
+    │ place_auction_bid│ Calculates displayed bid
+    │                 │ Checks sniping protection
+    └────────┬────────┘
+             │
+             ├─────────────────┬─────────────────┐
+             ▼                 ▼                 ▼
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │auction_bids  │  │vehicle_listings│ │Notifications │
+    │              │  │              │  │              │
+    │proxy_max:    │  │current_high: │  │Seller: "New  │
+    │$10,000       │  │$5,250        │  │bid received" │
+    │displayed:    │  │bidder_id:    │  │              │
+    │$5,250        │  │buyer_id      │  │Previous:     │
+    │is_winning:   │  │bid_count: 3  │  │"Outbid"      │
+    │true          │  │end_time:     │  │              │
+    └──────────────┘  │extended?     │  └──────────────┘
+                      └──────────────┘
+                             │
+                             ▼
+                      ┌──────────────┐
+                      │Real-time      │ WebSocket broadcast
+                      │Broadcast      │ to all subscribers
+                      └──────────────┘
+                             │
+                             ▼
+                      ┌──────────────┐
+                      │All Connected  │ UI updates automatically
+                      │Users          │
+                      └──────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      SECURITY LAYERS                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    LAYER 1: FRONTEND VALIDATION
+    ────────────────────────────
+    • Input type checking (number fields)
+    • Basic format validation
+    • User feedback (errors, success messages)
+    ⚠️  NOT TRUSTED - Can be bypassed
+
+    LAYER 2: EDGE FUNCTION VALIDATION
+    ──────────────────────────────────
+    • Authentication check (JWT token)
+    • Input sanitization
+    • Rate limiting (future)
+    • IP address logging
+    ✓ TRUSTED - Server-side
+
+    LAYER 3: DATABASE FUNCTION LOCKS
+    ─────────────────────────────────
+    • FOR UPDATE lock prevents race conditions
+    • Transaction isolation
+    • Atomic operations
+    ✓ TRUSTED - Database-level
+
+    LAYER 4: BUSINESS LOGIC VALIDATION
+    ───────────────────────────────────
+    • Auction status check (must be active)
+    • Time validation (not ended)
+    • Seller cannot bid on own auction
+    • Minimum bid enforcement
+    • Reserve price logic
+    ✓ TRUSTED - Server-side
+
+    LAYER 5: DATA INTEGRITY
+    ────────────────────────
+    • Foreign key constraints
+    • Check constraints (bid amounts > 0)
+    • Unique constraints
+    • RLS policies (Row Level Security)
+    ✓ TRUSTED - Database-level
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      KEY DIFFERENCES FROM BRING A TRAILER                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    BRING A TRAILER                    THIS SYSTEM
+    ─────────────────                  ───────────
+    
+    Fixed 7-day auctions        →      Flexible: 5 min - 30 days
+    
+    Human curators review        →      AI agents (instant review)
+    (days/weeks wait)
+    
+    Manual activation            →      Auto-activation after AI approval
+    
+    No scheduled lots             →      Support for scheduled lots
+    
+    Limited auction types        →      live_auction + standard auction
+    
+    2-min sniping (fixed)        →      Configurable sniping protection
+    
+    Email notifications only     →      Real-time + email + SMS (future)
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      EXAMPLE: 10-MINUTE LIVE AUCTION                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    TIMELINE:
+    ────────
+    
+    10:00:00 AM - Owner creates listing
+                 • Vehicle: 1969 Camaro
+                 • Reserve: $50,000
+                 • Duration: 10 minutes
+                 • AI Review: ✅ Auto-approved (confidence: 95%)
+    
+    10:01:00 AM - Owner clicks "Start Auction"
+                 • Status: active
+                 • End time: 10:11:00 AM
+    
+    10:02:00 AM - Buyer A bids $45,000 max
+                 • Displayed: $45,000 (first bid)
+                 • Buyer A: Winning ✓
+    
+    10:03:00 AM - Buyer B bids $60,000 max
+                 • Displayed: $45,250 (one increment above A)
+                 • Buyer B: Winning ✓
+                 • Buyer A: Notified "You were outbid"
+    
+    10:05:00 AM - Buyer C bids $55,000 max
+                 • Displayed: $60,000 (B's max is higher)
+                 • Buyer C: Outbid immediately
+                 • Buyer B: Still winning ✓
+    
+    10:08:00 AM - Buyer A bids $65,000 max
+                 • Displayed: $60,250 (one increment above B)
+                 • Buyer A: Winning again ✓
+                 • Buyer B: Notified "You were outbid"
+    
+    10:10:00 AM - Buyer B's proxy bid activates automatically
+                 • System auto-bids $65,250 (one increment above A)
+                 • Buyer B: Winning again ✓
+                 • Buyer A: Notified "You were outbid"
+    
+    10:10:30 AM - Bid placed (30 seconds before end)
+                 • Sniping protection: Auction extended to 10:12:30 AM
+                 • All users see countdown reset to 2:00
+    
+    10:12:00 AM - No bids for 2 minutes
+                 • Auction ends at 10:12:30 AM
+                 • Final bid: $65,250
+                 • Reserve met ($50,000) ✓
+                 • Status: sold
+                 • Buyer B: Wins
+                 • Notifications sent to all participants
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF FRAMEWORK
+═══════════════════════════════════════════════════════════════════════════════
+

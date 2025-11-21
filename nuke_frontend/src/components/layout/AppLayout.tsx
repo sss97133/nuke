@@ -136,6 +136,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               >
                 Organizations
               </Link>
+              <Link 
+                to="/financials" 
+                className={`nav-link ${isActivePage('/financials') || isActivePage('/invoices') || isActivePage('/suppliers') ? 'active' : ''}`}
+              >
+                Financials
+              </Link>
             </nav>
           </div>
 
@@ -198,6 +204,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               onClick={() => setMobileMenuOpen(false)}
             >
               Organizations
+            </Link>
+            <Link 
+              to="/financials" 
+              className={`mobile-nav-link ${isActivePage('/financials') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Financials
+            </Link>
+            <Link 
+              to="/invoices" 
+              className={`mobile-nav-link ${isActivePage('/invoices') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Invoices
+            </Link>
+            <Link 
+              to="/suppliers" 
+              className={`mobile-nav-link ${isActivePage('/suppliers') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Suppliers
             </Link>
             {session && (
               <Link 

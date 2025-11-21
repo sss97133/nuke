@@ -76,6 +76,8 @@ export interface VehicleFormData {
   // System Fields
   is_public?: boolean;
   notes?: string;
+  description?: string;
+  trim?: string;
   status?: 'draft' | 'active' | 'archived';
 
   // Form-specific fields

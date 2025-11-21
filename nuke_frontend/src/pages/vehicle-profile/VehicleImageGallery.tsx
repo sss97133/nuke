@@ -1,5 +1,5 @@
 import React from 'react';
-import ImageGallery from '../../components/images/ImageGallery';
+import ImageGalleryV2 from '../../components/image/ImageGalleryV2';
 import VehicleContributors from '../../components/VehicleContributors';
 import type { VehicleImageGalleryProps } from './types';
 
@@ -36,8 +36,9 @@ const VehicleImageGallery: React.FC<VehicleImageGalleryProps> = ({
   return (
     <div className="card" style={{ gridColumn: '2 / span 1' }}>
       <div className="card-body">
-        <ImageGallery
+        <ImageGalleryV2
           vehicleId={vehicle.id}
+          vehicleYMM={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
           onImagesUpdated={onImageUpdate}
           showUpload={canUpload}
         />

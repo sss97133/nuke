@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import type { documentAPI } from '../services/api';
+import { storageService } from '../services/supabase/storageService';
 import '../design-system.css';
 
 interface OwnershipVerificationWizardProps {
@@ -10,7 +10,7 @@ interface OwnershipVerificationWizardProps {
   onComplete: () => void;
 }
 
-type UserTier = 'verified_owner' | 'responsible_party' | 'professional' | 'contributor' | 'public';
+type UserTier = 'verified_owner' | 'responsible_party' | 'professional' | 'contributor' | 'consigner' | 'public';
 type WizardStep = 'select_relationship' | 'upload_documents' | 'sign_contract' | 'review_submit';
 
 interface VerificationData {
@@ -20,6 +20,8 @@ interface VerificationData {
     driversLicense?: File;
     insurance?: File;
     contract?: File;
+    dealerLicense?: File;
+    photoEvidence?: File;
   };
   contractSigned: boolean;
   additionalInfo: string;
@@ -79,17 +81,24 @@ const OwnershipVerificationWizard: React.FC<OwnershipVerificationWizardProps> = 
       icon: 'M'
     },
     {
+      id: 'consigner',
+      title: 'Dealer / Consigner',
+      description: 'You are selling this vehicle on behalf of the owner',
+      requirements: ['Dealer License / Business Credential', 'Consignment Contract'],
+      icon: 'D'
+    },
+    {
       id: 'professional',
-      title: 'Professional Relationship',
-      description: 'Mechanic, dealer, or service provider working on the vehicle',
-      requirements: ['Business license/credentials', 'Service contract with owner'],
+      title: 'Service Provider',
+      description: 'Mechanic, detailer, or shop performing work',
+      requirements: ['Business license', 'Service Order'],
       icon: 'P'
     },
     {
       id: 'contributor',
-      title: 'Information Contributor',
-      description: 'You have knowledge about this vehicle to share',
-      requirements: ['Proof of knowledge/experience'],
+      title: 'Inspector / Contributor',
+      description: 'You have physical access and original photos',
+      requirements: ['Original photos with metadata (GPS/EXIF)'],
       icon: 'C'
     }
   ];
@@ -145,17 +154,9 @@ const OwnershipVerificationWizard: React.FC<OwnershipVerificationWizardProps> = 
       for (const [key, file] of Object.entries(verificationData.documents)) {
         if (file) {
           try {
-            const formData = new FormData();
-            formData.append('document', file);
-            formData.append('vehicleId', vehicleId);
-            formData.append('userId', userId);
-            formData.append('documentType', key);
-            formData.append('category', 'ownership_verification');
-            formData.append('description', `${verificationData.relationship} - ${key}`);
-
-            const uploadResponse = await documentAPI.uploadDocument(formData);
-            if (uploadResponse?.data?.file_path) {
-              documentPaths[key] = uploadResponse.data.file_path;
+            const publicUrl = await storageService.uploadDocument(vehicleId, file, userId, key);
+            if (publicUrl) {
+              documentPaths[key] = publicUrl;
             }
           } catch (uploadError) {
             console.error(`Error uploading ${key} document:`, uploadError);
@@ -338,6 +339,70 @@ const OwnershipVerificationWizard: React.FC<OwnershipVerificationWizardProps> = 
               </>
             )}
 
+            {verificationData.relationship === 'consigner' && (
+              <>
+                <div className="mb-4">
+                  <label className="text-small font-bold">
+                    Dealer License / Business Credential
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="input"
+                    onChange={(e) => e.target.files?.[0] && handleFileUpload('dealerLicense', e.target.files[0])}
+                    style={{ width: '100%', marginTop: '4px' }}
+                  />
+                  {verificationData.documents.dealerLicense && (
+                    <div className="text-small text-green-600 mt-1">
+                      ✓ Selected: {verificationData.documents.dealerLicense.name}
+                    </div>
+                  )}
+                </div>
+                <div className="mb-4">
+                  <label className="text-small font-bold">
+                    Consignment Contract
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="input"
+                    onChange={(e) => e.target.files?.[0] && handleFileUpload('contract', e.target.files[0])}
+                    style={{ width: '100%', marginTop: '4px' }}
+                  />
+                  {verificationData.documents.contract && (
+                    <div className="text-small text-green-600 mt-1">
+                      ✓ Selected: {verificationData.documents.contract.name}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {verificationData.relationship === 'contributor' && (
+              <>
+                <div className="mb-4">
+                  <label className="text-small font-bold">
+                    Proof of Access (Original Photo)
+                  </label>
+                  <p className="text-xs text-muted mb-2">
+                    Upload an original photo you took of the vehicle. We analyze the metadata (EXIF/GPS) to verify you had physical access.
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input"
+                    onChange={(e) => e.target.files?.[0] && handleFileUpload('photoEvidence', e.target.files[0])}
+                    style={{ width: '100%', marginTop: '4px' }}
+                  />
+                  {verificationData.documents.photoEvidence && (
+                    <div className="text-small text-green-600 mt-1">
+                      ✓ Selected: {verificationData.documents.photoEvidence.name}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
             {verificationData.relationship === 'professional' && (
               <>
                 <div className="mb-4">
@@ -394,6 +459,16 @@ const OwnershipVerificationWizard: React.FC<OwnershipVerificationWizardProps> = 
                       alert('Please upload your driver\'s license before proceeding.');
                       return;
                     }
+                  } else if (verificationData.relationship === 'consigner') {
+                    if (!verificationData.documents.dealerLicense || !verificationData.documents.contract) {
+                      alert('Please upload your dealer license and consignment contract.');
+                      return;
+                    }
+                  } else if (verificationData.relationship === 'contributor') {
+                    if (!verificationData.documents.photoEvidence) {
+                      alert('Please upload a photo to verify your access.');
+                      return;
+                    }
                   } else if (verificationData.relationship === 'professional') {
                     if (!verificationData.documents.contract) {
                       alert('Please upload your business license or professional credentials before proceeding.');
@@ -402,7 +477,7 @@ const OwnershipVerificationWizard: React.FC<OwnershipVerificationWizardProps> = 
                   }
 
                   // Navigate to next step
-                  if (verificationData.relationship === 'professional') {
+                  if (['professional', 'consigner'].includes(verificationData.relationship)) {
                     setCurrentStep('sign_contract');
                   } else {
                     setCurrentStep('review_submit');
@@ -504,7 +579,7 @@ const OwnershipVerificationWizard: React.FC<OwnershipVerificationWizardProps> = 
             <div className="mt-4" style={{ display: 'flex', gap: '8px' }}>
               <button
                 className="button button-secondary"
-                onClick={() => setCurrentStep(verificationData.relationship === 'professional' ? 'sign_contract' : 'upload_documents')}
+                onClick={() => setCurrentStep(['professional', 'consigner'].includes(verificationData.relationship) ? 'sign_contract' : 'upload_documents')}
               >
                 Back
               </button>

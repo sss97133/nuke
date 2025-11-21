@@ -23,7 +23,10 @@ export default defineConfig({
           exif: ['exifr', 'piexifjs', 'exif-js', 'exifreader'],
         }
       }
-    }
+    },
+    // Ensure production builds don't use eval
+    target: 'esnext',
+    minify: 'esbuild',
   },
   server: {
     port: 5174,

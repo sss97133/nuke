@@ -733,9 +733,9 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
           </div>
 
           {/* Upload Button & Image Count */}
-          <div className="flex items-center gap-4">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
             {showUpload && (
-              <div className="relative">
+              <div style={{ position: 'relative' }}>
                 <input
                   id={`gallery-upload-${vehicleId}`}
                   type="file"
@@ -751,7 +751,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
                 />
                 <label htmlFor={`gallery-upload-${vehicleId}`}>
                   <span className="button button-primary" style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-3)', display: 'inline-block', cursor: 'pointer' }}>
-                  Upload Images
+                    Upload Images
                   </span>
                 </label>
               </div>

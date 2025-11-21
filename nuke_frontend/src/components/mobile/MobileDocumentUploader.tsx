@@ -6,6 +6,7 @@
 import React, { useState, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import CursorButton from '../CursorButton';
 
 interface MobileDocumentUploaderProps {
   vehicleId: string;
@@ -234,7 +235,7 @@ export const MobileDocumentUploader: React.FC<MobileDocumentUploaderProps> = ({
             {step === 'processing' && '⚙️ Processing...'}
             {step === 'details' && '✏️ Document Details'}
           </h2>
-          <button onClick={onClose} style={styles.closeBtn}>✕</button>
+          <CursorButton onClick={onClose} variant="secondary" size="sm">✕</CursorButton>
         </div>
 
         {/* Category Selection */}
@@ -339,20 +340,23 @@ export const MobileDocumentUploader: React.FC<MobileDocumentUploaderProps> = ({
 
             {/* Actions */}
             <div style={styles.actions}>
-              <button
+              <CursorButton
                 onClick={() => setStep('category')}
-                style={styles.backBtn}
+                variant="secondary"
+                size="md"
                 disabled={uploading}
               >
                 ← Back
-              </button>
-              <button
+              </CursorButton>
+              <CursorButton
                 onClick={handleUpload}
-                style={styles.uploadBtn}
+                variant="primary"
+                size="md"
+                fullWidth
                 disabled={uploading}
               >
-                {uploading ? 'Uploading...' : '✓ Save Document'}
-              </button>
+                {uploading ? 'Uploading...' : 'Save Document'}
+              </CursorButton>
             </div>
           </div>
         )}
@@ -362,9 +366,9 @@ export const MobileDocumentUploader: React.FC<MobileDocumentUploaderProps> = ({
   );
 };
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   overlay: {
-    position: 'fixed' as const,
+    position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
@@ -372,178 +376,154 @@ const styles = {
     background: 'rgba(0, 0, 0, 0.85)',
     zIndex: 999999,
     display: 'flex',
-    flexDirection: 'column' as const,
+    flexDirection: 'column',
     overflow: 'auto'
   },
   modal: {
-    background: '#ffffff',
+    background: 'var(--bg)',
     width: '100%',
     minHeight: '100vh',
     display: 'flex',
-    flexDirection: 'column' as const
+    flexDirection: 'column'
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px',
-    borderBottom: '2px solid #000080',
-    background: '#f0f0f0'
+    padding: 'var(--space-4)',
+    borderBottom: '2px solid var(--border)',
+    background: 'var(--surface)'
   },
   title: {
     margin: 0,
-    fontSize: '10px',
-    fontFamily: '"MS Sans Serif", sans-serif',
-    fontWeight: 'bold'
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '10px',
-    cursor: 'pointer',
-    padding: '0',
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
+    fontSize: '8pt',
+    fontFamily: 'var(--font-family)',
+    fontWeight: 700,
+    color: 'var(--text)'
   },
   categoryGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '12px',
-    padding: '16px'
+    gap: 'var(--space-3)',
+    padding: 'var(--space-4)'
   },
   categoryCard: {
-    background: '#ffffff',
-    border: '2px solid #c0c0c0',
-    padding: '20px 12px',
-    borderRadius: '8px',
+    background: 'var(--surface)',
+    border: '2px solid var(--border)',
+    padding: 'var(--space-4) var(--space-3)',
+    borderRadius: 'var(--radius)',
     cursor: 'pointer',
-    transition: 'all 0.2s',
+    transition: 'var(--transition)',
     display: 'flex',
-    flexDirection: 'column' as const,
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: '8px',
+    gap: 'var(--space-2)',
     minHeight: '120px',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontFamily: 'var(--font-family)'
   },
   categoryIcon: {
-    fontSize: '36px'
+    fontSize: '24px'
   },
   categoryName: {
-    fontSize: '10px',
-    fontWeight: 'bold',
-    textAlign: 'center' as const
+    fontSize: '8pt',
+    fontWeight: 700,
+    textAlign: 'center',
+    color: 'var(--text)'
   },
   categoryDesc: {
-    fontSize: '10px',
-    color: '#666',
-    textAlign: 'center' as const
+    fontSize: '8pt',
+    color: 'var(--text-secondary)',
+    textAlign: 'center'
   },
   processing: {
-    padding: '60px 16px',
-    textAlign: 'center' as const
+    padding: 'var(--space-6) var(--space-4)',
+    textAlign: 'center'
   },
   spinner: {
-    fontSize: '10px',
+    fontSize: '8pt',
     animation: 'spin 2s linear infinite'
   },
   processingSubtext: {
-    fontSize: '10px',
-    color: '#666',
-    marginTop: '8px'
+    fontSize: '8pt',
+    color: 'var(--text-secondary)',
+    marginTop: 'var(--space-2)'
   },
   detailsForm: {
-    padding: '16px',
+    padding: 'var(--space-4)',
     flex: 1,
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '16px'
+    flexDirection: 'column',
+    gap: 'var(--space-4)'
   },
   previewContainer: {
     width: '100%',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius)',
     overflow: 'hidden',
-    border: '2px solid #c0c0c0',
+    border: '2px solid var(--border)',
     maxHeight: '200px'
   },
   previewImage: {
     width: '100%',
-    height: 'auto',
+    height: '100%',
+    objectFit: 'cover',
+    objectPosition: 'center',
     display: 'block'
   },
   extractedDataCard: {
-    background: '#f0f8ff',
-    border: '2px solid #000080',
-    borderRadius: '8px',
-    padding: '12px'
+    background: 'var(--surface)',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: 'var(--space-3)'
   },
   extractedTitle: {
-    fontWeight: 'bold',
-    marginBottom: '8px',
-    fontSize: '13px'
+    fontWeight: 700,
+    marginBottom: 'var(--space-2)',
+    fontSize: '8pt',
+    color: 'var(--text)'
   },
   extractedRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '4px 0',
-    fontSize: '10px',
-    borderBottom: '1px solid rgba(0,0,128,0.1)'
+    padding: 'var(--space-1) 0',
+    fontSize: '8pt',
+    borderBottom: '2px solid var(--border)',
+    color: 'var(--text)'
   },
   field: {
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px'
+    flexDirection: 'column',
+    gap: 'var(--space-2)'
   },
   label: {
-    fontSize: '10px',
-    fontWeight: 'bold',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontSize: '8pt',
+    fontWeight: 700,
+    fontFamily: 'var(--font-family)',
+    color: 'var(--text)'
   },
   input: {
-    padding: '12px',
-    border: '2px inset #c0c0c0',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    padding: 'var(--space-2)',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    fontSize: '8pt',
+    fontFamily: 'var(--font-family)',
+    background: 'var(--surface)',
+    color: 'var(--text)'
   },
   textarea: {
-    padding: '12px',
-    border: '2px inset #c0c0c0',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontFamily: '"MS Sans Serif", sans-serif',
-    resize: 'vertical' as const
+    padding: 'var(--space-2)',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    fontSize: '8pt',
+    fontFamily: 'var(--font-family)',
+    resize: 'vertical',
+    background: 'var(--surface)',
+    color: 'var(--text)'
   },
   actions: {
     display: 'flex',
-    gap: '12px',
+    gap: 'var(--space-3)',
     marginTop: 'auto',
-    paddingTop: '16px'
-  },
-  backBtn: {
-    flex: 1,
-    padding: '14px',
-    background: '#c0c0c0',
-    border: '2px outset #ffffff',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif'
-  },
-  uploadBtn: {
-    flex: 2,
-    padding: '14px',
-    background: '#000080',
-    color: '#ffffff',
-    border: '2px outset #ffffff',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    paddingTop: 'var(--space-4)'
   }
 };
 

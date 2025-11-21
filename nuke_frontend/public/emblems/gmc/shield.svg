@@ -1,0 +1,33 @@
+<!-- GMC Shield Logo (Classic Red) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="redGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E31E24;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#B71C1C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E31E24;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield shape -->
+  <g transform="translate(50, 10)">
+    <path d="M 0,0 L 30,15 L 30,60 L 0,80 L -30,60 L -30,15 Z" 
+          fill="url(#redGradient)" 
+          stroke="#8B0000" 
+          stroke-width="2"/>
+    
+    <!-- White border -->
+    <path d="M 0,5 L 25,18 L 25,58 L 0,75 L -25,58 L -25,18 Z" 
+          fill="none" 
+          stroke="white" 
+          stroke-width="2"/>
+    
+    <!-- GMC Text -->
+    <text x="0" y="50" 
+          font-family="Arial Black, sans-serif" 
+          font-size="16" 
+          font-weight="900" 
+          fill="white" 
+          text-anchor="middle">GMC</text>
+  </g>
+</svg>
+

@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { pricingService } from '../services/pricingService';
 import { supabase } from '../lib/supabase';
 import { VehicleValuationService } from '../services/vehicleValuationService';
 import type { VehicleValuation } from '../services/vehicleValuationService';
@@ -22,6 +21,7 @@ interface VehiclePricingWidgetProps {
   };
   isOwner?: boolean;
   className?: string;
+  initialValuation?: any | null; // From RPC to avoid duplicate query
 }
 
 interface PricingStatus {
@@ -36,7 +36,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   vehicleId,
   vehicleInfo,
   isOwner = false,
-  className = ''
+  className = '',
+  initialValuation
 }) => {
   const [pricingStatus, setPricingStatus] = useState<PricingStatus | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -47,11 +48,27 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const [selectedPart, setSelectedPart] = useState<any>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
 
+  // Use initialValuation if provided (eliminates duplicate query)
   useEffect(() => {
+    if (initialValuation) {
+      const valuation = initialValuation;
+      setPricingStatus({
+        status: (valuation.confidence_score || 0) >= 80 ? 'high_confidence' : 
+                (valuation.confidence_score || 0) >= 65 ? 'medium_confidence' : 
+                (valuation.confidence_score || 0) > 0 ? 'low_confidence' : 'not_analyzed',
+        message: valuation.documented_components?.length > 0 ? 
+                `Based on ${valuation.documented_components.length} components` : 
+                'No data available',
+        estimated_value: Math.round(valuation.estimated_value || 0),
+        confidence_score: valuation.confidence_score || 0,
+        last_analyzed: valuation.valuation_date
+      });
+      return; // Skip fetch if provided
+    }
     if (vehicleId) {
       loadPricingStatus();
     }
-  }, [vehicleId]);
+  }, [vehicleId, initialValuation]);
 
   // Refresh when receipts/documents update
   useEffect(() => {
@@ -111,10 +128,9 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const triggerAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      await pricingService.triggerManualAnalysis(vehicleId, {
-        priority: 'user_requested',
-        fresh_data: true
-      });
+      // TODO: Implement triggerManualAnalysis in pricingService
+      // For now, just reload the status after a delay
+      console.log('Triggering analysis for vehicle:', vehicleId);
 
       // Poll for updated status
       setTimeout(() => {

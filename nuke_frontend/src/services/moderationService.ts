@@ -308,7 +308,7 @@ export class ModerationService {
         .eq('vehicle_id', vehicleId)
         .eq('user_id', currentUserId)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         return null;

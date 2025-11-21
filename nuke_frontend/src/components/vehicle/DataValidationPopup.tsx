@@ -45,9 +45,73 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
   const loadValidations = async () => {
     try {
       setLoading(true);
+      const sources: ValidationSource[] = [];
 
-      // Get all validation sources for this field
-      const { data: validationData, error: validationError } = await supabase
+      // 1. Get ownership verifications (title, registration uploads)
+      const { data: ownershipDocs } = await supabase
+        .from('ownership_verifications')
+        .select('*')
+        .eq('vehicle_id', vehicleId)
+        .order('created_at', { ascending: false });
+
+      if (ownershipDocs && ownershipDocs.length > 0) {
+        ownershipDocs.forEach((doc: any) => {
+          const docType = doc.document_type || 'document';
+          sources.push({
+            validation_source: docType === 'title' ? 'title_upload' : `${docType}_upload`,
+            confidence_score: doc.verification_status === 'verified' ? 95 : 80,
+            source_url: doc.document_url || doc.image_url,
+            notes: `${docType.toUpperCase()} - ${doc.verification_status || 'pending'}`,
+            validated_by: doc.verified_by,
+            created_at: doc.created_at
+          });
+        });
+      }
+
+      // 2. Get vehicle images tagged as title/registration/VIN plate
+      const { data: docImages } = await supabase
+        .from('vehicle_images')
+        .select('*')
+        .eq('vehicle_id', vehicleId)
+        .in('sensitive_type', ['title', 'registration', 'vin_plate', 'bill_of_sale'])
+        .order('created_at', { ascending: false });
+
+      if (docImages && docImages.length > 0) {
+        docImages.forEach((img: any) => {
+          const docType = img.sensitive_type || 'document';
+          sources.push({
+            validation_source: `${docType}_image`,
+            confidence_score: 85,
+            source_url: img.image_url,
+            notes: `Image tagged as ${docType.replace(/_/g, ' ')}`,
+            validated_by: img.uploaded_by,
+            created_at: img.created_at
+          });
+        });
+      }
+
+      // 3. Get field-specific validation sources from vehicle_field_sources
+      const { data: fieldSources } = await supabase
+        .from('vehicle_field_sources')
+        .select('*')
+        .eq('vehicle_id', vehicleId)
+        .eq('field_name', fieldName)
+        .order('updated_at', { ascending: false });
+
+      if (fieldSources && fieldSources.length > 0) {
+        fieldSources.forEach((source: any) => {
+          sources.push({
+            validation_source: source.source_type || 'user_input',
+            confidence_score: source.confidence_score || 50,
+            notes: `Value: ${source.field_value}`,
+            validated_by: source.user_id,
+            created_at: source.updated_at
+          });
+        });
+      }
+
+      // 4. Fallback: Get all validation sources for this field from data_validations table
+      const { data: validationData } = await supabase
         .from('data_validations')
         .select('*')
         .eq('entity_type', 'vehicle')
@@ -55,20 +119,38 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
         .eq('field_name', fieldName)
         .order('confidence_score', { ascending: false });
 
-      if (validationError) throw validationError;
-      setValidations(validationData || []);
+      if (validationData && validationData.length > 0) {
+        validationData.forEach((val: any) => {
+          sources.push({
+            validation_source: val.validation_source,
+            confidence_score: val.confidence_score,
+            source_url: val.source_url,
+            notes: val.notes,
+            validated_by: val.validated_by,
+            created_at: val.created_at
+          });
+        });
+      }
 
-      // Get consensus view
-      const { data: consensusData, error: consensusError } = await supabase
-        .from('data_validation_consensus')
-        .select('*')
-        .eq('entity_type', 'vehicle')
-        .eq('entity_id', vehicleId)
-        .eq('field_name', fieldName)
-        .single();
+      setValidations(sources);
 
-      if (!consensusError && consensusData) {
-        setConsensus(consensusData);
+      // Calculate consensus from all sources
+      if (sources.length > 0) {
+        const avgConfidence = sources.reduce((sum, s) => sum + s.confidence_score, 0) / sources.length;
+        const maxConfidence = Math.max(...sources.map(s => s.confidence_score));
+        const uniqueSources = new Set(sources.map(s => s.validation_source));
+        const uniqueValidators = new Set(sources.map(s => s.validated_by).filter(Boolean));
+
+        setConsensus({
+          field_name: fieldName,
+          field_value: fieldValue,
+          source_count: uniqueSources.size,
+          validator_count: uniqueValidators.size,
+          avg_confidence: avgConfidence,
+          max_confidence: maxConfidence,
+          sources: Array.from(uniqueSources),
+          last_validated_at: sources[0].created_at
+        });
       }
     } catch (err: any) {
       console.error('Error loading validations:', err);

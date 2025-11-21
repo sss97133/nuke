@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import type { vehicleAPI } from '../../services/api';
+import { vehicleService } from '../../services/supabase/vehicleService';
 import { DocumentUploadButton } from '../vehicle/DocumentUploadButton';
 import TimelineList from '../timeline/TimelineList';
 import ImageGallery from '../images/ImageGallery';
@@ -21,9 +21,8 @@ const VehicleDetail = () => {
 
     try {
       setLoading(true);
-      // Load vehicle WITH images to ensure primary image works
-      const response = await vehicleAPI.getVehicle(id, { include: 'images' });
-      setVehicle(response.data);
+      const data = await vehicleService.getById(id);
+      setVehicle(data);
     } catch (err) {
       console.error('Error fetching vehicle details:', err);
       setError('Failed to load vehicle details. Please try again.');
@@ -39,12 +38,7 @@ const VehicleDetail = () => {
   const handleImagesUpdated = async () => {
     // Refresh vehicle data to ensure primary image is updated
     if (id) {
-      try {
-        const response = await vehicleAPI.getVehicle(id, { include: 'images' });
-        setVehicle(response.data);
-      } catch (err) {
-        console.error('Error refreshing vehicle after image update:', err);
-      }
+      fetchVehicle();
     }
   };
 
@@ -53,7 +47,7 @@ const VehicleDetail = () => {
     
     if (window.confirm("Are you sure you want to archive this vehicle? This action follows vehicle-centric principles and will not delete the vehicle's digital identity.")) {
       try {
-        await vehicleAPI.archiveVehicle(vehicle.id);
+        await vehicleService.archive(vehicle.id);
         navigate('/vehicles');
       } catch (err) {
         console.error('Error archiving vehicle:', err);

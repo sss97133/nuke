@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import * as XLSX from 'xlsx';
+// import * as XLSX from 'xlsx'; // Optional dependency - install with: npm install xlsx
 
 interface BulkVehicle {
   id?: string;
@@ -255,6 +255,9 @@ const DealerBulkEditor: React.FC = () => {
     
     setAiParsing(true);
     try {
+      // Dynamic import to avoid build errors if xlsx is not installed
+      const XLSX = await import('xlsx');
+      
       const reader = new FileReader();
       reader.onload = async (e) => {
         const data = e.target?.result;

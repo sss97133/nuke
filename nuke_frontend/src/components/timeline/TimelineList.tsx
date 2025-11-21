@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import type { timelineAPI } from '../../services/api';
 import { supabase } from '../../lib/supabase';
+import { timelineService } from '../../services/supabase/timelineService';
 import type { TimelineEvent } from '../../types';
 import EnhancedTimelineEventForm from '../EnhancedTimelineEventForm';
 
@@ -20,8 +20,8 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
     const fetchTimelineEvents = async () => {
       try {
         setLoading(true);
-        const response = await timelineAPI.getTimelineEvents(vehicleId);
-        setEvents(response.data || []);
+        const data = await timelineService.getByVehicleId(vehicleId);
+        setEvents(data || []);
       } catch (err) {
         console.error('Error fetching timeline events:', err);
         setError('Failed to load timeline events. Please try again.');
@@ -73,8 +73,8 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
               // Refresh events
               const fetchTimelineEvents = async () => {
                 try {
-                  const response = await timelineAPI.getTimelineEvents(vehicleId);
-                  setEvents(response.data || []);
+                  const data = await timelineService.getByVehicleId(vehicleId);
+                  setEvents(data || []);
                 } catch (err) {
                   console.error('Error fetching timeline events:', err);
                 }
@@ -189,10 +189,11 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
                       <button
                         onClick={async () => {
                           try {
-                            await timelineAPI.verifyTimelineEvent(event.id);
+                            await timelineService.verify(event.id);
+
                             // Refresh the events list
-                            const response = await timelineAPI.getTimelineEvents(vehicleId);
-                            setEvents(response.data || []);
+                            const data = await timelineService.getByVehicleId(vehicleId);
+                            setEvents(data || []);
                           } catch (err) {
                             console.error('Error verifying event:', err);
                             alert('Failed to verify event. Please try again.');
@@ -222,8 +223,8 @@ const TimelineList = ({ vehicleId }: TimelineListProps) => {
             // Refresh events
             const fetchTimelineEvents = async () => {
               try {
-                const response = await timelineAPI.getTimelineEvents(vehicleId);
-                setEvents(response.data || []);
+                const data = await timelineService.getByVehicleId(vehicleId);
+                setEvents(data || []);
               } catch (err) {
                 console.error('Error fetching timeline events:', err);
               }

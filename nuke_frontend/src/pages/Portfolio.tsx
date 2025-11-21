@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CashBalanceService, CashTransaction } from '../services/cashBalanceService';
+import { CashBalanceService } from '../services/cashBalanceService';
+import type { CashTransaction } from '../services/cashBalanceService';
 import CashBalance from '../components/trading/CashBalance';
 
 interface ShareHolding {

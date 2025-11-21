@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import CursorButton from '../CursorButton';
 
 interface MobilePriceEditorProps {
   vehicleId: string;
@@ -140,8 +141,8 @@ export const MobilePriceEditor: React.FC<MobilePriceEditorProps> = ({
       <div style={styles.modal}>
         {/* Header */}
         <div style={styles.header}>
-          <h2 style={styles.title}>💰 Edit Prices</h2>
-          <button onClick={onClose} style={styles.closeBtn}>✕</button>
+          <h2 style={styles.title}>Edit Prices</h2>
+          <CursorButton onClick={onClose} variant="secondary" size="sm">✕</CursorButton>
         </div>
 
         <div style={styles.content}>
@@ -247,13 +248,15 @@ export const MobilePriceEditor: React.FC<MobilePriceEditorProps> = ({
           )}
 
           {/* Save Button */}
-          <button
+          <CursorButton
             onClick={handleSave}
             disabled={saving}
-            style={styles.saveBtn}
+            variant="primary"
+            fullWidth
+            size="md"
           >
-            {saving ? 'Saving...' : '✓ Save Prices'}
-          </button>
+            {saving ? 'Saving...' : 'Save Prices'}
+          </CursorButton>
         </div>
       </div>
     </div>,
@@ -261,9 +264,9 @@ export const MobilePriceEditor: React.FC<MobilePriceEditorProps> = ({
   );
 };
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   overlay: {
-    position: 'fixed' as const,
+    position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
@@ -271,151 +274,143 @@ const styles = {
     background: 'rgba(0, 0, 0, 0.85)',
     zIndex: 999999,
     display: 'flex',
-    flexDirection: 'column' as const
+    flexDirection: 'column'
   },
   modal: {
-    background: '#ffffff',
+    background: 'var(--bg)',
     width: '100%',
     height: '100%',
     display: 'flex',
-    flexDirection: 'column' as const,
+    flexDirection: 'column',
     overflow: 'hidden'
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px',
-    borderBottom: '2px solid #000080',
-    background: '#f0f0f0'
+    padding: 'var(--space-4)',
+    borderBottom: '2px solid var(--border)',
+    background: 'var(--surface)'
   },
   title: {
     margin: 0,
-    fontSize: '10px',
-    fontFamily: '"MS Sans Serif", sans-serif',
-    fontWeight: 'bold'
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '10px',
-    cursor: 'pointer',
-    padding: '0'
+    fontSize: '8pt',
+    fontFamily: 'var(--font-family)',
+    fontWeight: 700,
+    color: 'var(--text)'
   },
   content: {
-    padding: '16px',
-    overflowY: 'auto' as const,
+    padding: 'var(--space-4)',
+    overflowY: 'auto',
     flex: 1,
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '16px'
+    flexDirection: 'column',
+    gap: 'var(--space-4)'
   },
   gainCard: {
     border: '2px solid',
-    borderRadius: '8px',
-    padding: '16px',
-    textAlign: 'center' as const
+    borderRadius: 'var(--radius)',
+    padding: 'var(--space-4)',
+    textAlign: 'center'
   },
   gainLabel: {
-    fontSize: '10px',
-    fontWeight: 'bold',
-    marginBottom: '4px'
+    fontSize: '8pt',
+    fontWeight: 700,
+    marginBottom: 'var(--space-1)',
+    color: 'var(--text)'
   },
   gainValue: {
-    fontSize: '10px',
-    fontWeight: 'bold',
-    fontFamily: 'monospace'
+    fontSize: '8pt',
+    fontWeight: 700,
+    fontFamily: 'var(--font-mono)'
   },
   gainPct: {
-    fontSize: '10px',
-    fontWeight: 'bold',
-    marginTop: '4px'
+    fontSize: '8pt',
+    fontWeight: 700,
+    marginTop: 'var(--space-1)',
+    fontFamily: 'var(--font-mono)'
   },
   field: {
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px'
+    flexDirection: 'column',
+    gap: 'var(--space-2)'
   },
   label: {
-    fontSize: '10px',
-    fontWeight: 'bold',
-    fontFamily: '"MS Sans Serif", sans-serif'
+    fontSize: '8pt',
+    fontWeight: 700,
+    fontFamily: 'var(--font-family)',
+    color: 'var(--text)'
   },
   input: {
-    padding: '14px',
-    border: '2px inset #c0c0c0',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontFamily: 'monospace'
+    padding: 'var(--space-2)',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    fontSize: '8pt',
+    fontFamily: 'var(--font-mono)',
+    background: 'var(--surface)',
+    color: 'var(--text)'
   },
   toggleField: {
-    padding: '12px',
-    background: '#f9f9f9',
-    border: '2px solid #c0c0c0',
-    borderRadius: '4px'
+    padding: 'var(--space-3)',
+    background: 'var(--surface)',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)'
   },
   toggleLabel: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: 'var(--space-3)',
     cursor: 'pointer'
   },
   checkbox: {
-    width: '20px',
-    height: '20px',
+    width: '16px',
+    height: '16px',
     cursor: 'pointer'
   },
   toggleText: {
-    fontSize: '10px',
-    fontWeight: 'bold'
+    fontSize: '8pt',
+    fontWeight: 700,
+    color: 'var(--text)'
   },
   historySection: {
-    marginTop: '8px'
+    marginTop: 'var(--space-2)'
   },
   historyTitle: {
-    fontSize: '10px',
-    fontWeight: 'bold',
-    marginBottom: '8px'
+    fontSize: '8pt',
+    fontWeight: 700,
+    marginBottom: 'var(--space-2)',
+    color: 'var(--text)'
   },
   historyList: {
-    background: '#f5f5f5',
-    border: '2px solid #c0c0c0',
-    borderRadius: '4px',
+    background: 'var(--surface)',
+    border: '2px solid var(--border)',
+    borderRadius: 'var(--radius)',
     overflow: 'hidden'
   },
   historyItem: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '10px 12px',
-    borderBottom: '1px solid #e0e0e0',
-    fontSize: '12px'
+    padding: 'var(--space-2) var(--space-3)',
+    borderBottom: '2px solid var(--border)',
+    fontSize: '8pt'
   },
   historyType: {
-    fontWeight: 'bold',
-    flex: 1
+    fontWeight: 700,
+    flex: 1,
+    color: 'var(--text)'
   },
   historyValue: {
-    fontFamily: 'monospace',
+    fontFamily: 'var(--font-mono)',
     flex: 1,
-    textAlign: 'right' as const
+    textAlign: 'right',
+    color: 'var(--text)'
   },
   historyDate: {
-    color: '#666',
+    color: 'var(--text-secondary)',
     flex: 1,
-    textAlign: 'right' as const,
-    fontSize: '11px'
-  },
-  saveBtn: {
-    padding: '16px',
-    background: '#000080',
-    color: '#ffffff',
-    border: '2px outset #ffffff',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    fontFamily: '"MS Sans Serif", sans-serif',
-    marginTop: 'auto'
+    textAlign: 'right',
+    fontSize: '8pt',
+    fontFamily: 'var(--font-mono)'
   }
 };
 

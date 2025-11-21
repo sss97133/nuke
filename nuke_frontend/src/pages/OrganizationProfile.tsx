@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactDOM from 'react-dom';
 import { supabase } from '../lib/supabase';
 import TradePanel from '../components/trading/TradePanel';
@@ -17,6 +17,7 @@ import EnhancedDealerInventory from '../components/organization/EnhancedDealerIn
 import BaTBulkImporter from '../components/dealer/BaTBulkImporter';
 import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowser';
 import MarketplaceComplianceForm from '../components/organization/MarketplaceComplianceForm';
+import OrganizationNotifications from '../components/organization/OrganizationNotifications';
 import '../design-system.css';
 
 interface Organization {
@@ -97,7 +98,27 @@ interface Offering {
 }
 
 export default function OrganizationProfile() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams();
+  const location = useLocation();
+  
+  // Extract orgId from params first
+  const id = (params as any)?.id;
+  const orgId = (params as any)?.orgId;
+  
+  // Fallback: Extract from pathname if params don't work
+  // Path should be /org/{orgId}
+  const pathnameMatch = location.pathname.match(/\/org\/([^/]+)/);
+  const pathnameOrgId = pathnameMatch ? pathnameMatch[1] : null;
+  
+  const organizationId = id || orgId || pathnameOrgId;
+  
+  // Force console logs even in production for debugging
+  if (typeof window !== 'undefined') {
+    console.log('[OrgProfile] RAW PARAMS:', JSON.stringify(params), 'all keys:', Object.keys(params || {}));
+    console.log('[OrgProfile] Extracted - id:', id, 'orgId:', orgId, 'pathnameOrgId:', pathnameOrgId, 'organizationId:', organizationId);
+    console.log('[OrgProfile] Current pathname:', location.pathname);
+  }
+  
   const navigate = useNavigate();
 
   const [organization, setOrganization] = useState<Organization | null>(null);
@@ -127,15 +148,50 @@ export default function OrganizationProfile() {
   const [selectedWorkOrderImage, setSelectedWorkOrderImage] = useState<OrgImage | null>(null);
   const [showOrganizationEditor, setShowOrganizationEditor] = useState(false);
   const [showBaTImporter, setShowBaTImporter] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const ownershipUploadId = `org-ownership-${id}`;
+  const ownershipUploadId = `org-ownership-${organizationId}`;
 
   useEffect(() => {
-    loadOrganization();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-  }, [id]);
+    console.log('[OrgProfile] useEffect triggered - organizationId:', organizationId);
+    
+    if (!organizationId) {
+      console.error('[OrgProfile] No organizationId in useEffect!');
+      setLoading(false);
+      return;
+    }
+    
+    let isMounted = true;
+    
+    const load = async () => {
+      if (!isMounted) {
+        console.log('[OrgProfile] Component unmounted, skipping load');
+        return;
+      }
+      
+      console.log('[OrgProfile] Starting load sequence');
+      
+      // Load session in parallel
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (isMounted) {
+          console.log('[OrgProfile] Session loaded:', session?.user?.id || 'none');
+          setSession(session);
+        }
+      });
+      
+      // Load organization
+      console.log('[OrgProfile] Calling loadOrganization');
+      await loadOrganization();
+      console.log('[OrgProfile] loadOrganization completed');
+    };
+    
+    load();
+    
+    return () => {
+      console.log('[OrgProfile] Cleanup - unmounting');
+      isMounted = false;
+    };
+  }, [organizationId]);
 
   const loadImageTags = async (imageIds: string[]) => {
     try {
@@ -161,201 +217,211 @@ export default function OrganizationProfile() {
   };
 
   const loadOrganization = async () => {
-    if (!id) return;
-
+    if (!organizationId) {
+      console.error('[OrgProfile] No organizationId - id:', id, 'orgId:', orgId);
+      setLoading(false);
+      return;
+    }
+    
+    console.log('[OrgProfile] Loading organization:', organizationId);
+    
     try {
       setLoading(true);
+      setLoadError(null);
 
-      // Load organization
+      // STEP 1: Load basic organization data - SIMPLE, no timeout complexity
+      console.log('[OrgProfile] Executing query for:', organizationId);
+      
       const { data: org, error: orgError } = await supabase
         .from('businesses')
         .select('*')
-        .eq('id', id)
+        .eq('id', organizationId)
         .single();
-
-      if (orgError) throw orgError;
-      setOrganization(org);
-
-      // Load images
-      const { data: orgImages } = await supabase
-        .from('organization_images')
-        .select('*')
-        .eq('organization_id', id)
-        .order('uploaded_at', { ascending: false });
-
-      setImages(orgImages || []);
-
-      // Load AI tags for all images
-      if (orgImages && orgImages.length > 0) {
-        await loadImageTags(orgImages.map(img => img.id));
-      }
-
-      // Load associated vehicles with enriched data
-      const { data: orgVehicles } = await supabase
-        .from('organization_vehicles')
-        .select(`
-          id,
-          vehicle_id,
-          relationship_type,
-          vehicles:vehicle_id (
-            year,
-            make,
-            model,
-            vin,
-            current_value,
-            vehicle_images:vehicle_images(image_url)
-          )
-        `)
-        .eq('organization_id', id)
-        .eq('status', 'active');
-
-      const enrichedVehicles = (orgVehicles || []).map((ov: any) => ({
-        id: ov.id,
-        vehicle_id: ov.vehicle_id,
-        relationship_type: ov.relationship_type,
-        vehicle_year: ov.vehicles?.year,
-        vehicle_make: ov.vehicles?.make,
-        vehicle_model: ov.vehicles?.model,
-        vehicle_vin: ov.vehicles?.vin,
-        vehicle_current_value: ov.vehicles?.current_value,
-        vehicle_image_url: ov.vehicles?.vehicle_images?.[0]?.image_url
-      }));
-      setVehicles(enrichedVehicles);
-
-      // Load tradable offering if exists
-      if (org.is_tradable && org.stock_symbol) {
-        const { data: offeringData } = await supabase
-          .from('organization_offerings')
-          .select('*')
-          .eq('organization_id', id)
-          .eq('status', 'active')
-          .maybeSingle();
-
-        setOffering(offeringData);
-      }
-
-      // Load contributors with attribution
-      const { data: contributorsData, error: contributorsError } = await supabase
-        .from('organization_contributors')
-        .select('id, user_id, role, contribution_count, created_at')
-        .eq('organization_id', id)
-        .order('contribution_count', { ascending: false })
-        .limit(20);
-
-      if (contributorsError) {
-        console.error('Error loading contributors:', contributorsError);
-      }
-
-      // Enrich with profile data
-      const enrichedContributors = await Promise.all(
-        (contributorsData || []).map(async (c: any) => {
-            const { data: profile } = await supabase
-              .from('profiles')
-            .select('id, full_name, username, avatar_url')
-            .eq('id', c.user_id)
-              .single();
-
-            return {
-            ...c,
-            profiles: profile
-            };
-          })
-        );
-
-      setContributors(enrichedContributors);
-
-      // Check if current user is owner OR first contributor (if no owner exists)
-      const { data: { user } } = await supabase.auth.getUser();
       
-      if (user && org) {
-        // Get current user's role in the organization
-        const currentUserContributor = enrichedContributors.find(c => c.user_id === user.id);
-        const userRole = currentUserContributor?.role || null;
-        setCurrentUserRole(userRole);
-        
-        // Set canEdit based on role
-        const editRoles = ['owner', 'co_founder', 'board_member', 'manager', 'employee', 'technician', 'moderator', 'contractor', 'contributor'];
-        setCanEdit(userRole !== null && editRoles.includes(userRole));
+      console.log('[OrgProfile] Query completed - org:', org ? 'found' : 'null', 'error:', orgError?.message || 'none');
 
-        // First check if there's any verified owner
-        const { data: anyOwner } = await supabase
-          .from('business_ownership')
-          .select('id')
-          .eq('business_id', org.id)
-          .eq('status', 'active')
-          .maybeSingle();
+      if (orgError || !org) {
+        setLoadError(orgError?.message || 'Failed to load organization. It may be private or not exist.');
+        setLoading(false);
+        return;
+      }
+      
+      setOrganization(org);
+      
+      // CRITICAL: Set loading to false IMMEDIATELY after org loads so page can render
+      setLoading(false);
 
-        if (anyOwner) {
-          // If there's an owner, check if it's the current user
-          const { data: ownership } = await supabase
-            .from('business_ownership')
-            .select('id, owner_id, status')
-            .eq('business_id', org.id)
-            .eq('owner_id', user.id)
-            .eq('status', 'active')
-            .maybeSingle();
-
-          setIsOwner(!!ownership);
-        } else {
-          // No owner exists - check if current user is the first contributor AND has owner role
-          const { data: firstContributor } = await supabase
-            .from('organization_contributors')
-            .select('user_id, role')
-            .eq('organization_id', org.id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-
-          // User has control if they're the first contributor AND have owner/manager role
-          const isFirstOwner = firstContributor?.user_id === user.id &&
-            firstContributor?.role &&
-            ['owner', 'co_founder', 'board_member', 'manager'].includes(firstContributor.role);
-          setIsOwner(isFirstOwner);
+      // STEP 2: Load everything else in background (non-blocking)
+      // Images
+      (async () => {
+        try {
+          const { data: orgImages, error: imagesError } = await supabase
+            .from('organization_images')
+            .select('*')
+            .eq('organization_id', organizationId)
+            .order('uploaded_at', { ascending: false });
           
-          // If first contributor, grant edit access
-          if (firstContributor?.user_id === user.id) {
-            setCanEdit(true);
+          if (imagesError) {
+            setImages([]);
+          } else {
+            setImages(orgImages || []);
+            if (orgImages && orgImages.length > 0) {
+              loadImageTags(orgImages.map(img => img.id)).catch(() => {});
+            }
           }
+        } catch {
+          setImages([]);
         }
-      } else {
-        // Not logged in - no edit access
-        setCanEdit(false);
+      })();
+
+      // Vehicles (simplified, load in background)
+      (async () => {
+        try {
+          const { data: orgVehicles, error: vehiclesError } = await supabase
+            .from('organization_vehicles')
+            .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, sale_price, listing_status, asking_price')
+            .eq('organization_id', organizationId)
+            .or('status.eq.active,status.eq.sold,status.eq.archived')
+            .order('created_at', { ascending: false });
+          
+          if (vehiclesError) {
+            setVehicles([]);
+            return;
+          }
+          
+          // Enrich vehicles in background
+          const enriched = await Promise.allSettled(
+            (orgVehicles || []).map(async (ov: any) => {
+              try {
+                const [vehicleResult, imageResult] = await Promise.all([
+                  supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status').eq('id', ov.vehicle_id).single(),
+                  supabase.from('vehicle_images').select('image_url').eq('vehicle_id', ov.vehicle_id).eq('is_primary', true).maybeSingle()
+                ]);
+                
+                return {
+                  id: ov.id,
+                  vehicle_id: ov.vehicle_id,
+                  relationship_type: ov.relationship_type,
+                  status: ov.status,
+                  start_date: ov.start_date,
+                  end_date: ov.end_date,
+                  sale_date: ov.sale_date,
+                  sale_price: ov.sale_price,
+                  vehicle_year: vehicleResult.data?.year,
+                  vehicle_make: vehicleResult.data?.make,
+                  vehicle_model: vehicleResult.data?.model,
+                  vehicle_vin: vehicleResult.data?.vin,
+                  vehicle_current_value: vehicleResult.data?.current_value,
+                  vehicle_asking_price: vehicleResult.data?.asking_price,
+                  vehicle_sale_status: vehicleResult.data?.sale_status,
+                  vehicle_image_url: imageResult.data?.image_url,
+                  vehicles: vehicleResult.data || {}
+                };
+              } catch {
+                return { id: ov.id, vehicle_id: ov.vehicle_id, relationship_type: ov.relationship_type, status: ov.status, vehicles: {} };
+              }
+            })
+          );
+          
+          setVehicles(enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value));
+        } catch {
+          setVehicles([]);
+        }
+      })();
+
+      // Offering (background)
+      if (org.is_tradable && org.stock_symbol) {
+        (async () => {
+          try {
+            const { data: offeringData, error: offeringError } = await supabase
+              .from('organization_offerings')
+              .select('*')
+              .eq('organization_id', organizationId)
+              .eq('status', 'active')
+              .maybeSingle();
+            if (!offeringError && offeringData) setOffering(offeringData);
+          } catch {
+            // Ignore errors
+          }
+        })();
       }
 
-      // Load timeline for attribution tracking
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('business_timeline_events')
-        .select('id, event_type, title, description, event_date, created_by, metadata')
-        .eq('business_id', id)
-        .order('event_date', { ascending: false })
-        .limit(50);
+      // Contributors (background)
+      (async () => {
+        try {
+          const { data: contributorsData, error: contributorsError } = await supabase
+            .from('organization_contributors')
+            .select('id, user_id, role, contribution_count, created_at')
+            .eq('organization_id', organizationId)
+            .order('contribution_count', { ascending: false })
+            .limit(20);
+          
+          if (contributorsError || !contributorsData) {
+            setContributors([]);
+            return;
+          }
+          
+          const enriched = await Promise.allSettled(
+            contributorsData.map(async (c: any) => {
+              const { data: profile } = await supabase.from('profiles').select('id, full_name, username, avatar_url').eq('id', c.user_id).single();
+              return { ...c, profiles: profile || null };
+            })
+          );
+          
+          setContributors(enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value));
+          
+          // Check user permissions in background
+          (async () => {
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user && org) {
+                const contributor = enriched.find((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.user_id === user.id);
+                const userRole = contributor?.value?.role || null;
+                setCurrentUserRole(userRole);
+                setCanEdit(['owner', 'co_founder', 'board_member', 'manager', 'employee', 'technician', 'moderator', 'contractor', 'contributor'].includes(userRole || ''));
+                
+                const { data: ownership } = await supabase.from('business_ownership').select('id').eq('business_id', org.id).eq('owner_id', user.id).eq('status', 'active').maybeSingle();
+                setIsOwner(!!ownership);
+              }
+            } catch {
+              // Ignore errors
+            }
+          })();
+        } catch {
+          setContributors([]);
+        }
+      })();
 
-      if (eventsError) {
-        console.error('Error loading timeline:', eventsError);
-      }
-
-      // Enrich with profile data
-      const enrichedEvents = await Promise.all(
-        (eventsData || []).map(async (e: any) => {
-            const { data: profile } = await supabase
-              .from('profiles')
-            .select('full_name, username, avatar_url')
-            .eq('id', e.created_by)
-              .single();
-
-            return {
-            ...e,
-            profiles: profile
-            };
-          })
-        );
-
-      setTimelineEvents(enrichedEvents);
+      // Timeline (background)
+      (async () => {
+        try {
+          const { data: eventsData, error: eventsError } = await supabase
+            .from('business_timeline_events')
+            .select('id, event_type, title, description, event_date, created_by, metadata')
+            .eq('business_id', organizationId)
+            .order('event_date', { ascending: false })
+            .limit(50);
+          
+          if (eventsError || !eventsData) {
+            setTimelineEvents([]);
+            return;
+          }
+          
+          const enriched = await Promise.allSettled(
+            eventsData.map(async (e: any) => {
+              const { data: profile } = await supabase.from('profiles').select('full_name, username, avatar_url').eq('id', e.created_by).single();
+              return { ...e, profiles: profile || null };
+            })
+          );
+          
+          setTimelineEvents(enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value));
+        } catch {
+          setTimelineEvents([]);
+        }
+      })();
 
     } catch (error: any) {
-      console.error('Error loading organization:', error);
-      alert(`Error: ${error.message}`);
-    } finally {
+      setLoadError(error?.message || 'Failed to load organization. Please try again.');
       setLoading(false);
     }
   };
@@ -404,7 +470,7 @@ export default function OrganizationProfile() {
       const { error: orgError } = await supabase
         .from('businesses')
         .update({ logo_url: selectedImage.large_url || selectedImage.image_url })
-        .eq('id', id);
+        .eq('id', organizationId);
 
       if (orgError) throw orgError;
 
@@ -434,7 +500,7 @@ export default function OrganizationProfile() {
           body: JSON.stringify({
             imageId: image.id,
             imageUrl: image.image_url,
-            organizationId: id
+            organizationId: organizationId
           })
         }
       );
@@ -485,7 +551,7 @@ export default function OrganizationProfile() {
         .select('id')
         .eq('user_id', session.user.id)
         .eq('organization_id', organization.id)
-        .in('status', ['pending', 'approved'])
+        .or('status.eq.pending,status.eq.approved')
         .maybeSingle();
 
       if (existing) {
@@ -523,10 +589,32 @@ export default function OrganizationProfile() {
     }
   };
 
+  // Safety check - if we've been loading for too long, show error
+  useEffect(() => {
+    if (loading && organizationId) {
+      const timeout = setTimeout(() => {
+        console.error('[OrgProfile] Loading timeout - forcing error state');
+        setLoadError('Loading took too long. The organization may be private or the server is slow.');
+        setLoading(false);
+      }, 10000);
+      return () => clearTimeout(timeout);
+    }
+  }, [loading, organizationId]);
+
   if (loading) {
     return (
       <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
         <div className="text">Loading organization...</div>
+        {!organizationId && (
+          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '8pt' }}>
+            No organization ID found in URL
+          </div>
+        )}
+        {loadError && (
+          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '8pt' }}>
+            {loadError}
+          </div>
+        )}
       </div>
     );
   }
@@ -535,6 +623,11 @@ export default function OrganizationProfile() {
     return (
       <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
         <div className="text">Organization not found</div>
+        {loadError && (
+          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '8pt' }}>
+            {loadError}
+          </div>
+        )}
         <button
           onClick={() => navigate('/organizations')}
           className="button button-secondary"
@@ -709,7 +802,7 @@ export default function OrganizationProfile() {
           <>
             {/* GitHub-Style Activity Heatmap */}
             <div style={{ marginBottom: '16px' }}>
-              <OrganizationTimelineHeatmap organizationId={id!} />
+              <OrganizationTimelineHeatmap organizationId={organizationId!} />
             </div>
 
             {/* Detailed Event Cards */}
@@ -873,7 +966,7 @@ export default function OrganizationProfile() {
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
                   Browse previously sold vehicles with sale prices and platform information. Perfect for market research and value references.
                 </div>
-                <SoldInventoryBrowser organizationId={id!} />
+                <SoldInventoryBrowser organizationId={organizationId!} />
               </div>
             </div>
 
@@ -1046,12 +1139,20 @@ export default function OrganizationProfile() {
         )}
 
         {activeTab === 'vehicles' && (
-          <EnhancedDealerInventory
-            organizationId={id}
-            userId={session?.user?.id || null}
-            canEdit={canEdit}
-            isOwner={isOwner}
-          />
+          <>
+            {session?.user && (
+              <OrganizationNotifications
+                organizationId={organizationId!}
+                userId={session.user.id}
+              />
+            )}
+            <EnhancedDealerInventory
+              organizationId={organizationId!}
+              userId={session?.user?.id || null}
+              canEdit={canEdit}
+              isOwner={isOwner}
+            />
+          </>
         )}
 
         {activeTab === 'images' && (

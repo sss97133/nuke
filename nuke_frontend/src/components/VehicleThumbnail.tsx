@@ -87,9 +87,9 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
         try {
           const { data, error } = await supabase
             .from('vehicle_images')
-            .select('image_url, is_primary, variants')
+            .select('image_url, is_primary, variants, created_at, taken_at')
             .eq('vehicle_id', vehicleId)
-            .order('uploaded_at', { ascending: false })
+            .order('created_at', { ascending: false })
             .limit(5);
 
           if (error) {

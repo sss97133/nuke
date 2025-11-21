@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../lib/supabase';
 import AddEventWizard from './AddEventWizard';
-import UniversalImageUpload from './UniversalImageUpload';
+import { UniversalImageUpload } from './UniversalImageUpload';
 import TimelineEventComments from './TimelineEventComments';
 import TimelineEventEditor from './TimelineEventEditor';
 import { TechnicianWorkTimeline } from './TechnicianWorkTimeline';
@@ -122,7 +122,7 @@ const VehicleTimeline: React.FC<{
           .select('role')
           .eq('user_id', user.id)
           .eq('vehicle_id', vehicleId)
-          .single();
+          .maybeSingle();
 
         if (roleData) {
           setUserVehicleRole(roleData.role);
@@ -749,23 +749,43 @@ const VehicleTimeline: React.FC<{
         {/* Image Lightbox for Grid Popup - USING PORTAL TO ESCAPE TIMELINE DIV */}
         {popupImageUrl && ReactDOM.createPortal(
           <div
-            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center"
-            style={{ zIndex: 10002, overflow: 'hidden' }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.85)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10002,
+              overflow: 'hidden'
+            }}
             onClick={() => setPopupImageUrl(null)}
           >
-            <div className="relative max-w-4xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div style={{ position: 'relative', maxWidth: '1200px', width: '100%', margin: '0 16px' }} onClick={(e) => e.stopPropagation()}>
               <img
                 src={popupImageUrl}
                 alt="Event image"
-                style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '6px' }}
+                style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: 'var(--radius)' }}
               />
               <button
-                className="button button-secondary"
                 onClick={() => setPopupImageUrl(null)}
-                style={{ position: 'absolute', top: 8, right: 8 }}
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  padding: '6px 12px',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  background: 'rgba(42, 42, 42, 0.85)',
+                  color: '#ffffff',
+                  borderRadius: 'var(--radius)',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'var(--transition)'
+                }}
                 title="Close"
               >
-                ×
+                CLOSE
               </button>
             </div>
           </div>,
@@ -776,36 +796,50 @@ const VehicleTimeline: React.FC<{
         {showDeleteConfirm && ReactDOM.createPortal(
           <div style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000
           }}>
             <div style={{
-              backgroundColor: 'white',
-              padding: '24px',
-              borderRadius: '8px',
+              background: 'var(--surface)',
+              padding: 'var(--space-4)',
+              borderRadius: 'var(--radius)',
               maxWidth: '400px',
-              width: '90%'
+              width: '90%',
+              border: '2px solid var(--border)'
             }}>
-              <h4 style={{ marginBottom: '16px' }}>Confirm Delete</h4>
-              <p style={{ marginBottom: '20px', color: '#666' }}>
+              <h4 style={{ 
+                marginBottom: 'var(--space-3)', 
+                fontSize: '11px', 
+                fontWeight: 700,
+                color: 'var(--text)' 
+              }}>
+                Confirm Delete
+              </h4>
+              <p style={{ 
+                marginBottom: 'var(--space-4)', 
+                color: 'var(--text-secondary)',
+                fontSize: '9px',
+                lineHeight: '1.4'
+              }}>
                 Are you sure you want to delete this event? This action cannot be undone.
               </p>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setShowDeleteConfirm(null)}
                   style={{
-                    padding: '8px 16px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    cursor: 'pointer'
+                    padding: '6px 12px',
+                    border: '2px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'var(--transition)'
                   }}
                 >
                   Cancel
@@ -813,12 +847,15 @@ const VehicleTimeline: React.FC<{
                 <button
                   onClick={() => handleDeleteEvent(showDeleteConfirm)}
                   style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#dc2626',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
+                    padding: '6px 12px',
+                    background: 'var(--error)',
+                    color: '#ffffff',
+                    border: '2px solid var(--error)',
+                    borderRadius: 'var(--radius)',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'var(--transition)'
                   }}
                 >
                   Delete Event

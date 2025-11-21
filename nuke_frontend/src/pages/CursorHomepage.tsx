@@ -12,6 +12,9 @@ interface HypeVehicle {
   model?: string;
   current_value?: number;
   purchase_price?: number;
+  sale_price?: number;
+  asking_price?: number;
+  display_price?: number; // Computed smart price
   roi_pct?: number;
   image_count?: number;
   event_count?: number;
@@ -205,10 +208,11 @@ const CursorHomepage: React.FC = () => {
       const timeFilter = getTimePeriodFilter();
 
       // OPTIMIZED: Single query with LEFT join (includes vehicles without images)
+      // Now includes all price fields for smart pricing hierarchy
       let query = supabase
         .from('vehicles')
         .select(`
-          id, year, make, model, current_value, purchase_price, view_count, created_at, updated_at, mileage, vin,
+          id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, view_count, created_at, updated_at, mileage, vin,
           vehicle_images(id, thumbnail_url, medium_url, image_url, is_primary, created_at)
         `)
         .eq('is_public', true)
@@ -241,8 +245,21 @@ const CursorHomepage: React.FC = () => {
           })
           .slice(0, 5); // Limit to 5 for performance
 
-          const roi = v.current_value && v.purchase_price
-            ? ((v.current_value - v.purchase_price) / v.purchase_price) * 100
+          // SMART PRICING: Use hierarchy (sale_price > asking_price > current_value)
+          // Priority: actual sale > owner asking > estimated value
+          // Convert to numbers and handle nulls explicitly
+          const salePrice = v.sale_price ? Number(v.sale_price) : 0;
+          const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
+          const currentValue = v.current_value ? Number(v.current_value) : 0;
+          
+          const displayPrice = salePrice > 0 
+            ? salePrice 
+            : askingPrice > 0
+            ? askingPrice
+            : currentValue;
+
+          const roi = displayPrice && v.purchase_price
+            ? ((displayPrice - v.purchase_price) / v.purchase_price) * 100
             : 0;
 
           const activity7d = 0; // Removed for performance
@@ -290,6 +307,7 @@ const CursorHomepage: React.FC = () => {
 
           return {
             ...v,
+            display_price: displayPrice, // Add smart price for display
             roi_pct: roi,
             image_count: totalImages,
             event_count: activity7d,
@@ -305,7 +323,7 @@ const CursorHomepage: React.FC = () => {
       const sorted = enriched.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
       setFeedVehicles(sorted);
 
-      const totalValue = enriched.reduce((sum, v) => sum + (v.current_value || 0), 0);
+      const totalValue = enriched.reduce((sum, v) => sum + (v.display_price || 0), 0);
       const activeCount = enriched.filter(v => (v.activity_7d || 0) > 0).length;
 
       setStats({
@@ -337,10 +355,10 @@ const CursorHomepage: React.FC = () => {
       ));
     }
     if (filters.priceMin) {
-      result = result.filter(v => (v.current_value || 0) >= filters.priceMin!);
+      result = result.filter(v => (v.display_price || 0) >= filters.priceMin!);
     }
     if (filters.priceMax) {
-      result = result.filter(v => (v.current_value || 0) <= filters.priceMax!);
+      result = result.filter(v => (v.display_price || 0) <= filters.priceMax!);
     }
     if (filters.hasImages) {
       result = result.filter(v => (v.image_count || 0) > 0);
@@ -387,10 +405,10 @@ const CursorHomepage: React.FC = () => {
         );
         break;
       case 'price_high':
-        result.sort((a, b) => (b.current_value || 0) - (a.current_value || 0));
+        result.sort((a, b) => (b.display_price || 0) - (a.display_price || 0));
         break;
       case 'price_low':
-        result.sort((a, b) => (a.current_value || 0) - (b.current_value || 0));
+        result.sort((a, b) => (a.display_price || 0) - (b.display_price || 0));
         break;
       case 'volume':
         // TODO: Add trading volume data from share_holdings table
@@ -1037,8 +1055,8 @@ const CursorHomepage: React.FC = () => {
                         borderRight: '1px solid var(--border)',
                         whiteSpace: 'nowrap'
                       }}>
-                        {vehicle.current_value 
-                          ? `$${vehicle.current_value.toLocaleString()}` 
+                        {vehicle.display_price 
+                          ? `$${vehicle.display_price.toLocaleString()}` 
                           : '—'
                         }
                       </td>

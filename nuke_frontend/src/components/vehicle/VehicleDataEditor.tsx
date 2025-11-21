@@ -57,20 +57,26 @@ export function VehicleDataEditor({ vehicleId, onClose }: VehicleDataEditorProps
         return;
       }
 
-      // Update in database
-      const { data, error } = await supabase
+      // Store previous state for rollback
+      const previousData = { ...vehicleData };
+
+      // Optimistic update - update local state immediately
+      setVehicleData({ ...vehicleData, ...updates });
+
+      // Update in database - don't wait for full record fetch
+      const { error } = await supabase
         .from('vehicles')
         .update(updates)
-        .eq('id', vehicleId)
-        .select()
-        .single();
+        .eq('id', vehicleId);
 
       if (error) {
+        // Rollback on error
+        setVehicleData(previousData);
         throw error;
       }
 
       setMessage('Saved successfully');
-      setVehicleData(data);
+      setIsSaving(false);
       
       // Auto-close message after 2 seconds
       setTimeout(() => setMessage(''), 2000);

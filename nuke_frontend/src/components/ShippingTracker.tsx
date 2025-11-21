@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getShippingStatus, getShippingEvents, ShippingEvent } from '../services/shippingService';
+import { getShippingStatus, getShippingEvents } from '../services/shippingService';
+import type { ShippingEvent } from '../services/shippingService';
 
 interface ShippingTrackerProps {
   transactionId: string;

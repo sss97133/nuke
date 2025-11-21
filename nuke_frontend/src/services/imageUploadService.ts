@@ -357,15 +357,16 @@ export class ImageUploadService {
   /**
    * Trigger background AI analysis (non-blocking)
    * This runs async so upload feels fast
+   * Now uses analyze-image which includes Rekognition + Appraiser Brain + SPID extraction
    */
   private static triggerBackgroundAIAnalysis(imageUrl: string, vehicleId: string, imageId: string): void {
     // Fire and forget - don't await this
-    supabase.functions.invoke('auto-analyze-upload', {
+    // Use analyze-image function which has full pipeline: Rekognition + Appraiser + SPID
+    supabase.functions.invoke('analyze-image', {
       body: {
         image_url: imageUrl,
         vehicle_id: vehicleId,
-        image_id: imageId,
-        trigger_source: 'upload'
+        timeline_event_id: null
       }
     }).then(({ data, error }) => {
       if (error) {

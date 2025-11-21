@@ -1,14 +1,11 @@
 /**
  * Instagram/Twitter-Level Smooth Fullscreen Image Viewer
- * Buttery smooth swipes, pinch zoom, momentum scrolling
+ * Vertical scrolling with thumb-friendly navigation
+ * Swipe right = comment, swipe left = exit
  */
 
-import React, { useState, useEffect } from 'react';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Zoom, Virtual } from 'swiper/modules';
-import 'swiper/css';
-import 'swiper/css/zoom';
-import 'swiper/css/virtual';
+import React, { useState, useEffect, useRef } from 'react';
+import { MobileCommentBox } from './MobileCommentBox';
 
 interface SmoothFullscreenViewerProps {
   images: any[];
@@ -28,15 +25,98 @@ export const SmoothFullscreenViewer: React.FC<SmoothFullscreenViewerProps> = ({
   session,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [showControls, setShowControls] = useState(true);
+  const [showComment, setShowComment] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isScrollingRef = useRef(false);
+
   const currentImage = images[currentIndex];
   const isOwner = currentImage?.uploaded_by === session?.user?.id;
 
-  // Auto-hide controls after 3 seconds
+  // Scroll to initial image on mount
   useEffect(() => {
-    const timer = setTimeout(() => setShowControls(false), 3000);
-    return () => clearTimeout(timer);
-  }, [currentIndex]);
+    if (scrollContainerRef.current) {
+      const targetElement = scrollContainerRef.current.children[initialIndex] as HTMLElement;
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'instant', block: 'center' });
+      }
+    }
+  }, []);
+
+  // Handle scroll to update current index
+  const handleScroll = () => {
+    if (isScrollingRef.current) return;
+    
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const children = Array.from(container.children) as HTMLElement[];
+    const containerRect = container.getBoundingClientRect();
+    const containerCenter = containerRect.top + containerRect.height / 2;
+
+    let closestIndex = 0;
+    let closestDistance = Infinity;
+
+    children.forEach((child, index) => {
+      const childRect = child.getBoundingClientRect();
+      const childCenter = childRect.top + childRect.height / 2;
+      const distance = Math.abs(childCenter - containerCenter);
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = index;
+      }
+    });
+
+    if (closestIndex !== currentIndex) {
+      setCurrentIndex(closestIndex);
+    }
+  };
+
+  // Handle touch gestures
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+    isScrollingRef.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    
+    const deltaX = e.touches[0].clientX - touchStartRef.current.x;
+    const deltaY = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
+    
+    // If vertical scroll is significant, mark as scrolling
+    if (deltaY > 10) {
+      isScrollingRef.current = true;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+
+    const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+    const absDeltaX = Math.abs(deltaX);
+
+    // Only handle horizontal swipes if not scrolling vertically
+    if (!isScrollingRef.current && absDeltaX > 50 && absDeltaX > deltaY * 2) {
+      if (deltaX > 0) {
+        // Swipe right = show comment
+        setShowComment(true);
+      } else {
+        // Swipe left = exit
+        onClose();
+      }
+    }
+
+    touchStartRef.current = null;
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 100);
+  };
 
   const handleDelete = () => {
     if (!isOwner) {
@@ -50,7 +130,12 @@ export const SmoothFullscreenViewer: React.FC<SmoothFullscreenViewerProps> = ({
   };
 
   return (
-    <div style={styles.fullscreen} onClick={() => setShowControls(true)}>
+    <div 
+      style={styles.fullscreen}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Close button - Always visible */}
       <button onClick={onClose} style={styles.closeBtn}>
         ✕
@@ -61,158 +146,61 @@ export const SmoothFullscreenViewer: React.FC<SmoothFullscreenViewerProps> = ({
         {currentIndex + 1} / {images.length}
       </div>
 
-      {/* Swiper - Buttery smooth */}
-      <Swiper
-        modules={[Zoom, Virtual]}
-        initialSlide={initialIndex}
-        spaceBetween={0}
-        slidesPerView={1}
-        speed={250} // Fast but smooth
-        touchRatio={1.5} // Very responsive
-        resistance={true}
-        resistanceRatio={0.65}
-        threshold={3} // Very sensitive
-        virtual={true} // Only render visible slides + 2 on each side
-        zoom={{
-          maxRatio: 4,
-          minRatio: 1,
-          toggle: true, // Double tap to zoom
-        }}
-        onSlideChange={(swiper) => {
-          setCurrentIndex(swiper.activeIndex);
-          setShowControls(true);
-        }}
-        style={styles.swiper}
+      {/* Vertical Scroll Container */}
+      <div
+        ref={scrollContainerRef}
+        style={styles.scrollContainer}
+        onScroll={handleScroll}
       >
         {images.map((image, index) => (
-          <SwiperSlide key={image.id} virtualIndex={index}>
-            <div className="swiper-zoom-container" style={styles.slideContainer}>
-              <img
-                src={image.large_url || image.image_url}
-                alt=""
-                style={styles.image}
-                draggable={false}
-              />
-            </div>
-          </SwiperSlide>
+          <div key={image.id} style={styles.imageWrapper}>
+            <img
+              src={image.large_url || image.image_url}
+              alt=""
+              style={styles.image}
+              draggable={false}
+            />
+          </div>
         ))}
-      </Swiper>
+      </div>
 
-      {/* Controls - Fade in/out */}
-      {showControls && (
-        <div style={styles.controls}>
-          {/* Navigation arrows */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (currentIndex > 0) {
-                setCurrentIndex(currentIndex - 1);
-              }
-            }}
-            disabled={currentIndex === 0}
-            style={{
-              ...styles.navBtn,
-              ...styles.navBtnLeft,
-              opacity: currentIndex === 0 ? 0.3 : 1,
-            }}
-          >
-            ←
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (currentIndex < images.length - 1) {
-                setCurrentIndex(currentIndex + 1);
-              }
-            }}
-            disabled={currentIndex === images.length - 1}
-            style={{
-              ...styles.navBtn,
-              ...styles.navBtnRight,
-              opacity: currentIndex === images.length - 1 ? 0.3 : 1,
-            }}
-          >
-            →
-          </button>
-
-          {/* Bottom toolbar */}
-          <div style={styles.toolbar}>
-            {/* Image info */}
-            <div style={styles.imageInfo}>
-              {currentImage.metadata?.taken_at && (
-                <span style={styles.infoText}>
-                  {new Date(currentImage.metadata.taken_at).toLocaleDateString()}
-                </span>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div style={styles.actions}>
-              {isOwner && (
-                <button onClick={handleDelete} style={styles.actionBtn}>
-                  DELETE
-                </button>
-              )}
-            </div>
+      {/* Comment Panel - Slides in from right */}
+      {showComment && (
+        <div style={styles.commentPanel}>
+          <div style={styles.commentHeader}>
+            <button onClick={() => setShowComment(false)} style={styles.commentCloseBtn}>
+              ✕
+            </button>
+            <div style={styles.commentTitle}>Comments</div>
+          </div>
+          <div style={styles.commentContent}>
+            <MobileCommentBox
+              vehicleId={vehicleId}
+              session={session}
+              targetType="image"
+              targetId={currentImage.id}
+            />
           </div>
         </div>
       )}
 
-      {/* Swipe hint - Fade out after first swipe */}
-      {currentIndex === initialIndex && (
-        <div style={styles.hint}>
-          Swipe • Pinch to zoom • Double tap
+      {/* Bottom toolbar - Only show when not commenting */}
+      {!showComment && (
+        <div style={styles.toolbar}>
+          {isOwner && (
+            <button onClick={handleDelete} style={styles.actionBtn}>
+              DELETE
+            </button>
+          )}
         </div>
       )}
 
-      <style>{`
-        /* Smooth Swiper overrides */
-        .swiper {
-          --swiper-theme-color: #00ff00;
-        }
-        
-        .swiper-slide {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-        }
-
-        .swiper-zoom-container {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        /* Pagination dots - minimalist */
-        .swiper-pagination-bullet {
-          background: rgba(255, 255, 255, 0.5);
-          opacity: 1;
-          width: 6px;
-          height: 6px;
-        }
-
-        .swiper-pagination-bullet-active {
-          background: #00ff00;
-          width: 8px;
-          height: 8px;
-        }
-
-        /* Momentum scrolling for iOS */
-        .swiper-wrapper {
-          -webkit-overflow-scrolling: touch;
-        }
-
-        /* Performance boost */
-        .swiper-slide img {
-          will-change: transform;
-          -webkit-transform: translateZ(0);
-          transform: translateZ(0);
-        }
-      `}</style>
+      {/* Swipe hint */}
+      {currentIndex === initialIndex && !showComment && (
+        <div style={styles.hint}>
+          Scroll up/down • Swipe right for comments • Swipe left to exit
+        </div>
+      )}
     </div>
   );
 };
@@ -228,7 +216,8 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 9999,
     display: 'flex',
     flexDirection: 'column',
-    touchAction: 'none', // Prevent default gestures
+    touchAction: 'pan-y', // Allow vertical scrolling
+    overflow: 'hidden',
   },
   closeBtn: {
     position: 'absolute',
@@ -239,7 +228,8 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(0, 0, 0, 0.6)',
     border: '2px solid rgba(255, 255, 255, 0.3)',
     color: '#fff',
-    fontSize: '24px',
+    fontSize: '8pt',
+    fontWeight: 700,
     cursor: 'pointer',
     zIndex: 10001,
     borderRadius: '50%',
@@ -256,21 +246,28 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(0, 0, 0, 0.6)',
     color: '#fff',
     padding: '8px 12px',
-    fontSize: '14px',
+    fontSize: '8pt',
     borderRadius: '20px',
     zIndex: 10001,
-    fontFamily: 'monospace',
+    fontFamily: 'var(--font-mono)',
   },
-  swiper: {
-    width: '100%',
-    height: '100%',
-  } as React.CSSProperties,
-  slideContainer: {
-    width: '100%',
-    height: '100%',
+  scrollContainer: {
+    flex: 1,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
+    scrollSnapType: 'y mandatory',
+    scrollBehavior: 'smooth',
+  },
+  imageWrapper: {
+    width: '100vw',
+    height: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    scrollSnapAlign: 'center',
+    scrollSnapStop: 'always',
+    position: 'relative',
   },
   image: {
     maxWidth: '100%',
@@ -279,41 +276,6 @@ const styles: Record<string, React.CSSProperties> = {
     userSelect: 'none',
     WebkitUserSelect: 'none',
     WebkitTouchCallout: 'none',
-    pointerEvents: 'none', // Let Swiper handle all interactions
-  },
-  controls: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    pointerEvents: 'none', // Let swipes pass through
-    zIndex: 10000,
-  },
-  navBtn: {
-    position: 'absolute',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'rgba(0, 0, 0, 0.5)',
-    border: 'none',
-    color: '#fff',
-    fontSize: '32px',
-    width: '50px',
-    height: '80px',
-    cursor: 'pointer',
-    pointerEvents: 'all', // Re-enable for buttons
-    transition: 'all 0.15s ease',
-    WebkitTapHighlightColor: 'transparent',
-  },
-  navBtnLeft: {
-    left: 0,
-    borderTopRightRadius: '8px',
-    borderBottomRightRadius: '8px',
-  },
-  navBtnRight: {
-    right: 0,
-    borderTopLeftRadius: '8px',
-    borderBottomLeftRadius: '8px',
   },
   toolbar: {
     position: 'absolute',
@@ -321,30 +283,18 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     background: 'linear-gradient(transparent, rgba(0, 0, 0, 0.8))',
-    padding: '60px 16px 16px 16px',
+    padding: '16px',
     pointerEvents: 'all',
-  },
-  imageInfo: {
-    marginBottom: '12px',
-  },
-  infoText: {
-    color: '#fff',
-    fontSize: '13px',
-    fontFamily: 'monospace',
-  },
-  actions: {
-    display: 'flex',
-    gap: '8px',
-    justifyContent: 'flex-end',
+    zIndex: 10000,
   },
   actionBtn: {
     background: '#ff0000',
     color: '#fff',
     border: 'none',
     padding: '10px 20px',
-    fontSize: '12px',
-    fontWeight: 'bold',
-    borderRadius: '6px',
+    fontSize: '8pt',
+    fontWeight: 700,
+    borderRadius: 'var(--radius)',
     cursor: 'pointer',
     transition: 'all 0.1s ease',
     WebkitTapHighlightColor: 'transparent',
@@ -358,10 +308,69 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#fff',
     padding: '10px 16px',
     borderRadius: '20px',
-    fontSize: '13px',
+    fontSize: '8pt',
     zIndex: 10002,
     pointerEvents: 'none',
     animation: 'fadeOut 3s forwards',
+    textAlign: 'center',
+    fontFamily: 'var(--font-family)',
+  },
+  commentPanel: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '80%',
+    maxWidth: '400px',
+    background: 'var(--bg)',
+    zIndex: 10003,
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.5)',
+    animation: 'slideInRight 0.3s ease',
+  },
+  commentHeader: {
+    padding: 'var(--space-4)',
+    borderBottom: '2px solid var(--border)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'var(--space-3)',
+  },
+  commentCloseBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '20px',
+    cursor: 'pointer',
+    color: 'var(--text)',
+    padding: 0,
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentTitle: {
+    fontSize: '8pt',
+    fontWeight: 700,
+    color: 'var(--text)',
+  },
+  commentContent: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: 'var(--space-4)',
   },
 };
 
+// Add animations
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes fadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes slideInRight {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(0); }
+  }
+`;
+document.head.appendChild(styleSheet);
