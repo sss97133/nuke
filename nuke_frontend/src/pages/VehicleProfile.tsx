@@ -47,7 +47,7 @@ const WORKSPACE_TABS = [
 ] as const;
 
 type WorkspaceTabId = typeof WORKSPACE_TABS[number]['id'];
-import ImageGalleryV2 from '../components/image/ImageGalleryV2';
+import ImageGallery from '../components/images/ImageGallery';
 import { UniversalImageUpload } from '../components/UniversalImageUpload';
 
 const VehicleProfile: React.FC = () => {
@@ -1343,13 +1343,13 @@ const VehicleProfile: React.FC = () => {
               </div>
             </section>
             <section className="section">
-              <ImageGalleryV2
+              <ImageGallery
                 vehicleId={vehicle.id}
-                vehicleYMM={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
                 onImagesUpdated={() => {
                   loadVehicle();
                   loadTimelineEvents();
                 }}
+                showUpload={Boolean(session?.user?.id)}
               />
             </section>
           </>
