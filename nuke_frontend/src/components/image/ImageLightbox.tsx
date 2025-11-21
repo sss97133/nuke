@@ -970,9 +970,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                       })
                     )}
                   </div>
-                  <div className="mt-auto pt-4 border-t border-white/10">
+                  <div className="mt-auto pt-4 border-t-2 border-white/20">
                     <input
-                      className="w-full bg-black/50 border border-white/20 rounded p-2 text-sm text-white mb-2"
+                      className="w-full bg-[#1a1a1a] border-2 border-white/30 text-white text-[10px] p-3 mb-3 transition-all duration-150 focus:border-white focus:outline-none focus:shadow-[0_0_0_3px_rgba(255,255,255,0.1)] placeholder:text-white/40"
+                      style={{ fontFamily: 'Arial, sans-serif' }}
                       placeholder="Add a comment..."
                       value={newComment}
                       onChange={e => setNewComment(e.target.value)}
@@ -981,9 +982,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     <button 
                       onClick={addComment}
                       disabled={!newComment.trim()}
-                      className="w-full py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                      className="w-full py-2.5 bg-white text-black border-2 border-white text-[10px] font-bold uppercase tracking-wide hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 hover:translate-y-[-2px] hover:shadow-[0_0_0_3px_rgba(255,255,255,0.2)]"
+                      style={{ fontFamily: 'Arial, sans-serif' }}
                     >
-                      Post Comment
+                      POST COMMENT
                     </button>
                   </div>
         </div>
