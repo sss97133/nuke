@@ -88,7 +88,7 @@ export class TagService {
   static async getTagsForImage(imageId: string): Promise<Tag[]> {
     const { data, error } = await supabase
       .from('vehicle_image_tags')
-      .select('*, vehicle_images!inner(vehicle_id)')
+      .select('*, vehicle_images(vehicle_id)')
       .eq('image_id', imageId)
       .order('created_at', { ascending: false });
 
@@ -104,10 +104,20 @@ export class TagService {
    * Get all tags for a vehicle (via image join)
    */
   static async getTagsForVehicle(vehicleId: string): Promise<Tag[]> {
+    // First get all images for the vehicle, then get tags
+    const { data: images } = await supabase
+      .from('vehicle_images')
+      .select('id')
+      .eq('vehicle_id', vehicleId);
+
+    if (!images || images.length === 0) return [];
+
+    const imageIds = images.map(img => img.id);
+
     const { data, error } = await supabase
       .from('vehicle_image_tags')
-      .select('*, vehicle_images!inner(vehicle_id)')
-      .eq('vehicle_images.vehicle_id', vehicleId)
+      .select('*, vehicle_images(vehicle_id)')
+      .in('image_id', imageIds)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -184,7 +194,7 @@ export class TagService {
         y_position: yPos,
         created_by: userId
       })
-      .select('*, vehicle_images!inner(vehicle_id)')
+      .select('*, vehicle_images(vehicle_id)')
       .single();
 
     if (error) {
