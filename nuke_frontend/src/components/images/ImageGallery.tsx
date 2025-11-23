@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ImageUploadService } from '../../services/imageUploadService';
 import { globalUploadStatusService } from '../../services/globalUploadStatusService';
+import { uploadQueueService } from '../../services/uploadQueueService';
 import { sortImagesByPriority } from '../../services/imageDisplayPriority';
 import ImageLightbox from '../image/ImageLightbox';
 import { SensitiveImageOverlay } from './SensitiveImageOverlay';
@@ -44,6 +45,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   const [autoLoad, setAutoLoad] = useState(false);
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{total: number, completed: number, uploading: boolean}>({total: 0, completed: 0, uploading: false});
+  const [queueStats, setQueueStats] = useState<{pending: number, failed: number} | null>(null);
   const [imageCommentCounts, setImageCommentCounts] = useState<Record<string, number>>({});
   const [imageUploaderNames, setImageUploaderNames] = useState<Record<string, string>>({});
   const [imageTagTextsById, setImageTagTextsById] = useState<Record<string, string[]>>({});
@@ -190,6 +192,12 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         const initialBatch = Math.min(50, sorted.length);
         setDisplayedImages(sorted.slice(0, initialBatch));
         setShowImages(true);
+        
+        // Check for pending uploads in queue
+        const stats = await uploadQueueService.getQueueStats(vehicleId);
+        if (stats.pending > 0 || stats.failed > 0) {
+          setQueueStats(stats);
+        }
       } catch (err) {
         console.error('Error fetching vehicle images:', err);
         setError('Failed to load vehicle images. Please try again.');
@@ -227,32 +235,64 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
 
     const fileArray = Array.from(files);
     
+    // Save files to persistent queue FIRST
+    await uploadQueueService.addFiles(vehicleId, fileArray);
+    console.log(`Saved ${fileArray.length} files to upload queue`);
+    
+    // Start upload from queue
+    await uploadFromQueue();
+  };
+
+  const uploadFromQueue = async () => {
+    if (!session?.user?.id) return;
+    
+    // Get pending files from queue
+    const pendingFiles = await uploadQueueService.getPendingFiles(vehicleId);
+    if (pendingFiles.length === 0) {
+      console.log('No pending files in queue');
+      setQueueStats(null);
+      return;
+    }
+    
+    console.log(`Uploading ${pendingFiles.length} files from queue`);
+    
     // Create global upload job for header status bar
-    const jobId = globalUploadStatusService.createJob(vehicleId, fileArray.length);
+    const jobId = globalUploadStatusService.createJob(vehicleId, pendingFiles.length);
     
     // Keep local progress for component-specific UI
-    setUploadProgress({total: fileArray.length, completed: 0, uploading: true});
+    setUploadProgress({total: pendingFiles.length, completed: 0, uploading: true});
 
     const errors: string[] = [];
     const uploadedImageIds: string[] = [];
 
     try {
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i];
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const queuedFile = pendingFiles[i];
+        
+        if (!queuedFile.file) {
+          console.warn(`File object missing for ${queuedFile.name}, skipping`);
+          await uploadQueueService.updateStatus(queuedFile.id, 'failed', { error: 'File object missing' });
+          continue;
+        }
+        
+        // Mark as uploading
+        await uploadQueueService.updateStatus(queuedFile.id, 'uploading');
         
         // Use centralized upload service (handles EXIF, variants, timeline, AI)
         const result = await ImageUploadService.uploadImage(
           vehicleId,
-          file,
+          queuedFile.file,
           'general'
         );
         
         if (!result.success) {
           console.error('Upload failed:', result.error);
-          errors.push(`${file.name}: ${result.error}`);
+          errors.push(`${queuedFile.name}: ${result.error}`);
+          await uploadQueueService.updateStatus(queuedFile.id, 'failed', { error: result.error });
         } else if (result.imageId) {
           // Track successful uploads for AI processing
           uploadedImageIds.push(result.imageId);
+          await uploadQueueService.updateStatus(queuedFile.id, 'completed', { imageId: result.imageId });
         }
 
         // Update both local and global progress
@@ -293,6 +333,13 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
       setDisplayedImages(sortedImages.slice(0, Math.max(displayedImages.length, imagesPerPage)));
       
       onImagesUpdated?.();
+      
+      // Clear completed files from queue
+      await uploadQueueService.clearCompleted(vehicleId);
+      
+      // Update queue stats
+      const stats = await uploadQueueService.getQueueStats(vehicleId);
+      setQueueStats(stats.pending > 0 || stats.failed > 0 ? stats : null);
 
     } catch (error) {
       console.error('Upload failed:', error);
@@ -825,26 +872,44 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
           {/* Upload Button & Image Count */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
             {showUpload && (
-              <div style={{ position: 'relative' }}>
-                <input
-                  id={`gallery-upload-${vehicleId}`}
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      handleFileUpload(e.target.files);
-                      e.target.value = '';
-                    }
-                  }}
-                  style={{ display: 'none' }}
-                />
-                <label htmlFor={`gallery-upload-${vehicleId}`}>
-                  <span className="button button-primary" style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-3)', display: 'inline-block', cursor: 'pointer' }}>
-                    Upload Images
-                  </span>
-                </label>
-              </div>
+              <>
+                {queueStats && (queueStats.pending > 0 || queueStats.failed > 0) && (
+                  <button
+                    onClick={uploadFromQueue}
+                    className="button cursor-button"
+                    style={{ 
+                      fontSize: '8pt', 
+                      padding: 'var(--space-1) var(--space-3)',
+                      border: '2px solid var(--warning)',
+                      background: 'var(--warning-light)',
+                      color: 'var(--warning-dark)',
+                      fontWeight: 700
+                    }}
+                  >
+                    RESUME UPLOAD ({queueStats.pending + queueStats.failed} files)
+                  </button>
+                )}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id={`gallery-upload-${vehicleId}`}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        handleFileUpload(e.target.files);
+                        e.target.value = '';
+                      }
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                  <label htmlFor={`gallery-upload-${vehicleId}`}>
+                    <span className="button button-primary" style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-3)', display: 'inline-block', cursor: 'pointer' }}>
+                      Upload Images
+                    </span>
+                  </label>
+                </div>
+              </>
             )}
             <div className="text text-muted">
               {showImages ? `${displayedImages.length} of ${allImages.length}` : `${allImages.length} images available`}
