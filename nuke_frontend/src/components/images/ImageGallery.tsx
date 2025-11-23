@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ImageUploadService } from '../../services/imageUploadService';
+import { globalUploadStatusService } from '../../services/globalUploadStatusService';
+import { sortImagesByPriority } from '../../services/imageDisplayPriority';
 import ImageLightbox from '../image/ImageLightbox';
+import { SensitiveImageOverlay } from './SensitiveImageOverlay';
 
 interface ImageGalleryProps {
   vehicleId: string;
@@ -34,12 +37,12 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'masonry' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc'>('date_desc');
+  const [sortBy, setSortBy] = useState<'quality' | 'date_desc' | 'date_asc'>('quality'); // Default to quality (best first)
   const [showFilters, setShowFilters] = useState(false);
   const [showImages, setShowImages] = useState(false);
   const [imagesPerPage] = useState(25);
   const [autoLoad, setAutoLoad] = useState(false);
-  const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(false);
+  const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{total: number, completed: number, uploading: boolean}>({total: 0, completed: 0, uploading: false});
   const [imageCommentCounts, setImageCommentCounts] = useState<Record<string, number>>({});
   const [imageUploaderNames, setImageUploaderNames] = useState<Record<string, string>>({});
@@ -170,8 +173,9 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         setLoading(true);
         const { data: rawImages, error } = await supabase
           .from('vehicle_images')
-          .select('id, image_url, thumbnail_url, medium_url, large_url, is_primary, caption, created_at, taken_at, exif_data, user_id')
+          .select('id, image_url, thumbnail_url, medium_url, large_url, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category')
           .eq('vehicle_id', vehicleId)
+          .eq('is_document', false) // Filter out documents - they should be in a separate section
           .order('is_primary', { ascending: false });
 
         if (error) throw error;
@@ -222,7 +226,15 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
     }
 
     const fileArray = Array.from(files);
+    
+    // Create global upload job for header status bar
+    const jobId = globalUploadStatusService.createJob(vehicleId, fileArray.length);
+    
+    // Keep local progress for component-specific UI
     setUploadProgress({total: fileArray.length, completed: 0, uploading: true});
+
+    const errors: string[] = [];
+    const uploadedImageIds: string[] = [];
 
     try {
       for (let i = 0; i < fileArray.length; i++) {
@@ -237,18 +249,28 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         
         if (!result.success) {
           console.error('Upload failed:', result.error);
-          setError(`Upload failed: ${result.error}`);
-          throw new Error(result.error);
+          errors.push(`${file.name}: ${result.error}`);
+        } else if (result.imageId) {
+          // Track successful uploads for AI processing
+          uploadedImageIds.push(result.imageId);
         }
 
+        // Update both local and global progress
         setUploadProgress(prev => ({...prev, completed: i + 1}));
+        globalUploadStatusService.updateJobProgress(jobId, i + 1, errors.length, errors);
+      }
+
+      // Create AI processing job for successfully uploaded images
+      if (uploadedImageIds.length > 0) {
+        globalUploadStatusService.createProcessingJob(vehicleId, uploadedImageIds);
       }
 
       // Refresh images and notify parent
       const { data: refreshedImages } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, is_primary, caption, created_at, taken_at')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, is_primary, caption, created_at, taken_at, is_document, document_category')
         .eq('vehicle_id', vehicleId)
+        .eq('is_document', false) // Filter out documents
         .order('is_primary', { ascending: false });
 
       setAllImages(refreshedImages || []);
@@ -355,16 +377,62 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   };
 
   const getSortedImages = () => {
-    return allImages.sort((a, b) => {
-      if (sortBy === 'date_desc') {
-          const dateDescA = new Date(a.taken_at || a.created_at);
-          const dateDescB = new Date(b.taken_at || b.created_at);
-          return dateDescB.getTime() - dateDescA.getTime();
+    if (sortBy === 'quality') {
+      // Presentation sorting - best images first
+      // Try AI-based sorting first, fallback to heuristics if no angle data
+      try {
+        const sorted = sortImagesByPriority(allImages);
+        // Check if it actually sorted (has variety in positions)
+        if (sorted.length > 0) return sorted;
+      } catch (e) {
+        console.log('AI sorting unavailable, using heuristics');
       }
-          const dateAscA = new Date(a.taken_at || a.created_at);
-          const dateAscB = new Date(b.taken_at || b.created_at);
-          return dateAscA.getTime() - dateAscB.getTime();
-    });
+      
+      // Fallback: Smart heuristics when no AI angle data exists
+      return [...allImages].sort((a, b) => {
+        // Primary images always first
+        if (a.is_primary && !b.is_primary) return -1;
+        if (!a.is_primary && b.is_primary) return 1;
+        
+        // Category-based priority (exterior > interior > engine > other)
+        const catPriority: Record<string, number> = {
+          'exterior': 100,
+          'hero': 95,
+          'interior': 80,
+          'engine': 70,
+          'engine_bay': 70,
+          'undercarriage': 50,
+          'detail': 40,
+          'general': 30,
+          'work': 10,
+          'document': 5,
+          'receipt': -10
+        };
+        
+        const catA = catPriority[(a.category || 'general').toLowerCase()] || 20;
+        const catB = catPriority[(b.category || 'general').toLowerCase()] || 20;
+        
+        if (catA !== catB) return catB - catA;
+        
+        // Within same category, newer first
+        const dateA = new Date(a.taken_at || a.created_at).getTime();
+        const dateB = new Date(b.taken_at || a.created_at).getTime();
+        return dateB - dateA;
+      });
+    } else if (sortBy === 'date_desc') {
+      return [...allImages].sort((a, b) => {
+        const dateA = new Date(a.taken_at || a.created_at);
+        const dateB = new Date(b.taken_at || b.created_at);
+        return dateB.getTime() - dateA.getTime();
+      });
+    } else {
+      // date_asc
+      return [...allImages].sort((a, b) => {
+        const dateA = new Date(a.taken_at || a.created_at);
+        const dateB = new Date(b.taken_at || b.created_at);
+        return dateA.getTime() - dateB.getTime();
+      });
+    }
   };
 
   const handleUnloadImages = () => {
@@ -618,8 +686,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
           borderRadius: '0px',
           marginBottom: 'var(--space-3)'
         }}>
-          <div style={{ fontSize: '48px', marginBottom: 'var(--space-2)' }}>📷</div>
-          <p className="text" style={{ marginBottom: 'var(--space-2)', fontWeight: 700 }}>
+          <p className="text" style={{ marginBottom: 'var(--space-2)', fontWeight: 700, fontSize: '12pt' }}>
             No images yet
           </p>
           <p className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
@@ -695,7 +762,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
       <div className="card-header">
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-            {/* View Mode Toggle */}
+            {/* View Mode */}
             <div style={{ display: 'flex', border: '1px solid var(--border-medium)', backgroundColor: 'var(--white)' }}>
               <button
                 onClick={() => setViewMode('grid')}
@@ -720,15 +787,26 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
               </button>
             </div>
 
-            {/* Sort Options (chronological only) */}
+            {/* Sort Options */}
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'date_desc' | 'date_asc')}
+              onChange={(e) => {
+                const newSort = e.target.value as any;
+                if (newSort === 'quality') {
+                  // Check if images have angle classifications
+                  // For now, show toast that analysis is pending
+                  alert('⏳ Presentation sorting requires AI angle analysis.\n\nImages will be analyzed automatically on upload in the future.\n\nUsing newest first for now.');
+                  setSortBy('date_desc');
+                } else {
+                  setSortBy(newSort);
+                }
+              }}
               className="form-select"
               style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-2)' }}
             >
-              <option value="date_desc">Date (Newest)</option>
-              <option value="date_asc">Date (Oldest)</option>
+              <option value="quality">Best First (Presentation)</option>
+              <option value="date_desc">Newest First</option>
+              <option value="date_asc">Oldest First</option>
             </select>
           </div>
 
@@ -789,18 +867,14 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
               style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden', backgroundColor: 'var(--white)' }}
               onClick={() => openLightbox(index)}
             >
-              {/* Image Container */}
+              {/* Image Container with Sensitive Content Protection */}
               <div style={{ width: '100%', height: '150px', overflow: 'hidden', backgroundColor: 'var(--grey-100)' }}>
-                <img
-                  src={image.thumbnail_url || image.image_url}
-                  alt={image.caption || 'Vehicle image'}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    imageOrientation: 'from-image' // Preserve EXIF orientation
-                  }}
-                  loading="lazy"
+                <SensitiveImageOverlay
+                  imageId={image.id}
+                  vehicleId={vehicleId}
+                  imageUrl={image.thumbnail_url || image.image_url}
+                  isSensitive={image.is_sensitive || false}
+                  sensitiveType={image.sensitive_type}
                 />
               </div>
 
@@ -993,8 +1067,8 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
           onNext={displayedImages.length > 1 ? nextImage : undefined}
           onPrev={displayedImages.length > 1 ? previousImage : undefined}
           canEdit={canCreateTags}
-          title={currentImage.caption}
-          description={`${getDisplayDate(currentImage)} • ${currentImageIndex + 1} of ${displayedImages.length}`}
+          title={`${currentImageIndex + 1} of ${displayedImages.length}`}
+          description={getDisplayDate(currentImage)}
         />
       )}
     </div>
