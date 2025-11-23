@@ -112,17 +112,17 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         const docId = eventResult.data.metadata.document_id;
         setDocumentId(docId);
 
-        // Load document processing status
+        // Load document processing status from unified documents table
         const { data: document } = await supabase
-          .from('vehicle_documents')
-          .select('ai_processing_status, ai_extraction_confidence, document_url')
+          .from('documents')
+          .select('ai_processing_status, ai_extraction_confidence, file_url')
           .eq('id', docId)
           .single();
 
         if (document) {
           setProcessingStatus(document.ai_processing_status || 'pending');
           setExtractionConfidence(document.ai_extraction_confidence);
-          setDocumentUrl(document.document_url);
+          setDocumentUrl(document.file_url);
         }
 
         // Load extracted receipt items via receipts table
@@ -849,8 +849,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                   setProcessingStatus('processing');
                   try {
                     const { data: doc } = await supabase
-                      .from('vehicle_documents')
-                      .select('document_url, vehicle_id')
+                      .from('documents')
+                      .select('file_url, entity_id')
                       .eq('id', documentId)
                       .single();
                     
@@ -858,8 +858,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                       await supabase.functions.invoke('smart-receipt-linker', {
                         body: {
                           documentId,
-                          vehicleId: doc.vehicle_id,
-                          documentUrl: doc.document_url
+                          vehicleId: doc.entity_id,
+                          documentUrl: doc.file_url
                         }
                       });
                       
