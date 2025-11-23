@@ -33,6 +33,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
   const [loading, setLoading] = useState(true);
   const [receiptItems, setReceiptItems] = useState<any[]>([]);
   const [documentId, setDocumentId] = useState<string | null>(null);
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string>('pending');
   const [extractionConfidence, setExtractionConfidence] = useState<number | null>(null);
   const [showPerformerCard, setShowPerformerCard] = useState(false);
@@ -114,13 +115,14 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         // Load document processing status
         const { data: document } = await supabase
           .from('vehicle_documents')
-          .select('ai_processing_status, ai_extraction_confidence')
+          .select('ai_processing_status, ai_extraction_confidence, document_url')
           .eq('id', docId)
           .single();
 
         if (document) {
           setProcessingStatus(document.ai_processing_status || 'pending');
           setExtractionConfidence(document.ai_extraction_confidence);
+          setDocumentUrl(document.document_url);
         }
 
         // Load extracted receipt items via receipts table
@@ -477,32 +479,67 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         {documentId && processingStatus === 'processing' && (
           <div style={{
             padding: '12px 16px',
-            background: '#e0f2fe',
-            border: '1px solid #0ea5e9',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--accent)',
             margin: '0',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             gap: '8px',
             fontSize: '8pt'
           }}>
-            <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid #0ea5e9', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            <span>🤖 AI is extracting receipt data...</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="spinner" style={{ width: '12px', height: '12px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontWeight: 600, color: 'var(--accent)' }}>AI PROCESSING RECEIPT DATA...</span>
+            </div>
+            {documentUrl && (
+              <button
+                onClick={() => window.open(documentUrl, '_blank')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent)',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  fontSize: '8pt'
+                }}
+              >
+                VIEW SOURCE
+              </button>
+            )}
           </div>
         )}
 
         {documentId && processingStatus === 'completed' && extractionConfidence && (
           <div style={{
             padding: '12px 16px',
-            background: '#d1fae5',
-            border: '1px solid #10b981',
+            background: 'var(--success-light)',
+            border: '1px solid var(--success)',
             margin: '0',
             fontSize: '8pt',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            <span>✅ AI extraction complete</span>
-            <span style={{ color: 'var(--text-muted)' }}>Confidence: {Math.round(extractionConfidence * 100)}%</span>
+            <span style={{ fontWeight: 600, color: 'var(--success)' }}>AI EXTRACTION COMPLETE</span>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Confidence: {Math.round(extractionConfidence * 100)}%</span>
+              {documentUrl && (
+                <button
+                  onClick={() => window.open(documentUrl, '_blank')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--success)',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    fontSize: '8pt'
+                  }}
+                >
+                  VIEW SOURCE
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -774,20 +811,38 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         {receiptItems.length === 0 && !event.cost_amount && !event.duration_hours && !event.parts_used && (
           <div style={{
             padding: '16px',
-            background: '#fffbeb',
-            border: '2px solid #f59e0b',
+            background: 'var(--warning-light)',
+            border: '2px solid var(--warning)',
             margin: '16px',
             borderRadius: '0px'
           }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '4px' }}>
-              ⚠️ Incomplete Work Order
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '4px', color: 'var(--warning-dark)', textTransform: 'uppercase' }}>
+                  INCOMPLETE WORK ORDER
+                </div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                  {documentId && processingStatus === 'pending' 
+                    ? 'AI extraction pending - refresh to see extracted data'
+                    : 'Add cost, labor hours, or parts to complete this receipt'
+                  }
+                </div>
+              </div>
+              {documentUrl && (
+                <button
+                  onClick={() => window.open(documentUrl, '_blank')}
+                  className="button button-secondary cursor-button"
+                  style={{
+                    fontSize: '8pt',
+                    padding: '4px 8px',
+                    height: 'auto'
+                  }}
+                >
+                  VIEW SOURCE
+                </button>
+              )}
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
-              {documentId && processingStatus === 'pending' 
-                ? '🤖 AI extraction pending - refresh to see extracted data'
-                : 'Add cost, labor hours, or parts to complete this receipt'
-              }
-            </div>
+            
             {documentId && processingStatus === 'pending' && (
               <button
                 onClick={async () => {
@@ -818,19 +873,19 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                     setProcessingStatus('failed');
                   }
                 }}
+                className="button cursor-button"
                 style={{
-                  marginTop: '8px',
-                  padding: '4px 8px',
-                  border: '1px solid #f59e0b',
-                  background: '#ffffff',
-                  color: '#f59e0b',
+                  marginTop: '12px',
+                  padding: '6px 12px',
+                  border: '2px solid var(--warning)',
+                  background: 'var(--surface)',
+                  color: 'var(--warning-dark)',
                   fontSize: '8pt',
                   fontWeight: 700,
-                  cursor: 'pointer',
-                  borderRadius: '2px'
+                  width: '100%'
                 }}
               >
-                🤖 Extract Receipt Data Now
+                EXTRACT RECEIPT DATA NOW
               </button>
             )}
           </div>
