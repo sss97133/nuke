@@ -84,7 +84,7 @@ export const UploadStatusBar: React.FC = () => {
         <div
           style={{
             position: 'fixed',
-            top: '40px',
+            top: '88px', // Below app header (48px) + vehicle header (40px)
             left: 0,
             right: 0,
             height: '32px',
@@ -133,7 +133,7 @@ export const UploadStatusBar: React.FC = () => {
         <div
           style={{
             position: 'fixed',
-            top: activeUploadJobs.length > 0 ? '104px' : '48px', // Stack below header and upload bar if present
+            top: activeUploadJobs.length > 0 ? '120px' : '88px', // Stack below upload bar or vehicle header
             left: 0,
             right: 0,
             height: '32px',
