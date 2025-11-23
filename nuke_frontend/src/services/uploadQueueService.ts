@@ -44,9 +44,9 @@ class UploadQueueService {
   }
 
   /**
-   * Add files to upload queue
+   * Add files to upload queue (with deduplication check)
    */
-  async addFiles(vehicleId: string, files: FileList | File[]): Promise<void> {
+  async addFiles(vehicleId: string, files: FileList | File[], existingImages: Array<{file_name: string, file_size: number}>): Promise<{added: number, skipped: number}> {
     await this.init();
     if (!this.db) throw new Error('Database not initialized');
 
@@ -54,8 +54,21 @@ class UploadQueueService {
     const store = transaction.objectStore(this.storeName);
 
     const fileArray = Array.from(files);
+    let added = 0;
+    let skipped = 0;
     
     for (const file of fileArray) {
+      // Check if file already exists in database (by name and size)
+      const isDuplicate = existingImages.some(
+        img => img.file_name === file.name && img.file_size === file.size
+      );
+      
+      if (isDuplicate) {
+        console.log(`Skipping duplicate: ${file.name} (${file.size} bytes)`);
+        skipped++;
+        continue;
+      }
+      
       const queuedFile: QueuedFile = {
         id: `${vehicleId}_${file.name}_${file.size}_${Date.now()}`,
         name: file.name,
@@ -67,10 +80,11 @@ class UploadQueueService {
       };
 
       store.put(queuedFile);
+      added++;
     }
 
     return new Promise((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
+      transaction.oncomplete = () => resolve({added, skipped});
       transaction.onerror = () => reject(transaction.error);
     });
   }
