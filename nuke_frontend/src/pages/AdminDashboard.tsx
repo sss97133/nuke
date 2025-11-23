@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import OwnershipVerificationDashboard from '../components/admin/OwnershipVerificationDashboard';
+import AdminAnalytics from './AdminAnalytics';
+import '../../design-system.css';
 
 interface PendingApproval {
   id: string;
@@ -21,7 +23,7 @@ interface PendingApproval {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'reviews' | 'ownership' | 'todo' | 'analytics' | 'users'>('reviews');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'ownership' | 'todo' | 'analytics' | 'users' | 'processing' | 'tables'>('reviews');
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -138,7 +140,7 @@ const AdminDashboard: React.FC = () => {
         }
       }
 
-      alert(approve ? '✅ Request Approved!' : '❌ Request Rejected');
+      alert(approve ? 'Request Approved' : 'Request Rejected');
       await loadPendingApprovals();
     } catch (error) {
       console.error('Error processing approval:', error);
@@ -147,42 +149,69 @@ const AdminDashboard: React.FC = () => {
   };
 
   if (!isAdmin) {
-    return <div>Loading...</div>;
+    return <div style={{ padding: '40px', textAlign: 'center', fontSize: '8pt', color: 'var(--text-muted)' }}>Loading...</div>;
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: '24px', fontSize: '28px', fontWeight: '700' }}>Admin Dashboard</h1>
+    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <button
+            onClick={() => navigate('/admin')}
+            className="button button-secondary cursor-button"
+            style={{ 
+              marginBottom: '16px',
+              fontSize: '8pt', 
+              padding: '6px 12px',
+              border: '2px solid var(--border-light)',
+              transition: 'all 0.12s ease'
+            }}
+          >
+            ← Back to Mission Control
+          </button>
+          <h1 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Legacy Admin Dashboard
+          </h1>
+          <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            Manage user approvals and legacy verification requests
+          </p>
+        </div>
+      </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #e5e7eb', marginBottom: '24px' }}>
-        {(['reviews', 'ownership', 'todo', 'analytics', 'users'] as const).map((tab) => (
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--border-light)', marginBottom: '24px' }}>
+        {(['reviews', 'ownership', 'todo', 'analytics', 'users', 'tables'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
               padding: '12px 24px',
               border: 'none',
-              borderBottom: activeTab === tab ? '2px solid #3b82f6' : '2px solid transparent',
+              borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
               background: 'none',
               cursor: 'pointer',
-              fontWeight: activeTab === tab ? '600' : '400',
-              color: activeTab === tab ? '#3b82f6' : '#6b7280',
+              fontWeight: activeTab === tab ? '700' : '400',
+              color: activeTab === tab ? 'var(--accent)' : 'var(--text-muted)',
               position: 'relative',
-              marginBottom: '-2px'
+              marginBottom: '-2px',
+              fontSize: '8pt',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              transition: 'all 0.12s ease'
             }}
           >
-            {tab === 'ownership' ? 'Ownership Verifications' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'ownership' ? 'OWNERSHIP VERIFICATIONS' : 
+             tab === 'tables' ? 'TABLE STATUS' :
+             tab.toUpperCase()}
             {tab === 'reviews' && approvals.length > 0 && (
               <span style={{
-                position: 'absolute',
-                top: '6px',
-                right: '6px',
-                backgroundColor: '#ef4444',
+                marginLeft: '8px',
+                backgroundColor: 'var(--error)',
                 color: 'white',
-                borderRadius: '10px',
-                padding: '2px 6px',
-                fontSize: '11px',
+                borderRadius: '2px',
+                padding: '1px 4px',
+                fontSize: '8pt',
                 fontWeight: '700'
               }}>
                 {approvals.length}
@@ -195,51 +224,47 @@ const AdminDashboard: React.FC = () => {
       {/* Reviews Tab */}
       {activeTab === 'reviews' && (
         <div>
-          <h2 style={{ marginBottom: '16px', fontSize: '20px', fontWeight: '600' }}>
-            Pending Contributor Approvals
+          <h2 style={{ marginBottom: '16px', fontSize: '8pt', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            PENDING CONTRIBUTOR APPROVALS
           </h2>
 
           {loading ? (
-            <div>Loading...</div>
+            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Loading...</div>
           ) : approvals.length === 0 ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
-              No pending approvals
+            <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
+              <div style={{ fontSize: '8pt' }}>No pending approvals</div>
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '16px' }}>
               {approvals.map((approval) => (
                 <div
                   key={approval.id}
-                  style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '20px',
-                    backgroundColor: 'white'
-                  }}
+                  className="card"
+                  style={{ padding: '20px' }}
                 >
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '4px' }}>
                       {approval.year} {approval.make} {approval.model}
                     </div>
-                    <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                       {approval.user_email} • {approval.requested_role.replace(/_/g, ' ')}
                       {approval.shop_name && (
-                        <span style={{ marginLeft: '8px', color: '#3b82f6' }}>
+                        <span style={{ marginLeft: '8px', color: 'var(--accent)' }}>
                           via {approval.shop_name}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
-                    <div style={{ fontWeight: '500', marginBottom: '4px' }}>Justification:</div>
-                    <div style={{ fontSize: '14px', color: '#374151' }}>{approval.role_justification}</div>
+                  <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ fontWeight: '700', marginBottom: '4px', fontSize: '8pt' }}>JUSTIFICATION</div>
+                    <div style={{ fontSize: '8pt', color: 'var(--text)' }}>{approval.role_justification}</div>
                   </div>
 
                   {approval.uploaded_document_ids && approval.uploaded_document_ids.length > 0 && (
                     <div style={{ marginBottom: '16px' }}>
-                      <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
-                        Documents: {approval.uploaded_document_ids.length}
+                      <div style={{ fontSize: '8pt', fontWeight: '700', marginBottom: '4px' }}>
+                        DOCUMENTS: {approval.uploaded_document_ids.length}
                       </div>
                     </div>
                   )}
@@ -247,45 +272,37 @@ const AdminDashboard: React.FC = () => {
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                       onClick={() => handleApproval(approval.id, true)}
+                      className="button button-primary cursor-button"
                       style={{
                         padding: '8px 16px',
-                        backgroundColor: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: '500'
+                        fontSize: '8pt',
+                        backgroundColor: 'var(--success)',
+                        borderColor: 'var(--success)'
                       }}
                     >
-                      Approve
+                      APPROVE
                     </button>
                     <button
                       onClick={() => handleApproval(approval.id, false)}
+                      className="button button-secondary cursor-button"
                       style={{
                         padding: '8px 16px',
-                        backgroundColor: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: '500'
+                        fontSize: '8pt',
+                        color: 'var(--error)',
+                        borderColor: 'var(--error)'
                       }}
                     >
-                      Reject
+                      REJECT
                     </button>
                     <button
                       onClick={() => navigate(`/vehicles/${approval.vehicle_id}`)}
+                      className="button button-secondary cursor-button"
                       style={{
                         padding: '8px 16px',
-                        backgroundColor: 'white',
-                        color: '#374151',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: '500'
+                        fontSize: '8pt'
                       }}
                     >
-                      View Vehicle
+                      VIEW VEHICLE
                     </button>
                   </div>
                 </div>
@@ -304,22 +321,20 @@ const AdminDashboard: React.FC = () => {
 
       {/* Todo Tab */}
       {activeTab === 'todo' && (
-        <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
-          Admin task management coming soon
+        <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
+          <div style={{ fontSize: '8pt' }}>Admin task management coming soon</div>
         </div>
       )}
 
       {/* Analytics Tab */}
       {activeTab === 'analytics' && (
-        <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
-          Platform analytics coming soon
-        </div>
+        <AdminAnalytics />
       )}
 
       {/* Users Tab */}
       {activeTab === 'users' && (
-        <div style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
-          User management coming soon
+        <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
+          <div style={{ fontSize: '8pt' }}>User management coming soon</div>
         </div>
       )}
     </div>
