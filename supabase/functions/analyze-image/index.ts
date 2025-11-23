@@ -83,14 +83,16 @@ serve(async (req) => {
         if (spidResponse.is_spid_sheet && spidResponse.confidence > 70) {
           const extracted = spidResponse.extracted_data
           
-          // Upsert SPID data to dedicated table
-          await supabase
+          // Upsert SPID data to dedicated table (triggers auto-verification)
+          const { error: spidSaveError } = await supabase
             .from('vehicle_spid_data')
             .upsert({
               vehicle_id: vehicle_id,
               image_id: imageRecord.id,
               vin: extracted.vin || null,
+              model_code: extracted.model_code || null,
               build_date: extracted.build_date || null,
+              sequence_number: extracted.sequence_number || null,
               paint_code_exterior: extracted.paint_code_exterior || null,
               paint_code_interior: extracted.paint_code_interior || null,
               engine_code: extracted.engine_code || null,
@@ -98,13 +100,18 @@ serve(async (req) => {
               axle_ratio: extracted.axle_ratio || null,
               rpo_codes: extracted.rpo_codes || [],
               extraction_confidence: spidResponse.confidence,
-              raw_extracted_text: spidResponse.raw_text || null,
-              extraction_method: 'ai_vision',
-              updated_at: new Date().toISOString()
+              raw_text: spidResponse.raw_text || null,
+              extraction_model: 'gpt-4o'
             }, {
               onConflict: 'vehicle_id',
               ignoreDuplicates: false
             })
+          
+          if (spidSaveError) {
+            console.error('Failed to save SPID data:', spidSaveError)
+          } else {
+            console.log('✅ SPID data saved - auto-verification triggered')
+          }
           
           // If VIN was extracted and vehicle doesn't have one, update vehicle record
           if (extracted.vin) {
@@ -177,13 +184,17 @@ async function detectSPIDSheet(imageUrl: string, vehicleId?: string) {
           content: `You are a GM SPID (Service Parts Identification) sheet expert. Analyze images to detect and extract data from SPID sheets.
 
 SPID sheets are labels found on GM vehicles (usually on the glove box or center console) that contain:
-- VIN (17-character alphanumeric)
+- VIN (17-character alphanumeric) - Usually top line
+- MODEL CODE (e.g., CCE2436, CKE1418) - Contains series, year, cab config
 - Build date and sequence number
 - Paint codes (exterior and interior trim codes)
-- RPO codes (3-character option codes like G80, KC4, etc.)
-- Engine code (e.g., L31, LT1, LS1)
-- Transmission code (e.g., 4L60E, TH400)
+- RPO codes (3-character option codes like G80, KC4, Z84, LS4, M40, etc.)
+- Engine code (e.g., L31, LT1, LS4) - Usually in RPO list
+- Transmission code (e.g., M40, M38, M20) - Usually in RPO list
 - Rear axle ratio (e.g., 3.73, 4.10)
+
+CRITICAL: Extract the MODEL CODE line (often shows "MODEL:" or "MDL:"). This contains encoded information:
+- Example: CCE2436 = C/K series, 1984, C20, Crew Cab
 
 Return a JSON object with:
 {
@@ -191,7 +202,9 @@ Return a JSON object with:
   "confidence": number (0-100),
   "extracted_data": {
     "vin": string | null,
+    "model_code": string | null,
     "build_date": string | null,
+    "sequence_number": string | null,
     "paint_code_exterior": string | null,
     "paint_code_interior": string | null,
     "rpo_codes": string[],
@@ -200,7 +213,9 @@ Return a JSON object with:
     "axle_ratio": string | null
   },
   "raw_text": string
-}`
+}
+
+Extract ALL RPO codes you see, including engine (LS4, L31) and transmission (M40, M38) codes.`
         },
         {
           role: 'user',
@@ -240,40 +255,56 @@ async function runAppraiserBrain(imageUrl: string, context: string) {
   const openAiKey = Deno.env.get('OPENAI_API_KEY')
   if (!openAiKey) return null
 
-  const questionnaires = {
-    engine: `
-      Answer these Yes/No questions about the engine bay:
-      1. is_stock: Does it appear completely stock?
-      2. is_clean: Is the engine bay detailed/clean?
-      3. has_visible_leaks: Are there wet spots or oil residue?
-      4. wiring_quality: Is wiring tidy and professional? (Yes/No)
-      5. rust_presence: Is there visible corrosion on shock towers or firewall?
-    `,
-    interior: `
-      Answer these Yes/No questions about the interior:
-      1. seats_good_condition: Are seats free of rips/tears?
-      2. dash_cracks: Are there cracks in the dashboard?
-      3. stock_radio: Is the radio stock/original?
-      4. manual_transmission: Is it a manual stick shift?
-      5. carpets_clean: Are carpets clean and unstained?
-    `,
-    undercarriage: `
-      Answer these Yes/No questions about the undercarriage:
-      1. heavy_rust: Is there structural rust or heavy scaling?
-      2. recent_work: Are there shiny/new suspension parts?
-      3. leaks_detected: Are there drips or wet areas?
-      4. exhaust_condition: Does the exhaust look intact/rust-free?
-    `,
-    exterior: `
-      Answer these Yes/No questions about the exterior:
-      1. body_straight: Are panels straight with even gaps?
-      2. paint_glossy: Is the paint finish glossy/consistent?
-      3. visible_damage: Are there dents, scratches, or rust spots?
-      4. modifications: Are there aftermarket wheels, lift, or body kits?
-    `
+  const prompts = {
+    engine: `Analyze this engine bay image. Return a JSON object with:
+{
+  "description": "One detailed sentence (e.g., Stock 5.7L V8 engine bay with clean wiring and visible A/C compressor)",
+  "is_stock": true or false,
+  "is_clean": true or false,
+  "has_visible_leaks": true or false,
+  "wiring_quality": true or false,
+  "rust_presence": true or false,
+  "visible_components": ["component1", "component2"],
+  "category": "engine_bay",
+  "model": "gpt-4o-mini"
+}`,
+    interior: `Analyze this interior image. Return a JSON object with:
+{
+  "description": "One detailed sentence (e.g., Original bench seat interior with column shifter and AM/FM radio)",
+  "seats_good_condition": true or false,
+  "dash_cracks": true or false,
+  "stock_radio": true or false,
+  "manual_transmission": true or false,
+  "carpets_clean": true or false,
+  "visible_features": ["feature1", "feature2"],
+  "category": "interior",
+  "model": "gpt-4o-mini"
+}`,
+    undercarriage: `Analyze this undercarriage image. Return a JSON object with:
+{
+  "description": "One detailed sentence (e.g., Clean frame rails with recent suspension work and minimal surface rust)",
+  "heavy_rust": true or false,
+  "recent_work": true or false,
+  "leaks_detected": true or false,
+  "exhaust_condition": true or false,
+  "visible_components": ["component1", "component2"],
+  "category": "undercarriage",
+  "model": "gpt-4o-mini"
+}`,
+    exterior: `Analyze this exterior image. Return a JSON object with:
+{
+  "description": "One detailed sentence (e.g., Driver side view showing red paint with chrome trim and original hubcaps)",
+  "body_straight": true or false,
+  "paint_glossy": true or false,
+  "visible_damage": true or false,
+  "modifications": true or false,
+  "visible_panels": ["panel1", "panel2"],
+  "category": "exterior",
+  "model": "gpt-4o-mini"
+}`
   }
 
-  const prompt = questionnaires[context as keyof typeof questionnaires] || questionnaires.exterior
+  const prompt = prompts[context as keyof typeof prompts] || prompts.exterior
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -282,17 +313,18 @@ async function runAppraiserBrain(imageUrl: string, context: string) {
       'Authorization': `Bearer ${openAiKey}`
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini", // Vision model
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
           content: [
-            { type: "text", text: `Act as a professional vehicle appraiser. ${prompt}. Return ONLY a JSON object with boolean values for these keys.` },
+            { type: "text", text: prompt },
             { type: "image_url", image_url: { url: imageUrl } }
           ]
         }
       ],
-      max_tokens: 300
+      max_tokens: 500,
+      response_format: { type: "json_object" }
     })
   })
 

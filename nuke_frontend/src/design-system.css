@@ -1924,6 +1924,39 @@ body {
 
 /* Login page mobile optimizations */
 @media (max-width: 768px) {
+  /* SCROLL SENSITIVITY REDUCTION - Critical for mobile UX */
+  html, body {
+    /* Prevent bounce/rubber-band effect */
+    overscroll-behavior-y: contain;
+    
+    /* Disable momentum scrolling for precise control */
+    -webkit-overflow-scrolling: auto;
+    
+    /* Only allow vertical pan and pinch zoom */
+    touch-action: pan-y pinch-zoom;
+  }
+  
+  /* Apply to all scrollable containers */
+  .scrollable,
+  .content,
+  .main,
+  .page-content,
+  .app-layout,
+  [style*="overflow: auto"],
+  [style*="overflow-y: auto"] {
+    /* Disable momentum for controlled scrolling */
+    -webkit-overflow-scrolling: auto !important;
+    
+    /* Smooth but not floaty */
+    scroll-behavior: smooth;
+    
+    /* Contain overscroll within element */
+    overscroll-behavior: contain;
+    
+    /* Control touch behavior */
+    touch-action: pan-y;
+  }
+  
   .desktop-nav {
     display: none;
   }
@@ -3018,8 +3051,167 @@ body {
   pointer-events: none;
 }
 
-/* Responsive adjustments */
+/* Mobile Menu Button (hidden on desktop) */
+.mobile-menu-button {
+  display: none;
+  background: var(--grey-200);
+  border: 2px solid var(--border-light);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  font-size: 18px;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.mobile-menu-button:hover {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px #0ea5e922;
+}
+
+/* Mobile Navigation Menu (hidden by default) */
+.mobile-nav {
+  display: none;
+  flex-direction: column;
+  background: var(--white);
+  border-top: 2px solid var(--border-light);
+  padding: var(--space-2);
+}
+
+.mobile-nav-link {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border-light);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.mobile-nav-link:hover,
+.mobile-nav-link.active {
+  background: var(--grey-100);
+  border-left: 3px solid #0ea5e9;
+  padding-left: calc(var(--space-4) - 3px);
+}
+
+/* Responsive adjustments for Mobile */
 @media (max-width: 768px) {
+  /* Show mobile menu button on mobile */
+  .mobile-menu-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Show mobile navigation when open */
+  .mobile-nav {
+    display: flex;
+  }
+
+  /* Base Layout Adjustments */
+  .app-layout {
+    padding: 0;
+  }
+
+  .container {
+    padding: var(--space-3);
+    max-width: 100%;
+  }
+
+  .main {
+    padding: var(--space-3);
+  }
+
+  .main-content {
+    padding: var(--space-3);
+  }
+
+  .content-container {
+    padding: 0;
+  }
+
+  /* Navigation adjustments */
+  .app-header {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .header-content {
+    flex-wrap: wrap;
+  }
+
+  .header-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .desktop-nav {
+    display: none !important;
+  }
+
+  /* Profile bubble adjustments */
+  .profile-bubble {
+    font-size: 0; /* Hide text on mobile */
+    padding: var(--space-2);
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .profile-bubble .profile-image,
+  .profile-bubble .profile-initials {
+    margin-right: 0;
+  }
+
+  /* Cards and Content */
+  .card {
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .card-body {
+    padding: var(--space-3);
+  }
+
+  /* Forms */
+  .form-group {
+    margin-bottom: var(--space-3);
+  }
+
+  .form-input,
+  .input,
+  input,
+  textarea,
+  select {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+    padding: var(--space-3);
+    width: 100%;
+  }
+
+  .button,
+  button {
+    padding: var(--space-3) var(--space-4);
+    width: 100%;
+    margin-bottom: var(--space-2);
+  }
+
+  /* Grid layouts */
+  .grid,
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  /* Vehicle controls */
   .vehicle-controls-container {
     flex-direction: column;
     align-items: stretch;
@@ -3028,6 +3220,191 @@ body {
   .search-sort-controls {
     justify-content: flex-end;
     margin-top: var(--space-2);
+  }
+
+  /* Tables */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    font-size: 8pt;
+  }
+
+  /* Modals */
+  .modal-content,
+  .modal-dialog {
+    width: 95vw;
+    max-width: 95vw;
+    margin: var(--space-3);
+  }
+
+  /* Touch targets - ensure minimum 44px */
+  .button,
+  button,
+  a,
+  .nav-link {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Text readability */
+  .text {
+    line-height: 1.5;
+  }
+
+  /* Images */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Flexbox adjustments */
+  .flex {
+    flex-direction: column;
+  }
+
+  .flex-row {
+    flex-direction: column;
+  }
+
+  /* Spacing adjustments */
+  .mb-4,
+  .my-4 {
+    margin-bottom: var(--space-3) !important;
+  }
+
+  .mt-4 {
+    margin-top: var(--space-3) !important;
+  }
+
+  .p-4 {
+    padding: var(--space-3) !important;
+  }
+
+  /* Vehicle profile specific */
+  .vehicle-profile-header {
+    flex-direction: column;
+  }
+
+  .vehicle-image-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  /* Tabs */
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab {
+    white-space: nowrap;
+  }
+
+  /* Vehicle Profile Mobile Fixes */
+  /* Make ALL circular images/avatars smaller on mobile */
+  [style*="border-radius: 50%"],
+  [style*="border-radius:50%"],
+  [style*="borderRadius: '50%'"],
+  [style*='borderRadius:"50%"'] {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
+  }
+
+  /* Smaller font sizes for vehicle header */
+  .vehicle-price-header {
+    font-size: 7pt !important;
+    padding: var(--space-2) var(--space-3) !important;
+    height: auto !important;
+    min-height: 44px !important; /* Allow for 2 lines */
+  }
+
+  /* Make vehicle title wrap to 2 lines on mobile */
+  .vehicle-price-header [style*="fontSize: '9pt'"],
+  .vehicle-price-header [style*='fontSize:"9pt"'] {
+    white-space: normal !important;
+    line-height: 1.2 !important;
+    max-width: 200px !important;
+    font-size: 8pt !important;
+  }
+
+  /* Fix button sizing on mobile - prevent explosion */
+  .button,
+  button {
+    width: auto !important;
+    max-width: 100% !important;
+    padding: var(--space-2) var(--space-3) !important;
+    font-size: 7pt !important;
+    min-width: auto !important;
+    min-height: 32px !important;
+  }
+  
+  /* Specific fixes for inline buttons that shouldn't expand */
+  .card-header button,
+  [style*="justifyContent: 'space-between'"] button,
+  [style*='justifyContent:"space-between"'] button {
+    padding: 2px 6px !important;
+    font-size: 7pt !important;
+    min-width: auto !important;
+    width: auto !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* Mobile menu button exception */
+  .mobile-menu-button {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  /* Timeline Heatmap - keep original horizontal scroll on mobile */
+  .timeline-container {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Single column layout for vehicle profile */
+  .section [style*="gridTemplateColumns: '320px 1fr'"],
+  .section [style*='gridTemplateColumns:"320px 1fr"'],
+  .section [style*="grid-template-columns: 320px 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stack all content vertically */
+  .vehicle-profile-layout,
+  .section > div[style*="display: grid"] {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* Image gallery at bottom */
+  .section > div > div:last-child {
+    order: 999;
+  }
+
+  /* Price badge smaller on mobile */
+  .price-badge,
+  .price-display {
+    font-size: 14px !important;
+    padding: var(--space-2) var(--space-3) !important;
+  }
+
+  /* Vehicle header info more compact */
+  .vehicle-header {
+    padding: var(--space-2) !important;
+  }
+
+  .vehicle-title {
+    font-size: 14px !important;
+    line-height: 1.2 !important;
   }
 }
 

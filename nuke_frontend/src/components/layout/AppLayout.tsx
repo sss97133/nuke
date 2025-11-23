@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import CashBalanceWidget from '../CashBalanceWidget';
+import { UploadStatusBar } from './UploadStatusBar';
 import '../../design-system.css';
 
 interface AppLayoutProps {
@@ -104,6 +105,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
   return (
     <div className="app-layout compact win95">
+      {/* Upload Status Bar */}
+      <UploadStatusBar />
+      
       {/* Main Navigation Header */}
       <header className="app-header" style={{
         position: 'sticky',
@@ -129,6 +133,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
               >
                 Vehicles
+              </Link>
+              <Link 
+                to="/auctions" 
+                className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
+              >
+                Auctions
               </Link>
               <Link 
                 to={orgNavPath}
@@ -197,6 +207,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               onClick={() => setMobileMenuOpen(false)}
             >
               Vehicles
+            </Link>
+            <Link 
+              to="/auctions" 
+              className={`mobile-nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Auctions
             </Link>
             <Link 
               to="/shops" 

@@ -265,6 +265,15 @@ export const ComprehensiveVehicleEditor: React.FC<ComprehensiveVehicleEditorProp
           />
           <UniversalFieldEditor
             vehicleId={vehicleId}
+            fieldName="transmission_model"
+            fieldLabel="Transmission Model"
+            currentValue={(vehicle as any).transmission_model}
+            canEdit={canEdit}
+            placeholder="e.g., 6L90, 4L60E, TH350, Getrag 260"
+            onSaved={() => handleFieldSaved('transmission_model')}
+          />
+          <UniversalFieldEditor
+            vehicleId={vehicleId}
             fieldName="fuel_type"
             fieldLabel="Fuel Type"
             currentValue={vehicle.fuel_type}

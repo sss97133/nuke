@@ -48,6 +48,7 @@ const VehicleTimeline: React.FC<{
   onDateClick?: (date: string, events: any[]) => void;
 }> = ({ vehicleId, isOwner, onDateClick }) => {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [photoDates, setPhotoDates] = useState<Map<string, number>>(new Map()); // Map of date -> photo count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
@@ -210,34 +211,22 @@ const VehicleTimeline: React.FC<{
   };
 
   const calcEventImpact = (ev: any) => {
-    const hours = estimateEventHours(ev);
+    // Don't calculate labor cost for photo/inspection events - photos document work, they aren't work
+    const isPhotoEvent = ['inspection', 'documentation', 'pending_analysis'].includes(ev?.event_type);
+    
+    const hours = isPhotoEvent ? 0 : estimateEventHours(ev);
     const laborRate = 120; // USD/hr default
-    const valueUSD = hours * laborRate;
+    const valueUSD = isPhotoEvent ? 0 : (hours * laborRate);
     const anchor = valueAnchor();
     const pct = anchor ? (valueUSD / anchor) * 100 : null;
-    // Timestamp preference from metadata
     const ts = (ev?.metadata?.when?.photo_taken || ev?.metadata?.when?.uploaded || ev?.created_at || ev?.event_date);
     return { hours, valueUSD, anchor, pct, ts };
   };
 
   // Group photo_added events in a single day into one evidence set
   const groupDayEvents = (dayEvents: TimelineEvent[]): TimelineEvent[] => {
-    if (!Array.isArray(dayEvents) || dayEvents.length === 0) return dayEvents;
-    const photos: TimelineEvent[] = [];
-    const others: TimelineEvent[] = [];
-    for (const e of dayEvents) {
-      const t = String((e as any).event_type || '').toLowerCase();
-      if (t === 'photo_added') photos.push(e); else others.push(e);
-    }
-    if (photos.length <= 1) return dayEvents;
-    const merged: TimelineEvent = {
-      ...(photos[0] as any),
-      id: `merged-${photos[0].id}`,
-      title: 'Evidence set',
-      description: undefined,
-      image_urls: photos.flatMap((p: any) => Array.isArray(p.image_urls) ? p.image_urls : []).slice(0, 24),
-    } as any;
-    return [merged, ...others];
+    // ✅ No longer grouping photo events since photos aren't events
+    return dayEvents;
   };
 
   const toggleComments = (eventId: string) => {
@@ -275,14 +264,33 @@ const VehicleTimeline: React.FC<{
     try {
       setLoading(true);
 
-      // Load from timeline_events table (the actual table with image_urls)
-      // Note: vehicle_timeline_events is just a VIEW that might not return all fields
+      // Load timeline events (actual work/events only, not photos)
       const { data: timelineData, error: timelineError } = await supabase
         .from('vehicle_timeline_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('event_date', { ascending: false })
         .limit(200);
+
+      // Load photo dates for calendar heatmap (photos ARE activity even if not events)
+      const { data: imageData } = await supabase
+        .from('vehicle_images')
+        .select('taken_at')
+        .eq('vehicle_id', vehicleId)
+        .not('taken_at', 'is', null);
+
+      // Build photo date map for calendar
+      const photoDateMap = new Map<string, number>();
+      if (imageData) {
+        for (const img of imageData) {
+          if (img.taken_at) {
+            const dateKey = new Date(img.taken_at).toISOString().split('T')[0];
+            photoDateMap.set(dateKey, (photoDateMap.get(dateKey) || 0) + 1);
+          }
+        }
+      }
+      setPhotoDates(photoDateMap);
+      console.log(`Loaded ${photoDateMap.size} days with photos`);
 
       if (timelineError) {
         console.error('Error loading timeline events:', timelineError);
@@ -291,57 +299,29 @@ const VehicleTimeline: React.FC<{
       } else {
         let merged: any[] = (timelineData || []).map((e: any) => ({ ...e, __table: 'timeline_events' }));
 
-        // ONLY derive from images if we have NO real timeline events AND we have images
-        // Don't override real events with empty derived ones!
-        if (merged.length === 0) {
-          const { data: imgs, error: imgErr } = await supabase
-            .from('vehicle_images')
-            .select('id, image_url, exif_data, created_at')
-            .eq('vehicle_id', vehicleId)
-            .limit(500);
-          if (!imgErr && imgs && imgs.length > 0) {
-            merged = imgs.map((r: any) => {
-              const dt = r?.exif_data?.dateTaken ? new Date(r.exif_data.dateTaken) : new Date(r.created_at);
-              const dateOnly = isNaN(dt.getTime()) ? new Date().toISOString().split('T')[0] : dt.toISOString().split('T')[0];
-              return {
-                id: `derived-${r.id}`,
-                vehicle_id: vehicleId,
-                event_type: 'photo_added',
-                source: 'derived_from_images',
-                event_date: dateOnly,
-                title: 'Photo Added',
-                description: 'Derived from uploaded photo',
-                image_urls: [r.image_url],
-                metadata: { derived: true, image_id: r.id, exif: r.exif_data },
-                __table: 'derived'
-              };
-            }).sort((x: any, y: any) => new Date(y.event_date).getTime() - new Date(x.event_date).getTime());
-          }
-        }
+        // ✅ PHOTOS ARE NOT EVENTS
+        // But photo dates ARE loaded separately for the calendar heatmap
 
-        console.log(`Loaded ${merged.length} timeline items (merged)`);
-        // Debug: Log first few events to see what's actually loaded
-        if (merged.length > 0) {
-          console.log('Timeline events loaded:');
-          merged.slice(0, 3).forEach(ev => {
-            console.log(`  - ${ev.title} on ${ev.event_date}`, {
-              has_images: !!ev.image_urls,
-              image_count: ev.image_urls?.length || 0,
-              first_image: ev.image_urls?.[0]?.substring(0, 50) || 'none'
-            });
-          });
-        }
+        console.log(`Loaded ${merged.length} timeline events`);
         setEvents(merged as any);
 
-        if (merged.length > 0) {
-          // Get all years and find the one with the most events
-          const yearCounts = merged.reduce((acc: Record<number, number>, ev: any) => {
-            const year = new Date(ev.event_date).getFullYear();
-            acc[year] = (acc[year] || 0) + 1;
-            return acc;
-          }, {});
-          
-          // Sort by count (most events first), then by year (most recent first)
+        // Get all years from both events AND photos
+        const yearCounts: Record<number, number> = {};
+        
+        // Count timeline events by year
+        merged.forEach((ev: any) => {
+          const year = new Date(ev.event_date).getFullYear();
+          yearCounts[year] = (yearCounts[year] || 0) + 1;
+        });
+        
+        // Add photo counts by year
+        photoDateMap.forEach((count, dateStr) => {
+          const year = new Date(dateStr).getFullYear();
+          yearCounts[year] = (yearCounts[year] || 0) + count;
+        });
+        
+        if (Object.keys(yearCounts).length > 0) {
+          // Sort by activity count (most active year first), then by year (most recent first)
           const sortedYears = Object.entries(yearCounts)
             .sort(([yearA, countA], [yearB, countB]) => {
               if (countB !== countA) return countB - countA;
@@ -349,11 +329,9 @@ const VehicleTimeline: React.FC<{
             })
             .map(([year]) => Number(year));
           
-          if (sortedYears.length > 0) {
-            // Always set to the year with the most events
-            setSelectedYear(sortedYears[0]);
-            console.log(`Setting timeline to year ${sortedYears[0]} with ${yearCounts[sortedYears[0]]} events`);
-          }
+          // Always set to the year with the most activity (events + photos)
+          setSelectedYear(sortedYears[0]);
+          console.log(`Setting timeline to year ${sortedYears[0]} with ${yearCounts[sortedYears[0]]} items (events + photos)`);
         }
       }
     } catch (error) {
@@ -626,18 +604,44 @@ const VehicleTimeline: React.FC<{
                                         return evYmd === dayYmd;
                                       })
                                     : [];
-                                  const hours = hoursForDay(dayEvents);
-                                  const clickable = dayEvents.length > 0;
+                                  
+                                  // Include photo activity for this day (photos taken on this date)
+                                  const photoCount = photoDates.get(dayYmd) || 0;
+                                  const hours = hoursForDay(dayEvents) + (photoCount > 0 ? Math.min(2, photoCount / 10) : 0);
+                                  const clickable = dayEvents.length > 0 || photoCount > 0;
                                   return (
                                     <div
                                       key={idx}
-                                      title={`${date.toLocaleDateString()}: ${clickable ? `${dayEvents.length} events • ~${hours.toFixed(1)} hrs` : 'No work'}`}
-                                      onClick={() => {
+                                      title={`${date.toLocaleDateString()}: ${clickable ? `${dayEvents.length} events${photoCount > 0 ? ` • ${photoCount} photos` : ''} • ~${hours.toFixed(1)} hrs` : 'No activity'}`}
+                                      onClick={async () => {
                                         if (clickable) {
                                           if (onDateClick) {
                                             onDateClick(date.toISOString().split('T')[0], dayEvents);
                                           } else {
-                                            setSelectedDayEvents(dayEvents);
+                                            // If day has photos but no events, load and show the photos
+                                            if (dayEvents.length === 0 && photoCount > 0) {
+                                              const { data: dayImages } = await supabase
+                                                .from('vehicle_images')
+                                                .select('*')
+                                                .eq('vehicle_id', vehicleId)
+                                                .gte('taken_at', dayYmd)
+                                                .lt('taken_at', new Date(new Date(dayYmd).getTime() + 86400000).toISOString());
+                                              
+                                              // Create synthetic events to show photos in day popup
+                                              const photoEvent = {
+                                                id: `photos-${dayYmd}`,
+                                                vehicle_id: vehicleId,
+                                                event_type: 'documentation' as any,
+                                                event_date: dayYmd,
+                                                title: `${photoCount} photo${photoCount > 1 ? 's' : ''} taken`,
+                                                description: 'Vehicle documentation',
+                                                image_urls: dayImages?.map(img => img.image_url) || [],
+                                                metadata: { photo_date: true, photo_count: photoCount }
+                                              };
+                                              setSelectedDayEvents([photoEvent as any]);
+                                            } else {
+                                              setSelectedDayEvents(dayEvents);
+                                            }
                                             setShowDayPopup(true);
                                           }
                                         }
@@ -877,7 +881,7 @@ const VehicleTimeline: React.FC<{
         {/* Day Events Popup (for Grid View) - USING PORTAL TO ESCAPE TIMELINE DIV */}
         {showDayPopup && selectedDayEvents && selectedDayEvents.length > 0 && ReactDOM.createPortal(
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center"
             style={{ zIndex: 10001 }}
             onClick={() => setShowDayPopup(false)}
             onKeyDown={(e) => {
@@ -911,60 +915,63 @@ const VehicleTimeline: React.FC<{
             tabIndex={0}
             ref={(el) => el?.focus()}
           >
-            <div className="card" style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto' }}>
-              <div className="card-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <button
-                      className="button button-small"
-                      onClick={() => {
-                        const currentDate = new Date(selectedDayEvents[0].event_date);
-                        currentDate.setDate(currentDate.getDate() - 1);
-                        const prevDayEvents = events.filter(ev => {
-                          const evDate = new Date(ev.event_date).toISOString().slice(0, 10);
-                          return evDate === currentDate.toISOString().slice(0, 10);
-                        });
-                        if (prevDayEvents.length > 0) {
-                          setSelectedDayEvents(prevDayEvents);
-                        }
-                      }}
-                      title="Previous day"
-                    >
-                      ←
-                    </button>
-                    <h3 className="text">
-                      {new Date(selectedDayEvents[0].event_date).toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </h3>
-                    <button
-                      className="button button-small"
-                      onClick={() => {
-                        const currentDate = new Date(selectedDayEvents[0].event_date);
-                        currentDate.setDate(currentDate.getDate() + 1);
-                        const nextDayEvents = events.filter(ev => {
-                          const evDate = new Date(ev.event_date).toISOString().slice(0, 10);
-                          return evDate === currentDate.toISOString().slice(0, 10);
-                        });
-                        if (nextDayEvents.length > 0) {
-                          setSelectedDayEvents(nextDayEvents);
-                        }
-                      }}
-                      title="Next day"
-                    >
-                      →
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <span className="text-small text-muted">
-                      {selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}
-                    </span>
-                    <button className="button button-small" onClick={() => setShowDayPopup(false)}>×</button>
-                  </div>
+            <div className="card" style={{ maxWidth: '800px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <button
+                    className="button button-secondary button-small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const currentDate = new Date(selectedDayEvents[0].event_date);
+                      currentDate.setDate(currentDate.getDate() - 1);
+                      const prevDayEvents = events.filter(ev => {
+                        const evDate = new Date(ev.event_date).toISOString().slice(0, 10);
+                        return evDate === currentDate.toISOString().slice(0, 10);
+                      });
+                      if (prevDayEvents.length > 0) {
+                        setSelectedDayEvents(prevDayEvents);
+                      }
+                    }}
+                    style={{ fontSize: '9px', fontWeight: 700 }}
+                  >
+                    PREV DAY
+                  </button>
+                  <h4 style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+                    {new Date(selectedDayEvents[0].event_date).toLocaleDateString('en-US', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </h4>
+                  <button
+                    className="button button-secondary button-small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const currentDate = new Date(selectedDayEvents[0].event_date);
+                      currentDate.setDate(currentDate.getDate() + 1);
+                      const nextDayEvents = events.filter(ev => {
+                        const evDate = new Date(ev.event_date).toISOString().slice(0, 10);
+                        return evDate === currentDate.toISOString().slice(0, 10);
+                      });
+                      if (nextDayEvents.length > 0) {
+                        setSelectedDayEvents(nextDayEvents);
+                      }
+                    }}
+                    style={{ fontSize: '9px', fontWeight: 700 }}
+                  >
+                    NEXT DAY
+                  </button>
                 </div>
+                <button 
+                  className="button button-secondary button-small" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDayPopup(false);
+                  }}
+                  style={{ fontSize: '9px', fontWeight: 700 }}
+                >
+                  CLOSE
+                </button>
               </div>
               <div className="card-body">
               <div className="space-y-2">
@@ -989,7 +996,10 @@ const VehicleTimeline: React.FC<{
                   const isEditing = editingEvent === ev.id;
                   
                   return (
-                    <div key={ev.id} className="alert alert-default" style={{ cursor: 'pointer' }} onClick={() => setSelectedEventForDetail(ev.id)}>
+                    <div key={ev.id} className="alert alert-default" style={{ cursor: 'pointer' }} onClick={() => {
+                      // Open receipt directly, not image popup
+                      setSelectedEventForDetail(ev.id);
+                    }}>
                       <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
                         {shown.length > 0 && (
                           <img
@@ -1003,7 +1013,8 @@ const VehicleTimeline: React.FC<{
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setPopupImageUrl(shown[0]);
+                              // Don't open image popup - open receipt instead
+                              setSelectedEventForDetail(ev.id);
                             }}
                           />
                         )}
@@ -1029,7 +1040,9 @@ const VehicleTimeline: React.FC<{
                             <>
                               {(() => {
                                 const isPhoto = String(ev.event_type || '').toLowerCase() === 'photo_added' || String(ev.title || '').toLowerCase().includes('photo') || String(ev.title || '').toLowerCase().includes('evidence');
-                                const title = isPhoto ? `Evidence set (${shown.length} photos)` : (ev.title || 'Work Session');
+                                // Count unique images, not URLs (which may include variants)
+                                const imageCount = urls.length;
+                                const title = isPhoto ? `Evidence set (${imageCount} ${imageCount === 1 ? 'photo' : 'photos'})` : (ev.title || 'Work Session');
                                 return (
                                   <h4 className="text" style={{ marginBottom: 'var(--space-1)' }}>
                                     {title}

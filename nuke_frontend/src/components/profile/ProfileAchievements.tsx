@@ -14,7 +14,7 @@ const ProfileAchievements: React.FC<ProfileAchievementsProps> = ({ achievements,
     'first_image': '📸',
     'contributor': '🤝',
     'vehicle_collector': '🏆',
-    'image_enthusiast': '📷',
+    'image_enthusiast': 'IMG',
     'community_member': '👥',
     'verified_user': '✓'
   };

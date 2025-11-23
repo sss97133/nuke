@@ -118,7 +118,7 @@ const VehicleImageGallery = ({ vehicleId, showThumbnails = true, maxImages }: Ve
                 overflow: 'hidden',
                 cursor: 'pointer',
                 border: '1px solid #e5e7eb',
-                background: `url(${image.image_url}) center/cover`,
+                background: `url(${image.thumbnail_url || image.medium_url || image.image_url}) center/cover`,
                 position: 'relative',
                 transition: 'transform 0.2s'
               }}

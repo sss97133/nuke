@@ -47,6 +47,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.525.0",
     "openai": "^6.7.0",
+    "openseadragon": "^5.0.1",
     "papaparse": "^5.4.1",
     "pdfjs-dist": "^5.4.149",
     "phoenix": "^1.8.1",

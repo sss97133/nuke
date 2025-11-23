@@ -151,8 +151,8 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId, in
       <div className="card-body">
         <div className="space-y-3">
           {organizations.map((org) => {
-            const Icon = RELATIONSHIP_ICONS[org.relationship_type] || FiMapPin;
-            const relationshipLabel = RELATIONSHIP_LABELS[org.relationship_type] || org.relationship_type;
+            const Icon = RELATIONSHIP_ICONS[org.relationship_type || 'service_provider'] || FiMapPin;
+            const relationshipLabel = RELATIONSHIP_LABELS[org.relationship_type || 'service_provider'] || org.relationship_type || 'Unknown';
 
             return (
               <Link

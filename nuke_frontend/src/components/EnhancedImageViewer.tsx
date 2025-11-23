@@ -181,7 +181,7 @@ const EnhancedImageViewer: React.FC<EnhancedImageViewerProps> = ({
         .insert({
           vehicle_id: vehicleId,
           user_id: currentUser.id,
-          content: `📷 Image comment: ${newComment.trim()}`,
+          content: `Image comment: ${newComment.trim()}`,
           metadata: {
             type: 'image_comment',
             image_id: selectedImage.id,

@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { useValuationIntel } from '../hooks/useValuationIntel';
-import MobileVehicleProfileV2 from '../components/mobile/MobileVehicleProfileV2';
 import { TimelineEventService } from '../services/timelineEventService';
 import AddEventWizard from '../components/AddEventWizard';
 import EventMap from '../components/EventMap';
@@ -40,6 +39,7 @@ import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type F
 import type { Session } from '@supabase/supabase-js';
 import ImageGallery from '../components/images/ImageGallery';
 import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
+import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -1031,9 +1031,10 @@ const VehicleProfile: React.FC = () => {
         .from('vehicle_images')
         .select('*')
         .eq('vehicle_id', vehicle.id)
+        .eq('is_document', false) // Filter out documents - they belong in a separate section
         .order('is_primary', { ascending: false })
         .order('position', { ascending: true })
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error loading vehicle images from database:', error);
@@ -1195,8 +1196,9 @@ const VehicleProfile: React.FC = () => {
         {/* Two column layout: Info on left, Images on right */}
             <section className="section">
           <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: '320px 1fr' }}>
-            {/* Left Column: Vehicle Info & Tools */}
+            {/* Left Column: Vehicle Info & Tools - Order: Basic Info → Description → Comments → Ref Docs → Maps */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  {/* 1. Basic Info */}
                   <VehicleBasicInfo
                     vehicle={vehicle}
                     session={session}
@@ -1204,12 +1206,16 @@ const VehicleProfile: React.FC = () => {
                     onDataPointClick={handleDataPointClick}
                     onEditClick={handleEditClick}
                   />
+                  
+                  {/* 2. Description */}
               <VehicleDescriptionCard
                 vehicleId={vehicle.id}
                 initialDescription={vehicle.description}
                 isEditable={canEdit}
                 onUpdate={() => loadVehicle()}
               />
+                  
+                  {/* 3. Comments */}
               <VehicleCommentsCard
                 vehicleId={vehicle.id}
                     session={session}
@@ -1217,7 +1223,7 @@ const VehicleProfile: React.FC = () => {
                 maxVisible={2}
                   />
                   
-                  {/* Reference Library Upload */}
+                  {/* 4. Reference Documents - Upload */}
                   {session && (
                     <ReferenceLibraryUpload
                       vehicleId={vehicle.id}
@@ -1230,6 +1236,17 @@ const VehicleProfile: React.FC = () => {
                     />
                   )}
                   
+                  {/* 4. Reference Documents - Display */}
+                  <VehicleReferenceLibrary
+                    vehicleId={vehicle.id}
+                    year={vehicle.year}
+                    make={vehicle.make}
+                    series={(vehicle as any).series}
+                    model={vehicle.model}
+                    bodyStyle={(vehicle as any).body_style}
+                  />
+                  
+                  {/* 5. Coverage Map */}
                   <div className="card">
                     <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>Coverage Map</span>
@@ -1243,6 +1260,8 @@ const VehicleProfile: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  
+                  {/* Image Tagging (for owners/contributors only) */}
                   {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
                     <div className="card">
                       <div className="card-header">Image Tagging & AI Validation</div>
@@ -1259,12 +1278,6 @@ const VehicleProfile: React.FC = () => {
                         />
                       </div>
                     </div>
-                  )}
-                  {(isVerifiedOwner || hasContributorAccess) && (
-                    <WorkMemorySection
-                      vehicleId={vehicle.id}
-                      permissions={permissions}
-                    />
                   )}
                 </div>
 
@@ -1285,12 +1298,8 @@ const VehicleProfile: React.FC = () => {
         );
   };
 
-  // Render mobile or desktop version (no early return to avoid hook errors)
+  // Render vehicle profile (responsive for mobile and desktop)
   return (
-    <>
-      {isMobile && vehicleId ? (
-        <MobileVehicleProfileV2 vehicleId={vehicleId} isMobile={isMobile} />
-      ) : (
       <div>
         {/* Vehicle Header with Price */}
         <VehicleHeader
@@ -1406,8 +1415,6 @@ const VehicleProfile: React.FC = () => {
         />
       )}
       </div>
-      )}
-    </>
   );
 };
 

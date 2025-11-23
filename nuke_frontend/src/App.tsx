@@ -5,6 +5,7 @@ import { supabase } from './lib/supabase';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider as OldToastProvider } from './hooks/useToast';
 import { ToastProvider } from './components/ui/Toast';
+import { UploadStatusProvider } from './contexts/UploadStatusContext';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -20,6 +21,8 @@ import VehicleProfile from './pages/VehicleProfile';
 // import VehicleEditForm from './pages/VehicleEditForm';
 // import VehicleDateImages from './pages/VehicleDateImages';
 import Dashboard from './pages/Dashboard';
+import ImageProcessingDashboard from './pages/ImageProcessingDashboard';
+import ScriptControlCenter from './pages/ScriptControlCenter';
 import VehicleMakeModelDemo from './pages/VehicleMakeModelDemo';
 import VehicleDataNormalization from './pages/VehicleDataNormalization';
 import Profile from './pages/Profile';
@@ -81,11 +84,13 @@ import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import SignDocument from './pages/SignDocument';
 import ShippingSettings from './pages/admin/ShippingSettings';
-import { MobileOrg } from './pages/mobile/MobileOrg';
+import BatchImageAnalysis from './pages/admin/BatchImageAnalysis';
 import InvestorDashboardPage from './pages/InvestorDashboard';
 import MergeProposalsDashboard from './pages/MergeProposalsDashboard';
 import Library from './pages/Library';
 import ExtractionReview from './pages/ExtractionReview';
+import InvestmentOpportunities from './pages/InvestmentOpportunities';
+import AdminMissionControl from './pages/AdminMissionControl';
 
 // Financial & Accounting components
 import InvoiceManager from './pages/InvoiceManager';
@@ -93,6 +98,12 @@ import ShopFinancials from './pages/ShopFinancials';
 import SupplierDashboard from './pages/SupplierDashboard';
 import ContractManager from './pages/ContractManager';
 import KnowledgeBase from './pages/KnowledgeBase';
+
+// Auction & Export components
+import AuctionMarketplace from './pages/AuctionMarketplace';
+import CreateAuctionListing from './components/auction/CreateAuctionListing';
+import ListingPreparationWizard from './components/auction/ListingPreparationWizard';
+import AuctionAnalyticsDashboard from './components/auction/AuctionAnalyticsDashboard';
 
 // Auth components
 import ResetPassword from './pages/ResetPassword';
@@ -200,6 +211,7 @@ function App() {
   // Allow public access to Discovery and vehicle profile pages - vehicles should be viewable by all
   const isPublicRoute = window.location.pathname === '/' ||
                        window.location.pathname === '/discover' ||
+                       window.location.pathname === '/auctions' ||
                        window.location.pathname.startsWith('/vehicle/') ||
                        window.location.pathname.startsWith('/invite/') ||
                        window.location.pathname === '/legal' ||
@@ -230,6 +242,7 @@ function App() {
     <ThemeProvider>
       <OldToastProvider>
       <ToastProvider>
+      <UploadStatusProvider>
         <Router>
         {/* Global Upload Status - Always visible at top */}
         <GlobalUploadStatus />
@@ -290,6 +303,12 @@ function App() {
             <Route path="/browse-investments" element={<BrowseInvestments />} />
             <Route path="/investor/dashboard" element={<InvestorDashboardPage />} />
             
+            {/* Auction Marketplace & Multi-Platform Export */}
+            <Route path="/auctions" element={<AuctionMarketplace />} />
+            <Route path="/auctions/create" element={<CreateAuctionListing />} />
+            <Route path="/auctions/prepare" element={<ListingPreparationWizard />} />
+            <Route path="/auctions/analytics" element={<AuctionAnalyticsDashboard />} />
+            
             {/* Financial & Accounting Management */}
             <Route path="/invoices" element={<InvoiceManager />} />
             <Route path="/financials" element={<ShopFinancials />} />
@@ -313,7 +332,11 @@ function App() {
             <Route path="/review/ai-detections" element={<CurationQueue />} />
             
             {/* Admin & Development */}
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin" element={<AdminMissionControl />} />
+            <Route path="/admin/old" element={<AdminDashboard />} />
+            <Route path="/admin/scripts" element={<ScriptControlCenter />} />
+            <Route path="/admin/image-processing" element={<ImageProcessingDashboard />} />
+            <Route path="/admin/batch-analysis" element={<BatchImageAnalysis />} />
             <Route path="/admin/verifications" element={<AdminVerifications />} />
             <Route path="/admin/ownership-verifications" element={<OwnershipVerificationDashboard />} />
             <Route path="/admin/merge-proposals" element={<MergeProposalsDashboard />} />
@@ -328,11 +351,10 @@ function App() {
             <Route path="/shops/onboarding" element={<Navigate to="/org/create" replace />} />
             <Route path="/shops/new" element={<CreateOrganization />} />
             <Route path="/organizations" element={<Organizations />} />
+            <Route path="/investment-opportunities" element={<InvestmentOpportunities />} />
             <Route path="/library" element={<Library />} />
             <Route path="/org/create" element={<CreateOrganization />} />
             <Route path="/org/:id" element={<ErrorBoundary><OrganizationProfile /></ErrorBoundary>} />
-            <Route path="/mobile/org/:orgId" element={<MobileOrg />} />
-            <Route path="/mobile/org" element={<MobileOrg />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/inbox" element={<Inbox />} />
@@ -387,6 +409,7 @@ function App() {
         {/* Global Upload Progress Bar - Persists across navigation */}
         <UploadProgressBar />
         </Router>
+      </UploadStatusProvider>
       </ToastProvider>
       </OldToastProvider>
       <SpeedInsights />

@@ -304,13 +304,23 @@ const OrganizationVehiclesTab: React.FC<Props> = ({ organizationId, userId, canE
 
                 {/* Info */}
                 <div className="card-body">
-                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '8px' }}>
-                    {v.vehicles.year} {v.vehicles.make} {v.vehicles.model}
+                  <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px', lineHeight: 1.2 }}>
+                    {v.vehicles.year} {v.vehicles.make} {v.vehicles.model || v.vehicles.series}
                   </div>
                   
-                  {v.vehicles.trim && (
+                  {(v.vehicles.trim || (v.vehicles.series && v.vehicles.model)) && (
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                      {v.vehicles.trim}
+                      {[
+                        v.vehicles.model && v.vehicles.series && v.vehicles.series !== v.vehicles.model ? v.vehicles.series : null,
+                        v.vehicles.trim,
+                        v.vehicles.body_style
+                      ].filter(Boolean).join(' ')}
+                    </div>
+                  )}
+                  
+                  {(v.vehicles.engine_size || v.vehicles.transmission) && (
+                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '6px', fontFamily: 'monospace' }}>
+                      {[v.vehicles.engine_size, v.vehicles.transmission].filter(Boolean).join(' • ')}
                     </div>
                   )}
                   

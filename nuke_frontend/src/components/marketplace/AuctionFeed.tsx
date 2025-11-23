@@ -360,7 +360,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
                   padding: '2px 6px',
                   fontSize: '7pt'
                 }}>
-                  📷 {listing.images.length}
+                  {listing.images.length} images
                 </div>
               )}
             </div>

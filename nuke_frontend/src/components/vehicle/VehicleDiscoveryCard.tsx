@@ -54,7 +54,7 @@ const VehicleDiscoveryCard: React.FC<VehicleDiscoveryCardProps> = ({ vehicle, co
       return { label: 'Help Needed', color: '#f59e0b', icon: '?' };
     }
     if (metadata.needs_photos && metadata.photos_count === 0) {
-      return { label: 'Add Photos', color: '#3b82f6', icon: '📷' };
+      return { label: 'Add Photos', color: '#3b82f6', icon: '' };
     }
     if (metadata.data_completeness_score < 30) {
       return { label: 'Add Info', color: '#ef4444', icon: '+' };
@@ -282,7 +282,7 @@ const VehicleDiscoveryCard: React.FC<VehicleDiscoveryCardProps> = ({ vehicle, co
               fontSize: '10px',
               color: '#6b7280'
             }}>
-              📷 {metadata.photos_count}
+              {metadata.photos_count} photos
             </div>
           )}
 
@@ -308,7 +308,7 @@ const VehicleDiscoveryCard: React.FC<VehicleDiscoveryCardProps> = ({ vehicle, co
           }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>Can you help with:</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {metadata.needs_photos && <span>📷 Photos</span>}
+              {metadata.needs_photos && <span>Photos needed</span>}
               {metadata.needs_specifications && <span>📋 Specs</span>}
               {metadata.needs_history && <span>📜 History</span>}
               {metadata.needs_verification && <span>✓ Verification</span>}

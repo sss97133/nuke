@@ -525,7 +525,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                             padding: '1px 2px',
                             textAlign: 'center'
                           }}>
-                            📷 {imgIdx + 1}
+                            IMG {imgIdx + 1}
                           </div>
                         </div>
                       ))}

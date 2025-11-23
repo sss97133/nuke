@@ -111,6 +111,7 @@ export interface VehicleHeaderProps {
 
 export interface VehicleHeroImageProps {
   leadImageUrl: string | null;
+  vehicleId?: string;
 }
 
 // Removed duplicate - see VehicleBasicInfoProps below that extends VehicleBaseProps

@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { extractImageMetadata } from '../utils/imageMetadata';
 import { imageOptimizationService } from './imageOptimizationService';
 import { TimelineEventService } from './timelineEventService';
+import { DocumentTypeDetector } from './documentTypeDetector';
 
 export interface ImageUploadResult {
   success: boolean;
@@ -83,13 +84,13 @@ export class ImageUploadService {
       // Validate file - allow images and documents for document category
       const isImage = file.type.startsWith('image/');
       const isPdf = file.type === 'application/pdf';
-      const isDocument = isPdf || file.type.includes('document');
+      const isFileDocument = isPdf || file.type.includes('document');
 
       if (!isImage && category !== 'document') {
         return { success: false, error: 'Please select an image file' };
       }
 
-      if (category === 'document' && !isImage && !isPdf && !isDocument) {
+      if (category === 'document' && !isImage && !isPdf && !isFileDocument) {
         return { success: false, error: 'Please select an image or PDF file for documents' };
       }
 
@@ -237,6 +238,11 @@ export class ImageUploadService {
         .select('id', { count: 'exact', head: true })
         .eq('vehicle_id', vehicleId);
 
+      // Detect document type
+      const docDetection = DocumentTypeDetector.detectFromFile(file);
+      const isDocument = docDetection.type !== 'vehicle_photo';
+      const documentCategory = isDocument ? this.mapDocumentTypeToCategory(docDetection.type) : null;
+
       // Save to database with correct data, EXIF metadata, and variants
       const exifPayload: Record<string, any> = {
         DateTimeOriginal: metadata.dateTaken?.toISOString(),
@@ -266,11 +272,19 @@ export class ImageUploadService {
           category: category,
           file_size: fileToUpload.size, // Use compressed file size
           mime_type: fileToUpload.type,
-          is_primary: count === 0, // First image becomes primary
+          is_primary: count === 0 && !isDocument, // First image becomes primary (not documents)
           is_sensitive: false, // Required field
           taken_at: photoDate.toISOString(), // Use actual photo date for timeline
           variants: variants, // Store all variant URLs
-          exif_data: exifPayload
+          exif_data: exifPayload,
+          is_document: isDocument,
+          document_category: documentCategory,
+          document_classification: isDocument ? JSON.stringify({
+            type: docDetection.type,
+            confidence: docDetection.confidence,
+            reasoning: docDetection.reasoning,
+            detected_at: new Date().toISOString()
+          }) : null
         })
         .select('id')
         .single();
@@ -293,48 +307,29 @@ export class ImageUploadService {
         return { success: false, error: `Database error: ${dbError.message}` };
       }
 
-      // Create timeline event after successful upload and link image to it
-      try {
-        if (isImage) {
-          const eventId = await TimelineEventService.createImageUploadEvent(
-            vehicleId,
-            {
-              fileName: file.name,
-              fileSize: file.size,
-              imageUrl: urlData.publicUrl,
-              dateTaken: photoDate,
-              gps: metadata.gps,
-              listingCapturedAt,
-              listingSource,
-              listingOriginalUrl
-            },
-            user.id
-          );
+      // ✅ PHOTOS ARE NOT EVENTS
+      // Images are evidence/documentation that attach to real work events
+      // They are displayed in image gallery, not as timeline events
 
-          // ✅ CRITICAL FIX: Link the image to the timeline event
-          if (eventId) {
-            await supabase
-              .from('vehicle_images')
-              .update({ timeline_event_id: eventId })
-              .eq('id', dbResult.id);
+      // 🤖 TRIGGER AI ANALYSIS AUTOMATICALLY
+      // Analyze image in background - don't wait for result
+      if (isImage && dbResult?.id) {
+        console.log('Triggering AI analysis for image:', dbResult.id);
+        supabase.functions.invoke('analyze-image', {
+          body: {
+            image_url: urlData.publicUrl,
+            vehicle_id: vehicleId,
+            image_id: dbResult.id
           }
-        } else {
-          // Create document upload timeline event
-          await TimelineEventService.createDocumentUploadEvent(
-            vehicleId,
-            {
-              fileName: file.name,
-              fileSize: file.size,
-              documentUrl: urlData.publicUrl,
-              uploadDate: photoDate,
-              category: category
-            },
-            user.id
-          );
-        }
-      } catch (error) {
-        console.error('Failed to create timeline event:', error);
-        // Don't fail the entire upload if timeline event creation fails
+        }).then(({ data, error }) => {
+          if (error) {
+            console.warn('AI analysis failed:', error);
+          } else {
+            console.log('AI analysis triggered successfully');
+          }
+        }).catch(err => {
+          console.warn('AI analysis error:', err);
+        });
       }
 
       // Trigger AI analysis in background (non-blocking)
@@ -357,11 +352,29 @@ export class ImageUploadService {
   /**
    * Trigger background AI analysis (non-blocking)
    * This runs async so upload feels fast
-   * Now uses analyze-image which includes Rekognition + Appraiser Brain + SPID extraction
+   * Now includes:
+   * 1. Sensitive document detection (titles, registrations)
+   * 2. Rekognition + Appraiser Brain + SPID extraction
    */
   private static triggerBackgroundAIAnalysis(imageUrl: string, vehicleId: string, imageId: string): void {
-    // Fire and forget - don't await this
-    // Use analyze-image function which has full pipeline: Rekognition + Appraiser + SPID
+    // First: Check for sensitive documents (IMMEDIATE - blocks unauthorized access)
+    supabase.functions.invoke('detect-sensitive-document', {
+      body: {
+        image_url: imageUrl,
+        vehicle_id: vehicleId,
+        image_id: imageId
+      }
+    }).then(({ data, error }) => {
+      if (error) {
+        console.warn('Sensitive document detection failed:', error);
+      } else if (data?.is_sensitive) {
+        console.log(`🔒 Sensitive ${data.document_type} detected - access restricted`);
+      }
+    }).catch(err => {
+      console.warn('Sensitive document detection request failed:', err);
+    });
+
+    // Second: General AI analysis (tagging, quality, etc.)
     supabase.functions.invoke('analyze-image', {
       body: {
         image_url: imageUrl,
@@ -372,10 +385,25 @@ export class ImageUploadService {
       if (error) {
         console.warn('Background AI analysis trigger failed:', error);
       }
-      // Removed noisy success log - only log errors
     }).catch(err => {
       console.warn('Background AI analysis request failed:', err);
     });
+  }
+
+  /**
+   * Map DocumentType to database category
+   */
+  private static mapDocumentTypeToCategory(type: string): string | null {
+    const mapping: Record<string, string> = {
+      'receipt': 'receipt',
+      'invoice': 'invoice',
+      'title': 'title',
+      'registration': 'registration',
+      'insurance': 'insurance',
+      'manual': 'manual',
+      'other_document': 'other_document'
+    };
+    return mapping[type] || null;
   }
 
   /**

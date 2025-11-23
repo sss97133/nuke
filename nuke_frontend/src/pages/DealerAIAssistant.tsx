@@ -327,7 +327,7 @@ What do you want to do first?`,
                       <span>
                         {action.type === 'create_vehicle' && '+ Created vehicle'}
                         {action.type === 'update_vehicle' && '✓ Updated vehicle'}
-                        {action.type === 'add_images' && '📷 Added images'}
+                        {action.type === 'add_images' && 'Added images'}
                         {action.type === 'parse_receipt' && '🧾 Parsed receipt'}
                       </span>
                       <span style={{

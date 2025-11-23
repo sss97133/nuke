@@ -21,6 +21,7 @@ export type PrimaryPriceLabel = 'ASK' | 'SOLD' | 'EST' | 'PAID' | 'MSRP' | null;
 export interface PriceInfo {
   label: PrimaryPriceLabel;
   amount: number | null;
+  source?: string; // Database field name that provided this price
 }
 
 export interface DeltaInfo {
@@ -49,12 +50,12 @@ export const formatCurrency = (value?: number | null): string => {
 };
 
 export const computePrimaryPrice = (m: VehiclePriceMetadata): PriceInfo => {
-  if (m?.is_for_sale && typeof m?.asking_price === 'number') return { label: 'ASK', amount: m.asking_price };
-  if (typeof m?.sale_price === 'number') return { label: 'SOLD', amount: m.sale_price };
-  if (typeof m?.current_value === 'number') return { label: 'EST', amount: m.current_value };
-  if (typeof m?.purchase_price === 'number') return { label: 'PAID', amount: m.purchase_price };
-  if (typeof m?.msrp === 'number') return { label: 'MSRP', amount: m.msrp };
-  return { label: null, amount: null };
+  if (m?.is_for_sale && typeof m?.asking_price === 'number') return { label: 'ASK', amount: m.asking_price, source: 'asking_price' };
+  if (typeof m?.sale_price === 'number') return { label: 'SOLD', amount: m.sale_price, source: 'sale_price' };
+  if (typeof m?.current_value === 'number') return { label: 'EST', amount: m.current_value, source: 'current_value' };
+  if (typeof m?.purchase_price === 'number') return { label: 'PAID', amount: m.purchase_price, source: 'purchase_price' };
+  if (typeof m?.msrp === 'number') return { label: 'MSRP', amount: m.msrp, source: 'msrp' };
+  return { label: null, amount: null, source: '' };
 };
 
 export const computeDelta = (m: VehiclePriceMetadata): DeltaInfo | null => {

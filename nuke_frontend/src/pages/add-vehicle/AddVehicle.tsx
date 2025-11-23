@@ -13,8 +13,6 @@ import VerificationProgress from './components/VerificationProgress';
 import type { VehicleFormData, DetailLevel, ImageUploadProgress, ImageUploadStatus } from './types/index';
 import { extractImageMetadata, reverseGeocode, getEventDateFromImages, getEventLocationFromImages, type ImageMetadata } from '../../utils/imageMetadata';
 import { generateCraigslistEmail } from '../../utils/generateCraigslistEmail';
-import { MobileAddVehicle } from '../../components/mobile/MobileAddVehicle';
-import { useIsMobile } from '../../hooks/useIsMobile';
 
 const toDateTimeLocalString = (value: string): string => {
   const date = new Date(value);
@@ -86,7 +84,6 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
 }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
-  const isMobile = useIsMobile();
 
   // Form state using custom hook
   const {
@@ -1238,17 +1235,7 @@ Redirecting to vehicle profile...`);
     }
   }, [processImages]);
 
-  // If mobile, render mobile-optimized flow regardless of auth (it handles auth messaging)
-  if (isMobile) {
-    return (
-      <MobileAddVehicle
-        onClose={onClose}
-        onSuccess={onSuccess}
-      />
-    );
-  }
-
-  // Early return if not authenticated (desktop flow only)
+  // Early return if not authenticated
   if (!user) {
     const authContent = (
       <div className="container">

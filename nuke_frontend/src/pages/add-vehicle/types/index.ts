@@ -21,6 +21,7 @@ export interface VehicleFormData {
   // Engine & Performance
   fuel_type?: string;
   transmission?: string;
+  transmission_model?: string;
   engine_size?: string;
   displacement?: string;
   horsepower?: number;
