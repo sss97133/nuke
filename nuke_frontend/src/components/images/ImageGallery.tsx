@@ -235,12 +235,26 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
 
     const fileArray = Array.from(files);
     
-    // Save files to persistent queue FIRST
-    await uploadQueueService.addFiles(vehicleId, fileArray);
-    console.log(`Saved ${fileArray.length} files to upload queue`);
+    // Get existing images for deduplication check
+    const { data: existingImages } = await supabase
+      .from('vehicle_images')
+      .select('file_name, file_size')
+      .eq('vehicle_id', vehicleId);
+    
+    // Save files to persistent queue FIRST (with dedup check)
+    const result = await uploadQueueService.addFiles(vehicleId, fileArray, existingImages || []);
+    
+    if (result.skipped > 0) {
+      console.log(`Skipped ${result.skipped} duplicate files`);
+      alert(`${result.skipped} files were skipped (already uploaded). ${result.added} new files added to queue.`);
+    } else {
+      console.log(`Saved ${result.added} files to upload queue`);
+    }
     
     // Start upload from queue
-    await uploadFromQueue();
+    if (result.added > 0) {
+      await uploadFromQueue();
+    }
   };
 
   const uploadFromQueue = async () => {
