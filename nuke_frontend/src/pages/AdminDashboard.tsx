@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import OwnershipVerificationDashboard from '../components/admin/OwnershipVerificationDashboard';
 import AdminAnalytics from './AdminAnalytics';
-import '../../design-system.css';
+import '../design-system.css';
 
 interface PendingApproval {
   id: string;
