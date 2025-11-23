@@ -167,6 +167,11 @@ export class VehicleDeduplicationService {
         supabase.rpc('update_timeline_vehicle_id', {
           old_vehicle_id: mergeVehicleId,
           new_vehicle_id: keepVehicleId
+        }).catch(() => {
+          // Fallback if RPC doesn't exist - update manually
+          return supabase.from('timeline_events')
+            .update({ vehicle_id: keepVehicleId })
+            .eq('vehicle_id', mergeVehicleId);
         }),
         
         // Move organization links
@@ -185,14 +190,75 @@ export class VehicleDeduplicationService {
           .eq('vehicle_id', mergeVehicleId)
       ]);
 
-      // Soft delete the merged vehicle
-      await supabase
+      // HARD DELETE: Remove all remaining data for the merged vehicle
+      // First, get vehicle offering IDs for this vehicle
+      const { data: offerings } = await supabase
+        .from('vehicle_offerings')
+        .select('id')
+        .eq('vehicle_id', mergeVehicleId);
+
+      const offeringIds = (offerings || []).map(o => o.id);
+
+      // Delete all related data
+      await Promise.all([
+        // Delete any remaining timeline events
+        supabase.from('timeline_events')
+          .delete()
+          .eq('vehicle_id', mergeVehicleId),
+        
+        // Delete any remaining images
+        supabase.from('vehicle_images')
+          .delete()
+          .eq('vehicle_id', mergeVehicleId),
+        
+        // Delete organization links (already moved, but delete any orphaned ones)
+        supabase.from('organization_vehicles')
+          .delete()
+          .eq('vehicle_id', mergeVehicleId),
+        
+        // Delete comments (already moved, but delete any orphaned ones)
+        supabase.from('vehicle_comments')
+          .delete()
+          .eq('vehicle_id', mergeVehicleId),
+        
+        // Delete any other references
+        supabase.from('contractor_work_contributions')
+          .delete()
+          .eq('vehicle_id', mergeVehicleId),
+        
+        // Delete price history
+        supabase.from('vehicle_price_history')
+          .delete()
+          .eq('vehicle_id', mergeVehicleId),
+        
+        // Delete share holdings for this vehicle's offerings
+        offeringIds.length > 0 ? supabase.from('share_holdings')
+          .delete()
+          .in('offering_id', offeringIds) : Promise.resolve({ error: null }),
+        
+        // Delete vehicle offerings
+        supabase.from('vehicle_offerings')
+          .delete()
+          .eq('vehicle_id', mergeVehicleId)
+      ]);
+
+      // HARD DELETE: Remove the merged vehicle completely
+      const { error: deleteError } = await supabase
         .from('vehicles')
-        .update({ 
-          deleted_at: new Date().toISOString(),
-          notes: `Merged into ${keepVehicleId} by user ${userId}`
-        })
+        .delete()
         .eq('id', mergeVehicleId);
+
+      if (deleteError) {
+        console.warn('Error deleting merged vehicle:', deleteError);
+        // Fallback to soft delete if hard delete fails
+        await supabase
+          .from('vehicles')
+          .update({ 
+            deleted_at: new Date().toISOString(),
+            notes: `Merged into ${keepVehicleId} by user ${userId} - failed to hard delete`
+          })
+          .eq('id', mergeVehicleId);
+      }
 
       return { success: true };
     } catch (error: any) {

@@ -84,6 +84,7 @@ const Library: React.FC = () => {
     try {
       setLoading(true);
       
+      // Load documents with extraction status and uploader info
       const { data, error } = await supabase
         .from('library_documents')
         .select(`
@@ -93,10 +94,25 @@ const Library: React.FC = () => {
             make,
             series,
             body_style
+          ),
+          document_extractions (
+            id,
+            status,
+            extracted_data,
+            extracted_at
           )
         `)
         .eq('uploaded_by', session.user.id)
         .order('uploaded_at', { ascending: false });
+      
+      // Also get uploader profiles for attribution
+      const uploaderIds = [...new Set((data || []).map((d: any) => d.uploaded_by).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', uploaderIds);
+      
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
       if (!error && data) {
         const enriched = data.map((d: any) => ({
@@ -104,15 +120,75 @@ const Library: React.FC = () => {
           library_year: d.reference_libraries?.year,
           library_make: d.reference_libraries?.make,
           library_series: d.reference_libraries?.series,
-          library_body_style: d.reference_libraries?.body_style
+          library_body_style: d.reference_libraries?.body_style,
+          extraction: d.document_extractions?.[0] || null,
+          uploader_name: d.uploaded_by 
+            ? (profileMap.get(d.uploaded_by)?.full_name || profileMap.get(d.uploaded_by)?.username || 'You')
+            : 'You'
         }));
-        setDocuments(enriched);
+        
+        // Group documents by upload batch (within 2 minutes = same book)
+        const grouped = groupDocumentsByBook(enriched);
+        setDocuments(grouped);
       }
     } catch (err) {
       console.error('Failed to load documents:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Group documents uploaded within 2 minutes as one "book"
+  const groupDocumentsByBook = (docs: any[]): any[] => {
+    if (docs.length === 0) return [];
+    
+    const books: any[] = [];
+    let currentBook: any = null;
+    
+    for (const doc of docs) {
+      if (!currentBook) {
+        // Start new book
+        currentBook = {
+          ...doc,
+          is_book: true,
+          pages: [doc],
+          page_count: 1,
+          total_size: doc.file_size_bytes || 0
+        };
+      } else {
+        // Check if this doc is part of same book (within 2 minutes)
+        const timeDiff = new Date(doc.uploaded_at).getTime() - new Date(currentBook.uploaded_at).getTime();
+        const twoMinutes = 2 * 60 * 1000;
+        
+        if (timeDiff <= twoMinutes && doc.library_id === currentBook.library_id) {
+          // Same book - add as page
+          currentBook.pages.push(doc);
+          currentBook.page_count = currentBook.pages.length;
+          currentBook.total_size += (doc.file_size_bytes || 0);
+          // Use first extraction if available
+          if (!currentBook.extraction && doc.extraction) {
+            currentBook.extraction = doc.extraction;
+          }
+        } else {
+          // New book - save current and start new
+          books.push(currentBook);
+          currentBook = {
+            ...doc,
+            is_book: true,
+            pages: [doc],
+            page_count: 1,
+            total_size: doc.file_size_bytes || 0
+          };
+        }
+      }
+    }
+    
+    // Don't forget last book
+    if (currentBook) {
+      books.push(currentBook);
+    }
+    
+    return books;
   };
 
   const loadStats = async () => {
@@ -377,40 +453,67 @@ const Library: React.FC = () => {
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: 'var(--space-3)'
         }}>
-          {documents.map((doc) => (
-            <div key={doc.id} className="card" style={{ cursor: 'pointer' }}>
+          {documents.map((book) => (
+            <div key={book.id} className="card" style={{ cursor: 'pointer' }}>
               <div className="card-body">
                 <div style={{ fontSize: '32pt', textAlign: 'center', marginBottom: '8px' }}>
-                  {getDocumentIcon(doc.document_type)}
+                  {getDocumentIcon(book.document_type)}
                 </div>
                 <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
-                  {doc.title}
+                  {book.is_book && book.page_count > 1 
+                    ? `${book.page_count} Pages - ${book.pages[0]?.title || book.title}`
+                    : book.title}
                 </div>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  {doc.library_year} {doc.library_make} {doc.library_series}
-                  {doc.library_body_style && ` ${doc.library_body_style}`}
+                  {book.library_year} {book.library_make} {book.library_series}
+                  {book.library_body_style && ` ${book.library_body_style}`}
                 </div>
-                {doc.page_count && (
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                    {doc.page_count} pages
+                
+                {/* Book Stats */}
+                {book.is_book && book.page_count > 1 && (
+                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    {book.page_count} pages • {(book.total_size / 1024 / 1024).toFixed(1)} MB
                   </div>
                 )}
-                {doc.publisher && (
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                    {doc.publisher}
+                
+                {/* Extraction Status */}
+                {book.extraction && (
+                  <div style={{ 
+                    marginTop: '8px',
+                    padding: '6px',
+                    background: book.extraction.status === 'pending_review' ? '#fef3c7' : '#f0fdf4',
+                    borderRadius: '4px',
+                    fontSize: '7pt'
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                      {book.extraction.status === 'pending_review' ? '⏳ Processing...' : 
+                       book.extraction.status === 'applied' ? '✓ Extracted' : 
+                       book.extraction.status === 'rejected' ? '✗ Rejected' : 'Processing'}
+                    </div>
+                    {book.extraction.extracted_data && (
+                      <div style={{ fontSize: '6pt', color: 'var(--text-muted)' }}>
+                        {book.extraction.extracted_data.colors?.length || 0} colors • {' '}
+                        {book.extraction.extracted_data.specifications?.engines?.length || 0} engines • {' '}
+                        {book.extraction.extracted_data.options?.length || 0} options
+                      </div>
+                    )}
                   </div>
                 )}
+                
                 <div style={{ 
                   display: 'flex', 
                   gap: '4px', 
                   marginTop: '8px',
                   fontSize: '7pt'
                 }}>
-                  {doc.is_factory_original && (
+                  {book.is_factory_original && (
                     <span className="badge badge-secondary">Factory</span>
                   )}
-                  {doc.is_verified && (
+                  {book.is_verified && (
                     <span className="badge badge-success">Verified</span>
+                  )}
+                  {book.is_book && book.page_count > 1 && (
+                    <span className="badge badge-primary">{book.page_count} pages</span>
                   )}
                 </div>
                 <div style={{ 
@@ -420,10 +523,25 @@ const Library: React.FC = () => {
                   fontSize: '7pt',
                   color: 'var(--text-muted)',
                   display: 'flex',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '4px'
+                }}>
+                  <span>{book.download_count || 0} downloads</span>
+                  <span>{book.vehicles_using || 0} vehicles</span>
+                </div>
+                {/* Attribution */}
+                <div style={{
+                  fontSize: '7pt',
+                  color: 'var(--text-muted)',
+                  marginTop: '8px',
+                  paddingTop: '8px',
+                  borderTop: '1px solid var(--border)',
+                  display: 'flex',
                   justifyContent: 'space-between'
                 }}>
-                  <span>{doc.download_count} downloads</span>
-                  <span>{doc.vehicles_using || 0} vehicles</span>
+                  <span>Provided by</span>
+                  <span style={{ fontWeight: 600 }}>{book.uploader_name || 'You'}</span>
                 </div>
                 <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
                   <button

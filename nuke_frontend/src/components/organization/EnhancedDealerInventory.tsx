@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleRelationshipVerification from './VehicleRelationshipVerification';
+import QuickRelationshipEditor from './QuickRelationshipEditor';
+import MarkAsDuplicateButton from '../vehicle/MarkAsDuplicateButton';
+import QuickStatusBadge from './QuickStatusBadge';
+import FlagProblemButton from './FlagProblemButton';
 
 interface DealerVehicle {
   id: string;
@@ -17,6 +21,7 @@ interface DealerVehicle {
   sale_price: number | null;
   start_date?: string | null;
   end_date?: string | null;
+  notes?: string | null;
   created_at: string;
   vehicles: {
     id: string;
@@ -25,6 +30,7 @@ interface DealerVehicle {
     model: string;
     trim?: string;
     vin?: string;
+    vin_is_valid?: boolean | null;
     current_value?: number;
     mileage?: number;
     sale_status?: string | null;
@@ -40,8 +46,8 @@ interface Props {
 }
 
 type ViewMode = 'grid' | 'list' | 'compact';
-type CategoryType = 'all' | 'for_sale' | 'sold' | 'new_arrival' | 'in_build' | 'auction_soon' | 'pending' | 'service' | 'historical';
-type SortBy = 'newest' | 'oldest' | 'price_high' | 'price_low' | 'days_lot';
+type CategoryType = 'current' | 'all' | 'for_sale' | 'sold' | 'new_arrival' | 'in_build' | 'auction_soon' | 'pending' | 'service' | 'historical';
+type SortBy = 'newest' | 'oldest' | 'price_high' | 'price_low' | 'days_lot' | 'year_desc' | 'year_asc' | 'make_az' | 'make_za';
 
 const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canEdit, isOwner }) => {
   const navigate = useNavigate();
@@ -49,11 +55,12 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
   const [vehicles, setVehicles] = useState<DealerVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [category, setCategory] = useState<CategoryType>('all');
+  const [category, setCategory] = useState<CategoryType>('current');  // Changed from 'all' to 'current'
   const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [selectedVehicles, setSelectedVehicles] = useState<Set<string>>(new Set());
-  const [bulkEditMode, setBulkEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingVehicle, setEditingVehicle] = useState<DealerVehicle | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     loadVehicles();
@@ -79,6 +86,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           sale_price,
           start_date,
           end_date,
+          notes,
           created_at,
           vehicles!inner(
             id,
@@ -87,6 +95,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             model,
             trim,
             vin,
+            vin_is_valid,
             current_value,
             mileage,
             sale_status
@@ -137,9 +146,9 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       return 'sold';
     }
     
-    // If status says "sold" but no proof, treat as inventory (needs verification)
+    // If status says "sold" but no proof, still show as sold but flag it
     if (v.status === 'sold' && !hasSaleProof) {
-      return 'all'; // Show in "all" until verified
+      return 'sold'; // Show as sold, user can verify/fix
     }
     
     // Service/work vehicles
@@ -164,8 +173,13 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
   // Filter and sort
   const filteredAndSorted = vehicles
     .filter(v => {
+      // "Current" filter: exclude sold vehicles (this is the default view)
+      if (category === 'current') {
+        const displayCategory = getDisplayCategory(v);
+        if (displayCategory === 'sold' || displayCategory === 'historical') return false;
+      }
       // Category filter - use smart categorization
-      if (category !== 'all') {
+      else if (category !== 'all') {
         const displayCategory = getDisplayCategory(v);
         if (displayCategory !== category) return false;
       }
@@ -183,6 +197,10 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       switch (sortBy) {
         case 'newest': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         case 'oldest': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'year_desc': return (b.vehicles.year || 0) - (a.vehicles.year || 0);
+        case 'year_asc': return (a.vehicles.year || 0) - (b.vehicles.year || 0);
+        case 'make_az': return (a.vehicles.make || '').localeCompare(b.vehicles.make || '');
+        case 'make_za': return (b.vehicles.make || '').localeCompare(a.vehicles.make || '');
         case 'price_high': return (b.asking_price || 0) - (a.asking_price || 0);
         case 'price_low': return (a.asking_price || 0) - (b.asking_price || 0);
         case 'days_lot': return b.days_on_lot - a.days_on_lot;
@@ -192,6 +210,10 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
 
   // Calculate category counts using smart categorization
   const counts = {
+    current: vehicles.filter(v => {
+      const cat = getDisplayCategory(v);
+      return cat !== 'sold' && cat !== 'historical';
+    }).length,
     all: vehicles.length,
     for_sale: vehicles.filter(v => getDisplayCategory(v) === 'for_sale').length,
     new_arrival: vehicles.filter(v => getDisplayCategory(v) === 'new_arrival').length,
@@ -240,6 +262,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
     const badges: Record<string, { color: string; text: string }> = {
       'for_sale': { color: '#10b981', text: 'FOR SALE' },
       'sold': { color: '#6b7280', text: 'SOLD' },
+      'all': { color: '#9ca3af', text: 'UNCATEGORIZED' },
       'new_arrival': { color: '#3b82f6', text: 'NEW ARRIVAL' },
       'in_build': { color: '#f59e0b', text: 'IN BUILD' },
       'auction_soon': { color: '#8b5cf6', text: 'AUCTION SOON' },
@@ -275,84 +298,82 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           </span>
         </div>
 
-        {canEdit && (
-          <button
-            onClick={() => setBulkEditMode(!bulkEditMode)}
-            style={{
-              padding: '8px 16px',
-              fontSize: '8pt',
-              fontWeight: 700,
-              border: bulkEditMode ? '2px solid var(--accent)' : '1px solid var(--border)',
-              background: bulkEditMode ? 'var(--accent)' : 'white',
-              color: bulkEditMode ? 'white' : 'var(--text)',
-              cursor: 'pointer',
-              borderRadius: '4px'
-            }}
-          >
-            {bulkEditMode ? 'EXIT BULK EDIT' : 'BULK EDIT'}
-          </button>
-        )}
       </div>
 
-      {/* Bulk Actions */}
-      {bulkEditMode && selectedVehicles.size > 0 && (
+      {/* Minimal Sticky Edit Bar */}
+      {canEdit && (
         <div style={{
-          padding: '12px',
-          background: 'var(--accent)',
-          color: 'white',
-          borderRadius: '4px',
-          marginBottom: '16px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          background: 'var(--bg-primary)',
+          padding: '4px 0',
+          marginBottom: '8px',
+          borderBottom: '1px solid var(--border-light)',
           display: 'flex',
-          justifyContent: 'space-between',
+          gap: '8px',
           alignItems: 'center'
         }}>
-          <div style={{ fontSize: '9pt', fontWeight: 700 }}>
-            {selectedVehicles.size} selected
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <select
-              onChange={(e) => handleBulkStatusChange(e.target.value)}
-              style={{
-                padding: '4px 8px',
-                fontSize: '8pt',
-                borderRadius: '3px',
-                border: 'none'
-              }}
-              defaultValue=""
-            >
-              <option value="" disabled>Change Status...</option>
-              <option value="for_sale">For Sale</option>
-              <option value="sold">Sold</option>
-              <option value="new_arrival">New Arrival</option>
-              <option value="in_build">In Build</option>
-              <option value="auction_soon">Auction Soon</option>
-              <option value="pending">Pending</option>
-            </select>
-            <button
-              onClick={() => setSelectedVehicles(new Set())}
-              style={{
-                padding: '4px 12px',
-                fontSize: '8pt',
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: 'white',
-                cursor: 'pointer',
-                borderRadius: '3px'
-              }}
-            >
-              CLEAR
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              setEditMode(!editMode);
+              setSelectedVehicles(new Set());
+            }}
+            style={{
+              padding: '4px 12px',
+              fontSize: '8pt',
+              fontWeight: 700,
+              border: editMode ? '2px solid var(--accent)' : '1px solid var(--border)',
+              background: editMode ? 'var(--accent)' : 'white',
+              color: editMode ? 'white' : 'var(--text)',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              transition: 'all 0.12s ease'
+            }}
+          >
+            {editMode ? 'EXIT EDIT' : 'EDIT'}
+          </button>
+          {editMode && selectedVehicles.size > 0 && (
+            <div style={{
+              padding: '4px 12px',
+              background: 'var(--accent-dim)',
+              border: '1px solid var(--accent)',
+              borderRadius: '4px',
+              fontSize: '8pt',
+              fontWeight: 700,
+              color: 'var(--accent)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>{selectedVehicles.size} selected</span>
+              <button
+                onClick={() => setSelectedVehicles(new Set())}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '8pt',
+                  background: 'var(--accent)',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer',
+                  borderRadius: '3px',
+                  fontWeight: 600
+                }}
+              >
+                CLEAR
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Search and Filters */}
+      {/* Search and Filters - NOT Sticky */}
       <div style={{
         display: 'flex',
         gap: '12px',
-        marginBottom: '16px',
         flexWrap: 'wrap',
-        alignItems: 'center'
+        alignItems: 'center',
+        marginBottom: '16px'
       }}>
         {/* Search */}
         <input
@@ -364,7 +385,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             flex: 1,
             minWidth: '200px',
             padding: '8px 12px',
-            fontSize: '9pt',
+            fontSize: '8pt',
             border: '1px solid var(--border)',
             borderRadius: '4px'
           }}
@@ -383,6 +404,10 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
         >
           <option value="newest">Newest First</option>
           <option value="oldest">Oldest First</option>
+          <option value="year_desc">Year (Newest)</option>
+          <option value="year_asc">Year (Oldest)</option>
+          <option value="make_az">Make (A-Z)</option>
+          <option value="make_za">Make (Z-A)</option>
           <option value="price_high">Price: High to Low</option>
           <option value="price_low">Price: Low to High</option>
           <option value="days_lot">Days on Lot</option>
@@ -395,8 +420,8 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
               key={mode}
               onClick={() => setViewMode(mode)}
               style={{
-                padding: '6px 12px',
-                fontSize: '7pt',
+                padding: '4px 10px',
+                fontSize: '8pt',
                 fontWeight: 700,
                 border: 'none',
                 background: viewMode === mode ? 'var(--accent)' : 'transparent',
@@ -419,7 +444,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
         overflowX: 'auto',
         paddingBottom: '8px'
       }}>
-        {(['all', 'for_sale', 'sold', 'new_arrival', 'in_build', 'auction_soon', 'pending', 'service', 'historical'] as CategoryType[]).filter(cat => counts[cat] > 0 || cat === 'all').map(cat => (
+        {(['current', 'for_sale', 'sold', 'all', 'new_arrival', 'in_build', 'auction_soon', 'pending', 'service', 'historical'] as CategoryType[]).filter(cat => counts[cat] > 0 || cat === 'all' || cat === 'current').map(cat => (
           <button
             key={cat}
             onClick={() => setCategory(cat)}
@@ -436,7 +461,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
               transition: 'all 0.12s ease'
             }}
           >
-            {cat === 'all' ? 'ALL' : cat.replace('_', ' ').toUpperCase()} ({counts[cat]})
+            {cat === 'current' ? 'CURRENT' : cat === 'all' ? 'ALL' : cat.replace('_', ' ').toUpperCase()} ({counts[cat]})
           </button>
         ))}
       </div>
@@ -482,10 +507,10 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                       border: isSelected ? '3px solid var(--accent)' : undefined,
                       position: 'relative'
                     }}
-                    onClick={() => bulkEditMode ? toggleSelectVehicle(v.id) : navigate(`/vehicle/${v.vehicle_id}`)}
+                    onClick={() => editMode ? toggleSelectVehicle(v.id) : navigate(`/vehicle/${v.vehicle_id}`)}
                   >
-                    {/* Checkbox for bulk edit */}
-                    {bulkEditMode && (
+                    {/* Checkbox for selection */}
+                    {editMode && isSelected && (
                       <div style={{
                         position: 'absolute',
                         top: '8px',
@@ -537,7 +562,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         <div style={{
                           position: 'absolute',
                           top: '8px',
-                          left: bulkEditMode ? '36px' : '8px',
+                          left: '8px',
                           fontSize: '18pt'
                         }}>
                           ⭐
@@ -593,20 +618,45 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         </div>
                       )}
 
+                      {/* VIN Warning */}
+                      {(v.vehicles.vin_is_valid === false || !v.vehicles.vin) && (
+                        <div style={{
+                          padding: '6px 8px',
+                          background: v.vehicles.vin_is_valid === false ? '#fef2f2' : '#fef3c7',
+                          border: `2px solid ${v.vehicles.vin_is_valid === false ? '#dc2626' : '#fbbf24'}`,
+                          borderRadius: '4px',
+                          fontSize: '8pt',
+                          fontWeight: 600,
+                          color: v.vehicles.vin_is_valid === false ? '#dc2626' : '#92400e',
+                          marginBottom: '8px'
+                        }}>
+                          {v.vehicles.vin_is_valid === false ? '❌ INVALID VIN' : '⚠️ NO VIN'}
+                        </div>
+                      )}
+
                       {/* Metrics */}
                       <div style={{
                         display: 'flex',
                         gap: '12px',
                         fontSize: '8pt',
                         color: 'var(--text-muted)',
-                        marginTop: '8px'
+                        marginTop: '8px',
+                        alignItems: 'center'
                       }}>
                         {v.vehicles.mileage && (
                           <span>{v.vehicles.mileage.toLocaleString()} mi</span>
                         )}
                         {v.vehicles.vin && (
-                          <span style={{ fontFamily: 'monospace' }}>
+                          <span style={{ 
+                            fontFamily: 'monospace',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
                             {v.vehicles.vin.slice(-6)}
+                            {v.vehicles.vin_is_valid === false && (
+                              <span style={{ color: '#dc2626', fontSize: '10px' }}>❌</span>
+                            )}
                           </span>
                         )}
                       </div>
@@ -626,18 +676,31 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         </div>
                       )}
 
-                      {/* Verification Request Button */}
-                      {canEdit && (
-                        <div style={{ marginTop: '8px' }}>
-                          <VehicleRelationshipVerification
-                            organizationVehicleId={v.id}
-                            currentRelationshipType={v.relationship_type}
-                            currentStatus={v.status}
-                            vehicleId={v.vehicle_id}
-                            onVerificationSubmitted={() => {
-                              loadVehicles();
+                      {/* Quick Edit Buttons - Only show in edit mode */}
+                      {editMode && (
+                        <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingVehicle(v);
                             }}
-                          />
+                            className="button button-secondary"
+                            style={{
+                              flex: 1,
+                              fontSize: '8pt',
+                              padding: '6px 8px'
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <FlagProblemButton
+                              orgVehicleId={v.id}
+                              vehicleId={v.vehicle_id}
+                              userId={userId!}
+                              onFlagged={loadVehicles}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -663,7 +726,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                       cursor: 'pointer',
                       border: isSelected ? '3px solid var(--accent)' : undefined
                     }}
-                    onClick={() => bulkEditMode ? toggleSelectVehicle(v.id) : navigate(`/vehicle/${v.vehicle_id}`)}
+                    onClick={() => editMode ? toggleSelectVehicle(v.id) : navigate(`/vehicle/${v.vehicle_id}`)}
                   >
                     <div className="card-body">
                       <div style={{
@@ -672,7 +735,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         alignItems: 'center'
                       }}>
                         {/* Checkbox */}
-                        {bulkEditMode && (
+                        {editMode && isSelected && (
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -746,6 +809,32 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                               ${v.asking_price.toLocaleString()}
                             </div>
                           )}
+
+                          {editMode && (
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingVehicle(v);
+                                }}
+                                className="button button-secondary"
+                                style={{
+                                  fontSize: '7pt',
+                                  padding: '4px 8px',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <MarkAsDuplicateButton
+                                  vehicleId={v.vehicle_id}
+                                  userId={userId!}
+                                  onMarked={loadVehicles}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -762,12 +851,13 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                 <table style={{ width: '100%', fontSize: '8pt', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg-secondary)' }}>
-                      {bulkEditMode && <th style={{ padding: '8px', width: '40px' }}></th>}
+                      {editMode && <th style={{ padding: '8px', width: '40px' }}></th>}
                       <th style={{ padding: '8px', textAlign: 'left' }}>Vehicle</th>
                       <th style={{ padding: '8px', textAlign: 'left' }}>Status</th>
                       <th style={{ padding: '8px', textAlign: 'right' }}>Price</th>
                       <th style={{ padding: '8px', textAlign: 'center' }}>Days</th>
                       <th style={{ padding: '8px', textAlign: 'left' }}>VIN</th>
+                      {editMode && <th style={{ padding: '8px', textAlign: 'center' }}>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -779,7 +869,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                       return (
                         <tr
                           key={v.id}
-                          onClick={() => bulkEditMode ? toggleSelectVehicle(v.id) : navigate(`/vehicle/${v.vehicle_id}`)}
+                          onClick={() => editMode ? toggleSelectVehicle(v.id) : navigate(`/vehicle/${v.vehicle_id}`)}
                           style={{
                             borderBottom: '1px solid var(--border)',
                             cursor: 'pointer',
@@ -787,7 +877,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           }}
                           className="hover:bg-gray-50"
                         >
-                          {bulkEditMode && (
+                          {editMode && (
                             <td style={{ padding: '8px' }}>
                               <input
                                 type="checkbox"
@@ -822,6 +912,32 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '7pt' }}>
                             {v.vehicles.vin || '—'}
                           </td>
+                          {editMode && (
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingVehicle(v);
+                                  }}
+                                  className="button button-secondary"
+                                  style={{
+                                    fontSize: '7pt',
+                                    padding: '4px 8px'
+                                  }}
+                                >
+                                  Edit
+                                </button>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <MarkAsDuplicateButton
+                                    vehicleId={v.vehicle_id}
+                                    userId={userId!}
+                                    onMarked={loadVehicles}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -831,6 +947,20 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             </div>
           )}
         </>
+      )}
+
+      {/* Quick Relationship Editor Popup */}
+      {editingVehicle && (
+        <QuickRelationshipEditor
+          orgVehicleId={editingVehicle.id}
+          currentRelationship={editingVehicle.relationship_type}
+          currentStatus={editingVehicle.status}
+          currentNotes={editingVehicle.notes || ''}
+          vehicleName={`${editingVehicle.vehicles.year} ${editingVehicle.vehicles.make} ${editingVehicle.vehicles.model}`}
+          vehicleId={editingVehicle.vehicle_id}
+          onUpdate={loadVehicles}
+          onClose={() => setEditingVehicle(null)}
+        />
       )}
     </div>
   );

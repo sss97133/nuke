@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { generateContributionEventDescription } from '../../services/intelligentEventDescription';
 import { supabase } from '../../lib/supabase';
 import type { UserContribution } from '../../types/profile';
+import TechnicianDayReceipt from './TechnicianDayReceipt';
 
 interface ContributionTimelineProps {
   contributions: UserContribution[];
   onTotalCalculated?: (total: number) => void;
+  userId?: string; // User ID for technician receipt
 }
 
-const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributions, onTotalCalculated }) => {
+const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributions, onTotalCalculated, userId }) => {
   const [selectedDayContributions, setSelectedDayContributions] = useState<UserContribution[]>([]);
   const [showDayPopup, setShowDayPopup] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [vehicleDetails, setVehicleDetails] = useState<Map<string, any>>(new Map());
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const year = new Date().getFullYear();
@@ -147,10 +150,11 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
     );
     
     if (dayContributions.length > 0) {
+      setSelectedDate(dayYmd);
       setSelectedDayContributions(dayContributions);
       setShowDayPopup(true);
       
-      // Fetch vehicle details for these contributions
+      // Fetch vehicle details for these contributions (for fallback old popup)
       const vehicleIds = [...new Set(dayContributions.map(c => c.related_vehicle_id).filter((id): id is string => !!id))];
       const newDetails = new Map(vehicleDetails);
       
@@ -181,6 +185,16 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
       
       setVehicleDetails(newDetails);
     }
+  };
+
+  const handleNavigateDay = (direction: 'prev' | 'next') => {
+    if (!selectedDate) return;
+    
+    const currentDate = new Date(selectedDate);
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
+    
+    handleDayClick(newDate);
   };
 
   // Calculate streaks
@@ -427,30 +441,59 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
           <span className="text-small">More</span>
         </div>
 
-        {/* Day Contributions Popup */}
-        {showDayPopup && selectedDayContributions.length > 0 && (
+        {/* Technician Day Receipt - New comprehensive work report */}
+        {showDayPopup && selectedDate && userId && (
+          <TechnicianDayReceipt
+            userId={userId}
+            date={selectedDate}
+            onClose={() => {
+              setShowDayPopup(false);
+              setSelectedDate(null);
+            }}
+            onNavigate={handleNavigateDay}
+          />
+        )}
+
+        {/* Day Contributions Popup - Fallback for when userId not provided */}
+        {showDayPopup && selectedDayContributions.length > 0 && !userId && (
           <div
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.5)',
+              background: 'rgba(0, 0, 0, 0.75)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 1001
             }}
             onClick={() => setShowDayPopup(false)}
+            onKeyDown={(e) => {
+              // Keyboard navigation
+              if (e.key === 'ArrowLeft') {
+                const currentDate = new Date(selectedDayContributions[0].contribution_date);
+                currentDate.setDate(currentDate.getDate() - 1);
+                handleDayClick(currentDate);
+              } else if (e.key === 'ArrowRight') {
+                const currentDate = new Date(selectedDayContributions[0].contribution_date);
+                currentDate.setDate(currentDate.getDate() + 1);
+                handleDayClick(currentDate);
+              } else if (e.key === 'Escape') {
+                setShowDayPopup(false);
+              }
+            }}
+            tabIndex={0}
           >
             <div
-            className="card"
-            style={{ maxWidth: '800px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+              className="card"
+              style={{ maxWidth: '800px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <button 
                     className="button button-secondary button-small"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       const currentDate = new Date(selectedDayContributions[0].contribution_date);
                       currentDate.setDate(currentDate.getDate() - 1);
                       handleDayClick(currentDate);
@@ -460,11 +503,16 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                     PREV DAY
                   </button>
                   <h4 style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                    {new Date(selectedDayContributions[0].contribution_date).toLocaleDateString()}
+                    {new Date(selectedDayContributions[0].contribution_date).toLocaleDateString('en-US', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
                   </h4>
                   <button 
                     className="button button-secondary button-small"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       const currentDate = new Date(selectedDayContributions[0].contribution_date);
                       currentDate.setDate(currentDate.getDate() + 1);
                       handleDayClick(currentDate);
@@ -476,7 +524,10 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                 </div>
                 <button 
                   className="button button-secondary button-small" 
-                  onClick={() => setShowDayPopup(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDayPopup(false);
+                  }}
                   style={{ fontSize: '9px', fontWeight: 700 }}
                 >
                   CLOSE
@@ -560,7 +611,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                                 marginTop: '4px'
                               }}>
                                 <div style={{ fontWeight: 'bold', color: '#1a5490', marginBottom: '2px' }}>
-                                  🧠 AI Analysis
+                                  AI Analysis
                                 </div>
                                 <div style={{ color: '#475569', fontSize: '9px' }}>
                                   {metadata.ai_analysis.summary}

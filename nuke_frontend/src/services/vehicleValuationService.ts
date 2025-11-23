@@ -289,7 +289,7 @@ export class VehicleValuationService {
       // 2. Get market data including MarketCheck validated sources
       const { data: vehicle } = await supabase
         .from('vehicles')
-        .select('make, model, year, vin')
+        .select('make, model, year, vin, current_value, purchase_price, msrp')
         .eq('id', vehicleId)
         .single();
 
@@ -389,6 +389,55 @@ export class VehicleValuationService {
         .from('vehicle_images')
         .select('id, image_url')
         .eq('vehicle_id', vehicleId);
+
+      // 3a. Get AI analysis results for quality assessment
+      const { data: profileInsights } = await supabase
+        .from('profile_image_insights')
+        .select('*')
+        .eq('vehicle_id', vehicleId)
+        .order('summary_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Use AI insights to detect build quality
+      let buildQualityMultiplier = 1.0;
+      if (profileInsights && profileInsights.checklist) {
+        const checklist = profileInsights.checklist as any;
+        
+        // Professional build indicators
+        const isProfessionalBuild = 
+          checklist.paint_quality === 'professional' ||
+          checklist.paint_quality === 'show_quality' ||
+          checklist.build_quality === 'professional';
+        
+        const hasCustomWork =
+          checklist.has_custom_interior === true ||
+          checklist.has_custom_paint === true ||
+          checklist.has_lift_kit === true;
+        
+        const isCleanBuild =
+          checklist.rust_severity === 'none' ||
+          checklist.rust_severity === 'surface' &&
+          checklist.frame_visible_damage === false;
+        
+        // Apply quality multipliers
+        if (isProfessionalBuild) {
+          buildQualityMultiplier += 0.15; // +15% for professional work
+          valuation.dataSources.push('AI: Professional Build Quality');
+        }
+        
+        if (hasCustomWork) {
+          buildQualityMultiplier += 0.10; // +10% for custom features
+          valuation.dataSources.push('AI: Custom Features Detected');
+        }
+        
+        if (isCleanBuild) {
+          buildQualityMultiplier += 0.05; // +5% for clean condition
+          valuation.dataSources.push('AI: Excellent Condition');
+        }
+        
+        console.log(`AI build quality multiplier: ${buildQualityMultiplier}x`);
+      }
       
       // 3b. Check structured vehicle documents (Receipts, Invoices, etc.)
       // Fetch all documents and filter client-side to avoid enum type issues with .in()
@@ -499,6 +548,23 @@ export class VehicleValuationService {
         );
       } else if (valuation.totalInvested > 0 && !valuation.estimatedValue) {
         valuation.estimatedValue = valuation.totalInvested + documentationBonus;
+      } else if (!valuation.estimatedValue && vehicle?.current_value) {
+        // FALLBACK: Use database current_value if no other data
+        valuation.estimatedValue = vehicle.current_value;
+        valuation.dataSources.push('Vehicle Record');
+        valuation.hasRealData = true;
+        valuation.confidence = Math.max(valuation.confidence, 70);
+      } else if (!valuation.estimatedValue && vehicle?.purchase_price) {
+        // FALLBACK: Use purchase price if current_value missing
+        valuation.estimatedValue = vehicle.purchase_price;
+        valuation.dataSources.push('Purchase Price');
+        valuation.hasRealData = true;
+        valuation.confidence = Math.max(valuation.confidence, 60);
+      } else if (!valuation.estimatedValue && vehicle?.msrp) {
+        // FALLBACK: Use MSRP as last resort
+        valuation.estimatedValue = vehicle.msrp;
+        valuation.dataSources.push('Original MSRP');
+        valuation.confidence = Math.max(valuation.confidence, 40);
       }
 
       // 5b. Apply AI condition caps/penalties using latest profile_image_insights checklist
@@ -542,6 +608,14 @@ export class VehicleValuationService {
         }
       } catch {
         // If insights unavailable, skip penalties silently
+      }
+
+      // Apply AI-detected build quality multiplier to final value
+      if (buildQualityMultiplier > 1.0 && valuation.estimatedValue > 0) {
+        const qualityAdjustment = valuation.estimatedValue * (buildQualityMultiplier - 1.0);
+        console.log(`Applying AI quality adjustment: +$${Math.round(qualityAdjustment)}`);
+        valuation.estimatedValue = Math.round(valuation.estimatedValue * buildQualityMultiplier);
+        valuation.confidence = Math.min(valuation.confidence + 5, 95); // Increase confidence with AI data
       }
 
       // Set market range

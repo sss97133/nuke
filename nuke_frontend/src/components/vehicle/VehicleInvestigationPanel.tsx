@@ -400,7 +400,7 @@ export default function VehicleInvestigationPanel({ vehicleId, onClose }: Props)
           </h3>
           <div style={{ fontSize: '9pt', color: 'var(--text-secondary)' }}>
             {data.who.photographer_device && (
-              <div>📷 Camera: {data.who.photographer_device}</div>
+              <div>Camera: {data.who.photographer_device}</div>
             )}
             <div>👥 Contributors: {data.who.contributor_count}</div>
           </div>

@@ -1,6 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import ReactImageAnnotate from '@visionware/react-image-annotate';
 import { supabase } from '../../lib/supabase';
+
+// Error Boundary for catching annotation library errors
+class AnnotationErrorBoundary extends Component<
+  { children: React.ReactNode; onError?: () => void },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Annotation library error:', error, errorInfo);
+    this.props.onError?.();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          background: '#0a0a0a',
+          color: '#ffffff',
+          flexDirection: 'column',
+          gap: '16px',
+          padding: '24px'
+        }}>
+          <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+            Annotation Tool Error
+          </div>
+          <div style={{ fontSize: '14px', color: '#888', textAlign: 'center', maxWidth: '500px' }}>
+            The image annotation library encountered an error. This feature is temporarily unavailable.
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '12px 24px',
+              background: '#2196f3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 interface IntelligentImageTaggerProps {
   imageUrl: string;
@@ -148,39 +209,41 @@ export const IntelligentImageTagger: React.FC<IntelligentImageTaggerProps> = ({
   }
 
   return (
-    <div style={{ width: '100%', height: '100vh' }}>
-      <ReactImageAnnotate
-        labelImages
-        regionClsList={[
-          'part',
-          'damage',
-          'modification',
-          'rust',
-          'paint',
-          'trim',
-          'mechanical',
-          'electrical',
-          'interior',
-          'exterior'
-        ]}
-        enabledTools={[
-          'select',
-          'create-box',
-          'create-polygon',
-          'create-point'
-        ]}
-        selectedTool="select"
-        images={[
-          {
-            src: imageUrl,
-            name: 'Vehicle Image',
-            regions: regions
-          }
-        ]}
-        onExit={onClose}
-        onChange={handleChange}
-      />
-    </div>
+    <AnnotationErrorBoundary onError={onClose}>
+      <div style={{ width: '100%', height: '100vh' }}>
+        <ReactImageAnnotate
+          labelImages
+          regionClsList={[
+            'part',
+            'damage',
+            'modification',
+            'rust',
+            'paint',
+            'trim',
+            'mechanical',
+            'electrical',
+            'interior',
+            'exterior'
+          ]}
+          enabledTools={[
+            'select',
+            'create-box',
+            'create-polygon',
+            'create-point'
+          ]}
+          selectedTool="select"
+          images={[
+            {
+              src: imageUrl,
+              name: 'Vehicle Image',
+              regions: regions
+            }
+          ]}
+          onExit={onClose}
+          onChange={handleChange}
+        />
+      </div>
+    </AnnotationErrorBoundary>
   );
 };
 

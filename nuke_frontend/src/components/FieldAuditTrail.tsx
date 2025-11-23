@@ -40,7 +40,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
       case 'human_input': return '👤';
       case 'ai_scan': return '🤖';
       case 'ai_extraction': return '📄';
-      case 'ocr': return '📷';
+      case 'ocr': return 'OCR';
       default: return '❓';
     }
   };

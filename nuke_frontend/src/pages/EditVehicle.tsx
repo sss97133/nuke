@@ -20,14 +20,32 @@ interface VehicleFormData {
 
   // Physical Specifications
   color?: string;
+  secondary_color?: string;
   interior_color?: string;
+  interior_color_secondary?: string;
+  interior_color_tertiary?: string;
   body_style?: string;
   doors?: number;
   seats?: number;
+  seat_type?: string;
+  seat_material_primary?: string;
+  seat_material_secondary?: string;
+  interior_material_details?: string;
+  
+  // Trade information
+  received_in_trade?: boolean;
+  
+  // Trim & Styling
+  has_molding?: boolean;
+  has_pinstriping?: boolean;
+  has_body_kit?: boolean;
+  has_racing_stripes?: boolean;
+  trim_details?: string;
 
   // Engine & Performance
   fuel_type?: string;
   transmission?: string;
+  transmission_model?: string;
   engine_size?: string;
   displacement?: string;
   horsepower?: number;
@@ -133,16 +151,16 @@ const EditVehicle: React.FC = () => {
       }
 
       // Check if user is owner or has edit permissions
-      if (!user || data.user_id !== user?.id) {
-        // Check for contributor access
-        const { data: contribData } = await supabase
-          .from('vehicle_contributor_roles')
-          .select('role')
-          .eq('vehicle_id', vehicleId)
-          .eq('user_id', user?.id || '')
-          .maybeSingle();
+      if (!user || (data.user_id !== user?.id && data.uploaded_by !== user?.id && data.owner_id !== user?.id)) {
+        // Check for contributor access via RPC function
+        const { data: canEdit, error: permError } = await supabase
+          .rpc('user_can_edit_vehicle', {
+            p_vehicle_id: vehicleId,
+            p_user_id: user?.id || ''
+          });
         
-        if (!contribData || (contribData.role !== 'owner' && contribData.role !== 'restorer')) {
+        if (permError || !canEdit) {
+          console.error('[EditVehicle] Permission denied:', permError, 'canEdit:', canEdit);
           setError('You do not have permission to edit this vehicle');
           return;
         }
@@ -164,6 +182,7 @@ const EditVehicle: React.FC = () => {
         seats: data.seats,
         fuel_type: data.fuel_type,
         transmission: data.transmission,
+        transmission_model: data.transmission_model,
         engine_size: data.engine_size,
         displacement: data.displacement,
         horsepower: data.horsepower,
@@ -600,7 +619,7 @@ const EditVehicle: React.FC = () => {
                   <div className="card-body">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="form-group">
-                        <label htmlFor="color" className="form-label">Exterior Color</label>
+                        <label htmlFor="color" className="form-label">Primary Exterior Color</label>
                         <input
                           type="text"
                           id="color"
@@ -613,7 +632,20 @@ const EditVehicle: React.FC = () => {
                       </div>
 
                       <div className="form-group">
-                        <label htmlFor="interior_color" className="form-label">Interior Color</label>
+                        <label htmlFor="secondary_color" className="form-label">Secondary Color (if two-tone)</label>
+                        <input
+                          type="text"
+                          id="secondary_color"
+                          name="secondary_color"
+                          value={formData.secondary_color || ''}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          placeholder="e.g., White, Black, Chrome"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="interior_color" className="form-label">Primary Interior Color</label>
                         <input
                           type="text"
                           id="interior_color"
@@ -625,6 +657,174 @@ const EditVehicle: React.FC = () => {
                         />
                       </div>
 
+                      <div className="form-group">
+                        <label htmlFor="interior_color_secondary" className="form-label">Secondary Interior Color</label>
+                        <input
+                          type="text"
+                          id="interior_color_secondary"
+                          name="interior_color_secondary"
+                          value={formData.interior_color_secondary || ''}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          placeholder="e.g., Door panels, dash"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="interior_color_tertiary" className="form-label">Tertiary Interior Color</label>
+                        <input
+                          type="text"
+                          id="interior_color_tertiary"
+                          name="interior_color_tertiary"
+                          value={formData.interior_color_tertiary || ''}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          placeholder="e.g., Carpet, headliner"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="seat_type" className="form-label">Seat Type</label>
+                        <select
+                          id="seat_type"
+                          name="seat_type"
+                          value={formData.seat_type || ''}
+                          onChange={handleInputChange}
+                          className="form-select"
+                        >
+                          <option value="">Select...</option>
+                          <option value="bench">Bench</option>
+                          <option value="bucket">Bucket</option>
+                          <option value="split_bench">Split Bench</option>
+                          <option value="bench_bucket_combo">Bench/Bucket Combo</option>
+                          <option value="captain_chairs">Captain Chairs</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="seat_material_primary" className="form-label">Primary Seat Material</label>
+                        <select
+                          id="seat_material_primary"
+                          name="seat_material_primary"
+                          value={formData.seat_material_primary || ''}
+                          onChange={handleInputChange}
+                          className="form-select"
+                        >
+                          <option value="">Select...</option>
+                          <option value="Cloth">Cloth</option>
+                          <option value="Vinyl">Vinyl</option>
+                          <option value="Leather">Leather</option>
+                          <option value="Velour">Velour</option>
+                          <option value="Suede">Suede</option>
+                          <option value="Alcantara">Alcantara</option>
+                          <option value="Nylon">Nylon</option>
+                          <option value="Polyester">Polyester</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="seat_material_secondary" className="form-label">Secondary Seat Material</label>
+                        <select
+                          id="seat_material_secondary"
+                          name="seat_material_secondary"
+                          value={formData.seat_material_secondary || ''}
+                          onChange={handleInputChange}
+                          className="form-select"
+                        >
+                          <option value="">Select...</option>
+                          <option value="Cloth">Cloth</option>
+                          <option value="Vinyl">Vinyl</option>
+                          <option value="Leather">Leather</option>
+                          <option value="Velour">Velour</option>
+                          <option value="Suede">Suede</option>
+                          <option value="Alcantara">Alcantara</option>
+                          <option value="Nylon">Nylon</option>
+                          <option value="Polyester">Polyester</option>
+                        </select>
+                      </div>
+                      
+                      <div className="form-group">
+                        <label className="form-label">Trim & Styling</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              name="has_molding"
+                              checked={formData.has_molding || false}
+                              onChange={(e) => setFormData({ ...formData, has_molding: e.target.checked })}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span>Has Molding/Trim</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              name="has_pinstriping"
+                              checked={formData.has_pinstriping || false}
+                              onChange={(e) => setFormData({ ...formData, has_pinstriping: e.target.checked })}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span>Has Pinstriping</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              name="has_racing_stripes"
+                              checked={formData.has_racing_stripes || false}
+                              onChange={(e) => setFormData({ ...formData, has_racing_stripes: e.target.checked })}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span>Has Racing Stripes</span>
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              name="has_body_kit"
+                              checked={formData.has_body_kit || false}
+                              onChange={(e) => setFormData({ ...formData, has_body_kit: e.target.checked })}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span>Has Body Kit</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trim Details - Full Width */}
+                    {(formData.has_molding || formData.has_pinstriping || formData.has_racing_stripes || formData.has_body_kit) && (
+                      <div className="form-group" style={{ marginTop: '16px' }}>
+                        <label htmlFor="trim_details" className="form-label">Trim Details (optional)</label>
+                        <textarea
+                          id="trim_details"
+                          name="trim_details"
+                          value={formData.trim_details || ''}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          rows={3}
+                          placeholder="Describe colors, materials, brands, or specific details about the trim/styling..."
+                          style={{ resize: 'vertical' }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Interior Material Details - Full Width */}
+                    {(formData.seat_type || formData.seat_material_primary || formData.interior_color_secondary || formData.interior_color_tertiary) && (
+                      <div className="form-group" style={{ marginTop: '16px' }}>
+                        <label htmlFor="interior_material_details" className="form-label">Interior Material Details (optional)</label>
+                        <textarea
+                          id="interior_material_details"
+                          name="interior_material_details"
+                          value={formData.interior_material_details || ''}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          rows={3}
+                          placeholder="Describe patterns, textures, brands, condition, or specific details about interior materials..."
+                          style={{ resize: 'vertical' }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
                       {(detailLevel === 'detailed' || detailLevel === 'professional' || detailLevel === 'expert') && (
                         <>
                           <div className="form-group">
@@ -721,6 +921,19 @@ const EditVehicle: React.FC = () => {
                           <option value="CVT">CVT</option>
                           <option value="Semi-Automatic">Semi-Automatic</option>
                         </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="transmission_model" className="form-label">Transmission Model</label>
+                        <input
+                          type="text"
+                          id="transmission_model"
+                          name="transmission_model"
+                          value={formData.transmission_model || ''}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          placeholder="e.g., 6L90, 4L60E, TH350, Getrag 260"
+                        />
                       </div>
 
                       <div className="form-group">
@@ -847,7 +1060,7 @@ const EditVehicle: React.FC = () => {
                       </div>
 
                       <div className="form-group">
-                        <label htmlFor="purchase_price" className="form-label">Purchase Price</label>
+                        <label htmlFor="purchase_price" className="form-label">Purchase Price (Cash Paid)</label>
                         <input
                           type="number"
                           id="purchase_price"
@@ -855,14 +1068,53 @@ const EditVehicle: React.FC = () => {
                           value={formData.purchase_price || ''}
                           onChange={handleInputChange}
                           className="form-input"
-                          placeholder="$ What you paid"
+                          placeholder="$ Cash paid (excluding trade-ins)"
                           min="0"
                           step="100"
                         />
                       </div>
 
                       <div className="form-group">
-                        <label htmlFor="purchase_date" className="form-label">Purchase Date</label>
+                        <label className="form-label">Acquisition Method</label>
+                        <div style={{ marginTop: '8px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={formData.received_in_trade || false}
+                              onChange={(e) => setFormData({ ...formData, received_in_trade: e.target.checked })}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span>Vehicle received in trade (including partial trades)</span>
+                          </label>
+                        </div>
+                        {formData.received_in_trade && (
+                          <div style={{ 
+                            marginTop: '12px', 
+                            padding: '12px', 
+                            background: '#f9fafb', 
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '4px'
+                          }}>
+                            <div style={{ fontSize: '8pt', color: '#6b7280', marginBottom: '8px' }}>
+                              Trade details will be managed in the vehicle profile after saving.
+                              You'll be able to link the vehicle(s) you traded and specify values.
+                            </div>
+                            <a 
+                              href="#trade-details" 
+                              style={{ fontSize: '8pt', color: '#2563eb', textDecoration: 'underline' }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                alert('Save this vehicle first, then use the "Manage Trade Details" button in the Financial Information section of the vehicle profile.');
+                              }}
+                            >
+                              Learn more about recording trades
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="purchase_date" className="form-label">Acquisition Date</label>
                         <input
                           type="date"
                           id="purchase_date"

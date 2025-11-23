@@ -18,6 +18,7 @@ import BaTBulkImporter from '../components/dealer/BaTBulkImporter';
 import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowser';
 import MarketplaceComplianceForm from '../components/organization/MarketplaceComplianceForm';
 import OrganizationNotifications from '../components/organization/OrganizationNotifications';
+import VehicleInquiryModal from '../components/organization/VehicleInquiryModal';
 import '../design-system.css';
 
 interface Organization {
@@ -127,7 +128,7 @@ export default function OrganizationProfile() {
   const [offering, setOffering] = useState<Offering | null>(null);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'vehicles' | 'images' | 'inventory' | 'contributors' | 'marketplace'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'vehicles' | 'images' | 'inventory' | 'contributors' | 'marketplace' | 'notifications'>('overview');
   const [showTrade, setShowTrade] = useState(false);
   const [showOwnershipModal, setShowOwnershipModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState(false);
@@ -149,6 +150,8 @@ export default function OrganizationProfile() {
   const [showOrganizationEditor, setShowOrganizationEditor] = useState(false);
   const [showBaTImporter, setShowBaTImporter] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showVehicleInquiry, setShowVehicleInquiry] = useState(false);
+  const [selectedInquiryVehicle, setSelectedInquiryVehicle] = useState<{id: string, name: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const ownershipUploadId = `org-ownership-${organizationId}`;
 
@@ -775,7 +778,7 @@ export default function OrganizationProfile() {
         borderBottom: '2px solid var(--border)',
         padding: '0 16px'
       }}>
-        {(['overview', 'vehicles', 'images', 'inventory', 'contributors', 'marketplace'] as const).map(tab => (
+        {(['overview', 'vehicles', 'images', 'inventory', 'contributors', 'marketplace', 'notifications'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -800,61 +803,54 @@ export default function OrganizationProfile() {
       <div style={{ padding: '16px' }}>
         {activeTab === 'overview' && (
           <>
+
             {/* GitHub-Style Activity Heatmap */}
             <div style={{ marginBottom: '16px' }}>
               <OrganizationTimelineHeatmap organizationId={organizationId!} />
             </div>
 
-            {/* Detailed Event Cards */}
+            {/* Products for Sale */}
             <div className="card" style={{ marginBottom: '16px' }}>
               <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
-                Recent Work Orders & Events
+                Products for Sale
               </div>
               <div className="card-body">
-                {timelineEvents.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
-                    No work orders or events yet. Upload images or add inventory to create timeline entries.
-                  </div>
-                ) : (
-                  <div>
-                    {(() => {
-                      // Group events by date + title + vehicle to remove duplicates
-                      const grouped = new Map();
-                      
-                      for (const event of timelineEvents) {
-                        const key = `${event.event_date}_${event.title}_${event.metadata?.vehicle_id || 'no-vehicle'}`;
-                        
-                        if (!grouped.has(key)) {
-                          grouped.set(key, { ...event, count: 1, image_count: event.image_urls?.length || 0 });
-                        } else {
-                          const existing = grouped.get(key);
-                          existing.count++;
-                          existing.image_count += (event.image_urls?.length || 0);
-                        }
-                      }
-                      
-                      return Array.from(grouped.values())
-                        .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
-                        .slice(0, 10)
-                        .map((event: any) => (
-                          <div
-                            key={event.id}
-                            style={{
-                              padding: '12px',
-                              marginBottom: '8px',
-                              border: '1px solid var(--border-light)',
-                              borderRadius: '4px',
-                              background: 'var(--white)'
-                            }}
-                          >
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <div style={{ flex: 1 }}>
-                            {/* Show vehicle name prominently if this is vehicle work */}
-                            {event.metadata?.vehicle_name && event.metadata?.vehicle_id && (
+                {(() => {
+                  // Filter vehicles that are for sale (active inventory)
+                  const productsForSale = vehicles.filter(v => 
+                    v.relationship_type === 'in_stock' || v.relationship_type === 'consignment'
+                  );
+                  
+                  if (productsForSale.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                        No products currently for sale. Add inventory to display vehicles here.
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div>
+                      {productsForSale.slice(0, 10).map((vehicle) => (
+                        <div
+                          key={vehicle.id}
+                          style={{
+                            padding: '12px',
+                            marginBottom: '8px',
+                            border: '1px solid var(--border-light)',
+                            borderRadius: '4px',
+                            background: 'var(--white)',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <div style={{ flex: 1 }}>
                               <a 
-                                href={`/vehicle/${event.metadata.vehicle_id}`}
+                                href={`/vehicle/${vehicle.vehicle_id}`}
+                                onClick={(e) => e.stopPropagation()}
                                 style={{ 
-                                  fontSize: '9pt', 
+                                  fontSize: '10pt', 
                                   fontWeight: 600, 
                                   color: 'var(--accent)', 
                                   marginBottom: '2px',
@@ -863,97 +859,67 @@ export default function OrganizationProfile() {
                                 }}
                                 className="hover:underline"
                               >
-                                {event.metadata.vehicle_name}
+                                {vehicle.vehicle_year} {vehicle.vehicle_make} {vehicle.vehicle_model}
                               </a>
-                            )}
-                            <div style={{ fontSize: '10pt', fontWeight: event.metadata?.vehicle_name ? 400 : 700, marginBottom: '2px' }}>
-                              {/* Strip redundant vehicle name from title if it starts with it */}
-                              {(() => {
-                                let title = event.title;
-                                if (event.metadata?.vehicle_name && title.startsWith(event.metadata.vehicle_name)) {
-                                  title = title.substring(event.metadata.vehicle_name.length).trim();
-                                }
-                                return title;
-                              })()}
+                              {vehicle.vehicle_vin && (
+                                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                  VIN: {vehicle.vehicle_vin}
+                                </div>
+                              )}
                             </div>
-                            {event.description && (
-                              <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                                {event.description}
+                            {vehicle.vehicle_current_value && (
+                              <div style={{ fontSize: '10pt', fontWeight: 600, color: 'var(--success)', whiteSpace: 'nowrap', marginLeft: '12px' }}>
+                                ${vehicle.vehicle_current_value.toLocaleString()}
                               </div>
                             )}
                           </div>
-                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap', marginLeft: '12px' }}>
-                            {new Date(event.event_date).toLocaleDateString()}
+                          
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <div style={{
+                                fontSize: '7pt',
+                                padding: '2px 6px',
+                                borderRadius: '2px',
+                                background: 'var(--accent-dim)',
+                                color: 'var(--accent)'
+                              }}>
+                                {vehicle.relationship_type === 'consignment' ? 'Consignment' : 'In Stock'}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {vehicle.vehicle_image_url && (
+                                <img 
+                                  src={vehicle.vehicle_image_url} 
+                                  alt={`${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`}
+                                  style={{
+                                    width: '60px',
+                                    height: '40px',
+                                    objectFit: 'cover',
+                                    borderRadius: '4px'
+                                  }}
+                                />
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedInquiryVehicle({
+                                    id: vehicle.vehicle_id,
+                                    name: `${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`
+                                  });
+                                  setShowVehicleInquiry(true);
+                                }}
+                                className="button button-primary button-small"
+                                style={{ fontSize: '8pt', padding: '4px 8px', whiteSpace: 'nowrap' }}
+                              >
+                                Inquire
+                              </button>
+                            </div>
                           </div>
                         </div>
-
-                        {/* Event metadata */}
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                          {event.count > 1 && (
-                            <div style={{
-                              fontSize: '7pt',
-                              padding: '2px 6px',
-                              borderRadius: '2px',
-                              background: '#e3f2fd',
-                              color: '#1976d2',
-                              fontWeight: 600
-                            }}>
-                              {event.count}× events
-                            </div>
-                          )}
-                          
-                          {event.image_count > 0 && (
-                            <div style={{
-                              fontSize: '7pt',
-                              padding: '2px 6px',
-                              borderRadius: '2px',
-                              background: '#fff3cd',
-                              color: '#856404'
-                            }}>
-                              {event.image_count} {event.image_count === 1 ? 'photo' : 'photos'}
-                            </div>
-                          )}
-                          
-                          <div style={{
-                            fontSize: '7pt',
-                            padding: '2px 6px',
-                            borderRadius: '2px',
-                            background: 'var(--accent-dim)',
-                            color: 'var(--accent)'
-                          }}>
-                            {event.event_category?.replace(/_/g, ' ')}
-                          </div>
-
-                          {event.cost_amount && (
-                            <div style={{
-                              fontSize: '7pt',
-                              padding: '2px 6px',
-                              borderRadius: '2px',
-                              background: 'var(--success-dim)',
-                              color: 'var(--success)',
-                              fontWeight: 600
-                            }}>
-                              ${event.cost_amount.toLocaleString()}
-                            </div>
-                          )}
-
-                          {event.labor_hours && (
-                            <div style={{
-                              fontSize: '7pt',
-                              padding: '2px 6px',
-                              borderRadius: '2px',
-                              background: 'var(--info-dim)',
-                              color: 'var(--info)'
-                            }}>
-                              {event.labor_hours}h
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                        ));
-                    })()}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1139,20 +1105,29 @@ export default function OrganizationProfile() {
         )}
 
         {activeTab === 'vehicles' && (
-          <>
-            {session?.user && (
-              <OrganizationNotifications
-                organizationId={organizationId!}
-                userId={session.user.id}
-              />
-            )}
             <EnhancedDealerInventory
               organizationId={organizationId!}
               userId={session?.user?.id || null}
               canEdit={canEdit}
               isOwner={isOwner}
             />
-          </>
+        )}
+
+        {activeTab === 'notifications' && (
+          <div>
+            {session?.user ? (
+              <OrganizationNotifications
+                organizationId={organizationId!}
+                userId={session.user.id}
+              />
+            ) : (
+              <div className="card">
+                <div className="card-body" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  Sign in to view notifications
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'images' && (
@@ -2036,6 +2011,23 @@ export default function OrganizationProfile() {
             setShowBaTImporter(false);
           }}
           onClose={() => setShowBaTImporter(false)}
+        />
+      )}
+
+      {/* Vehicle Inquiry Modal */}
+      {showVehicleInquiry && selectedInquiryVehicle && organization && (
+        <VehicleInquiryModal
+          vehicleId={selectedInquiryVehicle.id}
+          vehicleName={selectedInquiryVehicle.name}
+          organizationId={organization.id}
+          organizationName={organization.business_name}
+          onClose={() => {
+            setShowVehicleInquiry(false);
+            setSelectedInquiryVehicle(null);
+          }}
+          onSubmitted={() => {
+            loadOrganization();
+          }}
         />
       )}
     </div>

@@ -39,6 +39,7 @@ import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
 import LivePlayer from '../components/profile/LivePlayer';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
+import VehicleMergeInterface from '../components/vehicle/VehicleMergeInterface';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -47,7 +48,7 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'achievements' | 'stats' | 'professional' | 'organizations' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'achievements' | 'stats' | 'professional' | 'organizations' | 'duplicates' | 'settings'>('overview');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
@@ -468,6 +469,7 @@ const Profile: React.FC = () => {
             { key: 'activity', label: 'Activity' },
             { key: 'professional', label: 'Professional' },
             { key: 'organizations', label: 'Organizations' },
+            ...(isOwnProfile ? [{ key: 'duplicates', label: 'Duplicates' }] : []),
             ...(isOwnProfile ? [{ key: 'settings', label: 'Settings' }] : [])
           ].map((tab) => (
             <button
@@ -507,6 +509,7 @@ const Profile: React.FC = () => {
                   <ContributionTimeline
                     key={`contributions-${(profileData.recentContributions || []).length}`}
                     contributions={profileData.recentContributions || []}
+                    userId={profile.id}
                   />
                 </div>
 
@@ -532,6 +535,21 @@ const Profile: React.FC = () => {
             
             {activeTab === 'organizations' && (
               <OrganizationAffiliations userId={profile.id} isOwnProfile={isOwnProfile} />
+            )}
+            
+            {activeTab === 'duplicates' && isOwnProfile && (
+              <div>
+                <div className="card" style={{ marginBottom: '16px' }}>
+                  <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
+                    Duplicate Vehicle Detection
+                  </div>
+                  <div className="card-body" style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                    When potential duplicate vehicles are detected in your profile, they'll appear below for review. 
+                    You can merge duplicates to consolidate all images, events, and data into a single vehicle profile.
+                  </div>
+                </div>
+                <VehicleMergeInterface userId={profile.id} />
+              </div>
             )}
             
             {activeTab === 'settings' && isOwnProfile && (

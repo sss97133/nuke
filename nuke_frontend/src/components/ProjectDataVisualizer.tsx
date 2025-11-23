@@ -397,7 +397,7 @@ const ProjectDataVisualizer: React.FC<ProjectDataVisualizerProps> = ({
                   </div>
                   <div className="flex items-center gap-1 text-gray-500">
                     {session.images_uploaded > 0 && (
-                      <span>{session.images_uploaded}📷</span>
+                      <span>{session.images_uploaded} images</span>
                     )}
                     {session.timeline_events_added > 0 && (
                       <span>{session.timeline_events_added}📝</span>

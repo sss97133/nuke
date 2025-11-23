@@ -115,34 +115,29 @@ serve(async (req) => {
       throw new Error('Document not found');
     }
     
-    // Extract using OpenAI
-    const extracted = await extractWithOpenAI(doc.file_url);
+    // Get ALL documents from the same library (for multi-page brochures)
+    // Process all pages/images together - no time window, just same library + type
+    const { data: allDocs, error: docsError } = await supabase
+      .from('library_documents')
+      .select('id, file_url, title, uploaded_at')
+      .eq('library_id', doc.library_id)
+      .eq('document_type', doc.document_type)
+      .order('uploaded_at', { ascending: true });
     
-    // Store extraction for review
-    const { data: extraction, error: insertError } = await supabase
-      .from('document_extractions')
-      .insert({
-        document_id: documentId,
-        extracted_data: extracted,
-        status: 'pending_review',
-        extracted_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-    
-    if (insertError) {
-      throw insertError;
+    if (docsError) {
+      console.error('Error fetching related documents:', docsError);
     }
+    
+    console.log(`Found ${allDocs?.length || 0} documents in library ${doc.library_id} for processing`);
+    
+    // Return immediately - process in background
+    // This allows users to navigate away without losing progress
+    processExtractionInBackground(allDocs || [], documentId, doc.library_id);
     
     return new Response(JSON.stringify({
       success: true,
-      extraction_id: extraction.id,
-      summary: {
-        engines_found: extracted.specifications?.engines?.length || 0,
-        colors_found: extracted.colors?.length || 0,
-        options_found: extracted.options?.length || 0,
-        specs_extracted: Object.keys(extracted.specifications || {}).length
-      }
+      message: `Processing ${allDocs?.length || 0} pages in background. Check review page in a few minutes!`,
+      pages_queued: allDocs?.length || 0
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -228,5 +223,202 @@ Return valid JSON only.`;
   
   const data = await response.json();
   return JSON.parse(data.choices[0].message.content);
+}
+
+// Process extraction in background (non-blocking)
+async function processExtractionInBackground(
+  allDocs: Array<{id: string, file_url: string, title: string}>,
+  documentId: string,
+  libraryId: string
+) {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+  
+  try {
+    console.log(`[Background] Starting extraction for ${allDocs.length} pages`);
+    
+    // Extract from all pages/images
+    const allExtractions: ExtractionResult[] = [];
+    for (let i = 0; i < allDocs.length; i++) {
+      const pageDoc = allDocs[i];
+      try {
+        console.log(`[Background] Processing page ${i + 1}/${allDocs.length}: ${pageDoc.title}`);
+        const extracted = await extractWithOpenAI(pageDoc.file_url);
+        allExtractions.push(extracted);
+      } catch (error) {
+        console.error(`[Background] Failed to extract from ${pageDoc.title}:`, error);
+        // Continue with other pages
+      }
+    }
+    
+    console.log(`[Background] Completed extraction from ${allExtractions.length} pages`);
+    
+    // Merge all extractions into one comprehensive result
+    const merged = mergeExtractions(allExtractions);
+    
+    // Store extraction for review
+    const { data: extraction, error: insertError } = await supabase
+      .from('document_extractions')
+      .insert({
+        document_id: documentId,
+        extracted_data: merged,
+        status: 'pending_review',
+        extracted_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('[Background] Failed to save extraction:', insertError);
+      throw insertError;
+    }
+    
+    console.log(`[Background] Extraction saved: ${extraction.id} with ${allExtractions.length} pages processed`);
+    
+  } catch (error) {
+    console.error('[Background] Extraction failed:', error);
+    // Still try to save a partial extraction
+    try {
+      await supabase
+        .from('document_extractions')
+        .insert({
+          document_id: documentId,
+          extracted_data: { error: 'Extraction failed', message: error.message },
+          status: 'rejected',
+          extracted_at: new Date().toISOString()
+        });
+    } catch (e) {
+      console.error('[Background] Failed to save error record:', e);
+    }
+  }
+}
+
+// Merge multiple page extractions into one comprehensive result
+function mergeExtractions(extractions: ExtractionResult[]): ExtractionResult {
+  if (extractions.length === 0) {
+    return {
+      specifications: {},
+      colors: [],
+      options: [],
+      trim_levels: [],
+      emblems: [],
+      meta: {}
+    };
+  }
+  
+  if (extractions.length === 1) {
+    return extractions[0];
+  }
+  
+  // Merge arrays, deduplicate by key fields
+  const merged: ExtractionResult = {
+    specifications: {},
+    colors: [],
+    options: [],
+    trim_levels: [],
+    emblems: [],
+    meta: {}
+  };
+  
+  // Merge specifications (take first non-null value)
+  for (const ext of extractions) {
+    if (ext.specifications) {
+      if (!merged.specifications.dimensions && ext.specifications.dimensions) {
+        merged.specifications.dimensions = ext.specifications.dimensions;
+      }
+      if (!merged.specifications.weights && ext.specifications.weights) {
+        merged.specifications.weights = ext.specifications.weights;
+      }
+      if (!merged.specifications.engines && ext.specifications.engines) {
+        merged.specifications.engines = ext.specifications.engines;
+      } else if (ext.specifications.engines && merged.specifications.engines) {
+        // Merge engines, deduplicate by code
+        const engineMap = new Map();
+        [...merged.specifications.engines, ...ext.specifications.engines].forEach(eng => {
+          const key = eng.code || eng.displacement_cid || eng.displacement_liters || JSON.stringify(eng);
+          if (!engineMap.has(key)) {
+            engineMap.set(key, eng);
+          }
+        });
+        merged.specifications.engines = Array.from(engineMap.values());
+      }
+      if (!merged.specifications.transmissions && ext.specifications.transmissions) {
+        merged.specifications.transmissions = ext.specifications.transmissions;
+      }
+      if (!merged.specifications.fuel_economy && ext.specifications.fuel_economy) {
+        merged.specifications.fuel_economy = ext.specifications.fuel_economy;
+      }
+      if (!merged.specifications.capacities && ext.specifications.capacities) {
+        merged.specifications.capacities = ext.specifications.capacities;
+      }
+    }
+  }
+  
+  // Merge colors (deduplicate by code)
+  const colorMap = new Map();
+  for (const ext of extractions) {
+    if (ext.colors) {
+      ext.colors.forEach(color => {
+        const key = color.code || color.name;
+        if (!colorMap.has(key)) {
+          colorMap.set(key, color);
+        }
+      });
+    }
+  }
+  merged.colors = Array.from(colorMap.values());
+  
+  // Merge options (deduplicate by RPO code or description)
+  const optionMap = new Map();
+  for (const ext of extractions) {
+    if (ext.options) {
+      ext.options.forEach(opt => {
+        const key = opt.rpo_code || opt.description;
+        if (!optionMap.has(key)) {
+          optionMap.set(key, opt);
+        }
+      });
+    }
+  }
+  merged.options = Array.from(optionMap.values());
+  
+  // Merge trim levels (deduplicate by name or code)
+  const trimMap = new Map();
+  for (const ext of extractions) {
+    if (ext.trim_levels) {
+      ext.trim_levels.forEach(trim => {
+        const key = trim.code || trim.name;
+        if (!trimMap.has(key)) {
+          trimMap.set(key, trim);
+        }
+      });
+    }
+  }
+  merged.trim_levels = Array.from(trimMap.values());
+  
+  // Merge emblems
+  const emblemMap = new Map();
+  for (const ext of extractions) {
+    if (ext.emblems) {
+      ext.emblems.forEach(emblem => {
+        const key = `${emblem.type}-${emblem.variant}`;
+        if (!emblemMap.has(key)) {
+          emblemMap.set(key, emblem);
+        }
+      });
+    }
+  }
+  merged.emblems = Array.from(emblemMap.values());
+  
+  // Merge meta (take most complete)
+  for (const ext of extractions) {
+    if (ext.meta) {
+      merged.meta = { ...merged.meta, ...ext.meta };
+    }
+  }
+  
+  return merged;
 }
 

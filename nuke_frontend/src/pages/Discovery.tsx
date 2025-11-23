@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import DiscoveryFeed from '../components/feed/DiscoveryFeed';
 import AddVehicle from './add-vehicle/AddVehicle';
-import { MobileAddVehicle } from '../components/mobile/MobileAddVehicle';
-import { useIsMobile } from '../hooks/useIsMobile';
 import DealAlertPanel from '../components/marketplace/DealAlertPanel';
 import '../design-system.css';
 
@@ -28,7 +26,6 @@ interface BuildAnalysisResult {
 }
 
 const Discovery: React.FC = () => {
-  const isMobile = useIsMobile();
   const [session, setSession] = useState<any>(null);
   const [stats, setStats] = useState({
     totalVehicles: 0,
@@ -132,16 +129,6 @@ const Discovery: React.FC = () => {
 
         {/* Add Vehicle Modal */}
         {session && showAddVehicle && (
-          isMobile ? (
-            <MobileAddVehicle
-              onClose={() => setShowAddVehicle(false)}
-              onSuccess={() => {
-                setShowAddVehicle(false);
-                // Refresh the feed when a new vehicle is added
-                window.location.reload();
-              }}
-            />
-          ) : (
             <AddVehicle
               mode="modal"
               onClose={() => setShowAddVehicle(false)}
@@ -151,7 +138,6 @@ const Discovery: React.FC = () => {
                 window.location.reload();
               }}
             />
-          )
         )}
 
       </div>

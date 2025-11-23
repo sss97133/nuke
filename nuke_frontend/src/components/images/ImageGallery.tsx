@@ -416,21 +416,33 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         
         // Within same category, newer first
         const dateA = new Date(a.taken_at || a.created_at).getTime();
-        const dateB = new Date(b.taken_at || a.created_at).getTime();
-        return dateB - dateA;
+        const dateB = new Date(b.taken_at || b.created_at).getTime();
+        
+        if (dateA !== dateB) return dateB - dateA;
+        
+        // Stable fallback when dates are equal
+        return (a.id || '').localeCompare(b.id || '');
       });
     } else if (sortBy === 'date_desc') {
       return [...allImages].sort((a, b) => {
-        const dateA = new Date(a.taken_at || a.created_at);
-        const dateB = new Date(b.taken_at || b.created_at);
-        return dateB.getTime() - dateA.getTime();
+        const dateA = new Date(a.taken_at || a.created_at).getTime();
+        const dateB = new Date(b.taken_at || b.created_at).getTime();
+        
+        if (dateA !== dateB) return dateB - dateA;
+        
+        // Stable fallback when dates are equal
+        return (a.id || '').localeCompare(b.id || '');
       });
     } else {
       // date_asc
       return [...allImages].sort((a, b) => {
-        const dateA = new Date(a.taken_at || a.created_at);
-        const dateB = new Date(b.taken_at || b.created_at);
-        return dateA.getTime() - dateB.getTime();
+        const dateA = new Date(a.taken_at || a.created_at).getTime();
+        const dateB = new Date(b.taken_at || b.created_at).getTime();
+        
+        if (dateA !== dateB) return dateA - dateB;
+        
+        // Stable fallback when dates are equal
+        return (a.id || '').localeCompare(b.id || '');
       });
     }
   };

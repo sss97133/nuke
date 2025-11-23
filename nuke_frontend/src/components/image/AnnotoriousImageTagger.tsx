@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Annotorious, ImageAnnotator } from '@annotorious/react';
 import '@annotorious/react/annotorious-react.css';
 import { supabase } from '../../lib/supabase';
@@ -11,35 +11,15 @@ interface AnnotoriousImageTaggerProps {
   readonly?: boolean;
 }
 
-interface Annotation {
-  id: string;
-  target: {
-    selector: {
-      type: string;
-      value?: string;
-      x?: number;
-      y?: number;
-      w?: number;
-      h?: number;
-    };
-  };
-  body: Array<{
-    type: string;
-    value: string;
-    purpose: string;
-  }>;
-}
-
 /**
- * Professional Image Annotation Tool using Annotorious
+ * Professional Image Annotation Tool using Annotorious React
  * 
  * Features:
  * - Rectangle selection tool
  * - Polygon selection tool  
  * - Point marker tool
- * - Freehand drawing tool
- * - Keyboard shortcuts
  * - Auto-save to database
+ * - Keyboard shortcuts (ESC to cancel, DEL to delete)
  */
 export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
   imageUrl,
@@ -48,192 +28,133 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
   onTagsUpdate,
   readonly = false
 }) => {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const annoRef = useRef<ImageAnnotator | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [annotations, setAnnotations] = useState<any[]>([]);
 
-  // Initialize Annotorious
-  useEffect(() => {
-    if (imgRef.current && !annoRef.current) {
-      import('@annotorious/annotorious').then((Annotorious) => {
-        const anno = new Annotorious.default(imgRef.current!, {
-          readOnly: readonly,
-          drawOnSingleClick: true,
-          allowEmpty: false,
-          widgets: [
-            {
-              widget: 'COMMENT',
-              force: true
-            },
-            'TAG'
-          ]
-        });
-
-        annoRef.current = anno as any;
-
-        // Load existing annotations
-        loadAnnotations();
-
-        // Listen for new annotations
-        anno.on('createAnnotation', handleCreateAnnotation);
-        anno.on('updateAnnotation', handleUpdateAnnotation);
-        anno.on('deleteAnnotation', handleDeleteAnnotation);
-
-        setIsLoading(false);
-      });
-    }
-
-    return () => {
-      if (annoRef.current) {
-        annoRef.current.destroy();
-        annoRef.current = null;
-      }
-    };
-  }, [imageUrl, readonly]);
-
-  const loadAnnotations = async () => {
+  // Handle annotation creation
+  const onCreateAnnotation = useCallback(async (annotation: any) => {
     if (!imageId || !vehicleId) return;
 
     try {
-      const { data, error } = await supabase
-        .from('vehicle_image_tags')
-        .select('*')
-        .eq('image_id', imageId)
-        .eq('vehicle_id', vehicleId);
-
-      if (error) throw error;
-
-      if (data && annoRef.current) {
-        // Convert database tags to Annotorious format
-        const annos = data.map((tag) => ({
-          '@context': 'http://www.w3.org/ns/anno.jsonld',
-          id: tag.id,
-          type: 'Annotation',
-          body: [
-            {
-              type: 'TextualBody',
-              value: tag.tag_name,
-              purpose: 'tagging'
-            }
-          ],
-          target: {
-            selector: {
-              type: 'FragmentSelector',
-              conformsTo: 'http://www.w3.org/TR/media-frags/',
-              value: `xywh=pixel:${tag.x_position},${tag.y_position},${tag.width},${tag.height}`
-            }
-          }
-        }));
-
-        annoRef.current.setAnnotations(annos);
-        setAnnotations(annos);
-      }
-    } catch (error) {
-      console.error('Error loading annotations:', error);
-    }
-  };
-
-  const handleCreateAnnotation = async (annotation: Annotation) => {
-    if (!imageId || !vehicleId) return;
-
-    try {
-      // Parse annotation geometry
-      const selector = annotation.target.selector;
+      // Parse annotation geometry from target
+      const target = annotation.target;
       let x = 0, y = 0, width = 0, height = 0;
 
-      if (selector.type === 'FragmentSelector' && selector.value) {
-        // Parse xywh=pixel:x,y,w,h
-        const match = selector.value.match(/xywh=pixel:(\d+),(\d+),(\d+),(\d+)/);
-        if (match) {
-          x = parseFloat(match[1]);
-          y = parseFloat(match[2]);
-          width = parseFloat(match[3]);
-          height = parseFloat(match[4]);
+      // Get selector info
+      if (target?.selector) {
+        const selector = target.selector;
+        
+        // Handle different selector types
+        if (selector.type === 'RECTANGLE') {
+          // Rectangle has geometry property
+          x = selector.geometry?.x || 0;
+          y = selector.geometry?.y || 0;
+          width = selector.geometry?.w || 0;
+          height = selector.geometry?.h || 0;
+        } else if (selector.type === 'POLYGON') {
+          // For polygon, calculate bounding box
+          const points = selector.geometry?.points || [];
+          if (points.length > 0) {
+            const xs = points.map((p: any) => p[0]);
+            const ys = points.map((p: any) => p[1]);
+            x = Math.min(...xs);
+            y = Math.min(...ys);
+            width = Math.max(...xs) - x;
+            height = Math.max(...ys) - y;
+          }
         }
       }
 
       // Get tag name from annotation body
-      const tagName = annotation.body?.find((b) => b.purpose === 'tagging' || b.purpose === 'commenting')?.value || 'Untitled';
+      const body = annotation.body || annotation.bodies || [];
+      const tagBody = Array.isArray(body) ? body[0] : body;
+      const tagName = tagBody?.value || 'Untitled';
 
-      // Convert pixel coordinates to percentages
-      const img = imgRef.current;
-      if (img) {
-        x = (x / img.naturalWidth) * 100;
-        y = (y / img.naturalHeight) * 100;
-        width = (width / img.naturalWidth) * 100;
-        height = (height / img.naturalHeight) * 100;
-      }
-
-      // Save to database
+      // Save to database (x, y, width, height are already percentages 0-1, convert to 0-100)
       const { error } = await supabase.from('vehicle_image_tags').insert({
         vehicle_id: vehicleId,
         image_id: imageId,
         tag_name: tagName,
         tag_type: 'part',
-        x_position: x,
-        y_position: y,
-        width: width,
-        height: height,
+        x_position: x * 100,
+        y_position: y * 100,
+        width: width * 100,
+        height: height * 100,
         source_type: 'manual',
         verified: false
       });
 
-      if (error) throw error;
-
-      onTagsUpdate?.();
-    } catch (error) {
-      console.error('Error saving annotation:', error);
-    }
-  };
-
-  const handleUpdateAnnotation = async (annotation: Annotation) => {
-    if (!imageId || !vehicleId) return;
-
-    try {
-      const selector = annotation.target.selector;
-      let x = 0, y = 0, width = 0, height = 0;
-
-      if (selector.type === 'FragmentSelector' && selector.value) {
-        const match = selector.value.match(/xywh=pixel:(\d+),(\d+),(\d+),(\d+)/);
-        if (match) {
-          x = parseFloat(match[1]);
-          y = parseFloat(match[2]);
-          width = parseFloat(match[3]);
-          height = parseFloat(match[4]);
-        }
+      if (error) {
+        console.error('Error saving annotation:', error);
+        throw error;
       }
 
-      const tagName = annotation.body?.find((b) => b.purpose === 'tagging' || b.purpose === 'commenting')?.value || 'Untitled';
+      onTagsUpdate?.();
+      
+      // Update local state
+      setAnnotations(prev => [...prev, annotation]);
+    } catch (error) {
+      console.error('Error creating annotation:', error);
+    }
+  }, [imageId, vehicleId, onTagsUpdate]);
 
-      const img = imgRef.current;
-      if (img) {
-        x = (x / img.naturalWidth) * 100;
-        y = (y / img.naturalHeight) * 100;
-        width = (width / img.naturalWidth) * 100;
-        height = (height / img.naturalHeight) * 100;
+  // Handle annotation updates
+  const onUpdateAnnotation = useCallback(async (annotation: any, previous: any) => {
+    if (!vehicleId) return;
+
+    try {
+      const body = annotation.body || annotation.bodies || [];
+      const tagBody = Array.isArray(body) ? body[0] : body;
+      const tagName = tagBody?.value || 'Untitled';
+
+      // Parse geometry for updated position
+      const target = annotation.target;
+      let x = 0, y = 0, width = 0, height = 0;
+
+      if (target?.selector) {
+        const selector = target.selector;
+        
+        if (selector.type === 'RECTANGLE') {
+          x = selector.geometry?.x || 0;
+          y = selector.geometry?.y || 0;
+          width = selector.geometry?.w || 0;
+          height = selector.geometry?.h || 0;
+        } else if (selector.type === 'POLYGON') {
+          const points = selector.geometry?.points || [];
+          if (points.length > 0) {
+            const xs = points.map((p: any) => p[0]);
+            const ys = points.map((p: any) => p[1]);
+            x = Math.min(...xs);
+            y = Math.min(...ys);
+            width = Math.max(...xs) - x;
+            height = Math.max(...ys) - y;
+          }
+        }
       }
 
       const { error } = await supabase
         .from('vehicle_image_tags')
         .update({
           tag_name: tagName,
-          x_position: x,
-          y_position: y,
-          width: width,
-          height: height
+          x_position: x * 100,
+          y_position: y * 100,
+          width: width * 100,
+          height: height * 100
         })
         .eq('id', annotation.id);
 
       if (error) throw error;
 
       onTagsUpdate?.();
+      
+      // Update local state
+      setAnnotations(prev => prev.map(a => a.id === annotation.id ? annotation : a));
     } catch (error) {
       console.error('Error updating annotation:', error);
     }
-  };
+  }, [vehicleId, onTagsUpdate]);
 
-  const handleDeleteAnnotation = async (annotation: Annotation) => {
+  // Handle annotation deletion
+  const onDeleteAnnotation = useCallback(async (annotation: any) => {
     if (!vehicleId) return;
 
     try {
@@ -245,36 +166,54 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
       if (error) throw error;
 
       onTagsUpdate?.();
+      
+      // Update local state
+      setAnnotations(prev => prev.filter(a => a.id !== annotation.id));
     } catch (error) {
       console.error('Error deleting annotation:', error);
     }
-  };
+  }, [vehicleId, onTagsUpdate]);
 
   return (
-    <div className="relative w-full h-full">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-          <div className="text-white">Loading annotation tools...</div>
-        </div>
-      )}
-      
-      <img
-        ref={imgRef}
-        src={imageUrl}
-        alt="Annotatable content"
-        className="w-full h-auto"
-        style={{ maxWidth: '100%', height: 'auto' }}
-      />
+    <div className="relative w-full h-full flex items-center justify-center" style={{ backgroundColor: '#0a0a0a' }}>
+      <Annotorious>
+        <ImageAnnotator>
+          <img 
+            src={imageUrl} 
+            alt="Annotatable vehicle image"
+            style={{ 
+              maxWidth: '100%', 
+              maxHeight: '100%', 
+              objectFit: 'contain',
+              display: 'block'
+            }}
+          />
+        </ImageAnnotator>
+      </Annotorious>
 
       {!readonly && (
-        <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
-          <h4 className="text-sm font-bold text-gray-800 mb-2">Annotation Tools</h4>
-          <div className="text-xs text-gray-600 space-y-1">
-            <div>• Click and drag to draw a rectangle</div>
-            <div>• Click multiple points to create a polygon (double-click to finish)</div>
-            <div>• Single click to place a point marker</div>
-            <div>• Press ESC to cancel current annotation</div>
-            <div>• Click on any annotation to edit or delete</div>
+        <div 
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '20px',
+            background: 'rgba(0, 0, 0, 0.9)',
+            border: '2px solid rgba(255, 255, 255, 0.3)',
+            padding: '16px',
+            borderRadius: '4px',
+            color: '#ffffff',
+            maxWidth: '300px'
+          }}
+        >
+          <h4 style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Annotation Tools
+          </h4>
+          <div style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.4' }}>
+            <div style={{ marginBottom: '4px' }}>• Click and drag to draw a rectangle</div>
+            <div style={{ marginBottom: '4px' }}>• Use toolbar for polygon or point tools</div>
+            <div style={{ marginBottom: '4px' }}>• Press ESC to cancel annotation</div>
+            <div style={{ marginBottom: '4px' }}>• Click annotation to edit or delete</div>
+            <div style={{ marginBottom: '4px' }}>• Double-click to finish polygon</div>
           </div>
         </div>
       )}
@@ -283,4 +222,3 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
 };
 
 export default AnnotoriousImageTagger;
-

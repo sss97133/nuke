@@ -170,7 +170,7 @@ const ValuationCitations: React.FC<ValuationCitationsProps> = ({ vehicleId }) =>
                 {/* Citations in Group */}
                 <div className="divide-y divide-gray-200">
                   {citationGroup.map((citation) => {
-                    const EvidenceIcon = EVIDENCE_ICONS[citation.evidence_type] || FiFileText;
+                    const EvidenceIcon = EVIDENCE_ICONS[citation.evidence_type || 'user_input'] || FiFileText;
                     const isVerified = ['user_verified', 'peer_verified', 'professional_verified', 'receipt_confirmed'].includes(citation.verification_status);
                     
                     return (

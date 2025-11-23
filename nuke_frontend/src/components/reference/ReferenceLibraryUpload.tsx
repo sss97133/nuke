@@ -40,24 +40,46 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
-  const [documentType, setDocumentType] = useState('brochure');
-  const [title, setTitle] = useState('');
-  const [yearPublished, setYearPublished] = useState(year);
-  const [isFactoryOriginal, setIsFactoryOriginal] = useState(true);
-  const [autoExtract, setAutoExtract] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{name: string, size: number, id: string}>>([]);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length > 0) {
       setFiles(selectedFiles);
-      // Auto-populate title if empty and only one file
-      if (!title && selectedFiles.length === 1) {
-        const baseName = selectedFiles[0].name.replace(/\.[^/.]+$/, '');
-        setTitle(baseName);
-      }
     }
-  }, [title]);
+  }, []);
+
+  // Auto-detect document type from file name/content
+  const detectDocumentType = useCallback((fileName: string, mimeType: string): string => {
+    const lower = fileName.toLowerCase();
+    if (lower.includes('brochure') || lower.includes('sales')) return 'brochure';
+    if (lower.includes('manual') || lower.includes('service')) return 'service_manual';
+    if (lower.includes('owner')) return 'owners_manual';
+    if (lower.includes('parts') || lower.includes('catalog')) return 'parts_catalog';
+    if (lower.includes('paint') || lower.includes('color')) return 'paint_codes';
+    if (lower.includes('rpo') || lower.includes('option')) return 'rpo_codes';
+    if (lower.includes('wiring') || lower.includes('electrical')) return 'wiring_diagram';
+    if (lower.includes('build') || lower.includes('sheet')) return 'build_sheet';
+    if (lower.includes('recall')) return 'recall_notice';
+    if (lower.includes('tsb') || lower.includes('bulletin')) return 'tsb';
+    if (lower.includes('spec')) return 'spec_sheet';
+    // Default based on file type
+    if (mimeType === 'application/pdf') return 'brochure'; // PDFs are usually brochures
+    return 'brochure'; // Default for images
+  }, []);
+
+  // Auto-generate title from filename
+  const generateTitle = useCallback((fileName: string, index: number, total: number): string => {
+    const baseName = fileName.replace(/\.[^/.]+$/, '');
+    if (total === 1) {
+      // Single file: clean up the name
+      return baseName.replace(/^IMG_/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+    // Multiple files: keep original name for clarity
+    return baseName;
+  }, []);
 
   const handleUpload = async () => {
     if (files.length === 0) {
@@ -137,25 +159,25 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
             .from('reference-docs')
             .getPublicUrl(filePath);
 
-          // Create document record
-          const docTitle = files.length === 1 && title 
-            ? title 
-            : title 
-              ? `${title} (${i + 1}/${files.length})` 
-              : file.name;
+          // AUTO-GENERATE ALL METADATA
+          const autoDocumentType = detectDocumentType(file.name, file.type);
+          const autoTitle = generateTitle(file.name, i, files.length);
+          const autoYearPublished = year; // Use vehicle year as default
+          const autoFactoryOriginal = true; // Assume factory docs by default
 
+          // Create document record
           const { data: document, error: docError } = await supabase
             .from('library_documents')
             .insert({
               library_id: libraryId,
-              document_type: documentType,
-              title: docTitle,
+              document_type: autoDocumentType,
+              title: autoTitle,
               file_url: publicUrl,
               file_size_bytes: file.size,
               mime_type: file.type,
               uploaded_by: user.id,
-              year_published: yearPublished,
-              is_factory_original: isFactoryOriginal
+              year_published: autoYearPublished,
+              is_factory_original: autoFactoryOriginal
             })
             .select('id')
             .single();
@@ -165,6 +187,13 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
           documentIds.push(document.id);
           setUploadProgress(prev => ({ ...prev, [fileKey]: 100 }));
           uploadedCount++;
+          
+          // Add to uploaded files list for immediate feedback
+          setUploadedFiles(prev => [...prev, {
+            name: file.name,
+            size: file.size,
+            id: document.id
+          }]);
 
         } catch (error: any) {
           console.error(`Failed to upload ${file.name}:`, error);
@@ -173,31 +202,29 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
       }
 
       if (uploadedCount > 0) {
+        // IMMEDIATE SUCCESS FEEDBACK
+        setShowSuccess(true);
         showToast(`${uploadedCount} document${uploadedCount > 1 ? 's' : ''} uploaded successfully!`, 'success');
 
-        // 5. Auto-extract if enabled (queue all uploads)
-        if (autoExtract && documentType !== 'other') {
-          setExtracting(true);
-          showToast('Starting AI extraction...', 'info');
-
-          for (const docId of documentIds) {
-            try {
-              await supabase.functions.invoke('parse-reference-document', {
-                body: { documentId: docId }
-              });
-            } catch (error) {
-              console.error('Extraction error:', error);
-            }
-          }
-          
-          showToast(`${documentIds.length} extraction${documentIds.length > 1 ? 's' : ''} queued - check review page soon!`, 'success');
-        }
+        // 5. ALWAYS auto-extract (no option needed)
+        setExtracting(true);
+        
+        // Trigger extraction (non-blocking) - processes ALL pages from same library
+        supabase.functions.invoke('parse-reference-document', {
+          body: { documentId: documentIds[0] }
+        }).then(() => {
+          showToast(`Processing all ${files.length} pages in background. Check review page soon!`, 'success');
+        }).catch((error) => {
+          console.error('Extraction error:', error);
+          showToast('Extraction queued - processing in background. Safe to navigate away!', 'info');
+        });
       }
 
-      // Reset form
+      // Clear file input but keep success message visible
       setFiles([]);
-      setTitle('');
       setUploadProgress({});
+      
+      // Don't reset immediately - let user see what they uploaded
       if (onUploadComplete) onUploadComplete();
 
     } catch (error: any) {
@@ -216,123 +243,56 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
       borderRadius: '4px',
       padding: '16px'
     }}>
-      <h3 style={{ margin: '0 0 12px 0', fontSize: '10pt', fontWeight: 700 }}>
-        Upload Reference Document  
+      <h3 style={{ margin: '0 0 8px 0', fontSize: '10pt', fontWeight: 700 }}>
+        Upload Reference Documents
       </h3>
-      <p style={{ fontSize: '8pt', color: 'var(--text-muted)', margin: '0 0 16px 0' }}>
-        Share factory brochures & manuals for {year} {make} {series || model}. Your contribution helps all owners!
+      <p style={{ fontSize: '7pt', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
+        Drop brochures, manuals, or images. Everything is detected automatically.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {/* File Input */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* File Input - The ONLY input */}
         <div>
-          <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-            Select Files (PDF, ZIP, or Images)
-          </label>
           <input
             type="file"
             accept=".pdf,.zip,.jpg,.jpeg,.png,.webp"
             onChange={handleFileSelect}
-            disabled={uploading}
+            disabled={uploading || extracting}
             multiple
-            style={{ fontSize: '8pt', width: '100%' }}
+            style={{ 
+              fontSize: '8pt', 
+              width: '100%',
+              padding: '8px',
+              border: '2px dashed var(--border)',
+              borderRadius: '4px',
+              background: 'var(--surface)',
+              cursor: uploading ? 'wait' : 'pointer'
+            }}
           />
           {files.length > 0 && (
             <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-              {files.length} file{files.length > 1 ? 's' : ''} selected ({(files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)} MB total)
+              {files.length} file{files.length > 1 ? 's' : ''} selected • {(files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)} MB
             </div>
           )}
           {Object.keys(uploadProgress).length > 0 && (
             <div style={{ marginTop: '8px' }}>
-              {Object.entries(uploadProgress).map(([key, progress]) => (
-                <div key={key} style={{ marginBottom: '4px' }}>
-                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                    {key.split('-').slice(1).join('-')}
+              {Object.entries(uploadProgress).map(([key, progress]) => {
+                const fileName = key.split('-').slice(1).join('-');
+                return (
+                  <div key={key} style={{ marginBottom: '4px' }}>
+                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{fileName}</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div style={{ background: '#e5e7eb', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
+                      <div style={{ background: 'var(--primary)', height: '100%', width: `${progress}%`, transition: 'width 0.3s' }} />
+                    </div>
                   </div>
-                  <div style={{ background: '#e5e7eb', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
-                    <div style={{ background: 'var(--primary)', height: '100%', width: `${progress}%`, transition: 'width 0.3s' }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
-
-        {/* Document Type */}
-        <div>
-          <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-            Document Type
-          </label>
-          <select
-            value={documentType}
-            onChange={(e) => setDocumentType(e.target.value)}
-            disabled={uploading}
-            className="form-select"
-            style={{ fontSize: '8pt', width: '100%' }}
-          >
-            {DOCUMENT_TYPES.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Title */}
-        <div>
-          <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-            Document Title
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={`e.g., ${year} ${make} Sales Brochure`}
-            disabled={uploading}
-            className="form-input"
-            style={{ fontSize: '8pt', width: '100%' }}
-          />
-        </div>
-
-        {/* Year Published */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          <div>
-            <label style={{ fontSize: '8pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-              Year Published
-            </label>
-            <input
-              type="number"
-              value={yearPublished}
-              onChange={(e) => setYearPublished(parseInt(e.target.value))}
-              min="1900"
-              max={new Date().getFullYear()}
-              disabled={uploading}
-              className="form-input"
-              style={{ fontSize: '8pt', width: '100%' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '8pt', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={isFactoryOriginal}
-                onChange={(e) => setIsFactoryOriginal(e.target.checked)}
-                disabled={uploading}
-              />
-              Factory Original
-            </label>
-          </div>
-        </div>
-
-        {/* Auto Extract */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '8pt', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={autoExtract}
-            onChange={(e) => setAutoExtract(e.target.checked)}
-            disabled={uploading}
-          />
-          Extract specs automatically (uses AI)
-        </label>
 
         {/* Upload Button */}
         <button
@@ -344,6 +304,76 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
           {uploading ? `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...` : extracting ? 'Extracting data...' : `Upload ${files.length > 0 ? files.length : ''} Document${files.length > 1 ? 's' : ''}`}
         </button>
       </div>
+
+      {/* SUCCESS MESSAGE - Show immediately after upload */}
+      {showSuccess && uploadedFiles.length > 0 && (
+        <div style={{
+          marginTop: '16px',
+          background: '#f0fdf4',
+          border: '2px solid #22c55e',
+          borderRadius: '4px',
+          padding: '12px'
+        }}>
+          <div style={{ fontSize: '9pt', fontWeight: 700, color: '#15803d', marginBottom: '8px' }}>
+            ✓ {uploadedFiles.length} Document{uploadedFiles.length > 1 ? 's' : ''} Uploaded!
+          </div>
+          <div style={{ fontSize: '7pt', color: '#166534', marginBottom: '8px' }}>
+            Your files are safe. Extraction is processing in background - you can navigate away now.
+          </div>
+          <div style={{ 
+            fontSize: '7pt', 
+            color: '#166534',
+            maxHeight: '150px',
+            overflowY: 'auto',
+            background: '#fff',
+            padding: '8px',
+            borderRadius: '4px',
+            border: '1px solid #bbf7d0',
+            marginBottom: '8px'
+          }}>
+            {uploadedFiles.map((file, idx) => (
+              <div key={file.id} style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 600 }}>{idx + 1}. {file.name}</span>
+                <span style={{ color: '#166534' }}>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <a
+              href="/admin/extraction-review"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: '8pt',
+                color: '#15803d',
+                textDecoration: 'underline',
+                fontWeight: 600
+              }}
+            >
+              View Extraction Review →
+            </a>
+            <button
+              onClick={() => {
+                setShowSuccess(false);
+                setUploadedFiles([]);
+                setExtracting(false);
+              }}
+              style={{
+                fontSize: '7pt',
+                background: 'transparent',
+                border: '1px solid #22c55e',
+                color: '#15803d',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginLeft: 'auto'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

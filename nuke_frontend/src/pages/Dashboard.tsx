@@ -1,41 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CashBalanceService } from '../services/cashBalanceService';
-import VehicleSearch from '../components/VehicleSearch';
 import '../design-system.css';
 
-interface ActionItem {
+interface Vehicle {
   id: string;
-  type: 'portfolio_alert' | 'documentation_gap' | 'deal_match' | 'work_reminder';
-  title: string;
-  description: string;
-  action_text: string;
-  action_url: string;
-  priority: 'high' | 'medium' | 'low';
-  icon: string;
+  year: number;
+  make: string;
+  model: string;
+  vin: string | null;
+  created_at: string;
+  image_count: number;
+  primary_image_url: string | null;
 }
 
-interface PortfolioHolding {
+interface RecentActivity {
   id: string;
-  name: string;
-  type: 'vehicle' | 'organization';
-  current_value: number;
-  invested: number;
-  gain_loss: number;
-  gain_loss_pct: number;
-  change_24h: number;
+  vehicle_id: string;
+  event_type: string;
+  title: string;
+  event_date: string;
+  created_at: string;
+  vehicle_year: number;
+  vehicle_make: string;
+  vehicle_model: string;
+}
+
+interface Stats {
+  totalVehicles: number;
+  totalImages: number;
+  totalEvents: number;
+  recentActivity: number; // Activity in last 7 days
 }
 
 export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
-  const [portfolioHoldings, setPortfolioHoldings] = useState<PortfolioHolding[]>([]);
-  const [dealMatches, setDealMatches] = useState<any[]>([]);
-  const [portfolioValue, setPortfolioValue] = useState(0);
-  const [portfolioChange, setPortfolioChange] = useState(0);
-  const [cashBalance, setCashBalance] = useState(0);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    totalVehicles: 0,
+    totalImages: 0,
+    totalEvents: 0,
+    recentActivity: 0
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,163 +59,78 @@ export default function Dashboard() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
 
-      // Load cash balance
-      const balance = await CashBalanceService.getUserBalance(session.user.id);
-      setCashBalance(balance?.available_cents || 0);
-
       // Load user's vehicles
-      const { data: vehicles } = await supabase
+      const { data: vehiclesData, error: vehiclesError } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(`
+          id,
+          year,
+          make,
+          model,
+          vin,
+          created_at,
+          image_count,
+          primary_image_url
+        `)
         .eq('uploaded_by', session.user.id)
         .order('created_at', { ascending: false });
 
-      // Build action items
-      const actions: ActionItem[] = [];
+      if (vehiclesError) throw vehiclesError;
+      setVehicles(vehiclesData || []);
 
-      // Check for portfolio alerts
-      (vehicles || []).forEach(vehicle => {
-        const value = vehicle.current_value || 0;
-        const purchase = vehicle.purchase_price || 0;
+      // Load recent activity from timeline_events
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        if (purchase > 0 && value > 0) {
-          const gainPct = ((value - purchase) / purchase) * 100;
+      const { data: activityData } = await supabase
+        .from('vehicle_timeline_events')
+        .select(`
+          id,
+          vehicle_id,
+          event_type,
+          title,
+          event_date,
+          created_at,
+          vehicles!inner(
+            year,
+            make,
+            model
+          )
+        `)
+        .eq('vehicles.uploaded_by', session.user.id)
+        .gte('created_at', sevenDaysAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-          if (gainPct > 20) {
-            actions.push({
-              id: `alert-${vehicle.id}`,
-          type: 'portfolio_alert',
-          title: `${vehicle.year} ${vehicle.make} ${vehicle.model} up ${gainPct.toFixed(0)}%`,
-          description: `Consider selling? Market value increased significantly.`,
-          action_text: 'View Vehicle',
-          action_url: `/vehicle/${vehicle.id}`,
-          priority: 'high',
-          icon: '+'
-            });
-          }
+      // Transform the nested data
+      const transformedActivity = (activityData || []).map((item: any) => ({
+        id: item.id,
+        vehicle_id: item.vehicle_id,
+        event_type: item.event_type,
+        title: item.title,
+        event_date: item.event_date,
+        created_at: item.created_at,
+        vehicle_year: item.vehicles?.year,
+        vehicle_make: item.vehicles?.make,
+        vehicle_model: item.vehicles?.model
+      }));
 
-          if (gainPct < -10) {
-            actions.push({
-            id: `alert-loss-${vehicle.id}`,
-            type: 'portfolio_alert',
-            title: `${vehicle.year} ${vehicle.make} ${vehicle.model} down ${Math.abs(gainPct).toFixed(0)}%`,
-            description: `Value dropped below purchase price. Review market conditions.`,
-            action_text: 'View Vehicle',
-            action_url: `/vehicle/${vehicle.id}`,
-            priority: 'medium',
-            icon: '-'
-            });
-          }
-        }
+      setRecentActivity(transformedActivity);
 
-        // Check for documentation gaps
-        const hasImages = (vehicle.image_count || 0) > 0;
-        const hasValue = vehicle.current_value && vehicle.current_value > 0;
-        const hasPurchase = vehicle.purchase_price && vehicle.purchase_price > 0;
+      // Calculate stats
+      const totalImages = vehiclesData?.reduce((sum, v) => sum + (v.image_count || 0), 0) || 0;
 
-        if (!hasImages) {
-          actions.push({
-            id: `doc-images-${vehicle.id}`,
-            type: 'documentation_gap',
-            title: `${vehicle.year} ${vehicle.make} ${vehicle.model} needs photos`,
-            description: 'Upload images to increase value and interest',
-            action_text: 'Add Photos',
-            action_url: `/vehicle/${vehicle.id}`,
-            priority: 'medium',
-            icon: 'IMG'
-          });
-        }
+      const { count: eventCount } = await supabase
+        .from('vehicle_timeline_events')
+        .select('*', { count: 'exact', head: true })
+        .in('vehicle_id', (vehiclesData || []).map(v => v.id));
 
-        if (!hasPurchase) {
-          actions.push({
-            id: `doc-purchase-${vehicle.id}`,
-            type: 'documentation_gap',
-            title: `Add purchase price for ${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-            description: 'Track ROI by documenting what you paid',
-            action_text: 'Add Price',
-            action_url: `/vehicle/${vehicle.id}`,
-            priority: 'low',
-            icon: '$'
-          });
-        }
-
-        if (!hasValue) {
-          actions.push({
-            id: `doc-value-${vehicle.id}`,
-            type: 'documentation_gap',
-            title: `Estimate value for ${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-            description: 'Add current market value to track performance',
-            action_text: 'Add Value',
-            action_url: `/vehicle/${vehicle.id}`,
-            priority: 'low',
-            icon: 'VAL'
-          });
-        }
+      setStats({
+        totalVehicles: vehiclesData?.length || 0,
+        totalImages,
+        totalEvents: eventCount || 0,
+        recentActivity: transformedActivity.length
       });
-
-      // Load deal matches based on user preferences (simple: YMM from existing vehicles)
-      if (vehicles && vehicles.length > 0) {
-        const makes = [...new Set(vehicles.map(v => v.make).filter(Boolean))];
-        
-        if (makes.length > 0) {
-          const { data: matches } = await supabase
-            .from('vehicles')
-            .select('*')
-            .in('make', makes)
-            .neq('uploaded_by', session.user.id)
-            .eq('is_for_sale', true)
-            .eq('is_public', true)
-            .limit(3);
-
-          setDealMatches(matches || []);
-
-          (matches || []).slice(0, 2).forEach(match => {
-            actions.push({
-              id: `deal-${match.id}`,
-              type: 'deal_match',
-              title: `New ${match.year} ${match.make} ${match.model} for sale`,
-              description: match.asking_price 
-                ? `Listed at $${match.asking_price.toLocaleString()}`
-                : 'Price available',
-              action_text: 'View Listing',
-              action_url: `/vehicle/${match.id}`,
-              priority: 'medium',
-              icon: 'NEW'
-            });
-          });
-        }
-      }
-
-      // Calculate portfolio
-      const holdings: PortfolioHolding[] = (vehicles || []).map(v => {
-        const value = v.current_value || 0;
-        const invested = v.purchase_price || 0;
-        const gain = value - invested;
-        const gainPct = invested > 0 ? (gain / invested) * 100 : 0;
-
-        return {
-          id: v.id,
-          name: `${v.year} ${v.make} ${v.model}`,
-          type: 'vehicle',
-          current_value: value,
-          invested,
-          gain_loss: gain,
-          gain_loss_pct: gainPct,
-          change_24h: 0 // TODO: Track daily changes
-        };
-      });
-
-      setPortfolioHoldings(holdings);
-      
-      const totalValue = holdings.reduce((sum, h) => sum + h.current_value, 0);
-      const totalGain = holdings.reduce((sum, h) => sum + h.gain_loss, 0);
-      setPortfolioValue(totalValue);
-      setPortfolioChange(totalGain);
-
-      // Sort actions by priority
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
-      actions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-      setActionItems(actions);
 
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -216,18 +139,40 @@ export default function Dashboard() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    }).format(value);
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getEventTypeLabel = (eventType: string) => {
+    const labels: Record<string, string> = {
+      'maintenance': 'MAINT',
+      'repair': 'REPAIR',
+      'modification': 'MOD',
+      'purchase': 'BOUGHT',
+      'sale': 'SOLD',
+      'inspection': 'INSPECT',
+      'registration': 'REG',
+      'insurance': 'INS',
+      'note': 'NOTE',
+      'image_upload': 'PHOTO'
+    };
+    return labels[eventType] || eventType.toUpperCase().slice(0, 6);
   };
 
   if (loading) {
     return (
       <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-        <div className="text">Loading your dashboard...</div>
+        <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Loading...</div>
       </div>
     );
   }
@@ -235,288 +180,300 @@ export default function Dashboard() {
   if (!session?.user) {
     return (
       <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-        <div className="text">Please log in to view your dashboard</div>
+        <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          Please log in to view your dashboard
+        </div>
+        <button
+          onClick={() => navigate('/auth')}
+          style={{
+            background: 'var(--text)',
+            color: 'var(--white)',
+            border: '2px outset var(--border)',
+            padding: '8px 16px',
+            fontSize: '9pt',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Log In
+        </button>
       </div>
     );
   }
 
   return (
-    <div style={{ background: '#f5f5f5', minHeight: '100vh', padding: 'var(--space-4)' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <h1 style={{ fontSize: '18pt', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: '4px' }}>
             Dashboard
           </h1>
           <p style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-            What needs your attention today
+          Welcome back, {session.user.email?.split('@')[0]}
           </p>
         </div>
 
-        {/* Global Vehicle Search */}
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <VehicleSearch />
-        </div>
-
-        {/* Portfolio Summary */}
+      {/* Stats Bar */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: 'var(--space-3)',
-          marginBottom: 'var(--space-4)'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+        gap: '12px',
+        marginBottom: '24px'
         }}>
           <div style={{
             background: 'var(--white)',
             border: '2px solid var(--border)',
-            padding: 'var(--space-3)'
+          padding: '12px'
           }}>
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              Portfolio Value
+            MY VEHICLES
             </div>
             <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>
-              {formatCurrency(portfolioValue)}
-            </div>
-            <div style={{
-              fontSize: '9pt',
-              color: portfolioChange >= 0 ? '#008000' : '#800000',
-              marginTop: '4px'
-            }}>
-              {portfolioChange >= 0 ? '↑' : '↓'} {formatCurrency(Math.abs(portfolioChange))} total gain
+            {stats.totalVehicles}
             </div>
           </div>
 
           <div style={{
             background: 'var(--white)',
             border: '2px solid var(--border)',
-            padding: 'var(--space-3)'
+          padding: '12px'
           }}>
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              Buying Power
+            TOTAL PHOTOS
             </div>
             <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>
-              {formatCurrency(cashBalance / 100)}
-            </div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Available to invest
+            {stats.totalImages}
             </div>
           </div>
 
           <div style={{
             background: 'var(--white)',
             border: '2px solid var(--border)',
-            padding: 'var(--space-3)'
+          padding: '12px'
           }}>
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              Holdings
+            TIMELINE EVENTS
             </div>
             <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>
-              {portfolioHoldings.length}
-            </div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-              {portfolioHoldings.filter(h => h.gain_loss > 0).length} profitable
+            {stats.totalEvents}
             </div>
           </div>
 
           <div style={{
             background: 'var(--white)',
             border: '2px solid var(--border)',
-            padding: 'var(--space-3)'
+          padding: '12px'
           }}>
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              Action Items
+            RECENT ACTIVITY
             </div>
             <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>
-              {actionItems.length}
+            {stats.recentActivity}
             </div>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-              {actionItems.filter(a => a.priority === 'high').length} high priority
+          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+            Last 7 days
             </div>
           </div>
         </div>
 
-        {/* Main Content Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-4)' }}>
-          {/* Left Column: Action Items */}
-        <div>
-          <h2 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
-            What To Do Next
+      {/* Quick Actions */}
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
+          Quick Actions
           </h2>
-
-            {actionItems.length === 0 ? (
-              <div style={{
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => navigate('/add-vehicle')}
+            style={{
+              background: 'var(--text)',
+              color: 'var(--white)',
+              border: '2px outset var(--border)',
+              padding: '8px 12px',
+              fontSize: '9pt',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            ADD VEHICLE
+          </button>
+          <button
+            onClick={() => navigate('/vehicles')}
+            style={{
                 background: 'var(--white)',
+              color: 'var(--text)',
                 border: '2px solid var(--border)',
-                padding: 'var(--space-8)',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '32pt', marginBottom: '16px' }}>✅</div>
-                <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
-                  All caught up!
-                </div>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                  No action items at this time
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {actionItems.map(item => (
-                  <div
-                    key={item.id}
-                    onClick={() => navigate(item.action_url)}
+              padding: '8px 12px',
+              fontSize: '9pt',
+              cursor: 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            VIEW ALL VEHICLES
+          </button>
+          <button
+            onClick={() => navigate('/')}
                     style={{
                       background: 'var(--white)',
-                      border: `2px solid ${item.priority === 'high' ? '#ff0000' : 'var(--border)'}`,
-                      padding: 'var(--space-3)',
+              color: 'var(--text)',
+              border: '2px solid var(--border)',
+              padding: '8px 12px',
+              fontSize: '9pt',
                       cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateX(4px)';
-                      e.currentTarget.style.borderColor = 'var(--text)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateX(0)';
-                      e.currentTarget.style.borderColor = item.priority === 'high' ? '#ff0000' : 'var(--border)';
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                      <div style={{ fontSize: '20pt' }}>{item.icon}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                          {item.title}
-                        </div>
-                        <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                          {item.description}
-                        </div>
-                        <div style={{
-                          display: 'inline-block',
-                          background: 'var(--grey-100)',
-                          border: '1px outset var(--border)',
-                          padding: '4px 8px',
-                          fontSize: '8pt',
-                          fontWeight: 'bold'
-                        }}>
-                          {item.action_text} →
-                        </div>
-                      </div>
-                      {item.priority === 'high' && (
-                        <div style={{
-                          background: '#ff0000',
-                          color: '#ffffff',
-                          padding: '2px 6px',
-                          fontSize: '7pt',
-                          fontWeight: 'bold',
-                          border: '1px solid #ffffff'
-                        }}>
-                          URGENT
-                        </div>
-                      )}
+              fontWeight: 'bold'
+            }}
+          >
+            EXPLORE PLATFORM
+          </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Right Column: Portfolio Performance */}
+      {/* Main Content */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        {/* My Vehicles */}
           <div>
-            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
-              Your Holdings
+          <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
+            My Vehicles
             </h2>
-
             <div style={{
               background: 'var(--white)',
               border: '2px solid var(--border)',
-              padding: 'var(--space-3)'
+            maxHeight: '400px',
+            overflowY: 'auto'
             }}>
-              {portfolioHoldings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--text-muted)' }}>
-                  <div style={{ fontSize: '9pt' }}>No vehicles yet</div>
+            {vehicles.length === 0 ? (
+              <div style={{ padding: '32px', textAlign: 'center' }}>
+                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                  No vehicles yet
+                </div>
                   <button
                     onClick={() => navigate('/add-vehicle')}
                     style={{
-                      marginTop: '12px',
                       background: 'var(--text)',
                       color: 'var(--white)',
                       border: '2px outset var(--border)',
-                      padding: '8px 16px',
-                      fontSize: '9pt',
+                    padding: '6px 12px',
+                    fontSize: '8pt',
                       cursor: 'pointer',
-                      fontFamily: '"MS Sans Serif", sans-serif'
+                    fontWeight: 'bold'
                     }}
                   >
-                    Add Vehicle
+                  ADD YOUR FIRST VEHICLE
                   </button>
                 </div>
               ) : (
-                <>
-                  {portfolioHoldings.map(holding => (
+              vehicles.map(vehicle => (
                     <div
-                      key={holding.id}
-                      onClick={() => navigate(`/vehicle/${holding.id}`)}
+                  key={vehicle.id}
+                  onClick={() => navigate(`/vehicle/${vehicle.id}`)}
                       style={{
                         padding: '12px',
-                        borderBottom: '1px solid var(--border-light)',
+                    borderBottom: '1px solid var(--border)',
                         cursor: 'pointer',
-                        fontSize: '9pt'
+                    display: 'flex',
+                    gap: '12px',
+                    alignItems: 'center'
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-100)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                        {holding.name}
+                  {vehicle.primary_image_url ? (
+                    <div style={{
+                      width: '60px',
+                      height: '45px',
+                      background: `url(${vehicle.primary_image_url}) center/cover`,
+                      border: '1px solid var(--border)',
+                      flexShrink: 0
+                    }} />
+                  ) : (
+                    <div style={{
+                      width: '60px',
+                      height: '45px',
+                      background: 'var(--grey-100)',
+                      border: '1px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '8pt',
+                      color: 'var(--text-muted)',
+                      flexShrink: 0
+                    }}>
+                      NO IMAGE
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8pt' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>
-                          Invested: {formatCurrency(holding.invested)}
-                        </span>
-                        <span style={{
-                          fontWeight: 'bold',
-                          color: holding.gain_loss >= 0 ? '#008000' : '#800000'
-                        }}>
-                          {holding.gain_loss >= 0 ? '+' : ''}{formatCurrency(holding.gain_loss)} ({holding.gain_loss_pct.toFixed(1)}%)
-                        </span>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>
+                      {vehicle.year} {vehicle.make} {vehicle.model}
                       </div>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {vehicle.image_count || 0} photos
+                      {vehicle.vin && ` • VIN: ${vehicle.vin.slice(-6)}`}
                     </div>
-                  ))}
-                </>
+                  </div>
+                </div>
+              ))
               )}
+          </div>
             </div>
 
-            {/* Deal Matches */}
-            {dealMatches.length > 0 && (
-              <div style={{ marginTop: 'var(--space-3)' }}>
-                <h2 style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
-                  Deals For You
+        {/* Recent Activity */}
+        <div>
+          <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
+            Recent Activity
                 </h2>
                 <div style={{
                   background: 'var(--white)',
                   border: '2px solid var(--border)',
-                  padding: 'var(--space-3)'
-                }}>
-                  {dealMatches.map(deal => (
+            maxHeight: '400px',
+            overflowY: 'auto'
+          }}>
+            {recentActivity.length === 0 ? (
+              <div style={{ padding: '32px', textAlign: 'center' }}>
+                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  No recent activity
+                </div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '8px' }}>
+                  Add events to your vehicle timelines to see them here
+                </div>
+              </div>
+            ) : (
+              recentActivity.map(activity => (
                     <div
-                      key={deal.id}
-                      onClick={() => navigate(`/vehicle/${deal.id}`)}
+                  key={activity.id}
+                  onClick={() => navigate(`/vehicle/${activity.vehicle_id}`)}
                       style={{
                         padding: '12px',
-                        borderBottom: '1px solid var(--border-light)',
-                        cursor: 'pointer',
-                        fontSize: '9pt'
+                    borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer'
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-100)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                        {deal.year} {deal.make} {deal.model}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                    <div style={{
+                      background: 'var(--text)',
+                      color: 'var(--white)',
+                      padding: '2px 4px',
+                      fontSize: '7pt',
+                      fontWeight: 'bold',
+                      border: '1px solid var(--border)',
+                      flexShrink: 0
+                    }}>
+                      {getEventTypeLabel(activity.event_type)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '2px' }}>
+                        {activity.title}
                       </div>
                       <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                        {deal.asking_price ? formatCurrency(deal.asking_price) : 'Price TBD'}
+                        {activity.vehicle_year} {activity.vehicle_make} {activity.vehicle_model}
+                      </div>
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {formatDate(activity.created_at)}
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
+              ))
             )}
           </div>
         </div>

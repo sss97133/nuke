@@ -66,7 +66,46 @@ Deno.serve(async (req) => {
       )
 
       // Route based on purchase type
-      if (purchaseType === 'vehicle_transaction') {
+      if (purchaseType === 'invoice_payment') {
+        // Handle invoice payment
+        const invoiceId = session.metadata?.invoice_id
+        const paymentToken = session.metadata?.payment_token
+        const customerEmail = session.customer_email || session.customer_details?.email
+        
+        if (!invoiceId || !paymentToken) {
+          console.error('Missing invoice_id or payment_token for invoice payment')
+          return new Response('Invalid metadata', { status: 400 })
+        }
+
+        // Mark invoice as paid via the public function
+        const { data: paymentResult, error: paymentError } = await supabase
+          .rpc('mark_invoice_paid', {
+            p_payment_token: paymentToken,
+            p_payment_method: 'stripe',
+            p_payment_method_details: {
+              stripe_session_id: session.id,
+              stripe_payment_intent: session.payment_intent,
+              stripe_customer_id: session.customer,
+              amount_paid_cents: amountCents,
+              amount_paid_usd: amountCents / 100,
+              payment_method_type: session.payment_method_types?.[0] || 'card'
+            },
+            p_confirmed_by: customerEmail || session.customer_details?.name || 'Card Payment',
+            p_notes: `Paid via Stripe - Session ${session.id}`
+          })
+
+        if (paymentError) {
+          console.error('Failed to mark invoice as paid:', paymentError)
+          return new Response('Failed to update invoice', { status: 500 })
+        }
+
+        console.log(`Invoice ${invoiceId} paid via Stripe: $${amountCents / 100}`)
+
+        // TODO: Send receipt email to customer
+        // TODO: Notify shop of payment
+        // TODO: Update journal entries for accounting
+
+      } else if (purchaseType === 'vehicle_transaction') {
         // Handle vehicle transaction facilitation fee
         const transactionId = session.metadata?.transaction_id
         

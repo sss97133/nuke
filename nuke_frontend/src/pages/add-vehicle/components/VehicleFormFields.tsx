@@ -244,6 +244,7 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
               { value: 'cvt', label: 'CVT' },
               { value: 'dual_clutch', label: 'Dual Clutch' }
             ])}
+            {renderField('transmission_model', 'Transmission Model', 'text', 'e.g., 6L90, 4L60E, TH350')}
             {renderField('engine_size', 'Engine Size', 'text', 'e.g., 2.0L, V6')}
           </div>
           <div className="form-grid grid-3">

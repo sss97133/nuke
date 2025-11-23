@@ -483,7 +483,7 @@ const PhotoLibraryCategorizer: React.FC = () => {
                   {photo.exifData && (
                     <div className="mb-2">
                       {photo.exifData.camera && (
-                        <small className="text-muted d-block">📷 {photo.exifData.camera}</small>
+                        <small className="text-muted d-block">Camera: {photo.exifData.camera}</small>
                       )}
                       {photo.exifData.location && (
                         <small className="text-muted d-block">📍 {photo.exifData.location}</small>

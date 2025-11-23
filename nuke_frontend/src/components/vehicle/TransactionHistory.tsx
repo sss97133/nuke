@@ -118,8 +118,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
           {/* Transactions */}
           <div className="space-y-4">
             {transactions.map((transaction, index) => {
-              const config = TRANSACTION_TYPES[transaction.transaction_type] || TRANSACTION_TYPES.purchase;
-              const Icon = config.icon;
+              const config = TRANSACTION_TYPES[transaction.transaction_type || 'purchase'] || TRANSACTION_TYPES.purchase;
+              const Icon = config?.icon || FiDollarSign;
               const isFirst = index === 0;
               const isLast = index === transactions.length - 1;
 
@@ -227,7 +227,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  ${firstTransaction.amount_usd.toLocaleString()}
+                  ${firstTransaction.amount.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">Initial Value</div>
               </div>
@@ -239,7 +239,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ vehicleId }) =>
               </div>
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  ${lastTransaction.amount_usd.toLocaleString()}
+                  ${lastTransaction.amount.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">Current Value</div>
               </div>

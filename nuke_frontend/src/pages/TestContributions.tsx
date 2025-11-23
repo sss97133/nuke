@@ -11,6 +11,7 @@ const TestContributions: React.FC = () => {
   const [contributions, setContributions] = useState<UserContribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string>('0b9f107a-d124-49de-9ded-94698f63c1c4'); // skylar williams
 
   useEffect(() => {
     loadContributions();
@@ -20,8 +21,6 @@ const TestContributions: React.FC = () => {
     try {
       setLoading(true);
       console.log('🔍 TestContributions: Loading contribution data...');
-
-      const userId = '0b9f107a-d124-49de-9ded-94698f63c1c4'; // skylar williams
 
       const { data, error } = await supabase
         .from('user_contributions')
@@ -106,6 +105,7 @@ const TestContributions: React.FC = () => {
                 <h3>Contribution Heatmap</h3>
                 <ContributionTimeline
                   contributions={contributions}
+                  userId={userId}
                 />
                 
                 <div style={{ marginTop: 16 }}>
