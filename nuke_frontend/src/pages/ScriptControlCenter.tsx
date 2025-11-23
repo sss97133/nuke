@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import '../../design-system.css';
+import '../design-system.css';
 
 interface ScriptStatus {
   name: string;
