@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openaiKey = Deno.env.get('OPENAI_API_KEY')!;
+    const openaiKey = Deno.env.get('OPEN_AI_API_KEY') || Deno.env.get('OPENAI_API_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
     const openai = new OpenAI({ apiKey: openaiKey });
@@ -215,7 +215,7 @@ Return ONLY valid JSON.`;
 
     // Step 4: Persist receipt data and create valuation citations
     const { data: document } = await supabase
-      .from('vehicle_documents')
+      .from('documents')
       .select('uploaded_by')
       .eq('id', documentId)
       .single();
