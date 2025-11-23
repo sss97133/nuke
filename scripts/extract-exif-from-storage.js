@@ -56,7 +56,7 @@ async function processExistingImages() {
   console.log('=======================================');
   console.log('');
 
-  const vehicleId = 'e7ed3e29-456a-43ea-843d-2dc0468ea4ca';
+  const vehicleId = '21ee373f-765e-4e24-a69d-e59e2af4f467';
 
   try {
     // Get images that need EXIF processing

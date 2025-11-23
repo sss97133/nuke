@@ -1,0 +1,6 @@
+
+// Add to your routes:
+import ImageProcessingDashboard from './pages/ImageProcessingDashboard';
+
+// In your router:
+<Route path="/admin/image-processing" element={<ImageProcessingDashboard />} />
