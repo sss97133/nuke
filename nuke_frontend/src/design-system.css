@@ -736,7 +736,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
+  height: 40px;
 }
 
 .header-left {
@@ -3174,8 +3174,8 @@ body {
 
   .header-content {
     flex-wrap: nowrap;
-    height: 48px !important;
-    min-height: 48px !important;
+    height: 40px !important;
+    min-height: 40px !important;
     overflow: hidden;
   }
 

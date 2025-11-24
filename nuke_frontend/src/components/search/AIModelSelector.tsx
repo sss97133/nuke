@@ -106,8 +106,8 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
           background: enabledModel ? 'var(--primary-dim)' : 'var(--white)',
           cursor: 'pointer',
           borderRadius: '2px',
-          width: '20px',
-          height: '20px',
+          width: '5px',
+          height: '5px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -121,16 +121,23 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
       {showDropdown && (
         <div
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            right: 0,
+            position: 'fixed',
+            top: 'auto',
+            right: 'auto',
             minWidth: '180px',
             background: 'var(--white)',
             border: '2px solid var(--border)',
             borderRadius: '4px',
             boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
-            zIndex: 10000,
+            zIndex: 99999,
             padding: '4px'
+          }}
+          ref={(el) => {
+            if (el && dropdownRef.current) {
+              const rect = dropdownRef.current.getBoundingClientRect();
+              el.style.top = `${rect.bottom + 4}px`;
+              el.style.right = `${window.innerWidth - rect.right}px`;
+            }
           }}
         >
           {availableModels.map(model => (
