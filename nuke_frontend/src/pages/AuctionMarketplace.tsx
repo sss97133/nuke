@@ -1,8 +1,3 @@
-/**
- * Auction Marketplace - BaT-inspired auction browse interface
- * Displays active auctions with real-time bidding updates
- */
-
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -173,126 +168,148 @@ export default function AuctionMarketplace() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold">Auction Marketplace</h1>
-            {user && (
-              <button
-                onClick={() => navigate('/list-vehicle')}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-              >
-                List Your Vehicle
-              </button>
-            )}
-          </div>
-
-          {/* Search and Filters */}
-          <div className="space-y-4">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by make, model, year..."
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-
-            <div className="flex gap-4 flex-wrap">
-              {/* Filter Buttons */}
-              <div className="flex gap-2">
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: 'var(--space-4)' }}>
+        {/* Header + filters */}
+        <section className="section">
+          <div className="card">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>Auction Marketplace</h1>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Browse live and upcoming auctions across the network.
+                </div>
+              </div>
+              {user && (
                 <button
-                  onClick={() => setFilter('all')}
-                  className={`px-4 py-2 rounded transition-colors ${
-                    filter === 'all'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white border border-gray-300 hover:bg-gray-50'
-                  }`}
+                  onClick={() => navigate('/list-vehicle')}
+                  className="button button-primary"
+                  style={{ fontSize: '9pt' }}
                 >
-                  All Auctions
+                  List Your Vehicle
                 </button>
-                <button
-                  onClick={() => setFilter('ending_soon')}
-                  className={`px-4 py-2 rounded transition-colors ${
-                    filter === 'ending_soon'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  Ending Soon
-                </button>
-                <button
-                  onClick={() => setFilter('no_reserve')}
-                  className={`px-4 py-2 rounded transition-colors ${
-                    filter === 'no_reserve'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  No Reserve
-                </button>
-                <button
-                  onClick={() => setFilter('new_listings')}
-                  className={`px-4 py-2 rounded transition-colors ${
-                    filter === 'new_listings'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  New Listings
-                </button>
+              )}
+            </div>
+            <div className="card-body">
+              {/* Search */}
+              <div style={{ marginBottom: '12px' }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by make, model, year..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    border: '1px solid var(--border)',
+                    fontSize: '9pt'
+                  }}
+                />
               </div>
 
-              {/* Sort Dropdown */}
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortType)}
-                className="px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {/* Filters + Sort */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  alignItems: 'center'
+                }}
               >
-                <option value="ending_soon">Ending Soon</option>
-                <option value="bid_count">Most Bids</option>
-                <option value="price_low">Price: Low to High</option>
-                <option value="price_high">Price: High to Low</option>
-                <option value="newest">Newest First</option>
-              </select>
+                {/* Filter buttons */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {[
+                    { id: 'all', label: 'All Auctions' },
+                    { id: 'ending_soon', label: 'Ending Soon' },
+                    { id: 'no_reserve', label: 'No Reserve' },
+                    { id: 'new_listings', label: 'New Listings' }
+                  ].map(option => (
+                    <button
+                      key={option.id}
+                      onClick={() => setFilter(option.id as FilterType)}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '8pt',
+                        border: filter === option.id ? '2px solid var(--accent)' : '1px solid var(--border)',
+                        background: filter === option.id ? 'var(--accent-dim)' : 'var(--white)',
+                        color: filter === option.id ? 'var(--accent)' : 'var(--text)',
+                        cursor: 'pointer',
+                        borderRadius: '2px',
+                        fontWeight: filter === option.id ? 700 : 400
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sort dropdown */}
+                <div style={{ marginLeft: 'auto', minWidth: '180px' }}>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as SortType)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px',
+                      fontSize: '8pt',
+                      border: '1px solid var(--border)'
+                    }}
+                  >
+                    <option value="ending_soon">Ending Soon</option>
+                    <option value="bid_count">Most Bids</option>
+                    <option value="price_low">Price: Low to High</option>
+                    <option value="price_high">Price: High to Low</option>
+                    <option value="newest">Newest First</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* Listings Grid */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">Loading auctions...</p>
+        {/* Listings */}
+        <section className="section">
+          <div className="card">
+            <div className="card-body">
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  Loading auctions...
+                </div>
+              ) : filteredListings.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                  <div style={{ fontSize: '10pt', marginBottom: '8px' }}>No active auctions found</div>
+                  {user && (
+                    <button
+                      onClick={() => navigate('/list-vehicle')}
+                      className="button button-primary"
+                      style={{ fontSize: '9pt' }}
+                    >
+                      List the First Vehicle
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '16px'
+                  }}
+                >
+                  {filteredListings.map((listing) => (
+                    <AuctionCard
+                      key={listing.id}
+                      listing={listing}
+                      formatCurrency={formatCurrency}
+                      formatTimeRemaining={formatTimeRemaining}
+                      getTimeRemainingColor={getTimeRemainingColor}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        ) : filteredListings.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 text-lg">No active auctions found</p>
-            {user && (
-              <button
-                onClick={() => navigate('/list-vehicle')}
-                className="mt-4 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-              >
-                List the First Vehicle
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredListings.map((listing) => (
-              <AuctionCard
-                key={listing.id}
-                listing={listing}
-                formatCurrency={formatCurrency}
-                formatTimeRemaining={formatTimeRemaining}
-                getTimeRemainingColor={getTimeRemainingColor}
-              />
-            ))}
-          </div>
-        )}
+        </section>
       </div>
     </div>
   );
@@ -312,63 +329,194 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
   return (
     <Link
       to={`/vehicle/${vehicle.id}`}
-      className="block bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-200"
+      style={{
+        display: 'block',
+        background: 'var(--white)',
+        border: '2px solid var(--border)',
+        borderRadius: '4px',
+        overflow: 'hidden',
+        textDecoration: 'none',
+        color: 'inherit',
+        transition: 'all 0.12s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--text)';
+        e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.12)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--border)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
     >
       {/* Image */}
-      <div className="aspect-[4/3] bg-gray-200 relative">
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          paddingBottom: '75%',
+          backgroundColor: '#e5e5e5',
+          overflow: 'hidden',
+        }}
+      >
         {vehicle.primary_image_url ? (
           <img
             src={vehicle.primary_image_url}
             alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-            className="w-full h-full object-cover"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '10pt',
+              color: 'var(--text-muted)',
+            }}
+          >
             No Image
           </div>
         )}
+
+        {/* NEW badge */}
         {listing.bid_count === 0 && (
-          <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-bold">
+          <div
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '6px',
+              background: '#16a34a',
+              color: '#fff',
+              padding: '3px 8px',
+              borderRadius: '3px',
+              fontSize: '7pt',
+              fontWeight: 700,
+            }}
+          >
             NEW
           </div>
         )}
+
+        {/* No Reserve badge */}
         {!hasReserve && (
-          <div className="absolute top-2 left-2 bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold">
+          <div
+            style={{
+              position: 'absolute',
+              top: '6px',
+              left: '6px',
+              background: '#ea580c',
+              color: '#fff',
+              padding: '3px 8px',
+              borderRadius: '3px',
+              fontSize: '7pt',
+              fontWeight: 700,
+            }}
+          >
             NO RESERVE
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div className="p-4 space-y-2">
-        <h3 className="font-bold text-lg">
+      <div style={{ padding: '10px 12px' }}>
+        <h3
+          style={{
+            fontSize: '10pt',
+            fontWeight: 700,
+            margin: '0 0 4px 0',
+          }}
+        >
           {vehicle.year} {vehicle.make} {vehicle.model}
           {vehicle.trim && ` ${vehicle.trim}`}
         </h3>
 
         {vehicle.mileage && (
-          <p className="text-sm text-gray-600">
+          <div
+            style={{
+              fontSize: '8pt',
+              color: 'var(--text-secondary)',
+              marginBottom: '6px',
+            }}
+          >
             {vehicle.mileage.toLocaleString()} miles
-          </p>
+          </div>
         )}
 
-        <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+        {/* Bid + time row */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: '6px',
+            borderTop: '1px solid var(--border-light)',
+            marginTop: '4px',
+          }}
+        >
           <div>
-            <p className="text-xs text-gray-500">Current Bid</p>
-            <p className="text-lg font-bold text-blue-600">
+            <div
+              style={{
+                fontSize: '7pt',
+                color: 'var(--text-muted)',
+                marginBottom: '2px',
+              }}
+            >
+              Current Bid
+            </div>
+            <div
+              style={{
+                fontSize: '11pt',
+                fontWeight: 700,
+                color: '#1d4ed8',
+              }}
+            >
               {formatCurrency(listing.current_high_bid_cents)}
-            </p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-500">Time Left</p>
-            <p className={`text-sm font-medium ${getTimeRemainingColor(listing.auction_end_time)}`}>
+          <div style={{ textAlign: 'right' }}>
+            <div
+              style={{
+                fontSize: '7pt',
+                color: 'var(--text-muted)',
+                marginBottom: '2px',
+              }}
+            >
+              Time Left
+            </div>
+            <div
+              style={{
+                fontSize: '8pt',
+                fontWeight: 600,
+              }}
+              className={getTimeRemainingColor(listing.auction_end_time)}
+            >
               {formatTimeRemaining(listing.auction_end_time)}
-            </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-between items-center text-xs text-gray-600 pt-2">
-          <span>{listing.bid_count} {listing.bid_count === 1 ? 'bid' : 'bids'}</span>
+        {/* Footer row with bids / reserve */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '6px',
+            fontSize: '8pt',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <span>
+            {listing.bid_count} {listing.bid_count === 1 ? 'bid' : 'bids'}
+          </span>
           {hasReserve && <span>Reserve</span>}
         </div>
       </div>

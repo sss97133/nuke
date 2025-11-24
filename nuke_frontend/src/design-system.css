@@ -779,7 +779,17 @@ body {
 
 .nav-link.active {
   background: var(--grey-300);
-  border: 1px inset var(--grey-300);
+  border: 1px inset var(--grey-600);
+  font-weight: 700;
+  box-shadow: 0 0 0 1px var(--grey-700);
+}
+
+.main-nav.collapsed .nav-link {
+  display: none;
+}
+
+.main-nav.collapsed .nav-link.active {
+  display: inline-block;
 }
 
 .header-right {

@@ -61,6 +61,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
   const [searchTerm, setSearchTerm] = useState('');
   const [editingVehicle, setEditingVehicle] = useState<DealerVehicle | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [showAddVehiclesModal, setShowAddVehiclesModal] = useState(false);
 
   useEffect(() => {
     loadVehicles();
@@ -320,7 +321,23 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             {filteredAndSorted.length} vehicles
           </span>
         </div>
-
+        {canEdit && (
+          <button
+            onClick={() => setShowAddVehiclesModal(true)}
+            style={{
+              marginLeft: 'auto',
+              padding: '6px 12px',
+              fontSize: '8pt',
+              fontWeight: 700,
+              border: '1px solid var(--border)',
+              background: 'white',
+              cursor: 'pointer',
+              borderRadius: '4px',
+            }}
+          >
+            Add Vehicles
+          </button>
+        )}
       </div>
 
       {/* Minimal Sticky Edit Bar */}
@@ -1000,9 +1017,371 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           onClose={() => setEditingVehicle(null)}
         />
       )}
+
+      {/* Add Vehicles Modal - link existing builds into this organization */}
+      {showAddVehiclesModal && userId && (
+        <AddVehiclesModal
+          organizationId={organizationId}
+          userId={userId}
+          onClose={() => setShowAddVehiclesModal(false)}
+          onLinked={() => {
+            setShowAddVehiclesModal(false);
+            loadVehicles();
+          }}
+        />
+      )}
     </div>
   );
 };
 
 export default EnhancedDealerInventory;
+
+interface AddVehiclesModalProps {
+  organizationId: string;
+  userId: string;
+  onClose: () => void;
+  onLinked: () => void;
+}
+
+const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
+  organizationId,
+  userId,
+  onClose,
+  onLinked,
+}) => {
+  const [loading, setLoading] = useState(true);
+  const [linking, setLinking] = useState(false);
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+
+        // Vehicles already linked to this organization
+        const { data: existingLinks } = await supabase
+          .from('organization_vehicles')
+          .select('vehicle_id')
+          .eq('organization_id', organizationId);
+
+        const existingIds = new Set(
+          (existingLinks || []).map((r: any) => r.vehicle_id)
+        );
+
+        // Candidate vehicles: ones this user uploaded or discovered
+        const { data: myVehicles, error } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, vin, current_value, asking_price')
+          .or(`user_id.eq.${userId},uploaded_by.eq.${userId}`)
+          .order('updated_at', { ascending: false })
+          .limit(200);
+
+        if (error) {
+          console.error('Error loading candidate vehicles:', error);
+          setCandidates([]);
+          return;
+        }
+
+        const filtered = (myVehicles || []).filter(
+          (v: any) => !existingIds.has(v.id)
+        );
+        setCandidates(filtered);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [organizationId, userId]);
+
+  const toggleSelect = (vehicleId: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(vehicleId)) {
+      next.delete(vehicleId);
+    } else {
+      next.add(vehicleId);
+    }
+    setSelectedIds(next);
+  };
+
+  const handleLink = async () => {
+    if (selectedIds.size === 0) {
+      onClose();
+      return;
+    }
+
+    if (
+      !confirm(
+        `Add ${selectedIds.size} vehicle${
+          selectedIds.size === 1 ? '' : 's'
+        } to this organization?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLinking(true);
+
+      const inserts = Array.from(selectedIds).map((vehicleId) =>
+        supabase.from('organization_vehicles').insert({
+          organization_id: organizationId,
+          vehicle_id: vehicleId,
+          relationship_type: 'in_stock',
+          status: 'active',
+          listing_status: 'for_sale',
+        })
+      );
+
+      await Promise.all(inserts);
+      onLinked();
+    } catch (error: any) {
+      console.error('Error linking vehicles:', error);
+      alert(`Failed to add vehicles: ${error.message}`);
+      setLinking(false);
+    }
+  };
+
+  const visibleCandidates = candidates.filter((v) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    const str = `${v.year || ''} ${v.make || ''} ${v.model || ''} ${
+      v.vin || ''
+    }`.toLowerCase();
+    return str.includes(s);
+  });
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.55)',
+        zIndex: 10002,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '12px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--white)',
+          maxWidth: '720px',
+          width: '100%',
+          maxHeight: '90vh',
+          border: '2px solid var(--border)',
+          boxShadow: 'var(--shadow)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div
+          style={{
+            padding: '10px 14px',
+            borderBottom: '2px solid var(--border)',
+            background: 'var(--surface)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+              Add Vehicles to Organization
+            </div>
+            <div
+              style={{
+                fontSize: '8pt',
+                color: 'var(--text-muted)',
+                marginTop: '2px',
+              }}
+            >
+              Link your existing builds into this shop&apos;s inventory.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              border: '1px solid var(--border)',
+              background: 'white',
+              padding: '2px 8px',
+              fontSize: '8pt',
+              cursor: 'pointer',
+            }}
+          >
+            Close
+          </button>
+        </div>
+
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)' }}>
+          <input
+            type="text"
+            placeholder="Search by year, make, model, VIN..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '6px 10px',
+              fontSize: '8pt',
+              border: '1px solid var(--border)',
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '8px 14px',
+          }}
+        >
+          {loading ? (
+            <div
+              style={{
+                padding: '40px 0',
+                textAlign: 'center',
+                fontSize: '9pt',
+                color: 'var(--text-muted)',
+              }}
+            >
+              Loading your vehicles...
+            </div>
+          ) : visibleCandidates.length === 0 ? (
+            <div
+              style={{
+                padding: '40px 0',
+                textAlign: 'center',
+                fontSize: '9pt',
+                color: 'var(--text-muted)',
+              }}
+            >
+              No eligible vehicles found to link.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                gap: '8px',
+              }}
+            >
+              {visibleCandidates.map((v) => {
+                const isSelected = selectedIds.has(v.id);
+                return (
+                  <div
+                    key={v.id}
+                    onClick={() => toggleSelect(v.id)}
+                    style={{
+                      border: isSelected
+                        ? '2px solid var(--accent)'
+                        : '1px solid var(--border)',
+                      background: isSelected ? 'var(--accent-dim)' : 'var(--white)',
+                      padding: '8px',
+                      cursor: 'pointer',
+                      fontSize: '8pt',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        {v.year} {v.make} {v.model}
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        readOnly
+                      />
+                    </div>
+                    {v.vin && (
+                      <div
+                        style={{
+                          fontFamily: 'monospace',
+                          color: 'var(--text-muted)',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        VIN: {v.vin}
+                      </div>
+                    )}
+                    {(v.current_value || v.asking_price) && (
+                      <div
+                        style={{
+                          fontSize: '8pt',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        Value:{' '}
+                        <strong>
+                          $
+                          {(v.asking_price || v.current_value || 0).toLocaleString()}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            padding: '8px 14px',
+            borderTop: '1px solid var(--border-light)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '8pt',
+          }}
+        >
+          <div style={{ color: 'var(--text-muted)' }}>
+            {selectedIds.size} selected
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={onClose}
+              style={{
+                padding: '4px 10px',
+                border: '1px solid var(--border)',
+                background: 'white',
+                fontSize: '8pt',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleLink}
+              disabled={linking || selectedIds.size === 0}
+              style={{
+                padding: '4px 12px',
+                border: '1px solid var(--accent)',
+                background: linking
+                  ? 'var(--accent-dim)'
+                  : 'var(--accent)',
+                color: 'white',
+                fontSize: '8pt',
+                fontWeight: 700,
+                cursor: linking || selectedIds.size === 0 ? 'default' : 'pointer',
+              }}
+            >
+              {linking ? 'Linking…' : 'Add to Organization'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 

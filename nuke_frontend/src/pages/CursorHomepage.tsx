@@ -202,6 +202,8 @@ interface FilterState {
   forSale: boolean;
   zipCode: string;
   radiusMiles: number;
+  showPrices: boolean;
+  showDetailOverlay: boolean;
 }
 
 const CursorHomepage: React.FC = () => {
@@ -225,7 +227,9 @@ const CursorHomepage: React.FC = () => {
     hasImages: false,
     forSale: false,
     zipCode: '',
-    radiusMiles: 50
+    radiusMiles: 50,
+    showPrices: true,
+    showDetailOverlay: true
   });
   const [stats, setStats] = useState({
     totalBuilds: 0,
@@ -695,7 +699,7 @@ const CursorHomepage: React.FC = () => {
         margin: '0 auto',
         padding: 'var(--space-4)'
       }}>
-        {/* Unified Header with Search */}
+        {/* Unified Header (without global search to avoid layout shifts) */}
         <div style={{
           background: 'var(--white)',
           border: '2px solid var(--border)',
@@ -713,17 +717,14 @@ const CursorHomepage: React.FC = () => {
             <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0 }}>
               <span style={{ 
                 transition: 'opacity 0.3s ease',
-                display: 'inline-block'
+                display: 'inline-block',
+                minWidth: '80px' // keep search/nav from shifting when verb length changes
               }}>
                 {rotatingVerb}
               </span>
             </h2>
             
-            <div style={{ flex: 1, maxWidth: '400px', margin: '0 auto' }}>
-              <VehicleSearch />
-            </div>
-            
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginLeft: 'auto' }}>
               {filteredVehicles.length} vehicles
             </div>
           </div>
@@ -982,10 +983,10 @@ const CursorHomepage: React.FC = () => {
                 />
               </div>
 
-              {/* For Sale Toggle */}
+              {/* Status & Display Toggles */}
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Status</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
                   <input
                     type="checkbox"
                     checked={filters.forSale}
@@ -993,12 +994,30 @@ const CursorHomepage: React.FC = () => {
                   />
                   <span>For Sale Only</span>
                 </label>
+                <div style={{ marginTop: '6px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '2px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.showPrices}
+                      onChange={(e) => setFilters({ ...filters, showPrices: e.target.checked })}
+                    />
+                    <span>Show Prices</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.showDetailOverlay}
+                      onChange={(e) => setFilters({ ...filters, showDetailOverlay: e.target.checked })}
+                    />
+                    <span>Show Detail Card</span>
+                  </label>
+                </div>
               </div>
 
               {/* Clear Filters */}
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <button
-                  onClick={() => setFilters({
+                    onClick={() => setFilters({
                     yearMin: null,
                     yearMax: null,
                     makes: [],
@@ -1007,7 +1026,9 @@ const CursorHomepage: React.FC = () => {
                     hasImages: false,
                     forSale: false,
                     zipCode: '',
-                    radiusMiles: 50
+                    radiusMiles: 50,
+                    showPrices: true,
+                    showDetailOverlay: true
                   })}
                   style={{
                     padding: '4px 12px',
@@ -1447,6 +1468,8 @@ const CursorHomepage: React.FC = () => {
                   primary_image_url: vehicle.primary_image_url
                 }}
                 viewMode="gallery"
+                showPriceOverlay={filters.showPrices}
+                showDetailOverlay={filters.showDetailOverlay}
               />
             ))}
           </div>
@@ -1466,7 +1489,9 @@ const CursorHomepage: React.FC = () => {
                 ...vehicle,
                   primary_image_url: vehicle.primary_image_url
               }}
-                viewMode="grid"
+              viewMode="grid"
+              showPriceOverlay={filters.showPrices}
+              showDetailOverlay={filters.showDetailOverlay}
             />
           ))}
         </div>

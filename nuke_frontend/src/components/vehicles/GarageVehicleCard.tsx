@@ -12,9 +12,10 @@ interface GarageVehicleCardProps {
     context?: string;
   };
   onRefresh?: () => void;
+  onEditRelationship?: (vehicleId: string, currentRelationship: string | null) => void;
 }
 
-const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relationship, onRefresh }) => {
+const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relationship, onRefresh, onEditRelationship }) => {
   const [liveData, setLiveData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -409,6 +410,26 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
             <div style={{ fontSize: '7pt', color: '#6b7280' }}>
               {primaryAction.reason}
             </div>
+          </div>
+        )}
+
+        {/* Relationship edit link */}
+        {relationship && onEditRelationship && (
+          <div
+            style={{
+              marginTop: '6px',
+              fontSize: '7pt',
+              color: '#2563eb',
+              textDecoration: 'underline',
+              cursor: 'pointer'
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEditRelationship(vehicle.id, relationship.relationshipType);
+            }}
+          >
+            Edit relationship
           </div>
         )}
       </div>

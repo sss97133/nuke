@@ -11,11 +11,14 @@ import { useNavigate } from 'react-router-dom';
 import { PersonalPhotoLibraryService, PersonalPhoto, VehicleSuggestion } from '../services/personalPhotoLibraryService';
 import { ImageUploadService } from '../services/imageUploadService';
 import { supabase } from '../lib/supabase';
+import { ImageSet, ImageSetService } from '../services/imageSetService';
+import { useToast } from '../hooks/useToast';
 
 type GridDensity = 'small' | 'medium' | 'large';
 
 export const PersonalPhotoLibrary: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   
   // Core data
   const [allPhotos, setAllPhotos] = useState<PersonalPhoto[]>([]);
@@ -24,6 +27,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<VehicleSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [personalAlbums, setPersonalAlbums] = useState<ImageSet[]>([]);
   
   // UI state  
   const [hideOrganized, setHideOrganized] = useState(true); // Default: hide organized photos
@@ -31,6 +35,11 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const [gridDensity, setGridDensity] = useState<GridDensity>('medium');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [vehicleSearch, setVehicleSearch] = useState('');
+  const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isTouchSelecting, setIsTouchSelecting] = useState(false);
+  const [touchVisitedIds, setTouchVisitedIds] = useState<Set<string>>(new Set());
   
   // Computed counts for sidebar
   const [counts, setCounts] = useState({
@@ -78,15 +87,17 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [photosData, vehiclesData, suggestionsData] = await Promise.all([
+      const [photosData, vehiclesData, suggestionsData, albumsData] = await Promise.all([
         PersonalPhotoLibraryService.getUnorganizedPhotos(10000),
         supabase.from('vehicles').select('id, year, make, model, trim').order('year', { ascending: false }).then(r => r.data || []),
-        PersonalPhotoLibraryService.getVehicleSuggestions()
+        PersonalPhotoLibraryService.getVehicleSuggestions(),
+        ImageSetService.getPersonalAlbums()
       ]);
 
       setAllPhotos(photosData);
       setVehicles(vehiclesData);
       setSuggestions(suggestionsData);
+      setPersonalAlbums(albumsData);
       
       // Calculate counts
       const newCounts = {
@@ -165,6 +176,11 @@ export const PersonalPhotoLibrary: React.FC = () => {
   };
 
   const handleLinkToVehicle = async (vehicleId: string) => {
+    if (!vehicleId || selectedPhotos.size === 0) return;
+    const v = vehicles.find(vh => vh.id === vehicleId);
+    const label = v ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'selected vehicle' : 'selected vehicle';
+    const ok = window.confirm(`Send ${selectedPhotos.size} photos to "${label}"?\n\nThey will be attached to that vehicle profile.`);
+    if (!ok) return;
     try {
       await PersonalPhotoLibraryService.bulkLinkToVehicle(Array.from(selectedPhotos), vehicleId);
       setSelectedPhotos(new Set());
@@ -218,6 +234,166 @@ export const PersonalPhotoLibrary: React.FC = () => {
     }
   };
 
+  const filteredVehicles = vehicles.filter(v => {
+    if (!vehicleSearch.trim()) return true;
+    const q = vehicleSearch.toLowerCase();
+    const text = `${v.year || ''} ${v.make || ''} ${v.model || ''} ${v.trim || ''}`.toLowerCase();
+    return text.includes(q);
+  });
+
+  const handleAddToAlbum = async () => {
+    if (selectedPhotos.size === 0) {
+      alert('Select at least one photo first.');
+      return;
+    }
+
+    const defaultName = `Album ${new Date().toLocaleDateString()}`;
+    const name = window.prompt('Album name (existing or new):', defaultName);
+    if (!name) return;
+
+    try {
+      // Try to find existing personal album by name
+      let album = personalAlbums.find(a => a.name.toLowerCase() === name.toLowerCase());
+      if (!album) {
+        album = await ImageSetService.createPersonalAlbum({ name });
+      }
+
+      if (!album) {
+        alert('Failed to create album');
+        return;
+      }
+
+      const added = await ImageSetService.addImagesToSet(album.id, Array.from(selectedPhotos));
+      if (added === 0) {
+        alert('No new photos were added to the album (they may already be in it).');
+      }
+
+      // Refresh counts and album list
+      await loadData();
+    } catch (error) {
+      console.error('Failed to add to album:', error);
+      alert('Failed to add photos to album.');
+    }
+  };
+
+  const handleConvertAlbumToVehicle = async (album: ImageSet) => {
+    if (!album) return;
+    if (!confirm(`Convert album "${album.name}" into a vehicle profile? This will create a vehicle and link all photos in the album.`)) {
+      return;
+    }
+
+    const yearInput = window.prompt('Year (e.g. 1996):', '');
+    if (!yearInput) return;
+    const year = parseInt(yearInput, 10);
+    if (Number.isNaN(year)) {
+      alert('Year must be a number.');
+      return;
+    }
+
+    const make = window.prompt('Make (e.g. Ford):', '') || '';
+    if (!make.trim()) return;
+    const model = window.prompt('Model (e.g. Bronco):', '') || '';
+    if (!model.trim()) return;
+    const trim = window.prompt('Trim (optional):', '') || undefined;
+    const vin = window.prompt('VIN (recommended):', '') || undefined;
+
+    try {
+      const vehicleId = await ImageSetService.convertPersonalAlbumToVehicle({
+        imageSetId: album.id,
+        year,
+        make: make.trim(),
+        model: model.trim(),
+        trim: trim?.trim() || undefined,
+        vin: vin?.trim() || undefined
+      });
+
+      // Reload data so inbox updates, then navigate to new profile
+      await loadData();
+      navigate(`/vehicles/${vehicleId}`);
+    } catch (error) {
+      console.error('Failed to convert album to vehicle:', error);
+      alert('Failed to convert album to vehicle profile.');
+    }
+  };
+
+  const handleAiStatusClick = () => {
+    const total =
+      counts.aiComplete +
+      counts.aiPending +
+      counts.aiProcessing +
+      counts.aiFailed;
+    const inQueue = counts.aiPending + counts.aiProcessing;
+    const message =
+      total === 0
+        ? 'AI has not processed any photos in this inbox yet. Newly uploaded images will be queued automatically after upload.'
+        : `AI processing inbox: ${counts.aiComplete} complete, ${counts.aiPending} pending, ${counts.aiProcessing} processing, ${counts.aiFailed} failed. Queue size: ${inQueue}. Engine: personal-inbox-analyzer v1.`;
+    showToast(message, 'info', 7000);
+  };
+
+  const handleVehicleStatusClick = () => {
+    const message = `Vehicle detection: ${counts.vehicleFound} photos where a vehicle was detected, ${counts.noVehicle} with no vehicle detected. Detector: vision-vehicle-detector v1.`;
+    showToast(message, 'info', 7000);
+  };
+
+  const handleAngleStatusClick = () => {
+    const totalAngles =
+      counts.anglesFront +
+      counts.anglesRear +
+      counts.anglesSide +
+      counts.anglesInterior +
+      counts.anglesEngineBay +
+      counts.anglesDetail;
+    const message =
+      totalAngles === 0
+        ? 'Angle analysis is enabled but no angles have been assigned in this inbox yet. As AI finishes, front / rear / side / interior / engine bay / detail counts will appear here.'
+        : `Angle coverage so far — Front: ${counts.anglesFront}, Rear: ${counts.anglesRear}, Side: ${counts.anglesSide}, Interior: ${counts.anglesInterior}, Engine Bay: ${counts.anglesEngineBay}, Detail: ${counts.anglesDetail}.`;
+    showToast(message, 'info', 8000);
+  };
+
+  const startTouchSelection = (e: React.TouchEvent<HTMLDivElement>) => {
+    setIsTouchSelecting(true);
+    const touch = e.touches[0];
+    if (!touch) return;
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const tile = target?.closest('[data-photo-id]') as HTMLElement | null;
+    const photoId = tile?.getAttribute('data-photo-id');
+    if (!photoId) return;
+
+    setSelectedPhotos(prev => {
+      const next = new Set(prev);
+      next.add(photoId);
+      return next;
+    });
+    setTouchVisitedIds(new Set([photoId]));
+  };
+
+  const moveTouchSelection = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isTouchSelecting) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const tile = target?.closest('[data-photo-id]') as HTMLElement | null;
+    const photoId = tile?.getAttribute('data-photo-id');
+    if (!photoId) return;
+
+    setTouchVisitedIds(prevVisited => {
+      if (prevVisited.has(photoId)) return prevVisited;
+      const nextVisited = new Set(prevVisited);
+      nextVisited.add(photoId);
+      setSelectedPhotos(prevSelected => {
+        const nextSel = new Set(prevSelected);
+        nextSel.add(photoId);
+        return nextSel;
+      });
+      return nextVisited;
+    });
+  };
+
+  const endTouchSelection = () => {
+    setIsTouchSelecting(false);
+    setTouchVisitedIds(new Set());
+  };
+
   if (loading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -230,12 +406,31 @@ export const PersonalPhotoLibrary: React.FC = () => {
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* LEFT SIDEBAR - Clickable Filters */}
       <div style={{
-        width: '200px',
+        width: sidebarCollapsed ? '40px' : '170px',
         borderRight: '1px solid var(--border-light)',
         background: 'var(--white)',
         overflowY: 'auto',
         flexShrink: 0
       }}>
+        {/* Sidebar header / collapse toggle */}
+        <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {!sidebarCollapsed && (
+            <span className="text text-small text-muted" style={{ fontWeight: 600 }}>
+              INBOX
+            </span>
+          )}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="button button-secondary"
+            style={{ padding: '2px 4px', fontSize: '7pt' }}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? '›' : '‹'}
+          </button>
+        </div>
+
+        {!sidebarCollapsed && (
+          <>
         {/* Upload Button */}
         <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
           <input
@@ -273,7 +468,11 @@ export const PersonalPhotoLibrary: React.FC = () => {
 
         {/* AI Status */}
         <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
-          <div className="text text-small text-muted" style={{ marginBottom: '8px', letterSpacing: '0.5px' }}>
+          <div
+            className="text text-small text-muted"
+            style={{ marginBottom: '8px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={handleAiStatusClick}
+          >
             AI STATUS
           </div>
           {[
@@ -303,7 +502,11 @@ export const PersonalPhotoLibrary: React.FC = () => {
 
         {/* Vehicle Detection */}
         <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
-          <div className="text text-small text-muted" style={{ marginBottom: '8px', letterSpacing: '0.5px' }}>
+          <div
+            className="text text-small text-muted"
+            style={{ marginBottom: '8px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={handleVehicleStatusClick}
+          >
             VEHICLE
           </div>
           {[
@@ -331,7 +534,11 @@ export const PersonalPhotoLibrary: React.FC = () => {
 
         {/* Angles */}
         <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
-          <div className="text text-small text-muted" style={{ marginBottom: '8px', letterSpacing: '0.5px' }}>
+          <div
+            className="text text-small text-muted"
+            style={{ marginBottom: '8px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={handleAngleStatusClick}
+          >
             ANGLE
           </div>
           {[
@@ -360,6 +567,97 @@ export const PersonalPhotoLibrary: React.FC = () => {
               <span className="text text-small font-bold">{item.count.toLocaleString()}</span>
             </div>
           ))}
+        </div>
+
+        {/* Vehicle Profiles - Work Table */}
+        <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
+          <div className="text text-small text-muted" style={{ marginBottom: '6px', letterSpacing: '0.5px' }}>
+            VEHICLE PROFILES
+          </div>
+          <input
+            type="text"
+            placeholder="Filter..."
+            value={vehicleSearch}
+            onChange={(e) => setVehicleSearch(e.target.value)}
+            className="form-input"
+            style={{ width: '100%', fontSize: '8pt', marginBottom: '6px', padding: '4px 6px' }}
+          />
+          <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
+            {filteredVehicles.length === 0 ? (
+              <div className="text text-small text-muted">
+                No matching vehicles
+              </div>
+            ) : (
+              filteredVehicles.map(v => {
+                const label = `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Untitled';
+                const isActive = activeVehicleId === v.id;
+                return (
+                  <div
+                    key={v.id}
+                    onClick={() => setActiveVehicleId(isActive ? null : v.id)}
+                    style={{
+                      padding: '4px 6px',
+                      marginBottom: '2px',
+                      cursor: 'pointer',
+                      background: isActive ? 'var(--grey-200)' : 'transparent',
+                      border: isActive ? '1px solid var(--border-medium)' : '1px solid transparent',
+                      fontSize: '8pt'
+                    }}
+                  >
+                    {label}
+                  </div>
+                );
+              })
+            )}
+          </div>
+          {activeVehicleId && (
+            <button
+              onClick={() => navigate(`/vehicles/${activeVehicleId}`)}
+              className="button button-secondary"
+              style={{ width: '100%', marginTop: '6px', fontSize: '8pt', padding: '4px 6px' }}
+            >
+              OPEN PROFILE
+            </button>
+          )}
+        </div>
+
+        {/* Personal Albums */}
+        <div style={{ padding: '12px' }}>
+          <div className="text text-small text-muted" style={{ marginBottom: '6px', letterSpacing: '0.5px' }}>
+            ALBUMS
+          </div>
+          {personalAlbums.length === 0 ? (
+            <div className="text text-small text-muted">
+              Albums are created from selected photos.
+            </div>
+          ) : (
+            <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {personalAlbums.map(album => (
+                <div
+                  key={album.id}
+                  style={{
+                    border: '1px solid var(--border-light)',
+                    padding: '4px 6px',
+                    background: 'var(--grey-50)'
+                  }}
+                >
+                  <div className="text" style={{ fontSize: '8pt', fontWeight: 600, marginBottom: '2px' }}>
+                    {album.name}
+                  </div>
+                  <div className="text text-small text-muted" style={{ fontSize: '7pt', marginBottom: '4px' }}>
+                    {(album.image_count || 0).toLocaleString()} photos
+                  </div>
+                  <button
+                    onClick={() => handleConvertAlbumToVehicle(album)}
+                    className="button button-secondary"
+                    style={{ width: '100%', fontSize: '7pt', padding: '3px 4px' }}
+                  >
+                    CONVERT TO PROFILE
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* AI Suggestions */}
@@ -394,6 +692,8 @@ export const PersonalPhotoLibrary: React.FC = () => {
               </div>
             ))}
           </div>
+        )}
+        </>
         )}
       </div>
 
@@ -484,18 +784,30 @@ export const PersonalPhotoLibrary: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${getGridColumns()}, 1fr)`,
-              gap: '0'
-            }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${getGridColumns()}, 1fr)`,
+                gap: '0'
+              }}
+              onTouchStart={startTouchSelection}
+              onTouchMove={moveTouchSelection}
+              onTouchEnd={endTouchSelection}
+              onTouchCancel={endTouchSelection}
+            >
               {displayPhotos.map(photo => {
                 const isSelected = selectedPhotos.has(photo.id);
-                const thumbnailUrl = photo.variants?.thumbnail || photo.variants?.small || photo.image_url;
+                const thumbnailUrl =
+                  gridDensity === 'large'
+                    ? (photo.variants?.medium || photo.variants?.large || photo.image_url)
+                    : gridDensity === 'medium'
+                      ? (photo.variants?.small || photo.variants?.medium || photo.image_url)
+                      : (photo.variants?.thumbnail || photo.variants?.small || photo.image_url);
 
                 return (
                   <div
                     key={photo.id}
+                    data-photo-id={photo.id}
                     onClick={(e) => {
                       if (e.metaKey || e.ctrlKey) {
                         const newSel = new Set(selectedPhotos);
@@ -503,7 +815,13 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         else newSel.add(photo.id);
                         setSelectedPhotos(newSel);
                       } else {
-                        setSelectedPhotos(new Set([photo.id]));
+                        const newSel = new Set(selectedPhotos);
+                        if (newSel.has(photo.id)) {
+                          newSel.delete(photo.id);
+                        } else {
+                          newSel.add(photo.id);
+                        }
+                        setSelectedPhotos(newSel);
                       }
                     }}
                     style={{
@@ -528,6 +846,23 @@ export const PersonalPhotoLibrary: React.FC = () => {
                       }}
                       loading="lazy"
                     />
+
+                    {/* Album count badge (personal or vehicle albums) */}
+                    {photo.album_count > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '4px',
+                        right: '4px',
+                        padding: '2px 4px',
+                        background: 'rgba(0,0,0,0.75)',
+                        color: 'white',
+                        fontSize: '7pt',
+                        borderRadius: '0px',
+                        border: '1px solid rgba(255,255,255,0.8)'
+                      }}>
+                        {photo.album_count} ALBUM{photo.album_count > 1 ? 'S' : ''}
+                      </div>
+                    )}
 
                     {isSelected && (
                       <div style={{
@@ -561,7 +896,13 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         fontSize: '7pt',
                         fontWeight: 'bold'
                       }}>
-                        {photo.ai_processing_status === 'processing' ? 'AI' : '...'}
+                        {photo.ai_processing_status === 'processing'
+                          ? 'AI'
+                          : photo.ai_processing_status === 'pending'
+                            ? 'PEND'
+                            : photo.ai_processing_status === 'failed'
+                              ? 'ERR'
+                              : 'AI'}
                       </div>
                     )}
 
@@ -611,6 +952,24 @@ export const PersonalPhotoLibrary: React.FC = () => {
 
           {selectedPhotos.size > 0 && (
             <>
+              <button
+                onClick={handleAddToAlbum}
+                className="button button-secondary"
+                style={{ fontSize: '8pt', padding: '6px 10px' }}
+              >
+                ADD TO ALBUM
+              </button>
+
+              {activeVehicleId && (
+                <button
+                  onClick={() => handleLinkToVehicle(activeVehicleId)}
+                  className="button button-secondary"
+                  style={{ fontSize: '8pt', padding: '6px 10px' }}
+                >
+                  LINK TO ACTIVE PROFILE
+                </button>
+              )}
+
               <select
                 onChange={(e) => {
                   if (e.target.value) {
@@ -628,14 +987,6 @@ export const PersonalPhotoLibrary: React.FC = () => {
                   </option>
                 ))}
               </select>
-
-              <button
-                onClick={handleMarkOrganized}
-                className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '6px 10px' }}
-              >
-                ORGANIZED
-              </button>
 
               <button
                 onClick={handleDelete}

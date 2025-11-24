@@ -37,29 +37,32 @@ ALTER TABLE vehicle_image_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vehicle_image_comments ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for views (allow all authenticated users to view and create)
+DROP POLICY IF EXISTS "Users can view image views" ON vehicle_image_views;
+DROP POLICY IF EXISTS "Users can create image views" ON vehicle_image_views;
 CREATE POLICY "Users can view image views" ON vehicle_image_views
   FOR SELECT USING (true);
-
 CREATE POLICY "Users can create image views" ON vehicle_image_views
   FOR INSERT WITH CHECK (true);
 
 -- RLS Policies for likes
+DROP POLICY IF EXISTS "Users can view image likes" ON vehicle_image_likes;
+DROP POLICY IF EXISTS "Users can manage their own likes" ON vehicle_image_likes;
 CREATE POLICY "Users can view image likes" ON vehicle_image_likes
   FOR SELECT USING (true);
-
 CREATE POLICY "Users can manage their own likes" ON vehicle_image_likes
   FOR ALL USING (auth.uid() = user_id);
 
 -- RLS Policies for comments
+DROP POLICY IF EXISTS "Users can view image comments" ON vehicle_image_comments;
+DROP POLICY IF EXISTS "Users can create comments" ON vehicle_image_comments;
+DROP POLICY IF EXISTS "Users can update their own comments" ON vehicle_image_comments;
+DROP POLICY IF EXISTS "Users can delete their own comments" ON vehicle_image_comments;
 CREATE POLICY "Users can view image comments" ON vehicle_image_comments
   FOR SELECT USING (true);
-
 CREATE POLICY "Users can create comments" ON vehicle_image_comments
   FOR INSERT WITH CHECK (auth.uid() = user_id);
-
 CREATE POLICY "Users can update their own comments" ON vehicle_image_comments
   FOR UPDATE USING (auth.uid() = user_id);
-
 CREATE POLICY "Users can delete their own comments" ON vehicle_image_comments
   FOR DELETE USING (auth.uid() = user_id);
 
