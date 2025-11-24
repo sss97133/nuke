@@ -120,16 +120,15 @@ export default function VehicleSearch() {
         gap: '4px',
         background: 'var(--white)',
         border: '2px solid var(--border)',
-        padding: '2px 6px',
-        height: '12px'
+        padding: '4px 8px',
+        height: '30px'
       }}>
         <span style={{ 
-          fontSize: '7pt', 
+          fontSize: '9pt', 
           marginRight: '4px',
           color: '#999',
           fontFamily: '"MS Sans Serif", sans-serif',
-          whiteSpace: 'nowrap',
-          lineHeight: '1'
+          whiteSpace: 'nowrap'
         }}>
           search
         </span>
@@ -145,13 +144,12 @@ export default function VehicleSearch() {
             flex: 1,
             border: 'none',
             outline: 'none',
-            fontSize: '7pt',
+            fontSize: '9pt',
             fontFamily: '"MS Sans Serif", sans-serif',
             background: 'transparent',
             minWidth: 0,
             height: '100%',
-            padding: 0,
-            lineHeight: '1'
+            padding: 0
           }}
         />
         {/* AI Model Selector - Small Button */}
@@ -159,7 +157,7 @@ export default function VehicleSearch() {
           onModelSelect={handleAIModelSelect}
           selectedProvider={selectedAIProvider}
         />
-        {loading && <span style={{ fontSize: '6pt', color: 'var(--text-muted)', whiteSpace: 'nowrap', lineHeight: '1' }}>...</span>}
+        {loading && <span style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>...</span>}
       </div>
 
       {/* Search Results Dropdown */}
