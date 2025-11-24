@@ -17,7 +17,8 @@ import Vehicles from './pages/Vehicles';
 import AddVehicle from './pages/add-vehicle/AddVehicle';
 import EditVehicle from './pages/EditVehicle';
 import VehicleForm from './components/vehicles/VehicleForm';
-import VehicleProfile from './pages/VehicleProfile';
+// Lazy load VehicleProfile to avoid circular dependency issues
+const VehicleProfile = React.lazy(() => import('./pages/VehicleProfile'));
 // import VehicleEditForm from './pages/VehicleEditForm';
 // import VehicleDateImages from './pages/VehicleDateImages';
 import Dashboard from './pages/Dashboard';
@@ -320,7 +321,11 @@ function App() {
             <Route path="/knowledge" element={<KnowledgeBase />} />
             
             {/* Vehicle Management */}
-            <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
+            <Route path="/vehicle/:vehicleId" element={
+              <Suspense fallback={<div style={{ padding: '20px' }}>Loading vehicle...</div>}>
+                <VehicleProfile />
+              </Suspense>
+            } />
             <Route path="/vehicle/:vehicleId/edit" element={<EditVehicle />} />
             {/* <Route path="/vehicle/:vehicleId/date-images" element={<VehicleDateImages />} /> */}
             <Route path="/vehicle-approval/:extractionId" element={<VehicleApproval />} />
@@ -366,7 +371,11 @@ function App() {
             <Route path="/vehicle/:vehicleId/moderate" element={<VehicleModerationDashboard />} />
             <Route path="/vehicle/:vehicleId/contribute" element={<VehicleContributionForm />} />
             <Route path="/vehicle-tasks/:vehicleId" element={<VehicleTasks />} />
-            <Route path="/vehicles/:id" element={<VehicleProfile />} />
+            <Route path="/vehicles/:id" element={
+              <Suspense fallback={<div style={{ padding: '20px' }}>Loading vehicle...</div>}>
+                <VehicleProfile />
+              </Suspense>
+            } />
             {/* <Route path="/public/:slug" element={<PublicVehicleProfile />} /> */}
             
             {/* Legacy redirects */}
