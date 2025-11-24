@@ -4,7 +4,8 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { globalUploadStatusService, UploadJob, ProcessingJob } from '../services/globalUploadStatusService';
+import { globalUploadStatusService } from '../services/globalUploadStatusService';
+import type { UploadJob, ProcessingJob } from '../services/globalUploadStatusService';
 
 interface UploadStatusContextValue {
   uploadJobs: UploadJob[];

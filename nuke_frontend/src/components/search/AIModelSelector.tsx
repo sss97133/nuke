@@ -3,8 +3,6 @@ import { supabase } from '../../lib/supabase';
 
 export type AIProvider = 'openai' | 'anthropic' | 'custom';
 
-export { AIProvider };
-
 interface AIModel {
   provider: AIProvider;
   modelName: string;
@@ -190,4 +188,5 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
 };
 
 export default AIModelSelector;
+export type { AIProvider };
 

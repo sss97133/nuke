@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AIModelSelector, { AIProvider } from './search/AIModelSelector';
+import AIModelSelector from './search/AIModelSelector';
+import type { AIProvider } from './search/AIModelSelector';
 import '../design-system.css';
 
 interface SearchResult {
