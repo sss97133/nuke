@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { KnowledgeLibraryService, KnowledgeArticle } from '../../services/knowledgeLibraryService';
-import { ImageSetService, ImageSet } from '../../services/imageSetService';
+import { KnowledgeLibraryService } from '../../services/knowledgeLibraryService';
+import type { KnowledgeArticle } from '../../services/knowledgeLibraryService';
+import { ImageSetService } from '../../services/imageSetService';
+import type { ImageSet } from '../../services/imageSetService';
 import { useToast } from '../../hooks/useToast';
 
 interface KnowledgeLibraryProps {

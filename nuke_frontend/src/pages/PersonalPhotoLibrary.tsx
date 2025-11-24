@@ -8,10 +8,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PersonalPhotoLibraryService, PersonalPhoto, VehicleSuggestion } from '../services/personalPhotoLibraryService';
+import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
+import type { PersonalPhoto, VehicleSuggestion } from '../services/personalPhotoLibraryService';
 import { ImageUploadService } from '../services/imageUploadService';
 import { supabase } from '../lib/supabase';
-import { ImageSet, ImageSetService } from '../services/imageSetService';
+import { ImageSetService } from '../services/imageSetService';
+import type { ImageSet } from '../services/imageSetService';
 import { useToast } from '../hooks/useToast';
 
 type GridDensity = 'small' | 'medium' | 'large';

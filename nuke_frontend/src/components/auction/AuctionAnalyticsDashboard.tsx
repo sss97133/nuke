@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { ListingExportService, ExportAnalytics } from '../../services/listingExportService';
+import { ListingExportService } from '../../services/listingExportService';
+import type { ExportAnalytics } from '../../services/listingExportService';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import '../../design-system.css';
