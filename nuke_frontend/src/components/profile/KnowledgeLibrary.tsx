@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { KnowledgeLibraryService, KnowledgeArticle } from '../../services/knowledgeLibraryService';
+import { ImageSetService, ImageSet } from '../../services/imageSetService';
 import { useToast } from '../../hooks/useToast';
 
 interface KnowledgeLibraryProps {
@@ -10,6 +11,7 @@ interface KnowledgeLibraryProps {
 
 const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfile }) => {
   const [articles, setArticles] = useState<KnowledgeArticle[]>([]);
+  const [imageSets, setImageSets] = useState<ImageSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingArticle, setEditingArticle] = useState<KnowledgeArticle | null>(null);
@@ -28,6 +30,36 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
         ? await KnowledgeLibraryService.getUserArticles(userId, true)
         : await KnowledgeLibraryService.getPublicArticles(userId);
       setArticles(articlesData);
+
+      // Also load personal image sets (albums)
+      if (isOwnProfile) {
+        const { data: setsData, error: setsError } = await supabase
+          .from('image_sets')
+          .select(`
+            *,
+            image_set_members(
+              image_id,
+              vehicle_images(image_url, is_primary)
+            )
+          `)
+          .eq('user_id', userId)
+          .eq('is_personal', true)
+          .order('created_at', { ascending: false });
+
+        if (!setsError && setsData) {
+          const setsWithImages = setsData.map((set: any) => {
+            const members = set.image_set_members || [];
+            const coverImage = members.find((m: any) => m.vehicle_images?.is_primary)?.vehicle_images?.image_url 
+              || members[0]?.vehicle_images?.image_url;
+            return {
+              ...set,
+              image_count: members.length,
+              cover_image: coverImage
+            };
+          });
+          setImageSets(setsWithImages as any);
+        }
+      }
     } catch (error) {
       console.error('Error loading knowledge articles:', error);
     } finally {
@@ -100,7 +132,7 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
     <div>
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 className="heading-3">Knowledge Library ({articles.length})</h3>
+          <h3 className="heading-3">Knowledge Library ({articles.length + imageSets.length})</h3>
           {isOwnProfile && (
             <button
               onClick={() => {
@@ -157,12 +189,70 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
             </div>
           )}
 
-          {/* Articles List */}
-          {filteredArticles.length === 0 ? (
-            <div className="text text-muted" style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
-              {isOwnProfile ? 'No articles yet. Create your first article!' : 'No public articles to display.'}
+          {/* Image Sets Section */}
+          {imageSets.length > 0 && (
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <h4 className="text font-bold" style={{ marginBottom: 'var(--space-2)' }}>Image Sets ({imageSets.length})</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 'var(--space-2)' }}>
+                {imageSets.map((set: any) => (
+                  <div
+                    key={set.id}
+                    style={{
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      overflow: 'hidden',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      // Navigate to image set or open in lightbox
+                      if (set.vehicle_id) {
+                        window.location.href = `/vehicle/${set.vehicle_id}`;
+                      }
+                    }}
+                  >
+                    {set.cover_image ? (
+                      <img
+                        src={set.cover_image}
+                        alt={set.name}
+                        style={{
+                          width: '100%',
+                          height: '120px',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100%',
+                        height: '120px',
+                        background: 'var(--grey-200)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '24pt'
+                      }}>
+                        📷
+                      </div>
+                    )}
+                    <div style={{ padding: 'var(--space-2)', background: 'var(--white)' }}>
+                      <div className="text text-small font-bold" style={{ marginBottom: '2px' }}>
+                        {set.name}
+                      </div>
+                      <div className="text text-small text-muted">
+                        {set.image_count || 0} images
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : (
+          )}
+
+          {/* Articles List */}
+          {filteredArticles.length === 0 && imageSets.length === 0 ? (
+            <div className="text text-muted" style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
+              {isOwnProfile ? 'No articles or image sets yet. Create your first article!' : 'No public articles to display.'}
+            </div>
+          ) : filteredArticles.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {filteredArticles.map(article => (
                 <div
