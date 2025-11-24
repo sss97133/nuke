@@ -66,15 +66,15 @@ const Capsule: React.FC = () => {
     return null; // Will redirect
   }
 
-  const tabs: Array<{ key: CapsuleTab; label: string; icon?: string }> = [
-    { key: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { key: 'settings', label: 'Settings', icon: '⚙️' },
-    { key: 'financials', label: 'Financials', icon: '💰' },
-    { key: 'organizations', label: 'Organizations', icon: '🏢' },
-    { key: 'knowledge', label: 'Knowledge Library', icon: '📚' },
-    { key: 'streaming', label: 'Streaming', icon: '📺' },
-    { key: 'professional', label: 'Professional', icon: '🔧' },
-    { key: 'photos', label: 'Photos', icon: '📷' }
+  const tabs: Array<{ key: CapsuleTab; label: string }> = [
+    { key: 'dashboard', label: 'Dashboard' },
+    { key: 'settings', label: 'Settings' },
+    { key: 'financials', label: 'Financials' },
+    { key: 'organizations', label: 'Organizations' },
+    { key: 'knowledge', label: 'Knowledge Library' },
+    { key: 'streaming', label: 'Streaming' },
+    { key: 'professional', label: 'Professional' },
+    { key: 'photos', label: 'Photos' }
   ];
 
   return (
@@ -102,7 +102,6 @@ const Capsule: React.FC = () => {
                   fontWeight: activeTab === tab.key ? 'bold' : 'normal'
                 }}
               >
-                {tab.icon && <span style={{ marginRight: '6px' }}>{tab.icon}</span>}
                 {tab.label}
               </button>
             ))}
@@ -118,13 +117,13 @@ const Capsule: React.FC = () => {
                   <h3 className="heading-3">Dashboard Overview</h3>
                 </div>
                 <div className="card-body">
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
-                    <div style={{ padding: 'var(--space-3)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                      <div className="text text-small text-muted" style={{ marginBottom: '4px' }}>Cash Balance</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--space-4)' }}>
+                    <div>
+                      <div className="text text-small text-muted" style={{ marginBottom: '8px', fontWeight: 600 }}>Cash Balance</div>
                       <CashBalance compact={false} showActions={true} />
                     </div>
                     <div style={{ padding: 'var(--space-3)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                      <div className="text text-small text-muted" style={{ marginBottom: '4px' }}>Quick Actions</div>
+                      <div className="text text-small text-muted" style={{ marginBottom: '8px', fontWeight: 600 }}>Quick Actions</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
                         <button
                           className="button button-secondary"
