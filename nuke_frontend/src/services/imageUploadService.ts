@@ -73,10 +73,13 @@ export class ImageUploadService {
   }
 
   /**
-   * Upload a single image to vehicle
+   * Upload a single image to vehicle OR personal library
+   * @param vehicleId - Vehicle ID (optional - if not provided, goes to personal library)
+   * @param file - Image file to upload
+   * @param category - Image category
    */
   static async uploadImage(
-    vehicleId: string, 
+    vehicleId: string | undefined, 
     file: File, 
     category: string = 'general'
   ): Promise<ImageUploadResult> {
@@ -163,11 +166,13 @@ export class ImageUploadService {
         console.log('Skipping EXIF extraction for non-image file:', file.name);
       }
 
-      // Generate simple filename: vehicleId/uniqueId.ext
+      // Generate simple filename: vehicleId/uniqueId.ext OR userId/unorganized/uniqueId.ext
       const fileExt = file.name.split('.').pop() || (isImage ? 'jpg' : 'pdf');
       const uniqueId = crypto.randomUUID();
       const fileName = `${uniqueId}.${fileExt}`;
-      const storagePath = `${vehicleId}/${fileName}`;
+      const storagePath = vehicleId 
+        ? `${vehicleId}/${fileName}`
+        : `${user.id}/unorganized/${fileName}`; // Personal library
 
       // Use photo date if available, otherwise use current time or file modified date
       const photoDate = listingCapturedAt 
@@ -200,7 +205,9 @@ export class ImageUploadService {
         console.log('Uploading image variants...');
 
         for (const [sizeName, blob] of Object.entries(optimizationResult.variantBlobs)) {
-          const variantPath = `${vehicleId}/${uniqueId}_${sizeName}.jpg`;
+          const variantPath = vehicleId 
+            ? `${vehicleId}/${uniqueId}_${sizeName}.jpg`
+            : `${user.id}/unorganized/${uniqueId}_${sizeName}.jpg`;
 
           const { data: variantUpload, error: variantError } = await supabase.storage
             .from(this.STORAGE_BUCKET)
@@ -232,11 +239,15 @@ export class ImageUploadService {
         };
       }
 
-      // Check if this is the first image for the vehicle
-      const { count } = await supabase
-        .from('vehicle_images')
-        .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicleId);
+      // Check if this is the first image for the vehicle (only if vehicle_id provided)
+      let count = 0;
+      if (vehicleId) {
+        const result = await supabase
+          .from('vehicle_images')
+          .select('id', { count: 'exact', head: true })
+          .eq('vehicle_id', vehicleId);
+        count = result.count || 0;
+      }
 
       // Detect document type
       const docDetection = DocumentTypeDetector.detectFromFile(file);
@@ -252,18 +263,33 @@ export class ImageUploadService {
         dimensions: metadata.dimensions
       };
 
-      if (listingCapturedAt || listingSource || listingOriginalUrl) {
+      // Mark EXIF as stripped if it comes from external source (no real EXIF data)
+      if (listingSource || listingOriginalUrl) {
+        const hasRealExif = metadata.camera || metadata.location || metadata.technical;
+        
+        exifPayload.exif_status = hasRealExif ? 'partial' : 'stripped';
+        exifPayload.source = {
+          type: 'external',
+          name: listingSource || 'unknown',
+          original_url: listingOriginalUrl ?? null,
+          captured_at: listingCapturedAt ? listingCapturedAt.toISOString() : null
+        };
+        
+        // Also keep listing_context for backwards compatibility
         exifPayload.listing_context = {
           captured_at: listingCapturedAt ? listingCapturedAt.toISOString() : null,
           listing_source: listingSource ?? null,
           original_url: listingOriginalUrl ?? null
         };
+      } else {
+        // User-uploaded image with real EXIF
+        exifPayload.exif_status = (metadata.camera || metadata.location || metadata.technical) ? 'complete' : 'minimal';
       }
 
       const { data: dbResult, error: dbError } = await supabase
         .from('vehicle_images')
         .insert({
-          vehicle_id: vehicleId,
+          vehicle_id: vehicleId || null, // Nullable for personal library
           user_id: user.id,
           image_url: urlData.publicUrl,
           file_name: fileName,
@@ -284,7 +310,9 @@ export class ImageUploadService {
             confidence: docDetection.confidence,
             reasoning: docDetection.reasoning,
             detected_at: new Date().toISOString()
-          }) : null
+          }) : null,
+          ai_processing_status: 'pending', // Queue for AI analysis
+          organization_status: vehicleId ? 'organized' : 'unorganized' // Auto-organized if linked to vehicle
         })
         .select('id')
         .single();
@@ -296,7 +324,10 @@ export class ImageUploadService {
         // Add variant paths to cleanup list
         if (optimizationResult.success && optimizationResult.variantBlobs) {
           for (const sizeName of Object.keys(optimizationResult.variantBlobs)) {
-            pathsToClean.push(`${vehicleId}/${uniqueId}_${sizeName}.jpg`);
+            const variantPath = vehicleId 
+              ? `${vehicleId}/${uniqueId}_${sizeName}.jpg`
+              : `${user.id}/unorganized/${uniqueId}_${sizeName}.jpg`;
+            pathsToClean.push(variantPath);
           }
         }
 
@@ -315,7 +346,20 @@ export class ImageUploadService {
       // Analyze image in background - don't wait for result
       if (isImage && dbResult?.id) {
         console.log('Triggering AI analysis for image:', dbResult.id);
-        supabase.functions.invoke('analyze-image', {
+        
+        // Emit event for UI to track
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('image_processing_started', {
+            detail: {
+              imageId: dbResult.id,
+              vehicleId: vehicleId,
+              fileName: file.name
+            }
+          }));
+        }
+
+        // Use tier1 function (more reliable than analyze-image)
+        supabase.functions.invoke('analyze-image-tier1', {
           body: {
             image_url: urlData.publicUrl,
             vehicle_id: vehicleId,
@@ -324,16 +368,25 @@ export class ImageUploadService {
         }).then(({ data, error }) => {
           if (error) {
             console.warn('AI analysis failed:', error);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('image_processing_failed', {
+                detail: { imageId: dbResult.id, error: error.message }
+              }));
+            }
           } else {
-            console.log('AI analysis triggered successfully');
+            console.log('AI analysis succeeded:', data);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('image_processing_complete', {
+                detail: { imageId: dbResult.id, result: data }
+              }));
+            }
           }
         }).catch(err => {
           console.warn('AI analysis error:', err);
         });
       }
 
-      // Trigger AI analysis in background (non-blocking)
-      // This happens async after upload completes so user doesn't wait
+      // Trigger sensitive document detection (titles, etc)
       if (isImage) {
         this.triggerBackgroundAIAnalysis(urlData.publicUrl, vehicleId, dbResult.id);
       }
@@ -369,6 +422,19 @@ export class ImageUploadService {
         console.warn('Sensitive document detection failed:', error);
       } else if (data?.is_sensitive) {
         console.log(`🔒 Sensitive ${data.document_type} detected - access restricted`);
+        
+        // EMIT EVENT FOR UI
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sensitive_document_detected', {
+            detail: {
+              imageId,
+              vehicleId,
+              documentType: data.document_type,
+              extractedFields: data.extracted_fields || [],
+              isPrivatized: true
+            }
+          }));
+        }
       }
     }).catch(err => {
       console.warn('Sensitive document detection request failed:', err);

@@ -91,6 +91,7 @@ import Library from './pages/Library';
 import ExtractionReview from './pages/ExtractionReview';
 import InvestmentOpportunities from './pages/InvestmentOpportunities';
 import AdminMissionControl from './pages/AdminMissionControl';
+import { PersonalPhotoLibrary } from './pages/PersonalPhotoLibrary';
 
 // Financial & Accounting components
 import InvoiceManager from './pages/InvoiceManager';
@@ -273,6 +274,7 @@ function App() {
             {/* <Route path="/business-management" element={<BusinessManagement />} /> */}
             
             {/* Media & Content Tools */}
+            <Route path="/photos" element={<PersonalPhotoLibrary />} />
             <Route path="/photo-categorizer" element={<PhotoLibraryCategorizer />} />
             <Route path="/dropbox-import" element={<DropboxImport />} />
             <Route path="/dealer/:orgId/dropbox-import" element={<DealerDropboxImport />} />

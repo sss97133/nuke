@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
-import CashBalanceWidget from '../CashBalanceWidget';
+import { ProfileBalancePill } from './ProfileBalancePill';
 import { UploadStatusBar } from './UploadStatusBar';
 import '../../design-system.css';
 
@@ -135,6 +135,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 Vehicles
               </Link>
               <Link 
+                to="/photos" 
+                className={`nav-link ${isActivePage('/photos') ? 'active' : ''}`}
+              >
+                Photos
+              </Link>
+              <Link 
                 to="/auctions" 
                 className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
               >
@@ -166,23 +172,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             {/* Upload Indicator - Windows 95 style */}
             <GlobalUploadIndicator />
 
-            {/* Cash Balance Widget */}
-            <CashBalanceWidget />
-
+            {/* Profile Balance Pill - Combined balance + profile */}
             {session ? (
-              <Link to="/profile" className="profile-bubble">
-                {userProfile?.avatar_url ? (
-                  <img
-                    src={userProfile.avatar_url}
-                    className="profile-image"
-                  />
-                ) : (
-                  <div className="profile-initials">
-                    {session.user?.email?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                )}
-                Profile
-              </Link>
+              <ProfileBalancePill session={session} userProfile={userProfile} />
             ) : (
               <Link to="/login" className="button button-primary" style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}>
                 Login
