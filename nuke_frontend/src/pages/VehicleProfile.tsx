@@ -10,12 +10,13 @@ import EventMap from '../components/EventMap';
 import VehicleDataEditor from '../components/vehicle/VehicleDataEditor';
 import EnhancedImageTagger from '../components/vehicle/EnhancedImageTagger';
 import { VisualValuationBreakdown } from '../components/vehicle/VisualValuationBreakdown';
-import VehicleHeader from './vehicle-profile/VehicleHeader';
-import VehicleHeroImage from './vehicle-profile/VehicleHeroImage';
-import VehicleBasicInfo from './vehicle-profile/VehicleBasicInfo';
-import VehicleTimelineSection from './vehicle-profile/VehicleTimelineSection';
-import VehiclePricingSection from './vehicle-profile/VehiclePricingSection';
-import WorkMemorySection from './vehicle-profile/WorkMemorySection';
+// Lazy load vehicle profile components to avoid circular dependencies
+const VehicleHeader = React.lazy(() => import('./vehicle-profile/VehicleHeader'));
+const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroImage'));
+const VehicleBasicInfo = React.lazy(() => import('./vehicle-profile/VehicleBasicInfo'));
+const VehicleTimelineSection = React.lazy(() => import('./vehicle-profile/VehicleTimelineSection'));
+const VehiclePricingSection = React.lazy(() => import('./vehicle-profile/VehiclePricingSection'));
+const WorkMemorySection = React.lazy(() => import('./vehicle-profile/WorkMemorySection'));
 import type {
   Vehicle,
   VehiclePermissions,
@@ -1201,13 +1202,15 @@ const VehicleProfile: React.FC = () => {
             {/* Left Column: Vehicle Info & Tools - Order: Basic Info → Description → Comments → Ref Docs → Maps */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   {/* 1. Basic Info */}
-                  <VehicleBasicInfo
-                    vehicle={vehicle}
-                    session={session}
-                    permissions={permissions}
-                    onDataPointClick={handleDataPointClick}
-                    onEditClick={handleEditClick}
-                  />
+                  <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
+                    <VehicleBasicInfo
+                      vehicle={vehicle}
+                      session={session}
+                      permissions={permissions}
+                      onDataPointClick={handleDataPointClick}
+                      onEditClick={handleEditClick}
+                    />
+                  </React.Suspense>
                   
                   {/* 2. Description */}
               <VehicleDescriptionCard
@@ -1306,18 +1309,20 @@ const VehicleProfile: React.FC = () => {
   return (
       <div>
         {/* Vehicle Header with Price */}
-        <VehicleHeader
-          vehicle={vehicle}
-          isOwner={isRowOwner || isVerifiedOwner}
-          canEdit={canEdit}
-          session={session}
-          permissions={permissions}
-          responsibleName={responsibleName || undefined}
-          onPriceClick={handlePriceClick}
-          initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
-          initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
-          organizationLinks={linkedOrganizations}
-        />
+        <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
+          <VehicleHeader
+            vehicle={vehicle}
+            isOwner={isRowOwner || isVerifiedOwner}
+            canEdit={canEdit}
+            session={session}
+            permissions={permissions}
+            responsibleName={responsibleName || undefined}
+            onPriceClick={handlePriceClick}
+            initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
+            initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
+            organizationLinks={linkedOrganizations}
+          />
+        </React.Suspense>
 
         {/* Merge Proposals Panel - Only visible to verified owners */}
         {isVerifiedOwner && (
@@ -1335,7 +1340,9 @@ const VehicleProfile: React.FC = () => {
         {/* Live Stats Bar (MVP: hidden to reduce clutter) */}
 
         {/* Hero Image Section */}
-        <VehicleHeroImage leadImageUrl={leadImageUrl} />
+        <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
+          <VehicleHeroImage leadImageUrl={leadImageUrl} />
+        </React.Suspense>
 
         {/* Main Content - Tabs disabled until backend processing is ready */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
