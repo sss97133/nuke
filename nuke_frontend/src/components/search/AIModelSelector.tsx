@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase';
 
 export type AIProvider = 'openai' | 'anthropic' | 'custom';
 
+export { AIProvider };
+
 interface AIModel {
   provider: AIProvider;
   modelName: string;
