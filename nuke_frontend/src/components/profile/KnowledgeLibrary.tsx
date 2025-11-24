@@ -253,9 +253,10 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
             <div className="text text-muted" style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
               {isOwnProfile ? 'No articles or image sets yet. Create your first article!' : 'No public articles to display.'}
             </div>
-          ) : filteredArticles.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {filteredArticles.map(article => (
+          ) : (
+            filteredArticles.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {filteredArticles.map(article => (
                 <div
                   key={article.id}
                   style={{
@@ -333,8 +334,9 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
                     {article.content}
                   </div>
                 </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       </div>
