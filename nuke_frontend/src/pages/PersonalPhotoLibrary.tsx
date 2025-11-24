@@ -25,8 +25,8 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const [suggestions, setSuggestions] = useState<VehicleSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // UI state
-  const [hideOrganized, setHideOrganized] = useState(true);
+  // UI state  
+  const [hideOrganized, setHideOrganized] = useState(true); // Default: hide organized photos
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [gridDensity, setGridDensity] = useState<GridDensity>('medium');
   const [uploading, setUploading] = useState(false);
