@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { LiveService } from '../../services/liveService';
 import type { LiveStatus } from '../../services/liveService';
 
@@ -155,14 +156,34 @@ const LivePlayer: React.FC<LivePlayerProps> = ({ userId, isOwnProfile }) => {
         )}
       </div>
 
-      {showSettings && (
+      {showSettings && ReactDOM.createPortal(
         <div
           role="dialog"
           aria-modal="true"
-          className="card"
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onClick={closeSettings}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}
         >
-          <div className="card" style={{ width: 'min(560px, 92vw)' }}>
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(560px, 92vw)',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
             <div className="card-body">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text font-bold">Stream Settings</h4>
@@ -196,7 +217,8 @@ const LivePlayer: React.FC<LivePlayerProps> = ({ userId, isOwnProfile }) => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
