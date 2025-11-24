@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 // AppLayout now provided globally by App.tsx
-import VehicleThumbnail from '../components/VehicleThumbnail';
 import GarageVehicleCard from '../components/vehicles/GarageVehicleCard';
+import VehicleRelationshipManager from '../components/VehicleRelationshipManager';
 import '../design-system.css';
 
 interface Vehicle {
@@ -50,6 +50,16 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
   }
 }
 
+type VehiclesTab =
+  | 'associated'
+  | 'owned'
+  | 'contributing'
+  | 'interested'
+  | 'discovered'
+  | 'curated'
+  | 'consigned'
+  | 'previously_owned';
+
 const VehiclesInner: React.FC = () => {
   const [vehicleRelationships, setVehicleRelationships] = useState<{
     owned: VehicleRelationship[];
@@ -64,7 +74,11 @@ const VehiclesInner: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
-  const [activeTab, setActiveTab] = useState<'owned' | 'contributing' | 'interested' | 'discovered' | 'curated' | 'consigned' | 'previously_owned'>('owned');
+  const [activeTab, setActiveTab] = useState<VehiclesTab>('associated');
+  const [relationshipModal, setRelationshipModal] = useState<{
+    vehicleId: string;
+    currentRelationship: string | null;
+  } | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -263,12 +277,6 @@ const VehiclesInner: React.FC = () => {
 
       setVehicleRelationships({ owned, contributing, interested, discovered, curated, consigned, previously_owned });
       
-      // Auto-switch to appropriate tab - now uploaders are contributors, not owners
-      if (contributing.length > 0 && owned.length === 0 && activeTab === 'owned') {
-        // Switch to contributing tab if no verified ownership but has uploaded vehicles
-        setActiveTab('contributing');
-      }
-      
       console.log(`Categorized vehicles: ${owned.length} owned, ${contributing.length} contributing, ${interested.length} interested`);
     } catch (error) {
       console.error('Error in loadVehicleRelationships:', error);
@@ -464,7 +472,20 @@ const VehiclesInner: React.FC = () => {
   };
 
   // Get current tab's relationships
-  const currentRelationships = vehicleRelationships[activeTab] || [];
+  const allRelationships: VehicleRelationship[] = [
+    ...vehicleRelationships.owned,
+    ...vehicleRelationships.contributing,
+    ...vehicleRelationships.interested,
+    ...vehicleRelationships.discovered,
+    ...vehicleRelationships.curated,
+    ...vehicleRelationships.consigned,
+    ...vehicleRelationships.previously_owned
+  ];
+
+  const currentRelationships: VehicleRelationship[] =
+    activeTab === 'associated'
+      ? allRelationships
+      : vehicleRelationships[activeTab as Exclude<VehiclesTab, 'associated'>] || [];
 
   // Filter and sort current relationships
   const filteredRelationships = currentRelationships
@@ -528,6 +549,14 @@ const VehiclesInner: React.FC = () => {
                 <div className="vehicle-controls-container">
                   {/* Filter Buttons */}
                   <div className="filter-buttons">
+                    <button
+                      className={`button-win95 ${
+                        activeTab === 'associated' ? 'button-win95-pressed' : ''
+                      }`}
+                      onClick={() => setActiveTab('associated')}
+                    >
+                      Associated ({allRelationships.length})
+                    </button>
                     <button
                       className={`button-win95 ${
                         activeTab === 'owned' ? 'button-win95-pressed' : ''
@@ -620,7 +649,9 @@ const VehiclesInner: React.FC = () => {
             <section className="section">
               <div className="card">
                 <div className="card-body text-center" style={{ padding: '48px 24px' }}>
-                  <h3 style={{ fontSize: '8px', marginBottom: '0' }}>No {activeTab} vehicles</h3>
+                  <h3 style={{ fontSize: '8px', marginBottom: '0' }}>
+                    {activeTab === 'associated' ? 'No associated vehicles' : `No ${activeTab} vehicles`}
+                  </h3>
                 </div>
               </div>
             </section>
@@ -647,6 +678,12 @@ const VehiclesInner: React.FC = () => {
                           vehicle={vehicle}
                           relationship={relationship}
                           onRefresh={loadVehicleRelationships}
+                          onEditRelationship={(vehicleId, current) => {
+                            setRelationshipModal({
+                              vehicleId,
+                              currentRelationship: current
+                            });
+                          }}
                         />
                       );
                     })}
@@ -656,7 +693,9 @@ const VehiclesInner: React.FC = () => {
                 <section className="section">
                   <div className="card">
                     <div className="card-body text-center">
-                      <h3 style={{ fontSize: '8px', marginBottom: '0' }}>No {activeTab} vehicles</h3>
+                      <h3 style={{ fontSize: '8px', marginBottom: '0' }}>
+                        {activeTab === 'associated' ? 'No associated vehicles' : `No ${activeTab} vehicles`}
+                      </h3>
                     </div>
                   </div>
                 </section>
@@ -681,6 +720,44 @@ const VehiclesInner: React.FC = () => {
               </div>
             </section>
           )}
+        </div>
+      )}
+      {/* Profile relationship editor modal */}
+      {relationshipModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 10002,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '12px'
+          }}
+          onClick={() => setRelationshipModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'var(--white)',
+              border: '2px solid var(--border)',
+              boxShadow: 'var(--shadow)',
+              maxWidth: '520px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
+            <VehicleRelationshipManager
+              vehicleId={relationshipModal.vehicleId}
+              currentRelationship={relationshipModal.currentRelationship}
+              onUpdate={() => {
+                loadVehicleRelationships();
+                setRelationshipModal(null);
+              }}
+            />
+          </div>
         </div>
       )}
     </>

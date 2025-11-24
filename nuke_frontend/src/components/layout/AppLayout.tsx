@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import { ProfileBalancePill } from './ProfileBalancePill';
 import { UploadStatusBar } from './UploadStatusBar';
+import VehicleSearch from '../VehicleSearch';
 import '../../design-system.css';
 
 interface AppLayoutProps {
@@ -32,6 +33,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [orgNavPath, setOrgNavPath] = useState<string>('/organizations');
+  const [navExpanded, setNavExpanded] = useState<boolean>(true);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -115,12 +117,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       }}>
         <div className="header-content">
           <div className="header-left">
-            <Link to="/" className="logo">
+            <button
+              type="button"
+              onClick={() => setNavExpanded(prev => !prev)}
+              className="logo"
+              style={{
+                border: 'none',
+                padding: 0,
+                background: 'transparent',
+                cursor: 'pointer'
+              }}
+            >
               <span className="logo-text">n-zero</span>
-            </Link>
+            </button>
             
             {/* Desktop Navigation */}
-            <nav className="main-nav desktop-nav">
+            <nav className={`main-nav desktop-nav ${navExpanded ? '' : 'collapsed'}`}>
               <Link 
                 to="/dashboard" 
                 className={`nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
@@ -149,6 +161,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           </div>
 
           <div className="header-right">
+            {/* Global Search - keeps search bar stable and out of rotating verb header */}
+            <div style={{ minWidth: '260px', maxWidth: '360px' }}>
+              <VehicleSearch />
+            </div>
+
             {/* Upload Indicator - Windows 95 style */}
             <GlobalUploadIndicator />
 

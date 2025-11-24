@@ -8,6 +8,7 @@ DROP POLICY IF EXISTS "Allow vehicle owners and contributors to insert images" O
 DROP POLICY IF EXISTS "Users can upload images to vehicles" ON vehicle_images;
 DROP POLICY IF EXISTS "simple_vehicle_images_insert" ON vehicle_images;
 DROP POLICY IF EXISTS "authenticated_can_insert" ON vehicle_images;
+DROP POLICY IF EXISTS "Authenticated users can upload images to any vehicle" ON vehicle_images;
 
 -- Create permissive INSERT policy: Any authenticated user can upload to any vehicle
 -- This enables the data entry workflow where users provide BAT links and images via comments

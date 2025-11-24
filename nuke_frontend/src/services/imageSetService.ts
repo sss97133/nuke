@@ -58,7 +58,41 @@ export class ImageSetService {
       throw error;
     }
 
-    return (data || []).map(set => ({
+    return (data || []).map((set: any) => ({
+      ...set,
+      image_count: set.image_count?.[0]?.count || 0
+    }));
+  }
+
+  /**
+   * Get personal albums (image sets not yet tied to a vehicle)
+   */
+  static async getPersonalAlbums(): Promise<ImageSet[]> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Must be logged in to load personal albums');
+    }
+
+    const userId = session.session.user.id;
+
+    const { data, error } = await supabase
+      .from('image_sets')
+      .select(
+        `
+        *,
+        image_count:image_set_members(count)
+      `
+      )
+      .eq('user_id', userId)
+      .eq('is_personal', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching personal albums:', error);
+      throw error;
+    }
+
+    return (data || []).map((set: any) => ({
       ...set,
       image_count: set.image_count?.[0]?.count || 0
     }));
@@ -83,7 +117,7 @@ export class ImageSetService {
   }
 
   /**
-   * Create a new image set
+   * Create a new image set for a vehicle
    */
   static async createImageSet(params: {
     vehicleId: string;
@@ -116,6 +150,42 @@ export class ImageSetService {
 
     if (error) {
       console.error('Error creating image set:', error);
+      throw error;
+    }
+
+    return data;
+  }
+
+  /**
+   * Create a new personal album (not yet tied to a vehicle)
+   */
+  static async createPersonalAlbum(params: {
+    name: string;
+    description?: string;
+    color?: string;
+    icon?: string;
+  }): Promise<ImageSet | null> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Must be logged in to create personal albums');
+    }
+
+    const { data, error } = await supabase
+      .from('image_sets')
+      .insert({
+        created_by: session.session.user.id,
+        user_id: session.session.user.id,
+        is_personal: true,
+        name: params.name,
+        description: params.description,
+        color: params.color || '#808080',
+        icon: params.icon
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating personal album:', error);
       throw error;
     }
 
@@ -226,6 +296,36 @@ export class ImageSetService {
     }
 
     return data || 0;
+  }
+
+  /**
+   * Convert a personal album into a full vehicle profile.
+   * This will create a vehicle, attach all album images to it,
+   * and flip the album to a vehicle-linked image set.
+   */
+  static async convertPersonalAlbumToVehicle(params: {
+    imageSetId: string;
+    year: number;
+    make: string;
+    model: string;
+    trim?: string;
+    vin?: string;
+  }): Promise<string> {
+    const { data, error } = await supabase.rpc('convert_personal_album_to_vehicle', {
+      p_image_set_id: params.imageSetId,
+      p_year: params.year,
+      p_make: params.make,
+      p_model: params.model,
+      p_trim: params.trim || null,
+      p_vin: params.vin || null
+    });
+
+    if (error) {
+      console.error('Error converting personal album to vehicle:', error);
+      throw error;
+    }
+
+    return data as string;
   }
 
   /**
