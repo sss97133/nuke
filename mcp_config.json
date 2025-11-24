@@ -21,6 +21,20 @@
         "--read-only",
         "--project-ref=qkgaybvrernstplzjaam"
       ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-playwright"
+      ]
+    },
+    "browser": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-browser"
+      ]
     }
   }
 }

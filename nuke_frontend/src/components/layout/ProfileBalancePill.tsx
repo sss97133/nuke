@@ -35,13 +35,24 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
     if (!session?.user?.id) return;
     
     const loadBalance = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('user_cash_balances')
         .select('available_cents, reserved_cents as pending_cents')
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
       
-      if (data) setBalance(data);
+      if (error) {
+        console.error('Error loading balance:', error);
+        // If no row exists, set balance to 0
+        if (error.code === 'PGRST116') {
+          setBalance({ available_cents: 0, pending_cents: 0 });
+        }
+        return;
+      }
+      
+      console.log('Balance loaded:', data);
+      // Set balance (or 0 if no data)
+      setBalance(data || { available_cents: 0, pending_cents: 0 });
     };
 
     loadBalance();
@@ -72,7 +83,9 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
     return () => document.removeEventListener('mousedown', handler);
   }, [showMenu]);
 
-  const amount = balance ? (balance.available_cents / 100).toFixed(2) : '0.00';
+  // Always show balance, default to 0.00 if no balance
+  const availableCents = balance?.available_cents ?? 0;
+  const amount = (availableCents / 100).toFixed(2);
   
   // Calculate balance width based on digits
   const balanceWidth = (() => {
@@ -106,7 +119,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
         }}
         onClick={() => setExpanded(!expanded)}
       >
-        {/* Balance (left side) */}
+        {/* Balance (left side) - Always show when expanded */}
         {expanded && (
           <div
             onClick={(e) => {
@@ -211,7 +224,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
               fontWeight: 700,
               fontFamily: '"MS Sans Serif", sans-serif'
             }}>
-              ${amount}
+              ${amount || '0.00'}
             </div>
             {balance && balance.pending_cents > 0 && (
               <div style={{ 

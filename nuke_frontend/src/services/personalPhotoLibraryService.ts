@@ -95,9 +95,20 @@ export class PersonalPhotoLibraryService {
    * Get all unorganized photos (inbox)
    */
   static async getUnorganizedPhotos(limit = 1000, offset = 0): Promise<PersonalPhoto[]> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const userId = session.session.user.id;
+
     const { data, error } = await supabase
-      .from('user_photo_inbox')
+      .from('vehicle_images')
       .select('*')
+      .eq('user_id', userId)
+      .is('vehicle_id', null)
+      // Treat NULL organization_status as "unorganized" so legacy uploads still show in inbox
+      .or('organization_status.eq.unorganized,organization_status.is.null')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -106,16 +117,47 @@ export class PersonalPhotoLibraryService {
       throw error;
     }
 
-    return data || [];
+    // Get album counts separately
+    const images = data || [];
+    const imageIds = images.map((img: any) => img.id);
+    
+    let albumCounts: Record<string, number> = {};
+    if (imageIds.length > 0) {
+      const { data: counts } = await supabase
+        .from('image_set_members')
+        .select('image_id')
+        .in('image_id', imageIds);
+      
+      if (counts) {
+        counts.forEach((member: any) => {
+          albumCounts[member.image_id] = (albumCounts[member.image_id] || 0) + 1;
+        });
+      }
+    }
+
+    // Transform and add album_count
+    return images.map((img: any) => ({
+      ...img,
+      album_count: albumCounts[img.id] || 0
+    }));
   }
 
   /**
    * Get organized photos
    */
   static async getOrganizedPhotos(limit = 1000, offset = 0): Promise<PersonalPhoto[]> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const userId = session.session.user.id;
+
     const { data, error } = await supabase
-      .from('user_organized_photos')
-      .select('*')
+      .from('vehicle_images')
+      .select('*, vehicles(year, make, model)')
+      .eq('user_id', userId)
+      .or('vehicle_id.not.is.null,organization_status.eq.organized')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -124,7 +166,32 @@ export class PersonalPhotoLibraryService {
       throw error;
     }
 
-    return data || [];
+    // Get album counts separately
+    const images = data || [];
+    const imageIds = images.map((img: any) => img.id);
+    
+    let albumCounts: Record<string, number> = {};
+    if (imageIds.length > 0) {
+      const { data: counts } = await supabase
+        .from('image_set_members')
+        .select('image_id')
+        .in('image_id', imageIds);
+      
+      if (counts) {
+        counts.forEach((member: any) => {
+          albumCounts[member.image_id] = (albumCounts[member.image_id] || 0) + 1;
+        });
+      }
+    }
+
+    // Transform data to match PersonalPhoto interface
+    return images.map((img: any) => ({
+      ...img,
+      year: img.vehicles?.year,
+      make: img.vehicles?.make,
+      model: img.vehicles?.model,
+      album_count: albumCounts[img.id] || 0
+    }));
   }
 
   /**
@@ -144,7 +211,8 @@ export class PersonalPhotoLibraryService {
         .select('id, file_size', { count: 'exact', head: false })
         .eq('user_id', userId)
         .is('vehicle_id', null)
-        .eq('organization_status', 'unorganized'),
+        // Include rows where organization_status is NULL as unorganized
+        .or('organization_status.eq.unorganized,organization_status.is.null'),
       
       supabase.from('vehicle_images')
         .select('id, file_size', { count: 'exact', head: false })
@@ -343,11 +411,20 @@ export class PersonalPhotoLibraryService {
     model?: string,
     year?: number
   ): Promise<PersonalPhoto[]> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const userId = session.session.user.id;
+
     let query = supabase
       .from('vehicle_images')
       .select('*')
+      .eq('user_id', userId)
       .is('vehicle_id', null)
-      .eq('organization_status', 'unorganized')
+      // Treat NULL organization_status as "unorganized" so legacy uploads still show
+      .or('organization_status.eq.unorganized,organization_status.is.null')
       .not('ai_detected_vehicle', 'is', null);
 
     if (make) {
@@ -374,11 +451,20 @@ export class PersonalPhotoLibraryService {
    * Search unorganized photos
    */
   static async searchUnorganizedPhotos(query: string): Promise<PersonalPhoto[]> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const userId = session.session.user.id;
+
     const { data, error } = await supabase
       .from('vehicle_images')
       .select('*')
+      .eq('user_id', userId)
       .is('vehicle_id', null)
-      .eq('organization_status', 'unorganized')
+      // Treat NULL organization_status as "unorganized" so legacy uploads still show
+      .or('organization_status.eq.unorganized,organization_status.is.null')
       .or(`file_name.ilike.%${query}%,ai_detected_angle.ilike.%${query}%`)
       .order('created_at', { ascending: false })
       .limit(100);
@@ -413,11 +499,20 @@ export class PersonalPhotoLibraryService {
    * Get photo count by AI detected angle
    */
   static async getPhotoCountsByAngle(): Promise<Record<string, number>> {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const userId = session.session.user.id;
+
     const { data, error } = await supabase
       .from('vehicle_images')
       .select('ai_detected_angle')
+      .eq('user_id', userId)
       .is('vehicle_id', null)
-      .eq('organization_status', 'unorganized')
+      // Treat NULL organization_status as "unorganized" so legacy uploads still show
+      .or('organization_status.eq.unorganized,organization_status.is.null')
       .not('ai_detected_angle', 'is', null);
 
     if (error) {
