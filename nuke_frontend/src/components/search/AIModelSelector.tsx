@@ -30,7 +30,9 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
   const [userProviders, setUserProviders] = useState<any[]>([]);
   const [session, setSession] = useState<any>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     loadUserProviders();
@@ -40,12 +42,24 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
     // Close dropdown on outside click
     if (!showDropdown) return;
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+          buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
         setShowDropdown(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [showDropdown]);
+
+  useEffect(() => {
+    // Calculate dropdown position when shown
+    if (showDropdown && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right
+      });
+    }
   }, [showDropdown]);
 
   const loadUserProviders = async () => {
@@ -99,6 +113,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
     <div ref={dropdownRef} style={{ position: 'relative' }}>
       {/* Small Button - No Label */}
       <button
+        ref={buttonRef}
         onClick={() => setShowDropdown(!showDropdown)}
         style={{
           padding: 0,
@@ -120,10 +135,11 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
       {/* Dropdown Menu */}
       {showDropdown && (
         <div
+          ref={dropdownRef}
           style={{
             position: 'fixed',
-            top: 'auto',
-            right: 'auto',
+            top: `${dropdownPosition.top}px`,
+            right: `${dropdownPosition.right}px`,
             minWidth: '180px',
             background: 'var(--white)',
             border: '2px solid var(--border)',
@@ -131,13 +147,6 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
             boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
             zIndex: 99999,
             padding: '4px'
-          }}
-          ref={(el) => {
-            if (el && dropdownRef.current) {
-              const rect = dropdownRef.current.getBoundingClientRect();
-              el.style.top = `${rect.bottom + 4}px`;
-              el.style.right = `${window.innerWidth - rect.right}px`;
-            }
           }}
         >
           {availableModels.map(model => (
