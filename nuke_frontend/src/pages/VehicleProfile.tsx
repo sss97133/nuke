@@ -101,6 +101,7 @@ const VehicleProfile: React.FC = () => {
   const [linkedOrganizations, setLinkedOrganizations] = useState<LinkedOrg[]>([]);
   const [isMobile, setIsMobile] = useState(false);
 
+
   // MOBILE DETECTION
   useEffect(() => {
     const checkMobile = () => {
@@ -1281,11 +1282,11 @@ const VehicleProfile: React.FC = () => {
                   )}
                 </div>
 
-            {/* Right Column: Image Gallery with Infinite Scroll */}
+            {/* Right Column: Gallery */}
             <div>
               <ImageGallery
                 vehicleId={vehicle.id}
-                showUpload={Boolean(session?.user?.id)}
+                showUpload={true}
                 onImagesUpdated={() => {
                   loadVehicle();
                   loadTimelineEvents();

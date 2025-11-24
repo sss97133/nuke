@@ -61,13 +61,15 @@ export const CashBalanceWidget: React.FC = () => {
         style={{
           background: 'var(--white)',
           border: '2px outset var(--border)',
-          padding: '4px 8px',
-          fontSize: '9pt',
+          padding: '1px 6px',
+          fontSize: '8pt',
           cursor: 'pointer',
           fontFamily: '"MS Sans Serif", sans-serif',
           display: 'flex',
           alignItems: 'center',
-          gap: '6px'
+          gap: '4px',
+          height: '15px',
+          minHeight: '15px'
         }}
         title="Your buying power"
       >

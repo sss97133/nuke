@@ -564,16 +564,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         style={{ 
           display: 'inline-flex', 
           alignItems: 'center', 
-          gap: 4, 
-          fontSize: '10px', 
+          gap: 3, 
+          fontSize: '8px', 
           color,
           cursor: 'pointer',
           userSelect: 'none'
         }}
       >
-        <span style={{ width: 0, height: 0, ...triangleStyle }} />
+        <span style={{ width: 0, height: 0, ...triangleStyle, borderWidth: '4px', borderTopWidth: positive ? '0' : '5px', borderBottomWidth: positive ? '5px' : '0' }} />
         {`${positive ? '+' : ''}${trendPct.toFixed(1)}%`}
-        <span style={{ fontSize: '8px', color: mutedTextColor, marginLeft: '2px' }}>
+        <span style={{ fontSize: '7px', color: mutedTextColor, marginLeft: '1px' }}>
           {periodLabel}
         </span>
       </span>
@@ -600,24 +600,39 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       style={{
         background: 'var(--surface)',
         border: 'none',
-        padding: '4px 12px',
-        margin: 0,
-        position: 'sticky',
-        top: 48,
-        zIndex: 10,
+        borderTop: 'none',
+        borderRight: 'none',
+        borderLeft: 'none',
         borderBottom: '1px solid var(--border)',
+        padding: '2px 8px',
+        margin: 0,
+        marginTop: 0,
+        marginBottom: 0,
+        marginLeft: 'calc(-1 * var(--space-2))',
+        marginRight: 'calc(-1 * var(--space-2))',
+        position: 'sticky',
+        top: '48px',
+        left: 0,
+        right: 0,
+        width: '100vw',
+        maxWidth: '100vw',
+        zIndex: 98,
         boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
-        height: '32px',
+        height: '25px',
+        minHeight: '25px',
+        maxHeight: '25px',
         display: 'flex',
-        alignItems: 'center'
+        alignItems: 'center',
+        lineHeight: '21px',
+        boxSizing: 'border-box'
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', gap: 16, width: '100%' }}>
-        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-          <div style={{ fontSize: '9pt', fontWeight: 700, lineHeight: 1.1, whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', gap: '6px', width: '100%', overflow: 'hidden' }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'hidden' }}>
+          <div style={{ fontSize: '8pt', fontWeight: 700, lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}
           </div>
-          <div style={{ position: 'relative', fontSize: '8pt', color: mutedTextColor, display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ position: 'relative', fontSize: '7pt', color: mutedTextColor, display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
             {isVerifiedOwner ? (
             <button
               type="button"
@@ -796,11 +811,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               padding: 0,
               cursor: 'pointer',
               display: 'flex',
+              flexDirection: 'row',
               alignItems: 'center',
-              gap: 8
+              gap: 6
             }}
+            className="vehicle-price-button"
           >
-            <div style={{ fontSize: '10pt', fontWeight: 700, color: baseTextColor }}>
+            <div style={{ fontSize: '9pt', fontWeight: 700, color: baseTextColor, lineHeight: 1 }}>
               {priceText}
             </div>
               {trendIndicator}

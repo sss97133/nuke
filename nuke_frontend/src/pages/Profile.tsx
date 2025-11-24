@@ -50,7 +50,7 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'achievements' | 'stats' | 'professional' | 'organizations' | 'duplicates' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'achievements' | 'stats' | 'professional' | 'organizations' | 'photos' | 'financials' | 'duplicates' | 'settings'>('overview');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
@@ -509,6 +509,8 @@ const Profile: React.FC = () => {
             { key: 'activity', label: 'Activity' },
             { key: 'professional', label: 'Professional' },
             { key: 'organizations', label: 'Organizations' },
+            ...(isOwnProfile ? [{ key: 'photos', label: 'Photos' }] : []),
+            ...(isOwnProfile ? [{ key: 'financials', label: 'Financials' }] : []),
             ...(isOwnProfile ? [{ key: 'duplicates', label: 'Duplicates' }] : []),
             ...(isOwnProfile ? [{ key: 'settings', label: 'Settings' }] : [])
           ].map((tab) => (
@@ -559,61 +561,6 @@ const Profile: React.FC = () => {
                   <LivePlayer userId={profile.id} isOwnProfile={isOwnProfile} />
                 </div>
 
-                {/* Photo Library - Only show for own profile */}
-                {isOwnProfile && (
-                  <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
-                    <div className="card-header">
-                      <h3 className="text">Photo Library</h3>
-                    </div>
-                    <div className="card-body">
-                      {photoLibraryStats && (
-                        <div style={{ 
-                          display: 'grid', 
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                          gap: 'var(--space-3)',
-                          marginBottom: 'var(--space-3)',
-                          padding: 'var(--space-3)',
-                          background: 'var(--grey-100)',
-                          border: '1px solid var(--border-light)',
-                          borderRadius: '4px'
-                        }}>
-                          <div>
-                            <div className="text text-small text-muted">To Organize</div>
-                            <div className="text font-bold" style={{ fontSize: '20px', color: photoLibraryStats.unorganized_photos > 0 ? 'var(--primary)' : 'var(--text)' }}>
-                              {photoLibraryStats.unorganized_photos?.toLocaleString() || 0}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text text-small text-muted">Organized</div>
-                            <div className="text font-bold" style={{ fontSize: '20px' }}>
-                              {photoLibraryStats.organized_photos?.toLocaleString() || 0}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text text-small text-muted">AI Suggestions</div>
-                            <div className="text font-bold" style={{ fontSize: '20px', color: photoLibraryStats.ai_suggestions_count > 0 ? '#ff9d00' : 'var(--text)' }}>
-                              {photoLibraryStats.ai_suggestions_count || 0}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      <p className="text text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
-                        Upload and organize your vehicle photos. Bulk upload thousands of photos,
-                        get AI suggestions for grouping, and organize them into vehicle profiles.
-                      </p>
-                      <button
-                        onClick={() => navigate('/photos')}
-                        className="button button-primary"
-                        style={{ width: '100%' }}
-                      >
-                        {photoLibraryStats?.unorganized_photos > 0 
-                          ? `Organize ${photoLibraryStats.unorganized_photos} Photos`
-                          : 'Open Photo Library'
-                        }
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -631,6 +578,46 @@ const Profile: React.FC = () => {
             
             {activeTab === 'organizations' && (
               <OrganizationAffiliations userId={profile.id} isOwnProfile={isOwnProfile} />
+            )}
+            
+            {activeTab === 'photos' && isOwnProfile && (
+              <div style={{ 
+                minHeight: '70vh',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <iframe
+                  src="/photos"
+                  style={{
+                    width: '100%',
+                    minHeight: '70vh',
+                    flex: 1,
+                    border: 'none',
+                    borderRadius: '4px'
+                  }}
+                  title="Photo Library"
+                />
+              </div>
+            )}
+
+            {activeTab === 'financials' && isOwnProfile && (
+              <div style={{ 
+                minHeight: '70vh',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <iframe
+                  src="/financials"
+                  style={{
+                    width: '100%',
+                    minHeight: '70vh',
+                    flex: 1,
+                    border: 'none',
+                    borderRadius: '4px'
+                  }}
+                  title="Financials"
+                />
+              </div>
             )}
             
             {activeTab === 'duplicates' && isOwnProfile && (

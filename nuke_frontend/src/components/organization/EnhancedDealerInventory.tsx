@@ -88,7 +88,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           end_date,
           notes,
           created_at,
-          vehicles!inner(
+          vehicles(
             id,
             year,
             make,
@@ -105,11 +105,22 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
         .in('status', ['active', 'sold', 'archived'])
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase query error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+
+      console.log('Loaded vehicles count:', data?.length || 0);
+      console.log('Sample vehicle data:', data?.[0]);
+
+      // Filter out vehicles where the join failed (vehicles is null)
+      const validVehicles = (data || []).filter(v => v.vehicles !== null);
+      console.log('Valid vehicles after filtering null joins:', validVehicles.length);
 
       // Fetch thumbnails
       const enriched = await Promise.all(
-        (data || []).map(async (v) => {
+        validVehicles.map(async (v) => {
           const { data: img } = await supabase
             .from('vehicle_images')
             .select('thumbnail_url, medium_url, image_url')
@@ -125,9 +136,11 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
         })
       );
 
+      console.log('Enriched vehicles count:', enriched.length);
       setVehicles(enriched as DealerVehicle[]);
     } catch (error) {
       console.error('Failed to load vehicles:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     } finally {
       setLoading(false);
     }
@@ -136,18 +149,18 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
   // Smart categorization: Map relationship_type + status to display categories
   // IMPORTANT: Only mark as "sold" if there's proof (BAT URL, sale_date, approved verification, etc.)
   const getDisplayCategory = (v: DealerVehicle): string => {
-    // Sold vehicles - ONLY if there's proof
+    // Sold vehicles - ONLY if there's proof AND status is 'sold'
     // Check for: sale_date, BAT listing (external_listings), or approved sale verification
     const hasSaleProof = v.sale_date || 
                         (v.vehicles.sale_status === 'sold' && v.sale_price) ||
                         (v.status === 'sold' && (v.sale_date || v.sale_price)); // Only if status is explicitly set with proof
     
-    if (hasSaleProof && v.status === 'sold') {
-      return 'sold';
-    }
-    
-    // If status says "sold" but no proof, still show as sold but flag it
-    if (v.status === 'sold' && !hasSaleProof) {
+    // Only mark as sold if status is actually 'sold' (not just listing_status)
+    if (v.status === 'sold') {
+      if (hasSaleProof) {
+        return 'sold';
+      }
+      // If status says "sold" but no proof, still show as sold but flag it
       return 'sold'; // Show as sold, user can verify/fix
     }
     
@@ -161,12 +174,22 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       return 'historical';
     }
     
-    // Active inventory
+    // Active inventory - prioritize status over listing_status
+    // If status is 'active', ignore listing_status='sold' (likely data inconsistency)
     if (v.relationship_type === 'in_stock' || v.relationship_type === 'consigner' || v.relationship_type === 'owner') {
+      // Only use listing_status if it's not 'sold' or if status is also 'sold'
+      if (v.status === 'active' && v.listing_status === 'sold') {
+        // Data inconsistency: status is active but listing_status says sold
+        // Treat as active inventory, default to 'for_sale'
+        return 'for_sale';
+      }
       return v.listing_status || 'for_sale';
     }
     
-    // Default to listing_status if available
+    // Default to listing_status if available, but not if it conflicts with active status
+    if (v.status === 'active' && v.listing_status === 'sold') {
+      return 'for_sale';
+    }
     return v.listing_status || 'all';
   };
 
@@ -467,7 +490,19 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       </div>
 
       {/* Vehicles Display */}
-      {filteredAndSorted.length === 0 ? (
+      {loading ? (
+        <div className="card">
+          <div className="card-body" style={{
+            textAlign: 'center',
+            padding: '60px 20px',
+            color: 'var(--text-muted)'
+          }}>
+            <div style={{ fontSize: '12pt', fontWeight: 600, marginBottom: '8px' }}>
+              Loading vehicles...
+            </div>
+          </div>
+        </div>
+      ) : filteredAndSorted.length === 0 ? (
         <div className="card">
           <div className="card-body" style={{
             textAlign: 'center',
@@ -477,8 +512,11 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             <div style={{ fontSize: '12pt', fontWeight: 600, marginBottom: '8px' }}>
               No vehicles found
             </div>
-            <div style={{ fontSize: '9pt' }}>
+            <div style={{ fontSize: '9pt', marginBottom: '8px' }}>
               {searchTerm ? 'Try adjusting your search' : 'No vehicles in this category'}
+            </div>
+            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '16px', fontFamily: 'monospace' }}>
+              Debug: Total loaded: {vehicles.length} | Filtered: {filteredAndSorted.length} | Category: {category} | Search: {searchTerm || 'none'}
             </div>
           </div>
         </div>

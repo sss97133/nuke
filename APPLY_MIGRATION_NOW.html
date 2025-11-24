@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Apply Personal Photo Library Migration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 40px;
+        }
+        h1 {
+            color: #4a9eff;
+            margin-top: 0;
+        }
+        .step {
+            background: #222;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #4a9eff;
+            border-radius: 4px;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #4a9eff;
+        }
+        button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 10px 10px 0;
+        }
+        button:hover {
+            background: #5dadff;
+        }
+        textarea {
+            width: 100%;
+            height: 400px;
+            background: #0a0a0a;
+            color: #00ff00;
+            border: 2px solid #333;
+            padding: 15px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+        .success {
+            color: #00c853;
+            font-weight: 600;
+        }
+        .warning {
+            color: #ff9d00;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Apply Personal Photo Library Migration</h1>
+        
+        <div class="step">
+            <h3>Step 1: Open Supabase SQL Editor</h3>
+            <p>Click this button to open the Supabase SQL Editor in a new tab:</p>
+            <button onclick="window.open('https://supabase.com/dashboard/project/qkgaybvrernstplzjaam/editor', '_blank')">
+                Open Supabase SQL Editor →
+            </button>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Copy the Migration SQL</h3>
+            <p>Click to select all the SQL below, then copy it (Cmd/Ctrl + C):</p>
+            <textarea id="sqlContent" readonly onclick="this.select()">-- Loading SQL...</textarea>
+            <button onclick="copyToClipboard()">Copy SQL to Clipboard</button>
+            <span id="copyStatus"></span>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Paste & Run</h3>
+            <p>In the Supabase SQL Editor:</p>
+            <ol>
+                <li>Click "New Query"</li>
+                <li>Paste the SQL (Cmd/Ctrl + V)</li>
+                <li>Click "Run" or press Cmd/Ctrl + Enter</li>
+            </ol>
+            <p class="success">✅ Done! The Personal Photo Library will be ready.</p>
+        </div>
+
+        <div class="step">
+            <h3>Step 4: Test It</h3>
+            <p>After running the migration, test the new features:</p>
+            <button onclick="window.open('https://n-zero.dev/photos', '_blank')">
+                Open Photo Library (Production) →
+            </button>
+            <button onclick="window.open('https://n-zero.dev/profile', '_blank')">
+                Open Your Profile →
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Load SQL from file
+        fetch('file:///Users/skylar/nuke/supabase/migrations/20251123200000_personal_photo_library.sql')
+            .then(response => response.text())
+            .then(sql => {
+                document.getElementById('sqlContent').value = sql;
+            })
+            .catch(err => {
+                // Fallback: embed the SQL directly
+                document.getElementById('sqlContent').value = `-- Copy this SQL from: /Users/skylar/nuke/supabase/migrations/20251123200000_personal_photo_library.sql
+-- Or run: cat /Users/skylar/nuke/supabase/migrations/20251123200000_personal_photo_library.sql | pbcopy
+
+⚠️  Please open the migration file and copy it manually.`;
+            });
+
+        function copyToClipboard() {
+            const textarea = document.getElementById('sqlContent');
+            textarea.select();
+            document.execCommand('copy');
+            document.getElementById('copyStatus').innerHTML = '<span class="success">✅ Copied!</span>';
+            setTimeout(() => {
+                document.getElementById('copyStatus').innerHTML = '';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
+
