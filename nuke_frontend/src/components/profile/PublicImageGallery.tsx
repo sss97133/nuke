@@ -18,17 +18,27 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
     try {
       setLoading(true);
       
-      // Load public images from user's vehicles
-      // For own profile, show all images
+      // Load images from vehicles the user owns or has contributed to
+      // For own profile, show all images from their vehicles
       // For public profile, only show images from public vehicles
-      const { data, error } = await supabase
+      let query = supabase
         .from('vehicle_images')
         .select(`
           *,
-          vehicles!inner(id, is_public, user_id)
-        `)
-        .eq('vehicles.user_id', userId)
-        .eq(isOwnProfile ? 'vehicles.user_id' : 'vehicles.is_public', isOwnProfile ? userId : true)
+          vehicle:vehicles!vehicle_images_vehicle_id_fkey(id, is_public, user_id, year, make, model)
+        `);
+
+      if (isOwnProfile) {
+        // Own profile: show all images from vehicles they own
+        query = query.eq('vehicle.user_id', userId);
+      } else {
+        // Public profile: only show images from public vehicles
+        query = query
+          .eq('vehicle.user_id', userId)
+          .eq('vehicle.is_public', true);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -90,8 +100,8 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
                 }}
                 onClick={() => {
                   // Navigate to vehicle if available
-                  if (image.vehicles?.id) {
-                    window.location.href = `/vehicle/${image.vehicles.id}`;
+                  if (image.vehicle?.id) {
+                    window.location.href = `/vehicle/${image.vehicle.id}`;
                   }
                 }}
               />

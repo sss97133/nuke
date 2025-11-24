@@ -30,11 +30,19 @@ export class KnowledgeLibraryService {
         .order('created_at', { ascending: false });
 
       if (!includePublic) {
-        query = query.eq('is_public', false);
+        // When includePublic is false, we still want all user's articles (public and private)
+        // The filter is only for public viewing
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        // If table doesn't exist (404), return empty array gracefully
+        if (error.code === 'PGRST301' || error.code === '42P01') {
+          console.warn('user_knowledge_library table does not exist yet');
+          return [];
+        }
+        throw error;
+      }
       return data || [];
     } catch (error) {
       console.error('Error loading knowledge articles:', error);
@@ -54,7 +62,14 @@ export class KnowledgeLibraryService {
         .eq('is_public', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // If table doesn't exist (404), return empty array gracefully
+        if (error.code === 'PGRST301' || error.code === '42P01') {
+          console.warn('user_knowledge_library table does not exist yet');
+          return [];
+        }
+        throw error;
+      }
       return data || [];
     } catch (error) {
       console.error('Error loading public knowledge articles:', error);
