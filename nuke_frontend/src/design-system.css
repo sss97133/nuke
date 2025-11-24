@@ -3117,20 +3117,26 @@ body {
 /* Responsive adjustments for Mobile */
 @media (max-width: 768px) {
   /* Hide desktop navigation on mobile - everything in capsule dropdown */
+  /* Mobile header should be EXACT same as desktop */
   .desktop-nav {
-    display: none !important;
+    display: flex !important;
   }
 
-  /* Logo and capsule stay visible */
   .header-left {
-    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    padding-left: 5px;
   }
   
   .header-right {
-    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-right: 5px;
   }
   
-  /* Keep mobile nav hidden since we removed it */
+  /* Keep mobile nav hidden */
   .mobile-nav {
     display: none !important;
   }
@@ -3161,32 +3167,36 @@ body {
     padding: 0;
   }
 
-  /* Navigation adjustments */
+  /* Navigation adjustments - keep same as desktop */
   .app-header {
     padding: var(--space-2) var(--space-3);
   }
 
   .header-content {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     height: 48px !important;
     min-height: 48px !important;
+    overflow: hidden;
   }
 
   .header-left {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-6);
+    min-width: 0;
   }
 
   .header-right {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-3);
+    min-width: 0;
   }
 
   .desktop-nav {
-    display: none !important;
+    display: flex !important;
   }
 
   /* Profile bubble adjustments */

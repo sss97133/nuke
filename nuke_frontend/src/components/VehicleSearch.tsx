@@ -101,10 +101,14 @@ export default function VehicleSearch() {
     setShowResults(false);
   };
 
-  const handleAIModelSelect = (provider: AIProvider, modelName: string) => {
-    setSelectedAIProvider(provider);
-    // TODO: Integrate AI model selection with search
-    console.log('AI model selected:', provider, modelName);
+  const handleAIModelSelect = (provider: AIProvider, modelName: string, enabled: boolean) => {
+    if (enabled) {
+      setSelectedAIProvider(provider);
+      // TODO: Integrate AI model selection with search
+      console.log('AI model enabled:', provider, modelName);
+    } else {
+      setSelectedAIProvider(undefined);
+    }
   };
 
   return (
@@ -113,16 +117,17 @@ export default function VehicleSearch() {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: '4px',
         background: 'var(--white)',
         border: '2px solid var(--border)',
-        padding: '8px 12px'
+        padding: '6px 8px'
       }}>
         <span style={{ 
-          fontSize: '10pt', 
-          marginRight: '8px',
+          fontSize: '9pt', 
+          marginRight: '4px',
           color: '#999',
-          fontFamily: '"MS Sans Serif", sans-serif'
+          fontFamily: '"MS Sans Serif", sans-serif',
+          whiteSpace: 'nowrap'
         }}>
           search
         </span>
@@ -138,18 +143,18 @@ export default function VehicleSearch() {
             flex: 1,
             border: 'none',
             outline: 'none',
-            fontSize: '10pt',
+            fontSize: '9pt',
             fontFamily: '"MS Sans Serif", sans-serif',
-            background: 'transparent'
+            background: 'transparent',
+            minWidth: 0
           }}
         />
-        {/* AI Model Selector Buttons */}
+        {/* AI Model Selector - Small Button */}
         <AIModelSelector
           onModelSelect={handleAIModelSelect}
           selectedProvider={selectedAIProvider}
-          compact={true}
         />
-        {loading && <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Searching...</span>}
+        {loading && <span style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>...</span>}
       </div>
 
       {/* Search Results Dropdown */}
