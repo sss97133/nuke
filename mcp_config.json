@@ -17,8 +17,9 @@
       "command": "npx",
       "args": [
         "-y",
-        "mcp-remote",
-        "https://mcp.supabase.com/mcp?project_ref=qkgaybvrernstplzjaam"
+        "@supabase/mcp-server-supabase@latest",
+        "--read-only",
+        "--project-ref=qkgaybvrernstplzjaam"
       ]
     }
   }

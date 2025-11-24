@@ -35,6 +35,7 @@ interface HypeVehicle {
 type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
 type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
+type SortDirection = 'asc' | 'desc';
 
 // Rotating action verbs hook (inspired by Claude's thinking animation)
 const useRotatingVerb = () => {
@@ -58,21 +59,134 @@ const useRotatingVerb = () => {
     'Revving',
     'Detailing',
     'Collecting',
-    'Showing'
+    'Showing',
+    'Flipping',
+    'Trading',
+    'Swapping',
+    'Hunting',
+    'Sourcing',
+    'Inspecting',
+    'Diagnosing',
+    'Tweaking',
+    'Dialing',
+    'Hooning',
+    'Launching',
+    'Burnouts',
+    'Drag',
+    'Tracking',
+    'AutoXing',
+    'Drifting',
+    'Rolling',
+    'Slamming',
+    'Bagging',
+    'Coiling',
+    'Cutting',
+    'Pounding',
+    'Stretching',
+    'Tucking',
+    'Dropping',
+    'Raising',
+    'Camber',
+    'Slapping',
+    'Bolting',
+    'Torquing',
+    'Bleeding',
+    'Flushing',
+    'Changing',
+    'Swapping',
+    'Rebuilding',
+    'Boring',
+    'Stroking',
+    'Porting',
+    'Machining',
+    'Balancing',
+    'Blueprinting',
+    'Dynoing',
+    'Mapping',
+    'Flashing',
+    'Coding',
+    'Logging',
+    'Scanning',
+    'Wiring',
+    'Soldering',
+    'Crimping',
+    'Routing',
+    'Tucking',
+    'Wrapping',
+    'Taping',
+    'Shrinking',
+    'Stripping',
+    'Chroming',
+    'Plating',
+    'Anodizing',
+    'Powder',
+    'Cerakoting',
+    'Wrapping',
+    'Dipping',
+    'Spraying',
+    'Rolling',
+    'Buffing',
+    'Claying',
+    'Correcting',
+    'Ceramic',
+    'Waxing',
+    'Sealing',
+    'Debadging',
+    'Shaving',
+    'Molding',
+    'Frenching',
+    'Smoothing',
+    'Louvering',
+    'Venting',
+    'Flaring',
+    'Widening',
+    'Chopping',
+    'Sectioning',
+    'Channeling',
+    'Z-ing',
+    'C-notching',
+    'Triangulating',
+    'Linking',
+    'Tabbing',
+    'Bracing',
+    'Caging',
+    'Gutting',
+    'Deleting',
+    'Relocating',
+    'Hiding'
   ];
   
   const [currentVerb, setCurrentVerb] = useState(verbs[0]);
   
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentVerb(prev => {
-        const currentIndex = verbs.indexOf(prev);
-        const nextIndex = (currentIndex + 1) % verbs.length;
-        return verbs[nextIndex];
-      });
-    }, 2000); // Change every 2 seconds
+    const getRandomInterval = () => {
+      // Variable speeds: 50% chance fast (500-1000ms), 30% medium (1000-2000ms), 20% slow (2000-4000ms)
+      const rand = Math.random();
+      if (rand < 0.5) {
+        return Math.random() * 500 + 500; // 500-1000ms (FAST)
+      } else if (rand < 0.8) {
+        return Math.random() * 1000 + 1000; // 1000-2000ms (MEDIUM)
+      } else {
+        return Math.random() * 2000 + 2000; // 2000-4000ms (SLOW)
+      }
+    };
     
-    return () => clearInterval(interval);
+    let timeoutId: NodeJS.Timeout;
+    
+    const scheduleNext = () => {
+      timeoutId = setTimeout(() => {
+        setCurrentVerb(prev => {
+          const currentIndex = verbs.indexOf(prev);
+          const nextIndex = (currentIndex + 1) % verbs.length;
+          return verbs[nextIndex];
+        });
+        scheduleNext();
+      }, getRandomInterval());
+    };
+    
+    scheduleNext();
+    
+    return () => clearTimeout(timeoutId);
   }, []);
   
   return currentVerb;
@@ -99,7 +213,9 @@ const CursorHomepage: React.FC = () => {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
   const [viewMode, setViewMode] = useState<ViewMode>('technical');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showFilters, setShowFilters] = useState(false);
+  const [timePeriodCollapsed, setTimePeriodCollapsed] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     yearMin: null,
     yearMax: null,
@@ -160,7 +276,7 @@ const CursorHomepage: React.FC = () => {
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
     applyFiltersAndSort();
-  }, [feedVehicles, filters, sortBy]);
+  }, [feedVehicles, filters, sortBy, sortDirection]);
 
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -378,54 +494,55 @@ const CursorHomepage: React.FC = () => {
       });
     }
     
-    // Apply sorting
+    // Apply sorting with direction
+    const dir = sortDirection === 'asc' ? 1 : -1;
     switch (sortBy) {
       case 'year':
-        result.sort((a, b) => (b.year || 0) - (a.year || 0));
+        result.sort((a, b) => dir * ((b.year || 0) - (a.year || 0)));
         break;
       case 'make':
-        result.sort((a, b) => (a.make || '').localeCompare(b.make || ''));
+        result.sort((a, b) => dir * (a.make || '').localeCompare(b.make || ''));
         break;
       case 'model':
-        result.sort((a, b) => (a.model || '').localeCompare(b.model || ''));
+        result.sort((a, b) => dir * (a.model || '').localeCompare(b.model || ''));
         break;
       case 'mileage':
-        result.sort((a, b) => (a.mileage || 0) - (b.mileage || 0));
+        result.sort((a, b) => dir * ((b.mileage || 0) - (a.mileage || 0)));
         break;
       case 'newest':
         result.sort((a, b) => 
-          new Date(b.updated_at || b.created_at || 0).getTime() - 
-          new Date(a.updated_at || a.created_at || 0).getTime()
+          dir * (new Date(b.updated_at || b.created_at || 0).getTime() - 
+          new Date(a.updated_at || a.created_at || 0).getTime())
         );
         break;
       case 'oldest':
         result.sort((a, b) => 
-          new Date(a.updated_at || a.created_at || 0).getTime() - 
-          new Date(b.updated_at || b.created_at || 0).getTime()
+          dir * (new Date(a.updated_at || a.created_at || 0).getTime() - 
+          new Date(b.updated_at || b.created_at || 0).getTime())
         );
         break;
       case 'price_high':
-        result.sort((a, b) => (b.display_price || 0) - (a.display_price || 0));
+        result.sort((a, b) => dir * ((b.display_price || 0) - (a.display_price || 0)));
         break;
       case 'price_low':
-        result.sort((a, b) => (a.display_price || 0) - (b.display_price || 0));
+        result.sort((a, b) => dir * ((a.display_price || 0) - (b.display_price || 0)));
         break;
       case 'volume':
         // TODO: Add trading volume data from share_holdings table
         result.sort((a, b) => 0); // Placeholder until we have volume data
         break;
       case 'images':
-        result.sort((a, b) => (b.image_count || 0) - (a.image_count || 0));
+        result.sort((a, b) => dir * ((b.image_count || 0) - (a.image_count || 0)));
         break;
       case 'events':
-        result.sort((a, b) => (b.event_count || 0) - (a.event_count || 0));
+        result.sort((a, b) => dir * ((b.event_count || 0) - (a.event_count || 0)));
         break;
       case 'views':
-        result.sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
+        result.sort((a, b) => dir * ((b.view_count || 0) - (a.view_count || 0)));
         break;
       default:
         // Hype score (default)
-        result.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
+        result.sort((a, b) => dir * ((b.hype_score || 0) - (a.hype_score || 0)));
     }
     
     setFilteredVehicles(result);
@@ -526,7 +643,7 @@ const CursorHomepage: React.FC = () => {
               </span>
             </h2>
             
-            {/* Time Period Selector */}
+            {/* Time Period Selector - Collapsible */}
             <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
               {[
                 { id: 'ALL', label: 'All Time' },
@@ -536,24 +653,38 @@ const CursorHomepage: React.FC = () => {
                 { id: 'W', label: 'Wk' },
                 { id: 'D', label: 'Day' },
                 { id: 'RT', label: 'Live' }
-              ].map(period => (
-                <button
-                  key={period.id}
-                  onClick={() => handleTimePeriodChange(period.id as TimePeriod)}
-                  style={{
-                    background: timePeriod === period.id ? 'var(--text)' : 'var(--white)',
-                    color: timePeriod === period.id ? 'var(--white)' : 'var(--text)',
-                    border: '1px solid var(--border)',
-                    padding: '3px 6px',
-                    fontSize: '7pt',
-                    cursor: 'pointer',
-                    fontWeight: timePeriod === period.id ? 'bold' : 'normal',
-                    transition: 'all 0.12s'
-                  }}
-                >
-                  {period.label}
-                </button>
-              ))}
+              ].map(period => {
+                const isSelected = timePeriod === period.id;
+                const shouldShow = !timePeriodCollapsed || isSelected;
+                
+                return (
+                  <button
+                    key={period.id}
+                    onClick={() => {
+                      if (isSelected) {
+                        // Toggle collapse when clicking selected button
+                        setTimePeriodCollapsed(!timePeriodCollapsed);
+                      } else {
+                        handleTimePeriodChange(period.id as TimePeriod);
+                        setTimePeriodCollapsed(false); // Expand when changing
+                      }
+                    }}
+                    style={{
+                      background: isSelected ? 'var(--text)' : 'var(--white)',
+                      color: isSelected ? 'var(--white)' : 'var(--text)',
+                      border: '1px solid var(--border)',
+                      padding: '3px 6px',
+                      fontSize: '7pt',
+                      cursor: 'pointer',
+                      fontWeight: isSelected ? 'bold' : 'normal',
+                      transition: 'all 0.12s',
+                      display: shouldShow ? 'inline-block' : 'none'
+                    }}
+                  >
+                    {period.label}
+                  </button>
+                );
+              })}
             </div>
 
             {/* View Mode Switcher */}
@@ -589,10 +720,10 @@ const CursorHomepage: React.FC = () => {
                 fontSize: '8pt',
                 cursor: 'pointer',
                 fontWeight: showFilters ? 'bold' : 'normal',
-                transition: 'all 0.12s'
+                transition: 'background 0.12s, color 0.12s'
               }}
             >
-              Filters {(filters.yearMin || filters.yearMax || filters.hasImages || filters.forSale) && '●'}
+              Filters {(filters.yearMin || filters.yearMax || filters.makes.length > 0 || filters.hasImages || filters.forSale) && '●'}
             </button>
           </div>
 
@@ -613,7 +744,8 @@ const CursorHomepage: React.FC = () => {
             marginBottom: '12px',
             zIndex: 100,
             boxShadow: filterBarMinimized ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-            transition: 'all 0.2s ease'
+            transition: 'padding 0.2s ease, background 0.2s ease',
+            opacity: 1
           }}>
             {/* Minimized header bar */}
             {filterBarMinimized && (
@@ -741,6 +873,26 @@ const CursorHomepage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Make Filter */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Make</label>
+                <input
+                  type="text"
+                  placeholder="Ford, Chevy, etc"
+                  value={filters.makes.join(', ')}
+                  onChange={(e) => {
+                    const makes = e.target.value.split(',').map(m => m.trim()).filter(m => m.length > 0);
+                    setFilters({...filters, makes});
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '4px 6px',
+                    border: '1px solid var(--border)',
+                    fontSize: '8pt'
+                  }}
+                />
+              </div>
+
               {/* For Sale Toggle */}
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Status</label>
@@ -789,8 +941,8 @@ const CursorHomepage: React.FC = () => {
           <div style={{ 
             background: 'var(--white)',
             border: '1px solid var(--border)',
-            overflow: 'auto',
-            maxHeight: '80vh',
+            overflowX: 'auto',
+            overflowY: 'visible',
             position: 'relative'
           }}>
             <table style={{ 
@@ -798,7 +950,7 @@ const CursorHomepage: React.FC = () => {
               fontSize: '8pt', 
               borderCollapse: 'collapse'
             }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--grey-50)' }}>
                 <tr style={{ background: 'var(--grey-50)', borderBottom: '2px solid var(--border)' }}>
                   <th style={{ 
                     padding: '8px', 
@@ -822,9 +974,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy('year')}
+                  onClick={() => {
+                    if (sortBy === 'year') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('year');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Year {sortBy === 'year' && '▼'}
+                    Year {sortBy === 'year' && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -835,9 +994,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy('make')}
+                  onClick={() => {
+                    if (sortBy === 'make') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('make');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Make {sortBy === 'make' && '▼'}
+                    Make {sortBy === 'make' && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -848,9 +1014,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy('model')}
+                  onClick={() => {
+                    if (sortBy === 'model') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('model');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Model {sortBy === 'model' && '▼'}
+                    Model {sortBy === 'model' && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -861,9 +1034,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy('mileage')}
+                  onClick={() => {
+                    if (sortBy === 'mileage') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('mileage');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Mileage {sortBy === 'mileage' && '▼'}
+                    Mileage {sortBy === 'mileage' && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -874,9 +1054,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy(sortBy === 'price_high' ? 'price_low' : 'price_high')}
+                  onClick={() => {
+                    if (sortBy === 'price_high' || sortBy === 'price_low') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('price_high');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Price {sortBy === 'price_high' && '▼'}{sortBy === 'price_low' && '▲'}
+                    Price {(sortBy === 'price_high' || sortBy === 'price_low') && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -887,9 +1074,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy('volume')}
+                  onClick={() => {
+                    if (sortBy === 'volume') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('volume');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Volume {sortBy === 'volume' && '▼'}
+                    Volume {sortBy === 'volume' && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -900,9 +1094,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy('images')}
+                  onClick={() => {
+                    if (sortBy === 'images') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('images');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Images {sortBy === 'images' && '▼'}
+                    Images {sortBy === 'images' && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -913,9 +1114,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy('events')}
+                  onClick={() => {
+                    if (sortBy === 'events') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('events');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Events {sortBy === 'events' && '▼'}
+                    Events {sortBy === 'events' && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -926,9 +1134,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy('views')}
+                  onClick={() => {
+                    if (sortBy === 'views') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('views');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Views {sortBy === 'views' && '▼'}
+                    Views {sortBy === 'views' && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                   <th style={{ 
                     padding: '8px', 
@@ -938,9 +1153,16 @@ const CursorHomepage: React.FC = () => {
                     userSelect: 'none',
                     whiteSpace: 'nowrap'
                   }}
-                  onClick={() => setSortBy(sortBy === 'newest' ? 'oldest' : 'newest')}
+                  onClick={() => {
+                    if (sortBy === 'newest' || sortBy === 'oldest') {
+                      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy('newest');
+                      setSortDirection('desc');
+                    }
+                  }}
                   >
-                    Updated {sortBy === 'newest' && '▼'}{sortBy === 'oldest' && '▲'}
+                    Updated {(sortBy === 'newest' || sortBy === 'oldest') && (sortDirection === 'desc' ? '▼' : '▲')}
                   </th>
                 </tr>
               </thead>
@@ -1141,12 +1363,12 @@ const CursorHomepage: React.FC = () => {
           </div>
         )}
 
-        {/* Grid View */}
+        {/* Grid View - Instagram-style with zero spacing */}
         {viewMode === 'grid' && (
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '12px'
+            gap: '0'
         }}>
             {filteredVehicles.map((vehicle) => (
             <VehicleCardDense

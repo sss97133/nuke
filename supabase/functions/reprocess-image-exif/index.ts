@@ -29,16 +29,34 @@ serve(async (req) => {
 
     console.log(`Reprocessing EXIF for vehicle: ${vehicleId}`);
 
-    // Get all images without taken_at
-    const { data: images, error: fetchError } = await supabase
+    // Get all images for the vehicle
+    const { data: allImages, error: fetchError } = await supabase
       .from('vehicle_images')
-      .select('id, image_url, taken_at, exif_data, created_at')
-      .eq('vehicle_id', vehicleId)
-      .is('taken_at', null);
-
+      .select('id, image_url, taken_at, exif_data, created_at, filename')
+      .eq('vehicle_id', vehicleId);
+    
     if (fetchError) throw fetchError;
+    
+    // Filter to find images with missing or minimal EXIF data
+    const images = (allImages || []).filter(img => {
+      // Include if exif_data is null or empty
+      if (!img.exif_data || img.exif_data === '{}' || Object.keys(img.exif_data).length === 0) return true;
+      
+      const exif = img.exif_data;
+      
+      // Check if it has meaningful EXIF data
+      const hasCamera = exif.camera && (exif.camera.make || exif.camera.model);
+      const hasLocation = exif.location && (exif.location.latitude || exif.location.longitude);
+      const hasTechnical = exif.technical && (exif.technical.iso || exif.technical.aperture);
+      
+      // Skip if it's just metadata about broken URLs or downloads (not real EXIF)
+      const isMetadataOnly = exif.fixed || exif.broken_url || exif.downloaded_at || exif.original_source;
+      
+      // Include if it doesn't have camera, location, or technical data (and isn't just metadata)
+      return !hasCamera && !hasLocation && !hasTechnical && !isMetadataOnly;
+    });
 
-    console.log(`Found ${images?.length || 0} images without taken_at`);
+    console.log(`Found ${images?.length || 0} images with missing or minimal EXIF data`);
 
     let fixed = 0;
     let failed = 0;
@@ -58,7 +76,14 @@ serve(async (req) => {
           iptc: false,
           ifd0: true,
           ifd1: false,
-          mergeOutput: false
+          mergeOutput: false,
+          pick: [
+            'DateTimeOriginal', 'DateTime', 'CreateDate', 'ModifyDate',
+            'GPSLatitude', 'GPSLongitude', 'latitude', 'longitude',
+            'GPSLatitudeRef', 'GPSLongitudeRef',
+            'Make', 'Model', 'ImageWidth', 'ImageHeight',
+            'ISO', 'FNumber', 'ExposureTime', 'FocalLength'
+          ]
         });
 
         if (!exifData) {
@@ -72,24 +97,86 @@ serve(async (req) => {
           continue;
         }
 
-        // Extract and structure EXIF
-        const structured = {
-          camera: {
+        // Extract and structure EXIF (matching frontend format)
+        const structured: any = {
+          DateTimeOriginal: exifData.DateTimeOriginal || exifData.DateTime || exifData.CreateDate || exifData.ModifyDate || null
+        };
+        
+        // Camera info
+        if (exifData.Make || exifData.Model) {
+          structured.camera = {
             make: exifData.Make || null,
             model: exifData.Model || null,
-          },
-          location: {
-            latitude: exifData.latitude || null,
-            longitude: exifData.longitude || null,
-          },
-          technical: {
-            iso: exifData.ISO || null,
-            aperture: exifData.FNumber ? `f/${exifData.FNumber}` : null,
-            focalLength: exifData.FocalLength ? `${exifData.FocalLength}mm` : null,
-            shutterSpeed: exifData.ExposureTime ? `1/${Math.round(1 / exifData.ExposureTime)}` : null,
-          },
-          DateTimeOriginal: exifData.DateTimeOriginal || exifData.CreateDate || exifData.ModifyDate || null
-        };
+          };
+        }
+        
+        // Location/GPS
+        let lat = exifData.latitude || exifData.GPSLatitude;
+        let lon = exifData.longitude || exifData.GPSLongitude;
+        
+        // Handle GPS reference directions
+        if (exifData.GPSLatitudeRef === 'S' && lat > 0) lat = -lat;
+        if (exifData.GPSLongitudeRef === 'W' && lon > 0) lon = -lon;
+        
+        if (lat && lon && typeof lat === 'number' && typeof lon === 'number' &&
+            lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+          structured.location = {
+            latitude: lat,
+            longitude: lon,
+          };
+        }
+        
+        // Technical settings
+        const technical: any = {};
+        if (exifData.ISO) technical.iso = exifData.ISO;
+        if (exifData.FNumber) technical.aperture = `f/${exifData.FNumber}`;
+        if (exifData.ExposureTime) {
+          technical.shutterSpeed = exifData.ExposureTime < 1 
+            ? `1/${Math.round(1/exifData.ExposureTime)}` 
+            : `${exifData.ExposureTime}s`;
+        }
+        if (exifData.FocalLength) technical.focalLength = `${exifData.FocalLength}mm`;
+        
+        if (Object.keys(technical).length > 0) {
+          structured.technical = technical;
+        }
+        
+        // Dimensions
+        if (exifData.ImageWidth && exifData.ImageHeight) {
+          structured.dimensions = {
+            width: exifData.ImageWidth,
+            height: exifData.ImageHeight
+          };
+        }
+        
+        // Preserve existing metadata if it exists (like original_source, etc.)
+        if (image.exif_data && typeof image.exif_data === 'object') {
+          const existing = image.exif_data as any;
+          
+          // Check if this is from an external source
+          if (existing.original_source || existing.downloaded_at || existing.original_bat_url || existing.source) {
+            const hasRealExif = structured.camera || structured.location || structured.technical;
+            
+            structured.exif_status = hasRealExif ? 'partial' : 'stripped';
+            structured.source = existing.source || {
+              type: 'external',
+              name: existing.original_source || 'unknown',
+              original_url: existing.original_bat_url || existing.original_url || null,
+              downloaded_at: existing.downloaded_at || null
+            };
+            
+            // Preserve old format for backwards compatibility
+            if (existing.original_source) structured.original_source = existing.original_source;
+            if (existing.downloaded_at) structured.downloaded_at = existing.downloaded_at;
+            if (existing.original_bat_url) structured.original_bat_url = existing.original_bat_url;
+          } else {
+            // User-uploaded image - mark EXIF status
+            structured.exif_status = (structured.camera || structured.location || structured.technical) ? 'complete' : 'minimal';
+          }
+        } else {
+          // New extraction - mark status
+          structured.exif_status = (structured.camera || structured.location || structured.technical) ? 'complete' : 'minimal';
+        }
 
         const takenAt = structured.DateTimeOriginal || image.created_at;
 

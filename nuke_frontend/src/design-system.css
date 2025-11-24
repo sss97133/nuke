@@ -700,6 +700,7 @@ body {
   z-index: 100;
   margin-top: 0;
   margin-bottom: 0;
+  transition: padding 0.2s ease, height 0.2s ease;
 }
 
 /* Fix sticky header positioning when GlobalUploadStatus is present */
@@ -956,6 +957,14 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 5px; /* slight side padding */
+}
+
+/* Vehicle price header breaks out of container padding */
+.vehicle-price-header {
+  margin-left: calc(-1 * 5px) !important;
+  margin-right: calc(-1 * 5px) !important;
+  width: calc(100% + 10px) !important;
+  max-width: none !important;
 }
 
 /* Ensure no top padding under compact layout */
@@ -3138,6 +3147,8 @@ body {
 
   .header-content {
     flex-wrap: wrap;
+    height: 48px !important;
+    min-height: 48px !important;
   }
 
   .header-left {
@@ -3319,21 +3330,72 @@ body {
     max-height: 20px !important;
   }
 
-  /* Smaller font sizes for vehicle header */
+  /* Vehicle Header - Ultra Compact Mobile */
   .vehicle-price-header {
-    font-size: 7pt !important;
-    padding: var(--space-2) var(--space-3) !important;
-    height: auto !important;
-    min-height: 44px !important; /* Allow for 2 lines */
+    top: 48px !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 98 !important;
+    height: 25px !important;
+    min-height: 25px !important;
+    max-height: 25px !important;
+    padding: 2px 6px !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
-
-  /* Make vehicle title wrap to 2 lines on mobile */
-  .vehicle-price-header [style*="fontSize: '9pt'"],
-  .vehicle-price-header [style*='fontSize:"9pt"'] {
-    white-space: normal !important;
-    line-height: 1.2 !important;
-    max-width: 200px !important;
-    font-size: 8pt !important;
+  
+  /* Keep everything on one line */
+  .vehicle-price-header > div {
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+  }
+  
+  /* Vehicle name - truncate */
+  .vehicle-price-header [style*="fontSize: '8pt'"][style*="fontWeight: 700"] {
+    font-size: 7pt !important;
+    max-width: 140px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  
+  /* Owner name */
+  .vehicle-price-header [style*="fontSize: '7pt'"] {
+    font-size: 6.5pt !important;
+  }
+  
+  /* Price button - keep horizontal */
+  .vehicle-price-header .vehicle-price-button {
+    flex-direction: row !important;
+    gap: 4px !important;
+  }
+  
+  /* Price text */
+  .vehicle-price-header .vehicle-price-button > div {
+    font-size: 7.5pt !important;
+  }
+  
+  /* Percentage indicator */
+  .vehicle-price-header .vehicle-price-button span {
+    font-size: 6.5pt !important;
+    gap: 2px !important;
+  }
+  
+  /* Org badges - smaller */
+  .vehicle-price-header img {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  
+  /* Ensure z-index hierarchy on mobile */
+  .app-header {
+    z-index: 100 !important;
+  }
+  
+  /* Upload components should be above everything */
+  .fixed.inset-0[style*="z-index: 9999"],
+  .fixed.inset-0[class*="z-[9999]"] {
+    z-index: 10000 !important;
   }
 
   /* Fix button sizing on mobile - prevent explosion */
@@ -3371,11 +3433,15 @@ body {
     -webkit-overflow-scrolling: touch !important;
   }
 
-  /* Single column layout for vehicle profile */
+  /* FORCE single column layout for vehicle profile on mobile */
   .section [style*="gridTemplateColumns: '320px 1fr'"],
   .section [style*='gridTemplateColumns:"320px 1fr"'],
-  .section [style*="grid-template-columns: 320px 1fr"] {
-    grid-template-columns: 1fr !important;
+  .section [style*="grid-template-columns: 320px 1fr"],
+  .section > div[style*="grid-template-columns"],
+  [style*="display: grid"][style*="gap: var(--space-4)"][style*="grid-template-columns"] {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
   }
 
   /* Stack all content vertically */

@@ -6,11 +6,21 @@ import { uploadQueueService } from '../../services/uploadQueueService';
 import { sortImagesByPriority } from '../../services/imageDisplayPriority';
 import ImageLightbox from '../image/ImageLightbox';
 import { SensitiveImageOverlay } from './SensitiveImageOverlay';
+import { ImageSetService } from '../../services/imageSetService';
+import { OnboardingSlideshow } from '../onboarding/OnboardingSlideshow';
 
 interface ImageGalleryProps {
   vehicleId: string;
   onImagesUpdated?: () => void;
   showUpload?: boolean;
+  // NEW: Image Set features (optional - defaults maintain existing behavior)
+  selectMode?: boolean;
+  selectedImages?: Set<string>;
+  onSelectionChange?: (selected: Set<string>) => void;
+  showPriority?: boolean;
+  showSetCount?: boolean;
+  filteredSetId?: string | null;
+  onAddToSetRequested?: (imageIds: string[]) => void;
 }
 
 interface ImageTag {
@@ -29,7 +39,43 @@ const TAG_TYPES = [
   { value: 'tool', label: 'Tool' }
 ];
 
-const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGalleryProps) => {
+// Helper function to get optimal image URL based on variants
+const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' | 'full' = 'medium'): string => {
+  // First check if variants JSONB exists and has the requested size
+  if (image.variants && typeof image.variants === 'object') {
+    const variant = image.variants[size];
+    if (variant) return variant;
+    
+    // Fallback order: try other sizes in order of preference
+    if (size === 'thumbnail') {
+      return image.variants.thumbnail || image.variants.medium || image.thumbnail_url || image.image_url;
+    } else if (size === 'medium') {
+      return image.variants.medium || image.variants.large || image.variants.thumbnail || image.medium_url || image.image_url;
+    } else if (size === 'large') {
+      return image.variants.large || image.variants.full || image.variants.medium || image.large_url || image.image_url;
+    }
+  }
+  
+  // Fallback to column-based URLs
+  if (size === 'thumbnail') return image.thumbnail_url || image.image_url;
+  if (size === 'medium') return image.medium_url || image.image_url;
+  if (size === 'large') return image.large_url || image.image_url;
+  return image.image_url;
+};
+
+const ImageGallery = ({ 
+  vehicleId, 
+  onImagesUpdated, 
+  showUpload = true,
+  // NEW: Optional image set props
+  selectMode = false,
+  selectedImages,
+  onSelectionChange,
+  showPriority = false,
+  showSetCount = false,
+  filteredSetId = null,
+  onAddToSetRequested
+}: ImageGalleryProps) => {
   const [allImages, setAllImages] = useState<any[]>([]);
   const [displayedImages, setDisplayedImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +100,12 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
   const [imageAttributions, setImageAttributions] = useState<Record<string, any>>({});
   const [showDropZone, setShowDropZone] = useState(false);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
+  
+  // NEW: Image set related state
+  const [imageSetCounts, setImageSetCounts] = useState<Record<string, number>>({});
+  
+  // NEW: Onboarding modal state
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
 
   // Tagging state
   const [imageTags, setImageTags] = useState<ImageTag[]>([]);
@@ -175,7 +227,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         setLoading(true);
         const { data: rawImages, error } = await supabase
           .from('vehicle_images')
-          .select('id, image_url, thumbnail_url, medium_url, large_url, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category')
+          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category')
           .eq('vehicle_id', vehicleId)
           .eq('is_document', false) // Filter out documents - they should be in a separate section
           .order('is_primary', { ascending: false });
@@ -224,12 +276,55 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
     }
   }, [displayedImages]);
 
+  // NEW: Load set counts when enabled
+  useEffect(() => {
+    if (showSetCount && displayedImages.length > 0) {
+      loadImageSetCounts();
+    }
+  }, [showSetCount, displayedImages]);
+
+  const loadImageSetCounts = async () => {
+    try {
+      const imageIds = displayedImages.map(img => img.id);
+      const counts = await ImageSetService.getImageSetCounts(imageIds);
+      setImageSetCounts(counts);
+    } catch (err) {
+      console.error('Error loading set counts:', err);
+    }
+  };
+
+  // NEW: Handle image selection
+  const handleImageSelect = (imageId: string, event: React.MouseEvent) => {
+    if (!selectMode || !onSelectionChange) return;
+    
+    event.stopPropagation();
+    
+    const newSelected = new Set(selectedImages || []);
+    if (newSelected.has(imageId)) {
+      newSelected.delete(imageId);
+    } else {
+      newSelected.add(imageId);
+    }
+    onSelectionChange(newSelected);
+  };
+
+  const handleUploadClick = () => {
+    // Check if user is logged in
+    if (!session?.user?.id) {
+      setShowOnboardingModal(true);
+      return;
+    }
+    
+    // If logged in, trigger file input
+    document.getElementById(`gallery-upload-${vehicleId}`)?.click();
+  };
+
   const handleFileUpload = async (files: FileList) => {
     if (!files.length) return;
 
-    // Validate user is logged in
+    // Validate user is logged in (double-check)
     if (!session?.user?.id) {
-      setError('You must be logged in to upload images');
+      setShowOnboardingModal(true);
       return;
     }
 
@@ -748,8 +843,8 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
     return <div className="text-center p-8 text-red-500">{error}</div>;
   }
 
-  // If no images but user can upload, show upload UI
-  if (allImages.length === 0 && showUpload) {
+  // If no images, show upload UI (always visible to encourage uploads)
+  if (allImages.length === 0) {
     return (
       <div style={{ padding: 'var(--space-4)' }}>
         <div style={{ 
@@ -777,28 +872,24 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
             style={{ display: 'none' }}
             id={`image-upload-${vehicleId}`}
           />
-          <label
-            htmlFor={`image-upload-${vehicleId}`}
+          <button
+            onClick={handleUploadClick}
             className="button button-primary"
             style={{ 
-              display: 'inline-block',
               cursor: 'pointer',
               fontSize: '9pt',
               padding: '10px 20px'
             }}
           >
             Upload Images
-          </label>
+          </button>
         </div>
-      </div>
-    );
-  }
-
-  // If no images and can't upload, show empty state
-  if (allImages.length === 0) {
-    return (
-      <div className="text-center p-8">
-        <p className="text text-muted">No images found for this vehicle.</p>
+        
+        {/* Onboarding Modal */}
+        <OnboardingSlideshow
+          isOpen={showOnboardingModal}
+          onClose={() => setShowOnboardingModal(false)}
+        />
       </div>
     );
   }
@@ -833,102 +924,91 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
 
       {/* Gallery Controls */}
       <div className="card-header">
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-            {/* View Mode */}
-            <div style={{ display: 'flex', border: '1px solid var(--border-medium)', backgroundColor: 'var(--white)' }}>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={viewMode === 'grid' ? 'button button-primary' : 'button'}
-                style={{ padding: 'var(--space-1) var(--space-3)', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0 }}
-              >
-                Grid
-              </button>
-              <button
-                onClick={() => setViewMode('masonry')}
-                className={viewMode === 'masonry' ? 'button button-primary' : 'button'}
-                style={{ padding: 'var(--space-1) var(--space-3)', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0 }}
-              >
-                Masonry
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={viewMode === 'list' ? 'button button-primary' : 'button'}
-                style={{ padding: 'var(--space-1) var(--space-3)', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0 }}
-              >
-                List
-              </button>
-            </div>
-
-            {/* Sort Options */}
-            <select
-              value={sortBy}
-              onChange={(e) => {
-                const newSort = e.target.value as any;
-                if (newSort === 'quality') {
-                  // Check if images have angle classifications
-                  // For now, show toast that analysis is pending
-                  alert('⏳ Presentation sorting requires AI angle analysis.\n\nImages will be analyzed automatically on upload in the future.\n\nUsing newest first for now.');
-                  setSortBy('date_desc');
-                } else {
-                  setSortBy(newSort);
-                }
-              }}
-              className="form-select"
-              style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-2)' }}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+          {/* View Mode */}
+          <div style={{ display: 'flex', border: '2px solid var(--border)', backgroundColor: 'var(--white)' }}>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={viewMode === 'grid' ? 'button button-primary' : 'button'}
+              style={{ padding: '4px 12px', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0, height: '24px', minHeight: '24px' }}
             >
-              <option value="quality">Best First (Presentation)</option>
-              <option value="date_desc">Newest First</option>
-              <option value="date_asc">Oldest First</option>
-            </select>
+              Grid
+            </button>
+            <button
+              onClick={() => setViewMode('masonry')}
+              className={viewMode === 'masonry' ? 'button button-primary' : 'button'}
+              style={{ padding: '4px 12px', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0, height: '24px', minHeight: '24px' }}
+            >
+              Full
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'button button-primary' : 'button'}
+              style={{ padding: '4px 12px', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0, height: '24px', minHeight: '24px' }}
+            >
+              Info
+            </button>
           </div>
 
-          {/* Upload Button & Image Count */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-            {showUpload && (
-              <>
-                {queueStats && (queueStats.pending > 0 || queueStats.failed > 0) && (
-                  <button
-                    onClick={uploadFromQueue}
-                    className="button cursor-button"
-                    style={{ 
-                      fontSize: '8pt', 
-                      padding: 'var(--space-1) var(--space-3)',
-                      border: '2px solid var(--warning)',
-                      background: 'var(--warning-light)',
-                      color: 'var(--warning-dark)',
-                      fontWeight: 700
-                    }}
-                  >
-                    RESUME UPLOAD ({queueStats.pending + queueStats.failed} files)
-                  </button>
-                )}
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id={`gallery-upload-${vehicleId}`}
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files) {
-                        handleFileUpload(e.target.files);
-                        e.target.value = '';
-                      }
-                    }}
-                    style={{ display: 'none' }}
-                  />
-                  <label htmlFor={`gallery-upload-${vehicleId}`}>
-                    <span className="button button-primary" style={{ fontSize: '8pt', padding: 'var(--space-1) var(--space-3)', display: 'inline-block', cursor: 'pointer' }}>
-                      Upload Images
-                    </span>
-                  </label>
-                </div>
-              </>
-            )}
-            <div className="text text-muted">
-              {showImages ? `${displayedImages.length} of ${allImages.length}` : `${allImages.length} images available`}
-            </div>
-          </div>
+          {/* Sort Options */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              const newSort = e.target.value as any;
+              if (newSort === 'quality') {
+                alert('⏳ Presentation sorting requires AI angle analysis.\n\nImages will be analyzed automatically on upload in the future.\n\nUsing newest first for now.');
+                setSortBy('date_desc');
+              } else {
+                setSortBy(newSort);
+              }
+            }}
+            className="form-select"
+            style={{ fontSize: '8pt', padding: '4px 8px', height: '24px', minHeight: '24px' }}
+          >
+            <option value="quality">Best First</option>
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+          </select>
+
+          {/* Upload Button */}
+          {queueStats && (queueStats.pending > 0 || queueStats.failed > 0) && session?.user?.id && (
+            <button
+              onClick={uploadFromQueue}
+              className="button cursor-button"
+              style={{ 
+                fontSize: '8pt', 
+                padding: '4px 12px',
+                height: '24px',
+                minHeight: '24px',
+                border: '2px solid var(--warning)',
+                background: 'var(--warning-light)',
+                color: 'var(--warning-dark)',
+                fontWeight: 700
+              }}
+            >
+              RESUME UPLOAD ({queueStats.pending + queueStats.failed} files)
+            </button>
+          )}
+          <input
+            id={`gallery-upload-${vehicleId}`}
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={(e) => {
+              if (e.target.files) {
+                handleFileUpload(e.target.files);
+                e.target.value = '';
+              }
+            }}
+            style={{ display: 'none' }}
+          />
+          <button
+            onClick={handleUploadClick}
+            className="button button-primary"
+            style={{ fontSize: '8pt', padding: '4px 12px', cursor: 'pointer', height: '24px', minHeight: '24px' }}
+          >
+            Upload
+          </button>
         </div>
       </div>
 
@@ -950,20 +1030,59 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
 
       {/* Image Grid */}
       {viewMode === 'grid' && showImages && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', padding: 'var(--space-4)' }}>
-          {displayedImages.map((image, index) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0 }}>
+          {displayedImages.map((image, index) => {
+            const isSelected = selectMode && selectedImages?.has(image.id);
+            return (
             <div
               key={image.id}
-              className="card"
-              style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden', backgroundColor: 'var(--white)' }}
-              onClick={() => openLightbox(index)}
+              style={{ 
+                cursor: 'pointer', 
+                position: 'relative', 
+                overflow: 'hidden', 
+                backgroundColor: 'var(--grey-100)',
+                aspectRatio: '1 / 1',
+                border: 'none'
+              }}
+              onClick={(e) => {
+                if (selectMode) {
+                  handleImageSelect(image.id, e);
+                } else {
+                  openLightbox(index);
+                }
+              }}
             >
+              {/* NEW: Selection Checkbox (top-left when in select mode) */}
+              {selectMode && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'var(--space-1)',
+                    left: 'var(--space-1)',
+                    width: '24px',
+                    height: '24px',
+                    backgroundColor: isSelected ? 'var(--grey-900)' : 'var(--white)',
+                    border: '2px solid var(--grey-900)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 20,
+                    cursor: 'pointer'
+                  }}
+                  onClick={(e) => handleImageSelect(image.id, e)}
+                >
+                  {isSelected && (
+                    <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '10pt' }}>✓</span>
+                  )}
+                </div>
+              )}
+              
               {/* Image Container with Sensitive Content Protection */}
-              <div style={{ width: '100%', height: '150px', overflow: 'hidden', backgroundColor: 'var(--grey-100)' }}>
+              <div style={{ width: '100%', height: '100%', overflow: 'hidden', backgroundColor: 'var(--grey-100)' }}>
                 <SensitiveImageOverlay
                   imageId={image.id}
                   vehicleId={vehicleId}
-                  imageUrl={image.thumbnail_url || image.image_url}
+                  imageUrl={getOptimalImageUrl(image, 'medium')}
                   isSensitive={image.is_sensitive || false}
                   sensitiveType={image.sensitive_type}
                 />
@@ -993,6 +1112,46 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
                 </div>
               )}
 
+              {/* NEW: Set Count Badge (top-right, below tag count) */}
+              {showSetCount && imageSetCounts[image.id] && (
+                <div style={{
+                  position: 'absolute',
+                  top: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
+                  right: 'var(--space-1)',
+                  backgroundColor: '#4169E1',
+                  color: '#fff',
+                  borderRadius: '0px',
+                  border: '1px solid #fff',
+                  padding: '2px 6px',
+                  fontSize: '7pt',
+                  fontWeight: 'bold',
+                  fontFamily: '"MS Sans Serif", sans-serif',
+                  zIndex: 10
+                }}>
+                  {imageSetCounts[image.id]} SETS
+                </div>
+              )}
+
+              {/* NEW: Priority Badge (bottom-right corner) */}
+              {showPriority && image.manual_priority > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: 'var(--space-1)',
+                  right: 'var(--space-1)',
+                  backgroundColor: image.manual_priority >= 90 ? '#FFD700' : image.manual_priority >= 70 ? '#C0C0C0' : '#CD7F32',
+                  color: '#000',
+                  borderRadius: '0px',
+                  border: '2px solid #fff',
+                  padding: '2px 6px',
+                  fontSize: '7pt',
+                  fontWeight: 'bold',
+                  fontFamily: '"MS Sans Serif", sans-serif',
+                  zIndex: 10
+                }}>
+                  {image.manual_priority}
+                </div>
+              )}
+
               {/* Image Info Overlay */}
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', padding: 'var(--space-2)' }}>
                 {image.is_primary && (
@@ -1006,10 +1165,12 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
                 <p className="text" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '6pt', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {imageTagCounts[image.id] && ` • ${imageTagCounts[image.id]} tags`}
+                  {showSetCount && imageSetCounts[image.id] && ` • ${imageSetCounts[image.id]} sets`}
                 </p>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1026,20 +1187,25 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         </div>
       )}
 
-      {/* Masonry View */}
+      {/* Full View - Single column, full width images */}
       {viewMode === 'masonry' && showImages && (
-        <div style={{ columnCount: 3, columnGap: 'var(--space-4)', padding: 'var(--space-4)' }}>
+        <div>
           {displayedImages.map((image, index) => (
             <div
               key={image.id}
-              className="card"
-              style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden', backgroundColor: 'var(--white)', marginBottom: 'var(--space-4)', breakInside: 'avoid', display: 'inline-block', width: '100%' }}
+              style={{ 
+                cursor: 'pointer', 
+                position: 'relative', 
+                overflow: 'hidden', 
+                backgroundColor: 'var(--grey-100)',
+                width: '100%'
+              }}
               onClick={() => openLightbox(index)}
             >
               <img
-                src={image.medium_url || image.image_url}
+                src={getOptimalImageUrl(image, 'large')}
                 alt={image.caption || 'Vehicle image'}
-                style={{ width: '100%', height: 'auto' }}
+                style={{ width: '100%', height: 'auto', display: 'block' }}
                 loading="lazy"
               />
 
@@ -1062,84 +1228,60 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
         </div>
       )}
 
-      {/* List View */}
+      {/* Info View - Compact list with image left, info right, zero spacing */}
       {viewMode === 'list' && showImages && (
-        <div style={{ padding: 'var(--space-4)' }}>
+        <div>
           {displayedImages.map((image, index) => (
             <div
               key={image.id}
-              className="card"
-              style={{ display: 'flex', gap: 'var(--space-3)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)', cursor: 'pointer' }}
+              style={{ 
+                display: 'flex', 
+                gap: 'var(--space-2)', 
+                padding: 'var(--space-2)', 
+                cursor: 'pointer', 
+                borderBottom: '1px solid var(--border)', 
+                backgroundColor: 'var(--white)',
+                margin: 0
+              }}
               onClick={() => openLightbox(index)}
             >
               {/* Thumbnail */}
-              <div style={{ flexShrink: 0, width: '96px', height: '96px', overflow: 'hidden', backgroundColor: 'var(--grey-100)' }}>
+              <div style={{ flexShrink: 0, width: '100px', height: '100px', overflow: 'hidden', backgroundColor: 'var(--grey-100)' }}>
                 <img
-                  src={image.thumbnail_url || image.image_url}
+                  src={getOptimalImageUrl(image, 'thumbnail')}
                   alt={image.caption || 'Vehicle image'}
                   style={{
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    imageOrientation: 'from-image' // Preserve EXIF orientation
+                    imageOrientation: 'from-image'
                   }}
                   loading="lazy"
                 />
               </div>
 
-              {/* Info */}
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between' }}>
-                  <div>
-                    {image.is_primary && (
-                      <div className="button button-small" style={{ fontSize: '6pt', padding: '2px 6px', marginBottom: 'var(--space-1)', backgroundColor: 'var(--grey-600)', color: 'var(--white)' }}>
-                        PRIMARY
-                      </div>
-                    )}
-                    {image.caption && (
-                      <h4 className="text" style={{ fontWeight: 'bold', marginBottom: '2px' }}>{image.caption}</h4>
-                    )}
-                    <p className="text text-muted" style={{ fontSize: '7pt' }}>
-                      {getDisplayDate(image)} • {getTimeOfDayLabel(image.taken_at || image.created_at)}
-                    </p>
-                    {/* Camera / Location / Tags */}
-                    <div className="text" style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                      {getCameraText(image.exif_data) && (<span>Camera: {getCameraText(image.exif_data)}</span>)}
-                      {getCameraText(image.exif_data) && (getLocationText(image.exif_data) || image.exif_data?.gps) && (<span> • </span>)}
-                      {getLocationText(image.exif_data) && (<span>Location: {getLocationText(image.exif_data)}</span>)}
-                      {!image.exif_data?.location && image.exif_data?.gps && image.exif_data.gps.latitude && image.exif_data.gps.longitude && (
-                        <span>Location: {image.exif_data.gps.latitude.toFixed?.(3) || image.exif_data.gps.latitude}, {image.exif_data.gps.longitude.toFixed?.(3) || image.exif_data.gps.longitude}</span>
-                      )}
-                      {(imageTagTextsById[image.id]?.length || imageTagCounts[image.id]) && (
-                        <>
-                          {(getCameraText(image.exif_data) || getLocationText(image.exif_data) || image.exif_data?.gps) && <span> • </span>}
-                          <span>Tags: {imageTagTextsById[image.id]?.join(', ') || `${imageTagCounts[image.id]} tags`}</span>
-                        </>
-                      )}
-                    </div>
-                    {/* Attribution and counts */}
-                    <div className="text" style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {image.user_id && (
-                        <span>By {uploaderOrgNames[image.user_id] || imageUploaderNames[image.user_id] || 'user'}</span>
-                      )}
-                      {typeof imageViewCounts[image.id] === 'number' && (
-                        <span> • {imageViewCounts[image.id]} views</span>
-                      )}
-                      {typeof imageCommentCounts[image.id] === 'number' && (
-                        <span> • {imageCommentCounts[image.id]} comments</span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openLightbox(index);
-                    }}
-                    className="button button-small"
-                    style={{ fontSize: '7pt' }}
-                  >
-                    View →
-                  </button>
+              {/* Info - Everything compressed */}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1px' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {image.is_primary && <span style={{ backgroundColor: 'var(--grey-900)', color: 'var(--white)', padding: '1px 4px', marginRight: '4px', fontSize: '6pt' }}>PRIMARY</span>}
+                  {image.caption || 'Vehicle Image'}
+                </div>
+                <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                  {getDisplayDate(image)}
+                  {getTimeOfDayLabel(image.taken_at || image.created_at) && ` • ${getTimeOfDayLabel(image.taken_at || image.created_at)}`}
+                  {image.user_id && ` • ${uploaderOrgNames[image.user_id] || imageUploaderNames[image.user_id] || 'user'}`}
+                </div>
+                {/* Everything else on one line */}
+                <div style={{ fontSize: '6pt', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {getCameraText(image.exif_data) && <span>{getCameraText(image.exif_data)}</span>}
+                  {getCameraText(image.exif_data) && (getLocationText(image.exif_data) || image.exif_data?.gps) && <span> • </span>}
+                  {getLocationText(image.exif_data) && <span>{getLocationText(image.exif_data)}</span>}
+                  {!image.exif_data?.location && image.exif_data?.gps && image.exif_data.gps.latitude && image.exif_data.gps.longitude && (
+                    <span>{image.exif_data.gps.latitude.toFixed?.(2)}, {image.exif_data.gps.longitude.toFixed?.(2)}</span>
+                  )}
+                  {typeof imageViewCounts[image.id] === 'number' && imageViewCounts[image.id] > 0 && <span> • {imageViewCounts[image.id]}v</span>}
+                  {typeof imageCommentCounts[image.id] === 'number' && imageCommentCounts[image.id] > 0 && <span> • {imageCommentCounts[image.id]}c</span>}
+                  {imageTagCounts[image.id] && <span> • {imageTagCounts[image.id]}t</span>}
                 </div>
               </div>
             </div>
@@ -1150,7 +1292,7 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
       {/* Image Lightbox - Using proper ImageLightbox component with tags */}
       {lightboxOpen && currentImage && (
         <ImageLightbox
-          imageUrl={currentImage.large_url || currentImage.medium_url || currentImage.image_url}
+          imageUrl={getOptimalImageUrl(currentImage, 'large')}
           imageId={currentImage.id}
           vehicleId={vehicleId}
           isOpen={lightboxOpen}
@@ -1162,6 +1304,12 @@ const ImageGallery = ({ vehicleId, onImagesUpdated, showUpload = true }: ImageGa
           description={getDisplayDate(currentImage)}
         />
       )}
+
+      {/* Onboarding Modal for non-logged-in users */}
+      <OnboardingSlideshow
+        isOpen={showOnboardingModal}
+        onClose={() => setShowOnboardingModal(false)}
+      />
     </div>
   );
 };

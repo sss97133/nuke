@@ -1,6 +1,6 @@
-I don't except to always watch stuff OK I like to look at my family Sonia do you want to see pictures of our family OK bye huggy Wuggy in the in the bag you messing with I put huggy Wuggy on the TV screen so if you walk in the bedroom huggy Wuggy there he's on the TV screen did you see the video huggy Wuggy comes out of the TV screen thank you go downstairs# Intelligent Organization Coordination System
+Intelligent Organization Coordination System
 
-## Vision Statement
+## Vision Statement daddy this is a very funny movie what's so funny dummy
 
 **N-Zero transforms idle capacity into economic opportunity by intelligently matching customers, facilities, and skilled labor in real-time.**
 

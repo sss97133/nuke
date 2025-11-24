@@ -135,12 +135,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 Vehicles
               </Link>
               <Link 
-                to="/photos" 
-                className={`nav-link ${isActivePage('/photos') ? 'active' : ''}`}
-              >
-                Photos
-              </Link>
-              <Link 
                 to="/auctions" 
                 className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
               >
@@ -151,12 +145,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 className={`nav-link ${isActivePage('/shops') ? 'active' : ''}`}
               >
                 Organizations
-              </Link>
-              <Link 
-                to="/financials" 
-                className={`nav-link ${isActivePage('/financials') || isActivePage('/invoices') || isActivePage('/suppliers') ? 'active' : ''}`}
-              >
-                Financials
               </Link>
             </nav>
           </div>

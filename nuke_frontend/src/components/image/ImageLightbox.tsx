@@ -10,6 +10,7 @@ import PartEnrichmentModal from '../parts/PartEnrichmentModal';
 import { ManualAnnotationViewer } from './ManualAnnotationViewer';
 import { ClickablePartModal } from '../parts/ClickablePartModal';
 import { AnnotoriousImageTagger } from './AnnotoriousImageTagger';
+import { ImageInfoPanel } from './ImageInfoPanel';
 import '../../design-system.css';
 
 interface ImageLightboxProps {
@@ -158,18 +159,183 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [showTagger, setShowTagger] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Touch gesture handlers for swipe navigation + info panel
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      // Single finger - swipe, double-tap, or long-press
+      const touch = e.touches[0];
+      setTouchStart({ x: touch.clientX, y: touch.clientY });
+      setIsPinching(false);
+      setIsDragging(true);
+      
+      // Check for double-tap
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        // Double tap detected - toggle zoom
+        e.preventDefault();
+        setZoom(zoom === 1 ? 2 : 1);
+        setLastTap(0);
+        return;
+      }
+      setLastTap(now);
+      
+      // Start long-press timer
+      const timer = setTimeout(() => {
+        // Long press detected
+        if (canEdit) {
+          setContextMenuPos({ x: touch.clientX, y: touch.clientY });
+          setShowContextMenu(true);
+          // Haptic feedback if available
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+        }
+      }, 500);
+      setLongPressTimer(timer);
+      
+    } else if (e.touches.length === 2) {
+      // Two fingers - pinch zoom or swipe up for quick actions
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setTouchStartDistance(distance);
+      setTouchStart({ 
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+      });
+      setIsPinching(true);
+      
+      // Clear long-press timer
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        setLongPressTimer(null);
+      }
+    }
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    // Clear long-press timer if user moves
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    if (isPinching && e.touches.length === 2 && touchStartDistance && touchStart) {
+      // Two-finger gesture
+      const currentDistance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const deltaY = touchStart.y - currentY;
+      
+      // Check if it's a swipe up (quick actions) or pinch (zoom)
+      const distanceChange = Math.abs(currentDistance - touchStartDistance);
+      
+      if (deltaY > 50 && distanceChange < 30) {
+        // Two-finger swipe up - show quick actions
+        if (canEdit && !showQuickActions) {
+          setShowQuickActions(true);
+          if (navigator.vibrate) {
+            navigator.vibrate(30);
+          }
+        }
+      } else if (distanceChange > 30) {
+        // Pinch zoom - continuous scale
+        const scale = Math.max(1, Math.min(4, currentDistance / touchStartDistance));
+        setZoom(scale);
+      }
+    }
+  };
+  
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    // Clear long-press timer
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    if (!touchStart || isPinching) {
+      setTouchStart(null);
+      setTouchStartDistance(null);
+      setIsPinching(false);
+      setIsDragging(false);
+      return;
+    }
+    
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStart.x;
+    const deltaY = touch.clientY - touchStart.y;
+    const distance = Math.hypot(deltaX, deltaY);
+    
+    // If barely moved, it might be a tap (not a double-tap which is handled earlier)
+    if (distance < 10) {
+      // Single tap - could toggle UI or other actions
+      // Already handled by other logic
+    } else {
+      // Determine gesture type: horizontal (navigate) or vertical (info panel)
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Horizontal swipe - navigate
+        if (Math.abs(deltaX) > 50) {
+          if (deltaX > 0 && onPrev) {
+            onPrev();
+          } else if (deltaX < 0 && onNext) {
+            onNext();
+          }
+        }
+      } else {
+        // Vertical swipe - info panel
+        if (Math.abs(deltaY) > 50) {
+          if (deltaY < -50) {
+            // Swipe up - show info panel
+            setShowInfoPanel(true);
+          } else if (deltaY > 50 && showInfoPanel) {
+            // Swipe down - hide info panel
+            setShowInfoPanel(false);
+          } else if (deltaY > 100 && !showInfoPanel) {
+            // Long swipe down - close lightbox
+            onClose();
+          }
+        }
+      }
+    }
+    
+    setTouchStart(null);
+    setTouchStartDistance(null);
+    setIsPinching(false);
+    setIsDragging(false);
+  };
+
   const [attribution, setAttribution] = useState<any>(null);
   const [imageMetadata, setImageMetadata] = useState<any>(null);
   const [angleData, setAngleData] = useState<any>(null);
   const [vehicleOwnerId, setVehicleOwnerId] = useState<string | null>(null);
   const [previousOwners, setPreviousOwners] = useState<Set<string>>(new Set());
 
-  // Sidebar State
+  // Sidebar State (Desktop only now)
   const [showSidebar, setShowSidebar] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'tags'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'tags' | 'actions'>('info');
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [locationDisplay, setLocationDisplay] = useState<'coordinates' | 'city' | 'org'>('city');
+  
+  // Mobile Info Panel State
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
+  const infoPanelRef = useRef<any>(null);
+  
+  // Touch gesture state
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchStartDistance, setTouchStartDistance] = useState<number | null>(null);
+  const [isPinching, setIsPinching] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [lastTap, setLastTap] = useState<number>(0);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Modals
   const [spatialPopupOpen, setSpatialPopupOpen] = useState(false);
@@ -578,7 +744,17 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   // If Tagger is open, show it fullscreen
   if (showTagger) {
     return createPortal(
-      <div className="fixed inset-0 z-[10000] bg-[#0a0a0a] flex flex-col">
+      <div 
+        className="fixed inset-0 bg-[#0a0a0a] flex flex-col"
+        style={{
+          zIndex: 10000,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0
+        }}
+      >
         {/* Close button for tagger */}
         <div className="flex items-center justify-between px-6 py-3 bg-[#111] border-b-2 border-white/20">
           <span className="text-[10px] text-white/50 font-medium tracking-wide uppercase">
@@ -613,102 +789,91 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[10000] bg-[#0a0a0a] flex flex-col text-white" style={{ fontFamily: 'Arial, sans-serif' }}>
-      {/* Header - Completely Redesigned for Mobile */}
+    <div 
+      className="fixed inset-0 bg-[#0a0a0a] flex flex-col text-white" 
+      style={{ 
+        fontFamily: 'Arial, sans-serif',
+        zIndex: 10000,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0
+      }}
+    >
+      {/* Header - Mobile-Optimized */}
       <div className="bg-[#111] border-b-2 border-white/20">
-        {/* Mobile: Stacked layout */}
+        {/* Mobile: Single Row, Actually Minimal */}
         <div className="block sm:hidden">
-          {/* Row 1: Close + Date + Info */}
-          <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/10">
+          <div 
+            style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#0a0a0a',
+              padding: '4px 8px',
+              flexWrap: 'nowrap',
+              gap: '8px',
+              minWidth: 0,
+              width: '100%'
+            }}
+          >
             <button 
               onClick={onClose}
-              className="px-3 py-1 bg-red-600 border border-white text-white text-[8px] font-bold"
-              style={{ fontFamily: 'Arial, sans-serif' }}
+              style={{ 
+                fontFamily: 'Arial, sans-serif', 
+                fontSize: '8px', 
+                padding: '2px 4px', 
+                flexShrink: 0,
+                color: 'rgba(255,255,255,0.8)',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
             >
-              ✕
+              CLOSE
             </button>
-            <span className="text-[9px] text-white/70 font-medium flex-1 text-center mx-2">
-              {description || title || 'IMAGE'}
-            </span>
+            
+            {title && (
+              <span 
+                style={{ 
+                  fontSize: '8px', 
+                  whiteSpace: 'nowrap', 
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis', 
+                  minWidth: 0,
+                  flex: '1 1 auto',
+                  color: 'rgba(255,255,255,0.6)',
+                  fontWeight: 500,
+                  textAlign: 'center'
+                }}
+              >
+                {title}
+              </span>
+            )}
+            
             <button 
-              onClick={() => setShowSidebar(!showSidebar)}
-              className={`px-3 py-1 border text-[8px] font-bold ${
-                showSidebar ? 'bg-white text-black border-white' : 'bg-transparent border-white/50 text-white'
-              }`}
-              style={{ fontFamily: 'Arial, sans-serif' }}
+              onClick={() => setShowInfoPanel(!showInfoPanel)}
+              style={{ 
+                fontFamily: 'Arial, sans-serif', 
+                fontSize: '8px', 
+                padding: '2px 4px', 
+                flexShrink: 0,
+                color: showInfoPanel ? '#fff' : 'rgba(255,255,255,0.6)',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
             >
               INFO
             </button>
           </div>
-
-          {/* Row 2: Navigation arrows (prominent) */}
-          <div className="flex items-center justify-center gap-4 py-2">
-            {onPrev && (
-              <button 
-                onClick={onPrev}
-                className="px-6 py-2 bg-[#2a2a2a] border-2 border-white/40 text-white text-[14px] font-bold hover:bg-white/10"
-                style={{ fontFamily: 'Arial, sans-serif' }}
-              >
-                ←
-              </button>
-            )}
-            {onNext && (
-              <button 
-                onClick={onNext}
-                className="px-6 py-2 bg-[#2a2a2a] border-2 border-white/40 text-white text-[14px] font-bold hover:bg-white/10"
-                style={{ fontFamily: 'Arial, sans-serif' }}
-              >
-                →
-              </button>
-            )}
-          </div>
-
-          {/* Row 3: Action buttons (compact grid) */}
-          {canEdit && (
-            <div className="grid grid-cols-4 gap-1 px-2 py-1.5">
-              <button
-                onClick={() => setShowTagger(true)}
-                className="px-2 py-1.5 bg-white text-black border border-white text-[7px] font-bold"
-                style={{ fontFamily: 'Arial, sans-serif' }}
-              >
-                TAG
-              </button>
-              <button
-                onClick={setAsPrimary}
-                disabled={imageMetadata?.is_primary}
-                className={`px-2 py-1.5 border text-[7px] font-bold ${
-                  imageMetadata?.is_primary
-                    ? 'bg-green-900/30 border-green-700 text-green-400'
-                    : 'bg-transparent border-white/50 text-white'
-                }`}
-                style={{ fontFamily: 'Arial, sans-serif' }}
-              >
-                PRIMARY
-              </button>
-              <button 
-                onClick={() => {
-                  const newRotation = (rotation + 90) % 360;
-                  setRotation(newRotation);
-                  saveRotation(newRotation);
-                }}
-                className="px-2 py-1.5 bg-transparent border border-white/50 text-white text-[7px] font-bold"
-                style={{ fontFamily: 'Arial, sans-serif' }}
-              >
-                ROTATE
-              </button>
-              <button 
-                onClick={toggleSensitive}
-                className={`px-2 py-1.5 border text-[7px] font-bold ${
-                  isSensitive 
-                    ? 'bg-yellow-600 text-black border-yellow-400' 
-                    : 'bg-transparent border-white/50 text-white'
-                }`}
-                style={{ fontFamily: 'Arial, sans-serif' }}
-              >
-                BLUR
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Desktop: Original horizontal layout */}
@@ -835,12 +1000,130 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         </div>
       </div>
 
+      {/* Two-Finger Quick Actions Bar (Mobile) */}
+      {showQuickActions && canEdit && (
+        <div 
+          className="block sm:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a] border-t-2 border-white/20 p-2 flex justify-around items-center"
+          style={{ zIndex: 10002 }}
+        >
+          <button
+            onClick={() => { setShowTagger(true); setShowQuickActions(false); }}
+            className="flex-1 py-3 text-white text-[10px] font-bold border-2 border-white/30 bg-white text-black mx-1"
+          >
+            TAG
+          </button>
+          <button
+            onClick={() => { setAsPrimary(); setShowQuickActions(false); }}
+            disabled={imageMetadata?.is_primary}
+            className="flex-1 py-3 text-white text-[10px] font-bold border-2 border-white/30 mx-1"
+            style={{ backgroundColor: imageMetadata?.is_primary ? '#16a34a' : 'rgba(255,255,255,0.1)' }}
+          >
+            PRIMARY
+          </button>
+          <button
+            onClick={() => { const r = (rotation + 90) % 360; setRotation(r); saveRotation(r); setShowQuickActions(false); }}
+            className="flex-1 py-3 text-white text-[10px] font-bold border-2 border-white/30 bg-transparent mx-1"
+          >
+            ROTATE
+          </button>
+          <button
+            onClick={() => { toggleSensitive(); setShowQuickActions(false); }}
+            className="flex-1 py-3 text-[10px] font-bold border-2 border-white/30 mx-1"
+            style={{ backgroundColor: isSensitive ? '#eab308' : 'rgba(255,255,255,0.1)', color: isSensitive ? 'black' : 'white' }}
+          >
+            BLUR
+          </button>
+          <button
+            onClick={() => setShowQuickActions(false)}
+            className="flex-1 py-3 text-white text-[10px] font-bold border-2 border-red-600 bg-red-600 mx-1"
+          >
+            X
+          </button>
+        </div>
+      )}
+
+      {/* Long-Press Context Menu (Mobile) */}
+      {showContextMenu && canEdit && (
+        <>
+          <div 
+            className="block sm:hidden fixed inset-0"
+            style={{ zIndex: 10003, backgroundColor: 'transparent' }}
+            onClick={() => setShowContextMenu(false)}
+          />
+          <div
+            className="block sm:hidden fixed bg-[#0a0a0a] border-2 border-white/30"
+            style={{
+              zIndex: 10004,
+              left: `${Math.min(contextMenuPos.x, typeof window !== 'undefined' ? window.innerWidth - 200 : 200)}px`,
+              top: `${Math.min(contextMenuPos.y, typeof window !== 'undefined' ? window.innerHeight - 300 : 300)}px`,
+              minWidth: '180px'
+            }}
+          >
+            <button
+              onClick={() => { setAsPrimary(); setShowContextMenu(false); }}
+              className="w-full py-2 px-3 text-left text-white text-[9px] font-bold hover:bg-white/10 border-b border-white/10"
+            >
+              Set as Primary
+            </button>
+            <button
+              onClick={() => { setShowTagger(true); setShowContextMenu(false); }}
+              className="w-full py-2 px-3 text-left text-white text-[9px] font-bold hover:bg-white/10 border-b border-white/10"
+            >
+              Tag Image
+            </button>
+            <button
+              onClick={() => { 
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(imageUrl);
+                }
+                setShowContextMenu(false);
+              }}
+              className="w-full py-2 px-3 text-left text-white text-[9px] font-bold hover:bg-white/10 border-b border-white/10"
+            >
+              Copy Image URL
+            </button>
+            <button
+              onClick={() => { 
+                const a = document.createElement('a');
+                a.href = imageUrl;
+                a.download = 'image.jpg';
+                a.click();
+                setShowContextMenu(false);
+              }}
+              className="w-full py-2 px-3 text-left text-white text-[9px] font-bold hover:bg-white/10 border-b border-white/10"
+            >
+              Download Original
+            </button>
+            <button
+              onClick={() => { toggleSensitive(); setShowContextMenu(false); }}
+              className="w-full py-2 px-3 text-left text-white text-[9px] font-bold hover:bg-white/10 border-b border-white/10"
+            >
+              Mark Sensitive
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Delete this image? Cannot be undone.')) {
+                  deleteImage();
+                }
+                setShowContextMenu(false);
+              }}
+              className="w-full py-2 px-3 text-left text-red-500 text-[9px] font-bold hover:bg-white/10"
+            >
+              Delete Image
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Image Canvas */}
       <div
         ref={containerRef}
           className="flex-1 flex items-center justify-center p-4 relative"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
       >
         <div
           style={{
@@ -857,10 +1140,11 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             className="max-w-full max-h-full object-contain select-none"
             style={{ 
               pointerEvents: 'auto',
-              transform: `rotate(${rotation}deg)`,
+              transform: `rotate(${rotation}deg) scale(${zoom})`,
               transition: 'transform 0.3s ease, filter 0.3s ease',
               display: 'block',
-              filter: isSensitive ? 'blur(20px)' : 'none'
+              filter: isSensitive ? 'blur(20px)' : 'none',
+              cursor: zoom > 1 ? 'grab' : 'default'
             }}
           />
 
@@ -889,9 +1173,22 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
         {/* Sidebar - Cursor Style */}
         {showSidebar && (
-          <div className="w-80 bg-[#111] border-l-2 border-white/20 flex flex-col">
+          <div className="w-80 sm:w-80 w-full bg-[#111] border-l-2 border-white/20 flex flex-col overflow-hidden">
             {/* Tabs - Cursor Style */}
             <div className="flex border-b-2 border-white/20">
+              {canEdit && (
+                <button 
+                  onClick={() => setActiveTab('actions')}
+                  className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 ${
+                    activeTab === 'actions' 
+                      ? 'text-white border-b-2 border-white bg-white/5' 
+                      : 'text-white/50 hover:text-white hover:bg-white/5'
+                  }`}
+                  style={{ fontFamily: 'Arial, sans-serif' }}
+                >
+                  ACTIONS
+                </button>
+              )}
               <button 
                 onClick={() => setActiveTab('info')}
                 className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 ${
@@ -901,7 +1198,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 }`}
                 style={{ fontFamily: 'Arial, sans-serif' }}
               >
-                DETAILS
+                INFO
               </button>
               <button 
                 onClick={() => setActiveTab('comments')}
@@ -912,7 +1209,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 }`}
                 style={{ fontFamily: 'Arial, sans-serif' }}
               >
-                COMMENTS ({comments.length})
+                COMMENTS
               </button>
               <button 
                 onClick={() => setActiveTab('tags')}
@@ -923,11 +1220,81 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 }`}
                 style={{ fontFamily: 'Arial, sans-serif' }}
               >
-                TAGS ({tags.length})
+                TAGS
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {/* Actions Tab (Mobile Quick Actions) */}
+              {activeTab === 'actions' && canEdit && (
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowTagger(true);
+                      setShowSidebar(false);
+                    }}
+                    className="w-full py-3 px-4 bg-white text-black border-2 border-white text-[10px] font-bold hover:bg-white/90"
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    TAG IMAGE
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setAsPrimary();
+                      setShowSidebar(false);
+                    }}
+                    disabled={imageMetadata?.is_primary}
+                    className={`w-full py-3 px-4 border-2 text-[10px] font-bold ${
+                      imageMetadata?.is_primary
+                        ? 'bg-green-700 border-green-400 text-white'
+                        : 'bg-[#1a1a1a] border-white/30 text-white hover:bg-white/10'
+                    }`}
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    {imageMetadata?.is_primary ? '✓ PRIMARY IMAGE' : 'SET AS PRIMARY'}
+                  </button>
+                  
+                  <button 
+                    onClick={() => {
+                      const newRotation = (rotation + 90) % 360;
+                      setRotation(newRotation);
+                      saveRotation(newRotation);
+                    }}
+                    className="w-full py-3 px-4 bg-[#1a1a1a] border-2 border-white/30 text-white text-[10px] font-bold hover:bg-white/10"
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    ROTATE 90°
+                  </button>
+                  
+                  <button 
+                    onClick={toggleSensitive}
+                    className={`w-full py-3 px-4 border-2 text-[10px] font-bold ${
+                      isSensitive 
+                        ? 'bg-yellow-600 text-black border-yellow-400' 
+                        : 'bg-[#1a1a1a] border-white/30 text-white hover:bg-white/10'
+                    }`}
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    {isSensitive ? '✓ SENSITIVE (BLURRED)' : 'MARK AS SENSITIVE'}
+                  </button>
+
+                  <div className="border-t-2 border-white/20 pt-3 mt-3">
+                    <button 
+                      onClick={() => {
+                        if (confirm('Delete this image? This cannot be undone.')) {
+                          deleteImage();
+                        }
+                      }}
+                      className="w-full py-3 px-4 bg-red-600 border-2 border-red-400 text-white text-[10px] font-bold hover:bg-red-700"
+                      style={{ fontFamily: 'Arial, sans-serif' }}
+                    >
+                      DELETE IMAGE
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Info Tab */}
               {activeTab === 'info' && (
                 <div className="space-y-6">
@@ -1212,6 +1579,32 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     <div>
                       <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">EXIF Data</h4>
                       <div className="space-y-2 text-xs">
+                        {/* EXIF Status Badge */}
+                        {imageMetadata.exif_data.exif_status && (
+                          <div className="border-b border-white/10 pb-2 mb-2">
+                            {imageMetadata.exif_data.exif_status === 'stripped' && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded">EXIF STRIPPED</span>
+                                {imageMetadata.exif_data.source && (
+                                  <span className="text-[10px] text-gray-400">
+                                    Source: {imageMetadata.exif_data.source.name || imageMetadata.exif_data.source.original_url || 'External'}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {imageMetadata.exif_data.exif_status === 'partial' && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-orange-400 bg-orange-400/10 px-2 py-1 rounded">PARTIAL EXIF</span>
+                                {imageMetadata.exif_data.source && (
+                                  <span className="text-[10px] text-gray-400">
+                                    Source: {imageMetadata.exif_data.source.name || 'External'}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
                         {/* Camera Info */}
                         {imageMetadata.exif_data.camera && (
                           <div className="border-b border-white/10 pb-2">
@@ -1408,6 +1801,30 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           userId={session?.user?.id}
         />
       )}
+
+      {/* Mobile Info Panel (Swipe Up) - Only on mobile */}
+      <div className="block sm:hidden">
+        {showInfoPanel && (
+          <ImageInfoPanel
+            imageMetadata={imageMetadata}
+            attribution={attribution}
+            tags={tags}
+            comments={comments}
+            canEdit={canEdit}
+            onTag={() => setShowTagger(true)}
+            onSetPrimary={setAsPrimary}
+            onRotate={() => {
+              const newRotation = (rotation + 90) % 360;
+              setRotation(newRotation);
+              saveRotation(newRotation);
+            }}
+            onToggleSensitive={toggleSensitive}
+            onDelete={deleteImage}
+            onClose={() => setShowInfoPanel(false)}
+            session={session}
+          />
+        )}
+      </div>
     </div>,
     document.body
   );

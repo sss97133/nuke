@@ -399,25 +399,21 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       to={`/vehicle/${vehicle.id}`}
       style={{
         display: 'block',
-        background: 'rgba(255, 255, 255, 0.7)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(0, 0, 0, 0.1)',
-        borderRadius: '4px',
+        background: '#000',
+        border: 'none',
+        borderRadius: '0',
         overflow: 'hidden',
         textDecoration: 'none',
         color: 'inherit',
         transition: 'all 0.12s ease',
         cursor: 'pointer',
+        position: 'relative'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        e.currentTarget.style.opacity = '0.85';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.7)';
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
+        e.currentTarget.style.opacity = '1';
       }}
     >
       {/* Horizontal swipeable image grid (1:1 ratio) */}
@@ -433,30 +429,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Image dots indicator (if multiple images) */}
-        {vehicleImages.length > 1 && (
-          <div style={{
-            position: 'absolute',
-            bottom: '8px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: '4px',
-            zIndex: 2
-          }}>
-            {vehicleImages.map((_, idx) => (
-              <div key={idx} style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: idx === currentImageIndex ? 'white' : 'rgba(255,255,255,0.5)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                transition: 'all 0.2s ease'
-              }} />
-            ))}
-          </div>
-        )}
-        
         {/* Price overlay - top right */}
         {vehicle.current_value && (
           <div style={{

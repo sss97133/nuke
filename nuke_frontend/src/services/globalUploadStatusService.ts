@@ -162,12 +162,12 @@ class GlobalUploadStatusService {
 
       try {
         // Check multiple indicators of AI processing:
-        // 1. ai_tags_extracted flag
+        // 1. ai_scan_metadata populated (tier_1_analysis exists)
         // 2. is_sensitive flag being set
-        // 3. Any AI tags exist for the image
+        // 3. ai_last_scanned timestamp set
         const { data: images, error: imgError } = await supabase
           .from('vehicle_images')
-          .select('id, ai_tags_extracted, is_sensitive')
+          .select('id, ai_scan_metadata, is_sensitive, ai_last_scanned')
           .in('id', job.imageIds);
 
         if (imgError) {
@@ -175,10 +175,17 @@ class GlobalUploadStatusService {
           return;
         }
 
-        // Count images that have been processed (either ai_tags or sensitive detection)
-        const processed = images?.filter(img => 
-          img.ai_tags_extracted === true || img.is_sensitive !== null
-        ).length || 0;
+        // Count images that have been processed
+        // Processed if: ai_scan_metadata has tier_1_analysis, is_sensitive is set, or ai_last_scanned exists
+        const processed = images?.filter(img => {
+          const hasMetadata = img.ai_scan_metadata && 
+                             typeof img.ai_scan_metadata === 'object' &&
+                             img.ai_scan_metadata.tier_1_analysis !== null &&
+                             img.ai_scan_metadata.tier_1_analysis !== undefined;
+          const hasSensitive = img.is_sensitive !== null;
+          const hasScanned = img.ai_last_scanned !== null;
+          return hasMetadata || hasSensitive || hasScanned;
+        }).length || 0;
 
         console.log(`[Job ${jobId}] Progress: ${processed}/${job.totalImages} (poll ${pollCount})`);
 
