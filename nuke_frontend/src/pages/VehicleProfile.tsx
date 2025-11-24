@@ -34,10 +34,11 @@ import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
 import { BATListingManager } from '../components/vehicle/BATListingManager';
 import VehicleDescriptionCard from '../components/vehicle/VehicleDescriptionCard';
 import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
-import MergeProposalsPanel from '../components/vehicle/MergeProposalsPanel';
+// Lazy load heavy components to avoid circular dependencies
+const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
+const ImageGallery = React.lazy(() => import('../components/images/ImageGallery'));
 import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 import type { Session } from '@supabase/supabase-js';
-import ImageGallery from '../components/images/ImageGallery';
 import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
 import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
 
@@ -1284,14 +1285,16 @@ const VehicleProfile: React.FC = () => {
 
             {/* Right Column: Gallery */}
             <div>
-              <ImageGallery
-                vehicleId={vehicle.id}
-                showUpload={true}
-                onImagesUpdated={() => {
-                  loadVehicle();
-                  loadTimelineEvents();
-                }}
-              />
+              <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading gallery...</div>}>
+                <ImageGallery
+                  vehicleId={vehicle.id}
+                  showUpload={true}
+                  onImagesUpdated={() => {
+                    loadVehicle();
+                    loadTimelineEvents();
+                  }}
+                />
+              </React.Suspense>
             </div>
           </div>
             </section>
@@ -1318,13 +1321,15 @@ const VehicleProfile: React.FC = () => {
 
         {/* Merge Proposals Panel - Only visible to verified owners */}
         {isVerifiedOwner && (
-          <MergeProposalsPanel
-            vehicleId={vehicle.id}
-            onMergeComplete={() => {
-              // Reload the vehicle after merge
-              loadVehicle();
-            }}
-          />
+          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading merge proposals...</div>}>
+            <MergeProposalsPanel
+              vehicleId={vehicle.id}
+              onMergeComplete={() => {
+                // Reload the vehicle after merge
+                loadVehicle();
+              }}
+            />
+          </React.Suspense>
         )}
 
         {/* Live Stats Bar (MVP: hidden to reduce clutter) */}
