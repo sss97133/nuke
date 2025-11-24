@@ -40,6 +40,12 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isTouchSelecting, setIsTouchSelecting] = useState(false);
   const [touchVisitedIds, setTouchVisitedIds] = useState<Set<string>>(new Set());
+  const [aiStatusCollapsed, setAiStatusCollapsed] = useState(false);
+  const [showRestartWizard, setShowRestartWizard] = useState(false);
+  const [showSubmitWizard, setShowSubmitWizard] = useState(false);
+  const [submitVehicleId, setSubmitVehicleId] = useState<string | null>(null);
+  const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
+  const [editingAlbumName, setEditingAlbumName] = useState('');
   
   // Computed counts for sidebar
   const [counts, setCounts] = useState({
@@ -241,38 +247,122 @@ export const PersonalPhotoLibrary: React.FC = () => {
     return text.includes(q);
   });
 
-  const handleAddToAlbum = async () => {
+  const handleAddToAlbum = async (albumId?: string) => {
     if (selectedPhotos.size === 0) {
-      alert('Select at least one photo first.');
+      showToast('Select at least one photo first.', 'warning');
       return;
     }
 
+    if (albumId) {
+      // Add to existing album
+      try {
+        const added = await ImageSetService.addImagesToSet(albumId, Array.from(selectedPhotos));
+        if (added === 0) {
+          showToast('No new photos were added (they may already be in the album).', 'info');
+        } else {
+          showToast(`Added ${added} photo${added > 1 ? 's' : ''} to album.`, 'success');
+          setSelectedPhotos(new Set());
+        }
+        await loadData();
+      } catch (error) {
+        console.error('Failed to add to album:', error);
+        showToast('Failed to add photos to album.', 'error');
+      }
+      return;
+    }
+
+    // Create new album
     const defaultName = `Album ${new Date().toLocaleDateString()}`;
-    const name = window.prompt('Album name (existing or new):', defaultName);
+    const name = window.prompt('New album name:', defaultName);
     if (!name) return;
 
     try {
-      // Try to find existing personal album by name
-      let album = personalAlbums.find(a => a.name.toLowerCase() === name.toLowerCase());
+      const album = await ImageSetService.createPersonalAlbum({ name });
       if (!album) {
-        album = await ImageSetService.createPersonalAlbum({ name });
-      }
-
-      if (!album) {
-        alert('Failed to create album');
+        showToast('Failed to create album', 'error');
         return;
       }
 
       const added = await ImageSetService.addImagesToSet(album.id, Array.from(selectedPhotos));
       if (added === 0) {
-        alert('No new photos were added to the album (they may already be in it).');
+        showToast('No new photos were added.', 'info');
+      } else {
+        showToast(`Created album "${name}" and added ${added} photo${added > 1 ? 's' : ''}.`, 'success');
+        setSelectedPhotos(new Set());
       }
 
-      // Refresh counts and album list
       await loadData();
     } catch (error) {
-      console.error('Failed to add to album:', error);
-      alert('Failed to add photos to album.');
+      console.error('Failed to create album:', error);
+      showToast('Failed to create album.', 'error');
+    }
+  };
+
+  const handleRestartAIProcessing = async () => {
+    try {
+      // Reset failed and stuck pending photos to pending
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        showToast('Not authenticated', 'error');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('vehicle_images')
+        .update({ 
+          ai_processing_status: 'pending',
+          ai_processing_started_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', session.session.user.id)
+        .is('vehicle_id', null)
+        .in('ai_processing_status', ['failed', 'pending']);
+
+      if (error) throw error;
+
+      showToast('AI processing restarted. Photos will be processed shortly.', 'success');
+      setShowRestartWizard(false);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to restart AI processing:', error);
+      showToast('Failed to restart AI processing.', 'error');
+    }
+  };
+
+  const handleSubmitToVehicle = async () => {
+    if (!submitVehicleId || selectedPhotos.size === 0) return;
+    
+    try {
+      const v = vehicles.find(vh => vh.id === submitVehicleId);
+      const label = v ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'selected vehicle' : 'selected vehicle';
+      
+      await PersonalPhotoLibraryService.bulkLinkToVehicle(Array.from(selectedPhotos), submitVehicleId);
+      showToast(`Submitted ${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} to ${label}.`, 'success');
+      setSelectedPhotos(new Set());
+      setShowSubmitWizard(false);
+      setSubmitVehicleId(null);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to submit photos:', error);
+      showToast('Failed to submit photos to vehicle.', 'error');
+    }
+  };
+
+  const handleUpdateAlbumName = async (albumId: string, newName: string) => {
+    if (!newName.trim()) {
+      showToast('Album name cannot be empty', 'warning');
+      return;
+    }
+
+    try {
+      await ImageSetService.updateImageSet(albumId, { name: newName.trim() });
+      setEditingAlbumId(null);
+      setEditingAlbumName('');
+      await loadData();
+      showToast('Album name updated', 'success');
+    } catch (error) {
+      console.error('Failed to update album name:', error);
+      showToast('Failed to update album name', 'error');
     }
   };
 
@@ -282,17 +372,30 @@ export const PersonalPhotoLibrary: React.FC = () => {
       return;
     }
 
-    const yearInput = window.prompt('Year (e.g. 1996):', '');
+    // Try to extract vehicle info from album name (e.g. "1974 Ford Bronco")
+    const nameParts = album.name.trim().split(/\s+/);
+    let suggestedYear: string | null = null;
+    let suggestedMake: string | null = null;
+    let suggestedModel: string | null = null;
+
+    // Try to parse year from beginning
+    if (nameParts.length > 0 && /^\d{4}$/.test(nameParts[0])) {
+      suggestedYear = nameParts[0];
+      if (nameParts.length > 1) suggestedMake = nameParts[1];
+      if (nameParts.length > 2) suggestedModel = nameParts.slice(2).join(' ');
+    }
+
+    const yearInput = window.prompt('Year (e.g. 1996):', suggestedYear || '');
     if (!yearInput) return;
     const year = parseInt(yearInput, 10);
     if (Number.isNaN(year)) {
-      alert('Year must be a number.');
+      showToast('Year must be a number.', 'error');
       return;
     }
 
-    const make = window.prompt('Make (e.g. Ford):', '') || '';
+    const make = window.prompt('Make (e.g. Ford):', suggestedMake || '') || '';
     if (!make.trim()) return;
-    const model = window.prompt('Model (e.g. Bronco):', '') || '';
+    const model = window.prompt('Model (e.g. Bronco):', suggestedModel || '') || '';
     if (!model.trim()) return;
     const trim = window.prompt('Trim (optional):', '') || undefined;
     const vin = window.prompt('VIN (recommended):', '') || undefined;
@@ -307,12 +410,21 @@ export const PersonalPhotoLibrary: React.FC = () => {
         vin: vin?.trim() || undefined
       });
 
+      // Update album name to match vehicle profile name
+      const vehicleName = `${year} ${make.trim()} ${model.trim()}`.trim();
+      try {
+        await ImageSetService.updateImageSet(album.id, { name: vehicleName });
+      } catch (e) {
+        console.warn('Failed to update album name:', e);
+      }
+
       // Reload data so inbox updates, then navigate to new profile
       await loadData();
-      navigate(`/vehicles/${vehicleId}`);
+      showToast(`Album converted to vehicle profile: ${vehicleName}`, 'success');
+      navigate(`/vehicle/${vehicleId}`);
     } catch (error) {
       console.error('Failed to convert album to vehicle:', error);
-      alert('Failed to convert album to vehicle profile.');
+      showToast('Failed to convert album to vehicle profile.', 'error');
     }
   };
 
@@ -467,37 +579,92 @@ export const PersonalPhotoLibrary: React.FC = () => {
         </div>
 
         {/* AI Status */}
-        <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
+        <div 
+          style={{ 
+            padding: '12px', 
+            borderBottom: '1px solid var(--border-light)',
+            cursor: 'pointer'
+          }}
+          onClick={(e) => {
+            // Only toggle if clicking the row, not the text or status items
+            if ((e.target as HTMLElement).closest('.ai-status-item') || (e.target as HTMLElement).closest('.ai-status-header')) {
+              return;
+            }
+            setAiStatusCollapsed(!aiStatusCollapsed);
+          }}
+        >
           <div
-            className="text text-small text-muted"
-            style={{ marginBottom: '8px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={handleAiStatusClick}
+            className="ai-status-header text text-small text-muted"
+            style={{ 
+              marginBottom: '8px', 
+              letterSpacing: '0.5px', 
+              cursor: 'pointer', 
+              textDecoration: 'underline',
+              pointerEvents: 'auto'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAiStatusClick();
+            }}
           >
-            AI STATUS
+            AI STATUS {aiStatusCollapsed ? '▼' : '▲'}
           </div>
-          {[
-            { key: 'ai_complete', label: 'Complete', count: counts.aiComplete },
-            { key: 'ai_pending', label: 'Pending', count: counts.aiPending },
-            { key: 'ai_processing', label: 'Processing', count: counts.aiProcessing },
-            { key: 'ai_failed', label: 'Failed', count: counts.aiFailed }
-          ].map(item => (
-            <div
-              key={item.key}
-              onClick={() => setActiveFilter(activeFilter === item.key ? null : item.key)}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '4px 6px',
-                marginBottom: '2px',
-                cursor: 'pointer',
-                background: activeFilter === item.key ? 'var(--grey-200)' : 'transparent',
-                border: activeFilter === item.key ? '1px solid var(--border-medium)' : '1px solid transparent'
-              }}
-            >
-              <span className="text text-small">{item.label}</span>
-              <span className="text text-small font-bold">{item.count.toLocaleString()}</span>
-            </div>
-          ))}
+          {!aiStatusCollapsed && [
+            { key: 'ai_complete', label: 'Complete', count: counts.aiComplete, status: 'complete' },
+            { key: 'ai_pending', label: 'Pending', count: counts.aiPending, status: 'pending' },
+            { key: 'ai_processing', label: 'Processing', count: counts.aiProcessing, status: 'processing' },
+            { key: 'ai_failed', label: 'Failed', count: counts.aiFailed, status: 'failed' }
+          ].map(item => {
+            const isProcessing = item.status === 'processing';
+            const hasIssues = (item.status === 'failed' || item.status === 'pending') && item.count > 0;
+            return (
+              <div
+                key={item.key}
+                className="ai-status-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (hasIssues && item.count > 0) {
+                    setShowRestartWizard(true);
+                  } else {
+                    setActiveFilter(activeFilter === item.key ? null : item.key);
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '4px 6px',
+                  marginBottom: '2px',
+                  cursor: 'pointer',
+                  background: activeFilter === item.key ? 'var(--grey-200)' : 'transparent',
+                  border: activeFilter === item.key ? '1px solid var(--border-medium)' : '1px solid transparent',
+                  pointerEvents: 'auto'
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {/* Status indicator light */}
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: isProcessing 
+                        ? '#10b981' 
+                        : hasIssues 
+                          ? '#ef4444' 
+                          : item.status === 'complete' 
+                            ? '#10b981' 
+                            : '#999',
+                      display: 'inline-block',
+                      boxShadow: isProcessing || hasIssues ? '0 0 4px currentColor' : 'none'
+                    }}
+                  />
+                  <span className="text text-small">{item.label}</span>
+                </span>
+                <span className="text text-small font-bold">{item.count.toLocaleString()}</span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Vehicle Detection */}
@@ -594,7 +761,14 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 return (
                   <div
                     key={v.id}
-                    onClick={() => setActiveVehicleId(isActive ? null : v.id)}
+                    onClick={() => {
+                      if (selectedPhotos.size > 0) {
+                        setSubmitVehicleId(v.id);
+                        setShowSubmitWizard(true);
+                      } else {
+                        setActiveVehicleId(isActive ? null : v.id);
+                      }
+                    }}
                     style={{
                       padding: '4px 6px',
                       marginBottom: '2px',
@@ -610,13 +784,16 @@ export const PersonalPhotoLibrary: React.FC = () => {
               })
             )}
           </div>
-          {activeVehicleId && (
+          {activeVehicleId && selectedPhotos.size > 0 && (
             <button
-              onClick={() => navigate(`/vehicles/${activeVehicleId}`)}
-              className="button button-secondary"
+              onClick={() => {
+                setSubmitVehicleId(activeVehicleId);
+                setShowSubmitWizard(true);
+              }}
+              className="button button-primary"
               style={{ width: '100%', marginTop: '6px', fontSize: '8pt', padding: '4px 6px' }}
             >
-              OPEN PROFILE
+              SUBMIT TO PROFILE
             </button>
           )}
         </div>
@@ -627,11 +804,11 @@ export const PersonalPhotoLibrary: React.FC = () => {
             ALBUMS
           </div>
           {personalAlbums.length === 0 ? (
-            <div className="text text-small text-muted">
+            <div className="text text-small text-muted" style={{ marginBottom: '6px' }}>
               Albums are created from selected photos.
             </div>
           ) : (
-            <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
               {personalAlbums.map(album => (
                 <div
                   key={album.id}
@@ -641,9 +818,61 @@ export const PersonalPhotoLibrary: React.FC = () => {
                     background: 'var(--grey-50)'
                   }}
                 >
-                  <div className="text" style={{ fontSize: '8pt', fontWeight: 600, marginBottom: '2px' }}>
-                    {album.name}
-                  </div>
+                  {editingAlbumId === album.id ? (
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '4px' }}>
+                      <input
+                        type="text"
+                        value={editingAlbumName}
+                        onChange={(e) => setEditingAlbumName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleUpdateAlbumName(album.id, editingAlbumName);
+                          } else if (e.key === 'Escape') {
+                            setEditingAlbumId(null);
+                            setEditingAlbumName('');
+                          }
+                        }}
+                        autoFocus
+                        className="form-input"
+                        style={{ fontSize: '8pt', padding: '2px 4px', flex: 1 }}
+                      />
+                      <button
+                        onClick={() => handleUpdateAlbumName(album.id, editingAlbumName)}
+                        className="button button-primary"
+                        style={{ fontSize: '7pt', padding: '2px 4px' }}
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingAlbumId(null);
+                          setEditingAlbumName('');
+                        }}
+                        className="button button-secondary"
+                        style={{ fontSize: '7pt', padding: '2px 4px' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div 
+                      className="text" 
+                      style={{ 
+                        fontSize: '8pt', 
+                        fontWeight: 600, 
+                        marginBottom: '2px',
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                      onClick={() => {
+                        setEditingAlbumId(album.id);
+                        setEditingAlbumName(album.name);
+                      }}
+                      title="Click to rename"
+                    >
+                      {album.name}
+                    </div>
+                  )}
                   <div className="text text-small text-muted" style={{ fontSize: '7pt', marginBottom: '4px' }}>
                     {(album.image_count || 0).toLocaleString()} photos
                   </div>
@@ -657,6 +886,15 @@ export const PersonalPhotoLibrary: React.FC = () => {
                 </div>
               ))}
             </div>
+          )}
+          {selectedPhotos.size > 0 && (
+            <button
+              onClick={() => handleAddToAlbum()}
+              className="button button-secondary"
+              style={{ width: '100%', fontSize: '8pt', padding: '6px 10px' }}
+            >
+              {personalAlbums.length === 0 ? 'CREATE ALBUM' : 'ADD TO ALBUM'}
+            </button>
           )}
         </div>
 
@@ -1015,6 +1253,132 @@ export const PersonalPhotoLibrary: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Restart AI Processing Wizard Modal */}
+      {showRestartWizard && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000
+          }}
+          onClick={() => setShowRestartWizard(false)}
+        >
+          <div
+            className="card"
+            style={{
+              background: 'var(--white)',
+              padding: '20px',
+              maxWidth: '400px',
+              width: '90%',
+              border: '2px solid var(--border)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text font-bold" style={{ marginBottom: '12px', fontSize: '11pt' }}>
+              Restart AI Processing
+            </div>
+            <div className="text text-small" style={{ marginBottom: '16px' }}>
+              This will reset all failed and pending photos back to the processing queue. 
+              They will be analyzed by AI shortly.
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowRestartWizard(false)}
+                className="button button-secondary"
+                style={{ fontSize: '8pt', padding: '6px 12px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRestartAIProcessing}
+                className="button button-primary"
+                style={{ fontSize: '8pt', padding: '6px 12px' }}
+              >
+                Restart Processing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit to Vehicle Wizard Modal */}
+      {showSubmitWizard && submitVehicleId && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000
+          }}
+          onClick={() => {
+            setShowSubmitWizard(false);
+            setSubmitVehicleId(null);
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              background: 'var(--white)',
+              padding: '20px',
+              maxWidth: '400px',
+              width: '90%',
+              border: '2px solid var(--border)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text font-bold" style={{ marginBottom: '12px', fontSize: '11pt' }}>
+              Submit to Vehicle
+            </div>
+            {(() => {
+              const v = vehicles.find(vh => vh.id === submitVehicleId);
+              const label = v ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'selected vehicle' : 'selected vehicle';
+              return (
+                <>
+                  <div className="text text-small" style={{ marginBottom: '16px' }}>
+                    Submit <strong>{selectedPhotos.size}</strong> photo{selectedPhotos.size > 1 ? 's' : ''} to <strong>"{label}"</strong>?
+                  </div>
+                  <div className="text text-small text-muted" style={{ marginBottom: '16px' }}>
+                    The photos will be linked to this vehicle profile.
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => {
+                        setShowSubmitWizard(false);
+                        setSubmitVehicleId(null);
+                      }}
+                      className="button button-secondary"
+                      style={{ fontSize: '8pt', padding: '6px 12px' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSubmitToVehicle}
+                      className="button button-primary"
+                      style={{ fontSize: '8pt', padding: '6px 12px' }}
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
