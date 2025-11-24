@@ -581,42 +581,20 @@ const Profile: React.FC = () => {
             )}
             
             {activeTab === 'photos' && isOwnProfile && (
-              <div style={{ 
-                minHeight: '70vh',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <iframe
-                  src="/photos"
-                  style={{
-                    width: '100%',
-                    minHeight: '70vh',
-                    flex: 1,
-                    border: 'none',
-                    borderRadius: '4px'
-                  }}
-                  title="Photo Library"
-                />
+              <div>
+                {(() => {
+                  navigate('/photos');
+                  return null;
+                })()}
               </div>
             )}
 
             {activeTab === 'financials' && isOwnProfile && (
-              <div style={{ 
-                minHeight: '70vh',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <iframe
-                  src="/financials"
-                  style={{
-                    width: '100%',
-                    minHeight: '70vh',
-                    flex: 1,
-                    border: 'none',
-                    borderRadius: '4px'
-                  }}
-                  title="Financials"
-                />
+              <div>
+                {(() => {
+                  navigate('/financials');
+                  return null;
+                })()}
               </div>
             )}
             
