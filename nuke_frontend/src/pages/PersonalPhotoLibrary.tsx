@@ -264,9 +264,10 @@ export const PersonalPhotoLibrary: React.FC = () => {
           setSelectedPhotos(new Set());
         }
         await loadData();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to add to album:', error);
-        showToast('Failed to add photos to album.', 'error');
+        const message = error?.message || 'Failed to add photos to album.';
+        showToast(message, 'error');
       }
       return;
     }
@@ -274,27 +275,33 @@ export const PersonalPhotoLibrary: React.FC = () => {
     // Create new album
     const defaultName = `Album ${new Date().toLocaleDateString()}`;
     const name = window.prompt('New album name:', defaultName);
-    if (!name) return;
+    if (!name || !name.trim()) return;
 
     try {
-      const album = await ImageSetService.createPersonalAlbum({ name });
+      const album = await ImageSetService.createPersonalAlbum({ name: name.trim() });
       if (!album) {
-        showToast('Failed to create album', 'error');
+        showToast('Failed to create album: No data returned', 'error');
         return;
       }
 
       const added = await ImageSetService.addImagesToSet(album.id, Array.from(selectedPhotos));
       if (added === 0) {
-        showToast('No new photos were added.', 'info');
+        showToast('Album created but no new photos were added.', 'info');
       } else {
         showToast(`Created album "${name}" and added ${added} photo${added > 1 ? 's' : ''}.`, 'success');
         setSelectedPhotos(new Set());
       }
 
       await loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create album:', error);
-      showToast('Failed to create album.', 'error');
+      const message = error?.message || error?.toString() || 'Failed to create album. Check console for details.';
+      showToast(message, 'error');
+      
+      // If it's a database constraint error, suggest running migration
+      if (message.includes('violates') || message.includes('constraint') || message.includes('null')) {
+        console.error('Database schema issue detected. Make sure migration 20250125000000_fix_personal_albums_schema.sql has been applied.');
+      }
     }
   };
 
