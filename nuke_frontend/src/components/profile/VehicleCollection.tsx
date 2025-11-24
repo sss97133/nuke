@@ -21,29 +21,34 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
     try {
       setLoading(true);
       
-      // Load vehicles associated with this user
-      // For public profiles, only show public vehicles
-      // For own profile, show all vehicles
-      const { data, error } = await supabase
+      // Load vehicles the user owns (user_id) or has verified ownership of
+      let query = supabase
         .from('vehicles')
         .select(`
           *,
-          vehicle_images!inner(image_url, is_primary)
+          vehicle_images(image_url, is_primary)
         `)
-        .eq('user_id', userId)
-        .eq(isOwnProfile ? 'user_id' : 'is_public', isOwnProfile ? userId : true)
+        .eq('user_id', userId);
+
+      // For public profiles, only show public vehicles
+      if (!isOwnProfile) {
+        query = query.eq('is_public', true);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
 
-      // Get primary images for each vehicle
+      // Get primary images for each vehicle (vehicles without images are still included)
       const vehiclesWithImages = (data || []).map(vehicle => {
-        const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
+        const images = vehicle.vehicle_images || [];
+        const primaryImage = images.find((img: any) => img.is_primary) || images[0];
         return {
           ...vehicle,
           image_url: primaryImage?.image_url,
-          image_count: vehicle.vehicle_images?.length || 0
+          image_count: images.length
         };
       });
 
