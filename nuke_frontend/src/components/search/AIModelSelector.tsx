@@ -67,12 +67,23 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
       
       setSession(session);
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('user_ai_providers')
         .select('*')
         .eq('user_id', session.user.id)
         .eq('is_active', true)
         .order('is_default', { ascending: false });
+
+      // Handle table not existing (404) gracefully
+      if (error && error.code === 'PGRST301') {
+        // Table doesn't exist yet, just use default models
+        return;
+      }
+
+      if (error) {
+        console.error('Error loading user AI providers:', error);
+        return;
+      }
 
       if (data) {
         setUserProviders(data);

@@ -291,14 +291,24 @@ const CursorHomepage: React.FC = () => {
     
     // Load user preference
     if (currentSession?.user) {
-      const { data: prefs } = await supabase
-        .from('user_preferences')
-        .select('settings')
-        .eq('user_id', currentSession.user.id)
-        .maybeSingle();
-      
-      if (prefs?.settings?.preferred_time_period) {
-        setTimePeriod(prefs.settings.preferred_time_period);
+      try {
+        const { data: prefs, error: prefsError } = await supabase
+          .from('user_preferences')
+          .select('settings')
+          .eq('user_id', currentSession.user.id)
+          .maybeSingle();
+        
+        // Handle table not existing gracefully
+        if (prefsError && prefsError.code !== 'PGRST116' && prefsError.code !== 'PGRST301') {
+          console.warn('Error loading user preferences:', prefsError);
+        }
+        
+        if (prefs?.settings?.preferred_time_period) {
+          setTimePeriod(prefs.settings.preferred_time_period);
+        }
+      } catch (err) {
+        // Table might not exist, ignore
+        console.debug('user_preferences table may not exist');
       }
     }
   };
@@ -656,12 +666,22 @@ const CursorHomepage: React.FC = () => {
         } as any
       );
 
-      await supabase
+      const { error } = await supabase
         .from('user_preferences')
         .upsert({
           user_id: session.user.id,
           settings: { preferred_time_period: period }
         }, { onConflict: 'user_id' });
+      
+      // Handle table not existing gracefully
+      if (error && error.code === 'PGRST301') {
+        console.warn('user_preferences table does not exist yet');
+        return;
+      }
+      
+      if (error) {
+        console.error('Error saving user preferences:', error);
+      }
     }
   };
 

@@ -35,24 +35,33 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
     if (!session?.user?.id) return;
     
     const loadBalance = async () => {
-      const { data, error } = await supabase
-        .from('user_cash_balances')
-        .select('available_cents, reserved_cents as pending_cents')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error loading balance:', error);
-        // If no row exists, set balance to 0
-        if (error.code === 'PGRST116') {
+      try {
+        const { data, error } = await supabase
+          .from('user_cash_balances')
+          .select('available_cents, reserved_cents')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        if (error) {
+          // If no row exists, set balance to 0
+          if (error.code === 'PGRST116' || error.code === 'PGRST301') {
+            setBalance({ available_cents: 0, pending_cents: 0 });
+            return;
+          }
+          console.error('Error loading balance:', error);
           setBalance({ available_cents: 0, pending_cents: 0 });
+          return;
         }
-        return;
+        
+        // Map reserved_cents to pending_cents
+        setBalance({
+          available_cents: data?.available_cents ?? 0,
+          pending_cents: data?.reserved_cents ?? 0
+        });
+      } catch (err) {
+        console.error('Error loading balance:', err);
+        setBalance({ available_cents: 0, pending_cents: 0 });
       }
-      
-      console.log('Balance loaded:', data);
-      // Set balance (or 0 if no data)
-      setBalance(data || { available_cents: 0, pending_cents: 0 });
     };
 
     loadBalance();
