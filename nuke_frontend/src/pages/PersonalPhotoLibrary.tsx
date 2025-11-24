@@ -3,6 +3,7 @@
  * 
  * Goal: Organize 30,000 photos into vehicle profiles as fast as possible
  * Design: Full-screen photos, clickable sidebar, minimal UI
+ * Version: 2.0
  */
 
 import React, { useState, useEffect } from 'react';
