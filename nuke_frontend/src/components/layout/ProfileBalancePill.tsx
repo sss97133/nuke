@@ -102,12 +102,12 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
   const capsuleWidth = expanded ? balanceWidth + circleSize : circleSize;
 
   return (
-    <div ref={menuRef} style={{ position: 'relative' }}>
+    <div ref={menuRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
       {/* The Capsule */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'stretch',
+          alignItems: 'center',
           width: `${capsuleWidth}px`,
           height: `${circleSize}px`,
           backgroundColor: '#1a1a1a',
@@ -135,7 +135,9 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
               fontSize: '10pt',
               fontWeight: 700,
               fontFamily: '"MS Sans Serif", sans-serif',
-              userSelect: 'none'
+              userSelect: 'none',
+              height: '100%',
+              paddingLeft: '12px'
             }}
           >
             ${amount}
