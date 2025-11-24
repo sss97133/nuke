@@ -228,9 +228,10 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '24pt'
+                        fontSize: '8pt',
+                        color: 'var(--text-muted)'
                       }}>
-                        📷
+                        No Image
                       </div>
                     )}
                     <div style={{ padding: 'var(--space-2)', background: 'var(--white)' }}>
