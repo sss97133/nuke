@@ -170,23 +170,59 @@ export class ImageSetService {
       throw new Error('Must be logged in to create personal albums');
     }
 
+    const userId = session.session.user.id;
+
+    // Ensure profile exists (profiles.id = auth.users.id, so we can use user ID directly)
+    // But let's verify the profile exists first
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    // If profile doesn't exist, create it
+    if (profileError && profileError.code === 'PGRST116') {
+      const { error: createProfileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: session.session.user.email || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (createProfileError) {
+        console.warn('Could not create profile, continuing anyway:', createProfileError);
+      }
+    }
+
+    // Create the personal album
     const { data, error } = await supabase
       .from('image_sets')
       .insert({
-        created_by: session.session.user.id,
-        user_id: session.session.user.id,
+        created_by: userId, // profiles.id = auth.users.id
+        user_id: userId,
         is_personal: true,
+        vehicle_id: null, // Explicitly set to null for personal albums
         name: params.name,
         description: params.description,
         color: params.color || '#808080',
-        icon: params.icon
+        icon: params.icon,
+        is_primary: false,
+        display_order: 0
       })
       .select()
       .single();
 
     if (error) {
       console.error('Error creating personal album:', error);
-      throw error;
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw new Error(`Failed to create album: ${error.message}`);
     }
 
     return data;
