@@ -3119,6 +3119,14 @@ body {
   .header-right {
     flex: 0 0 auto;
   }
+  
+  /* Keep mobile nav hidden since we removed it */
+  .mobile-nav {
+    display: none !important;
+  }
+  
+  .mobile-menu-button {
+    display: none !important;
   }
 
   /* Base Layout Adjustments */
