@@ -21,7 +21,7 @@ jobs:
           node-version: '20'
       
       - name: Install dependencies
-        run: npm install
+        run: cd scripts && npm install
       
       - name: Run expiration script
         env:
