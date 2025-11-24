@@ -161,8 +161,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           </div>
 
           <div className="header-right">
-            {/* Global Search - keeps search bar stable and out of rotating verb header */}
-            <div style={{ minWidth: '260px', maxWidth: '360px' }}>
+            {/* Global Search - compact to fit in header */}
+            <div style={{ minWidth: '200px', maxWidth: '300px', flex: '1 1 auto' }}>
               <VehicleSearch />
             </div>
 
