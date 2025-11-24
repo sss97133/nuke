@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ImageUploadService } from '../../services/imageUploadService';
 import { globalUploadStatusService } from '../../services/globalUploadStatusService';
@@ -125,7 +125,8 @@ const ImageGallery = ({
 
   // Infinite scroll observer
   useEffect(() => {
-    if (!infiniteScrollEnabled || !sentinelRef.current) return;
+    if (!infiniteScrollEnabled || !sentinelRef.current || !showImages) return;
+    if (displayedImages.length >= allImages.length) return; // All images already loaded
     
     const observer = new IntersectionObserver(
       (entries) => {
@@ -134,12 +135,12 @@ const ImageGallery = ({
           loadMoreImages();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1, rootMargin: '100px' }
     );
     
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [infiniteScrollEnabled, loadingMore, displayedImages.length, allImages.length]);
+  }, [infiniteScrollEnabled, loadingMore, displayedImages.length, allImages.length, showImages, loadMoreImages]);
 
   // Check authentication and permissions
   useEffect(() => {
@@ -493,7 +494,14 @@ const ImageGallery = ({
   const getDisplayDate = (image: any) => {
     // Use taken_at (when photo was taken) if available, otherwise fall back to created_at (when uploaded)
     const displayDate = image.taken_at || image.created_at;
-    return new Date(displayDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!displayDate) return 'No date';
+    try {
+      const date = new Date(displayDate);
+      if (isNaN(date.getTime())) return 'Invalid date';
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return 'Invalid date';
+    }
   };
 
   const handleShowImages = () => {
@@ -501,7 +509,9 @@ const ImageGallery = ({
     loadMoreImages();
   };
 
-  const loadMoreImages = () => {
+  const loadMoreImages = useCallback(() => {
+    if (loadingMore || displayedImages.length >= allImages.length) return;
+    
     if (!infiniteScrollEnabled) {
       // First click - enable infinite scroll
       setInfiniteScrollEnabled(true);
@@ -530,7 +540,7 @@ const ImageGallery = ({
       });
       setLoadingMore(false);
     }, 300); // Small delay for smooth UX
-  };
+  }, [loadingMore, displayedImages.length, allImages.length, infiniteScrollEnabled, sortBy, allImages, imagesPerPage]);
 
   const getSortedImages = () => {
     if (sortBy === 'quality') {
@@ -785,6 +795,11 @@ const ImageGallery = ({
     if (!exif || !exif.location) return '';
     const loc = exif.location;
     if (typeof loc === 'string') return loc;
+    // Handle location object with latitude/longitude (coordinates only)
+    if (loc.latitude && loc.longitude && !loc.city && !loc.state) {
+      return `${loc.latitude.toFixed?.(4) || loc.latitude}, ${loc.longitude.toFixed?.(4) || loc.longitude}`;
+    }
+    // Handle location object with city/state/country
     const parts = [
       loc.city || loc.nearest_city || '',
       loc.state || loc.region || '',
@@ -1274,11 +1289,18 @@ const ImageGallery = ({
                 {/* Everything else on one line */}
                 <div style={{ fontSize: '6pt', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {getCameraText(image.exif_data) && <span>{getCameraText(image.exif_data)}</span>}
-                  {getCameraText(image.exif_data) && (getLocationText(image.exif_data) || image.exif_data?.gps) && <span> • </span>}
-                  {getLocationText(image.exif_data) && <span>{getLocationText(image.exif_data)}</span>}
-                  {!image.exif_data?.location && image.exif_data?.gps && image.exif_data.gps.latitude && image.exif_data.gps.longitude && (
-                    <span>{image.exif_data.gps.latitude.toFixed?.(2)}, {image.exif_data.gps.longitude.toFixed?.(2)}</span>
-                  )}
+                  {(() => {
+                    const locationText = getLocationText(image.exif_data);
+                    const hasGps = image.exif_data?.gps && image.exif_data.gps.latitude && image.exif_data.gps.longitude;
+                    const gpsText = hasGps ? `${image.exif_data.gps.latitude.toFixed?.(2) || image.exif_data.gps.latitude}, ${image.exif_data.gps.longitude.toFixed?.(2) || image.exif_data.gps.longitude}` : null;
+                    const finalLocationText = locationText || gpsText;
+                    return (
+                      <>
+                        {getCameraText(image.exif_data) && finalLocationText && <span> • </span>}
+                        {finalLocationText && <span>{finalLocationText}</span>}
+                      </>
+                    );
+                  })()}
                   {typeof imageViewCounts[image.id] === 'number' && imageViewCounts[image.id] > 0 && <span> • {imageViewCounts[image.id]}v</span>}
                   {typeof imageCommentCounts[image.id] === 'number' && imageCommentCounts[image.id] > 0 && <span> • {imageCommentCounts[image.id]}c</span>}
                   {imageTagCounts[image.id] && <span> • {imageTagCounts[image.id]}t</span>}
