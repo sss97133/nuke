@@ -92,6 +92,7 @@ import ExtractionReview from './pages/ExtractionReview';
 import InvestmentOpportunities from './pages/InvestmentOpportunities';
 import AdminMissionControl from './pages/AdminMissionControl';
 import { PersonalPhotoLibrary } from './pages/PersonalPhotoLibrary';
+import Capsule from './pages/Capsule';
 
 // Financial & Accounting components
 import InvoiceManager from './pages/InvoiceManager';
@@ -386,6 +387,7 @@ function App() {
 
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/:userId" element={<Profile />} />
+            <Route path="/capsule" element={<Capsule />} />
             <Route path="/ghost-user/:ghostUserId" element={<GhostUserProfile />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />

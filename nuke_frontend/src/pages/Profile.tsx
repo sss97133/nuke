@@ -31,9 +31,11 @@ import EditableField from '../components/editable/EditableField';
 import { ProfileService } from '../services/profileService';
 import { ProfileActivityService } from '../services/profileActivityService';
 import type { ProfileData, ProfileEditForm } from '../types/profile';
-import VehicleActivityTimeline from '../components/profile/VehicleActivityTimeline';
 import ContributionTimeline from '../components/profile/ContributionTimeline';
 import ProfessionalToolbox from '../components/profile/ProfessionalToolbox';
+import VehicleCollection from '../components/profile/VehicleCollection';
+import PublicImageGallery from '../components/profile/PublicImageGallery';
+import KnowledgeLibrary from '../components/profile/KnowledgeLibrary';
 import { ProfileVerification } from '../components/ProfileVerification';
 import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
@@ -52,7 +54,7 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'achievements' | 'stats' | 'professional' | 'organizations' | 'photos' | 'financials' | 'duplicates' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'collection' | 'gallery' | 'professional' | 'organizations'>('overview');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
@@ -508,14 +510,11 @@ const Profile: React.FC = () => {
         }}>
           {[
             { key: 'overview', label: 'Overview' },
-            { key: 'activity', label: 'Activity' },
+            { key: 'collection', label: 'Collection', public: true },
+            { key: 'gallery', label: 'Gallery', public: true },
             { key: 'professional', label: 'Professional' },
-            { key: 'organizations', label: 'Organizations' },
-            ...(isOwnProfile ? [{ key: 'photos', label: 'Photos' }] : []),
-            ...(isOwnProfile ? [{ key: 'financials', label: 'Financials' }] : []),
-            ...(isOwnProfile ? [{ key: 'duplicates', label: 'Duplicates' }] : []),
-            ...(isOwnProfile ? [{ key: 'settings', label: 'Settings' }] : [])
-          ].map((tab) => (
+            { key: 'organizations', label: 'Organizations' }
+          ].filter(tab => tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations').map((tab) => (
             <button
               key={tab.key}
               className="text-small"
@@ -548,7 +547,7 @@ const Profile: React.FC = () => {
         <div className="profile-content">
             {activeTab === 'overview' && (
               <div className="section">
-                {/* Contribution Heatmap */}
+                {/* Contribution Timeline - Forefront */}
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <ContributionTimeline
                     key={`contributions-${(profileData.recentContributions || []).length}`}
@@ -557,8 +556,7 @@ const Profile: React.FC = () => {
                   />
                 </div>
 
-                
-                {/* Live Player */}
+                {/* Live Player/Streaming */}
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <LivePlayer userId={profile.id} isOwnProfile={isOwnProfile} />
                 </div>
@@ -566,9 +564,15 @@ const Profile: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'activity' && (
+            {activeTab === 'collection' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <VehicleActivityTimeline userId={profile.id} />
+                <VehicleCollection userId={profile.id} isOwnProfile={isOwnProfile} />
+              </div>
+            )}
+
+            {activeTab === 'gallery' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <PublicImageGallery userId={profile.id} isOwnProfile={isOwnProfile} />
               </div>
             )}
             
@@ -580,6 +584,12 @@ const Profile: React.FC = () => {
             
             {activeTab === 'organizations' && (
               <OrganizationAffiliations userId={profile.id} isOwnProfile={isOwnProfile} />
+            )}
+
+            {activeTab === 'overview' && isOwnProfile && (
+              <div style={{ marginTop: 'var(--space-4)' }}>
+                <KnowledgeLibrary userId={profile.id} isOwnProfile={isOwnProfile} />
+              </div>
             )}
             
             {activeTab === 'photos' && isOwnProfile && (
