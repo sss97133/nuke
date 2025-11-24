@@ -14,7 +14,9 @@
     "dev:frontend": "cd nuke_frontend && npm run dev",
     "dev:backend": "cd nuke_api && mix phx.server",
     "build:frontend": "cd nuke_frontend && npm run build",
-    "test:frontend": "cd nuke_frontend && npm test"
+    "test:frontend": "cd nuke_frontend && npm test",
+    "predeploy": "cd nuke_frontend && npm run build",
+    "validate:deploy": "./scripts/pre-commit-check.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.62.0",

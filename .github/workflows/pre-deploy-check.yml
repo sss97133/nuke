@@ -1,0 +1,75 @@
+name: Pre-Deploy Validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: nuke_frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./nuke_frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: ./nuke_frontend
+        run: npm run type-check || npx tsc --noEmit --skipLibCheck
+
+      - name: Lint check
+        working-directory: ./nuke_frontend
+        run: npm run lint || echo "Linting issues found but continuing..."
+
+      - name: Build check
+        working-directory: ./nuke_frontend
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
+
+      - name: Check for missing imports
+        run: |
+          echo "Checking for common build issues..."
+          # Check if parts components exist
+          if [ ! -f "nuke_frontend/src/components/parts/SpatialPartPopup.tsx" ]; then
+            echo "❌ Missing: SpatialPartPopup.tsx"
+            exit 1
+          fi
+          if [ ! -f "nuke_frontend/src/components/parts/PartCheckoutModal.tsx" ]; then
+            echo "❌ Missing: PartCheckoutModal.tsx"
+            exit 1
+          fi
+          if [ ! -f "nuke_frontend/src/components/parts/PartEnrichmentModal.tsx" ]; then
+            echo "❌ Missing: PartEnrichmentModal.tsx"
+            exit 1
+          fi
+          if [ ! -f "nuke_frontend/src/components/parts/ClickablePartModal.tsx" ]; then
+            echo "❌ Missing: ClickablePartModal.tsx"
+            exit 1
+          fi
+          echo "✅ All required files present"
+
+      - name: Verify TypeScript config
+        run: |
+          if ! grep -q '"baseUrl"' nuke_frontend/tsconfig.app.json; then
+            echo "❌ Missing baseUrl in tsconfig.app.json"
+            exit 1
+          fi
+          if ! grep -q '"@/\*"' nuke_frontend/tsconfig.app.json; then
+            echo "❌ Missing @/* path mapping in tsconfig.app.json"
+            exit 1
+          fi
+          echo "✅ TypeScript config valid"
+

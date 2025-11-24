@@ -211,7 +211,7 @@ const CursorHomepage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
-  const [viewMode, setViewMode] = useState<ViewMode>('technical');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showFilters, setShowFilters] = useState(false);
@@ -235,6 +235,8 @@ const CursorHomepage: React.FC = () => {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [filterBarMinimized, setFilterBarMinimized] = useState(false);
   const [scrollY, setScrollY] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -321,15 +323,34 @@ const CursorHomepage: React.FC = () => {
   const loadHypeFeed = async () => {
     try {
       setLoading(true);
+      setError(null);
       const timeFilter = getTimePeriodFilter();
 
-      // OPTIMIZED: Single query with LEFT join (includes vehicles without images)
-      // Now includes all price fields for smart pricing hierarchy
+      // Check Supabase connection first
+      const { data: healthCheck, error: healthError } = await supabase
+        .from('vehicles')
+        .select('id')
+        .limit(1);
+
+      if (healthError) {
+        console.error('❌ Supabase connection error:', healthError);
+        setError(`Database connection failed: ${healthError.message}`);
+        setDebugInfo({
+          error: healthError.message,
+          code: healthError.code,
+          details: healthError.details,
+          hint: healthError.hint
+        });
+        setFeedVehicles([]);
+        setLoading(false);
+        return;
+      }
+
+      // Query vehicles first (without embedded images to avoid relationship ambiguity)
       let query = supabase
         .from('vehicles')
         .select(`
-          id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, view_count, created_at, updated_at, mileage, vin,
-          vehicle_images(id, thumbnail_url, medium_url, image_url, is_primary, created_at)
+          id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, view_count, created_at, updated_at, mileage, vin
         `)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
@@ -339,13 +360,65 @@ const CursorHomepage: React.FC = () => {
         query = query.gte('updated_at', timeFilter);
       }
 
-      const { data: vehicles } = await query;
-      if (!vehicles) return;
+      const { data: vehicles, error } = await query;
+      
+      console.log('🔍 LoadHypeFeed Debug:', {
+        timePeriod,
+        timeFilter,
+        vehicleCount: vehicles?.length || 0,
+        error: error?.message,
+        hasSupabaseUrl: !!import.meta.env.VITE_SUPABASE_URL,
+        hasSupabaseKey: !!import.meta.env.VITE_SUPABASE_ANON_KEY
+      });
 
-      // Process joined data: each vehicle has vehicle_images array
+      if (error) {
+        console.error('❌ Error loading vehicles:', error);
+        setError(`Failed to load vehicles: ${error.message}`);
+        setDebugInfo({
+          error: error.message,
+          code: error.code,
+          details: error.details
+        });
+        setFeedVehicles([]);
+        setLoading(false);
+        return;
+      }
+      
+      if (!vehicles || vehicles.length === 0) {
+        console.warn('⚠️ No vehicles found with is_public=true');
+        setFeedVehicles([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch images separately for each vehicle to avoid relationship ambiguity
+      const vehicleIds = vehicles?.map((v: any) => v.id) || [];
+      
+      // Get all images for these vehicles in one query
+      const { data: allImages, error: imagesError } = await supabase
+        .from('vehicle_images')
+        .select('id, vehicle_id, thumbnail_url, medium_url, image_url, is_primary, created_at')
+        .in('vehicle_id', vehicleIds)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (imagesError) {
+        console.warn('Error loading images:', imagesError);
+      }
+
+      // Group images by vehicle_id
+      const imagesByVehicle = new Map<string, any[]>();
+      (allImages || []).forEach((img: any) => {
+        if (!imagesByVehicle.has(img.vehicle_id)) {
+          imagesByVehicle.set(img.vehicle_id, []);
+        }
+        imagesByVehicle.get(img.vehicle_id)!.push(img);
+      });
+
+      // Process vehicles with their images
       const enriched = vehicles.map((v: any) => {
-        // Extract and sort images
-        const images = Array.isArray(v.vehicle_images) ? v.vehicle_images : (v.vehicle_images ? [v.vehicle_images] : []);
+        // Get images for this vehicle
+        const images = imagesByVehicle.get(v.id) || [];
         
         const all_images = images
           .map((img: any) => ({
@@ -448,8 +521,15 @@ const CursorHomepage: React.FC = () => {
         activeToday: activeCount
       });
 
-    } catch (error) {
-      console.error('Error loading hype feed:', error);
+    } catch (error: any) {
+      console.error('❌ Unexpected error loading hype feed:', error);
+      setError(`Unexpected error: ${error?.message || 'Unknown error'}`);
+      setDebugInfo({
+        error: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      });
+      setFeedVehicles([]);
     } finally {
       setLoading(false);
     }
@@ -615,26 +695,22 @@ const CursorHomepage: React.FC = () => {
         margin: '0 auto',
         padding: 'var(--space-4)'
       }}>
-        {/* Global Vehicle Search */}
-        <div style={{ 
-          marginBottom: 'var(--space-4)',
-          display: 'flex',
-          justifyContent: 'center'
-        }}>
-          <VehicleSearch />
-        </div>
-
-        {/* Feed Header */}
+        {/* Unified Header with Search */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 'var(--space-3)',
-          flexWrap: 'wrap',
-          gap: '12px'
+          background: 'var(--white)',
+          border: '2px solid var(--border)',
+          padding: 'var(--space-3)',
+          marginBottom: 'var(--space-4)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0, minWidth: '120px' }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 'var(--space-3)',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0 }}>
               <span style={{ 
                 transition: 'opacity 0.3s ease',
                 display: 'inline-block'
@@ -643,6 +719,24 @@ const CursorHomepage: React.FC = () => {
               </span>
             </h2>
             
+            <div style={{ flex: 1, maxWidth: '400px', margin: '0 auto' }}>
+              <VehicleSearch />
+            </div>
+            
+            <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+              {filteredVehicles.length} vehicles
+            </div>
+          </div>
+            
+          {/* Controls Row */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px', 
+            flexWrap: 'wrap',
+            borderTop: '1px solid var(--border)',
+            paddingTop: 'var(--space-2)'
+          }}>
             {/* Time Period Selector - Collapsible */}
             <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
               {[
@@ -662,15 +756,14 @@ const CursorHomepage: React.FC = () => {
                     key={period.id}
                     onClick={() => {
                       if (isSelected) {
-                        // Toggle collapse when clicking selected button
                         setTimePeriodCollapsed(!timePeriodCollapsed);
                       } else {
                         handleTimePeriodChange(period.id as TimePeriod);
-                        setTimePeriodCollapsed(false); // Expand when changing
+                        setTimePeriodCollapsed(false);
                       }
                     }}
                     style={{
-                      background: isSelected ? 'var(--text)' : 'var(--white)',
+                      background: isSelected ? 'var(--grey-600)' : 'var(--white)',
                       color: isSelected ? 'var(--white)' : 'var(--text)',
                       border: '1px solid var(--border)',
                       padding: '3px 6px',
@@ -694,7 +787,7 @@ const CursorHomepage: React.FC = () => {
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   style={{
-                    background: viewMode === mode ? 'var(--text)' : 'var(--white)',
+                    background: viewMode === mode ? 'var(--grey-600)' : 'var(--white)',
                     color: viewMode === mode ? 'var(--white)' : 'var(--text)',
                     border: '1px solid var(--border)',
                     padding: '4px 8px',
@@ -713,7 +806,7 @@ const CursorHomepage: React.FC = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               style={{
-                background: showFilters ? 'var(--text)' : 'var(--white)',
+                background: showFilters ? 'var(--grey-600)' : 'var(--white)',
                 color: showFilters ? 'var(--white)' : 'var(--text)',
                 border: '1px solid var(--border)',
                 padding: '4px 8px',
@@ -725,10 +818,6 @@ const CursorHomepage: React.FC = () => {
             >
               Filters {(filters.yearMin || filters.yearMax || filters.makes.length > 0 || filters.hasImages || filters.forSale) && '●'}
             </button>
-          </div>
-
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-            {filteredVehicles.length} vehicles
           </div>
         </div>
 
@@ -1383,7 +1472,42 @@ const CursorHomepage: React.FC = () => {
         </div>
         )}
 
-        {feedVehicles.length === 0 && !loading && (
+        {/* Error Display */}
+        {error && (
+          <div style={{
+            background: '#fee',
+            border: '2px solid #f00',
+            padding: 'var(--space-8)',
+            margin: 'var(--space-4)',
+            textAlign: 'left'
+          }}>
+            <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: '#c00' }}>
+              ⚠️ Error Loading Content
+            </div>
+            <div style={{ fontSize: '9pt', color: '#800', marginBottom: '8px' }}>
+              {error}
+            </div>
+            {debugInfo && (
+              <details style={{ fontSize: '8pt', color: '#666', marginTop: '8px' }}>
+                <summary style={{ cursor: 'pointer', marginBottom: '4px' }}>Debug Info</summary>
+                <pre style={{ 
+                  background: '#fff', 
+                  padding: '8px', 
+                  border: '1px solid #ddd',
+                  overflow: 'auto',
+                  fontSize: '7pt'
+                }}>
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              </details>
+            )}
+            <div style={{ fontSize: '8pt', color: '#666', marginTop: '8px' }}>
+              Check browser console for more details. Verify environment variables are set in Vercel.
+            </div>
+          </div>
+        )}
+
+        {filteredVehicles.length === 0 && !loading && !error && (
           <div style={{
             background: 'var(--white)',
             border: '2px solid var(--border)',
@@ -1391,25 +1515,30 @@ const CursorHomepage: React.FC = () => {
             textAlign: 'center'
           }}>
             <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
-              No vehicles yet
+              No vehicles found
             </div>
             <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Be the first to add a build and start the hype train!
+              {feedVehicles.length === 0 
+                ? 'Be the first to add a build and start the hype train!'
+                : 'Try adjusting your filters to see more results.'
+              }
             </div>
-            <button
-              onClick={() => navigate('/add-vehicle')}
-              style={{
-                background: 'var(--text)',
-                color: 'var(--white)',
-                border: '2px outset var(--border)',
-                padding: '8px 16px',
-                fontSize: '9pt',
-                cursor: 'pointer',
-                fontFamily: '"MS Sans Serif", sans-serif'
-              }}
-            >
-              Add Your First Vehicle
-            </button>
+            {feedVehicles.length === 0 && (
+              <button
+                onClick={() => navigate('/add-vehicle')}
+                style={{
+                  background: 'var(--grey-600)',
+                  color: 'var(--white)',
+                  border: '2px solid var(--border)',
+                  padding: '8px 16px',
+                  fontSize: '9pt',
+                  cursor: 'pointer',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+              >
+                Add Your First Vehicle
+              </button>
+            )}
           </div>
         )}
       </div>

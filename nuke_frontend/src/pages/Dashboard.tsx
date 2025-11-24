@@ -59,7 +59,7 @@ export default function Dashboard() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
 
-      // Load user's vehicles
+      // Load user's vehicles - try both uploaded_by and user_id for compatibility
       const { data: vehiclesData, error: vehiclesError } = await supabase
         .from('vehicles')
         .select(`
@@ -72,10 +72,15 @@ export default function Dashboard() {
           image_count,
           primary_image_url
         `)
-        .eq('uploaded_by', session.user.id)
+        .or(`uploaded_by.eq.${session.user.id},user_id.eq.${session.user.id}`)
         .order('created_at', { ascending: false });
 
-      if (vehiclesError) throw vehiclesError;
+      if (vehiclesError) {
+        console.error('Error loading vehicles:', vehiclesError);
+        throw vehiclesError;
+      }
+      
+      console.log('Loaded vehicles:', vehiclesData?.length || 0, vehiclesData);
       setVehicles(vehiclesData || []);
 
       // Load recent activity from timeline_events
