@@ -344,6 +344,7 @@ const Profile: React.FC = () => {
           <div style={{
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             gap: 'var(--space-3)',
             padding: 'var(--space-3)',
             marginBottom: 'var(--space-4)',
@@ -351,12 +352,13 @@ const Profile: React.FC = () => {
             borderRadius: '4px',
             border: '1px solid var(--border-light)'
           }}>
-            {/* Avatar - Circular */}
-            <div style={{
-              width: '48px',
-              height: '48px',
-              flexShrink: 0
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
+              {/* Avatar - Circular - Larger */}
+              <div style={{
+                width: '64px',
+                height: '64px',
+                flexShrink: 0
+              }}>
               <input
                 ref={avatarInputRef}
                 type="file"
@@ -395,7 +397,12 @@ const Profile: React.FC = () => {
                   <img
                     src={profile.avatar_url}
                     alt={`${profile.full_name || 'User'}'s avatar`}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
                   />
                 ) : (
                   <div style={{ 
@@ -414,15 +421,16 @@ const Profile: React.FC = () => {
               </div>
             </div>
             
-            {/* Username */}
-            <div style={{ flex: 1 }}>
-              <h2 className="text font-bold" style={{ margin: 0 }}>
-                @{profile.username || 'username'}
-              </h2>
+              {/* Username */}
+              <div style={{ flex: 1 }}>
+                <h2 className="text font-bold" style={{ margin: 0 }}>
+                  @{profile.username || 'username'}
+                </h2>
+              </div>
             </div>
 
             {/* Action buttons */}
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               {isOwnProfile && (
                 <button
                   className="button button-small"

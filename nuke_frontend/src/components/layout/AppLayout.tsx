@@ -161,8 +161,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           </div>
 
           <div className="header-right">
-            {/* Global Search - compact to fit in header */}
-            <div style={{ minWidth: '200px', maxWidth: '300px', flex: '1 1 auto' }}>
+            {/* Global Search - half width to fit in header */}
+            <div style={{ minWidth: '100px', maxWidth: '150px', flex: '0 0 auto' }}>
               <VehicleSearch />
             </div>
 

@@ -23,9 +23,9 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
   selectedProvider
 }) => {
   const [availableModels, setAvailableModels] = useState<AIModel[]>([
-    { provider: 'openai', modelName: 'gpt-4o', displayName: 'GPT-4o', icon: '🤖', enabled: false },
-    { provider: 'anthropic', modelName: 'claude-3-5-sonnet-20241022', displayName: 'Claude 3.5', icon: '🧠', enabled: false },
-    { provider: 'custom', modelName: 'custom', displayName: 'Custom', icon: '⚙️', enabled: false }
+    { provider: 'openai', modelName: 'gpt-4o', displayName: 'GPT-4o', icon: '', enabled: false },
+    { provider: 'anthropic', modelName: 'claude-3-5-sonnet-20241022', displayName: 'Claude 3.5', icon: '', enabled: false },
+    { provider: 'custom', modelName: 'custom', displayName: 'Custom', icon: '', enabled: false }
   ]);
   const [userProviders, setUserProviders] = useState<any[]>([]);
   const [session, setSession] = useState<any>(null);
@@ -71,7 +71,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
             provider: 'custom' as AIProvider,
             modelName: p.model_name,
             displayName: p.model_name,
-            icon: '⚙️',
+            icon: '',
             enabled: false
           }));
         setAvailableModels(prev => [...prev.filter(m => m.provider !== 'custom'), ...customModels]);
@@ -94,7 +94,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
   };
 
   const enabledModel = availableModels.find(m => m.enabled);
-  const buttonIcon = enabledModel ? enabledModel.icon : '⚙️';
+  const buttonText = enabledModel ? enabledModel.displayName.substring(0, 3).toUpperCase() : 'AI';
 
   return (
     <div ref={dropdownRef} style={{ position: 'relative' }}>
@@ -103,7 +103,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
         onClick={() => setShowDropdown(!showDropdown)}
         style={{
           padding: '4px 8px',
-          fontSize: '8pt',
+          fontSize: '7pt',
           border: '1px solid var(--border)',
           background: enabledModel ? 'var(--primary-dim)' : 'var(--white)',
           cursor: 'pointer',
@@ -112,11 +112,12 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
           height: '24px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          fontWeight: 'bold'
         }}
         title="AI Model"
       >
-        {buttonIcon}
+        {buttonText}
       </button>
 
       {/* Dropdown Menu */}
@@ -131,7 +132,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
             border: '2px solid var(--border)',
             borderRadius: '4px',
             boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
-            zIndex: 1000,
+            zIndex: 10000,
             padding: '4px'
           }}
         >
@@ -152,7 +153,6 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>{model.icon}</span>
                 <span>{model.displayName}</span>
               </div>
               <div style={{

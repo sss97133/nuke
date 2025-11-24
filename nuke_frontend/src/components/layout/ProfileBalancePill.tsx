@@ -166,6 +166,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
+                objectPosition: 'center',
                 display: 'block'
               }}
             />
