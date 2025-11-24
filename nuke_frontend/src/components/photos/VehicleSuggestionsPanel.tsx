@@ -23,15 +23,16 @@ export const VehicleSuggestionsPanel: React.FC<VehicleSuggestionsPanelProps> = (
 
   if (suggestions.length === 0) {
     return (
-      <div style={{
-        textAlign: 'center',
-        padding: '80px 20px',
-        color: '#666'
-      }}>
-        <div style={{ fontSize: '48px', marginBottom: '20px' }}>🤖</div>
-        <div style={{ fontSize: '18px', marginBottom: '10px' }}>No AI Suggestions Yet</div>
-        <div style={{ fontSize: '14px' }}>
-          Upload photos and AI will automatically group them by vehicle
+      <div className="card">
+        <div className="card-body" style={{
+          textAlign: 'center',
+          padding: '60px 20px'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🤖</div>
+          <div className="text font-bold" style={{ fontSize: '14px', marginBottom: '8px' }}>No AI Suggestions Yet</div>
+          <div className="text text-small text-muted">
+            Upload photos and AI will automatically group them by vehicle
+          </div>
         </div>
       </div>
     );
@@ -39,51 +40,43 @@ export const VehicleSuggestionsPanel: React.FC<VehicleSuggestionsPanelProps> = (
 
   return (
     <div>
-      <div style={{ 
-        marginBottom: '30px',
-        padding: '20px',
-        background: '#1a1a1a',
-        border: '2px solid #333',
-        borderRadius: '8px'
-      }}>
-        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px', color: '#fff' }}>
-          AI Found {suggestions.length} Vehicle{suggestions.length !== 1 ? 's' : ''} in Your Photos
-        </div>
-        <div style={{ fontSize: '14px', color: '#888' }}>
-          Review each suggestion and confirm to create vehicle profiles automatically
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <div className="card-body">
+          <div className="text font-bold" style={{ marginBottom: '6px' }}>
+            AI Found {suggestions.length} Vehicle{suggestions.length !== 1 ? 's' : ''} in Your Photos
+          </div>
+          <div className="text text-small text-muted">
+            Review each suggestion and confirm to create vehicle profiles automatically
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {suggestions.map(suggestion => {
           const expanded = expandedId === suggestion.id;
           const confidencePercent = Math.round(suggestion.confidence * 100);
           const confidenceColor = 
-            confidencePercent >= 80 ? '#00c853' :
+            confidencePercent >= 80 ? 'var(--success)' :
             confidencePercent >= 50 ? '#ff9d00' :
-            '#ff4444';
+            '#dc2626';
 
           return (
             <div
               key={suggestion.id}
-              style={{
-                background: '#1a1a1a',
-                border: '2px solid #333',
-                borderRadius: '8px',
-                overflow: 'hidden'
-              }}
+              className="card"
             >
               {/* Header */}
               <div
                 onClick={() => setExpandedId(expanded ? null : suggestion.id)}
+                className="card-body"
                 style={{
-                  padding: '20px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '20px',
-                  background: expanded ? '#222' : 'transparent',
-                  transition: 'background 0.12s ease'
+                  gap: '16px',
+                  background: expanded ? 'var(--grey-100)' : 'var(--white)',
+                  transition: 'background 0.12s ease',
+                  borderBottom: expanded ? '1px solid var(--border-light)' : 'none'
                 }}
               >
                 {/* Sample Images Preview */}
@@ -94,11 +87,10 @@ export const VehicleSuggestionsPanel: React.FC<VehicleSuggestionsPanelProps> = (
                       src={img.variants?.thumbnail || img.image_url}
                       alt=""
                       style={{
-                        width: '60px',
-                        height: '60px',
+                        width: '48px',
+                        height: '48px',
                         objectFit: 'cover',
-                        borderRadius: '4px',
-                        border: '2px solid #333'
+                        border: '1px solid var(--border-medium)'
                       }}
                     />
                   ))}
@@ -106,17 +98,16 @@ export const VehicleSuggestionsPanel: React.FC<VehicleSuggestionsPanelProps> = (
 
                 {/* Info */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px', color: '#fff' }}>
+                  <div className="text font-bold" style={{ marginBottom: '2px' }}>
                     {suggestion.suggested_year} {suggestion.suggested_make} {suggestion.suggested_model}
                   </div>
-                  <div style={{ fontSize: '14px', color: '#888' }}>
+                  <div className="text text-small text-muted">
                     {suggestion.image_count} photos • Confidence: {confidencePercent}%
                   </div>
                   {suggestion.suggested_vin && (
-                    <div style={{ 
-                      marginTop: '4px',
-                      fontSize: '12px',
-                      color: '#4a9eff',
+                    <div className="text text-small" style={{ 
+                      marginTop: '2px',
+                      color: 'var(--primary)',
                       fontFamily: 'monospace'
                     }}>
                       VIN: {suggestion.suggested_vin}
@@ -126,45 +117,45 @@ export const VehicleSuggestionsPanel: React.FC<VehicleSuggestionsPanelProps> = (
 
                 {/* Confidence Badge */}
                 <div style={{
-                  padding: '8px 16px',
-                  background: confidenceColor,
-                  color: '#fff',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  borderRadius: '6px'
+                  padding: '6px 12px',
+                  background: 'var(--grey-200)',
+                  color: confidenceColor,
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  border: '1px solid var(--border-medium)'
                 }}>
                   {confidencePercent}%
                 </div>
 
                 {/* Expand Arrow */}
-                <div style={{ fontSize: '20px', color: '#666' }}>
+                <div className="text text-muted" style={{ fontSize: '16px' }}>
                   {expanded ? '▼' : '▶'}
                 </div>
               </div>
 
               {/* Expanded Content */}
               {expanded && (
-                <div style={{ padding: '20px', borderTop: '2px solid #333' }}>
+                <div className="card-body" style={{ background: 'var(--grey-50)' }}>
                   {/* Detection Method */}
-                  <div style={{ marginBottom: '20px' }}>
-                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <div className="text text-small text-muted" style={{ marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Detection Method
                     </div>
-                    <div style={{ fontSize: '14px', color: '#fff' }}>
-                      {suggestion.detection_method === 'visual_analysis' && '👁️ Visual Analysis'}
-                      {suggestion.detection_method === 'vin_detection' && '🔍 VIN Detection'}
-                      {suggestion.detection_method === 'exif_clustering' && '📊 EXIF Clustering'}
-                      {suggestion.detection_method === 'user_pattern' && '🎯 Usage Pattern'}
+                    <div className="text text-small">
+                      {suggestion.detection_method === 'visual_analysis' && 'Visual Analysis'}
+                      {suggestion.detection_method === 'vin_detection' && 'VIN Detection'}
+                      {suggestion.detection_method === 'exif_clustering' && 'EXIF Clustering'}
+                      {suggestion.detection_method === 'user_pattern' && 'Usage Pattern'}
                     </div>
                   </div>
 
                   {/* AI Reasoning */}
                   {suggestion.reasoning && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    <div style={{ marginBottom: '16px' }}>
+                      <div className="text text-small text-muted" style={{ marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         AI Reasoning
                       </div>
-                      <div style={{ fontSize: '14px', color: '#ccc', lineHeight: '1.6' }}>
+                      <div className="text text-small" style={{ lineHeight: '1.4' }}>
                         {suggestion.reasoning}
                       </div>
                     </div>
@@ -172,74 +163,62 @@ export const VehicleSuggestionsPanel: React.FC<VehicleSuggestionsPanelProps> = (
 
                   {/* All Sample Images */}
                   {suggestion.sample_images && suggestion.sample_images.length > 0 && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    <div style={{ marginBottom: '16px' }}>
+                      <div className="text text-small text-muted" style={{ marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         Sample Photos
                       </div>
                       <div style={{ 
                         display: 'grid',
                         gridTemplateColumns: 'repeat(5, 1fr)',
-                        gap: '8px'
+                        gap: '6px'
                       }}>
                         {suggestion.sample_images.map(img => (
-                          <img
+                          <div
                             key={img.id}
-                            src={img.variants?.small || img.image_url}
-                            alt=""
                             style={{
-                              width: '100%',
                               paddingBottom: '100%',
-                              objectFit: 'cover',
-                              borderRadius: '4px',
-                              border: '2px solid #333'
+                              position: 'relative',
+                              border: '1px solid var(--border-medium)',
+                              overflow: 'hidden'
                             }}
-                          />
+                          >
+                            <img
+                              src={img.variants?.small || img.image_url}
+                              alt=""
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>
                   )}
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
                     <button
                       onClick={() => onAccept(suggestion)}
+                      className="button button-primary"
                       style={{
                         flex: 1,
-                        padding: '14px',
-                        background: '#00c853',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '15px',
-                        fontWeight: '600',
-                        transition: 'all 0.12s ease'
+                        padding: '10px',
+                        fontSize: '11px'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#00e160'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = '#00c853'}
                     >
                       Accept & Create Vehicle Profile
                     </button>
                     <button
                       onClick={() => onReject(suggestion.id)}
+                      className="button button-secondary"
                       style={{
-                        padding: '14px 24px',
-                        background: '#333',
-                        color: '#fff',
-                        border: '2px solid #555',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '15px',
-                        fontWeight: '600',
-                        transition: 'all 0.12s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#ff4444';
-                        e.currentTarget.style.borderColor = '#ff4444';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#333';
-                        e.currentTarget.style.borderColor = '#555';
+                        padding: '10px 20px',
+                        fontSize: '11px'
                       }}
                     >
                       Reject

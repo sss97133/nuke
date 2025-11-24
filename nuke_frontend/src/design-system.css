@@ -3106,16 +3106,19 @@ body {
 
 /* Responsive adjustments for Mobile */
 @media (max-width: 768px) {
-  /* Show mobile menu button on mobile */
-  .mobile-menu-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  /* Hide desktop navigation on mobile - everything in capsule dropdown */
+  .desktop-nav {
+    display: none !important;
   }
 
-  /* Show mobile navigation when open */
-  .mobile-nav {
-    display: flex;
+  /* Logo and capsule stay visible */
+  .header-left {
+    flex: 0 0 auto;
+  }
+  
+  .header-right {
+    flex: 0 0 auto;
+  }
   }
 
   /* Base Layout Adjustments */

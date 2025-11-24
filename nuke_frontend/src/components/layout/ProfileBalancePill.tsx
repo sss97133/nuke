@@ -226,12 +226,18 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
             )}
           </div>
 
-          {/* Menu items */}
+          {/* Menu items - consolidated navigation */}
           {[
+            { label: 'Home', action: '/dashboard' },
+            { label: 'Vehicles', action: '/vehicles' },
+            { label: 'Auctions', action: '/auctions' },
+            { label: 'Organizations', action: '/organizations' },
+            { label: 'Financials', action: '/financials' },
+            { label: 'Invoices', action: '/invoices' },
+            { label: 'Suppliers', action: '/suppliers' },
+            { label: 'Profile', action: '/profile' },
             { label: 'Invest Now', action: '/financials?action=invest' },
-            { label: 'View Portfolio', action: '/financials?tab=portfolio' },
-            { label: 'Add Funds', action: '/financials?action=add' },
-            { label: 'Profile', action: '/profile' }
+            { label: 'Add Funds', action: '/financials?action=add' }
           ].map((item, i) => (
             <button
               key={i}
@@ -243,7 +249,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
                 width: '100%',
                 padding: '10px 12px',
                 border: 'none',
-                borderBottom: i < 3 ? '1px solid #eee' : 'none',
+                borderBottom: i < 9 ? '1px solid #eee' : 'none',
                 backgroundColor: 'transparent',
                 textAlign: 'left',
                 fontSize: '9pt',
