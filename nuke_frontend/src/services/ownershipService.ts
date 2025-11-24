@@ -192,53 +192,69 @@ export class OwnershipService {
     try {
       // Safe parallel queries - catch individual failures so missing tables don't crash
       const [vehicleResult, verificationResult, contributorResult, userPermissionResult, orgMemberResult] = await Promise.all([
-        supabase.from('vehicles').select('uploaded_by, user_id').eq('id', vehicleId).single().catch(err => {
-          console.warn('[OwnershipService] vehicles table query failed:', err.message);
-          return { data: null, error: err };
-        }),
-        supabase
-          .from('ownership_verifications')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .eq('user_id', session.user.id)
-          .eq('status', 'approved')
-          .maybeSingle()
-          .catch(err => {
+        (async () => {
+          try {
+            return await supabase.from('vehicles').select('uploaded_by, user_id').eq('id', vehicleId).single();
+          } catch (err: any) {
+            console.warn('[OwnershipService] vehicles table query failed:', err.message);
+            return { data: null, error: err };
+          }
+        })(),
+        (async () => {
+          try {
+            return await supabase
+              .from('ownership_verifications')
+              .select('*')
+              .eq('vehicle_id', vehicleId)
+              .eq('user_id', session.user.id)
+              .eq('status', 'approved')
+              .maybeSingle();
+          } catch (err: any) {
             console.warn('[OwnershipService] ownership_verifications table missing or RLS blocked:', err.message);
             return { data: null, error: err };
-          }),
-        supabase
-          .from('vehicle_contributors')
-          .select('*, profiles(full_name, email)')
-          .eq('vehicle_id', vehicleId)
-          .eq('user_id', session.user.id)
-          .eq('status', 'active')
-          .maybeSingle()
-          .catch(err => {
+          }
+        })(),
+        (async () => {
+          try {
+            return await supabase
+              .from('vehicle_contributors')
+              .select('*, profiles(full_name, email)')
+              .eq('vehicle_id', vehicleId)
+              .eq('user_id', session.user.id)
+              .eq('status', 'active')
+              .maybeSingle();
+          } catch (err: any) {
             console.warn('[OwnershipService] vehicle_contributors table missing or RLS blocked:', err.message);
             return { data: null, error: err };
-          }),
-        supabase
-          .from('vehicle_user_permissions')
-          .select('role, is_active')
-          .eq('vehicle_id', vehicleId)
-          .eq('user_id', session.user.id)
-          .eq('is_active', true)
-          .in('role', ['owner', 'co_owner'])
-          .maybeSingle()
-          .catch(err => {
+          }
+        })(),
+        (async () => {
+          try {
+            return await supabase
+              .from('vehicle_user_permissions')
+              .select('role, is_active')
+              .eq('vehicle_id', vehicleId)
+              .eq('user_id', session.user.id)
+              .eq('is_active', true)
+              .in('role', ['owner', 'co_owner'])
+              .maybeSingle();
+          } catch (err: any) {
             console.warn('[OwnershipService] vehicle_user_permissions table missing or RLS blocked:', err.message);
             return { data: null, error: err };
-          }),
-        supabase
-          .from('organization_vehicles')
-          .select('id, organization_id, relationship_type, start_date, end_date')
-          .eq('vehicle_id', vehicleId)
-          .eq('status', 'active')
-          .catch(err => {
+          }
+        })(),
+        (async () => {
+          try {
+            return await supabase
+              .from('organization_vehicles')
+              .select('id, organization_id, relationship_type, start_date, end_date')
+              .eq('vehicle_id', vehicleId)
+              .eq('status', 'active');
+          } catch (err: any) {
             console.warn('[OwnershipService] organization_vehicles table missing or RLS blocked:', err.message);
             return { data: [], error: err };
-          })
+          }
+        })()
       ]);
 
       const vehicle = vehicleResult.data;
