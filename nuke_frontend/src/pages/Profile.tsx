@@ -40,6 +40,8 @@ import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
 import LivePlayer from '../components/profile/LivePlayer';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
 import VehicleMergeInterface from '../components/vehicle/VehicleMergeInterface';
+import { AdminNotificationService } from '../services/adminNotificationService';
+import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -60,6 +62,8 @@ const Profile: React.FC = () => {
   const [emailUpdating, setEmailUpdating] = useState(false);
   const [emailChangeMessage, setEmailChangeMessage] = useState('');
   const [showProfileDetails, setShowProfileDetails] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [photoLibraryStats, setPhotoLibraryStats] = useState<any>(null);
 
   // Handle window resize for responsive behavior
   useEffect(() => {
@@ -132,6 +136,16 @@ const Profile: React.FC = () => {
         setProfileData(data);
       }
 
+      // Load photo library stats if this is own profile
+      if (targetUserId === currentUserId) {
+        try {
+          const stats = await PersonalPhotoLibraryService.getLibraryStats();
+          setPhotoLibraryStats(stats);
+        } catch (err) {
+          console.warn('Failed to load photo library stats:', err);
+        }
+      }
+
     } catch (err: any) {
       console.error('Error loading profile:', err);
       setError(err.message || 'Failed to load profile');
@@ -145,6 +159,17 @@ const Profile: React.FC = () => {
       loadProfileData();
     }
   }, [currentUserId, userId]);
+
+  // Check admin status
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (currentUserId) {
+        const admin = await AdminNotificationService.isCurrentUserAdmin();
+        setIsAdmin(admin);
+      }
+    };
+    checkAdminStatus();
+  }, [currentUserId]);
 
   // Sync heatmap year to most recent contribution year when profile data loads
   useEffect(() => {
@@ -392,16 +417,31 @@ const Profile: React.FC = () => {
               </h2>
             </div>
 
-            {/* Expand button for profile details */}
-            {isOwnProfile && (
-              <button
-                className="button button-small"
-                onClick={() => setShowProfileDetails(!showProfileDetails)}
-                style={{ marginLeft: 'auto' }}
-              >
-                {showProfileDetails ? 'Hide' : 'Edit'} Profile
-              </button>
-            )}
+            {/* Action buttons */}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
+              {isOwnProfile && (
+                <button
+                  className="button button-small"
+                  onClick={() => setShowProfileDetails(!showProfileDetails)}
+                >
+                  {showProfileDetails ? 'Hide' : 'Edit'} Profile
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  className="button button-small"
+                  onClick={() => navigate('/admin')}
+                  style={{
+                    background: 'var(--black)',
+                    color: 'var(--white)',
+                    border: '2px solid var(--black)',
+                    fontWeight: 700
+                  }}
+                >
+                  ADMIN
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Expandable Profile Details */}
@@ -518,6 +558,62 @@ const Profile: React.FC = () => {
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <LivePlayer userId={profile.id} isOwnProfile={isOwnProfile} />
                 </div>
+
+                {/* Photo Library - Only show for own profile */}
+                {isOwnProfile && (
+                  <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
+                    <div className="card-header">
+                      <h3 className="text">Photo Library</h3>
+                    </div>
+                    <div className="card-body">
+                      {photoLibraryStats && (
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                          gap: 'var(--space-3)',
+                          marginBottom: 'var(--space-3)',
+                          padding: 'var(--space-3)',
+                          background: 'var(--grey-100)',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: '4px'
+                        }}>
+                          <div>
+                            <div className="text text-small text-muted">To Organize</div>
+                            <div className="text font-bold" style={{ fontSize: '20px', color: photoLibraryStats.unorganized_photos > 0 ? 'var(--primary)' : 'var(--text)' }}>
+                              {photoLibraryStats.unorganized_photos?.toLocaleString() || 0}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text text-small text-muted">Organized</div>
+                            <div className="text font-bold" style={{ fontSize: '20px' }}>
+                              {photoLibraryStats.organized_photos?.toLocaleString() || 0}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text text-small text-muted">AI Suggestions</div>
+                            <div className="text font-bold" style={{ fontSize: '20px', color: photoLibraryStats.ai_suggestions_count > 0 ? '#ff9d00' : 'var(--text)' }}>
+                              {photoLibraryStats.ai_suggestions_count || 0}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <p className="text text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
+                        Upload and organize your vehicle photos. Bulk upload thousands of photos,
+                        get AI suggestions for grouping, and organize them into vehicle profiles.
+                      </p>
+                      <button
+                        onClick={() => navigate('/photos')}
+                        className="button button-primary"
+                        style={{ width: '100%' }}
+                      >
+                        {photoLibraryStats?.unorganized_photos > 0 
+                          ? `Organize ${photoLibraryStats.unorganized_photos} Photos`
+                          : 'Open Photo Library'
+                        }
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
