@@ -127,14 +127,44 @@ const VehiclesInner: React.FC = () => {
         .or(`user_id.eq.${session.user.id},uploaded_by.eq.${session.user.id}`);
 
       // Get explicit relationships from discovered_vehicles table
-      const { data: discoveredVehicles, error: discoveredError } = await supabase
-        .from('discovered_vehicles')
-        .select(`
-          relationship_type,
-          vehicles:vehicle_id (*, vehicle_images(image_url, is_primary, variants))
-        `)
-        .eq('user_id', session.user.id)
-        .eq('is_active', true);
+      // Note: relationship_type column may not exist in older databases
+      let discoveredVehicles: any[] = [];
+      let discoveredError: any = null;
+      
+      try {
+        const result = await supabase
+          .from('discovered_vehicles')
+          .select(`
+            relationship_type,
+            vehicles:vehicle_id (*, vehicle_images(image_url, is_primary, variants))
+          `)
+          .eq('user_id', session.user.id)
+          .eq('is_active', true);
+        
+        discoveredVehicles = result.data || [];
+        discoveredError = result.error;
+        
+        // If relationship_type column doesn't exist, try without it
+        if (discoveredError && discoveredError.message?.includes('relationship_type')) {
+          console.warn('[Vehicles] relationship_type column missing, fetching without it');
+          const fallbackResult = await supabase
+            .from('discovered_vehicles')
+            .select(`
+              vehicles:vehicle_id (*, vehicle_images(image_url, is_primary, variants))
+            `)
+            .eq('user_id', session.user.id)
+            .eq('is_active', true);
+          
+          discoveredVehicles = (fallbackResult.data || []).map((dv: any) => ({
+            ...dv,
+            relationship_type: 'interested' // Default to interested if column missing
+          }));
+          discoveredError = fallbackResult.error;
+        }
+      } catch (err: any) {
+        console.error('[Vehicles] Error loading discovered vehicles:', err);
+        discoveredError = err;
+      }
 
       // Get verified ownership (LEGAL ownership with documents)
       const { data: verifiedOwnerships, error: verifiedError } = await supabase
@@ -148,14 +178,27 @@ const VehiclesInner: React.FC = () => {
       
       console.log('[Vehicles] Verified ownerships:', verifiedOwnerships?.length || 0);
       console.log('[Vehicles] Uploaded vehicles:', userAddedVehicles?.length || 0);
+      console.log('[Vehicles] Discovered vehicles:', discoveredVehicles?.length || 0);
 
-      if (addedError) console.error('Error loading added vehicles:', addedError);
-      if (discoveredError) console.error('Error loading discovered vehicles:', discoveredError);
-      if (verifiedError) console.error('Error loading verified ownerships:', verifiedError);
+      if (addedError) {
+        console.error('[Vehicles] Error loading added vehicles:', addedError);
+        console.error('[Vehicles] Error details:', JSON.stringify(addedError, null, 2));
+      }
+      if (discoveredError) {
+        console.error('[Vehicles] Error loading discovered vehicles:', discoveredError);
+        console.error('[Vehicles] Error details:', JSON.stringify(discoveredError, null, 2));
+      }
+      if (verifiedError) {
+        console.error('[Vehicles] Error loading verified ownerships:', verifiedError);
+        console.error('[Vehicles] Error details:', JSON.stringify(verifiedError, null, 2));
+      }
 
-      console.log('User added vehicles:', userAddedVehicles);
-      console.log('Discovered vehicles:', discoveredVehicles);
-      console.log('Verified ownerships:', verifiedOwnerships);
+      // Only log full data in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Vehicles] User added vehicles:', userAddedVehicles);
+        console.log('[Vehicles] Discovered vehicles:', discoveredVehicles);
+        console.log('[Vehicles] Verified ownerships:', verifiedOwnerships);
+      }
       // Process relationships by type
       const owned: VehicleRelationship[] = [];
       const contributing: VehicleRelationship[] = [];
@@ -195,10 +238,16 @@ const VehiclesInner: React.FC = () => {
       // Process discovered vehicles (from discovered_vehicles table)
       (discoveredVehicles || []).forEach((discovery: any) => {
         const vehicle = discovery.vehicles;
-        if (!vehicle) return;
+        if (!vehicle) {
+          console.warn('[Vehicles] Discovery entry missing vehicle:', discovery);
+          return;
+        }
 
         const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
         const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
+
+        // Default to 'interested' if relationship_type is missing or null
+        const relationshipType = discovery.relationship_type || 'interested';
 
         const vehicleRelationship: VehicleRelationship = {
           vehicle: {
@@ -213,12 +262,12 @@ const VehiclesInner: React.FC = () => {
             isAnonymous: false,
             created_at: vehicle.created_at
           },
-          relationshipType: discovery.relationship_type,
-          role: discovery.relationship_type,
+          relationshipType: relationshipType as any,
+          role: relationshipType,
           lastActivity: vehicle.created_at
         };
 
-        switch (discovery.relationship_type) {
+        switch (relationshipType) {
           case 'discovered':
             discovered.push(vehicleRelationship);
             break;
@@ -234,8 +283,11 @@ const VehiclesInner: React.FC = () => {
           case 'interested':
             interested.push(vehicleRelationship);
             break;
+          case 'contributing':
+            contributing.push(vehicleRelationship);
+            break;
           default:
-            console.warn('Unknown relationship type:', discovery.relationship_type);
+            console.warn('[Vehicles] Unknown relationship type:', relationshipType, 'for vehicle:', vehicle.id);
             interested.push(vehicleRelationship);
         }
       });
@@ -277,7 +329,22 @@ const VehiclesInner: React.FC = () => {
 
       setVehicleRelationships({ owned, contributing, interested, discovered, curated, consigned, previously_owned });
       
-      console.log(`Categorized vehicles: ${owned.length} owned, ${contributing.length} contributing, ${interested.length} interested`);
+      const totalCount = owned.length + contributing.length + interested.length + discovered.length + 
+                        curated.length + consigned.length + previously_owned.length;
+      
+      console.log(`[Vehicles] Categorized vehicles: ${totalCount} total`);
+      console.log(`[Vehicles]   - Owned: ${owned.length}`);
+      console.log(`[Vehicles]   - Contributing: ${contributing.length}`);
+      console.log(`[Vehicles]   - Interested: ${interested.length}`);
+      console.log(`[Vehicles]   - Discovered: ${discovered.length}`);
+      console.log(`[Vehicles]   - Curated: ${curated.length}`);
+      console.log(`[Vehicles]   - Consigned: ${consigned.length}`);
+      console.log(`[Vehicles]   - Previously Owned: ${previously_owned.length}`);
+      
+      // Show user-friendly error if no vehicles found and there were errors
+      if (totalCount === 0 && (addedError || discoveredError || verifiedError)) {
+        console.warn('[Vehicles] No vehicles found and there were query errors. Check database schema and RLS policies.');
+      }
     } catch (error) {
       console.error('Error in loadVehicleRelationships:', error);
     } finally {
