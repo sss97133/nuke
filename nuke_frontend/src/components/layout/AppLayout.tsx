@@ -31,8 +31,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [orgNavPath, setOrgNavPath] = useState<string>('/shops');
+  const [orgNavPath, setOrgNavPath] = useState<string>('/organizations');
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -150,17 +149,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           </div>
 
           <div className="header-right">
-            <button 
-              className="mobile-menu-button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              ☰
-            </button>
-
             {/* Upload Indicator - Windows 95 style */}
             <GlobalUploadIndicator />
 
-            {/* Profile Balance Pill - Combined balance + profile */}
+            {/* Profile Balance Capsule - Combined balance + profile + navigation */}
             {session ? (
               <ProfileBalancePill session={session} userProfile={userProfile} />
             ) : (
@@ -170,70 +162,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             )}
           </div>
         </div>
-
-        {/* Mobile Navigation Menu */}
-        {mobileMenuOpen && (
-          <nav className="mobile-nav">
-            <Link 
-              to="/dashboard" 
-              className={`mobile-nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Home
-            </Link>
-            <Link 
-              to="/vehicles" 
-              className={`mobile-nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Vehicles
-            </Link>
-            <Link 
-              to="/auctions" 
-              className={`mobile-nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Auctions
-            </Link>
-            <Link 
-              to="/shops" 
-              className={`mobile-nav-link ${isActivePage('/shops') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Organizations
-            </Link>
-            <Link 
-              to="/financials" 
-              className={`mobile-nav-link ${isActivePage('/financials') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Financials
-            </Link>
-            <Link 
-              to="/invoices" 
-              className={`mobile-nav-link ${isActivePage('/invoices') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Invoices
-            </Link>
-            <Link 
-              to="/suppliers" 
-              className={`mobile-nav-link ${isActivePage('/suppliers') ? 'active' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Suppliers
-            </Link>
-            {session && (
-              <Link 
-                to="/profile" 
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Profile
-              </Link>
-            )}
-          </nav>
-        )}
       </header>
 
       {/* Page Header with Title and Actions */}

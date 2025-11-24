@@ -53,21 +53,22 @@ export const BulkUploadZone: React.FC<BulkUploadZoneProps> = ({ onUpload }) => {
   };
 
   return (
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      onClick={handleClick}
-      style={{
-        border: '3px dashed ' + (isDragging ? '#4a9eff' : '#333'),
-        borderRadius: '12px',
-        padding: '80px 40px',
-        textAlign: 'center',
-        cursor: 'pointer',
-        background: isDragging ? 'rgba(74, 158, 255, 0.1)' : '#1a1a1a',
-        transition: 'all 0.2s ease'
-      }}
-    >
+    <div className="card" style={{ marginBottom: '20px' }}>
+      <div
+        className="card-body"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={handleClick}
+        style={{
+          border: '2px dashed ' + (isDragging ? 'var(--primary)' : 'var(--border-medium)'),
+          padding: '60px 40px',
+          textAlign: 'center',
+          cursor: 'pointer',
+          background: isDragging ? 'var(--grey-100)' : 'var(--white)',
+          transition: 'all 0.12s ease'
+        }}
+      >
       <input
         ref={fileInputRef}
         type="file"
@@ -77,85 +78,86 @@ export const BulkUploadZone: React.FC<BulkUploadZoneProps> = ({ onUpload }) => {
         style={{ display: 'none' }}
       />
 
-      <div style={{ 
-        fontSize: '64px', 
-        marginBottom: '20px',
-        opacity: isDragging ? 1 : 0.6
-      }}>
-        📁
-      </div>
+        <div style={{ 
+          fontSize: '48px', 
+          marginBottom: '16px',
+          opacity: isDragging ? 1 : 0.5
+        }}>
+          📁
+        </div>
 
-      <div style={{ 
-        fontSize: '24px', 
-        fontWeight: '600', 
-        marginBottom: '12px',
-        color: '#fff'
-      }}>
-        {isDragging ? 'Drop Your Photos Here' : 'Upload Your Photos'}
-      </div>
+        <div className="text font-bold" style={{ 
+          fontSize: '16px', 
+          marginBottom: '8px'
+        }}>
+          {isDragging ? 'Drop Your Photos Here' : 'Upload Your Photos'}
+        </div>
 
-      <div style={{ 
-        fontSize: '16px', 
-        color: '#888',
-        marginBottom: '30px',
-        lineHeight: '1.6'
-      }}>
-        Drag and drop up to 10,000 photos at once<br />
-        or click to browse files
-      </div>
+        <div className="text text-small text-muted" style={{ 
+          marginBottom: '24px',
+          lineHeight: '1.4'
+        }}>
+          Drag and drop up to 10,000 photos at once<br />
+          or click to browse files
+        </div>
 
-      <div style={{
-        display: 'flex',
-        gap: '30px',
-        justifyContent: 'center',
-        marginTop: '30px',
-        flexWrap: 'wrap'
-      }}>
-        <div>
-          <div style={{ fontSize: '14px', color: '#4a9eff', fontWeight: '600', marginBottom: '4px' }}>
-            Supported Formats
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '16px',
+          marginTop: '24px',
+          marginBottom: '24px'
+        }}>
+          <div style={{ 
+            padding: '12px',
+            background: 'var(--grey-100)',
+            border: '1px solid var(--border-light)'
+          }}>
+            <div className="text text-small font-bold" style={{ marginBottom: '4px', color: 'var(--primary)' }}>
+              Supported Formats
+            </div>
+            <div className="text text-small text-muted">
+              JPG, PNG, HEIC, WebP, GIF
+            </div>
           </div>
-          <div style={{ fontSize: '13px', color: '#666' }}>
-            JPG, PNG, HEIC, WebP, GIF
+          <div style={{ 
+            padding: '12px',
+            background: 'var(--grey-100)',
+            border: '1px solid var(--border-light)'
+          }}>
+            <div className="text text-small font-bold" style={{ marginBottom: '4px', color: 'var(--success)' }}>
+              Auto Processing
+            </div>
+            <div className="text text-small text-muted">
+              EXIF, AI Analysis, Smart Grouping
+            </div>
+          </div>
+          <div style={{ 
+            padding: '12px',
+            background: 'var(--grey-100)',
+            border: '1px solid var(--border-light)'
+          }}>
+            <div className="text text-small font-bold" style={{ marginBottom: '4px' }}>
+              Background Upload
+            </div>
+            <div className="text text-small text-muted">
+              Close tab, uploads continue
+            </div>
           </div>
         </div>
-        <div>
-          <div style={{ fontSize: '14px', color: '#00c853', fontWeight: '600', marginBottom: '4px' }}>
-            Auto Processing
-          </div>
-          <div style={{ fontSize: '13px', color: '#666' }}>
-            EXIF, AI Analysis, Smart Grouping
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: '14px', color: '#ff9d00', fontWeight: '600', marginBottom: '4px' }}>
-            Background Upload
-          </div>
-          <div style={{ fontSize: '13px', color: '#666' }}>
-            Close tab, uploads continue
-          </div>
-        </div>
-      </div>
 
-      <button
-        onClick={handleClick}
-        style={{
-          marginTop: '40px',
-          padding: '16px 32px',
-          background: '#4a9eff',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontSize: '16px',
-          fontWeight: '600',
-          transition: 'all 0.12s ease'
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.background = '#5dadff'}
-        onMouseLeave={(e) => e.currentTarget.style.background = '#4a9eff'}
-      >
-        Select Photos from Computer
-      </button>
+        <button
+          onClick={handleClick}
+          className="button button-primary"
+          style={{
+            marginTop: '24px',
+            padding: '12px 24px',
+            fontSize: '11px'
+          }}
+        >
+          Select Photos from Computer
+        </button>
+      </div>
     </div>
   );
 };

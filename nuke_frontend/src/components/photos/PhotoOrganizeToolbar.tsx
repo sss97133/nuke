@@ -62,25 +62,21 @@ export const PhotoOrganizeToolbar: React.FC<PhotoOrganizeToolbarProps> = ({
       {/* Toolbar */}
       <div style={{
         position: 'fixed',
-        bottom: '30px',
+        bottom: '20px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 1000,
-        background: '#1a1a1a',
-        border: '2px solid #4a9eff',
-        borderRadius: '12px',
-        padding: '20px 30px',
+        background: 'var(--white)',
+        border: '2px outset var(--border-medium)',
+        padding: '12px 20px',
         display: 'flex',
         alignItems: 'center',
-        gap: '20px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+        gap: '12px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
       }}>
         {/* Selection Count */}
-        <div style={{ 
-          fontSize: '18px', 
-          fontWeight: '600',
-          color: '#fff',
-          marginRight: '10px'
+        <div className="text font-bold" style={{ 
+          marginRight: '8px'
         }}>
           {selectedCount} Selected
         </div>
@@ -89,16 +85,11 @@ export const PhotoOrganizeToolbar: React.FC<PhotoOrganizeToolbarProps> = ({
         <button
           onClick={handleLinkClick}
           disabled={loading}
+          className="button button-primary"
           style={{
-            padding: '12px 24px',
-            background: '#4a9eff',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: loading ? 'wait' : 'pointer',
-            fontSize: '14px',
-            fontWeight: '600',
-            transition: 'all 0.12s ease'
+            padding: '8px 16px',
+            fontSize: '11px',
+            cursor: loading ? 'wait' : 'pointer'
           }}
         >
           Link to Vehicle
@@ -106,16 +97,10 @@ export const PhotoOrganizeToolbar: React.FC<PhotoOrganizeToolbarProps> = ({
 
         <button
           onClick={onMarkAsOrganized}
+          className="button button-primary"
           style={{
-            padding: '12px 24px',
-            background: '#00c853',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '600',
-            transition: 'all 0.12s ease'
+            padding: '8px 16px',
+            fontSize: '11px'
           }}
         >
           Mark as Organized
@@ -123,46 +108,28 @@ export const PhotoOrganizeToolbar: React.FC<PhotoOrganizeToolbarProps> = ({
 
         <button
           onClick={onDelete}
+          className="button button-secondary"
           style={{
-            padding: '12px 24px',
-            background: '#333',
-            color: '#fff',
-            border: '2px solid #555',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '600',
-            transition: 'all 0.12s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#ff4444';
-            e.currentTarget.style.borderColor = '#ff4444';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#333';
-            e.currentTarget.style.borderColor = '#555';
+            padding: '8px 16px',
+            fontSize: '11px'
           }}
         >
           Delete
         </button>
 
         <div style={{ 
-          width: '2px', 
-          height: '40px', 
-          background: '#333',
-          margin: '0 10px'
+          width: '1px', 
+          height: '24px', 
+          background: 'var(--border-medium)',
+          margin: '0 4px'
         }} />
 
         <button
           onClick={onCancel}
+          className="button button-secondary"
           style={{
-            padding: '12px 24px',
-            background: 'transparent',
-            color: '#888',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '600'
+            padding: '8px 16px',
+            fontSize: '11px'
           }}
         >
           Cancel
@@ -179,7 +146,7 @@ export const PhotoOrganizeToolbar: React.FC<PhotoOrganizeToolbarProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.8)',
+            background: 'rgba(0, 0, 0, 0.5)',
             zIndex: 2000,
             display: 'flex',
             alignItems: 'center',
@@ -189,97 +156,69 @@ export const PhotoOrganizeToolbar: React.FC<PhotoOrganizeToolbarProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="card"
             style={{
-              background: '#1a1a1a',
-              border: '2px solid #333',
-              borderRadius: '12px',
-              maxWidth: '600px',
+              maxWidth: '500px',
               width: '100%',
               maxHeight: '80vh',
-              overflow: 'auto',
-              padding: '30px'
+              overflow: 'auto'
             }}
           >
-            <h2 style={{ 
-              margin: '0 0 20px 0',
-              fontSize: '24px',
-              fontWeight: '600',
-              color: '#fff'
-            }}>
-              Select Vehicle
-            </h2>
+            <div className="card-header">
+              <h2 className="text font-bold" style={{ margin: 0 }}>
+                Select Vehicle
+              </h2>
+            </div>
 
-            <p style={{ 
-              margin: '0 0 30px 0',
-              color: '#888',
-              fontSize: '14px'
-            }}>
-              Link {selectedCount} photo{selectedCount !== 1 ? 's' : ''} to:
-            </p>
+            <div className="card-body">
+              <p className="text text-small text-muted" style={{ margin: '0 0 16px 0' }}>
+                Link {selectedCount} photo{selectedCount !== 1 ? 's' : ''} to:
+              </p>
 
-            {vehicles.length === 0 ? (
-              <div style={{ 
-                textAlign: 'center',
-                padding: '40px',
-                color: '#666'
-              }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚗</div>
-                <div>No vehicles found. Create a vehicle profile first.</div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {vehicles.map(vehicle => (
-                  <button
-                    key={vehicle.id}
-                    onClick={() => {
-                      onLinkToVehicle(vehicle.id);
-                      setShowVehiclePicker(false);
-                    }}
-                    style={{
-                      padding: '16px 20px',
-                      background: '#222',
-                      color: '#fff',
-                      border: '2px solid #333',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      fontWeight: '500',
-                      textAlign: 'left',
-                      transition: 'all 0.12s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#4a9eff';
-                      e.currentTarget.style.background = '#2a2a2a';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#333';
-                      e.currentTarget.style.background = '#222';
-                    }}
-                  >
-                    {vehicle.year} {vehicle.make} {vehicle.model}
-                    {vehicle.trim && ` ${vehicle.trim}`}
-                  </button>
-                ))}
-              </div>
-            )}
+              {vehicles.length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center',
+                  padding: '40px'
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>🚗</div>
+                  <div className="text text-small text-muted">No vehicles found. Create a vehicle profile first.</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                  {vehicles.map(vehicle => (
+                    <button
+                      key={vehicle.id}
+                      onClick={() => {
+                        onLinkToVehicle(vehicle.id);
+                        setShowVehiclePicker(false);
+                      }}
+                      className="button button-secondary"
+                      style={{
+                        padding: '12px 16px',
+                        fontSize: '11px',
+                        textAlign: 'left',
+                        justifyContent: 'flex-start'
+                      }}
+                    >
+                      {vehicle.year} {vehicle.make} {vehicle.model}
+                      {vehicle.trim && ` ${vehicle.trim}`}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-            <button
-              onClick={() => setShowVehiclePicker(false)}
-              style={{
-                marginTop: '30px',
-                padding: '12px 24px',
-                background: '#333',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                width: '100%'
-              }}
-            >
-              Cancel
-            </button>
+              <button
+                onClick={() => setShowVehiclePicker(false)}
+                className="button button-secondary"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  fontSize: '11px'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

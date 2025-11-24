@@ -235,165 +235,141 @@ export const PersonalPhotoLibrary: React.FC = () => {
         </p>
       </div>
 
-      {/* Stats Bar */}
+      {/* Stats Cards */}
       {stats && (
         <div style={{
-          padding: '20px 40px',
-          display: 'flex',
-          gap: '40px',
-          borderBottom: '2px solid #222',
-          background: '#0a0a0a'
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px',
+          marginBottom: '20px'
         }}>
-          <div>
-            <div style={{ fontSize: '28px', fontWeight: '600', color: '#fff' }}>
-              {stats.unorganized_photos.toLocaleString()}
-            </div>
-            <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-              To Organize
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '28px', fontWeight: '600', color: '#4a9eff' }}>
-              {stats.organized_photos.toLocaleString()}
-            </div>
-            <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-              Organized
+          <div className="card">
+            <div className="card-body" style={{ textAlign: 'center' }}>
+              <div className="text font-bold" style={{ fontSize: '32px', marginBottom: '4px' }}>
+                {stats.unorganized_photos.toLocaleString()}
+              </div>
+              <div className="text text-small text-muted">To Organize</div>
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: '28px', fontWeight: '600', color: '#ff9d00' }}>
-              {stats.ai_suggestions_count}
-            </div>
-            <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-              AI Suggestions
+          <div className="card">
+            <div className="card-body" style={{ textAlign: 'center' }}>
+              <div className="text font-bold" style={{ fontSize: '32px', marginBottom: '4px', color: 'var(--primary)' }}>
+                {stats.organized_photos.toLocaleString()}
+              </div>
+              <div className="text text-small text-muted">Organized</div>
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: '28px', fontWeight: '600', color: '#888' }}>
-              {formatFileSize(stats.total_file_size)}
+          <div className="card">
+            <div className="card-body" style={{ textAlign: 'center' }}>
+              <div className="text font-bold" style={{ fontSize: '32px', marginBottom: '4px', color: '#ff9d00' }}>
+                {stats.ai_suggestions_count}
+              </div>
+              <div className="text text-small text-muted">AI Suggestions</div>
             </div>
-            <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-              Storage Used
+          </div>
+          <div className="card">
+            <div className="card-body" style={{ textAlign: 'center' }}>
+              <div className="text font-bold" style={{ fontSize: '32px', marginBottom: '4px' }}>
+                {formatFileSize(stats.total_file_size)}
+              </div>
+              <div className="text text-small text-muted">Storage Used</div>
             </div>
           </div>
         </div>
       )}
 
       {/* View Mode Tabs */}
-      <div style={{
-        padding: '20px 40px',
-        display: 'flex',
-        gap: '10px',
-        borderBottom: '2px solid #222',
-        background: '#0f0f0f'
-      }}>
-        <button
-          onClick={() => setViewMode('unorganized')}
-          style={{
-            padding: '10px 20px',
-            background: viewMode === 'unorganized' ? '#4a9eff' : '#222',
-            color: viewMode === 'unorganized' ? '#fff' : '#888',
-            border: '2px solid transparent',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            transition: 'all 0.12s ease'
-          }}
-        >
-          Unorganized ({stats?.unorganized_photos || 0})
-        </button>
-        <button
-          onClick={() => setViewMode('suggestions')}
-          style={{
-            padding: '10px 20px',
-            background: viewMode === 'suggestions' ? '#ff9d00' : '#222',
-            color: viewMode === 'suggestions' ? '#fff' : '#888',
-            border: '2px solid transparent',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            transition: 'all 0.12s ease'
-          }}
-        >
-          AI Suggestions ({stats?.ai_suggestions_count || 0})
-        </button>
-        <button
-          onClick={() => setViewMode('organized')}
-          style={{
-            padding: '10px 20px',
-            background: viewMode === 'organized' ? '#4a9eff' : '#222',
-            color: viewMode === 'organized' ? '#fff' : '#888',
-            border: '2px solid transparent',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            transition: 'all 0.12s ease'
-          }}
-        >
-          Organized ({stats?.organized_photos || 0})
-        </button>
-
-        {/* Grid Density Controls */}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', color: '#666', marginRight: '8px' }}>Grid:</span>
-          {(['small', 'medium', 'large'] as GridDensity[]).map(density => (
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <div className="card-body" style={{ padding: '12px' }}>
+          <div style={{ display: 'flex', gap: '0', alignItems: 'center' }}>
             <button
-              key={density}
-              onClick={() => setGridDensity(density)}
-              style={{
-                padding: '8px 16px',
-                background: gridDensity === density ? '#333' : '#1a1a1a',
-                color: gridDensity === density ? '#fff' : '#666',
-                border: '2px solid ' + (gridDensity === density ? '#555' : '#222'),
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                textTransform: 'capitalize'
+              onClick={() => setViewMode('unorganized')}
+              className={`button ${viewMode === 'unorganized' ? 'button-primary' : 'button-secondary'}`}
+              style={{ 
+                borderRadius: '4px 0 0 4px',
+                fontSize: '11px',
+                padding: '8px 16px'
               }}
             >
-              {density}
+              Unorganized ({stats?.unorganized_photos || 0})
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode('suggestions')}
+              className={`button ${viewMode === 'suggestions' ? 'button-primary' : 'button-secondary'}`}
+              style={{ 
+                borderRadius: '0',
+                marginLeft: '-2px',
+                fontSize: '11px',
+                padding: '8px 16px'
+              }}
+            >
+              AI Suggestions ({stats?.ai_suggestions_count || 0})
+            </button>
+            <button
+              onClick={() => setViewMode('organized')}
+              className={`button ${viewMode === 'organized' ? 'button-primary' : 'button-secondary'}`}
+              style={{ 
+                borderRadius: '0 4px 4px 0',
+                marginLeft: '-2px',
+                fontSize: '11px',
+                padding: '8px 16px'
+              }}
+            >
+              Organized ({stats?.organized_photos || 0})
+            </button>
+
+            {/* Grid Density Controls */}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0', alignItems: 'center' }}>
+              <span className="text text-small text-muted" style={{ marginRight: '12px' }}>Grid:</span>
+              {(['small', 'medium', 'large'] as GridDensity[]).map((density, idx) => (
+                <button
+                  key={density}
+                  onClick={() => setGridDensity(density)}
+                  className={`button ${gridDensity === density ? '' : 'button-secondary'}`}
+                  style={{
+                    borderRadius: idx === 0 ? '4px 0 0 4px' : idx === 2 ? '0 4px 4px 0' : '0',
+                    marginLeft: idx > 0 ? '-2px' : '0',
+                    fontSize: '11px',
+                    padding: '8px 12px',
+                    textTransform: 'capitalize',
+                    minWidth: '60px'
+                  }}
+                >
+                  {density}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Upload Zone (only show in unorganized view) */}
       {viewMode === 'unorganized' && stats && stats.unorganized_photos === 0 && !uploading && (
-        <div style={{ padding: '40px' }}>
-          <BulkUploadZone onUpload={handleBulkUpload} />
-        </div>
+        <BulkUploadZone onUpload={handleBulkUpload} />
       )}
 
       {/* Upload Progress */}
       {uploading && (
-        <div style={{ padding: '40px' }}>
-          <div style={{
-            background: '#1a1a1a',
-            border: '2px solid #333',
-            borderRadius: '8px',
-            padding: '30px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '18px', marginBottom: '20px', color: '#fff' }}>
+        <div className="card" style={{ marginBottom: '20px' }}>
+          <div className="card-body" style={{ textAlign: 'center', padding: '40px' }}>
+            <div className="text font-bold" style={{ fontSize: '16px', marginBottom: '20px' }}>
               Uploading Photos...
             </div>
-            <div style={{ fontSize: '32px', fontWeight: '600', color: '#4a9eff', marginBottom: '10px' }}>
+            <div className="text font-bold" style={{ fontSize: '36px', color: 'var(--primary)', marginBottom: '16px' }}>
               {uploadProgress.current} / {uploadProgress.total}
             </div>
             <div style={{
               width: '100%',
-              height: '8px',
-              background: '#222',
-              borderRadius: '4px',
-              overflow: 'hidden'
+              height: '24px',
+              background: 'var(--grey-200)',
+              border: '2px inset var(--border-medium)',
+              overflow: 'hidden',
+              position: 'relative'
             }}>
               <div style={{
                 width: `${(uploadProgress.current / uploadProgress.total) * 100}%`,
                 height: '100%',
-                background: '#4a9eff',
+                background: 'var(--primary)',
                 transition: 'width 0.3s ease'
               }} />
             </div>
@@ -413,25 +389,23 @@ export const PersonalPhotoLibrary: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <div style={{ padding: '40px' }}>
-        {viewMode === 'suggestions' ? (
-          <VehicleSuggestionsPanel
-            suggestions={suggestions}
-            onAccept={handleAcceptSuggestion}
-            onReject={handleRejectSuggestion}
-          />
-        ) : (
-          <PhotoInboxGrid
-            photos={photos}
-            gridDensity={gridDensity}
-            selectedImages={selectedImages}
-            onToggleImage={toggleImage}
-            onSelectAll={selectAll}
-            isSelected={isSelected}
-            showSelectionMode={viewMode === 'unorganized'}
-          />
-        )}
-      </div>
+      {viewMode === 'suggestions' ? (
+        <VehicleSuggestionsPanel
+          suggestions={suggestions}
+          onAccept={handleAcceptSuggestion}
+          onReject={handleRejectSuggestion}
+        />
+      ) : (
+        <PhotoInboxGrid
+          photos={photos}
+          gridDensity={gridDensity}
+          selectedImages={selectedImages}
+          onToggleImage={toggleImage}
+          onSelectAll={selectAll}
+          isSelected={isSelected}
+          showSelectionMode={viewMode === 'unorganized'}
+        />
+      )}
     </div>
   );
 };
