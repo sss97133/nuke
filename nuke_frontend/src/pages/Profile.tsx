@@ -42,6 +42,8 @@ import OrganizationAffiliations from '../components/profile/OrganizationAffiliat
 import VehicleMergeInterface from '../components/vehicle/VehicleMergeInterface';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
+import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
+import ShopFinancials from './ShopFinancials';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -581,20 +583,14 @@ const Profile: React.FC = () => {
             )}
             
             {activeTab === 'photos' && isOwnProfile && (
-              <div>
-                {(() => {
-                  navigate('/photos');
-                  return null;
-                })()}
+              <div style={{ marginTop: 'var(--space-4)' }}>
+                <PersonalPhotoLibrary />
               </div>
             )}
 
             {activeTab === 'financials' && isOwnProfile && (
-              <div>
-                {(() => {
-                  navigate('/financials');
-                  return null;
-                })()}
+              <div style={{ marginTop: 'var(--space-4)' }}>
+                <ShopFinancials />
               </div>
             )}
             
