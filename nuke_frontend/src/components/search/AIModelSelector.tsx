@@ -94,31 +94,27 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
   };
 
   const enabledModel = availableModels.find(m => m.enabled);
-  const buttonText = enabledModel ? enabledModel.displayName.substring(0, 3).toUpperCase() : 'MOD';
 
   return (
     <div ref={dropdownRef} style={{ position: 'relative' }}>
-      {/* Small Button */}
+      {/* Small Button - No Label */}
       <button
         onClick={() => setShowDropdown(!showDropdown)}
         style={{
-          padding: '0px 4px',
-          fontSize: '6pt',
+          padding: 0,
           border: '1px solid var(--border)',
           background: enabledModel ? 'var(--primary-dim)' : 'var(--white)',
           cursor: 'pointer',
           borderRadius: '2px',
-          minWidth: '24px',
-          height: '10px',
+          width: '20px',
+          height: '20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontWeight: 'bold',
-          lineHeight: '1'
+          flexShrink: 0
         }}
         title="Model"
       >
-        {buttonText}
       </button>
 
       {/* Dropdown Menu */}
