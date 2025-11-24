@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import AIModelSelector, { AIProvider } from './search/AIModelSelector';
 import '../design-system.css';
 
 interface SearchResult {
@@ -21,6 +22,7 @@ export default function VehicleSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [selectedAIProvider, setSelectedAIProvider] = useState<AIProvider | undefined>();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -99,12 +101,19 @@ export default function VehicleSearch() {
     setShowResults(false);
   };
 
+  const handleAIModelSelect = (provider: AIProvider, modelName: string) => {
+    setSelectedAIProvider(provider);
+    // TODO: Integrate AI model selection with search
+    console.log('AI model selected:', provider, modelName);
+  };
+
   return (
     <div style={{ position: 'relative', width: '100%', maxWidth: '600px' }}>
-      {/* Search Input */}
+      {/* Search Input with AI Model Selector */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
+        gap: '8px',
         background: 'var(--white)',
         border: '2px solid var(--border)',
         padding: '8px 12px'
@@ -133,6 +142,12 @@ export default function VehicleSearch() {
             fontFamily: '"MS Sans Serif", sans-serif',
             background: 'transparent'
           }}
+        />
+        {/* AI Model Selector Buttons */}
+        <AIModelSelector
+          onModelSelect={handleAIModelSelect}
+          selectedProvider={selectedAIProvider}
+          compact={true}
         />
         {loading && <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Searching...</span>}
       </div>

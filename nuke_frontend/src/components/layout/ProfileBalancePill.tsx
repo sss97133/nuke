@@ -202,55 +202,13 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
             zIndex: 9999
           }}
         >
-          {/* Balance info */}
-          <div
-            style={{
-              padding: '12px',
-              borderBottom: '1px solid #ccc',
-              backgroundColor: '#f5f5f5'
-            }}
-          >
-            <div style={{ 
-              fontSize: '8pt', 
-              color: 'var(--text-muted)', 
-              marginBottom: '4px',
-              fontFamily: '"MS Sans Serif", sans-serif',
-              fontWeight: 'normal'
-            }}>
-              Available Balance
-            </div>
-            <div style={{ 
-              fontSize: '16pt', 
-              fontWeight: 700,
-              fontFamily: '"MS Sans Serif", sans-serif'
-            }}>
-              ${amount || '0.00'}
-            </div>
-            {balance && balance.pending_cents > 0 && (
-              <div style={{ 
-                fontSize: '8pt', 
-                color: 'var(--text-muted)', 
-                marginTop: '4px',
-                fontFamily: '"MS Sans Serif", sans-serif',
-                fontWeight: 'normal'
-              }}>
-                ${(balance.pending_cents / 100).toFixed(2)} pending
-              </div>
-            )}
-          </div>
-
           {/* Menu items - consolidated navigation */}
           {[
-            { label: 'Home', action: '/dashboard' },
+            { label: 'Capsule', action: '/capsule' },
+            { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
             { label: 'Vehicles', action: '/vehicles' },
             { label: 'Auctions', action: '/auctions' },
-            { label: 'Organizations', action: '/organizations' },
-            { label: 'Financials', action: '/financials' },
-            { label: 'Invoices', action: '/invoices' },
-            { label: 'Suppliers', action: '/suppliers' },
-            { label: 'Profile', action: '/profile' },
-            { label: 'Invest Now', action: '/financials?action=invest' },
-            { label: 'Add Funds', action: '/financials?action=add' }
+            { label: 'Organizations', action: '/organizations' }
           ].map((item, i) => (
             <button
               key={i}
