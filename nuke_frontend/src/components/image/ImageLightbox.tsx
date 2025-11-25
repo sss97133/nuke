@@ -1316,7 +1316,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           const parts = [];
                           if (exif.focalLength || exif.technical?.focalLength) {
                             const fl = exif.focalLength || exif.technical?.focalLength;
-                            parts.push(`${typeof fl === 'number' ? fl.toFixed(1) : fl}mm`);
+                            const flNum = typeof fl === 'number' ? fl : parseFloat(String(fl).replace('mm', ''));
+                            if (!isNaN(flNum) && flNum > 0) {
+                              parts.push(`${flNum.toFixed(1)}mm`);
+                            }
                           }
                           if (exif.fNumber || exif.technical?.fNumber) {
                             const fn = exif.fNumber || exif.technical?.fNumber;
