@@ -314,8 +314,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [vehicleOwnerId, setVehicleOwnerId] = useState<string | null>(null);
   const [previousOwners, setPreviousOwners] = useState<Set<string>>(new Set());
 
-  // Sidebar State (Desktop only now)
-  const [showSidebar, setShowSidebar] = useState(false);
+  // Sidebar State (Desktop only now) - Open by default
+  const [showSidebar, setShowSidebar] = useState(true);
   const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'tags' | 'actions'>('info');
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -1298,6 +1298,113 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               {/* Info Tab */}
               {activeTab === 'info' && (
                 <div className="space-y-6">
+                  {/* Date/Time */}
+                  {imageMetadata && (
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Date & Time</h4>
+                      <div className="text-sm text-gray-200">
+                        {(() => {
+                          const date = imageMetadata.taken_at || imageMetadata.created_at;
+                          if (!date) return 'Unknown';
+                          const d = new Date(date);
+                          const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                          const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                          const now = new Date();
+                          const diffMs = now.getTime() - d.getTime();
+                          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                          const relative = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Yesterday' : `${diffDays} days ago`;
+                          return `${formatted} • ${time} • ${relative}`;
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Camera & EXIF */}
+                  {imageMetadata?.exif_data?.camera && (
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Camera & EXIF</h4>
+                      <div className="text-sm text-gray-200 space-y-1">
+                        <div>
+                          {typeof imageMetadata.exif_data.camera === 'string' 
+                            ? imageMetadata.exif_data.camera 
+                            : `${imageMetadata.exif_data.camera.make || ''} ${imageMetadata.exif_data.camera.model || ''}`.trim() || 'Camera'
+                          }
+                        </div>
+                        {(() => {
+                          const exif = imageMetadata.exif_data;
+                          const parts = [];
+                          if (exif.focalLength || exif.technical?.focalLength) {
+                            const fl = exif.focalLength || exif.technical?.focalLength;
+                            parts.push(`${typeof fl === 'number' ? fl.toFixed(1) : fl}mm`);
+                          }
+                          if (exif.fNumber || exif.technical?.fNumber) {
+                            const fn = exif.fNumber || exif.technical?.fNumber;
+                            parts.push(`f/${typeof fn === 'number' ? fn.toFixed(1) : fn}`);
+                          }
+                          if (exif.exposureTime || exif.technical?.exposureTime) {
+                            const et = exif.exposureTime || exif.technical?.exposureTime;
+                            if (typeof et === 'number' && et < 1) {
+                              parts.push(`1/${Math.round(1/et)}s`);
+                            } else {
+                              parts.push(`${et}s`);
+                            }
+                          }
+                          if (exif.iso || exif.technical?.iso) {
+                            parts.push(`ISO ${exif.iso || exif.technical?.iso}`);
+                          }
+                          if (parts.length > 0) {
+                            return <div className="text-xs text-gray-400">{parts.join(' • ')}</div>;
+                          }
+                          return null;
+                        })()}
+                        {imageMetadata.exif_data.dimensions && (
+                          <div className="text-xs text-gray-400">
+                            {imageMetadata.exif_data.dimensions.width} × {imageMetadata.exif_data.dimensions.height}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Location */}
+                  {imageMetadata?.exif_data?.location && (imageMetadata.exif_data.location.city || imageMetadata.exif_data.location.latitude) && (
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Location</h4>
+                      <div className="text-sm text-gray-200">
+                        {imageMetadata.exif_data.location.city && imageMetadata.exif_data.location.state
+                          ? `${imageMetadata.exif_data.location.city}, ${imageMetadata.exif_data.location.state}`
+                          : imageMetadata.exif_data.location.latitude
+                            ? `${imageMetadata.exif_data.location.latitude.toFixed(4)}, ${imageMetadata.exif_data.location.longitude.toFixed(4)}`
+                            : 'Unknown'
+                        }
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stats */}
+                  {(imageMetadata?.view_count || imageMetadata?.comment_count || comments.length > 0) && (
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Stats</h4>
+                      <div className="text-sm text-gray-200">
+                        {[
+                          imageMetadata?.view_count ? `${imageMetadata.view_count} ${imageMetadata.view_count === 1 ? 'view' : 'views'}` : null,
+                          comments.length > 0 ? `${comments.length} ${comments.length === 1 ? 'comment' : 'comments'}` : null
+                        ].filter(Boolean).join(' • ') || 'No stats'}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tags Preview */}
+                  {tags.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Tags</h4>
+                      <div className="text-sm text-gray-200">
+                        {tags.slice(0, 5).map(tag => tag.tag_text || tag.tag_name || tag.text || 'tag').filter(Boolean).join(' • ')}
+                        {tags.length > 5 && <span className="text-gray-400"> • +{tags.length - 5} more</span>}
+                      </div>
+                    </div>
+                  )}
+
           {/* AI Event Description */}
           {imageMetadata?.ai_scan_metadata?.appraiser?.description && (
                     <div>
