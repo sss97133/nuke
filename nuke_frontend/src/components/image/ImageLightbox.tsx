@@ -1483,24 +1483,6 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           </>
                         )}
                         
-                        {/* Who - Photographer (from EXIF camera device fingerprint) */}
-                        {attribution?.photographer ? (
-                          <div className="flex flex-col border-t border-white/10 pt-2 mt-2">
-                            <span className="text-gray-500 mb-1">Photographer:</span>
-                            <span className="text-white text-xs">
-                              {attribution.photographer.name}
-                              {attribution.photographer.camera && (
-                                <span className="text-gray-500"> • {attribution.photographer.camera}</span>
-                              )}
-                            </span>
-                          </div>
-                        ) : attribution?.source === 'dropbox_import' ? (
-                          <div className="flex flex-col border-t border-white/10 pt-2 mt-2">
-                            <span className="text-gray-500 mb-1">Photographer:</span>
-                            <span className="text-gray-400 italic text-xs">Unknown (automated import)</span>
-                          </div>
-                        ) : null}
-                        
                         {/* What - AI-Generated Description */}
                         {imageMetadata?.ai_scan_metadata?.appraiser?.description ? (
                           <div className="flex flex-col border-t border-white/10 pt-2 mt-2">
@@ -1541,36 +1523,6 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           </div>
                         )}
                         
-                        {/* Where - Location (clickable to toggle format) */}
-                        {imageMetadata?.exif_data?.location && (imageMetadata.exif_data.location.city || imageMetadata.exif_data.location.latitude) && (
-                          <div 
-                            className="flex justify-between border-t border-white/10 pt-2 mt-2 cursor-pointer hover:bg-white/5 -mx-2 px-2 py-2 rounded transition-all"
-                            onClick={() => {
-                              setLocationDisplay(prev => {
-                                if (prev === 'city') return 'coordinates';
-                                if (prev === 'coordinates') return 'org';
-                                return 'city';
-                              });
-                            }}
-                            title="Click to toggle location format"
-                          >
-                            <span>Where:</span>
-                            <span className="text-white text-right">
-                              {locationDisplay === 'city' && imageMetadata.exif_data.location.city && imageMetadata.exif_data.location.state 
-                                ? `${imageMetadata.exif_data.location.city}, ${imageMetadata.exif_data.location.state}`
-                                : locationDisplay === 'coordinates' && imageMetadata.exif_data.location.latitude
-                                  ? `${imageMetadata.exif_data.location.latitude.toFixed(4)}, ${imageMetadata.exif_data.location.longitude.toFixed(4)}`
-                                  : locationDisplay === 'org'
-                                    ? imageMetadata.exif_data.location.organization_name || imageMetadata.exif_data.location.shop_name || (imageMetadata.exif_data.location.city ? `${imageMetadata.exif_data.location.city}, ${imageMetadata.exif_data.location.state}` : 'Unknown')
-                                    : imageMetadata.exif_data.location.city 
-                                      ? `${imageMetadata.exif_data.location.city}, ${imageMetadata.exif_data.location.state}`
-                                      : imageMetadata.exif_data.location.latitude
-                                        ? `${imageMetadata.exif_data.location.latitude.toFixed(4)}, ${imageMetadata.exif_data.location.longitude.toFixed(4)}`
-                                        : 'Unknown'
-                              }
-                            </span>
-                          </div>
-                        )}
                         
                         {/* Why - Context */}
                         {imageMetadata?.ai_scan_metadata?.appraiser?.context && (
@@ -1666,96 +1618,6 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         </div>
       )}
       
-                  {imageMetadata?.exif_data && (
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">EXIF Data</h4>
-                      <div className="space-y-2 text-xs">
-                        {/* EXIF Status Badge */}
-                        {imageMetadata.exif_data.exif_status && (
-                          <div className="border-b border-white/10 pb-2 mb-2">
-                            {imageMetadata.exif_data.exif_status === 'stripped' && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded">EXIF STRIPPED</span>
-                                {imageMetadata.exif_data.source && (
-                                  <span className="text-[10px] text-gray-400">
-                                    Source: {imageMetadata.exif_data.source.name || imageMetadata.exif_data.source.original_url || 'External'}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            {imageMetadata.exif_data.exif_status === 'partial' && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-orange-400 bg-orange-400/10 px-2 py-1 rounded">PARTIAL EXIF</span>
-                                {imageMetadata.exif_data.source && (
-                                  <span className="text-[10px] text-gray-400">
-                                    Source: {imageMetadata.exif_data.source.name || 'External'}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Camera Info */}
-                        {imageMetadata.exif_data.camera && (
-                          <div className="border-b border-white/10 pb-2">
-                            <span className="block text-gray-500 mb-1">Camera</span>
-                            <span className="text-gray-200">
-                              {imageMetadata.exif_data.camera.make} {imageMetadata.exif_data.camera.model}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Photo Date/Time */}
-                        {imageMetadata.exif_data.DateTimeOriginal && (
-                          <div className="border-b border-white/10 pb-2">
-                            <span className="block text-gray-500 mb-1">Photo Taken</span>
-                            <span className="text-gray-200">
-                              {new Date(imageMetadata.exif_data.DateTimeOriginal).toLocaleString()}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Technical Settings */}
-                        {imageMetadata.exif_data.technical && (
-                          <div className="border-b border-white/10 pb-2">
-                            <span className="block text-gray-500 mb-1">Camera Settings</span>
-                            <div className="text-gray-200 font-mono text-[10px]">
-                              {imageMetadata.exif_data.technical.iso && `ISO ${imageMetadata.exif_data.technical.iso}`}
-                              {imageMetadata.exif_data.technical.aperture && ` • ${imageMetadata.exif_data.technical.aperture}`}
-                              {imageMetadata.exif_data.technical.shutterSpeed && ` • ${imageMetadata.exif_data.technical.shutterSpeed}`}
-                              {imageMetadata.exif_data.technical.focalLength && ` • ${imageMetadata.exif_data.technical.focalLength}`}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Location */}
-                        {imageMetadata.exif_data.location && (imageMetadata.exif_data.location.latitude || imageMetadata.exif_data.location.city) && (
-                          <div className="border-b border-white/10 pb-2">
-                            <span className="block text-gray-500 mb-1">Location</span>
-                            <div className="text-gray-200">
-                              {imageMetadata.exif_data.location.city && `${imageMetadata.exif_data.location.city}, ${imageMetadata.exif_data.location.state}`}
-                              {imageMetadata.exif_data.location.latitude && (
-                                <div className="text-[10px] text-gray-400 mt-1">
-                                  {imageMetadata.exif_data.location.latitude.toFixed(4)}, {imageMetadata.exif_data.location.longitude.toFixed(4)}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Dimensions */}
-                        {imageMetadata.exif_data.dimensions && (
-                          <div>
-                            <span className="block text-gray-500 mb-1">Dimensions</span>
-                            <span className="text-gray-200">
-                              {imageMetadata.exif_data.dimensions.width} × {imageMetadata.exif_data.dimensions.height}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Action Buttons - At bottom of info tab */}
                   {canEdit && (
