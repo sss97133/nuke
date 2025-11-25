@@ -321,7 +321,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [newComment, setNewComment] = useState('');
   const [locationDisplay, setLocationDisplay] = useState<'coordinates' | 'city' | 'org'>('city');
   
-  // Mobile Info Panel State
+  // Mobile Info Panel State - Start closed, swipe up to reveal
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const infoPanelRef = useRef<any>(null);
   
@@ -854,25 +854,6 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 {title}
               </span>
             )}
-            
-            <button 
-              onClick={() => setShowInfoPanel(!showInfoPanel)}
-              style={{ 
-                fontFamily: 'Arial, sans-serif', 
-                fontSize: '8px', 
-                padding: '2px 4px', 
-                flexShrink: 0,
-                color: showInfoPanel ? '#fff' : 'rgba(255,255,255,0.6)',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              INFO
-            </button>
           </div>
         </div>
 
@@ -1171,9 +1152,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         </div>
       </div>
 
-        {/* Sidebar - Cursor Style */}
+        {/* Sidebar - Cursor Style - Narrower to keep image visible */}
         {showSidebar && (
-          <div className="w-80 sm:w-80 w-full bg-[#111] border-l-2 border-white/20 flex flex-col overflow-hidden">
+          <div className="w-64 sm:w-64 w-full bg-[#111] border-l-2 border-white/20 flex flex-col overflow-hidden">
             {/* Tabs - Cursor Style */}
             <div className="flex border-b-2 border-white/20">
               {canEdit && (
