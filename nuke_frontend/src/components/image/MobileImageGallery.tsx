@@ -98,7 +98,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
   };
 
   const currentImage = images[currentIndex];
-  const imageUrl = currentImage?.large_url || currentImage?.image_url || leadImageUrl;
+  const imageUrl = currentImage?.image_url || leadImageUrl;
 
   return (
     <div
