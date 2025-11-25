@@ -1097,11 +1097,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative" style={{ minHeight: 0 }}>
         {/* Image Canvas */}
       <div
         ref={containerRef}
           className="flex-1 flex items-center justify-center p-4 relative"
+          style={{ minWidth: 0, minHeight: 0 }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -1110,7 +1111,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           style={{
             position: 'relative',
             maxWidth: '100%',
-            maxHeight: '100%'
+            maxHeight: '100%',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
         >
           <img
@@ -1118,14 +1124,18 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             src={imageUrl}
             alt="Vehicle"
             onLoad={() => setImageLoaded(true)}
-            className="max-w-full max-h-full object-contain select-none"
+            className="object-contain select-none"
             style={{ 
               pointerEvents: 'auto',
               transform: `rotate(${rotation}deg) scale(${zoom})`,
               transition: 'transform 0.3s ease, filter 0.3s ease',
               display: 'block',
               filter: isSensitive ? 'blur(20px)' : 'none',
-              cursor: zoom > 1 ? 'grab' : 'default'
+              cursor: zoom > 1 ? 'grab' : 'default',
+              maxWidth: '100%',
+              maxHeight: '100%',
+              width: 'auto',
+              height: 'auto'
             }}
           />
 
