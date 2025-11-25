@@ -41,6 +41,11 @@ const TAG_TYPES = [
 
 // Helper function to get optimal image URL based on variants
 const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' | 'full' = 'medium'): string => {
+  // For 'full', always use the original image_url (highest quality)
+  if (size === 'full') {
+    return image.image_url;
+  }
+  
   // First check if variants JSONB exists and has the requested size
   if (image.variants && typeof image.variants === 'object') {
     const variant = image.variants[size];
@@ -1315,7 +1320,7 @@ const ImageGallery = ({
       {/* Image Lightbox - Using proper ImageLightbox component with tags */}
       {lightboxOpen && currentImage && (
         <ImageLightbox
-          imageUrl={getOptimalImageUrl(currentImage, 'large')}
+          imageUrl={getOptimalImageUrl(currentImage, 'full')}
           imageId={currentImage.id}
           vehicleId={vehicleId}
           isOpen={lightboxOpen}
