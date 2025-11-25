@@ -96,7 +96,6 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
             model,
             trim,
             vin,
-            vin_is_valid,
             current_value,
             mileage,
             sale_status

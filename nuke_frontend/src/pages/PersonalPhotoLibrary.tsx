@@ -95,36 +95,39 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [photosData, vehiclesData, suggestionsData, albumsData] = await Promise.all([
-        PersonalPhotoLibraryService.getUnorganizedPhotos(10000),
+      // Use optimized RPC functions for better performance
+      const [photosResult, statsResult, vehiclesData, suggestionsData, albumsData] = await Promise.all([
+        PersonalPhotoLibraryService.getUnorganizedPhotos(10000, 0),
+        PersonalPhotoLibraryService.getLibraryStats(),
         supabase.from('vehicles').select('id, year, make, model, trim').order('year', { ascending: false }).then(r => r.data || []),
         PersonalPhotoLibraryService.getVehicleSuggestions(),
         ImageSetService.getPersonalAlbums()
       ]);
 
+      const photosData = photosResult.photos;
       setAllPhotos(photosData);
       setVehicles(vehiclesData);
       setSuggestions(suggestionsData);
       setPersonalAlbums(albumsData);
       
-      // Calculate counts
+      // Use stats from optimized RPC if available, otherwise calculate from photos
       const newCounts = {
-        total: photosData.length,
-        organized: photosData.filter(p => p.organization_status === 'organized').length,
-        unorganized: photosData.filter(p => p.organization_status === 'unorganized').length,
-        aiComplete: photosData.filter(p => p.ai_processing_status === 'complete').length,
-        aiPending: photosData.filter(p => p.ai_processing_status === 'pending').length,
-        aiProcessing: photosData.filter(p => p.ai_processing_status === 'processing').length,
-        aiFailed: photosData.filter(p => p.ai_processing_status === 'failed').length,
-        vehicleFound: photosData.filter(p => p.ai_detected_vehicle).length,
-        noVehicle: photosData.filter(p => !p.ai_detected_vehicle).length,
-        anglesFront: photosData.filter(p => p.ai_detected_angle?.includes('front')).length,
-        anglesRear: photosData.filter(p => p.ai_detected_angle?.includes('rear')).length,
-        anglesSide: photosData.filter(p => p.ai_detected_angle?.includes('side')).length,
-        anglesInterior: photosData.filter(p => p.ai_detected_angle === 'interior').length,
-        anglesEngineBay: photosData.filter(p => p.ai_detected_angle === 'engine_bay').length,
-        anglesUndercarriage: photosData.filter(p => p.ai_detected_angle === 'undercarriage').length,
-        anglesDetail: photosData.filter(p => p.ai_detected_angle === 'detail').length
+        total: statsResult.total_photos || photosData.length,
+        organized: statsResult.organized_photos || photosData.filter(p => p.organization_status === 'organized').length,
+        unorganized: statsResult.unorganized_photos || photosData.filter(p => p.organization_status === 'unorganized').length,
+        aiComplete: statsResult.ai_status_breakdown?.complete || photosData.filter(p => p.ai_processing_status === 'complete').length,
+        aiPending: statsResult.ai_status_breakdown?.pending || photosData.filter(p => p.ai_processing_status === 'pending').length,
+        aiProcessing: statsResult.ai_status_breakdown?.processing || photosData.filter(p => p.ai_processing_status === 'processing').length,
+        aiFailed: statsResult.ai_status_breakdown?.failed || photosData.filter(p => p.ai_processing_status === 'failed').length,
+        vehicleFound: statsResult.vehicle_detection?.found || photosData.filter(p => p.ai_detected_vehicle).length,
+        noVehicle: statsResult.vehicle_detection?.not_found || photosData.filter(p => !p.ai_detected_vehicle).length,
+        anglesFront: statsResult.angle_breakdown?.front || photosData.filter(p => p.ai_detected_angle?.includes('front')).length,
+        anglesRear: statsResult.angle_breakdown?.rear || photosData.filter(p => p.ai_detected_angle?.includes('rear')).length,
+        anglesSide: statsResult.angle_breakdown?.side || photosData.filter(p => p.ai_detected_angle?.includes('side')).length,
+        anglesInterior: statsResult.angle_breakdown?.interior || photosData.filter(p => p.ai_detected_angle === 'interior').length,
+        anglesEngineBay: statsResult.angle_breakdown?.engine_bay || photosData.filter(p => p.ai_detected_angle === 'engine_bay').length,
+        anglesUndercarriage: statsResult.angle_breakdown?.undercarriage || photosData.filter(p => p.ai_detected_angle === 'undercarriage').length,
+        anglesDetail: statsResult.angle_breakdown?.detail || photosData.filter(p => p.ai_detected_angle === 'detail').length
       };
       setCounts(newCounts);
       

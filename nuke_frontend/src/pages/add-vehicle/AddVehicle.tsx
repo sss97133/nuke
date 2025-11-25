@@ -920,7 +920,8 @@ Redirecting to vehicle profile...`);
               discoverySource = mapDiscoverySourceToCategory(formData.listing_source || lastScrapedData?.source);
             }
             
-            await supabase.from('discovered_vehicles').upsert({
+            // Try with relationship_type first
+            let upsertData: any = {
               user_id: user.id,
               vehicle_id: vehicleId,
               relationship_type: relationshipType,
@@ -929,7 +930,21 @@ Redirecting to vehicle profile...`);
               interest_level: 'high',
               is_active: true,
               created_at: new Date().toISOString()
-            }, { onConflict: 'vehicle_id,user_id' });
+            };
+            
+            const { error: upsertError } = await supabase
+              .from('discovered_vehicles')
+              .upsert(upsertData, { onConflict: 'vehicle_id,user_id' });
+            
+            // If relationship_type column doesn't exist, try without it
+            if (upsertError && upsertError.message?.includes('relationship_type')) {
+              delete upsertData.relationship_type;
+              await supabase
+                .from('discovered_vehicles')
+                .upsert(upsertData, { onConflict: 'vehicle_id,user_id' });
+            } else if (upsertError) {
+              throw upsertError;
+            }
           } catch (err) {
             console.warn('Failed to upsert discovered_vehicles entry:', err);
           }

@@ -123,6 +123,112 @@ const ImageGallery = ({
   const [showToolSearch, setShowToolSearch] = useState(false);
   const [toolSearchTerm, setToolSearchTerm] = useState('');
 
+  // Define getSortedImages BEFORE loadMoreImages (which depends on it)
+  const getSortedImages = () => {
+    if (sortBy === 'quality') {
+      // Presentation sorting - best images first
+      // Try AI-based sorting first, fallback to heuristics if no angle data
+      try {
+        const sorted = sortImagesByPriority(allImages);
+        // Check if it actually sorted (has variety in positions)
+        if (sorted.length > 0) return sorted;
+      } catch (e) {
+        console.log('AI sorting unavailable, using heuristics');
+      }
+      
+      // Fallback: Smart heuristics when no AI angle data exists
+      return [...allImages].sort((a, b) => {
+        // Primary images always first
+        if (a.is_primary && !b.is_primary) return -1;
+        if (!a.is_primary && b.is_primary) return 1;
+        
+        // Category-based priority (exterior > interior > engine > other)
+        const catPriority: Record<string, number> = {
+          'exterior': 100,
+          'hero': 95,
+          'interior': 80,
+          'engine': 70,
+          'engine_bay': 70,
+          'undercarriage': 50,
+          'detail': 40,
+          'general': 30,
+          'work': 10,
+          'document': 5,
+          'receipt': -10
+        };
+        
+        const catA = catPriority[(a.category || 'general').toLowerCase()] || 20;
+        const catB = catPriority[(b.category || 'general').toLowerCase()] || 20;
+        
+        if (catA !== catB) return catB - catA;
+        
+        // Within same category, newer first
+        const dateA = new Date(a.taken_at || a.created_at).getTime();
+        const dateB = new Date(b.taken_at || b.created_at).getTime();
+        
+        if (dateA !== dateB) return dateB - dateA;
+        
+        // Stable fallback when dates are equal
+        return (a.id || '').localeCompare(b.id || '');
+      });
+    } else if (sortBy === 'date_desc') {
+      return [...allImages].sort((a, b) => {
+        const dateA = new Date(a.taken_at || a.created_at).getTime();
+        const dateB = new Date(b.taken_at || b.created_at).getTime();
+        
+        if (dateA !== dateB) return dateB - dateA;
+        
+        // Stable fallback when dates are equal
+        return (a.id || '').localeCompare(b.id || '');
+      });
+    } else {
+      // date_asc
+      return [...allImages].sort((a, b) => {
+        const dateA = new Date(a.taken_at || a.created_at).getTime();
+        const dateB = new Date(b.taken_at || b.created_at).getTime();
+        
+        if (dateA !== dateB) return dateA - dateB;
+        
+        // Stable fallback when dates are equal
+        return (a.id || '').localeCompare(b.id || '');
+      });
+    }
+  };
+
+  // Define loadMoreImages BEFORE the useEffect that uses it
+  const loadMoreImages = useCallback(() => {
+    if (loadingMore || displayedImages.length >= allImages.length) return;
+    
+    if (!infiniteScrollEnabled) {
+      // First click - enable infinite scroll
+      setInfiniteScrollEnabled(true);
+    }
+    
+    setLoadingMore(true);
+    const currentCount = displayedImages.length;
+    const sortedImages = getSortedImages();
+    const nextBatch = sortedImages.slice(currentCount, currentCount + imagesPerPage);
+
+    setTimeout(() => {
+      setDisplayedImages(prev => {
+        const newImages = [...prev, ...nextBatch];
+        // Load tag counts after state updates
+        setTimeout(() => loadImageTagCounts(), 100);
+        // Also load comment counts, uploader names, and tag texts for new batch
+        setTimeout(() => {
+          loadImageCommentCounts(newImages.map(img => img.id));
+          loadUploaderNames(newImages.map(img => img.user_id).filter(Boolean));
+          loadImageTagTexts(newImages.map(img => img.id));
+          loadImageViewCounts(newImages.map(img => img.id));
+          loadUploaderOrgNames(newImages.map(img => img.user_id).filter(Boolean));
+          loadImageAttributions(newImages.map(img => img.id));
+        }, 120);
+        return newImages;
+      });
+      setLoadingMore(false);
+    }, 300); // Small delay for smooth UX
+  }, [loadingMore, displayedImages.length, allImages.length, infiniteScrollEnabled, sortBy, allImages, imagesPerPage]);
+
   // Infinite scroll observer
   useEffect(() => {
     if (!infiniteScrollEnabled || !sentinelRef.current || !showImages) return;
@@ -508,41 +614,6 @@ const ImageGallery = ({
     setShowImages(true);
     loadMoreImages();
   };
-
-  const loadMoreImages = useCallback(() => {
-    if (loadingMore || displayedImages.length >= allImages.length) return;
-    
-    if (!infiniteScrollEnabled) {
-      // First click - enable infinite scroll
-      setInfiniteScrollEnabled(true);
-    }
-    
-    setLoadingMore(true);
-    const currentCount = displayedImages.length;
-    const sortedImages = getSortedImages();
-    const nextBatch = sortedImages.slice(currentCount, currentCount + imagesPerPage);
-
-    setTimeout(() => {
-      setDisplayedImages(prev => {
-        const newImages = [...prev, ...nextBatch];
-        // Load tag counts after state updates
-        setTimeout(() => loadImageTagCounts(), 100);
-        // Also load comment counts, uploader names, and tag texts for new batch
-        setTimeout(() => {
-          loadImageCommentCounts(newImages.map(img => img.id));
-          loadUploaderNames(newImages.map(img => img.user_id).filter(Boolean));
-          loadImageTagTexts(newImages.map(img => img.id));
-          loadImageViewCounts(newImages.map(img => img.id));
-          loadUploaderOrgNames(newImages.map(img => img.user_id).filter(Boolean));
-          loadImageAttributions(newImages.map(img => img.id));
-        }, 120);
-        return newImages;
-      });
-      setLoadingMore(false);
-    }, 300); // Small delay for smooth UX
-  }, [loadingMore, displayedImages.length, allImages.length, infiniteScrollEnabled, sortBy, allImages, imagesPerPage]);
-
-  const getSortedImages = () => {
     if (sortBy === 'quality') {
       // Presentation sorting - best images first
       // Try AI-based sorting first, fallback to heuristics if no angle data
@@ -843,7 +914,6 @@ const ImageGallery = ({
 
   // Save a new tag to the database (disabled - using new tagging system)
   const saveTag = async (tagId: string) => {
-
     // Remove the temporary tag from UI
     setImageTags(prev => prev.filter(t => t.id !== tagId));
     setTagText('');

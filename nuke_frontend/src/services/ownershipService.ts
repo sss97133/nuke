@@ -274,18 +274,24 @@ export class OwnershipService {
         const now = new Date();
         // For each org linked to this vehicle, check if user is a member
         for (const orgVehicle of orgVehicles) {
-          const orgMemberQuery = await supabase
-            .from('organization_contributors')
-            .select('role, status, start_date, end_date')
-            .eq('organization_id', orgVehicle.organization_id)
-            .eq('user_id', session.user.id)
-            .catch(err => {
-              console.warn('[OwnershipService] organization_contributors table missing or RLS blocked:', err.message);
-              return { data: null, error: err };
-            });
-          const { data: orgMember, error: orgMemberError } = orgMemberQuery
-            .eq('status', 'active')
-            .maybeSingle();
+          let orgMember: any = null;
+          let orgMemberError: any = null;
+          
+          try {
+            const { data, error } = await supabase
+              .from('organization_contributors')
+              .select('role, status, start_date, end_date')
+              .eq('organization_id', orgVehicle.organization_id)
+              .eq('user_id', session.user.id)
+              .eq('status', 'active')
+              .maybeSingle();
+            
+            orgMember = data;
+            orgMemberError = error;
+          } catch (err: any) {
+            console.warn('[OwnershipService] organization_contributors table missing or RLS blocked:', err?.message);
+            orgMemberError = err;
+          }
           
           if (orgMemberError) {
             console.warn('[OwnershipService] Error checking org membership:', orgMemberError);

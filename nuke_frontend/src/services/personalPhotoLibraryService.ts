@@ -93,8 +93,14 @@ export interface LibraryStats {
 export class PersonalPhotoLibraryService {
   /**
    * Get all unorganized photos (inbox)
+   * Uses optimized RPC function for better performance
    */
-  static async getUnorganizedPhotos(limit = 1000, offset = 0): Promise<PersonalPhoto[]> {
+  static async getUnorganizedPhotos(
+    limit = 1000, 
+    offset = 0,
+    filterStatus?: string,
+    filterAngle?: string
+  ): Promise<{ photos: PersonalPhoto[]; totalCount: number }> {
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) {
       throw new Error('Not authenticated');
@@ -102,6 +108,28 @@ export class PersonalPhotoLibraryService {
 
     const userId = session.session.user.id;
 
+    // Try optimized RPC function first
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      'get_unorganized_photos_optimized',
+      {
+        p_user_id: userId,
+        p_limit: limit,
+        p_offset: offset,
+        p_filter_status: filterStatus || null,
+        p_filter_angle: filterAngle || null
+      }
+    );
+
+    if (!rpcError && rpcData) {
+      return {
+        photos: (rpcData.photos || []) as PersonalPhoto[],
+        totalCount: rpcData.total_count || 0
+      };
+    }
+
+    // Fallback to separate queries if RPC doesn't exist
+    console.warn('[PhotoLibrary] RPC function not available, using fallback queries');
+    
     const { data, error } = await supabase
       .from('vehicle_images')
       .select('*')
@@ -135,11 +163,22 @@ export class PersonalPhotoLibraryService {
       }
     }
 
+    // Get total count
+    const { count } = await supabase
+      .from('vehicle_images')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .is('vehicle_id', null)
+      .or('organization_status.eq.unorganized,organization_status.is.null');
+
     // Transform and add album_count
-    return images.map((img: any) => ({
-      ...img,
-      album_count: albumCounts[img.id] || 0
-    }));
+    return {
+      photos: images.map((img: any) => ({
+        ...img,
+        album_count: albumCounts[img.id] || 0
+      })),
+      totalCount: count || 0
+    };
   }
 
   /**
@@ -196,8 +235,13 @@ export class PersonalPhotoLibraryService {
 
   /**
    * Get library statistics
+   * Uses optimized RPC function for better performance
    */
-  static async getLibraryStats(): Promise<LibraryStats> {
+  static async getLibraryStats(): Promise<LibraryStats & {
+    ai_status_breakdown?: { complete: number; pending: number; processing: number; failed: number };
+    angle_breakdown?: { front: number; rear: number; side: number; interior: number; engine_bay: number; undercarriage: number; detail: number };
+    vehicle_detection?: { found: number; not_found: number };
+  }> {
     const { data: session } = await supabase.auth.getSession();
     if (!session?.session?.user) {
       throw new Error('Not authenticated');
@@ -205,6 +249,29 @@ export class PersonalPhotoLibraryService {
 
     const userId = session.session.user.id;
 
+    // Try optimized RPC function first
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      'get_photo_library_stats',
+      { p_user_id: userId }
+    );
+
+    if (!rpcError && rpcData) {
+      return {
+        total_photos: rpcData.total_photos || 0,
+        unorganized_photos: rpcData.unorganized_photos || 0,
+        organized_photos: rpcData.organized_photos || 0,
+        pending_ai_processing: rpcData.pending_ai_processing || 0,
+        ai_suggestions_count: rpcData.ai_suggestions_count || 0,
+        total_file_size: rpcData.total_file_size || 0,
+        ai_status_breakdown: rpcData.ai_status_breakdown,
+        angle_breakdown: rpcData.angle_breakdown,
+        vehicle_detection: rpcData.vehicle_detection
+      };
+    }
+
+    // Fallback to separate queries if RPC doesn't exist
+    console.warn('[PhotoLibrary] RPC stats function not available, using fallback queries');
+    
     // Get counts
     const [unorganizedResult, organizedResult, aiPendingResult, suggestionsResult] = await Promise.all([
       supabase.from('vehicle_images')

@@ -110,11 +110,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       <UploadStatusBar />
       
       {/* Main Navigation Header */}
-      <header className="app-header" style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 100
-      }}>
+      <div className="header-wrapper">
         <div className="header-content">
           <div className="header-left">
             <button
@@ -179,7 +175,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             )}
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Page Header with Title and Actions */}
       {(title || breadcrumbs || showBackButton || primaryAction) && (

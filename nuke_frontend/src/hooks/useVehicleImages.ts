@@ -100,45 +100,45 @@ export const useVehiclesWithImages = () => {
     setError(null);
     
     try {
-      // Get vehicles with their primary images
-      const { data: vehiclesData, error: vehiclesError } = await supabase
+      // Fetch vehicles and images separately to avoid PostgREST ambiguity
+      const { data: allVehiclesData, error: vehiclesError } = await supabase
         .from('vehicles')
-        .select(`
-          *,
-          vehicle_images!inner(
-            id,
-            image_url,
-            is_primary
-          )
-        `)
-        .eq('vehicle_images.is_primary', true);
+        .select('*');
 
       if (vehiclesError) {
         throw vehiclesError;
       }
 
-      // Also get vehicles without images
-      const { data: vehiclesWithoutImages, error: noImagesError } = await supabase
-        .from('vehicles')
-        .select('*')
-        .not('id', 'in', `(${(vehiclesData || []).map(v => `'${v.id}'`).join(',') || "''"})`)
-;
-
-      if (noImagesError) {
-        throw noImagesError;
+      if (!allVehiclesData || allVehiclesData.length === 0) {
+        setVehicles([]);
+        return;
       }
 
+      // Fetch primary images for all vehicles
+      const vehicleIds = allVehiclesData.map(v => v.id);
+      const { data: primaryImages, error: imagesError } = await supabase
+        .from('vehicle_images')
+        .select('vehicle_id, image_url, is_primary')
+        .in('vehicle_id', vehicleIds)
+        .eq('is_primary', true);
+
+      if (imagesError) {
+        throw imagesError;
+      }
+
+      // Create map of vehicle_id -> primary image URL
+      const primaryImageMap = new Map<string, string>();
+      (primaryImages || []).forEach(img => {
+        if (img.is_primary && img.image_url) {
+          primaryImageMap.set(img.vehicle_id, img.image_url);
+        }
+      });
+
       // Combine and format results
-      const allVehicles = [
-        ...(vehiclesData || []).map(vehicle => ({
-          ...vehicle,
-          primaryImage: vehicle.vehicle_images?.[0]?.image_url || null
-        })),
-        ...(vehiclesWithoutImages || []).map(vehicle => ({
-          ...vehicle,
-          primaryImage: null
-        }))
-      ];
+      const allVehicles = allVehiclesData.map(vehicle => ({
+        ...vehicle,
+        primaryImage: primaryImageMap.get(vehicle.id) || null
+      }));
 
       setVehicles(allVehicles);
       
