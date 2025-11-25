@@ -22,6 +22,15 @@ interface SoldVehicle {
   sold_at?: string | null;
   primary_image?: string | null;
   image_count: number;
+  // Proof data
+  proof_url?: string | null;
+  proof_platform?: string | null;
+  proof_type?: string | null;
+  proof_confidence?: number | null;
+  bat_auction_url?: string | null;
+  external_listing_id?: string | null;
+  timeline_event_id?: string | null;
+  timeline_bat_url?: string | null;
 }
 
 interface Props {
@@ -38,6 +47,7 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'price' | 'year'>('date');
+  const [selectedProof, setSelectedProof] = useState<SoldVehicle | null>(null);
 
   useEffect(() => {
     loadSoldVehicles();
@@ -46,6 +56,23 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
   const loadSoldVehicles = async () => {
     setLoading(true);
     try {
+      // Fetch vehicles and organization_vehicles separately to avoid PostgREST ordering issues
+      const { data: orgVehicles, error: orgError } = await supabase
+        .from('organization_vehicles')
+        .select('id, vehicle_id, sale_price, sale_date, listing_status')
+        .eq('organization_id', organizationId)
+        .eq('listing_status', 'sold')
+        .order('sale_date', { ascending: false, nullsFirst: false });
+
+      if (orgError) throw orgError;
+
+      if (!orgVehicles || orgVehicles.length === 0) {
+        setSoldVehicles([]);
+        setLoading(false);
+        return;
+      }
+
+      const vehicleIds = orgVehicles.map(ov => ov.vehicle_id);
       const { data, error } = await supabase
         .from('vehicles')
         .select(`
@@ -58,23 +85,31 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
           displacement,
           transmission,
           drivetrain,
-          mileage,
-          organization_vehicles!inner(
-            id,
-            sale_price,
-            sale_date,
-            listing_status
-          )
+          mileage
         `)
-        .eq('organization_vehicles.organization_id', organizationId)
-        .eq('organization_vehicles.listing_status', 'sold')
-        .order('organization_vehicles.sale_date', { ascending: false });
+        .in('id', vehicleIds);
 
       if (error) throw error;
+
+      // Create map of vehicle_id -> orgVehicle data
+      const orgVehicleMap = new Map(orgVehicles.map(ov => [ov.vehicle_id, ov]));
+
+      // Fetch proof data from sold_vehicle_proof view
+      const { data: proofData } = await supabase
+        .from('sold_vehicle_proof')
+        .select('*')
+        .eq('organization_id', organizationId);
+
+      const proofMap = new Map((proofData || []).map((p: any) => [p.vehicle_id, p]));
 
       // Fetch external listing data (BaT, etc)
       const enriched = await Promise.all(
         (data || []).map(async (v: any) => {
+          const orgVehicle = orgVehicleMap.get(v.id);
+          if (!orgVehicle) return null;
+
+          const proof = proofMap.get(v.id);
+
           // Get primary image
           const { data: img } = await supabase
             .from('vehicle_images')
@@ -103,14 +138,12 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
             .select('id', { count: 'exact', head: true })
             .eq('vehicle_id', v.id);
 
-          // Get external listing data
+          // Get external listing data (fallback if proof doesn't have it)
           const { data: externalListing } = await supabase
             .from('external_listings')
             .select('platform, listing_url, final_price, sold_at')
             .eq('vehicle_id', v.id)
             .maybeSingle();
-
-          const orgVehicle = v.organization_vehicles[0];
           
           return {
             id: orgVehicle.id,
@@ -126,17 +159,34 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
             mileage: v.mileage,
             sale_price: orgVehicle.sale_price ? parseFloat(orgVehicle.sale_price) : null,
             sale_date: orgVehicle.sale_date,
-            platform: externalListing?.platform,
-            listing_url: externalListing?.listing_url,
+            platform: proof?.proof_platform || externalListing?.platform,
+            listing_url: proof?.proof_url || externalListing?.listing_url,
             final_price: externalListing?.final_price,
             sold_at: externalListing?.sold_at,
             primary_image: img?.thumbnail_url || img?.medium_url || img?.image_url,
-            image_count: imageCount || 0
+            image_count: imageCount || 0,
+            // Proof data
+            proof_url: proof?.proof_url,
+            proof_platform: proof?.proof_platform,
+            proof_type: proof?.proof_type,
+            proof_confidence: proof?.proof_confidence,
+            bat_auction_url: proof?.bat_auction_url,
+            external_listing_id: proof?.external_listing_id,
+            timeline_event_id: proof?.timeline_event_id,
+            timeline_bat_url: proof?.timeline_bat_url
           };
         })
       );
 
-      setSoldVehicles(enriched as SoldVehicle[]);
+      // Filter out nulls and sort by sale_date
+      const validEnriched = enriched.filter(v => v !== null) as SoldVehicle[];
+      validEnriched.sort((a, b) => {
+        const dateA = a.sale_date ? new Date(a.sale_date).getTime() : 0;
+        const dateB = b.sale_date ? new Date(b.sale_date).getTime() : 0;
+        return dateB - dateA; // Descending
+      });
+
+      setSoldVehicles(validEnriched);
     } catch (error) {
       console.error('Failed to load sold vehicles:', error);
     } finally {
@@ -171,14 +221,28 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
     return `$${price.toLocaleString()}`;
   };
 
-  const formatPlatform = (platform?: string | null) => {
-    if (!platform) return 'Private Sale';
+  const formatPlatform = (vehicle: SoldVehicle) => {
+    // Use proof_platform if available (most accurate)
+    const platform = vehicle.proof_platform || vehicle.platform;
+    
+    if (!platform || platform === 'unknown') {
+      // Check if we have any proof at all
+      if (vehicle.proof_url || vehicle.bat_auction_url || vehicle.timeline_bat_url) {
+        return 'Bring a Trailer'; // Likely BaT if we have a URL
+      }
+      return 'Private Sale';
+    }
+    
     const platforms: Record<string, string> = {
       'bat': 'Bring a Trailer',
+      'ebay_motors': 'eBay Motors',
       'ebay': 'eBay Motors',
+      'cars_and_bids': 'Cars & Bids',
       'cars_bids': 'Cars & Bids',
       'hemmings': 'Hemmings',
-      'classic_com': 'Classic.com'
+      'classic_com': 'Classic.com',
+      'autotrader': 'AutoTrader',
+      'facebook_marketplace': 'Facebook Marketplace'
     };
     return platforms[platform] || platform;
   };
@@ -303,18 +367,30 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
                   : 'var(--grey-200)',
                 position: 'relative'
               }}>
-                {/* Sold badge */}
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  left: '8px',
-                  background: 'rgba(220, 38, 38, 0.95)',
-                  color: 'white',
-                  padding: '4px 10px',
-                  borderRadius: '2px',
-                  fontSize: '7pt',
-                  fontWeight: 700
-                }}>
+                {/* Sold badge - clickable to show proof */}
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedProof(vehicle);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    background: 'rgba(220, 38, 38, 0.95)',
+                    color: 'white',
+                    padding: '4px 10px',
+                    borderRadius: '2px',
+                    fontSize: '7pt',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'background 0.12s',
+                    zIndex: 10
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(220, 38, 38, 1)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(220, 38, 38, 0.95)'}
+                  title="Click to view sale proof"
+                >
                   SOLD
                 </div>
 
@@ -367,7 +443,7 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', color: 'var(--text-muted)' }}>
                     <span>Sold on:</span>
-                    <span style={{ fontWeight: 600 }}>{formatPlatform(vehicle.platform)}</span>
+                    <span style={{ fontWeight: 600 }}>{formatPlatform(vehicle)}</span>
                   </div>
                   {vehicle.sale_date && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', color: 'var(--text-muted)' }}>
@@ -375,9 +451,9 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
                       <span style={{ fontWeight: 600 }}>{new Date(vehicle.sale_date).toLocaleDateString()}</span>
                     </div>
                   )}
-                  {vehicle.listing_url && (
+                  {(vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url) && (
                     <a
-                      href={vehicle.listing_url}
+                      href={vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
@@ -426,17 +502,29 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
                   : 'var(--grey-200)',
                 position: 'relative'
               }}>
-                <div style={{
-                  position: 'absolute',
-                  top: '6px',
-                  left: '6px',
-                  background: 'rgba(220, 38, 38, 0.95)',
-                  color: 'white',
-                  padding: '3px 8px',
-                  borderRadius: '2px',
-                  fontSize: '6pt',
-                  fontWeight: 700
-                }}>
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedProof(vehicle);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '6px',
+                    left: '6px',
+                    background: 'rgba(220, 38, 38, 0.95)',
+                    color: 'white',
+                    padding: '3px 8px',
+                    borderRadius: '2px',
+                    fontSize: '6pt',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'background 0.12s',
+                    zIndex: 10
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(220, 38, 38, 1)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(220, 38, 38, 0.95)'}
+                  title="Click to view sale proof"
+                >
                   SOLD
                 </div>
               </div>
@@ -518,19 +606,19 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
                     {formatPrice(vehicle)}
                   </td>
                   <td style={{ padding: '10px' }}>
-                    {vehicle.listing_url ? (
+                    {(vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url) ? (
                       <a
-                        href={vehicle.listing_url}
+                        href={vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
                         style={{ color: 'var(--accent)', textDecoration: 'none' }}
                         className="hover:underline"
                       >
-                        {formatPlatform(vehicle.platform)}
+                        {formatPlatform(vehicle)}
                       </a>
                     ) : (
-                      formatPlatform(vehicle.platform)
+                      formatPlatform(vehicle)
                     )}
                   </td>
                   <td style={{ padding: '10px' }}>
@@ -543,6 +631,166 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Proof Modal */}
+      {selectedProof && (
+        <div
+          onClick={() => setSelectedProof(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '8px',
+              padding: '20px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>
+                Sale Proof: {selectedProof.year} {selectedProof.make} {selectedProof.model}
+              </h3>
+              <button
+                onClick={() => setSelectedProof(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '18pt',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: '0',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '9pt' }}>
+              {/* Proof Type */}
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>Proof Type:</div>
+                <div style={{ 
+                  padding: '6px 10px', 
+                  background: selectedProof.proof_confidence && selectedProof.proof_confidence >= 80 ? 'var(--success-dim)' : 'var(--warning-dim)',
+                  borderRadius: '4px',
+                  display: 'inline-block',
+                  fontWeight: 600
+                }}>
+                  {selectedProof.proof_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Manual Mark'}
+                  {selectedProof.proof_confidence && (
+                    <span style={{ marginLeft: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      ({selectedProof.proof_confidence}% confidence)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Platform */}
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>Platform:</div>
+                <div style={{ fontWeight: 600 }}>{formatPlatform(selectedProof)}</div>
+              </div>
+
+              {/* Proof URL */}
+              {(selectedProof.proof_url || selectedProof.bat_auction_url || selectedProof.timeline_bat_url) && (
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>Listing URL:</div>
+                  <a
+                    href={selectedProof.proof_url || selectedProof.bat_auction_url || selectedProof.timeline_bat_url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: 'var(--accent)',
+                      textDecoration: 'none',
+                      wordBreak: 'break-all',
+                      display: 'block',
+                      padding: '6px',
+                      background: 'var(--surface)',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border)'
+                    }}
+                    className="hover:underline"
+                  >
+                    {selectedProof.proof_url || selectedProof.bat_auction_url || selectedProof.timeline_bat_url}
+                  </a>
+                </div>
+              )}
+
+              {/* Sale Details */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {selectedProof.sale_date && (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>Sale Date:</div>
+                    <div>{new Date(selectedProof.sale_date).toLocaleDateString()}</div>
+                  </div>
+                )}
+                {selectedProof.sale_price && (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>Sale Price:</div>
+                    <div style={{ fontWeight: 600, color: 'var(--accent)' }}>
+                      ${selectedProof.sale_price.toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Proof Source Details */}
+              {selectedProof.external_listing_id && (
+                <div style={{ 
+                  padding: '8px', 
+                  background: 'var(--success-dim)', 
+                  borderRadius: '4px',
+                  fontSize: '8pt'
+                }}>
+                  <strong>External Listing Record:</strong> Verified sale through external_listings table (ID: {selectedProof.external_listing_id})
+                </div>
+              )}
+
+              {selectedProof.timeline_event_id && (
+                <div style={{ 
+                  padding: '8px', 
+                  background: 'var(--info-dim)', 
+                  borderRadius: '4px',
+                  fontSize: '8pt'
+                }}>
+                  <strong>Timeline Event:</strong> Sale recorded in timeline_events (ID: {selectedProof.timeline_event_id})
+                </div>
+              )}
+
+              {!selectedProof.proof_url && !selectedProof.bat_auction_url && !selectedProof.timeline_bat_url && (
+                <div style={{ 
+                  padding: '8px', 
+                  background: 'var(--warning-dim)', 
+                  borderRadius: '4px',
+                  fontSize: '8pt',
+                  color: 'var(--warning)'
+                }}>
+                  <strong>No external proof available.</strong> This vehicle was marked as sold manually or imported from a source without listing URLs.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

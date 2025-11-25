@@ -41,6 +41,8 @@ import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
 import LivePlayer from '../components/profile/LivePlayer';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
+import MyOrganizations from './MyOrganizations';
+import MyAuctions from './MyAuctions';
 import VehicleMergeInterface from '../components/vehicle/VehicleMergeInterface';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
@@ -54,7 +56,7 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'collection' | 'gallery' | 'professional' | 'organizations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'collection' | 'gallery' | 'professional' | 'organizations' | 'auctions'>('overview');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
@@ -521,8 +523,9 @@ const Profile: React.FC = () => {
             { key: 'collection', label: 'Collection', public: true },
             { key: 'gallery', label: 'Gallery', public: true },
             { key: 'professional', label: 'Professional' },
-            { key: 'organizations', label: 'Organizations' }
-          ].filter(tab => tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations').map((tab) => (
+            { key: 'organizations', label: 'My Organizations' },
+            { key: 'auctions', label: 'My Auctions' }
+          ].filter(tab => tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations' || tab.key === 'auctions').map((tab) => (
             <button
               key={tab.key}
               className="text-small"
@@ -591,7 +594,19 @@ const Profile: React.FC = () => {
             )}
             
             {activeTab === 'organizations' && (
-              <OrganizationAffiliations userId={profile.id} isOwnProfile={isOwnProfile} />
+              <div>
+                {isOwnProfile ? (
+                  <MyOrganizations />
+                ) : (
+                  <OrganizationAffiliations userId={profile.id} isOwnProfile={isOwnProfile} />
+                )}
+              </div>
+            )}
+
+            {activeTab === 'auctions' && isOwnProfile && (
+              <div>
+                <MyAuctions />
+              </div>
             )}
 
             {activeTab === 'overview' && isOwnProfile && (

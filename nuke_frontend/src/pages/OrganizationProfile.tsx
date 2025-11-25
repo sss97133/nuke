@@ -282,7 +282,7 @@ export default function OrganizationProfile() {
         try {
           const { data: orgVehicles, error: vehiclesError } = await supabase
             .from('organization_vehicles')
-            .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, sale_price, listing_status, asking_price')
+            .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, sale_price, listing_status, asking_price, cost_basis, days_on_lot')
             .eq('organization_id', organizationId)
             .or('status.eq.active,status.eq.sold,status.eq.archived')
             .order('created_at', { ascending: false });
@@ -315,9 +315,12 @@ export default function OrganizationProfile() {
                   vehicle_model: vehicleResult.data?.model,
                   vehicle_vin: vehicleResult.data?.vin,
                   vehicle_current_value: vehicleResult.data?.current_value,
-                  vehicle_asking_price: vehicleResult.data?.asking_price,
+                  vehicle_asking_price: vehicleResult.data?.asking_price || ov.asking_price,
                   vehicle_sale_status: vehicleResult.data?.sale_status,
                   vehicle_image_url: imageResult.data?.image_url,
+                  listing_status: ov.listing_status,
+                  cost_basis: ov.cost_basis,
+                  days_on_lot: ov.days_on_lot,
                   vehicles: vehicleResult.data || {}
                 };
               } catch {
@@ -366,7 +369,10 @@ export default function OrganizationProfile() {
           
           const enriched = await Promise.allSettled(
             contributorsData.map(async (c: any) => {
-              const { data: profile } = await supabase.from('profiles').select('id, full_name, username, avatar_url').eq('id', c.user_id).single();
+              if (!c.user_id) {
+                return { ...c, profiles: null };
+              }
+              const { data: profile } = await supabase.from('profiles').select('id, full_name, username, avatar_url').eq('id', c.user_id).maybeSingle();
               return { ...c, profiles: profile || null };
             })
           );
@@ -412,7 +418,10 @@ export default function OrganizationProfile() {
           
           const enriched = await Promise.allSettled(
             eventsData.map(async (e: any) => {
-              const { data: profile } = await supabase.from('profiles').select('full_name, username, avatar_url').eq('id', e.created_by).single();
+              if (!e.created_by) {
+                return { ...e, profiles: null };
+              }
+              const { data: profile } = await supabase.from('profiles').select('full_name, username, avatar_url').eq('id', e.created_by).maybeSingle();
               return { ...e, profiles: profile || null };
             })
           );
@@ -816,15 +825,21 @@ export default function OrganizationProfile() {
               </div>
               <div className="card-body">
                 {(() => {
-                  // Filter vehicles that are for sale (active inventory)
+                  // Filter vehicles that are current inventory (not sold, active)
+                  // Show vehicles that are:
+                  // 1. Not sold (listing_status != 'sold' AND sale_date IS NULL)
+                  // 2. Active status
+                  // 3. Preferably listing_status = 'for_sale' but include all active non-sold vehicles
                   const productsForSale = vehicles.filter(v => 
-                    v.relationship_type === 'in_stock' || v.relationship_type === 'consignment'
+                    v.status === 'active' &&
+                    v.listing_status !== 'sold' &&
+                    !v.sale_date
                   );
                   
                   if (productsForSale.length === 0) {
                     return (
                       <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
-                        No products currently for sale. Add inventory to display vehicles here.
+                        No current inventory. Add vehicles to display them here.
                       </div>
                     );
                   }
@@ -876,15 +891,29 @@ export default function OrganizationProfile() {
                           
                           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <div style={{
-                                fontSize: '7pt',
-                                padding: '2px 6px',
-                                borderRadius: '2px',
-                                background: 'var(--accent-dim)',
-                                color: 'var(--accent)'
-                              }}>
-                                {vehicle.relationship_type === 'consignment' ? 'Consignment' : 'In Stock'}
-                              </div>
+                              {vehicle.listing_status && (
+                                <div style={{
+                                  fontSize: '7pt',
+                                  padding: '2px 6px',
+                                  borderRadius: '2px',
+                                  background: vehicle.listing_status === 'for_sale' ? 'var(--success-dim)' : 'var(--accent-dim)',
+                                  color: vehicle.listing_status === 'for_sale' ? 'var(--success)' : 'var(--accent)'
+                                }}>
+                                  {vehicle.listing_status === 'for_sale' ? 'For Sale' : vehicle.listing_status === 'reserved' ? 'Reserved' : vehicle.listing_status || 'Active'}
+                                </div>
+                              )}
+                              {vehicle.relationship_type && (
+                                <div style={{
+                                  fontSize: '7pt',
+                                  padding: '2px 6px',
+                                  borderRadius: '2px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text-secondary)',
+                                  border: '1px solid var(--border)'
+                                }}>
+                                  {vehicle.relationship_type.replace(/_/g, ' ')}
+                                </div>
+                              )}
                             </div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                               {vehicle.vehicle_image_url && (

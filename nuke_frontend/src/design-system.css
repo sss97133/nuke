@@ -109,7 +109,7 @@
   box-shadow: none;
 }
 
-.win95 .app-header {
+.win95 .header-wrapper {
   background: var(--grey-200);
   border-bottom: 2px solid #cfcfcf;
 }
@@ -690,18 +690,7 @@ body {
   margin-top: auto;
 }
 
-.app-header {
-  background: var(--grey-200);
-  border-bottom: 1px solid var(--border-medium);
-  position: sticky; /* was fixed; compact layout prefers flush with content */
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  margin-top: 0;
-  margin-bottom: 0;
-  transition: padding 0.2s ease, height 0.2s ease;
-}
+/* .app-header removed - using .header-content directly instead */
 
 /* Fix sticky header positioning when GlobalUploadStatus is present */
 .global-upload-status {
@@ -715,7 +704,7 @@ body {
 }
 
 /* Add class-based approach for when upload status is active */
-.has-upload-status .app-header {
+.has-upload-status .header-wrapper {
   top: 60px;
 }
 
@@ -727,6 +716,16 @@ body {
 /* Also ensure content container has proper spacing */
 .content-container {
   padding-top: 0;
+}
+
+.header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--grey-200);
+  border-bottom: 1px solid var(--border-medium);
+  left: 0;
+  right: 0;
 }
 
 .header-content {
@@ -1989,7 +1988,7 @@ body {
   }
   
   .header-content {
-    padding: 0 var(--space-3);
+    padding: 0 5px; /* match desktop */
   }
   
   .profile-bubble {
@@ -3168,11 +3167,8 @@ body {
   }
 
   /* Navigation adjustments - keep same as desktop */
-  .app-header {
-    padding: var(--space-2) var(--space-3);
-  }
-
   .header-content {
+    padding: 0 5px; /* match desktop exactly */
     flex-wrap: nowrap;
     height: 40px !important;
     min-height: 40px !important;
@@ -3419,7 +3415,7 @@ body {
   }
   
   /* Ensure z-index hierarchy on mobile */
-  .app-header {
+  .header-wrapper {
     z-index: 100 !important;
   }
   

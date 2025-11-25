@@ -119,62 +119,329 @@ const VehiclesInner: React.FC = () => {
     try {
       console.log('Loading vehicle relationships for user:', session.user.id);
       
+      // Use optimized RPC function for single-query performance
+      // Falls back to separate queries if RPC doesn't exist
+      console.log('[Vehicles] Attempting to call RPC function: get_user_vehicle_relationships');
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_user_vehicle_relationships', { p_user_id: session.user.id });
+      
+      if (rpcError) {
+        console.error('[Vehicles] ❌ RPC function error:', rpcError);
+        console.error('[Vehicles] RPC error code:', rpcError.code);
+        console.error('[Vehicles] RPC error message:', rpcError.message);
+        console.error('[Vehicles] RPC error details:', rpcError.details);
+        console.error('[Vehicles] RPC error hint:', rpcError.hint);
+        console.error('[Vehicles] Full RPC error object:', JSON.stringify(rpcError, null, 2));
+        console.warn('[Vehicles] Falling back to separate queries');
+      } else if (rpcData) {
+        console.log('[Vehicles] ✅ RPC function succeeded, using optimized path');
+        console.log('[Vehicles] RPC data keys:', Object.keys(rpcData || {}));
+        console.log('[Vehicles] RPC data summary:', {
+          user_added: rpcData.user_added_vehicles?.length || 0,
+          discovered: rpcData.discovered_vehicles?.length || 0,
+          verified: rpcData.verified_ownerships?.length || 0
+        });
+      } else {
+        console.warn('[Vehicles] ⚠️ RPC function returned no data (null/undefined), using fallback');
+      }
+      
+      if (!rpcError && rpcData) {
+        // RPC function exists and worked - use optimized path
+        const userAddedVehicles = (rpcData.user_added_vehicles || []).map((item: any) => ({
+          ...item.vehicle,
+          vehicle_images: item.images || []
+        }));
+        
+        const discoveredVehicles = (rpcData.discovered_vehicles || []).map((item: any) => ({
+          relationship_type: item.relationship_type || 'interested',
+          vehicles: {
+            ...item.vehicle,
+            vehicle_images: item.images || []
+          }
+        }));
+        
+        const verifiedOwnerships = (rpcData.verified_ownerships || []).map((item: any) => ({
+          vehicle_id: item.vehicle_id,
+          vehicles: {
+            ...item.vehicle,
+            vehicle_images: item.images || []
+          }
+        }));
+        
+        // Process relationships (same logic as before)
+        const owned: VehicleRelationship[] = [];
+        const contributing: VehicleRelationship[] = [];
+        const interested: VehicleRelationship[] = [];
+        const discovered: VehicleRelationship[] = [];
+        const curated: VehicleRelationship[] = [];
+        const consigned: VehicleRelationship[] = [];
+        const previously_owned: VehicleRelationship[] = [];
+
+        // Process verified owned vehicles
+        verifiedOwnerships.forEach((ownership: any) => {
+          const vehicle = ownership.vehicles;
+          if (!vehicle) return;
+
+          const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
+          const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
+
+          owned.push({
+            vehicle: {
+              id: vehicle.id,
+              year: vehicle.year,
+              make: vehicle.make,
+              model: vehicle.model,
+              vin: vehicle.vin,
+              color: vehicle.color,
+              mileage: vehicle.mileage,
+              primaryImageUrl: imageUrl,
+              isAnonymous: false,
+              created_at: vehicle.created_at
+            },
+            relationshipType: 'owned',
+            role: 'Verified Owner',
+            lastActivity: vehicle.created_at
+          });
+        });
+
+        // Process discovered vehicles
+        discoveredVehicles.forEach((discovery: any) => {
+          const vehicle = discovery.vehicles;
+          if (!vehicle) return;
+
+          const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
+          const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
+
+          const relationshipType = discovery.relationship_type || 'interested';
+          const vehicleRelationship: VehicleRelationship = {
+            vehicle: {
+              id: vehicle.id,
+              year: vehicle.year,
+              make: vehicle.make,
+              model: vehicle.model,
+              vin: vehicle.vin,
+              color: vehicle.color,
+              mileage: vehicle.mileage,
+              primaryImageUrl: imageUrl,
+              isAnonymous: false,
+              created_at: vehicle.created_at
+            },
+            relationshipType: relationshipType as any,
+            role: relationshipType,
+            lastActivity: vehicle.created_at
+          };
+
+          switch (relationshipType) {
+            case 'discovered':
+              discovered.push(vehicleRelationship);
+              break;
+            case 'curated':
+              curated.push(vehicleRelationship);
+              break;
+            case 'consigned':
+              consigned.push(vehicleRelationship);
+              break;
+            case 'previously_owned':
+              previously_owned.push(vehicleRelationship);
+              break;
+            case 'interested':
+              interested.push(vehicleRelationship);
+              break;
+            default:
+              interested.push(vehicleRelationship);
+          }
+        });
+
+        // Process vehicles uploaded by user that don't have explicit relationships
+        const explicitVehicleIds = new Set([
+          ...verifiedOwnerships.map((o: any) => o.vehicle_id),
+          ...discoveredVehicles.map((d: any) => d.vehicles?.id).filter(Boolean)
+        ]);
+
+        userAddedVehicles.forEach((vehicle: any) => {
+          if (explicitVehicleIds.has(vehicle.id)) return;
+
+          const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
+          const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
+
+          contributing.push({
+            vehicle: {
+              id: vehicle.id,
+              year: vehicle.year,
+              make: vehicle.make,
+              model: vehicle.model,
+              vin: vehicle.vin,
+              color: vehicle.color,
+              mileage: vehicle.mileage,
+              primaryImageUrl: imageUrl,
+              isAnonymous: false,
+              created_at: vehicle.created_at
+            },
+            relationshipType: 'contributing',
+            role: 'Uploader (needs ownership verification)',
+            lastActivity: vehicle.created_at
+          });
+        });
+
+        setVehicleRelationships({ owned, contributing, interested, discovered, curated, consigned, previously_owned });
+        console.log(`[Vehicles] RPC: ${owned.length} owned, ${contributing.length} contributing, ${interested.length} interested`);
+        return;
+      }
+      
+      // Fallback: RPC doesn't exist or failed - use separate queries
+      console.warn('[Vehicles] RPC function not available, using fallback queries');
+      
       // Load vehicles and their relationships
       // Get all vehicles the user uploaded (for "Uploaded" tab, not "Owned")
-      const { data: userAddedVehicles, error: addedError } = await supabase
-        .from('vehicles')
-        .select('*, vehicle_images(image_url, is_primary, variants)')
-        .or(`user_id.eq.${session.user.id},uploaded_by.eq.${session.user.id}`);
+      // Query vehicles first, then fetch images separately to avoid PostgREST relationship ambiguity
+      const [userVehiclesResult, uploadedVehiclesResult] = await Promise.all([
+        supabase
+          .from('vehicles')
+          .select('*')
+          .eq('user_id', session.user.id),
+        supabase
+          .from('vehicles')
+          .select('*')
+          .eq('uploaded_by', session.user.id)
+      ]);
+      
+      // Combine results, deduplicate by id
+      const userVehicles = userVehiclesResult.data || [];
+      const uploadedVehicles = uploadedVehiclesResult.data || [];
+      const vehicleMap = new Map();
+      [...userVehicles, ...uploadedVehicles].forEach(v => {
+        if (!vehicleMap.has(v.id)) {
+          vehicleMap.set(v.id, v);
+        }
+      });
+      const userAddedVehicles = Array.from(vehicleMap.values());
+      const addedError = userVehiclesResult.error || uploadedVehiclesResult.error;
+      
+      // Fetch images separately for all vehicles
+      if (userAddedVehicles.length > 0) {
+        const vehicleIds = userAddedVehicles.map(v => v.id);
+        const { data: images } = await supabase
+          .from('vehicle_images')
+          .select('vehicle_id, image_url, is_primary, variants')
+          .in('vehicle_id', vehicleIds);
+        
+        // Attach images to vehicles
+        const imagesByVehicle = new Map();
+        (images || []).forEach(img => {
+          if (!imagesByVehicle.has(img.vehicle_id)) {
+            imagesByVehicle.set(img.vehicle_id, []);
+          }
+          imagesByVehicle.get(img.vehicle_id).push(img);
+        });
+        
+        userAddedVehicles.forEach(vehicle => {
+          vehicle.vehicle_images = imagesByVehicle.get(vehicle.id) || [];
+        });
+      }
 
       // Get explicit relationships from discovered_vehicles table
-      // Note: relationship_type column may not exist in older databases
+      // Query discovered_vehicles first, then fetch vehicles and images separately
       let discoveredVehicles: any[] = [];
       let discoveredError: any = null;
       
-      try {
-        const result = await supabase
+      const result = await supabase
+        .from('discovered_vehicles')
+        .select('relationship_type, vehicle_id')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true);
+      
+      if (result.error && result.error.message?.includes('relationship_type')) {
+        // Column doesn't exist, query without it and default to 'interested'
+        console.warn('[Vehicles] relationship_type column missing, using fallback');
+        const fallback = await supabase
           .from('discovered_vehicles')
-          .select(`
-            relationship_type,
-            vehicles:vehicle_id (*, vehicle_images(image_url, is_primary, variants))
-          `)
+          .select('vehicle_id')
           .eq('user_id', session.user.id)
           .eq('is_active', true);
         
+        discoveredVehicles = (fallback.data || []).map((dv: any) => ({
+          ...dv,
+          relationship_type: 'interested' // Default fallback
+        }));
+        discoveredError = fallback.error;
+      } else {
         discoveredVehicles = result.data || [];
         discoveredError = result.error;
-        
-        // If relationship_type column doesn't exist, try without it
-        if (discoveredError && discoveredError.message?.includes('relationship_type')) {
-          console.warn('[Vehicles] relationship_type column missing, fetching without it');
-          const fallbackResult = await supabase
-            .from('discovered_vehicles')
-            .select(`
-              vehicles:vehicle_id (*, vehicle_images(image_url, is_primary, variants))
-            `)
-            .eq('user_id', session.user.id)
-            .eq('is_active', true);
+      }
+      
+      // Fetch vehicles and images for discovered vehicles
+      if (discoveredVehicles.length > 0) {
+        const vehicleIds = discoveredVehicles.map(dv => dv.vehicle_id).filter(Boolean);
+        if (vehicleIds.length > 0) {
+          const { data: vehicles } = await supabase
+            .from('vehicles')
+            .select('*')
+            .in('id', vehicleIds);
           
-          discoveredVehicles = (fallbackResult.data || []).map((dv: any) => ({
+          const { data: images } = await supabase
+            .from('vehicle_images')
+            .select('vehicle_id, image_url, is_primary, variants')
+            .in('vehicle_id', vehicleIds);
+          
+          // Attach vehicles and images to discovered vehicles
+          const vehiclesMap = new Map((vehicles || []).map(v => [v.id, v]));
+          const imagesByVehicle = new Map();
+          (images || []).forEach(img => {
+            if (!imagesByVehicle.has(img.vehicle_id)) {
+              imagesByVehicle.set(img.vehicle_id, []);
+            }
+            imagesByVehicle.get(img.vehicle_id).push(img);
+          });
+          
+          discoveredVehicles = discoveredVehicles.map(dv => ({
             ...dv,
-            relationship_type: 'interested' // Default to interested if column missing
+            vehicles: vehiclesMap.get(dv.vehicle_id) ? {
+              ...vehiclesMap.get(dv.vehicle_id),
+              vehicle_images: imagesByVehicle.get(dv.vehicle_id) || []
+            } : null
           }));
-          discoveredError = fallbackResult.error;
         }
-      } catch (err: any) {
-        console.error('[Vehicles] Error loading discovered vehicles:', err);
-        discoveredError = err;
       }
 
       // Get verified ownership (LEGAL ownership with documents)
-      const { data: verifiedOwnerships, error: verifiedError } = await supabase
+      // Query ownership_verifications first, then fetch vehicles and images separately
+      const { data: verifiedOwnershipsData, error: verifiedError } = await supabase
         .from('ownership_verifications')
-        .select(`
-          vehicle_id,
-          vehicles:vehicle_id (*, vehicle_images(image_url, is_primary, variants))
-        `)
+        .select('vehicle_id')
         .eq('user_id', session.user.id)
         .eq('status', 'approved');
+      
+      let verifiedOwnerships: any[] = [];
+      if (verifiedOwnershipsData && verifiedOwnershipsData.length > 0) {
+        const vehicleIds = verifiedOwnershipsData.map(ov => ov.vehicle_id).filter(Boolean);
+        const { data: vehicles } = await supabase
+          .from('vehicles')
+          .select('*')
+          .in('id', vehicleIds);
+        
+        const { data: images } = await supabase
+          .from('vehicle_images')
+          .select('vehicle_id, image_url, is_primary, variants')
+          .in('vehicle_id', vehicleIds);
+        
+        // Attach vehicles and images to ownerships
+        const vehiclesMap = new Map((vehicles || []).map(v => [v.id, v]));
+        const imagesByVehicle = new Map();
+        (images || []).forEach(img => {
+          if (!imagesByVehicle.has(img.vehicle_id)) {
+            imagesByVehicle.set(img.vehicle_id, []);
+          }
+          imagesByVehicle.get(img.vehicle_id).push(img);
+        });
+        
+        verifiedOwnerships = verifiedOwnershipsData.map(ov => ({
+          ...ov,
+          vehicles: vehiclesMap.get(ov.vehicle_id) ? {
+            ...vehiclesMap.get(ov.vehicle_id),
+            vehicle_images: imagesByVehicle.get(ov.vehicle_id) || []
+          } : null
+        }));
+      }
       
       console.log('[Vehicles] Verified ownerships:', verifiedOwnerships?.length || 0);
       console.log('[Vehicles] Uploaded vehicles:', userAddedVehicles?.length || 0);
@@ -183,14 +450,26 @@ const VehiclesInner: React.FC = () => {
       if (addedError) {
         console.error('[Vehicles] Error loading added vehicles:', addedError);
         console.error('[Vehicles] Error details:', JSON.stringify(addedError, null, 2));
+        console.error('[Vehicles] Error message:', addedError.message);
+        console.error('[Vehicles] Error code:', addedError.code);
+        console.error('[Vehicles] Error details:', addedError.details);
+        console.error('[Vehicles] Error hint:', addedError.hint);
       }
       if (discoveredError) {
         console.error('[Vehicles] Error loading discovered vehicles:', discoveredError);
         console.error('[Vehicles] Error details:', JSON.stringify(discoveredError, null, 2));
+        console.error('[Vehicles] Error message:', discoveredError.message);
+        console.error('[Vehicles] Error code:', discoveredError.code);
+        console.error('[Vehicles] Error details:', discoveredError.details);
+        console.error('[Vehicles] Error hint:', discoveredError.hint);
       }
       if (verifiedError) {
         console.error('[Vehicles] Error loading verified ownerships:', verifiedError);
         console.error('[Vehicles] Error details:', JSON.stringify(verifiedError, null, 2));
+        console.error('[Vehicles] Error message:', verifiedError.message);
+        console.error('[Vehicles] Error code:', verifiedError.code);
+        console.error('[Vehicles] Error details:', verifiedError.details);
+        console.error('[Vehicles] Error hint:', verifiedError.hint);
       }
 
       // Only log full data in development
@@ -238,16 +517,10 @@ const VehiclesInner: React.FC = () => {
       // Process discovered vehicles (from discovered_vehicles table)
       (discoveredVehicles || []).forEach((discovery: any) => {
         const vehicle = discovery.vehicles;
-        if (!vehicle) {
-          console.warn('[Vehicles] Discovery entry missing vehicle:', discovery);
-          return;
-        }
+        if (!vehicle) return;
 
         const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
         const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
-
-        // Default to 'interested' if relationship_type is missing or null
-        const relationshipType = discovery.relationship_type || 'interested';
 
         const vehicleRelationship: VehicleRelationship = {
           vehicle: {
@@ -262,11 +535,14 @@ const VehiclesInner: React.FC = () => {
             isAnonymous: false,
             created_at: vehicle.created_at
           },
-          relationshipType: relationshipType as any,
-          role: relationshipType,
+          relationshipType: discovery.relationship_type,
+          role: discovery.relationship_type,
           lastActivity: vehicle.created_at
         };
 
+        // Default to 'interested' if relationship_type is null/undefined
+        const relationshipType = discovery.relationship_type || 'interested';
+        
         switch (relationshipType) {
           case 'discovered':
             discovered.push(vehicleRelationship);
@@ -283,11 +559,8 @@ const VehiclesInner: React.FC = () => {
           case 'interested':
             interested.push(vehicleRelationship);
             break;
-          case 'contributing':
-            contributing.push(vehicleRelationship);
-            break;
           default:
-            console.warn('[Vehicles] Unknown relationship type:', relationshipType, 'for vehicle:', vehicle.id);
+            console.warn('Unknown relationship type:', relationshipType);
             interested.push(vehicleRelationship);
         }
       });
@@ -329,22 +602,7 @@ const VehiclesInner: React.FC = () => {
 
       setVehicleRelationships({ owned, contributing, interested, discovered, curated, consigned, previously_owned });
       
-      const totalCount = owned.length + contributing.length + interested.length + discovered.length + 
-                        curated.length + consigned.length + previously_owned.length;
-      
-      console.log(`[Vehicles] Categorized vehicles: ${totalCount} total`);
-      console.log(`[Vehicles]   - Owned: ${owned.length}`);
-      console.log(`[Vehicles]   - Contributing: ${contributing.length}`);
-      console.log(`[Vehicles]   - Interested: ${interested.length}`);
-      console.log(`[Vehicles]   - Discovered: ${discovered.length}`);
-      console.log(`[Vehicles]   - Curated: ${curated.length}`);
-      console.log(`[Vehicles]   - Consigned: ${consigned.length}`);
-      console.log(`[Vehicles]   - Previously Owned: ${previously_owned.length}`);
-      
-      // Show user-friendly error if no vehicles found and there were errors
-      if (totalCount === 0 && (addedError || discoveredError || verifiedError)) {
-        console.warn('[Vehicles] No vehicles found and there were query errors. Check database schema and RLS policies.');
-      }
+      console.log(`Categorized vehicles: ${owned.length} owned, ${contributing.length} contributing, ${interested.length} interested`);
     } catch (error) {
       console.error('Error in loadVehicleRelationships:', error);
     } finally {
