@@ -254,12 +254,45 @@ export class ImageUploadService {
       const isDocument = docDetection.type !== 'vehicle_photo';
       const documentCategory = isDocument ? this.mapDocumentTypeToCategory(docDetection.type) : null;
 
+      // Reverse geocode location if GPS coordinates exist (await to ensure it's in payload)
+      let locationWithAddress = metadata.location;
+      if (metadata.location?.latitude && metadata.location?.longitude && !metadata.location.city) {
+        try {
+          const { reverseGeocode } = await import('../utils/imageMetadata');
+          const address = await reverseGeocode(metadata.location.latitude, metadata.location.longitude);
+          if (address) {
+            const parts = address.split(', ');
+            locationWithAddress = {
+              ...metadata.location,
+              address: address,
+              city: parts[0] || null,
+              state: parts[1] || null
+            };
+            console.log('Reverse geocoded location:', locationWithAddress);
+          }
+        } catch (err) {
+          console.warn('Reverse geocoding failed (non-blocking):', err);
+          locationWithAddress = metadata.location; // Use original if geocoding fails
+        }
+      }
+
       // Save to database with correct data, EXIF metadata, and variants
+      // Store EXIF data in format expected by ImageInfoPanel component
       const exifPayload: Record<string, any> = {
         DateTimeOriginal: metadata.dateTaken?.toISOString(),
         camera: metadata.camera,
+        // Store technical data in both formats for compatibility
         technical: metadata.technical,
-        location: metadata.location,
+        // Also store raw values at top level for easy access
+        fNumber: metadata.technical?.fNumber,
+        exposureTime: metadata.technical?.exposureTime,
+        iso: metadata.technical?.iso,
+        focalLength: metadata.technical?.focalLength,
+        location: locationWithAddress,
+        gps: locationWithAddress ? {
+          latitude: locationWithAddress.latitude,
+          longitude: locationWithAddress.longitude
+        } : null,
         dimensions: metadata.dimensions
       };
 
@@ -286,6 +319,10 @@ export class ImageUploadService {
         exifPayload.exif_status = (metadata.camera || metadata.location || metadata.technical) ? 'complete' : 'minimal';
       }
 
+      // Also store latitude/longitude at top level for easier querying
+      const latitude = locationWithAddress?.latitude || metadata.location?.latitude;
+      const longitude = locationWithAddress?.longitude || metadata.location?.longitude;
+
       const { data: dbResult, error: dbError } = await supabase
         .from('vehicle_images')
         .insert({
@@ -301,6 +338,8 @@ export class ImageUploadService {
           is_primary: count === 0 && !isDocument, // First image becomes primary (not documents)
           is_sensitive: false, // Required field
           taken_at: photoDate.toISOString(), // Use actual photo date for timeline
+          latitude: latitude || null, // Store at top level for easier querying
+          longitude: longitude || null, // Store at top level for easier querying
           variants: variants, // Store all variant URLs
           exif_data: exifPayload,
           is_document: isDocument,

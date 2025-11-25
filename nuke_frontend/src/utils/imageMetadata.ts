@@ -96,6 +96,25 @@ export async function extractImageMetadata(file: File): Promise<ImageMetadata> {
           };
           console.log('Final GPS coordinates after processing:', lat, lon);
           
+          // Reverse geocode to get city/state (async, don't block)
+          reverseGeocode(lat, lon).then(address => {
+            if (address) {
+              // Parse address into city/state
+              const parts = address.split(', ');
+              if (parts.length >= 2) {
+                metadata.location.city = parts[0];
+                metadata.location.state = parts[1];
+                metadata.location.address = address;
+                console.log('Reverse geocoded location:', metadata.location);
+                
+                // Update database if image already exists (for new uploads, this will be in exifPayload)
+                // This is a best-effort update, won't block upload
+              }
+            }
+          }).catch(err => {
+            console.warn('Reverse geocoding failed (non-blocking):', err);
+          });
+          
           // Log if coordinates seem unusual for US locations
           if (lat < 24 || lat > 49 || lon > -66 || lon < -125) {
             console.warn('GPS coordinates appear to be outside US bounds - photo may have incorrect location data');
@@ -115,19 +134,26 @@ export async function extractImageMetadata(file: File): Promise<ImageMetadata> {
         console.log('Found camera info:', metadata.camera);
       }
 
-      // Extract technical camera settings
+      // Extract technical camera settings - store both raw values AND formatted strings
       const technical: any = {};
       if (exifData.ISO) {
-        technical.iso = exifData.ISO;
+        technical.iso = typeof exifData.ISO === 'number' ? exifData.ISO : parseFloat(exifData.ISO);
+        technical.isoFormatted = `ISO ${technical.iso}`;
       }
       if (exifData.FNumber) {
-        technical.aperture = `f/${exifData.FNumber}`;
+        const fNum = typeof exifData.FNumber === 'number' ? exifData.FNumber : parseFloat(exifData.FNumber);
+        technical.fNumber = fNum;
+        technical.aperture = `f/${fNum.toFixed(1)}`;
       }
       if (exifData.ExposureTime) {
-        technical.shutterSpeed = exifData.ExposureTime < 1 ? `1/${Math.round(1/exifData.ExposureTime)}` : `${exifData.ExposureTime}s`;
+        const expTime = typeof exifData.ExposureTime === 'number' ? exifData.ExposureTime : parseFloat(exifData.ExposureTime);
+        technical.exposureTime = expTime;
+        technical.shutterSpeed = expTime < 1 ? `1/${Math.round(1/expTime)}s` : `${expTime}s`;
       }
       if (exifData.FocalLength) {
-        technical.focalLength = `${exifData.FocalLength}mm`;
+        const focal = typeof exifData.FocalLength === 'number' ? exifData.FocalLength : parseFloat(exifData.FocalLength);
+        technical.focalLength = focal;
+        technical.focalLengthFormatted = `${focal}mm`;
       }
       
       if (Object.keys(technical).length > 0) {

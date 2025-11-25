@@ -120,11 +120,28 @@ export default function ScriptControlCenter() {
         .select('*', { count: 'exact', head: true });
 
       // Get processed count using the metric
-      const { data, error } = await supabase.rpc('execute_sql', {
-        query: `SELECT ${script.metric} as processed FROM ${script.table}`
-      }).single();
+      let processed = 0;
+      try {
+        const { data, error } = await supabase.rpc('execute_sql', {
+          query: `SELECT ${script.metric} as processed FROM ${script.table}`
+        });
+        
+        if (error) {
+          // Function or table doesn't exist, return 0
+          if (error.code === 'PGRST301' || error.code === 'PGRST116' || error.code === '42P01' || error.code === '42883') {
+            processed = 0;
+          } else {
+            console.warn(`Error executing SQL for ${script.name}:`, error);
+            processed = 0;
+          }
+        } else {
+          processed = data?.processed || (Array.isArray(data) && data[0]?.processed) || 0;
+        }
+      } catch (err) {
+        console.warn(`Error in execute_sql for ${script.name}:`, err);
+        processed = 0;
+      }
 
-      const processed = data?.processed || 0;
       const percent = total && total > 0 ? (processed / total) * 100 : 0;
 
       // Check if actively processing (updated in last 2 minutes)

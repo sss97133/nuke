@@ -75,7 +75,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
         .order('is_default', { ascending: false });
 
       // Handle table not existing (404) gracefully
-      if (error && error.code === 'PGRST301') {
+      if (error && (error.code === 'PGRST301' || error.code === 'PGRST116' || error.code === '42P01')) {
         // Table doesn't exist yet, just use default models
         return;
       }

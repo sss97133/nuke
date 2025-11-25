@@ -443,10 +443,25 @@ export class VehicleValuationService {
       // Fetch all documents and filter client-side to avoid enum type issues with .in()
       let documents: any[] = [];
       try {
-        const { data: allDocs, error: docsError } = await supabase
-          .from('vehicle_documents')
-          .select('document_type, title, amount, vendor_name, description')
-          .eq('vehicle_id', vehicleId);
+        let allDocs = null;
+        let docsError = null;
+        
+        try {
+          const result = await supabase
+            .from('vehicle_documents')
+            .select('document_type, title, amount, vendor_name, description')
+            .eq('vehicle_id', vehicleId);
+          allDocs = result.data;
+          docsError = result.error;
+        } catch (err: any) {
+          // Table might not exist, handle gracefully
+          if (err.code === 'PGRST301' || err.code === 'PGRST116' || err.code === '42P01') {
+            docsError = null; // Table doesn't exist, just skip
+            allDocs = [];
+          } else {
+            docsError = err;
+          }
+        }
         
         if (!docsError && allDocs) {
           // Filter client-side to avoid .in() syntax issues with enum types

@@ -686,13 +686,22 @@ const VehicleProfile: React.FC = () => {
       const isVIN = vehicleId && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vehicleId);
 
       if (!vehicleId || (!isUUID && !isVIN)) {
+        console.error('Invalid vehicleId format:', vehicleId);
         navigate('/vehicles');
         return;
       }
 
       // OPTIMIZED: Try RPC first for fast loading, fallback to direct query if RPC fails
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId });
+      let rpcData = null;
+      let rpcError = null;
+      
+      // Only try RPC if vehicleId is a UUID (RPC expects UUID, not VIN)
+      if (isUUID) {
+        const rpcResult = await supabase
+          .rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId });
+        rpcData = rpcResult.data;
+        rpcError = rpcResult.error;
+      }
 
       let vehicleData;
       

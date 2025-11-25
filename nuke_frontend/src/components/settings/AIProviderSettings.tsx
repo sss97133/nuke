@@ -39,10 +39,24 @@ const AIProviderSettings: React.FC = () => {
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      // Handle table not existing (404) or other errors gracefully
+      if (error) {
+        // PGRST301 = table doesn't exist, PGRST116 = relation not found, 42P01 = PostgreSQL relation does not exist
+        if (error.code === 'PGRST301' || error.code === 'PGRST116' || error.code === '42P01') {
+          // Table doesn't exist yet, just use empty list
+          setProviders([]);
+          return;
+        }
+        // For other errors, log but don't throw
+        console.warn('Error loading AI providers:', error);
+        setProviders([]);
+        return;
+      }
+      
       setProviders(data || []);
     } catch (error) {
-      console.error('Error loading AI providers:', error);
+      console.warn('Error loading AI providers:', error);
+      setProviders([]);
     } finally {
       setLoading(false);
     }

@@ -294,21 +294,28 @@ const CursorHomepage: React.FC = () => {
       try {
         const { data: prefs, error: prefsError } = await supabase
           .from('user_preferences')
-          .select('settings')
+          .select('preferred_view_mode, preferred_device, enable_gestures, enable_haptic_feedback, preferred_vendors, hidden_tags, favorite_makes, interaction_style')
           .eq('user_id', currentSession.user.id)
           .maybeSingle();
         
-        // Handle table not existing gracefully
-        if (prefsError && prefsError.code !== 'PGRST116' && prefsError.code !== 'PGRST301') {
+        // Handle table not existing or query errors gracefully
+        if (prefsError) {
+          // PGRST301 = table doesn't exist, PGRST116 = relation not found, 400 = bad request (might be missing column or RLS issue)
+          if (prefsError.code === 'PGRST116' || prefsError.code === 'PGRST301' || prefsError.code === 'PGRST202' || prefsError.code === '42P01' || prefsError.code === '42703') {
+            // Table/column doesn't exist or RLS blocking - silently ignore
+            return;
+          }
+          // For other errors, log as warning but don't break the app
           console.warn('Error loading user preferences:', prefsError);
+          return;
         }
         
-        if (prefs?.settings?.preferred_time_period) {
-          setTimePeriod(prefs.settings.preferred_time_period);
-        }
+        // Note: user_preferences doesn't have a 'settings' column
+        // If we need preferred_time_period, we'd need to add it as a column
+        // For now, just use defaults
       } catch (err) {
-        // Table might not exist, ignore
-        console.debug('user_preferences table may not exist');
+        // Table might not exist or other error - silently ignore
+        // Don't log to avoid console noise
       }
     }
   };
@@ -656,31 +663,24 @@ const CursorHomepage: React.FC = () => {
     setTimePeriod(period);
     
     if (session?.user) {
-      await UserInteractionService.logInteraction(
-        session.user.id,
-        'view',
-        'vehicle',
-        'time-period-filter',
-        {
-          source_page: '/homepage'
-        } as any
-      );
+      try {
+        await UserInteractionService.logInteraction(
+          session.user.id,
+          'view',
+          'vehicle',
+          'time-period-filter',
+          {
+            source_page: '/homepage'
+          } as any
+        );
 
-      const { error } = await supabase
-        .from('user_preferences')
-        .upsert({
-          user_id: session.user.id,
-          settings: { preferred_time_period: period }
-        }, { onConflict: 'user_id' });
-      
-      // Handle table not existing gracefully
-      if (error && error.code === 'PGRST301') {
-        console.warn('user_preferences table does not exist yet');
-        return;
-      }
-      
-      if (error) {
-        console.error('Error saving user preferences:', error);
+        // Note: user_preferences table doesn't have a 'settings' column
+        // It has individual columns. For now, we'll skip this update
+        // TODO: Add preferred_time_period column to user_preferences table if needed
+        // Silently skip - table structure doesn't support this yet
+      } catch (error: any) {
+        // For other errors, log as warning but don't break the app
+        console.warn('Error saving user preferences:', error);
       }
     }
   };
