@@ -115,14 +115,19 @@ export class AIImageProcessingService {
       .single();
 
     // Load user preferences
-    const { data: preferences } = await supabase
+    const { data: preferences, error: prefsError } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
+
+    // Handle table not existing or query errors gracefully
+    if (prefsError && prefsError.code !== 'PGRST116' && prefsError.code !== 'PGRST301' && prefsError.code !== 'PGRST202') {
+      console.warn('Error loading user preferences for guardrails:', prefsError);
+    }
 
     // Construct guardrails based on user profile and preferences
-    const guardrails = this.constructGuardrails(userProfile, preferences);
+    const guardrails = this.constructGuardrails(userProfile, preferences || null);
     
     // Cache for future use
     this.userGuardrailsCache.set(userId, guardrails);
@@ -632,10 +637,18 @@ export class AIImageProcessingService {
         })
         .eq('user_id', userId);
 
-      if (!error) {
-        // Clear cache to force reload
-        this.userGuardrailsCache.delete(userId);
+      // Handle table not existing or query errors gracefully
+      if (error) {
+        if (error.code === 'PGRST116' || error.code === 'PGRST301' || error.code === 'PGRST202') {
+          // Table/column doesn't exist or RLS blocking - silently ignore
+          return;
+        }
+        console.warn('Error updating user preferences:', error);
+        return;
       }
+
+      // Clear cache to force reload
+      this.userGuardrailsCache.delete(userId);
     }
   }
 }

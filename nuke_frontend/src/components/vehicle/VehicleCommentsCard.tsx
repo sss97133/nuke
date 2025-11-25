@@ -53,33 +53,44 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   const loadComments = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // Fetch comments and profiles separately to avoid PostgREST embed issues
+      const { data: commentsData, error: commentsError } = await supabase
         .from('vehicle_comments')
-        .select(`
-          id,
-          user_id,
-          comment_text,
-          created_at,
-          profiles:user_id (
-            full_name,
-            username,
-            avatar_url
-          )
-        `)
+        .select('id, user_id, comment_text, created_at')
         .eq('vehicle_id', vehicleId)
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (!error && data) {
-        const enriched = data.map((c: any) => ({
-          id: c.id,
-          user_id: c.user_id,
-          comment_text: c.comment_text,
-          created_at: c.created_at,
-          user_name: c.profiles?.full_name || c.profiles?.username || 'User',
-          user_avatar: c.profiles?.avatar_url
-        }));
+      if (commentsError) {
+        console.warn('Failed to load comments:', commentsError);
+        setComments([]);
+        return;
+      }
+
+      if (commentsData && commentsData.length > 0) {
+        // Fetch profiles separately
+        const userIds = [...new Set(commentsData.map(c => c.user_id).filter(Boolean))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url')
+          .in('id', userIds);
+
+        const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
+
+        const enriched = commentsData.map((c: any) => {
+          const profile = profilesMap.get(c.user_id);
+          return {
+            id: c.id,
+            user_id: c.user_id,
+            comment_text: c.comment_text,
+            created_at: c.created_at,
+            user_name: profile?.full_name || profile?.username || 'User',
+            user_avatar: profile?.avatar_url
+          };
+        });
         setComments(enriched);
+      } else {
+        setComments([]);
       }
     } catch (err) {
       console.warn('Failed to load comments:', err);
