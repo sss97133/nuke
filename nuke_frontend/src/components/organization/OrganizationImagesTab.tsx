@@ -325,7 +325,7 @@ const OrganizationImagesTab: React.FC<Props> = ({ organizationId, userId, canEdi
       {/* Lightbox */}
       {lightboxOpen && selectedImage && (
         <ImageLightbox
-          imageUrl={selectedImage.medium_url || selectedImage.image_url}
+          imageUrl={selectedImage.image_url}
           onClose={() => {
             setLightboxOpen(false);
             setSelectedImage(null);
