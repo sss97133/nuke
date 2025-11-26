@@ -93,36 +93,38 @@ const Capsule: React.FC = () => {
 
   return (
       <div style={{ display: 'flex', gap: 'var(--space-4)', minHeight: '600px' }}>
-        {/* Sidebar Navigation */}
-        <div style={{
-          width: '200px',
-          flexShrink: 0,
-          borderRight: '1px solid var(--border)',
-          paddingRight: 'var(--space-4)'
-        }}>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {tabs.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => handleTabChange(tab.key)}
-                style={{
-                  padding: 'var(--space-2) var(--space-3)',
-                  textAlign: 'left',
-                  background: activeTab === tab.key ? 'var(--grey-200)' : 'transparent',
-                  border: activeTab === tab.key ? '2px outset var(--border-medium)' : '1px solid transparent',
-                  cursor: 'pointer',
-                  fontSize: '9pt',
-                  fontWeight: activeTab === tab.key ? 'bold' : 'normal'
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+        {/* Sidebar Navigation - Hidden on Photos tab */}
+        {activeTab !== 'photos' && (
+          <div style={{
+            width: '200px',
+            flexShrink: 0,
+            borderRight: '1px solid var(--border)',
+            paddingRight: 'var(--space-4)'
+          }}>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {tabs.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => handleTabChange(tab.key)}
+                  style={{
+                    padding: 'var(--space-2) var(--space-3)',
+                    textAlign: 'left',
+                    background: activeTab === tab.key ? 'var(--grey-200)' : 'transparent',
+                    border: activeTab === tab.key ? '2px outset var(--border-medium)' : '1px solid transparent',
+                    cursor: 'pointer',
+                    fontSize: '9pt',
+                    fontWeight: activeTab === tab.key ? 'bold' : 'normal'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        )}
 
         {/* Main Content */}
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: activeTab === 'photos' ? 1 : 1 }}>
           {activeTab === 'dashboard' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="card">
