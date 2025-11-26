@@ -41,8 +41,13 @@ const TAG_TYPES = [
 
 // Helper function to get optimal image URL based on variants
 const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' | 'full' = 'medium'): string => {
-  // For 'full', always use the original image_url (highest quality)
+  // For 'full', prioritize variants.full if it exists (true original), otherwise use image_url
   if (size === 'full') {
+    // Check if variants.full exists (this is the true original uploaded)
+    if (image.variants && typeof image.variants === 'object' && image.variants.full) {
+      return image.variants.full;
+    }
+    // Fallback to image_url (which might be compressed or a variant)
     return image.image_url;
   }
   
