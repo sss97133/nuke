@@ -26,6 +26,7 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
 
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
+  isOwner,
   session,
   permissions,
   responsibleName,
@@ -668,7 +669,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               type="button"
               onClick={(e) => {
                 e.preventDefault();
-                if (showOwnerCard) {
+                e.stopPropagation();
+                // If user is not owner, show claim functionality
+                if (!isOwner && !isVerifiedOwner && onClaimClick) {
+                  onClaimClick();
+                } else if (showOwnerCard) {
                   window.location.href = `/profile/${(vehicle as any).uploaded_by || (vehicle as any).user_id || ''}`;
                 } else {
                   setShowOwnerCard(true);
