@@ -580,8 +580,36 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         };
       }
       
-      // 2. Load uploader profile (person who ran the import)
-      if (imgData.user_id) {
+      // 2. For BAT images, get organization attribution instead of user
+      let organizationInfo = null;
+      if (imgData.source === 'bat_listing' && vehicleId) {
+        // Get organization from vehicle's organization_vehicles relationship
+        const { data: orgData } = await supabase
+          .from('organization_vehicles')
+          .select(`
+            organization_id,
+            businesses!inner (
+              id,
+              business_name
+            )
+          `)
+          .eq('vehicle_id', vehicleId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (orgData?.businesses && !Array.isArray(orgData.businesses)) {
+          const org = orgData.businesses as any;
+          organizationInfo = {
+            id: org.id,
+            name: org.business_name || 'Viva! Las Vegas Autos'
+          };
+        }
+      }
+      
+      // 3. Load uploader profile (person who ran the import) - only if not BAT
+      if (!organizationInfo && imgData.user_id) {
         const { data: profileData } = await supabase
           .from('profiles')
           .select('id, full_name, username')
@@ -594,9 +622,41 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       setAttribution({
         photographer: photographerInfo,
         uploader: uploaderInfo || null,
+        organization: organizationInfo,
         source: imgData.source,
         created_at: imgData.created_at
       });
+      
+      // Show toast notification for BAT images
+      if (imgData.source === 'bat_listing' && organizationInfo) {
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: rgba(0, 0, 0, 0.9);
+          color: white;
+          padding: 16px 20px;
+          border-radius: 8px;
+          border: 2px solid #fff;
+          z-index: 10001;
+          font-size: 12px;
+          max-width: 300px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+        toast.innerHTML = `
+          <div style="font-weight: bold; margin-bottom: 4px;">SOURCE - ${organizationInfo.name}</div>
+          <div style="font-size: 10px; color: #ccc;">BaT linked profile</div>
+          <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: transparent; color: #fff; border: none; padding: 2px 6px; font-size: 14px; cursor: pointer; font-weight: bold;">×</button>
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+          if (toast.parentElement) {
+            toast.remove();
+          }
+        }, 5000);
+      }
     }
 
     // AI Angle - handle gracefully if table doesn't exist or query fails
@@ -1442,44 +1502,53 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           </div>
                         ) : null}
                         
-                        {/* Uploader (person who ran the import/uploaded to system) */}
-                        <div>
-                          <div className="text-xs text-gray-500">
-                            {attribution.source === 'dropbox_import' ? 'Imported by:' : 'Uploaded by:'}
+                        {/* Organization (for BAT images) or Uploader (person who ran the import/uploaded to system) */}
+                        {attribution.organization ? (
+                          <div>
+                            <div className="text-xs text-gray-500">SOURCE</div>
+                            <div className="text-white font-semibold">
+                              {attribution.organization.name} BaT linked profile
+                            </div>
                           </div>
-                          {attribution.uploader ? (
-                            <button
-                              onClick={() => {
-                                // Show user profile card in toast
-                                const profileCard = document.createElement('div');
-                                profileCard.className = 'profile-toast';
-                                profileCard.innerHTML = `
-                                  <div style="position: fixed; top: 20px; right: 20px; z-index: 10000; background: #000; border: 2px solid #fff; padding: 16px; max-width: 300px;">
-                                    <div style="color: #fff; font-size: 12px; font-weight: bold; margin-bottom: 8px;">
-                                      ${attribution.uploader.full_name || attribution.uploader.username || 'User'}
+                        ) : (
+                          <div>
+                            <div className="text-xs text-gray-500">
+                              {attribution.source === 'dropbox_import' ? 'Imported by:' : 'Uploaded by:'}
+                            </div>
+                            {attribution.uploader ? (
+                              <button
+                                onClick={() => {
+                                  // Show user profile card in toast
+                                  const profileCard = document.createElement('div');
+                                  profileCard.className = 'profile-toast';
+                                  profileCard.innerHTML = `
+                                    <div style="position: fixed; top: 20px; right: 20px; z-index: 10000; background: #000; border: 2px solid #fff; padding: 16px; max-width: 300px;">
+                                      <div style="color: #fff; font-size: 12px; font-weight: bold; margin-bottom: 8px;">
+                                        ${attribution.uploader.full_name || attribution.uploader.username || 'User'}
+                                      </div>
+                                      <div style="color: #bbb; font-size: 10px; margin-bottom: 8px;">
+                                        @${attribution.uploader.username || 'user'}
+                                      </div>
+                                      <a href="/profile/${attribution.uploader.id}" style="color: #0066cc; font-size: 10px; text-decoration: underline;">
+                                        View Full Profile →
+                                      </a>
+                                      <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: #fff; color: #000; border: none; padding: 2px 6px; font-size: 10px; cursor: pointer;">
+                                        ✕
+                                      </button>
                                     </div>
-                                    <div style="color: #bbb; font-size: 10px; margin-bottom: 8px;">
-                                      @${attribution.uploader.username || 'user'}
-                                    </div>
-                                    <a href="/profile/${attribution.uploader.id}" style="color: #0066cc; font-size: 10px; text-decoration: underline;">
-                                      View Full Profile →
-                                    </a>
-                                    <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: #fff; color: #000; border: none; padding: 2px 6px; font-size: 10px; cursor: pointer;">
-                                      ✕
-                                    </button>
-                                  </div>
-                                `;
-                                document.body.appendChild(profileCard);
-                                setTimeout(() => profileCard.remove(), 5000);
-                              }}
-                              className="text-blue-400 hover:text-blue-300 underline cursor-pointer"
-                            >
-                              {attribution.uploader.full_name}
-                            </button>
-                          ) : (
-                            <span className="text-gray-400">Unknown</span>
-                          )}
-                        </div>
+                                  `;
+                                  document.body.appendChild(profileCard);
+                                  setTimeout(() => profileCard.remove(), 5000);
+                                }}
+                                className="text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                              >
+                                {attribution.uploader.full_name}
+                              </button>
+                            ) : (
+                              <span className="text-gray-400">Unknown</span>
+                            )}
+                          </div>
+                        )}
                         {attribution.source && <div className="mt-2 text-xs">Source: {attribution.source}</div>}
                       </div>
             </div>
