@@ -30,13 +30,13 @@ serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { image_url, image_id, estimated_resolution } = await req.json()
+    const { image_url, image_id, vehicle_id, estimated_resolution } = await req.json()
     if (!image_url) throw new Error('Missing image_url')
 
     console.log(`Tier 1 analysis: ${image_id}`)
 
     // Quick analysis with gpt-4o-mini
-    const analysis = await runTier1Analysis(image_url, estimated_resolution)
+    const analysis = await runTier1Analysis(image_url, estimated_resolution || 'medium')
     
     // Save to database
     if (image_id) {
@@ -165,6 +165,17 @@ Be fast and accurate. This is for organization only.`
   // Extract JSON from response
   const jsonMatch = content.match(/\{[\s\S]*\}/)
   const result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
+  
+  // Ensure image_quality exists
+  if (!result.image_quality) {
+    result.image_quality = {
+      lighting: 'adequate',
+      focus: 'acceptable',
+      sufficient_for_detail: true,
+      suitable_for_expert: false,
+      overall_score: 5
+    }
+  }
   
   // Enhance with resolution info
   result.image_quality.estimated_resolution = estimatedResolution
