@@ -16,7 +16,7 @@ import APIAccessSubscription from '../components/settings/APIAccessSubscription'
 import KnowledgeLibrary from '../components/profile/KnowledgeLibrary';
 import StreamingDashboard from '../components/profile/StreamingDashboard';
 
-type CapsuleTab = 'dashboard' | 'settings' | 'financials' | 'organizations' | 'knowledge' | 'streaming' | 'professional' | 'photos';
+type CapsuleTab = 'dashboard' | 'api-access' | 'settings' | 'financials' | 'organizations' | 'knowledge' | 'streaming' | 'professional' | 'photos';
 
 const Capsule: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -69,6 +69,7 @@ const Capsule: React.FC = () => {
 
   const tabs: Array<{ key: CapsuleTab; label: string }> = [
     { key: 'dashboard', label: 'Dashboard' },
+    { key: 'api-access', label: 'API Access' },
     { key: 'settings', label: 'Settings' },
     { key: 'financials', label: 'Financials' },
     { key: 'organizations', label: 'Organizations' },
@@ -155,6 +156,26 @@ const Capsule: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'api-access' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="card">
+                <div className="card-header">
+                  <h3 className="heading-3">API Access & Subscriptions</h3>
+                </div>
+                <div className="card-body">
+                  <p className="text" style={{ marginBottom: 'var(--space-4)' }}>
+                    Subscribe to use AI image analysis features. Add your own API keys (OpenAI, Anthropic, Google Gemini) 
+                    and we'll use them for processing - you pay for platform access, API costs come from your accounts.
+                  </p>
+                </div>
+              </div>
+
+              <APIAccessSubscription />
+              
+              <AIProviderSettings />
+            </div>
+          )}
+
           {activeTab === 'settings' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="card">
@@ -175,10 +196,6 @@ const Capsule: React.FC = () => {
                 </div>
               </div>
 
-              <APIAccessSubscription />
-              
-              <AIProviderSettings />
-              
               <StripeKeysManager />
             </div>
           )}
