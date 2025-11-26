@@ -116,6 +116,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             <button
               type="button"
               onClick={() => setNavExpanded(prev => !prev)}
+              onDoubleClick={() => navigate('/')}
               className="logo"
               style={{
                 border: 'none',
