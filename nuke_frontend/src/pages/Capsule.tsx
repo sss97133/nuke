@@ -119,44 +119,9 @@ const Capsule: React.FC = () => {
                   <h3 className="heading-3">Dashboard Overview</h3>
                 </div>
                 <div className="card-body">
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--space-4)' }}>
-                    <div>
-                      <div className="text text-small text-muted" style={{ marginBottom: '8px', fontWeight: 600 }}>Cash Balance</div>
-                      <CashBalance compact={false} showActions={true} />
-                    </div>
-                    <div style={{ padding: 'var(--space-3)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-                      <div className="text text-small text-muted" style={{ marginBottom: '8px', fontWeight: 600 }}>Quick Actions</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
-                        <button
-                          className="button button-secondary"
-                          style={{ fontSize: '8pt', padding: '6px 10px' }}
-                          onClick={() => navigate('/vehicles')}
-                        >
-                          View Vehicles
-                        </button>
-                        <button
-                          className="button button-secondary"
-                          style={{ fontSize: '8pt', padding: '6px 10px' }}
-                          onClick={() => setActiveTab('financials')}
-                        >
-                          Add Funds
-                        </button>
-                        <button
-                          className="button button-secondary"
-                          style={{ fontSize: '8pt', padding: '6px 10px' }}
-                          onClick={() => navigate('/profile')}
-                        >
-                          View Profile
-                        </button>
-                        <button
-                          className="button button-primary"
-                          style={{ fontSize: '8pt', padding: '6px 10px', marginTop: '4px' }}
-                          onClick={() => setActiveTab('api-access')}
-                        >
-                          Manage API Access
-                        </button>
-                      </div>
-                    </div>
+                  <div>
+                    <div className="text text-small text-muted" style={{ marginBottom: '8px', fontWeight: 600 }}>Cash Balance</div>
+                    <CashBalance compact={false} showActions={true} />
                   </div>
                 </div>
               </div>
@@ -165,20 +130,7 @@ const Capsule: React.FC = () => {
 
           {activeTab === 'api-access' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div className="card">
-                <div className="card-header">
-                  <h3 className="heading-3">API Access & Subscriptions</h3>
-                </div>
-                <div className="card-body">
-                  <p className="text" style={{ marginBottom: 'var(--space-4)' }}>
-                    Subscribe to use AI image analysis features. Add your own API keys (OpenAI, Anthropic, Google Gemini) 
-                    and we'll use them for processing - you pay for platform access, API costs come from your accounts.
-                  </p>
-                </div>
-              </div>
-
               <APIAccessSubscription />
-              
               <AIProviderSettings />
             </div>
           )}

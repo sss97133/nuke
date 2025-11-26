@@ -19,6 +19,7 @@ const APIAccessSubscription: React.FC = () => {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [cashBalance, setCashBalance] = useState<number>(0);
   const [purchasingCredits, setPurchasingCredits] = useState<string | null>(null);
+  const [customAmount, setCustomAmount] = useState<string>('');
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -158,6 +159,77 @@ const APIAccessSubscription: React.FC = () => {
     }
   };
 
+  const handleCustomPurchase = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        showToast('Not authenticated', 'error');
+        return;
+      }
+
+      const amountUSD = parseFloat(customAmount);
+      if (!amountUSD || amountUSD <= 0) {
+        showToast('Please enter a valid amount', 'error');
+        return;
+      }
+
+      const amountCents = Math.round(amountUSD * 100);
+      const estimatedCredits = Math.floor(amountCents / 5); // ~$0.05 per image
+
+      setPurchasingCredits('custom');
+
+      // Check balance
+      if (cashBalance < amountCents) {
+        showToast(`Insufficient balance. Need $${amountUSD.toFixed(2)}, have $${(cashBalance / 100).toFixed(2)}`, 'error');
+        setPurchasingCredits(null);
+        return;
+      }
+
+      // Deduct from balance and create subscription
+      const { error: deductError } = await supabase.rpc('deduct_cash_from_user', {
+        p_user_id: session.user.id,
+        p_amount_cents: amountCents,
+        p_transaction_type: 'api_access_purchase',
+        p_metadata: {
+          subscription_type: 'prepaid_credits',
+          credits: estimatedCredits,
+          custom_amount: amountUSD
+        }
+      });
+
+      if (deductError) {
+        throw deductError;
+      }
+
+      // Create or update subscription
+      const { error: subError } = await supabase
+        .from('api_access_subscriptions')
+        .upsert({
+          user_id: session.user.id,
+          subscription_type: 'prepaid_credits',
+          status: 'active',
+          credits_remaining: (subscription?.credits_remaining || 0) + estimatedCredits,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (subError) {
+        throw subError;
+      }
+
+      showToast(`Purchased ${estimatedCredits} credits for $${amountUSD.toFixed(2)}`, 'success');
+      await loadSubscription();
+      await loadCashBalance();
+      setCustomAmount('');
+      setPurchasingCredits(null);
+    } catch (error: any) {
+      console.error('Error purchasing credits:', error);
+      showToast(error?.message || 'Failed to purchase credits', 'error');
+      setPurchasingCredits(null);
+    }
+  };
+
   if (loading) {
     return <div className="text text-muted">Loading subscription...</div>;
   }
@@ -169,14 +241,13 @@ const APIAccessSubscription: React.FC = () => {
   return (
     <div className="card">
       <div className="card-header">
-        <h3 className="heading-3">API Access Subscription</h3>
+        <h3 className="heading-3">AI Analysis Credits</h3>
       </div>
       <div className="card-body">
         {!subscription ? (
           <div>
             <p className="text" style={{ marginBottom: 'var(--space-4)' }}>
-              Subscribe to use AI image analysis features. You'll add your own API keys (OpenAI, Anthropic, Google Gemini) 
-              and we'll use them for processing - you pay for platform access, API costs come from your accounts.
+              Purchase credits to use AI image analysis features. The platform handles all API costs - no need to add your own keys.
             </p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -187,78 +258,53 @@ const APIAccessSubscription: React.FC = () => {
                 background: 'var(--grey-50)'
               }}>
                 <h4 className="text font-bold" style={{ marginBottom: 'var(--space-2)' }}>
-                  Monthly Subscription - $29.99/month
-                </h4>
-                <p className="text text-small" style={{ marginBottom: 'var(--space-2)' }}>
-                  1,000 AI image analyses per month
-                </p>
-                <button
-                  onClick={() => handleSubscribe('monthly')}
-                  disabled={checkoutLoading}
-                  className="button button-primary"
-                  style={{ fontSize: '8pt', padding: '6px 12px' }}
-                >
-                  {checkoutLoading ? 'Loading...' : 'Subscribe Monthly'}
-                </button>
-              </div>
-
-              <div style={{
-                padding: 'var(--space-3)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                background: 'var(--grey-50)'
-              }}>
-                <h4 className="text font-bold" style={{ marginBottom: 'var(--space-2)' }}>
-                  Prepaid Credits (From Balance)
+                  Purchase Credits (From Balance)
                 </h4>
                 <p className="text text-small text-muted" style={{ marginBottom: 'var(--space-2)' }}>
                   Your Balance: ${(cashBalance / 100).toFixed(2)}
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                <p className="text text-small" style={{ marginBottom: 'var(--space-3)' }}>
+                  Enter any amount to purchase credits. Credits are used for AI image analysis (approximately $0.05 per image).
+                </p>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="text text-small" style={{ display: 'block', marginBottom: '4px' }}>Amount ($)</label>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Enter amount"
+                      value={customAmount}
+                      onChange={(e) => setCustomAmount(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '2px',
+                        fontSize: '9pt'
+                      }}
+                    />
+                  </div>
                   <button
-                    onClick={() => handleSubscribe('prepaid_100')}
-                    disabled={purchasingCredits === 'prepaid_100' || cashBalance < 499}
-                    className="button button-secondary"
+                    onClick={handleCustomPurchase}
+                    disabled={!customAmount || parseFloat(customAmount) <= 0 || purchasingCredits === 'custom' || (parseFloat(customAmount) * 100) > cashBalance}
+                    className="button button-primary"
                     style={{ 
                       fontSize: '8pt', 
-                      padding: '6px 12px', 
-                      textAlign: 'left',
-                      opacity: cashBalance < 499 ? 0.5 : 1,
-                      cursor: cashBalance < 499 ? 'not-allowed' : 'pointer'
+                      padding: '6px 12px',
+                      whiteSpace: 'nowrap',
+                      opacity: (!customAmount || parseFloat(customAmount) <= 0 || (parseFloat(customAmount) * 100) > cashBalance) ? 0.5 : 1
                     }}
                   >
-                    {purchasingCredits === 'prepaid_100' ? 'Processing...' : '100 Images - $4.99'}
-                  </button>
-                  <button
-                    onClick={() => handleSubscribe('prepaid_500')}
-                    disabled={purchasingCredits === 'prepaid_500' || cashBalance < 1999}
-                    className="button button-secondary"
-                    style={{ 
-                      fontSize: '8pt', 
-                      padding: '6px 12px', 
-                      textAlign: 'left',
-                      opacity: cashBalance < 1999 ? 0.5 : 1,
-                      cursor: cashBalance < 1999 ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {purchasingCredits === 'prepaid_500' ? 'Processing...' : '500 Images - $19.99'}
-                  </button>
-                  <button
-                    onClick={() => handleSubscribe('prepaid_1000')}
-                    disabled={purchasingCredits === 'prepaid_1000' || cashBalance < 3499}
-                    className="button button-secondary"
-                    style={{ 
-                      fontSize: '8pt', 
-                      padding: '6px 12px', 
-                      textAlign: 'left',
-                      opacity: cashBalance < 3499 ? 0.5 : 1,
-                      cursor: cashBalance < 3499 ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {purchasingCredits === 'prepaid_1000' ? 'Processing...' : '1,000 Images - $34.99'}
+                    {purchasingCredits === 'custom' ? 'Processing...' : 'Purchase'}
                   </button>
                 </div>
-                {cashBalance < 499 && (
+                {customAmount && parseFloat(customAmount) > 0 && (
+                  <p className="text text-small text-muted">
+                    ≈ {Math.floor((parseFloat(customAmount) * 100) / 5)} image analyses
+                  </p>
+                )}
+                {cashBalance < 100 && (
                   <p className="text text-small text-muted" style={{ marginTop: 'var(--space-2)' }}>
                     Add funds in Financials tab to purchase credits
                   </p>
