@@ -42,93 +42,77 @@ async function scrapeVivaListings() {
       timeout: 30000 
     });
     await page.waitForTimeout(3000);
-
-    // Load all listings by scrolling and clicking "Show more"
-    let previousCount = 0;
-    let currentCount = 0;
-    let showMoreClicked = 0;
-    let scrollAttempts = 0;
-    const maxScrollAttempts = 100;
     
-    while (scrollAttempts < maxScrollAttempts) {
-      // Count current listings
-      currentCount = await page.$$eval('a[href*="/listing/"]', links => {
-        return links.filter(link => {
-          const href = link.getAttribute('href');
-          return href && href.includes('/listing/') && !href.includes('#comment');
-        }).length;
-      });
-      
-      if (currentCount === previousCount && showMoreClicked > 0) {
-        // No new listings loaded, we're done
-        break;
+    // Dismiss cookie consent banner if present
+    try {
+      const acceptButton = await page.$('#onetrust-accept-btn-handler, button[id*="accept"], button:has-text("Accept"), button:has-text("I Accept")');
+      if (acceptButton) {
+        await acceptButton.click();
+        await page.waitForTimeout(1000);
+        console.log('   Dismissed cookie consent');
       }
-      
-      previousCount = currentCount;
-      
-      // Try to find and click "Show more" button
+    } catch (e) {
+      // No cookie banner or already dismissed
+    }
+
+    // Load all listings by clicking "Show more" button (like archive script)
+    let showMoreClicked = 0;
+    while (true) {
       try {
-        const showMoreButton = await page.$(
-          'button:has-text("Show more"), ' +
-          'button:has-text("Load more"), ' +
-          'button[class*="show"], ' +
-          'button[class*="load"]'
-        );
-        
-        if (showMoreButton) {
-          const isVisible = await showMoreButton.isVisible().catch(() => false);
-          const isDisabled = await showMoreButton.evaluate(btn => btn.disabled).catch(() => true);
-          
-          if (isVisible && !isDisabled) {
-            await showMoreButton.scrollIntoViewIfNeeded();
-            await page.waitForTimeout(300);
-            await showMoreButton.click();
-            await page.waitForTimeout(2000);
-            showMoreClicked++;
-            console.log(`   Clicked "Show more" (${showMoreClicked}), found ${currentCount} listings...`);
-            continue;
-          }
+        const btn = await page.$('button:has-text("Show more")');
+        if (!btn) {
+          console.log(`   No "Show more" button found`);
+          break;
         }
+        
+        const disabled = await btn.evaluate(b => b.disabled);
+        if (disabled) {
+          console.log(`   "Show more" button is disabled`);
+          break;
+        }
+        
+        await btn.click();
+        await page.waitForTimeout(2000);
+        showMoreClicked++;
+        console.log(`   Clicked "Show more" (${showMoreClicked})...`);
       } catch (e) {
-        // Button not found or not clickable, try scrolling
-      }
-      
-      // Scroll to bottom to trigger lazy loading
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForTimeout(1500);
-      scrollAttempts++;
-      
-      if (scrollAttempts % 10 === 0) {
-        console.log(`   Scrolled ${scrollAttempts} times, found ${currentCount} listings...`);
+        console.log(`   Error: ${e.message}`);
+        break;
       }
     }
     
-    console.log(`\n   Final count: ${currentCount} listings found\n`);
+    console.log(`\n   Loaded all listings (${showMoreClicked} clicks)\n`);
 
-    // Extract all listing URLs and basic info - filter out comment URLs
-    const listings = await page.$$eval('a[href*="/listing/"]', (links) => {
-      return links
-        .map(link => {
-          const href = link.getAttribute('href');
-          if (!href || !href.includes('/listing/')) return null;
-          
-          // Filter out comment URLs and hash fragments
-          if (href.includes('#comment-') || href.includes('#comment')) return null;
-          
-          // Get clean URL without hash
-          const cleanHref = href.split('#')[0];
-          const fullUrl = cleanHref.startsWith('http') ? cleanHref : `https://bringatrailer.com${cleanHref}`;
-          const text = link.textContent?.trim() || '';
-          
-          return {
-            url: fullUrl,
-            title: text
-          };
-        })
-        .filter(Boolean)
-        .filter((item, index, self) => 
-          index === self.findIndex(t => t.url === item.url)
-        );
+    // Extract all listing URLs - use card-based extraction like archive script
+    const listings = await page.$$eval('.past-listing-card, div[class*="listing"], a[href*="/listing/"]', (elements) => {
+      const seen = new Set();
+      const results = [];
+      
+      for (const el of elements) {
+        // If it's a card, find the link inside
+        let link = el.tagName === 'A' ? el : el.querySelector('a[href*="/listing/"]');
+        if (!link) continue;
+        
+        const href = link.getAttribute('href');
+        if (!href || !href.includes('/listing/') || href.includes('#comment')) continue;
+        
+        const cleanHref = href.split('#')[0];
+        const fullUrl = cleanHref.startsWith('http') ? cleanHref : `https://bringatrailer.com${cleanHref}`;
+        
+        if (seen.has(fullUrl)) continue;
+        seen.add(fullUrl);
+        
+        // Try to get title from heading or link text
+        const heading = el.querySelector('h2, h3, h4, [class*="title"]');
+        const title = heading?.textContent?.trim() || link.textContent?.trim() || '';
+        
+        results.push({
+          url: fullUrl,
+          title: title
+        });
+      }
+      
+      return results;
     });
 
     console.log(`\n📋 Found ${listings.length} unique listings\n`);
