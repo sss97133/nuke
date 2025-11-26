@@ -670,26 +670,32 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // If user is not owner, show claim functionality
+                // Always show claim functionality when clicking responsible name if user is not owner
                 if (!isOwner && !isVerifiedOwner && onClaimClick) {
                   onClaimClick();
-                } else if (showOwnerCard) {
+                  return;
+                }
+                // If user is owner, show owner card
+                if (showOwnerCard) {
                   window.location.href = `/profile/${(vehicle as any).uploaded_by || (vehicle as any).user_id || ''}`;
                 } else {
                   setShowOwnerCard(true);
                 }
               }}
+              title={!isOwner && !isVerifiedOwner && onClaimClick ? "Claim This Vehicle" : `View ${responsibleName}'s profile`}
               style={{
-                border: 'none',
-                background: 'transparent',
-                color: baseTextColor,
+                border: !isOwner && !isVerifiedOwner && onClaimClick ? '1px solid var(--primary)' : 'none',
+                background: !isOwner && !isVerifiedOwner && onClaimClick ? 'var(--surface)' : 'transparent',
+                color: !isOwner && !isVerifiedOwner && onClaimClick ? 'var(--primary)' : baseTextColor,
                 fontWeight: 600,
-                padding: 0,
-                  cursor: 'pointer',
-                  textDecoration: 'underline dotted'
+                padding: !isOwner && !isVerifiedOwner && onClaimClick ? '2px 8px' : 0,
+                borderRadius: !isOwner && !isVerifiedOwner && onClaimClick ? '4px' : 0,
+                cursor: 'pointer',
+                textDecoration: !isOwner && !isVerifiedOwner && onClaimClick ? 'none' : 'underline dotted',
+                fontSize: !isOwner && !isVerifiedOwner && onClaimClick ? '8pt' : 'inherit'
               }}
             >
-                {responsibleName}
+                {!isOwner && !isVerifiedOwner && onClaimClick ? 'Claim This Vehicle' : responsibleName}
             </button>
             ) : (
               <button
