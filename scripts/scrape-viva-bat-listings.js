@@ -135,6 +135,18 @@ async function scrapeVivaListings() {
             waitUntil: 'domcontentloaded',
             timeout: 20000 
           });
+          await listingPage.waitForTimeout(2000);
+          
+          // Scroll to load comments (they may be lazy-loaded)
+          await listingPage.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight);
+          });
+          await listingPage.waitForTimeout(2000);
+          
+          // Scroll back up
+          await listingPage.evaluate(() => {
+            window.scrollTo(0, 0);
+          });
           await listingPage.waitForTimeout(1000);
 
           const listingData = await listingPage.evaluate(() => {
@@ -146,6 +158,68 @@ async function scrapeVivaListings() {
             
             // Get all text content
             const bodyText = document.body?.textContent || '';
+            
+            // Extract auction start date and end date
+            // BaT shows sale date as "on MM/DD/YY" in a span.date element
+            const dateSpan = document.querySelector('span.date');
+            if (dateSpan) {
+              const dateText = dateSpan.textContent?.trim() || '';
+              // Match "on 10/28/25" or "on October 28, 2025"
+              const dateMatch = dateText.match(/on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i) || 
+                               dateText.match(/on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i);
+              if (dateMatch) {
+                try {
+                  const date = new Date(dateMatch[1]);
+                  if (!isNaN(date.getTime())) {
+                    data.auction_end_date = date.toISOString().split('T')[0];
+                    data.sale_date = data.auction_end_date;
+                  }
+                } catch {}
+              }
+            }
+            
+            // Also look for date patterns in body text
+            const endDatePatterns = [
+              /Sold\s+for[^0-9]*on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+              /Sold\s+for[^0-9]*on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+              /Auction\s+ended\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i
+            ];
+            
+            for (const pattern of endDatePatterns) {
+              const match = bodyText.match(pattern);
+              if (match && !data.auction_end_date) {
+                try {
+                  const date = new Date(match[1]);
+                  if (!isNaN(date.getTime())) {
+                    data.auction_end_date = date.toISOString().split('T')[0];
+                    data.sale_date = data.auction_end_date;
+                  }
+                } catch {}
+                break;
+              }
+            }
+            
+            // Try to find start date (listing date) - usually earlier than end date
+            // Look for "Listed" or "Posted" patterns
+            const startDatePatterns = [
+              /Listed\s+on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+              /Listed\s+on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+              /Posted\s+on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+              /Posted\s+on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i
+            ];
+            
+            for (const pattern of startDatePatterns) {
+              const match = bodyText.match(pattern);
+              if (match) {
+                try {
+                  const date = new Date(match[1]);
+                  if (!isNaN(date.getTime())) {
+                    data.auction_start_date = date.toISOString().split('T')[0];
+                  }
+                } catch {}
+                break;
+              }
+            }
             
             // Sale price - improved patterns
             const pricePatterns = [
@@ -165,25 +239,43 @@ async function scrapeVivaListings() {
               }
             }
             
-            // Sale date - improved patterns
-            const datePatterns = [
+            // Auction end date / Sale date - improved patterns
+            const endDatePatterns = [
+              /Auction\s+ended\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
               /sold\s+for[^0-9]*on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
               /([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*\(Lot/i,
               /Sold\s+on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
-              /Auction\s+ended\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
-              /Auction\s+Date[:\s]*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i
+              /Auction\s+Date[:\s]*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+              /Ended\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+              /Closed\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i
             ];
             
-            for (const pattern of datePatterns) {
+            for (const pattern of endDatePatterns) {
               const match = bodyText.match(pattern);
               if (match) {
                 try {
                   const date = new Date(match[1]);
                   if (!isNaN(date.getTime())) {
-                    data.sale_date = date.toISOString().split('T')[0];
+                    data.auction_end_date = date.toISOString().split('T')[0];
+                    data.sale_date = data.auction_end_date; // Also set sale_date for compatibility
                   }
                 } catch {}
                 break;
+              }
+            }
+            
+            // Try to find end date in meta tags or structured data
+            const metaEndDate = document.querySelector('meta[property*="end"], meta[name*="end"], [data-end-date]');
+            if (metaEndDate) {
+              const endValue = metaEndDate.getAttribute('content') || metaEndDate.getAttribute('data-end-date');
+              if (endValue) {
+                try {
+                  const date = new Date(endValue);
+                  if (!isNaN(date.getTime())) {
+                    data.auction_end_date = date.toISOString().split('T')[0];
+                    data.sale_date = data.auction_end_date;
+                  }
+                } catch {}
               }
             }
             
@@ -242,6 +334,111 @@ async function scrapeVivaListings() {
               data.model = parts.slice(startIndex + 1).join(' ');
             }
             
+            // Extract all comments with usernames and timestamps
+            // BaT comment structure: comments are in divs with comment-user-name and comment-datetime
+            data.comments = [];
+            
+            // Find all comment containers - BaT uses div.comment-user-name to identify comments
+            const usernameDivs = document.querySelectorAll('div.comment-user-name');
+            
+            usernameDivs.forEach((usernameDiv, index) => {
+              try {
+                // Get the comment container (parent of username div)
+                const commentContainer = usernameDiv.closest('div[class*="comment"], article, li') || usernameDiv.parentElement;
+                
+                // Extract username from member link
+                const usernameLink = usernameDiv.querySelector('a[href*="/member/"]');
+                let username = null;
+                let userUrl = null;
+                
+                if (usernameLink) {
+                  userUrl = usernameLink.getAttribute('href');
+                  const linkText = usernameLink.textContent?.trim();
+                  // Extract username from URL or text (remove @ and "The Seller" etc)
+                  username = userUrl?.match(/\/member\/([^\/\?]+)/)?.[1] ||
+                           linkText?.replace(/@/g, '').replace(/\s*\(The\s+Seller\)/i, '').trim() ||
+                           null;
+                }
+                
+                // Extract comment text - look for comment body/content
+                let commentText = '';
+                const textEl = commentContainer.querySelector('div[class*="comment-text"], div[class*="comment-content"], div[class*="comment-body"], p');
+                if (textEl) {
+                  commentText = textEl.textContent?.trim();
+                } else {
+                  // Fallback: get all text from container, remove username and timestamp
+                  const allText = commentContainer.textContent || '';
+                  let cleanText = allText;
+                  // Remove username
+                  if (username) {
+                    cleanText = cleanText.replace(new RegExp(username, 'gi'), '').trim();
+                    cleanText = cleanText.replace(/@/g, '').trim();
+                  }
+                  // Remove timestamp patterns
+                  cleanText = cleanText.replace(/[A-Za-z]{3}\s+\d{1,2}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/gi, '').trim();
+                  cleanText = cleanText.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, '').trim();
+                  if (cleanText.length > 5) {
+                    commentText = cleanText;
+                  }
+                }
+                
+                // Extract timestamp from comment-datetime div
+                let timestamp = null;
+                const timeDiv = commentContainer.querySelector('div.comment-datetime');
+                if (timeDiv) {
+                  const timeText = timeDiv.textContent?.trim();
+                  // Parse "Oct 28 at 10:45 PM" format
+                  const timeMatch = timeText.match(/([A-Za-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2}):(\d{2})\s+(AM|PM)/i);
+                  if (timeMatch) {
+                    try {
+                      const month = timeMatch[1];
+                      const day = parseInt(timeMatch[2]);
+                      const hour = parseInt(timeMatch[3]);
+                      const minute = parseInt(timeMatch[4]);
+                      const ampm = timeMatch[5].toUpperCase();
+                      
+                      // Get current year (or infer from context)
+                      const currentYear = new Date().getFullYear();
+                      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      const monthIndex = monthNames.findIndex(m => m.toLowerCase() === month.toLowerCase());
+                      
+                      if (monthIndex !== -1) {
+                        let hour24 = hour;
+                        if (ampm === 'PM' && hour !== 12) hour24 += 12;
+                        if (ampm === 'AM' && hour === 12) hour24 = 0;
+                        
+                        const date = new Date(currentYear, monthIndex, day, hour24, minute);
+                        // If date is in future, assume previous year
+                        if (date > new Date()) {
+                          date.setFullYear(currentYear - 1);
+                        }
+                        timestamp = date.toISOString();
+                      }
+                    } catch {}
+                  }
+                }
+                
+                // Extract comment ID
+                const commentId = commentContainer.id || 
+                                commentContainer.getAttribute('data-comment-id') ||
+                                `comment-${index}`;
+                
+                // Only add if we have meaningful content
+                if (commentText && commentText.length > 5 && username) {
+                  data.comments.push({
+                    id: commentId,
+                    username: username,
+                    user_url: userUrl,
+                    text: commentText,
+                    timestamp: timestamp,
+                    index: index
+                  });
+                }
+              } catch (e) {
+                // Skip this comment if extraction fails
+              }
+            });
+            
             return data;
           });
 
@@ -275,8 +472,23 @@ async function scrapeVivaListings() {
     console.log('Summary:');
     console.log(`   - With sale price: ${scrapedData.filter(d => d.sale_price).length}`);
     console.log(`   - With sale date: ${scrapedData.filter(d => d.sale_date).length}`);
+    console.log(`   - With auction start date: ${scrapedData.filter(d => d.auction_start_date).length}`);
+    console.log(`   - With auction end date: ${scrapedData.filter(d => d.auction_end_date).length}`);
     console.log(`   - With seller: ${scrapedData.filter(d => d.seller).length}`);
     console.log(`   - With buyer: ${scrapedData.filter(d => d.buyer).length}`);
+    
+    const totalComments = scrapedData.reduce((sum, d) => sum + (d.comments?.length || 0), 0);
+    const uniqueUsernames = new Set();
+    scrapedData.forEach(d => {
+      if (d.comments) {
+        d.comments.forEach(c => {
+          if (c.username) uniqueUsernames.add(c.username);
+        });
+      }
+    });
+    
+    console.log(`   - Total comments: ${totalComments}`);
+    console.log(`   - Unique BaT usernames: ${uniqueUsernames.size}`);
 
     // Save to database or file
     const fs = await import('fs');
