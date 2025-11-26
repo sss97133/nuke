@@ -172,5 +172,5 @@ COMMENT ON TABLE api_access_subscriptions IS 'Tracks user subscriptions for API 
 COMMENT ON TABLE api_usage_logs IS 'Logs all API usage for billing and analytics';
 COMMENT ON FUNCTION has_active_api_access(UUID) IS 'Checks if user has active API access subscription';
 COMMENT ON FUNCTION check_and_deduct_credits(UUID, INTEGER) IS 'Checks and deducts credits for prepaid subscriptions';
-COMMENT ON FUNCTION get_user_api_key(UUID, TEXT) IS 'Gets user-provided API key for a provider (if they added their own)';
+COMMENT ON FUNCTION get_user_api_key_info(UUID, TEXT) IS 'Gets user-provided API key info for a provider (if they added their own)';
 

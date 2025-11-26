@@ -12,6 +12,7 @@ import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import CashBalance from '../components/trading/CashBalance';
 import StripeKeysManager from '../components/settings/StripeKeysManager';
 import AIProviderSettings from '../components/settings/AIProviderSettings';
+import APIAccessSubscription from '../components/settings/APIAccessSubscription';
 import KnowledgeLibrary from '../components/profile/KnowledgeLibrary';
 import StreamingDashboard from '../components/profile/StreamingDashboard';
 
@@ -174,9 +175,11 @@ const Capsule: React.FC = () => {
                 </div>
               </div>
 
-              <StripeKeysManager />
+              <APIAccessSubscription />
               
               <AIProviderSettings />
+              
+              <StripeKeysManager />
             </div>
           )}
 
