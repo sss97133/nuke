@@ -80,7 +80,7 @@ const Capsule: React.FC = () => {
   ];
 
   return (
-    <AppLayout title="Capsule - Personal Tools">
+    <AppLayout>
       <div style={{ display: 'flex', gap: 'var(--space-4)', minHeight: '600px' }}>
         {/* Sidebar Navigation */}
         <div style={{
