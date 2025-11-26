@@ -5,6 +5,7 @@ import { supabase } from './lib/supabase';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider as OldToastProvider } from './hooks/useToast';
 import { ToastProvider } from './components/ui/Toast';
+import { Toaster } from 'react-hot-toast';
 import { UploadStatusProvider } from './contexts/UploadStatusContext';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
@@ -425,6 +426,7 @@ function App() {
       </UploadStatusProvider>
       </ToastProvider>
       </OldToastProvider>
+      <Toaster position="top-right" />
       <SpeedInsights />
     </ThemeProvider>
   );
