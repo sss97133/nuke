@@ -47,8 +47,27 @@ const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' |
     if (image.variants && typeof image.variants === 'object' && image.variants.full) {
       return image.variants.full;
     }
-    // Fallback to image_url (which might be compressed or a variant)
-    return image.image_url;
+    // If image_url contains variant paths, try to construct original
+    if (image.image_url) {
+      const url = image.image_url;
+      // Check if URL is a variant path and try to construct original
+      if (url.includes('/images/large/') || url.includes('/images/medium/') || url.includes('/images/thumbnail/')) {
+        // Replace variant path with base images path to get original
+        const originalUrl = url
+          .replace('/images/large/', '/images/')
+          .replace('/images/medium/', '/images/')
+          .replace('/images/thumbnail/', '/images/');
+        return originalUrl;
+      }
+      // If large_url exists and doesn't contain variant paths, it might be the original
+      if (image.large_url && image.large_url !== image.image_url) {
+        if (!image.large_url.includes('/large/') && !image.large_url.includes('/medium/') && !image.large_url.includes('/thumbnail/')) {
+          return image.large_url;
+        }
+      }
+    }
+    // Fallback to image_url
+    return image.image_url || '';
   }
   
   // First check if variants JSONB exists and has the requested size
