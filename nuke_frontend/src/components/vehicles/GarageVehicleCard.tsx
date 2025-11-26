@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleThumbnail from '../VehicleThumbnail';
+import VehicleRelationshipMetrics from './VehicleRelationshipMetrics';
 import '../../design-system.css';
 
 interface GarageVehicleCardProps {
@@ -18,11 +19,39 @@ interface GarageVehicleCardProps {
 const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relationship, onRefresh, onEditRelationship }) => {
   const [liveData, setLiveData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [organizationRelationships, setOrganizationRelationships] = useState<any[]>([]);
+  const [session, setSession] = useState<any>(null);
 
   // Load actual metrics for this vehicle
   useEffect(() => {
     loadVehicleMetrics();
+    loadOrganizationRelationships();
+    loadSession();
   }, [vehicle.id]);
+
+  const loadSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setSession(session);
+  };
+
+  const loadOrganizationRelationships = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('organization_vehicles')
+        .select('organization_id, relationship_type, status')
+        .eq('vehicle_id', vehicle.id)
+        .eq('status', 'active');
+
+      if (error) {
+        console.error('Error loading org relationships:', error);
+        return;
+      }
+
+      setOrganizationRelationships(data || []);
+    } catch (error) {
+      console.error('Error loading org relationships:', error);
+    }
+  };
 
   const loadVehicleMetrics = async () => {
     try {
@@ -430,6 +459,21 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
             }}
           >
             Edit relationship
+          </div>
+        )}
+
+        {/* Relationship-aware metrics */}
+        {organizationRelationships.length > 0 && session?.user?.id && (
+          <div onClick={(e) => e.stopPropagation()}>
+            {organizationRelationships.map((orgRel) => (
+              <VehicleRelationshipMetrics
+                key={orgRel.organization_id}
+                vehicleId={vehicle.id}
+                organizationId={orgRel.organization_id}
+                relationshipType={orgRel.relationship_type}
+                userId={session.user.id}
+              />
+            ))}
           </div>
         )}
       </div>

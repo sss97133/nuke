@@ -301,6 +301,7 @@ CREATE TRIGGER assign_verification_trigger
   EXECUTE FUNCTION trigger_assign_verification();
 
 -- Function to approve ownership verification
+-- NOW CHECKS FOR EXISTING OWNER AND REQUIRES TRANSFER APPROVAL
 CREATE OR REPLACE FUNCTION approve_ownership_verification(
   verification_id UUID,
   reviewer_id UUID,
@@ -309,6 +310,8 @@ CREATE OR REPLACE FUNCTION approve_ownership_verification(
 DECLARE
   verification_record ownership_verifications%ROWTYPE;
   vehicle_record vehicles%ROWTYPE;
+  v_existing_owner_id UUID;
+  v_transfer_id UUID;
 BEGIN
   -- Get verification record
   SELECT * INTO verification_record 
@@ -319,7 +322,53 @@ BEGIN
     RAISE EXCEPTION 'Verification not found';
   END IF;
   
-  -- Update verification status
+  -- Check if there's an existing approved owner
+  SELECT user_id INTO v_existing_owner_id
+  FROM ownership_verifications
+  WHERE vehicle_id = verification_record.vehicle_id
+    AND user_id != verification_record.user_id
+    AND status = 'approved'
+    AND id != verification_id
+  ORDER BY approved_at DESC
+  LIMIT 1;
+  
+  -- If existing owner exists, create transfer and require approval
+  IF v_existing_owner_id IS NOT NULL THEN
+    -- Create transfer record (requires seller approval)
+    SELECT detect_and_create_title_transfer(
+      verification_record.vehicle_id,
+      verification_record.user_id,
+      verification_id
+    ) INTO v_transfer_id;
+    
+    -- Set verification to pending transfer approval
+    UPDATE ownership_verifications 
+    SET 
+      status = 'pending', -- Keep as pending until transfer approved
+      human_reviewer_id = reviewer_id,
+      human_review_notes = format('%s (Transfer approval required from previous owner)', COALESCE(review_notes, '')),
+      human_reviewed_at = NOW(),
+      updated_at = NOW()
+    WHERE id = verification_id;
+    
+    -- Log that transfer approval is required
+    INSERT INTO verification_audit_log (
+      verification_id, action, actor_id, actor_type, details
+    ) VALUES (
+      verification_id, 'pending_transfer_approval', reviewer_id, 'system',
+      jsonb_build_object(
+        'review_notes', review_notes,
+        'transfer_id', v_transfer_id,
+        'previous_owner_id', v_existing_owner_id,
+        'message', 'Approval requires transfer approval from previous owner'
+      )
+    );
+    
+    -- Don't update vehicle ownership yet - wait for transfer approval
+    RETURN false; -- Not fully approved yet, waiting for transfer
+  END IF;
+  
+  -- No existing owner, proceed with normal approval
   UPDATE ownership_verifications 
   SET 
     status = 'approved',

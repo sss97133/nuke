@@ -78,6 +78,7 @@ const VehicleTimeline: React.FC<{
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [editingEventData, setEditingEventData] = useState<{title: string; description: string; event_date: string}>({title: '', description: '', event_date: ''});
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [timelineEventsExpanded, setTimelineEventsExpanded] = useState<boolean>(false);
   const [vehicleOwner, setVehicleOwner] = useState<string | null>(null);
   const [lastScrollTime, setLastScrollTime] = useState<number>(0);
   const [vehicleValueMeta, setVehicleValueMeta] = useState<{ current_value?: number|null; asking_price?: number|null; purchase_price?: number|null; msrp?: number|null } | null>(null);
@@ -753,106 +754,197 @@ const VehicleTimeline: React.FC<{
         {/* Timeline Events List - Show all events regardless of selected year */}
         {events.length > 0 && (
           <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
-            <h4 style={{ fontSize: '11px', fontWeight: 700, marginBottom: '12px', color: 'var(--text)' }}>
-              Timeline Events ({events.length})
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {(() => {
-                const filtered = filterType === 'life' ? events.filter(e => (e as any).event_type === 'life') : events;
-                const sortedEvents = [...filtered].sort((a, b) => {
-                  const dateA = new Date(a.event_date).getTime();
-                  const dateB = new Date(b.event_date).getTime();
-                  return dateB - dateA; // Most recent first
-                });
+            <button
+              onClick={() => setTimelineEventsExpanded(!timelineEventsExpanded)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                marginBottom: timelineEventsExpanded ? '12px' : 0
+              }}
+            >
+              <h4 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+                Timeline Events ({events.length})
+              </h4>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                {timelineEventsExpanded ? '▼' : '▶'}
+              </span>
+            </button>
+            
+            {timelineEventsExpanded ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(() => {
+                  const filtered = filterType === 'life' ? events.filter(e => (e as any).event_type === 'life') : events;
+                  const sortedEvents = [...filtered].sort((a, b) => {
+                    const dateA = new Date(a.event_date).getTime();
+                    const dateB = new Date(b.event_date).getTime();
+                    return dateB - dateA; // Most recent first
+                  });
 
-                return sortedEvents.map((ev) => {
-                  const eventYear = new Date(ev.event_date).getFullYear();
-                  const isSelectedYear = eventYear === (selectedYear ?? currentTopYear);
-                  const typeBadge = getEventTypeColor(ev.event_type);
-                  let urls: string[] = Array.isArray(ev.image_urls) ? ev.image_urls : [];
-                  
-                  // Fallback: If this is a derived photo event, use the image from metadata
-                  if (urls.length === 0 && ev.metadata?.derived && ev.metadata?.image_id) {
-                    const fallbackUrl = ev.metadata?.image_url || (ev as any).image_url;
-                    if (fallbackUrl) {
-                      urls = [fallbackUrl];
+                  return sortedEvents.map((ev) => {
+                    const eventYear = new Date(ev.event_date).getFullYear();
+                    const isSelectedYear = eventYear === (selectedYear ?? currentTopYear);
+                    const typeBadge = getEventTypeColor(ev.event_type);
+                    let urls: string[] = Array.isArray(ev.image_urls) ? ev.image_urls : [];
+                    
+                    // Fallback: If this is a derived photo event, use the image from metadata
+                    if (urls.length === 0 && ev.metadata?.derived && ev.metadata?.image_id) {
+                      const fallbackUrl = ev.metadata?.image_url || (ev as any).image_url;
+                      if (fallbackUrl) {
+                        urls = [fallbackUrl];
+                      }
                     }
-                  }
 
-                  return (
-                    <div
-                      key={ev.id}
-                      className="alert alert-default"
-                      style={{
-                        cursor: 'pointer',
-                        opacity: isSelectedYear ? 1 : 0.7,
-                        border: isSelectedYear ? '2px solid var(--primary)' : '1px solid var(--border)'
-                      }}
-                      onClick={() => {
-                        setSelectedEventForDetail(ev.id);
-                      }}
-                    >
-                      <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
-                        {urls.length > 0 && (
-                          <img
-                            src={urls[0]}
-                            alt="Event photo"
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              objectFit: 'cover',
-                              flexShrink: 0,
-                              borderRadius: '4px'
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEventForDetail(ev.id);
-                            }}
-                          />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-                            <span
+                    return (
+                      <div
+                        key={ev.id}
+                        className="alert alert-default"
+                        style={{
+                          cursor: 'pointer',
+                          opacity: isSelectedYear ? 1 : 0.7,
+                          border: isSelectedYear ? '2px solid var(--primary)' : '1px solid var(--border)'
+                        }}
+                        onClick={() => {
+                          setSelectedEventForDetail(ev.id);
+                        }}
+                      >
+                        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+                          {urls.length > 0 && (
+                            <img
+                              src={urls[0]}
+                              alt="Event photo"
                               style={{
-                                padding: '2px 6px',
-                                background: typeBadge.bg || '#f0f0f0',
-                                color: typeBadge.text || '#333',
-                                fontSize: '7pt',
-                                fontWeight: 700,
-                                borderRadius: '3px',
-                                textTransform: 'uppercase'
+                                width: '60px',
+                                height: '60px',
+                                objectFit: 'cover',
+                                flexShrink: 0,
+                                borderRadius: '4px'
                               }}
-                            >
-                              {ev.event_type}
-                            </span>
-                            <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                              {new Date(ev.event_date).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </span>
-                            {!isSelectedYear && (
-                              <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                ({eventYear})
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEventForDetail(ev.id);
+                              }}
+                            />
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  background: typeBadge.bg || '#f0f0f0',
+                                  color: typeBadge.text || '#333',
+                                  fontSize: '7pt',
+                                  fontWeight: 700,
+                                  borderRadius: '3px',
+                                  textTransform: 'uppercase'
+                                }}
+                              >
+                                {ev.event_type}
                               </span>
+                              <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                                {new Date(ev.event_date).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </span>
+                              {!isSelectedYear && (
+                                <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                  ({eventYear})
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '2px' }}>
+                              {ev.title || 'Untitled Event'}
+                            </div>
+                            {ev.description && (
+                              <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                                {ev.description}
+                              </div>
                             )}
                           </div>
-                          <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '2px' }}>
-                            {ev.title || 'Untitled Event'}
-                          </div>
-                          {ev.description && (
-                            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                              {ev.description}
-                            </div>
-                          )}
                         </div>
                       </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
+                {(() => {
+                  const filtered = filterType === 'life' ? events.filter(e => (e as any).event_type === 'life') : events;
+                  const sortedEvents = [...filtered].sort((a, b) => {
+                    const dateA = new Date(a.event_date).getTime();
+                    const dateB = new Date(b.event_date).getTime();
+                    return dateB - dateA; // Most recent first
+                  }).slice(0, 12); // Show max 12 thumbnails when collapsed
+
+                  return sortedEvents.map((ev) => {
+                    let urls: string[] = Array.isArray(ev.image_urls) ? ev.image_urls : [];
+                    if (urls.length === 0 && ev.metadata?.derived && ev.metadata?.image_id) {
+                      const fallbackUrl = ev.metadata?.image_url || (ev as any).image_url;
+                      if (fallbackUrl) {
+                        urls = [fallbackUrl];
+                      }
+                    }
+
+                    return urls.length > 0 ? (
+                      <img
+                        key={ev.id}
+                        src={urls[0]}
+                        alt={ev.title || 'Event'}
+                        onClick={() => {
+                          setTimelineEventsExpanded(true);
+                          setSelectedEventForDetail(ev.id);
+                        }}
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          objectFit: 'cover',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          border: '1px solid var(--border)',
+                          opacity: 0.8
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                          e.currentTarget.style.border = '2px solid var(--primary)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '0.8';
+                          e.currentTarget.style.border = '1px solid var(--border)';
+                        }}
+                      />
+                    ) : null;
+                  });
+                })()}
+                {events.length > 12 && (
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'var(--grey-200)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '3px',
+                      fontSize: '7pt',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setTimelineEventsExpanded(true)}
+                  >
+                    +{events.length - 12}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

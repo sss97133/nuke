@@ -480,7 +480,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         }
       }
 
-      // Create timeline event for BAT auction week
+      // Create timeline event and ownership transfer for BAT auction
       if (vinMatch && scrapedData) {
         try {
           // Extract auction date from scraped data or use vehicle year
@@ -494,7 +494,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           }
 
           // Create timeline event for the auction
-          const { error: eventError } = await supabase
+          const { data: timelineEvent, error: eventError } = await supabase
             .from('timeline_events')
             .insert({
               vehicle_id: vehicleId,
@@ -505,8 +505,8 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                 ? `Sold on Bring a Trailer for $${scrapedData.sale_price.toLocaleString()}`
                 : 'Listed on Bring a Trailer',
               description: scrapedData.title 
-                ? `${scrapedData.title} - ${scrapedData.seller ? `Seller: ${scrapedData.seller}` : ''}`
-                : `Vehicle auction on Bring a Trailer${scrapedData.seller ? ` - Seller: ${scrapedData.seller}` : ''}`,
+                ? `${scrapedData.title} - ${scrapedData.seller ? `Seller: ${scrapedData.seller}` : ''}${scrapedData.buyer ? `, Buyer: ${scrapedData.buyer}` : ''}`
+                : `Vehicle auction on Bring a Trailer${scrapedData.seller ? ` - Seller: ${scrapedData.seller}` : ''}${scrapedData.buyer ? `, Buyer: ${scrapedData.buyer}` : ''}`,
               cost_amount: scrapedData.sale_price || null,
               metadata: {
                 source: 'bat_import',
@@ -517,12 +517,79 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                 auction_date: auctionDate,
                 processed_from_comment: true
               }
-            });
+            })
+            .select('id')
+            .single();
 
           if (eventError) {
             console.warn('[VehicleComments] Failed to create timeline event:', eventError);
           } else {
             console.log('[VehicleComments] Created timeline event for BAT auction');
+            
+            // Create ownership transfer record if buyer is available
+            if (scrapedData.buyer && timelineEvent?.id) {
+              // Try to find existing profile by username/name matching buyer
+              // BaT buyers are often usernames, so try to match
+              let buyerProfileId = null;
+              const { data: buyerProfile } = await supabase
+                .from('profiles')
+                .select('id')
+                .or(`username.ilike.%${scrapedData.buyer}%,full_name.ilike.%${scrapedData.buyer}%`)
+                .limit(1)
+                .maybeSingle();
+              
+              if (buyerProfile) {
+                buyerProfileId = buyerProfile.id;
+              }
+
+              // Get current owner (if any) from vehicle_ownerships
+              const { data: currentOwner } = await supabase
+                .from('vehicle_ownerships')
+                .select('owner_profile_id')
+                .eq('vehicle_id', vehicleId)
+                .eq('is_current', true)
+                .limit(1)
+                .maybeSingle();
+
+              // Create ownership transfer record
+              // Note: We'll need to add metadata column to ownership_transfers table
+              const transferData: any = {
+                vehicle_id: vehicleId,
+                from_owner_id: currentOwner?.owner_profile_id || null,
+                to_owner_id: buyerProfileId || null, // null if buyer not found in profiles
+                transfer_date: auctionDate,
+                source: 'bring_a_trailer',
+                source_url: batUrl,
+                price: scrapedData.sale_price || null,
+                proof_event_id: timelineEvent.id
+              };
+
+              // Add metadata if column exists (will be added via migration)
+              // Store buyer name even if no profile match
+              if (scrapedData.buyer || scrapedData.seller) {
+                transferData.metadata = {
+                  ...(scrapedData.buyer && { buyer_name: scrapedData.buyer }),
+                  ...(scrapedData.seller && { seller_name: scrapedData.seller }),
+                  bat_listing_title: scrapedData.title,
+                  lot_number: scrapedData.lot_number || null
+                };
+              }
+
+              const { error: transferError } = await supabase
+                .from('ownership_transfers')
+                .insert(transferData);
+
+              if (transferError) {
+                console.warn('[VehicleComments] Failed to create ownership transfer:', transferError);
+              } else {
+                console.log('[VehicleComments] Created ownership transfer for BaT buyer:', scrapedData.buyer);
+                // Note: We do NOT create vehicle_ownerships records here because:
+                // 1. Ownership must be verified through the ownership_verification system
+                // 2. Only approved, up-to-date title verifications create vehicle_ownerships records
+                // 3. The ownership_transfer record documents the sale, but doesn't grant ownership
+                // 4. The buyer must submit title documents and get verified to become the current owner
+              }
+            }
           }
         } catch (eventErr) {
           console.warn('[VehicleComments] Error creating timeline event:', eventErr);

@@ -216,7 +216,7 @@ const CursorHomepage: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [timePeriodCollapsed, setTimePeriodCollapsed] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     yearMin: null,
@@ -255,10 +255,9 @@ const CursorHomepage: React.FC = () => {
       setShowScrollTop(currentScrollY > 500);
       
       // Minimize filter bar after scrolling down 200px (if filters are shown)
-      if (showFilters && currentScrollY > 200) {
+      // Only auto-minimize, don't auto-expand (let user control expansion)
+      if (showFilters && currentScrollY > 200 && !filterBarMinimized) {
         setFilterBarMinimized(true);
-      } else if (currentScrollY < 100) {
-        setFilterBarMinimized(false);
       }
     };
     
@@ -845,8 +844,8 @@ const CursorHomepage: React.FC = () => {
         {/* Filter Panel - Sticky with minimize */}
         {showFilters && (
           <div style={{ 
-            position: filterBarMinimized ? 'sticky' : 'relative',
-            top: filterBarMinimized ? 0 : 'auto',
+            position: 'sticky',
+            top: 0,
             background: filterBarMinimized ? 'rgba(255, 255, 255, 0.95)' : 'var(--grey-50)',
             backdropFilter: filterBarMinimized ? 'blur(10px)' : 'none',
             border: '1px solid var(--border)',
@@ -857,23 +856,24 @@ const CursorHomepage: React.FC = () => {
             transition: 'padding 0.2s ease, background 0.2s ease',
             opacity: 1
           }}>
-            {/* Minimized header bar */}
-            {filterBarMinimized && (
-              <div 
-                onClick={() => setFilterBarMinimized(false)}
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  fontSize: '8pt',
-                  fontWeight: 'bold'
-                }}
-              >
-                <span>Filters Active ({Object.values(filters).filter(v => v && v !== '' && v !== false && (Array.isArray(v) ? v.length > 0 : true)).length})</span>
-                <span style={{ fontSize: '10pt' }}>▼</span>
-              </div>
-            )}
+            {/* Collapsible header bar */}
+            <div 
+              onClick={() => setFilterBarMinimized(!filterBarMinimized)}
+              style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                cursor: 'pointer',
+                fontSize: '8pt',
+                fontWeight: 'bold',
+                marginBottom: filterBarMinimized ? 0 : '8px',
+                paddingBottom: filterBarMinimized ? 0 : '4px',
+                borderBottom: filterBarMinimized ? 'none' : '1px solid var(--border)'
+              }}
+            >
+              <span>Filters {filterBarMinimized && `Active (${Object.values(filters).filter(v => v && v !== '' && v !== false && (Array.isArray(v) ? v.length > 0 : true)).length})`}</span>
+              <span style={{ fontSize: '10pt' }}>{filterBarMinimized ? '▲' : '▼'}</span>
+            </div>
             
             {/* Full filter controls */}
             <div style={{ 
@@ -1032,6 +1032,43 @@ const CursorHomepage: React.FC = () => {
                     <span>Show Detail Card</span>
                   </label>
                 </div>
+              </div>
+
+              {/* Sort By */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortBy)}
+                  style={{
+                    width: '100%',
+                    padding: '4px 6px',
+                    border: '1px solid var(--border)',
+                    fontSize: '8pt',
+                    marginBottom: '4px'
+                  }}
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="year">Year</option>
+                  <option value="make">Make</option>
+                  <option value="model">Model</option>
+                  <option value="mileage">Mileage</option>
+                  <option value="price_high">Price (High to Low)</option>
+                  <option value="price_low">Price (Low to High)</option>
+                  <option value="popular">Most Popular</option>
+                  <option value="images">Most Images</option>
+                  <option value="events">Most Events</option>
+                  <option value="views">Most Views</option>
+                </select>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={sortDirection === 'desc'}
+                    onChange={(e) => setSortDirection(e.target.checked ? 'desc' : 'asc')}
+                  />
+                  <span>Descending</span>
+                </label>
               </div>
 
               {/* Clear Filters */}
