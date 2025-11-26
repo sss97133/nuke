@@ -360,48 +360,75 @@ async function scrapeVivaListings() {
                            null;
                 }
                 
-                // Extract comment text - look for comment body/content
+                // Extract comment text - BaT structure: username div, then comment text, then datetime
                 let commentText = '';
                 
-                // BaT comment text is usually in a p tag or specific div
-                // Try to find elements that contain actual comment text (not author info)
-                const allElements = commentContainer.querySelectorAll('p, div');
-                for (const el of allElements) {
-                  const text = el.textContent?.trim() || '';
-                  // Skip if it's author likes, timestamp, or username
+                // Strategy 1: Look for p tags that come after username div
+                const allPElements = commentContainer.querySelectorAll('p');
+                for (const pEl of allPElements) {
+                  const text = pEl.textContent?.trim() || '';
+                  // Skip if it contains author likes, timestamp, or is too short
                   if (text.includes("This author's likes") || 
                       text.match(/[A-Za-z]{3}\s+\d{1,2}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/) ||
                       text === username ||
-                      text.length < 15 ||
-                      text.match(/^\d+$/)) {
+                      text.length < 20 ||
+                      text.match(/^\d+$/) ||
+                      text.startsWith('@')) {
                     continue;
                   }
-                  // Found substantial text that looks like a comment
-                  if (text.length > 20) {
+                  // Check if this p comes after the username div
+                  const pPosition = Array.from(commentContainer.querySelectorAll('*')).indexOf(pEl);
+                  const usernamePosition = Array.from(commentContainer.querySelectorAll('*')).indexOf(usernameDiv);
+                  if (pPosition > usernamePosition) {
                     commentText = text;
                     break;
                   }
                 }
                 
-                // Fallback: clean all text from container
+                // Strategy 2: Get all text and intelligently clean it
                 if (!commentText || commentText.length < 10) {
                   const allText = commentContainer.textContent || '';
-                  let cleanText = allText;
-                  // Remove username
-                  if (username) {
-                    cleanText = cleanText.replace(new RegExp(username, 'gi'), '').trim();
-                    cleanText = cleanText.replace(/@/g, '').trim();
+                  
+                  // Split by newlines and find the longest meaningful text block
+                  const lines = allText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                  
+                  for (const line of lines) {
+                    // Skip metadata lines
+                    if (line.includes("This author's likes") ||
+                        line.match(/[A-Za-z]{3}\s+\d{1,2}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/) ||
+                        line === username ||
+                        line.match(/^\d+$/) ||
+                        line.startsWith('@') ||
+                        line.includes('(The Seller)') ||
+                        line.length < 20) {
+                      continue;
+                    }
+                    // Found a substantial line that looks like comment text
+                    if (line.length > 30) {
+                      commentText = line;
+                      break;
+                    }
                   }
-                  // Remove author likes pattern
-                  cleanText = cleanText.replace(/This author's likes:[\d,]+/gi, '').trim();
-                  // Remove timestamp patterns
-                  cleanText = cleanText.replace(/[A-Za-z]{3}\s+\d{1,2}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/gi, '').trim();
-                  cleanText = cleanText.replace(/\(The\s+Seller\)/gi, '').trim();
-                  cleanText = cleanText.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, '').trim();
-                  // Remove multiple newlines
-                  cleanText = cleanText.replace(/\n\s*\n+/g, '\n').trim();
-                  if (cleanText.length > 10) {
-                    commentText = cleanText;
+                  
+                  // Strategy 3: Clean entire text block
+                  if (!commentText || commentText.length < 10) {
+                    let cleanText = allText;
+                    // Remove username
+                    if (username) {
+                      cleanText = cleanText.replace(new RegExp(username, 'gi'), '').trim();
+                      cleanText = cleanText.replace(/@/g, '').trim();
+                    }
+                    // Remove common patterns
+                    cleanText = cleanText.replace(/This author's likes:[\d,]+/gi, '').trim();
+                    cleanText = cleanText.replace(/[A-Za-z]{3}\s+\d{1,2}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/gi, '').trim();
+                    cleanText = cleanText.replace(/\(The\s+Seller\)/gi, '').trim();
+                    cleanText = cleanText.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, '').trim();
+                    cleanText = cleanText.replace(/\n\s*\n+/g, '\n').trim();
+                    // Get the longest remaining text block
+                    const blocks = cleanText.split(/\n+/).filter(b => b.trim().length > 20);
+                    if (blocks.length > 0) {
+                      commentText = blocks[0].trim();
+                    }
                   }
                 }
                 
