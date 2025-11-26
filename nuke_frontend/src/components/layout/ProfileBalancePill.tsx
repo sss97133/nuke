@@ -220,7 +220,8 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
             { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
             { label: 'Vehicles', action: '/vehicles' },
             { label: 'Auctions', action: '/auctions' },
-            { label: 'Organizations', action: '/organizations' }
+            { label: 'Organizations', action: '/organizations' },
+            { label: 'Photos', action: '/capsule?tab=photos' }
           ].map((item, i) => (
             <button
               key={i}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
 import ShopFinancials from './ShopFinancials';
@@ -20,9 +20,24 @@ type CapsuleTab = 'dashboard' | 'api-access' | 'settings' | 'financials' | 'orga
 const Capsule: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<CapsuleTab>('dashboard');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as CapsuleTab | null;
+  const [activeTab, setActiveTab] = useState<CapsuleTab>(tabParam || 'dashboard');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Update active tab when URL param changes
+  useEffect(() => {
+    if (tabParam && ['dashboard', 'api-access', 'settings', 'financials', 'organizations', 'knowledge', 'streaming', 'professional', 'photos'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  // Update URL when tab changes
+  const handleTabChange = (tab: CapsuleTab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   useEffect(() => {
     checkAuth();
@@ -89,7 +104,7 @@ const Capsule: React.FC = () => {
             {tabs.map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => handleTabChange(tab.key)}
                 style={{
                   padding: 'var(--space-2) var(--space-3)',
                   textAlign: 'left',
