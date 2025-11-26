@@ -105,6 +105,65 @@ Deno.serve(async (req) => {
         // TODO: Notify shop of payment
         // TODO: Update journal entries for accounting
 
+      } else if (purchaseType === 'api_access_subscription') {
+        // Handle API access subscription
+        const subscriptionType = session.metadata?.subscription_type
+        const credits = session.metadata?.credits ? parseInt(session.metadata.credits) : null
+        
+        if (!subscriptionType) {
+          console.error('Missing subscription_type for API access subscription')
+          return new Response('Invalid metadata', { status: 400 })
+        }
+
+        // Create or update subscription
+        if (subscriptionType === 'monthly') {
+          // Monthly subscription
+          const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+          
+          const { error: subError } = await supabase
+            .from('api_access_subscriptions')
+            .upsert({
+              user_id: userId,
+              subscription_type: 'monthly',
+              status: 'active',
+              stripe_subscription_id: subscription.id,
+              stripe_customer_id: subscription.customer as string,
+              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              monthly_limit: 1000, // 1000 images per month
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'user_id'
+            })
+
+          if (subError) {
+            console.error('Failed to create subscription:', subError)
+            return new Response('Failed to create subscription', { status: 500 })
+          }
+
+          console.log(`Monthly API access subscription created for user ${userId}`)
+        } else if (subscriptionType.startsWith('prepaid_')) {
+          // Prepaid credits
+          const { error: subError } = await supabase
+            .from('api_access_subscriptions')
+            .upsert({
+              user_id: userId,
+              subscription_type: 'prepaid_credits',
+              status: 'active',
+              credits_remaining: credits || 0,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'user_id'
+            })
+
+          if (subError) {
+            console.error('Failed to create prepaid subscription:', subError)
+            return new Response('Failed to create subscription', { status: 500 })
+          }
+
+          console.log(`Prepaid credits subscription created for user ${userId}: ${credits} credits`)
+        }
+
       } else if (purchaseType === 'vehicle_transaction') {
         // Handle vehicle transaction facilitation fee
         const transactionId = session.metadata?.transaction_id
