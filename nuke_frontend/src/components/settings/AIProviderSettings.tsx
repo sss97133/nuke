@@ -165,6 +165,10 @@ const AIProviderSettings: React.FC = () => {
         </button>
       </div>
       <div className="card-body">
+        <p className="text" style={{ marginBottom: 'var(--space-4)' }}>
+          <strong>For developers only:</strong> If you're building integrations or want to use your own API keys, you can add them here. 
+          Regular users don't need to add keys - the platform handles all AI processing automatically.
+        </p>
         {showAddForm && (
           <div style={{
             padding: 'var(--space-3)',
