@@ -159,6 +159,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [showTagger, setShowTagger] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   
   // Touch gesture handlers for swipe navigation + info panel
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -195,16 +196,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       setLongPressTimer(timer);
       
     } else if (e.touches.length === 2) {
-      // Two fingers - pinch zoom or swipe up for quick actions
+      // Two fingers - ONLY pinch zoom, no navigation or other gestures
       const distance = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
       setTouchStartDistance(distance);
-      setTouchStart({ 
-        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-      });
       setIsPinching(true);
       
       // Clear long-press timer
@@ -222,28 +219,16 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       setLongPressTimer(null);
     }
     
-    if (isPinching && e.touches.length === 2 && touchStartDistance && touchStart) {
-      // Two-finger gesture
+    if (isPinching && e.touches.length === 2 && touchStartDistance) {
+      // Two-finger gesture - ONLY pinch zoom, no navigation or other gestures
       const currentDistance = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
-      const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const deltaY = touchStart.y - currentY;
       
-      // Check if it's a swipe up (quick actions) or pinch (zoom)
+      // Pinch zoom - continuous scale (only if distance actually changes)
       const distanceChange = Math.abs(currentDistance - touchStartDistance);
-      
-      if (deltaY > 50 && distanceChange < 30) {
-        // Two-finger swipe up - show quick actions
-        if (canEdit && !showQuickActions) {
-          setShowQuickActions(true);
-          if (navigator.vibrate) {
-            navigator.vibrate(30);
-          }
-        }
-      } else if (distanceChange > 30) {
-        // Pinch zoom - continuous scale
+      if (distanceChange > 10) {
         const scale = Math.max(1, Math.min(4, currentDistance / touchStartDistance));
         setZoom(scale);
       }
@@ -257,11 +242,17 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       setLongPressTimer(null);
     }
     
-    if (!touchStart || isPinching) {
+    // If it was a pinch gesture, don't process any navigation
+    if (isPinching) {
       setTouchStart(null);
       setTouchStartDistance(null);
       setIsPinching(false);
       setIsDragging(false);
+      return;
+    }
+    
+    // If no touch start position, can't process navigation
+    if (!touchStart) {
       return;
     }
     
@@ -277,8 +268,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     } else {
       // Determine gesture type: horizontal (navigate) or vertical (info panel)
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        // Horizontal swipe - navigate
-        if (Math.abs(deltaX) > 50) {
+        // Horizontal swipe - navigate (increased threshold to prevent accidental navigation)
+        if (Math.abs(deltaX) > 120) {
           if (deltaX > 0 && onPrev) {
             onPrev();
           } else if (deltaX < 0 && onNext) {
@@ -730,7 +721,49 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   useEffect(() => {
     loadImageMetadata();
-  }, [loadImageMetadata]);
+    
+    // Subscribe to realtime changes for this image's metadata
+    if (imageId) {
+      const channel = supabase
+        .channel(`image-metadata-${imageId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'vehicle_images',
+            filter: `id=eq.${imageId}`
+          },
+          (payload) => {
+            console.log('🔄 Image metadata updated, reloading...', payload);
+            // Reload metadata when image is updated
+            loadImageMetadata();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [loadImageMetadata, imageId]);
+  
+  // Also listen for custom events (for compatibility)
+  useEffect(() => {
+    const handleImageUpdate = () => {
+      if (imageId) {
+        loadImageMetadata();
+      }
+    };
+    
+    window.addEventListener('vehicle_images_updated', handleImageUpdate as any);
+    window.addEventListener('image_metadata_updated', handleImageUpdate as any);
+    
+    return () => {
+      window.removeEventListener('vehicle_images_updated', handleImageUpdate as any);
+      window.removeEventListener('image_metadata_updated', handleImageUpdate as any);
+    };
+  }, [loadImageMetadata, imageId]);
 
   // Comments Logic
   const addComment = async () => {
@@ -798,18 +831,21 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       if (e.key === 'ArrowRight' && onNext && !showTagger) onNext();
     };
     
-    // Use scroll wheel for image navigation
+    // Handle wheel events - on desktop, allow sidebar scrolling or image panning
     const handleWheel = (e: WheelEvent) => {
       // Only navigate if not in tagger
       if (showTagger) return;
       
-      if (e.deltaY > 0 && onNext) {
-        e.preventDefault();
-        onNext();
-      } else if (e.deltaY < 0 && onPrev) {
-        e.preventDefault();
-        onPrev();
+      // Check if we're over the sidebar
+      const target = e.target as HTMLElement;
+      if (sidebarRef.current && sidebarRef.current.contains(target)) {
+        // If over sidebar, allow normal scrolling - don't prevent default
+        return;
       }
+      
+      // On desktop, don't use wheel for image navigation
+      // Allow normal scroll/pan behavior instead
+      // (This prevents accidental navigation while scrolling)
     };
     
     window.addEventListener('keydown', handleKeyDown);
@@ -1252,12 +1288,14 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         {/* Sidebar - Cursor Style - Fixed width, doesn't shrink */}
         {showSidebar && (
           <div 
+            ref={sidebarRef}
             className="bg-[#111] border-l-2 border-white/20 flex flex-col overflow-hidden"
             style={{
               width: '256px',
               flexShrink: 0,
               minWidth: '256px',
-              maxWidth: '256px'
+              maxWidth: '256px',
+              minHeight: 0
             }}
           >
             {/* Tabs - Cursor Style */}
@@ -1310,7 +1348,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex-1 overflow-y-auto p-4" style={{ WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
               {/* Actions Tab (Mobile Quick Actions) */}
               {activeTab === 'actions' && canEdit && (
                 <div className="space-y-3">
@@ -1701,9 +1739,6 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Appraiser Brain Checklist */}
                   {imageMetadata?.ai_scan_metadata?.appraiser && (
                     <div className="mb-4 p-3 bg-white/5 rounded border border-white/10">
-                      <h4 className="text-xs font-bold text-blue-400 uppercase mb-2 flex items-center gap-2">
-                        <span>🧠</span> Appraiser Notes
-                      </h4>
                       <div className="space-y-2 text-xs">
                         {Object.entries(imageMetadata.ai_scan_metadata.appraiser).map(([key, value]) => {
                           if (key === 'raw_analysis') return null; // Skip raw text

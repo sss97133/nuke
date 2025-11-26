@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 // Deprecated modals (history/analysis/tag review) intentionally removed from UI
 import { VehicleValuationService } from '../../services/vehicleValuationService';
 import TradePanel from '../../components/trading/TradePanel';
+import { VehicleDeduplicationService } from '../../services/vehicleDeduplicationService';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -62,6 +63,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [isFollowing, setIsFollowing] = useState(false);
   const [priceMenuOpen, setPriceMenuOpen] = useState(false);
   const priceMenuRef = useRef<HTMLDivElement | null>(null);
+  const [showPendingDetails, setShowPendingDetails] = useState(false);
+  const [similarVehicles, setSimilarVehicles] = useState<any[]>([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
+  const [imageCount, setImageCount] = useState(0);
+  const pendingDetailsRef = useRef<HTMLDivElement | null>(null);
+  const [showOriginDetails, setShowOriginDetails] = useState(false);
+  const originDetailsRef = useRef<HTMLDivElement | null>(null);
 
   // Only fetch if not provided via props (eliminates duplicate query)
   useEffect(() => {
@@ -101,6 +109,66 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       }
     })();
   }, [vehicle?.id, initialValuation]);
+
+  // Load pending details if vehicle is pending
+  useEffect(() => {
+    if (!vehicle || (vehicle as any).status !== 'pending') {
+      setSimilarVehicles([]);
+      setImageCount(0);
+      return;
+    }
+
+    (async () => {
+      // Count images
+      const { count } = await supabase
+        .from('vehicle_images')
+        .select('id', { count: 'exact', head: true })
+        .eq('vehicle_id', vehicle.id);
+      setImageCount(count || 0);
+
+      // Find similar vehicles if we have basic info
+      if (vehicle.year && vehicle.make && vehicle.model) {
+        setLoadingSimilar(true);
+        try {
+          const matches = await VehicleDeduplicationService.findDuplicates({
+            vin: vehicle.vin || undefined,
+            year: vehicle.year,
+            make: vehicle.make,
+            model: vehicle.model,
+          });
+
+          // Filter out this vehicle and enrich with image counts
+          const enriched = await Promise.all(
+            matches
+              .filter(m => m.existingVehicle.id !== vehicle.id)
+              .map(async (match) => {
+                const { count } = await supabase
+                  .from('vehicle_images')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('vehicle_id', match.existingVehicle.id);
+
+                return {
+                  id: match.existingVehicle.id,
+                  year: match.existingVehicle.year,
+                  make: match.existingVehicle.make,
+                  model: match.existingVehicle.model,
+                  vin: match.existingVehicle.vin,
+                  image_count: count || 0,
+                  confidence: match.confidence,
+                  matchType: match.matchType,
+                };
+              })
+          );
+
+          setSimilarVehicles(enriched);
+        } catch (error) {
+          console.error('Error loading similar vehicles:', error);
+        } finally {
+          setLoadingSimilar(false);
+        }
+      }
+    })();
+  }, [vehicle?.id, (vehicle as any)?.status, vehicle?.year, vehicle?.make, vehicle?.model, vehicle?.vin]);
 
   // Load owner's preferred display settings (if the table/columns exist)
   useEffect(() => {
@@ -377,6 +445,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (mode === 'uploader') return 'Uploader';
     if (mode === 'listed_by') return 'Listed by';
     
+    // Check if this is an automated import (should show organization, not user)
+    const isAutomatedImport = vehicle?.profile_origin === 'dropbox_import' && 
+                              (vehicle?.origin_metadata?.automated_import === true || 
+                               vehicle?.origin_metadata?.no_user_uploader === true ||
+                               !vehicle?.uploaded_by);
+    if (isAutomatedImport) {
+      return 'Imported by'; // Organization import, not user upload
+    }
+    
     // Auto logic based on permissions
     if (isVerifiedOwner || contributorRole === 'owner') return 'Owner';
     if (contributorRole === 'consigner') return 'Consigner';
@@ -600,9 +677,32 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   const responsibleLabel = computeResponsibleLabel();
 
+  // Check if vehicle is pending - either by status or by missing VIN
+  const hasVIN = vehicle?.vin && vehicle.vin.trim() !== '' && !vehicle.vin.startsWith('VIVA-');
+  const isPending = vehicle && ((vehicle as any).status === 'pending' || !hasVIN);
+  const needsVIN = isPending && !hasVIN;
+  const needsImages = isPending && imageCount === 0;
+  const pendingReasons: string[] = [];
+  if (needsVIN) pendingReasons.push('VIN');
+  if (needsImages) pendingReasons.push('images');
+  const pendingReasonText = pendingReasons.length > 0 ? `Missing: ${pendingReasons.join(' and ')}` : 'Pending review';
+
+  // Close pending details when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (pendingDetailsRef.current && !pendingDetailsRef.current.contains(event.target as Node)) {
+        setShowPendingDetails(false);
+      }
+    };
+    if (showPendingDetails) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showPendingDetails]);
+
   return (
     <div
-      className="vehicle-price-header"
+        className="vehicle-price-header"
       style={{
         background: 'var(--surface)',
         border: 'none',
@@ -622,7 +722,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         right: 0,
         width: '100vw',
         maxWidth: '100vw',
-        zIndex: 98,
+        zIndex: 97,
         boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
         height: '25px',
         minHeight: '25px',
@@ -638,6 +738,33 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           <div style={{ fontSize: '8pt', fontWeight: 700, lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}
           </div>
+          {vehicle && (vehicle as any).profile_origin && (() => {
+            // Don't show origin badge if we're showing organization name (avoid duplication)
+            const isAutomatedImport = vehicle?.profile_origin === 'dropbox_import' && 
+                                      (vehicle?.origin_metadata?.automated_import === true || 
+                                       vehicle?.origin_metadata?.no_user_uploader === true ||
+                                       !vehicle?.uploaded_by);
+            const isOrgName = isAutomatedImport && vehicle?.origin_organization_id && responsibleName;
+            
+            // Only show badge if not showing org name
+            if (isOrgName) return null;
+            
+            return (
+              <div style={{ fontSize: '7pt', color: mutedTextColor, padding: '1px 6px', background: 'var(--grey-100)', borderRadius: '3px', whiteSpace: 'nowrap' }}>
+                {(() => {
+                  const origin = (vehicle as any).profile_origin;
+                  const originLabels: Record<string, string> = {
+                    'bat_import': 'BAT',
+                    'dropbox_import': 'Dropbox',
+                    'url_scraper': 'Scraped',
+                    'manual_entry': 'Manual',
+                    'api_import': 'API'
+                  };
+                  return originLabels[origin] || origin;
+                })()}
+              </div>
+            );
+          })()}
           <div style={{ position: 'relative', fontSize: '7pt', color: mutedTextColor, display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
             {isVerifiedOwner ? (
             <button
@@ -666,39 +793,211 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               >
                 <span>✓</span> Your Vehicle
               </button>
+            ) : isPending ? (
+              <div style={{ position: 'relative' }} ref={pendingDetailsRef}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowPendingDetails(!showPendingDetails);
+                  }}
+                  style={{
+                    border: '1px solid #f59e0b',
+                    background: '#fef3c7',
+                    color: '#92400e',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '8pt'
+                  }}
+                >
+                  Pending
+                </button>
+                {showPendingDetails && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '130%',
+                      left: 0,
+                      background: 'white',
+                      border: '1px solid var(--border)',
+                      borderRadius: 6,
+                      boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
+                      padding: 12,
+                      width: 320,
+                      zIndex: 50,
+                      maxHeight: '400px',
+                      overflowY: 'auto'
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div style={{ fontSize: '9pt', fontWeight: 600, color: '#92400e', marginBottom: '8px' }}>
+                      {pendingReasonText}
+                    </div>
+                    <div style={{ fontSize: '8pt', color: '#78350f', marginBottom: '12px', lineHeight: '1.5' }}>
+                      To activate this vehicle:
+                    </div>
+                    <ul style={{ fontSize: '8pt', color: '#78350f', margin: '0 0 12px 0', paddingLeft: '20px', lineHeight: '1.6' }}>
+                      {needsVIN && (
+                        <li style={{ marginBottom: '6px' }}>
+                          <strong>Add a VIN:</strong> Go to{' '}
+                          <button
+                            onClick={() => navigate(`/vehicle/${vehicle.id}/edit`)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#92400e',
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              padding: 0,
+                              fontSize: 'inherit',
+                            }}
+                          >
+                            Edit Vehicle
+                          </button>
+                          {' '}and enter the 17-character VIN
+                        </li>
+                      )}
+                      {needsImages && (
+                        <li style={{ marginBottom: '6px' }}>
+                          <strong>Add images:</strong> Upload at least one photo of this vehicle
+                        </li>
+                      )}
+                      {similarVehicles.length > 0 && (
+                        <li style={{ marginBottom: '6px' }}>
+                          <strong>Check for duplicates:</strong> Similar vehicles found below
+                        </li>
+                      )}
+                    </ul>
+
+                    {similarVehicles.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '9pt', fontWeight: 600, color: '#92400e', marginBottom: '8px' }}>
+                          Similar Vehicles ({similarVehicles.length}):
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {similarVehicles.map((similar) => (
+                            <div
+                              key={similar.id}
+                              style={{
+                                background: '#fef3c7',
+                                border: '1px solid #fbbf24',
+                                borderRadius: '4px',
+                                padding: '8px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '9pt', fontWeight: 600, color: '#1f2937' }}>
+                                  {similar.year} {similar.make} {similar.model}
+                                </div>
+                                <div style={{ fontSize: '7pt', color: '#6b7280', marginTop: '2px' }}>
+                                  {similar.vin ? `VIN: ${similar.vin.substring(0, 8)}...` : 'No VIN'} • {similar.image_count} images • {similar.confidence}% match
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  onClick={() => window.open(`/vehicle/${similar.id}`, '_blank')}
+                                  style={{
+                                    background: 'transparent',
+                                    border: '1px solid #d1d5db',
+                                    color: '#374151',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '7pt',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  View
+                                </button>
+                                {permissions?.canEdit && (
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm(`Merge this vehicle into "${similar.year} ${similar.make} ${similar.model}"? This will combine all data.`)) {
+                                        try {
+                                          await VehicleDeduplicationService.mergeVehicles(similar.id, vehicle.id);
+                                          toast.success('Vehicles merged successfully');
+                                          window.location.reload();
+                                        } catch (error: any) {
+                                          toast.error(error.message || 'Failed to merge vehicles');
+                                        }
+                                      }
+                                    }}
+                                    style={{
+                                      background: '#f59e0b',
+                                      border: '1px solid #d97706',
+                                      color: 'white',
+                                      padding: '4px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '7pt',
+                                      cursor: 'pointer',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Merge
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {loadingSimilar && (
+                      <div style={{ fontSize: '8pt', color: '#6b7280', marginTop: '8px' }}>
+                        Loading similar vehicles...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             ) : responsibleName ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                // Always show claim functionality when clicking responsible name if user is not owner
-                if (!isOwner && !isVerifiedOwner && onClaimClick) {
-                  onClaimClick();
-                  return;
-                }
-                // If user is owner, show owner card
-                if (showOwnerCard) {
-                  window.location.href = `/profile/${(vehicle as any).uploaded_by || (vehicle as any).user_id || ''}`;
-                } else {
-                  setShowOwnerCard(true);
-                }
-              }}
-              title={!isOwner && !isVerifiedOwner && onClaimClick ? "Claim This Vehicle" : `View ${responsibleName}'s profile`}
-              style={{
-                border: !isOwner && !isVerifiedOwner && onClaimClick ? '1px solid var(--primary)' : 'none',
-                background: !isOwner && !isVerifiedOwner && onClaimClick ? 'var(--surface)' : 'transparent',
-                color: !isOwner && !isVerifiedOwner && onClaimClick ? 'var(--primary)' : baseTextColor,
-                fontWeight: 600,
-                padding: !isOwner && !isVerifiedOwner && onClaimClick ? '2px 8px' : 0,
-                borderRadius: !isOwner && !isVerifiedOwner && onClaimClick ? '4px' : 0,
-                cursor: 'pointer',
-                textDecoration: !isOwner && !isVerifiedOwner && onClaimClick ? 'none' : 'underline dotted',
-                fontSize: !isOwner && !isVerifiedOwner && onClaimClick ? '8pt' : 'inherit'
-              }}
-            >
-                {!isOwner && !isVerifiedOwner && onClaimClick ? 'Claim This Vehicle' : responsibleName}
-            </button>
+              (() => {
+                // Check if this is an automated import (organization, not user)
+                const isAutomatedImport = vehicle?.profile_origin === 'dropbox_import' && 
+                                          (vehicle?.origin_metadata?.automated_import === true || 
+                                           vehicle?.origin_metadata?.no_user_uploader === true ||
+                                           !vehicle?.uploaded_by);
+                const isOrgName = isAutomatedImport && vehicle?.origin_organization_id;
+                
+                return (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isOrgName && vehicle?.origin_organization_id) {
+                        // Link to organization profile for automated imports
+                        window.location.href = `/organization/${vehicle.origin_organization_id}`;
+                      } else {
+                        // Link to user profile for regular uploads
+                        if (showOwnerCard) {
+                          window.location.href = `/profile/${(vehicle as any).uploaded_by || (vehicle as any).user_id || ''}`;
+                        } else {
+                          setShowOwnerCard(true);
+                        }
+                      }
+                    }}
+                    title={isOrgName ? `View ${responsibleName} organization` : `View ${responsibleName}'s profile`}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: baseTextColor,
+                      fontWeight: 600,
+                      padding: 0,
+                      cursor: 'pointer',
+                      textDecoration: 'underline dotted',
+                      fontSize: 'inherit'
+                    }}
+                  >
+                    {responsibleName}
+                  </button>
+                );
+              })()
             ) : (
               <button
                 type="button"

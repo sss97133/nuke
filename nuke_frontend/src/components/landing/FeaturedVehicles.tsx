@@ -24,6 +24,7 @@ const FeaturedVehicles: React.FC = () => {
           .from('vehicles')
           .select('*')
           .eq('is_public', true)
+          .neq('status', 'pending')
           .not('current_value', 'is', null)
           .order('current_value', { ascending: false })
           .limit(3)

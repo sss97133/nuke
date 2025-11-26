@@ -38,3 +38,4 @@ $$ LANGUAGE plpgsql;
 COMMENT ON MATERIALIZED VIEW organization_activity_summary IS 'Aggregated stats for organizations: vehicle count, value, contributions, last activity';
 COMMENT ON FUNCTION refresh_organization_activity_summary IS 'Refresh the organization activity summary materialized view';
 
+

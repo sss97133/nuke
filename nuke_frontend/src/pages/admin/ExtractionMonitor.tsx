@@ -145,8 +145,9 @@ const ExtractionMonitor: React.FC = () => {
       }
       
       // Show success notification when extractions complete
-      if (previousTotal > 0 && extracted > stats.extracted && extracted > 0) {
-        const newExtractions = extracted - stats.extracted;
+      const prevExtracted = stats.extracted;
+      if (prevExtracted > 0 && extracted > prevExtracted && extracted > 0) {
+        const newExtractions = extracted - prevExtracted;
         if (newExtractions > 0 && newExtractions < 10) { // Only notify for small batches to avoid spam
           addNotification('info', `${newExtractions} image${newExtractions > 1 ? 's' : ''} extracted successfully`);
         }

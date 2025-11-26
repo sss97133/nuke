@@ -46,6 +46,7 @@ const LiveFeed: React.FC = () => {
             is_primary
           )
         `)
+        .neq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(20);
 

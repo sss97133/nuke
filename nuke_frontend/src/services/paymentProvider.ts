@@ -185,6 +185,193 @@ export class SquareProvider implements PaymentProvider {
 }
 
 /**
+ * x402 Provider (HTTP 402 Payment Protocol - Blockchain payments)
+ * Uses HTTP 402 status code for programmatic payments via blockchain
+ * Supports USDC and other stablecoins on multiple chains
+ */
+export class X402Provider implements PaymentProvider {
+  id = 'x402';
+  name = 'x402 (Blockchain)';
+  description = 'Instant blockchain payments via HTTP 402 protocol';
+  feePercent = 0; // Protocol itself has no fees
+  feeFixed = 0.1; // ~$0.001 blockchain gas fees
+  minAmount = 100; // $1 minimum
+  maxAmount = 100000000; // $1M max
+  settlementTime = 'instant';
+
+  private apiUrl: string;
+  private walletAddress?: string;
+
+  constructor(apiUrl?: string, walletAddress?: string) {
+    this.apiUrl = apiUrl || (import.meta.env.VITE_X402_API_URL as string | undefined) || '';
+    this.walletAddress = walletAddress || (import.meta.env.VITE_X402_WALLET_ADDRESS as string | undefined);
+  }
+
+  async createPaymentSession(params: PaymentParams): Promise<PaymentSession> {
+    // x402 protocol: Server responds with HTTP 402 containing payment instructions
+    // Client then processes payment and retries with proof
+    
+    try {
+      // Call the x402-payment edge function to create a payment challenge
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/x402-payment/create-challenge`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          amount: params.amount,
+          currency: params.currency || 'usd',
+          invoice_id: params.metadata?.invoice_id,
+          transaction_id: params.metadata?.transaction_id,
+          metadata: params.metadata
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create payment challenge: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const challenge = data.challenge;
+
+      // Store payment challenge for verification
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`x402_${challenge.sessionId || Date.now()}`, JSON.stringify(challenge));
+      }
+
+      return {
+        sessionId: challenge.sessionId || `x402_${Date.now()}`,
+        paymentUrl: data.payment_url || (params.successUrl ? `${params.successUrl}?x402_session=${challenge.sessionId}` : undefined),
+        status: 'pending',
+        expiresAt: new Date(challenge.expires_at)
+      };
+    } catch (error) {
+      console.error('x402 payment session creation failed:', error);
+      throw error;
+    }
+  }
+
+  async verifyPayment(sessionId: string): Promise<PaymentVerification> {
+    // x402 verification: Check blockchain for payment transaction
+    // The payment proof should be included in the retry request headers
+    
+    try {
+      const challengeData = typeof window !== 'undefined' 
+        ? sessionStorage.getItem(`x402_${sessionId}`)
+        : null;
+      
+      if (!challengeData) {
+        throw new Error('Payment challenge not found');
+      }
+
+      const challenge = JSON.parse(challengeData);
+
+      // Call the x402-payment edge function to verify payment
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
+      // Get transaction hash from challenge or metadata
+      const transactionHash = challenge.transaction_hash || challenge.metadata?.transaction_hash;
+      
+      if (!transactionHash) {
+        // Payment not yet processed
+        return {
+          verified: false,
+          amount: challenge.amount,
+          userId: challenge.metadata?.user_id || '',
+          transactionId: sessionId,
+          metadata: {
+            chain: challenge.network,
+            token: challenge.token || 'USDC',
+            recipient: challenge.recipient,
+            status: 'pending'
+          }
+        };
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/x402-payment/verify-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          transaction_hash: transactionHash,
+          session_id: sessionId,
+          amount: challenge.amount,
+          recipient: challenge.recipient
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Payment verification failed: ${response.statusText}`);
+      }
+
+      const verification = await response.json();
+
+      return {
+        verified: verification.verified || false,
+        amount: verification.amount || challenge.amount,
+        userId: challenge.metadata?.user_id || '',
+        transactionId: verification.transaction_hash || sessionId,
+        metadata: {
+          chain: challenge.network,
+          token: challenge.token || 'USDC',
+          recipient: challenge.recipient,
+          verified_at: verification.verified_at
+        }
+      };
+    } catch (error) {
+      console.error('x402 payment verification failed:', error);
+      return {
+        verified: false,
+        amount: 0,
+        userId: '',
+        transactionId: sessionId
+      };
+    }
+  }
+
+  /**
+   * Process x402 payment challenge from HTTP 402 response
+   * This method handles the client-side payment flow
+   */
+  async processPaymentChallenge(
+    amount: number,
+    currency: string,
+    recipient: string,
+    chain?: string,
+    token?: string
+  ): Promise<{ transactionHash?: string; success: boolean }> {
+    // This would integrate with a wallet (like MetaMask, WalletConnect, etc.)
+    // or use thirdweb SDK's wrapFetchWithPayment function
+    
+    // Placeholder implementation
+    // TODO: Integrate with thirdweb SDK or wallet provider
+    console.log('Processing x402 payment challenge:', {
+      amount,
+      currency,
+      recipient,
+      chain: chain || 'ethereum',
+      token: token || 'USDC'
+    });
+
+    return {
+      success: false,
+      transactionHash: undefined
+    };
+  }
+}
+
+/**
  * Payment Provider Manager
  * Handles multiple providers and selects best one for user
  */
@@ -196,6 +383,7 @@ export class PaymentProviderManager {
     this.registerProvider(new SolanaPayProvider());
     this.registerProvider(new ClearingHouseProvider());
     this.registerProvider(new SquareProvider());
+    this.registerProvider(new X402Provider());
   }
 
   registerProvider(provider: PaymentProvider) {

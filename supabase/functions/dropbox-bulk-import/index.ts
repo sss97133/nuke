@@ -159,15 +159,29 @@ Deno.serve(async (req: Request) => {
 
         // Create vehicle if doesn't exist
         if (!vehicleId) {
+          const vivaUserId = '0b9f107a-d124-49de-9ded-94698f63c1c4';
+          
           const { data: newVehicle } = await supabase
             .from('vehicles')
             .insert({
-              vin: vehicleInfo.vin || `TEMP-${Date.now()}`,
+              vin: vehicleInfo.vin || null, // Don't create fake VINs - let trigger handle pending status
               year: vehicleInfo.year,
               make: vehicleInfo.make,
               model: vehicleInfo.model,
               trim: vehicleInfo.trim,
-              user_id: '0b9f107a-d124-49de-9ded-94698f63c1c4' // Your user ID
+              user_id: vivaUserId,
+              uploaded_by: vivaUserId, // Required for origin tracking
+              profile_origin: 'dropbox_import', // Explicit - don't rely on trigger
+              discovery_source: 'dropbox_bulk_import', // Required for trigger detection
+              origin_metadata: {
+                import_job_id: jobId,
+                dropbox_path: dropboxPath,
+                folder_name: jacket.name,
+                import_date: new Date().toISOString(),
+                import_method: 'edge_function_bulk_import',
+                automation_tracked: true
+              },
+              origin_organization_id: organizationId // Link to organization
             })
             .select('id')
             .single();

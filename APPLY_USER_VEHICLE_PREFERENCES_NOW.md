@@ -118,3 +118,4 @@ The frontend errors should stop immediately. The table is used by:
 - `BulkActionsToolbar.tsx` - for bulk operations
 - `OffloadVehicleButton.tsx` - for vehicle management
 
+

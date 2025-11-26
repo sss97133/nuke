@@ -66,3 +66,4 @@ CREATE POLICY "delete_own_preferences" ON user_auction_preferences
 
 COMMENT ON TABLE user_auction_preferences IS 'User-specific preferences for auction tracking: sync settings, notifications, display options';
 
+

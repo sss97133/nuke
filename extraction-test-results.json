@@ -1,0 +1,309 @@
+{
+  "timestamp": "2025-11-26T19:18:43.005Z",
+  "total": 5,
+  "successful": 2,
+  "failed": 3,
+  "results": [
+    {
+      "success": false,
+      "error": "Edge Function returned a non-2xx status code",
+      "imageName": "Sample Car Image",
+      "fullError": {
+        "name": "FunctionsHttpError",
+        "context": {}
+      }
+    },
+    {
+      "success": true,
+      "imageName": "Car Interior",
+      "imageUrl": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=800",
+      "extracted_data": {
+        "description": "A dimly lit garage featuring a white Chevrolet Camaro in the foreground, with other luxury cars such as a Mercedes-Benz, Corvette, BMW, and Rolls-Royce visible in the background, some on car lifts.",
+        "objects": [
+          "Chevrolet Camaro",
+          "Mercedes-Benz",
+          "Corvette",
+          "BMW",
+          "Rolls-Royce",
+          "car lift"
+        ],
+        "text": "",
+        "type": "Automotive",
+        "details": {
+          "colors": [
+            "white",
+            "black"
+          ],
+          "brands": [
+            "Chevrolet",
+            "Mercedes-Benz",
+            "Corvette",
+            "BMW",
+            "Rolls-Royce"
+          ],
+          "numbers": [],
+          "dates": [],
+          "locations": [
+            "garage"
+          ],
+          "condition": "new",
+          "features": [
+            "headlights",
+            "taillights",
+            "car lift"
+          ]
+        },
+        "metadata": {
+          "quality": "high",
+          "angle": "front",
+          "lighting": "dim"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=800",
+        "tokens": {
+          "input": 1964,
+          "output": 197,
+          "total": 2161
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 2161,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 462,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      },
+      "full_response": {
+        "success": true,
+        "extracted_data": {
+          "description": "A dimly lit garage featuring a white Chevrolet Camaro in the foreground, with other luxury cars such as a Mercedes-Benz, Corvette, BMW, and Rolls-Royce visible in the background, some on car lifts.",
+          "objects": [
+            "Chevrolet Camaro",
+            "Mercedes-Benz",
+            "Corvette",
+            "BMW",
+            "Rolls-Royce",
+            "car lift"
+          ],
+          "text": "",
+          "type": "Automotive",
+          "details": {
+            "colors": [
+              "white",
+              "black"
+            ],
+            "brands": [
+              "Chevrolet",
+              "Mercedes-Benz",
+              "Corvette",
+              "BMW",
+              "Rolls-Royce"
+            ],
+            "numbers": [],
+            "dates": [],
+            "locations": [
+              "garage"
+            ],
+            "condition": "new",
+            "features": [
+              "headlights",
+              "taillights",
+              "car lift"
+            ]
+          },
+          "metadata": {
+            "quality": "high",
+            "angle": "front",
+            "lighting": "dim"
+          }
+        },
+        "metadata": {
+          "model": "gemini-2.0-flash",
+          "model_tier": "free",
+          "image_url": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=800",
+          "tokens": {
+            "input": 1964,
+            "output": 197,
+            "total": 2161
+          },
+          "cost": {
+            "input_cost": 0,
+            "output_cost": 0,
+            "total_cost": 0,
+            "currency": "USD"
+          },
+          "efficiency": {
+            "tokens_per_image": 2161,
+            "images_per_1k_tokens": 0,
+            "images_per_1m_tokens": 462,
+            "estimated_images_per_day_free_tier": 0
+          },
+          "finish_reason": "STOP"
+        }
+      }
+    },
+    {
+      "success": true,
+      "imageName": "Classic Car",
+      "imageUrl": "https://images.unsplash.com/photo-1493238792000-8113da705763?w=800",
+      "extracted_data": {
+        "description": "A close-up shot of the rear of a black Audi R8 parked on a city street at dusk, with other cars and city lights visible in the background.",
+        "objects": [
+          "Audi R8",
+          "car",
+          "street",
+          "city lights",
+          "traffic light"
+        ],
+        "text": "R8",
+        "type": "Automotive",
+        "details": {
+          "colors": [
+            "black",
+            "red",
+            "orange",
+            "gray"
+          ],
+          "brands": [
+            "Audi"
+          ],
+          "numbers": [
+            "R8"
+          ],
+          "dates": [],
+          "locations": [
+            "city street"
+          ],
+          "condition": "new",
+          "features": [
+            "LED taillights",
+            "spoiler",
+            "exhaust pipes"
+          ]
+        },
+        "metadata": {
+          "quality": "high",
+          "angle": "rear",
+          "lighting": "warm"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://images.unsplash.com/photo-1493238792000-8113da705763?w=800",
+        "tokens": {
+          "input": 1964,
+          "output": 181,
+          "total": 2145
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 2145,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 466,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      },
+      "full_response": {
+        "success": true,
+        "extracted_data": {
+          "description": "A close-up shot of the rear of a black Audi R8 parked on a city street at dusk, with other cars and city lights visible in the background.",
+          "objects": [
+            "Audi R8",
+            "car",
+            "street",
+            "city lights",
+            "traffic light"
+          ],
+          "text": "R8",
+          "type": "Automotive",
+          "details": {
+            "colors": [
+              "black",
+              "red",
+              "orange",
+              "gray"
+            ],
+            "brands": [
+              "Audi"
+            ],
+            "numbers": [
+              "R8"
+            ],
+            "dates": [],
+            "locations": [
+              "city street"
+            ],
+            "condition": "new",
+            "features": [
+              "LED taillights",
+              "spoiler",
+              "exhaust pipes"
+            ]
+          },
+          "metadata": {
+            "quality": "high",
+            "angle": "rear",
+            "lighting": "warm"
+          }
+        },
+        "metadata": {
+          "model": "gemini-2.0-flash",
+          "model_tier": "free",
+          "image_url": "https://images.unsplash.com/photo-1493238792000-8113da705763?w=800",
+          "tokens": {
+            "input": 1964,
+            "output": 181,
+            "total": 2145
+          },
+          "cost": {
+            "input_cost": 0,
+            "output_cost": 0,
+            "total_cost": 0,
+            "currency": "USD"
+          },
+          "efficiency": {
+            "tokens_per_image": 2145,
+            "images_per_1k_tokens": 0,
+            "images_per_1m_tokens": 466,
+            "estimated_images_per_day_free_tier": 0
+          },
+          "finish_reason": "STOP"
+        }
+      }
+    },
+    {
+      "success": false,
+      "error": "Edge Function returned a non-2xx status code",
+      "imageName": "DB Image 1",
+      "fullError": {
+        "name": "FunctionsHttpError",
+        "context": {}
+      }
+    },
+    {
+      "success": false,
+      "error": "Edge Function returned a non-2xx status code",
+      "imageName": "DB Image 2",
+      "fullError": {
+        "name": "FunctionsHttpError",
+        "context": {}
+      }
+    }
+  ]
+}

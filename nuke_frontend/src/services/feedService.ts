@@ -115,6 +115,7 @@ export class FeedService {
             variants
           )
         `)
+        .neq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(50);
 

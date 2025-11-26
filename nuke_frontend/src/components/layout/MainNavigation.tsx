@@ -60,6 +60,8 @@ const navigationItems: NavigationItem[] = [
   { name: 'Data Diagnostic', href: '/data-diagnostic', icon: BeakerIcon, category: 'admin', description: 'System diagnostics and testing' },
   { name: 'Admin Dashboard', href: '/admin', icon: ShieldCheckIcon, category: 'admin', description: 'Admin approval dashboard' },
   { name: 'Admin Verifications', href: '/admin/verifications', icon: ShieldCheckIcon, category: 'admin', description: 'Manage user verifications' },
+  { name: 'Shipping Settings', href: '/admin/shipping-settings', icon: ShieldCheckIcon, category: 'admin', description: 'Configure shipping integrations' },
+  { name: 'x402 Payment Settings', href: '/admin/x402-settings', icon: ShieldCheckIcon, category: 'admin', description: 'Configure blockchain payments' },
   { name: 'Test Contributions', href: '/test-contributions', icon: BeakerIcon, category: 'admin', description: 'Test contribution system' },
 ];
 
