@@ -155,7 +155,7 @@ const AIProviderSettings: React.FC = () => {
   return (
     <div className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 className="heading-3">AI Providers</h3>
+        <h3 className="heading-3">Developer API Keys (Optional)</h3>
         <button
           onClick={() => setShowAddForm(true)}
           className="button button-primary"
