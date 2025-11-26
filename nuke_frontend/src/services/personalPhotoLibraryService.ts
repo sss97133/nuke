@@ -136,7 +136,8 @@ export class PersonalPhotoLibraryService {
       .eq('user_id', userId)
       .is('vehicle_id', null)
       // Treat NULL organization_status as "unorganized" so legacy uploads still show in inbox
-      .or('organization_status.eq.unorganized,organization_status.is.null')
+      // Also include images that don't have organization_status set (manually uploaded)
+      .or('organization_status.eq.unorganized,organization_status.is.null,organization_status.eq.ignored')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
