@@ -588,11 +588,14 @@ function scrapeBringATrailer(doc: any, url: string): any {
       data.color = colorMatch[1]
     }
 
-    // Extract sale price - multiple patterns to catch different formats
+    // Extract sale price - improved patterns to catch all formats
     const pricePatterns = [
       /Sold\s+for\s+(?:USD\s+)?\$?([\d,]+)/i,
       /sold\s+for\s+\$?([\d,]+)\s+on/i,  // "sold for $11,000 on April 15"
-      /for\s+\$?([\d,]+)\s+on\s+[A-Za-z]+\s+\d+/i  // "for $11,000 on April 15"
+      /for\s+\$?([\d,]+)\s+on\s+[A-Za-z]+\s+\d+/i,  // "for $11,000 on April 15"
+      /Sold\s+for\s+\$([\d,]+)/i,  // "Sold for $11,000"
+      /Final\s+Bid[:\s]*\$?([\d,]+)/i,  // "Final Bid: $11,000"
+      /Winning\s+Bid[:\s]*\$?([\d,]+)/i  // "Winning Bid: $11,000"
     ]
     for (const pattern of pricePatterns) {
       const priceMatch = bodyText.match(pattern)
@@ -602,11 +605,13 @@ function scrapeBringATrailer(doc: any, url: string): any {
       }
     }
 
-    // Extract sale date - look for "sold for $X on [Month] [Day], [Year]"
+    // Extract sale date - improved patterns to catch all formats
     const saleDatePatterns = [
       /sold\s+for[^0-9]*on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
       /([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*\(Lot/i,
-      /Sold\s+on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i
+      /Sold\s+on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+      /([A-Za-z]+\s+\d{1,2},\s+\d{4})\s+for\s+\$[\d,]+/i,  // "April 15, 2024 for $11,000"
+      /Auction\s+ended[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i  // "Auction ended: April 15, 2024"
     ]
     for (const pattern of saleDatePatterns) {
       const dateMatch = bodyText.match(pattern)
