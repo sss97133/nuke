@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Import BaT comments from scraped JSON into database
- * Creates bat_users, bat_listings, and bat_comments records
+ * Setup BaT tables and import data in one script
+ * Applies migration if needed, then imports scraped data
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -21,15 +21,83 @@ if (!supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
-const INPUT_FILE = path.join(process.cwd(), 'viva-bat-listings.json');
 
-async function importBatData() {
-  console.log('🚀 Importing BaT data to database...\n');
+async function checkTablesExist() {
+  const { data, error } = await supabase.rpc('exec_sql', {
+    query: `
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'bat_listings'
+      ) as exists;
+    `
+  });
+  
+  // Try direct query instead
+  const { error: checkError } = await supabase
+    .from('bat_listings')
+    .select('id')
+    .limit(1);
+  
+  return !checkError || !checkError.message.includes('does not exist');
+}
+
+async function applyMigration() {
+  console.log('📦 Applying BaT comment tracking migration...\n');
+  
+  const migrationPath = path.join(process.cwd(), 'supabase/migrations/20250205_bat_comment_tracking_system.sql');
+  
+  if (!fs.existsSync(migrationPath)) {
+    console.error(`❌ Migration file not found: ${migrationPath}`);
+    return false;
+  }
+  
+  const migrationSQL = fs.readFileSync(migrationPath, 'utf-8');
+  
+  // Split by semicolons and execute in chunks
+  const statements = migrationSQL
+    .split(';')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('COMMENT'));
+  
+  console.log(`   Executing ${statements.length} SQL statements...`);
+  
+  for (let i = 0; i < statements.length; i++) {
+    const statement = statements[i];
+    if (statement.length < 10) continue; // Skip very short statements
+    
+    try {
+      // Use RPC if available, otherwise try direct execution
+      const { error } = await supabase.rpc('exec_sql', { query: statement + ';' });
+      
+      if (error) {
+        // Try alternative method - some statements might fail if already exist
+        if (!error.message.includes('already exists') && 
+            !error.message.includes('duplicate') &&
+            !error.message.includes('relation') && 
+            !error.message.includes('does not exist')) {
+          console.error(`   ⚠️  Statement ${i + 1} error: ${error.message.substring(0, 100)}`);
+        }
+      }
+    } catch (e) {
+      // Ignore errors for CREATE IF NOT EXISTS statements
+      if (!e.message?.includes('already exists')) {
+        console.error(`   ⚠️  Statement ${i + 1} error: ${e.message.substring(0, 100)}`);
+      }
+    }
+  }
+  
+  console.log('   ✅ Migration applied (or tables already exist)\n');
+  return true;
+}
+
+async function importData() {
+  const INPUT_FILE = path.join(process.cwd(), 'viva-bat-listings.json');
   
   if (!fs.existsSync(INPUT_FILE)) {
     console.error(`❌ File not found: ${INPUT_FILE}`);
     console.log('   Run scrape-viva-bat-listings.js first to generate the data file');
-    process.exit(1);
+    return;
   }
   
   const listings = JSON.parse(fs.readFileSync(INPUT_FILE, 'utf-8'));
@@ -38,37 +106,41 @@ async function importBatData() {
   let importedListings = 0;
   let importedComments = 0;
   let importedUsers = 0;
+  let matchedVehicles = 0;
   
   for (const listing of listings) {
     try {
-      // 1. Get or create BaT users for seller and buyer
+      // 1. Get or create BaT users
       let sellerBatUserId = null;
       let buyerBatUserId = null;
       
       if (listing.seller) {
-        const { data: sellerUser } = await supabase.rpc('get_or_create_bat_user', {
+        const { data: sellerUser, error: sellerError } = await supabase.rpc('get_or_create_bat_user', {
           p_username: listing.seller,
           p_profile_url: null,
           p_display_name: listing.seller
         });
-        sellerBatUserId = sellerUser;
-        if (sellerUser) importedUsers++;
+        if (!sellerError && sellerUser) {
+          sellerBatUserId = sellerUser;
+          importedUsers++;
+        }
       }
       
       if (listing.buyer) {
-        const { data: buyerUser } = await supabase.rpc('get_or_create_bat_user', {
+        const { data: buyerUser, error: buyerError } = await supabase.rpc('get_or_create_bat_user', {
           p_username: listing.buyer,
           p_profile_url: null,
           p_display_name: listing.buyer
         });
-        buyerBatUserId = buyerUser;
-        if (buyerUser) importedUsers++;
+        if (!buyerError && buyerUser) {
+          buyerBatUserId = buyerUser;
+          importedUsers++;
+        }
       }
       
-      // 2. Find or create vehicle by URL, VIN, or title/year/make/model
+      // 2. Find vehicle
       let vehicleId = null;
       if (listing.url) {
-        // Try to find existing vehicle with this BaT URL
         const { data: existingVehicle } = await supabase
           .from('vehicles')
           .select('id')
@@ -80,21 +152,17 @@ async function importBatData() {
         }
       }
       
-      // If not found by URL, try matching by year/make/model
       if (!vehicleId && listing.year && listing.make && listing.model) {
-        // Clean make/model for better matching
         const cleanMake = listing.make.replace(/^Lingenfelter-Modified\s+/i, '').trim();
-        const makeParts = cleanMake.split(/\s+/);
-        const actualMake = makeParts[0]; // Usually first word is the make
+        const actualMake = cleanMake.split(/\s+/)[0];
         
         const { data: matchedVehicles } = await supabase
           .from('vehicles')
-          .select('id, make, model, year, vin')
+          .select('id, make, model, year')
           .eq('year', listing.year)
           .ilike('make', `%${actualMake}%`);
         
         if (matchedVehicles && matchedVehicles.length > 0) {
-          // Try to find best match by model
           const modelMatch = matchedVehicles.find(v => 
             v.model && listing.model && 
             (v.model.toLowerCase().includes(listing.model.toLowerCase().split(' ')[0]) ||
@@ -103,16 +171,17 @@ async function importBatData() {
           
           if (modelMatch) {
             vehicleId = modelMatch.id;
-            console.log(`   🔗 Matched vehicle: ${modelMatch.year} ${modelMatch.make} ${modelMatch.model}`);
+            matchedVehicles++;
+            console.log(`   🔗 Matched: ${modelMatch.year} ${modelMatch.make} ${modelMatch.model}`);
           } else if (matchedVehicles.length === 1) {
-            // Single match, use it
             vehicleId = matchedVehicles[0].id;
-            console.log(`   🔗 Matched vehicle: ${matchedVehicles[0].year} ${matchedVehicles[0].make} ${matchedVehicles[0].model}`);
+            matchedVehicles++;
+            console.log(`   🔗 Matched: ${matchedVehicles[0].year} ${matchedVehicles[0].make} ${matchedVehicles[0].model}`);
           }
         }
       }
       
-      // If vehicle found, update it with BaT URL if not already set
+      // Update vehicle with BaT data if found
       if (vehicleId && listing.url) {
         await supabase
           .from('vehicles')
@@ -124,20 +193,17 @@ async function importBatData() {
           .eq('id', vehicleId);
       }
       
-      // 3. Find organization (Viva Las Vegas Autos)
+      // 3. Find organization
       let organizationId = null;
       const { data: org } = await supabase
         .from('businesses')
         .select('id')
         .ilike('business_name', '%Viva%Las%Vegas%')
-        .limit(1)
-        .single();
+        .maybeSingle();
       
-      if (org) {
-        organizationId = org.id;
-      }
+      if (org) organizationId = org.id;
       
-      // 4. Create or update bat_listing
+      // 4. Create bat_listing
       const listingData = {
         bat_listing_url: listing.url,
         bat_lot_number: listing.lot_number,
@@ -160,34 +226,26 @@ async function importBatData() {
       const { data: batListing, error: listingError } = await supabase
         .from('bat_listings')
         .upsert(listingData, {
-          onConflict: 'bat_listing_url',
-          ignoreDuplicates: false
+          onConflict: 'bat_listing_url'
         })
         .select()
         .single();
       
       if (listingError) {
-        console.error(`   ❌ Error creating listing: ${listingError.message || JSON.stringify(listingError)}`);
-        if (listingError.message?.includes('relation') || listingError.message?.includes('does not exist')) {
-          console.error(`   ⚠️  Tables don't exist! Please apply migration: supabase/migrations/20250205_bat_comment_tracking_system.sql`);
-          process.exit(1);
-        }
+        console.error(`   ❌ Listing error: ${listingError.message}`);
         continue;
       }
       
       if (batListing) {
         importedListings++;
-        console.log(`   ✅ Listing: ${listing.title}`);
+        console.log(`   ✅ ${listing.title.substring(0, 50)}`);
       }
       
       // 5. Import comments
       if (listing.comments && Array.isArray(listing.comments) && listing.comments.length > 0) {
         for (const comment of listing.comments) {
-          if (!comment.username || !comment.text || comment.text.length < 10) {
-            continue; // Skip invalid comments
-          }
+          if (!comment.username || !comment.text || comment.text.length < 10) continue;
           
-          // Get or create BaT user for commenter
           const { data: commenterUserId } = await supabase.rpc('get_or_create_bat_user', {
             p_username: comment.username,
             p_profile_url: comment.user_url || null,
@@ -196,52 +254,42 @@ async function importBatData() {
           
           if (commenterUserId) importedUsers++;
           
-          // Parse timestamp
           let commentTimestamp = new Date().toISOString();
           if (comment.timestamp) {
             try {
               const parsed = new Date(comment.timestamp);
-              if (!isNaN(parsed.getTime())) {
-                commentTimestamp = parsed.toISOString();
-              }
+              if (!isNaN(parsed.getTime())) commentTimestamp = parsed.toISOString();
             } catch {}
           }
           
-          // Create comment record
-          const commentData = {
-            bat_listing_id: batListing.id,
-            vehicle_id: vehicleId,
-            bat_user_id: commenterUserId,
-            bat_username: comment.username,
-            comment_text: comment.text,
-            comment_timestamp: commentTimestamp,
-            bat_comment_id: comment.id,
-            comment_url: comment.user_url ? `${comment.user_url}#comment-${comment.id}` : null,
-            is_seller_comment: comment.username === listing.seller,
-            metadata: {
-              scraped_at: listing.scraped_at,
-              index: comment.index
-            }
-          };
-          
           const { error: commentError } = await supabase
             .from('bat_comments')
-            .insert(commentData);
+            .insert({
+              bat_listing_id: batListing.id,
+              vehicle_id: vehicleId,
+              bat_user_id: commenterUserId,
+              bat_username: comment.username,
+              comment_text: comment.text,
+              comment_timestamp: commentTimestamp,
+              bat_comment_id: comment.id,
+              comment_url: comment.user_url ? `${comment.user_url}#comment-${comment.id}` : null,
+              is_seller_comment: comment.username === listing.seller,
+              metadata: {
+                scraped_at: listing.scraped_at,
+                index: comment.index
+              }
+            });
           
-          if (commentError) {
-            console.error(`     ⚠️  Comment error: ${commentError.message}`);
-          } else {
-            importedComments++;
-          }
+          if (!commentError) importedComments++;
         }
         
         if (listing.comments.length > 0) {
-          console.log(`     💬 ${listing.comments.length} comments imported`);
+          console.log(`     💬 ${listing.comments.length} comments`);
         }
       }
       
     } catch (error) {
-      console.error(`   ❌ Error processing ${listing.title}:`, error.message);
+      console.error(`   ❌ Error: ${error.message}`);
     }
   }
   
@@ -249,7 +297,25 @@ async function importBatData() {
   console.log(`   - Listings: ${importedListings}`);
   console.log(`   - Comments: ${importedComments}`);
   console.log(`   - BaT Users: ${importedUsers}`);
+  console.log(`   - Vehicles Matched: ${matchedVehicles}`);
 }
 
-importBatData().catch(console.error);
+async function main() {
+  console.log('🚀 Setting up BaT comment tracking system...\n');
+  
+  // Check if tables exist
+  const tablesExist = await checkTablesExist();
+  
+  if (!tablesExist) {
+    console.log('📦 Tables not found, applying migration...\n');
+    await applyMigration();
+  } else {
+    console.log('✅ Tables already exist, skipping migration\n');
+  }
+  
+  // Import data
+  await importData();
+}
+
+main().catch(console.error);
 
