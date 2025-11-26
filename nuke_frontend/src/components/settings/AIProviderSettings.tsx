@@ -212,7 +212,10 @@ const AIProviderSettings: React.FC = () => {
             {editingProvider?.id === provider.id ? (
               <ProviderForm
                 provider={provider}
-                onSave={handleSave}
+                onSave={(p, key) => {
+                  handleSave(p, key);
+                  setEditingProvider(null);
+                }}
                 onCancel={() => setEditingProvider(null)}
                 defaultModels={defaultModels}
               />
@@ -271,7 +274,7 @@ const AIProviderSettings: React.FC = () => {
 
 interface ProviderFormProps {
   provider: AIProvider;
-  onSave: (provider: AIProvider) => void;
+  onSave: (provider: AIProvider, apiKey?: string) => void;
   onCancel: () => void;
   defaultModels: Array<{ provider: 'openai' | 'anthropic' | 'custom'; modelName: string; displayName: string }>;
 }
@@ -373,7 +376,7 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ provider, onSave, onCancel,
 
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
         <button
-          onClick={() => onSave(formData)}
+          onClick={() => onSave(formData, apiKey)}
           className="button button-primary"
           style={{ fontSize: '9pt', padding: '6px 12px' }}
         >
