@@ -150,6 +150,28 @@ const Login = () => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      
+      // REMOTE-ONLY: Always let Supabase handle OAuth redirects
+      // Supabase will redirect to the configured Site URL after authentication
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // Supabase handles redirects via dashboard configuration
+          // No localhost dependencies
+        }
+      });
+      
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || 'Failed to login with Google');
+      setLoading(false);
+    }
+  };
+
 
   if (showForgotPassword) {
     return (
@@ -186,6 +208,15 @@ const Login = () => {
               </div>
             )}
             
+            <button
+              onClick={handleGoogleLogin}
+              className="button button-secondary w-full"
+              disabled={loading}
+              style={{ marginBottom: '12px' }}
+            >
+              {loading ? 'Connecting...' : 'Continue with Google'}
+            </button>
+
             <button
               onClick={handleGitHubLogin}
               className="button button-secondary w-full"
