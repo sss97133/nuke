@@ -148,6 +148,13 @@ const Capsule: React.FC = () => {
                         >
                           View Profile
                         </button>
+                        <button
+                          className="button button-primary"
+                          style={{ fontSize: '8pt', padding: '6px 10px', marginTop: '4px' }}
+                          onClick={() => setActiveTab('api-access')}
+                        >
+                          Manage API Access
+                        </button>
                       </div>
                     </div>
                   </div>
