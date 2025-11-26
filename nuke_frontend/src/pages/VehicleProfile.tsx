@@ -28,7 +28,7 @@ import '../design-system.css';
 import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
 import FinancialProducts from '../components/financial/FinancialProducts';
 import ExternalListingCard from '../components/vehicle/ExternalListingCard';
-import LinkedOrganizations, { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
+import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 import AddOrganizationRelationship from '../components/vehicle/AddOrganizationRelationship';
 import ValuationCitations from '../components/vehicle/ValuationCitations';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
@@ -1357,19 +1357,6 @@ const VehicleProfile: React.FC = () => {
         <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
           <VehicleHeroImage leadImageUrl={leadImageUrl} />
         </React.Suspense>
-
-        {/* Linked Organizations Section */}
-        {vehicle && (
-          <section className="section">
-            <LinkedOrganizations
-              vehicleId={vehicle.id}
-              vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-              userId={session?.user?.id}
-              initialOrganizations={linkedOrganizations}
-              onAddRelationship={() => setShowAddOrgRelationship(true)}
-            />
-          </section>
-        )}
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (

@@ -40,10 +40,28 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
   const [performerProfile, setPerformerProfile] = useState<any>(null);
   const [showLocationCard, setShowLocationCard] = useState(false);
   const [locationDetails, setLocationDetails] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [vehicleOwnerId, setVehicleOwnerId] = useState<string | null>(null);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
 
   useEffect(() => {
     loadEventData();
+    loadCurrentUser();
   }, [eventId]);
+
+  const loadCurrentUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, username, full_name')
+        .eq('id', session.user.id)
+        .single();
+      setCurrentUser(profile);
+    }
+  };
 
   // Handle escape key to close modal
   useEffect(() => {
@@ -73,6 +91,23 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
     if (eventResult.data) {
       setEvent(eventResult.data);
+      
+      // Load vehicle owner
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('owner_id')
+        .eq('id', eventResult.data.vehicle_id)
+        .single();
+      if (vehicle?.owner_id) {
+        setVehicleOwnerId(vehicle.owner_id);
+      }
+      
+      // Load comments
+      const { CommentService } = await import('../services/CommentService');
+      const commentsResult = await CommentService.getEventComments(eventId);
+      if (commentsResult.success && commentsResult.data) {
+        setComments(commentsResult.data);
+      }
       
       // Load uploader name
       if (eventResult.data.user_id) {
@@ -236,44 +271,91 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* RECEIPT HEADER */}
+        {/* COMPACT RECEIPT HEADER WITH IMAGES */}
         <div style={{
-          padding: '16px',
-          borderBottom: '4px double #000',
-          background: '#f5f5f5'
+          padding: '8px 12px',
+          borderBottom: '3px double #000',
+          background: '#fafafa',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '12px'
         }}>
-          <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-            <div style={{ fontSize: '14pt', fontWeight: 700, letterSpacing: '1px' }}>
-              WORK ORDER / SERVICE RECEIPT
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '10pt', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
+              WORK ORDER #{event.id.slice(0, 8).toUpperCase()}
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Event ID: {event.id.slice(0, 8).toUpperCase()}
+            <div style={{ fontSize: '7pt', color: '#666', marginBottom: '6px' }}>
+              {formatDate(event.event_date)}
+              {event.mileage_at_event && ` • ${event.mileage_at_event.toLocaleString()} mi`}
+            </div>
+            <div style={{ fontSize: '7pt', color: '#666' }}>
+              {event.service_provider_name || uploaderName || 'Owner/DIY'}
             </div>
           </div>
-
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr', 
-            gap: '12px',
-            fontSize: '8pt' 
-          }}>
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: '4px' }}>DATE:</div>
-              <div>{formatDate(event.event_date)}</div>
+          
+          {/* IMAGE THUMBNAILS IN HEADER */}
+          {images.length > 0 && (
+            <div style={{ 
+              display: 'flex', 
+              gap: '4px',
+              flexShrink: 0
+            }}>
+              {images.slice(0, 4).map((img, idx) => (
+                <img
+                  key={img.id}
+                  src={img.image_url}
+                  alt={`Receipt ${idx + 1}`}
+                  onClick={() => window.open(img.image_url, '_blank')}
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    objectFit: 'cover',
+                    border: '1px solid #ccc',
+                    cursor: 'pointer',
+                    borderRadius: '2px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.border = '2px solid #000';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.border = '1px solid #ccc';
+                  }}
+                />
+              ))}
+              {images.length > 4 && (
+                <div
+                  onClick={() => {
+                    // Scroll to images section
+                    const imagesSection = document.querySelector('[data-images-section]');
+                    imagesSection?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#f0f0f0',
+                    border: '1px solid #ccc',
+                    borderRadius: '2px',
+                    fontSize: '7pt',
+                    color: '#666',
+                    cursor: 'pointer',
+                    fontWeight: 700
+                  }}
+                >
+                  +{images.length - 4}
+                </div>
+              )}
             </div>
-            {event.mileage_at_event && (
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: '4px' }}>MILEAGE:</div>
-                <div>{event.mileage_at_event.toLocaleString()} miles</div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* SERVICE PROVIDER / WHO DID THE WORK */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd', position: 'relative' }}>
-          <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
-            PERFORMED BY:
+        {/* SERVICE PROVIDER / WHO DID THE WORK - COMPACT */}
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', position: 'relative' }}>
+          <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '4px', color: '#666', textTransform: 'uppercase' }}>
+            Performed By:
           </div>
           <div style={{ fontSize: '8pt' }}>
             <span
@@ -457,12 +539,12 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
           </div>
         </div>
 
-        {/* WORK PERFORMED */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
-          <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
-            WORK PERFORMED:
+        {/* WORK PERFORMED - COMPACT */}
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
+          <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '4px', color: '#666', textTransform: 'uppercase' }}>
+            Work Performed:
           </div>
-          <div style={{ fontSize: '8pt', marginBottom: '8px', padding: '8px', background: '#f9f9f9' }}>
+          <div style={{ fontSize: '8pt', marginBottom: '4px', padding: '6px', background: '#f9f9f9', borderRadius: '2px' }}>
             <div style={{ fontWeight: 700 }}>{event.title}</div>
             {event.description && (
               <div style={{ marginTop: '4px', color: 'var(--text-secondary)' }}>
@@ -545,8 +627,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
         {/* PARTS & MATERIALS - AI EXTRACTED */}
         {receiptItems.filter(item => item.category === 'part').length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
               PARTS & MATERIALS:
               {receiptItems.some(item => item.extracted_by_ai) && (
                 <span style={{ fontSize: '7pt', marginLeft: '8px', padding: '2px 6px', background: '#dbeafe', border: '1px solid #3b82f6', borderRadius: '2px' }}>
@@ -591,8 +673,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
         {/* PARTS & MATERIALS - FALLBACK TO MANUAL */}
         {receiptItems.length === 0 && event.parts_used && event.parts_used.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
               PARTS & MATERIALS:
             </div>
             <table style={{ width: '100%', fontSize: '8pt', borderCollapse: 'collapse' }}>
@@ -629,8 +711,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
         {/* LABOR - AI EXTRACTED */}
         {receiptItems.filter(item => item.category === 'labor').length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
               LABOR:
             </div>
             <table style={{ width: '100%', fontSize: '8pt', borderCollapse: 'collapse' }}>
@@ -664,8 +746,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
         {/* LABOR - FALLBACK TO MANUAL */}
         {receiptItems.length === 0 && event.duration_hours && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
               LABOR:
             </div>
             <div style={{ fontSize: '8pt', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -687,14 +769,14 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
           </div>
         )}
 
-        {/* TOTAL */}
-        <div style={{ padding: '16px', borderBottom: '4px double #000', background: '#f5f5f5' }}>
+        {/* TOTAL - COMPACT */}
+        <div style={{ padding: '8px 12px', borderBottom: '3px double #000', background: '#f5f5f5' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
-            fontSize: '13pt', 
+            fontSize: '11pt', 
             fontWeight: 700,
-            marginBottom: '8px'
+            marginBottom: '4px'
           }}>
             <span>TOTAL COST:</span>
             <span>{formatCurrency(totalCost)}</span>
@@ -713,8 +795,8 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
         {/* VALUE IMPACT */}
         {event.metadata?.value_impact && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd', background: '#f9f9f9' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: '#f9f9f9' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '4px', color: '#666', textTransform: 'uppercase' }}>
               VALUE IMPACT:
             </div>
             <div style={{ 
@@ -730,77 +812,179 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
           </div>
         )}
 
-        {/* PHOTOS */}
+        {/* PHOTOS - COMPACT GRID */}
         {images.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
-              DOCUMENTATION ({images.length} photos):
+          <div data-images-section style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: '#fafafa' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
+              Documentation ({images.length})
             </div>
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', 
-              gap: '8px' 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(60px, 1fr))', 
+              gap: '4px' 
             }}>
-              {images.slice(0, 12).map((img) => (
+              {images.map((img) => (
                 <div
                   key={img.id}
                   style={{
                     width: '100%',
                     paddingBottom: '100%',
                     background: `url(${img.image_url}) center/cover`,
-                    border: '1px solid #bdbdbd',
-                    borderRadius: '0px',
-                    cursor: 'pointer'
+                    border: '1px solid #ccc',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                    position: 'relative'
                   }}
                   onClick={() => window.open(img.image_url, '_blank')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.border = '2px solid #000';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.border = '1px solid #ccc';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
                 />
               ))}
             </div>
-            {images.length > 12 && (
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '8px' }}>
-                +{images.length - 12} more photos
-              </div>
-            )}
           </div>
         )}
 
         {/* NOTES */}
         {event.metadata?.notes && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #bdbdbd' }}>
-            <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
-              NOTES:
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '4px', color: '#666', textTransform: 'uppercase' }}>
+              Notes:
             </div>
-            <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontSize: '8pt', color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
               {event.metadata.notes}
             </div>
           </div>
         )}
 
-        {/* FOOTER / ACTIONS */}
-        <div style={{ padding: '12px', background: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-            Press ESC to close
+        {/* USER COMMENTS / INPUT SECTION */}
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: '#f9f9f9' }}>
+          <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
+            Comments ({comments.length})
+          </div>
+          
+          {/* Existing Comments */}
+          {comments.length > 0 && (
+            <div style={{ marginBottom: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+              {comments.map((comment: any) => (
+                <div key={comment.id} style={{ 
+                  marginBottom: '6px', 
+                  padding: '6px',
+                  background: '#fff',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '2px',
+                  fontSize: '7pt'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <span style={{ fontWeight: 700, color: '#333' }}>
+                      {comment.user_profile?.username || comment.user_profile?.full_name || 'User'}
+                    </span>
+                    <span style={{ color: '#999', fontSize: '6pt' }}>
+                      {new Date(comment.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div style={{ color: '#555', lineHeight: 1.3 }}>
+                    {comment.comment_text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add Comment Input */}
+          {currentUser && (
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Add a comment or note..."
+                disabled={submittingComment}
+                style={{
+                  flex: 1,
+                  fontSize: '7pt',
+                  padding: '4px 6px',
+                  border: '1px solid #ccc',
+                  borderRadius: '2px',
+                  resize: 'none',
+                  minHeight: '40px',
+                  fontFamily: 'inherit'
+                }}
+                rows={2}
+              />
+              <button
+                onClick={async () => {
+                  if (!newComment.trim() || submittingComment || !currentUser) return;
+                  
+                  setSubmittingComment(true);
+                  const { CommentService } = await import('../services/CommentService');
+                  const result = await CommentService.addComment(eventId, newComment, currentUser.id);
+                  
+                  if (result.success) {
+                    setNewComment('');
+                    const commentsResult = await CommentService.getEventComments(eventId);
+                    if (commentsResult.success && commentsResult.data) {
+                      setComments(commentsResult.data);
+                    }
+                  } else {
+                    alert(result.error || 'Failed to add comment');
+                  }
+                  setSubmittingComment(false);
+                }}
+                disabled={submittingComment || !newComment.trim()}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '7pt',
+                  fontWeight: 700,
+                  border: '1px solid #000',
+                  background: submittingComment || !newComment.trim() ? '#ccc' : '#fff',
+                  color: submittingComment || !newComment.trim() ? '#999' : '#000',
+                  cursor: submittingComment || !newComment.trim() ? 'not-allowed' : 'pointer',
+                  borderRadius: '2px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {submittingComment ? '...' : 'POST'}
+              </button>
+            </div>
+          )}
+          
+          {!currentUser && (
+            <div style={{ fontSize: '7pt', color: '#999', fontStyle: 'italic', padding: '4px' }}>
+              Sign in to add comments
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER / ACTIONS - COMPACT */}
+        <div style={{ padding: '6px 12px', background: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '7pt', color: '#999' }}>
+            ESC to close
           </div>
           <button
             onClick={onClose}
             style={{
-              padding: '6px 12px',
-              border: '2px solid var(--text)',
-              background: 'var(--surface)',
-              color: 'var(--text)',
-              fontSize: '9pt',
+              padding: '4px 8px',
+              border: '1px solid #000',
+              background: '#fff',
+              color: '#000',
+              fontSize: '7pt',
               fontWeight: 700,
               cursor: 'pointer',
-              borderRadius: '0px',
+              borderRadius: '2px',
               transition: 'all 0.12s ease'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--text)';
-              e.currentTarget.style.color = 'var(--surface)';
+              e.currentTarget.style.background = '#000';
+              e.currentTarget.style.color = '#fff';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--surface)';
-              e.currentTarget.style.color = 'var(--text)';
+              e.currentTarget.style.background = '#fff';
+              e.currentTarget.style.color = '#000';
             }}
           >
             Close
@@ -810,18 +994,18 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         {/* Missing data prompts */}
         {receiptItems.length === 0 && !event.cost_amount && !event.duration_hours && !event.parts_used && (
           <div style={{
-            padding: '16px',
-            background: 'var(--warning-light)',
-            border: '2px solid var(--warning)',
-            margin: '16px',
-            borderRadius: '0px'
+            padding: '8px 12px',
+            background: '#fff3cd',
+            border: '1px solid #ffc107',
+            margin: '8px 12px',
+            borderRadius: '2px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '4px', color: 'var(--warning-dark)', textTransform: 'uppercase' }}>
-                  INCOMPLETE WORK ORDER
+                <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '2px', color: '#856404', textTransform: 'uppercase' }}>
+                  Incomplete Work Order
                 </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '7pt', color: '#856404' }}>
                   {documentId && processingStatus === 'pending' 
                     ? 'AI extraction pending - refresh to see extracted data'
                     : 'Add cost, labor hours, or parts to complete this receipt'

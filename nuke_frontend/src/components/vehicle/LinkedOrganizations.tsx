@@ -5,7 +5,10 @@ import { FiMapPin, FiTool, FiDollarSign, FiTruck, FiShoppingCart } from 'react-i
 
 interface LinkedOrganizationsProps {
   vehicleId: string;
+  vehicleName?: string;
+  userId?: string;
   initialOrganizations?: LinkedOrg[];
+  onAddRelationship?: () => void;
 }
 
 export interface LinkedOrg {
@@ -54,7 +57,13 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   consigner: 'Consignment'
 };
 
-const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId, initialOrganizations }) => {
+const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ 
+  vehicleId, 
+  vehicleName,
+  userId,
+  initialOrganizations,
+  onAddRelationship
+}) => {
   const [organizations, setOrganizations] = useState<LinkedOrg[]>(initialOrganizations ?? []);
   const [loading, setLoading] = useState(initialOrganizations === undefined);
 
@@ -143,10 +152,34 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({ vehicleId, in
   return (
     <div className="card">
       <div className="card-header">
-        <h3 className="text-lg font-semibold">Associated Organizations</h3>
-        <p className="text-sm text-gray-600 mt-1">
-          Shops, dealers, and other businesses linked to this vehicle
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h3 className="text-lg font-semibold">Associated Organizations</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Shops, dealers, and other businesses linked to this vehicle
+            </p>
+          </div>
+          {userId && onAddRelationship && (
+            <button
+              onClick={onAddRelationship}
+              style={{
+                padding: '6px 12px',
+                fontSize: '8pt',
+                fontWeight: 600,
+                border: '1px solid var(--accent)',
+                background: 'var(--accent)',
+                color: 'white',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                transition: 'all 0.12s ease',
+                whiteSpace: 'nowrap'
+              }}
+              title="Add organization relationship"
+            >
+              ADD ORGANIZATION
+            </button>
+          )}
+        </div>
       </div>
       <div className="card-body">
         <div className="space-y-3">

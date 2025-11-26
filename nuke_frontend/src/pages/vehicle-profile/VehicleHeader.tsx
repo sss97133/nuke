@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
 import { computePrimaryPrice, formatCurrency } from '../../services/priceSignalService';
 import { supabase } from '../../lib/supabase';
@@ -36,6 +37,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   organizationLinks = [],
   onClaimClick
 }) => {
+  const navigate = useNavigate();
   const { isVerifiedOwner, contributorRole } = permissions || {};
   const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
   const [trendPct, setTrendPct] = useState<number | null>(null);
@@ -785,6 +787,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 <Link
                   key={org.id}
                   to={`/org/${org.organization_id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toast.success(
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontWeight: 'bold', fontSize: '11px' }}>{org.business_name}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                          {formatRelationship(org.relationship_type)}
+                        </div>
+                      </div>,
+                      { 
+                        duration: 3000, 
+                        position: 'top-right',
+                        style: {
+                          borderRadius: '4px',
+                          padding: '8px 12px',
+                          fontSize: '10px'
+                        }
+                      }
+                    );
+                    setTimeout(() => navigate(`/org/${org.organization_id}`), 100);
+                  }}
                   title={`${org.business_name} (${formatRelationship(org.relationship_type)})`}
                   style={{
                     display: 'inline-flex',
@@ -798,7 +821,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     color: baseTextColor,
                     textDecoration: 'none',
                     fontSize: '10px',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    transition: 'transform 0.1s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
                   {org.logo_url ? (

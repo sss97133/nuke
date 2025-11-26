@@ -4,6 +4,14 @@ import { supabase } from '../lib/supabase';
 // AppLayout now provided globally by App.tsx
 import GarageVehicleCard from '../components/vehicles/GarageVehicleCard';
 import VehicleRelationshipManager from '../components/VehicleRelationshipManager';
+import OrganizationContextFilter from '../components/vehicles/OrganizationContextFilter';
+import BulkActionsToolbar from '../components/vehicles/BulkActionsToolbar';
+import BulkGPSAssignment from '../components/vehicles/BulkGPSAssignment';
+import VehicleOrganizationToolbar from '../components/vehicles/VehicleOrganizationToolbar';
+import GPSOrganizationSuggestions from '../components/vehicles/GPSOrganizationSuggestions';
+import PendingAssignments from '../components/vehicles/PendingAssignments';
+import VehicleConfirmationQuestions from '../components/vehicles/VehicleConfirmationQuestions';
+import TitleTransferApproval from '../components/ownership/TitleTransferApproval';
 import '../design-system.css';
 
 interface Vehicle {
@@ -79,6 +87,16 @@ const VehiclesInner: React.FC = () => {
     vehicleId: string;
     currentRelationship: string | null;
   } | null>(null);
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<string>>(new Set());
+  const [preferenceFilter, setPreferenceFilter] = useState<'all' | 'favorites' | 'hidden' | 'collection'>('all');
+  const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
+  const [discoverySourceFilter, setDiscoverySourceFilter] = useState<string | null>(null);
+  const [vehiclePreferences, setVehiclePreferences] = useState<Map<string, {
+    is_favorite: boolean;
+    is_hidden: boolean;
+    collection_name: string | null;
+  }>>(new Map());
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -101,7 +119,10 @@ const VehiclesInner: React.FC = () => {
 
   useEffect(() => {
     loadVehicleRelationships();
-  }, [session]); // Reload vehicle relationships when session changes
+    if (session?.user?.id) {
+      loadVehiclePreferences();
+    }
+  }, [session, selectedOrganizationId]); // Reload vehicle relationships when session or organization changes
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -152,13 +173,25 @@ const VehiclesInner: React.FC = () => {
           vehicle_images: item.images || []
         }));
         
-        const discoveredVehicles = (rpcData.discovered_vehicles || []).map((item: any) => ({
-          relationship_type: item.relationship_type || 'interested',
-          vehicles: {
-            ...item.vehicle,
-            vehicle_images: item.images || []
-          }
-        }));
+        const discoveredVehicles = (rpcData.discovered_vehicles || []).map((item: any) => {
+          const vehicle = item.vehicle || {};
+          // Get discovery source from vehicle or infer from URL
+          const discoverySource = item.discovery_source || vehicle.discovery_source ||
+            (vehicle.discovery_url?.includes('craigslist.org') ? 'Craigslist' :
+             vehicle.discovery_url?.includes('marketplace') ? 'Marketplace' :
+             vehicle.discovery_url?.includes('autotrader') ? 'AutoTrader' :
+             vehicle.discovery_url?.includes('cars.com') ? 'Cars.com' :
+             vehicle.discovery_url ? 'External URL' : null);
+          
+          return {
+            relationship_type: item.relationship_type || 'interested',
+            discovery_source: discoverySource,
+            vehicles: {
+              ...vehicle,
+              vehicle_images: item.images || []
+            }
+          };
+        });
         
         const verifiedOwnerships = (rpcData.verified_ownerships || []).map((item: any) => ({
           vehicle_id: item.vehicle_id,
@@ -213,6 +246,13 @@ const VehiclesInner: React.FC = () => {
           const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
 
           const relationshipType = discovery.relationship_type || 'interested';
+          const discoverySource = discovery.discovery_source || vehicle.discovery_source ||
+            (vehicle.discovery_url?.includes('craigslist.org') ? 'Craigslist' :
+             vehicle.discovery_url?.includes('marketplace') ? 'Marketplace' :
+             vehicle.discovery_url?.includes('autotrader') ? 'AutoTrader' :
+             vehicle.discovery_url?.includes('cars.com') ? 'Cars.com' :
+             vehicle.discovery_url ? 'External URL' : null);
+          
           const vehicleRelationship: VehicleRelationship = {
             vehicle: {
               id: vehicle.id,
@@ -228,6 +268,7 @@ const VehiclesInner: React.FC = () => {
             },
             relationshipType: relationshipType as any,
             role: relationshipType,
+            context: discoverySource || undefined,
             lastActivity: vehicle.created_at
           };
 
@@ -294,14 +335,15 @@ const VehiclesInner: React.FC = () => {
       // Load vehicles and their relationships
       // Get all vehicles the user uploaded (for "Uploaded" tab, not "Owned")
       // Query vehicles first, then fetch images separately to avoid PostgREST relationship ambiguity
+      // Include discovery fields to identify URL-found vehicles
       const [userVehiclesResult, uploadedVehiclesResult] = await Promise.all([
         supabase
           .from('vehicles')
-          .select('*')
+          .select('*, discovery_url, discovery_source, profile_origin')
           .eq('user_id', session.user.id),
         supabase
           .from('vehicles')
-          .select('*')
+          .select('*, discovery_url, discovery_source, profile_origin')
           .eq('uploaded_by', session.user.id)
       ]);
       
@@ -346,7 +388,7 @@ const VehiclesInner: React.FC = () => {
       
       const result = await supabase
         .from('discovered_vehicles')
-        .select('relationship_type, vehicle_id')
+        .select('relationship_type, vehicle_id, discovery_source, discovery_context')
         .eq('user_id', session.user.id)
         .eq('is_active', true);
       
@@ -359,10 +401,12 @@ const VehiclesInner: React.FC = () => {
           .eq('user_id', session.user.id)
           .eq('is_active', true);
         
-        discoveredVehicles = (fallback.data || []).map((dv: any) => ({
-          ...dv,
-          relationship_type: 'interested' // Default fallback
-        }));
+          discoveredVehicles = (fallback.data || []).map((dv: any) => ({
+            ...dv,
+            relationship_type: 'interested', // Default fallback
+            discovery_source: null,
+            discovery_context: null
+          }));
         discoveredError = fallback.error;
       } else {
         discoveredVehicles = result.data || [];
@@ -375,7 +419,7 @@ const VehiclesInner: React.FC = () => {
         if (vehicleIds.length > 0) {
           const { data: vehicles } = await supabase
             .from('vehicles')
-            .select('*')
+            .select('*, discovery_url, discovery_source, profile_origin')
             .in('id', vehicleIds);
           
           const { data: images } = await supabase
@@ -393,13 +437,25 @@ const VehiclesInner: React.FC = () => {
             imagesByVehicle.get(img.vehicle_id).push(img);
           });
           
-          discoveredVehicles = discoveredVehicles.map(dv => ({
-            ...dv,
-            vehicles: vehiclesMap.get(dv.vehicle_id) ? {
-              ...vehiclesMap.get(dv.vehicle_id),
-              vehicle_images: imagesByVehicle.get(dv.vehicle_id) || []
-            } : null
-          }));
+          discoveredVehicles = discoveredVehicles.map(dv => {
+            const vehicle = vehiclesMap.get(dv.vehicle_id);
+            // Use discovery_source from discovered_vehicles, fallback to vehicle's discovery_source
+            const discoverySource = dv.discovery_source || vehicle?.discovery_source || 
+              (vehicle?.discovery_url?.includes('craigslist.org') ? 'Craigslist' :
+               vehicle?.discovery_url?.includes('marketplace') ? 'Marketplace' :
+               vehicle?.discovery_url?.includes('autotrader') ? 'AutoTrader' :
+               vehicle?.discovery_url?.includes('cars.com') ? 'Cars.com' :
+               vehicle?.discovery_url ? 'External URL' : null);
+            
+            return {
+              ...dv,
+              discovery_source: discoverySource,
+              vehicles: vehicle ? {
+                ...vehicle,
+                vehicle_images: imagesByVehicle.get(dv.vehicle_id) || []
+              } : null
+            };
+          });
         }
       }
 
@@ -522,6 +578,14 @@ const VehiclesInner: React.FC = () => {
         const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
         const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
 
+        // Get discovery source from discovered_vehicles or vehicle
+        const discoverySource = discovery.discovery_source || vehicle.discovery_source ||
+          (vehicle.discovery_url?.includes('craigslist.org') ? 'Craigslist' :
+           vehicle.discovery_url?.includes('marketplace') ? 'Marketplace' :
+           vehicle.discovery_url?.includes('autotrader') ? 'AutoTrader' :
+           vehicle.discovery_url?.includes('cars.com') ? 'Cars.com' :
+           vehicle.discovery_url ? 'External URL' : null);
+
         const vehicleRelationship: VehicleRelationship = {
           vehicle: {
             id: vehicle.id,
@@ -537,6 +601,7 @@ const VehiclesInner: React.FC = () => {
           },
           relationshipType: discovery.relationship_type,
           role: discovery.relationship_type,
+          context: discoverySource || undefined,
           lastActivity: vehicle.created_at
         };
 
@@ -577,7 +642,23 @@ const VehiclesInner: React.FC = () => {
         // Skip if this vehicle already has an explicit relationship
         if (explicitVehicleIds.has(vehicle.id)) return;
 
+        // URL-found vehicles should NOT be in contributing - they should only be in discovered
+        // Check if vehicle was found via URL (discovery_url, discovery_source, or profile_origin = 'url_scraper')
+        const isUrlFound = !!(
+          vehicle.discovery_url || 
+          vehicle.discovery_source || 
+          vehicle.profile_origin === 'url_scraper' ||
+          vehicle.profile_origin === 'bat_import'
+        );
+
+        // If it's a URL find, skip it - it should already be in discovered_vehicles
+        if (isUrlFound) {
+          console.log('[Vehicles] Skipping URL-found vehicle from contributing:', vehicle.id, vehicle.discovery_url);
+          return;
+        }
+
         // Place in contributing section - uploaders are contributors, not automatic owners
+        // Only for manually uploaded vehicles (not URL finds)
         const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
         const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
 
@@ -600,13 +681,85 @@ const VehiclesInner: React.FC = () => {
         });
       });
 
-      setVehicleRelationships({ owned, contributing, interested, discovered, curated, consigned, previously_owned });
+      // Filter by organization context if selected
+      let filteredOwned = owned;
+      let filteredContributing = contributing;
+      let filteredInterested = interested;
+      let filteredDiscovered = discovered;
+      let filteredCurated = curated;
+      let filteredConsigned = consigned;
+      let filteredPreviouslyOwned = previously_owned;
+
+      if (selectedOrganizationId) {
+        // Load vehicles linked to this organization
+        const { data: orgVehicles } = await supabase
+          .from('organization_vehicles')
+          .select('vehicle_id')
+          .eq('organization_id', selectedOrganizationId)
+          .eq('status', 'active');
+
+        const orgVehicleIds = new Set((orgVehicles || []).map((ov: any) => ov.vehicle_id));
+
+        filteredOwned = owned.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredContributing = contributing.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredInterested = interested.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredDiscovered = discovered.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredCurated = curated.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredConsigned = consigned.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredPreviouslyOwned = previously_owned.filter(r => orgVehicleIds.has(r.vehicle.id));
+      }
+
+      setVehicleRelationships({
+        owned: filteredOwned,
+        contributing: filteredContributing,
+        interested: filteredInterested,
+        discovered: filteredDiscovered,
+        curated: filteredCurated,
+        consigned: filteredConsigned,
+        previously_owned: filteredPreviouslyOwned
+      });
       
-      console.log(`Categorized vehicles: ${owned.length} owned, ${contributing.length} contributing, ${interested.length} interested`);
+      console.log(`Categorized vehicles: ${filteredOwned.length} owned, ${filteredContributing.length} contributing, ${filteredInterested.length} interested`);
     } catch (error) {
       console.error('Error in loadVehicleRelationships:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadVehiclePreferences = async () => {
+    if (!session?.user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_vehicle_preferences')
+        .select('vehicle_id, is_favorite, is_hidden, collection_name')
+        .eq('user_id', session.user.id);
+
+      if (error) {
+        // Table might not exist yet - that's ok, just return empty map
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.log('user_vehicle_preferences table not found - migration may not be applied yet');
+          setVehiclePreferences(new Map());
+          return;
+        }
+        throw error;
+      }
+
+      const prefsMap = new Map();
+      (data || []).forEach((pref: any) => {
+        prefsMap.set(pref.vehicle_id, {
+          is_favorite: pref.is_favorite || false,
+          is_hidden: pref.is_hidden || false,
+          collection_name: pref.collection_name || null
+        });
+      });
+
+      setVehiclePreferences(prefsMap);
+    } catch (error) {
+      console.error('Error loading vehicle preferences:', error);
+      // Set empty map on error so UI doesn't break
+      setVehiclePreferences(new Map());
     }
   };
 
@@ -815,21 +968,53 @@ const VehiclesInner: React.FC = () => {
   // Filter and sort current relationships
   const filteredRelationships = currentRelationships
     .filter(relationship => {
-      if (!searchTerm) return true;
-      const searchLower = searchTerm.toLowerCase();
       const vehicle = relationship.vehicle;
-      return (
-        vehicle.year.toString().includes(searchLower) ||
-        vehicle.make.toLowerCase().includes(searchLower) ||
-        vehicle.model.toLowerCase().includes(searchLower) ||
-        (vehicle.vin && vehicle.vin.toLowerCase().includes(searchLower)) ||
-        (vehicle.color && vehicle.color.toLowerCase().includes(searchLower)) ||
-        (relationship.role && relationship.role.toLowerCase().includes(searchLower))
-      );
+      const prefs = vehiclePreferences.get(vehicle.id);
+
+      // Apply preference filters (only in personal view, not org context)
+      if (!selectedOrganizationId) {
+        if (preferenceFilter === 'favorites' && !prefs?.is_favorite) return false;
+        if (preferenceFilter === 'hidden' && !prefs?.is_hidden) return false;
+        if (preferenceFilter === 'collection') {
+          if (!collectionFilter) return false; // Need to select a collection
+          if (prefs?.collection_name !== collectionFilter) return false;
+        }
+        // Hide hidden vehicles unless explicitly viewing hidden
+        if (preferenceFilter !== 'hidden' && prefs?.is_hidden) return false;
+      }
+
+      // Apply discovery source filter (only for discovered tab)
+      if (activeTab === 'discovered' && discoverySourceFilter) {
+        const relationshipSource = relationship.context?.toLowerCase() || '';
+        if (relationshipSource !== discoverySourceFilter.toLowerCase()) return false;
+      }
+
+      // Apply search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = (
+          vehicle.year.toString().includes(searchLower) ||
+          vehicle.make.toLowerCase().includes(searchLower) ||
+          vehicle.model.toLowerCase().includes(searchLower) ||
+          (vehicle.vin && vehicle.vin.toLowerCase().includes(searchLower)) ||
+          (vehicle.color && vehicle.color.toLowerCase().includes(searchLower)) ||
+          (relationship.role && relationship.role.toLowerCase().includes(searchLower))
+        );
+        if (!matchesSearch) return false;
+      }
+
+      return true;
     })
     .sort((a, b) => {
       const aVehicle = a.vehicle;
       const bVehicle = b.vehicle;
+      const aPrefs = vehiclePreferences.get(aVehicle.id);
+      const bPrefs = vehiclePreferences.get(bVehicle.id);
+
+      // Sort favorites first
+      if (aPrefs?.is_favorite && !bPrefs?.is_favorite) return -1;
+      if (!aPrefs?.is_favorite && bPrefs?.is_favorite) return 1;
+
       switch (sortBy) {
         case 'year':
           return bVehicle.year - aVehicle.year;
@@ -866,6 +1051,136 @@ const VehiclesInner: React.FC = () => {
               </div>
             </div>
           </section>
+
+          {/* Organization Context Filter */}
+          {session?.user?.id && (
+            <section className="section">
+              <div className="card">
+                <div className="card-body">
+                  <OrganizationContextFilter
+                    selectedOrganizationId={selectedOrganizationId}
+                    onOrganizationChange={(orgId) => {
+                      setSelectedOrganizationId(orgId);
+                      setSelectedVehicleIds(new Set()); // Clear selection when switching context
+                    }}
+                    showPersonalView={true}
+                  />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Title Transfer Approvals (Critical - Show First) */}
+          {session?.user?.id && !selectedOrganizationId && (
+            <section className="section">
+              <TitleTransferApproval
+                userId={session.user.id}
+                onUpdate={() => {
+                  loadVehicleRelationships();
+                  loadVehiclePreferences();
+                }}
+              />
+            </section>
+          )}
+
+          {/* Vehicle Confirmation Questions */}
+          {session?.user?.id && !selectedOrganizationId && (
+            <section className="section">
+              <VehicleConfirmationQuestions
+                userId={session.user.id}
+                onUpdate={() => {
+                  loadVehicleRelationships();
+                  loadVehiclePreferences();
+                }}
+              />
+            </section>
+          )}
+
+          {/* Bulk Actions Toolbar */}
+          {session?.user?.id && selectedVehicleIds.size > 0 && (
+            <>
+              <section className="section">
+                <BulkActionsToolbar
+                  selectedVehicleIds={Array.from(selectedVehicleIds)}
+                  userId={session.user.id}
+                  onDeselectAll={() => setSelectedVehicleIds(new Set())}
+                  onUpdate={() => {
+                    loadVehiclePreferences();
+                    loadVehicleRelationships();
+                  }}
+                />
+              </section>
+              <section className="section">
+                <BulkGPSAssignment
+                  selectedVehicleIds={Array.from(selectedVehicleIds)}
+                  userId={session.user.id}
+                  onComplete={() => {
+                    loadVehicleRelationships();
+                    setSelectedVehicleIds(new Set());
+                  }}
+                  onDeselectAll={() => setSelectedVehicleIds(new Set())}
+                />
+              </section>
+            </>
+          )}
+
+          {/* Preference Filters (only in personal view) */}
+          {session?.user?.id && !selectedOrganizationId && (
+            <section className="section">
+              <div className="card">
+                <div className="card-body">
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      Filter:
+                    </label>
+                    {(['all', 'favorites', 'hidden', 'collection'] as const).map((filter) => (
+                      <button
+                        key={filter}
+                        onClick={() => {
+                          setPreferenceFilter(filter);
+                          if (filter !== 'collection') setCollectionFilter(null);
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '8pt',
+                          fontWeight: 600,
+                          border: preferenceFilter === filter ? '2px solid var(--accent)' : '1px solid var(--border)',
+                          background: preferenceFilter === filter ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
+                          color: preferenceFilter === filter ? 'var(--accent)' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          transition: 'all 0.12s ease'
+                        }}
+                      >
+                        {filter === 'all' ? 'ALL' : filter === 'favorites' ? 'FAVORITES' : filter === 'hidden' ? 'HIDDEN' : 'COLLECTION'}
+                      </button>
+                    ))}
+                    {preferenceFilter === 'collection' && (
+                      <select
+                        value={collectionFilter || ''}
+                        onChange={(e) => setCollectionFilter(e.target.value || null)}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '8pt',
+                          border: '1px solid var(--border)',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        <option value="">Select collection...</option>
+                        {Array.from(new Set(
+                          Array.from(vehiclePreferences.values())
+                            .map(p => p.collection_name)
+                            .filter(Boolean)
+                        )).map((collection) => (
+                          <option key={collection} value={collection}>{collection}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* Relationship Tabs */}
           <section className="section">
@@ -940,6 +1255,62 @@ const VehiclesInner: React.FC = () => {
                     </button>
                   </div>
 
+                  {/* Discovery Source Filter (only for discovered tab) */}
+                  {activeTab === 'discovered' && vehicleRelationships.discovered.length > 0 && (
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '8px', 
+                      alignItems: 'center', 
+                      flexWrap: 'wrap',
+                      marginTop: '12px',
+                      paddingTop: '12px',
+                      borderTop: '1px solid var(--border)'
+                    }}>
+                      <label style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text-muted)' }}>
+                        Source:
+                      </label>
+                      <button
+                        onClick={() => setDiscoverySourceFilter(null)}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '8pt',
+                          fontWeight: 600,
+                          border: discoverySourceFilter === null ? '2px solid var(--accent)' : '1px solid var(--border)',
+                          background: discoverySourceFilter === null ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
+                          color: discoverySourceFilter === null ? 'var(--accent)' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          transition: 'all 0.12s ease'
+                        }}
+                      >
+                        ALL
+                      </button>
+                      {Array.from(new Set(
+                        vehicleRelationships.discovered
+                          .map(r => r.context)
+                          .filter(Boolean)
+                      )).sort().map((source) => (
+                        <button
+                          key={source}
+                          onClick={() => setDiscoverySourceFilter(source || null)}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '8pt',
+                            fontWeight: 600,
+                            border: discoverySourceFilter === source ? '2px solid var(--accent)' : '1px solid var(--border)',
+                            background: discoverySourceFilter === source ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
+                            color: discoverySourceFilter === source ? 'var(--accent)' : 'var(--text-muted)',
+                            cursor: 'pointer',
+                            borderRadius: '4px',
+                            transition: 'all 0.12s ease'
+                          }}
+                        >
+                          {source?.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Search and Sort Controls */}
                   {currentRelationships.length > 0 && (
                     <div className="search-sort-controls">
@@ -997,19 +1368,109 @@ const VehiclesInner: React.FC = () => {
                     {filteredRelationships.map((relationship) => {
                       const vehicle = relationship?.vehicle;
                       if (!vehicle || !relationship) return null;
+                      const isSelected = selectedVehicleIds.has(vehicle.id);
+                      const prefs = vehiclePreferences.get(vehicle.id);
                       return (
-                        <GarageVehicleCard
-                          key={vehicle.id}
-                          vehicle={vehicle}
-                          relationship={relationship}
-                          onRefresh={loadVehicleRelationships}
-                          onEditRelationship={(vehicleId, current) => {
-                            setRelationshipModal({
-                              vehicleId,
-                              currentRelationship: current
-                            });
-                          }}
-                        />
+                        <div key={vehicle.id} style={{ position: 'relative' }}>
+                          {/* Selection Checkbox */}
+                          {session?.user?.id && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '8px',
+                              left: '8px',
+                              zIndex: 10,
+                              background: 'white',
+                              border: '2px solid var(--accent)',
+                              borderRadius: '4px',
+                              padding: '4px'
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  const newSelection = new Set(selectedVehicleIds);
+                                  if (e.target.checked) {
+                                    newSelection.add(vehicle.id);
+                                  } else {
+                                    newSelection.delete(vehicle.id);
+                                  }
+                                  setSelectedVehicleIds(newSelection);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          <GarageVehicleCard
+                            vehicle={vehicle}
+                            relationship={relationship}
+                            onRefresh={() => {
+                              loadVehicleRelationships();
+                              loadVehiclePreferences();
+                            }}
+                            onEditRelationship={(vehicleId, current) => {
+                              setRelationshipModal({
+                                vehicleId,
+                                currentRelationship: current
+                              });
+                            }}
+                          />
+
+                          {/* GPS Organization Suggestions */}
+                          {session?.user?.id && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              background: '#f0f9ff',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '4px'
+                            }}>
+                              <GPSOrganizationSuggestions
+                                vehicleId={vehicle.id}
+                                userId={session.user.id}
+                                onAssign={() => {
+                                  loadVehicleRelationships();
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {/* Pending Assignments */}
+                          {session?.user?.id && (
+                            <PendingAssignments
+                              vehicleId={vehicle.id}
+                              userId={session.user.id}
+                              onAssignmentChange={() => {
+                                loadVehicleRelationships();
+                              }}
+                            />
+                          )}
+
+                          {/* Organization Toolbar */}
+                          {session?.user?.id && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              background: '#f9fafb',
+                              border: '1px solid var(--border)',
+                              borderRadius: '4px'
+                            }}>
+                              <VehicleOrganizationToolbar
+                                vehicleId={vehicle.id}
+                                userId={session.user.id}
+                                onUpdate={() => {
+                                  loadVehiclePreferences();
+                                  loadVehicleRelationships();
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
