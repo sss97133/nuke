@@ -263,14 +263,24 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
           {attribution.photographer?.name && (
             <div>{attribution.photographer.name}</div>
           )}
-          {attribution.uploader && (
+          {attribution.organization ? (
+            <>
+              <div style={{ fontWeight: 600 }}>{attribution.organization.name}</div>
+              {attribution.organization.relationshipLabel && (
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9pt' }}>
+                  {attribution.organization.relationshipLabel}
+                </div>
+              )}
+            </>
+          ) : attribution.uploader ? (
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9pt' }}>
               {attribution.uploader.full_name || attribution.uploader.username || 'User'}
             </div>
-          )}
-          {attribution.source && (
+          ) : null}
+          {/* Only show source if it's not bat_listing (already shown via organization) */}
+          {attribution.source && attribution.source !== 'bat_listing' && (
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt' }}>
-              {attribution.source}
+              Source: {attribution.source}
             </div>
           )}
         </>

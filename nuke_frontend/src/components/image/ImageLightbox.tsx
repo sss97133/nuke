@@ -583,11 +583,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       // 2. For BAT images, get organization attribution instead of user
       let organizationInfo = null;
       if (imgData.source === 'bat_listing' && vehicleId) {
-        // Get organization from vehicle's organization_vehicles relationship
+        // Get organization from vehicle's organization_vehicles relationship with relationship type
         const { data: orgData } = await supabase
           .from('organization_vehicles')
           .select(`
             organization_id,
+            relationship_type,
             businesses!inner (
               id,
               business_name
@@ -601,9 +602,28 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         
         if (orgData?.businesses && !Array.isArray(orgData.businesses)) {
           const org = orgData.businesses as any;
+          const relationshipLabels: Record<string, string> = {
+            owner: 'Owner',
+            consigner: 'Consignment',
+            collaborator: 'Collaborator',
+            service_provider: 'Service',
+            work_location: 'Work site',
+            seller: 'Seller',
+            buyer: 'Buyer',
+            parts_supplier: 'Parts',
+            fabricator: 'Fabricator',
+            painter: 'Paint',
+            upholstery: 'Upholstery',
+            transport: 'Transport',
+            storage: 'Storage',
+            inspector: 'Inspector'
+          };
+          
           organizationInfo = {
             id: org.id,
-            name: org.business_name || 'Viva! Las Vegas Autos'
+            name: org.business_name || 'Unknown Organization',
+            relationshipType: orgData.relationship_type,
+            relationshipLabel: relationshipLabels[orgData.relationship_type] || orgData.relationship_type || 'Linked'
           };
         }
       }
@@ -645,9 +665,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           max-width: 300px;
           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         `;
+        const relationshipText = organizationInfo.relationshipLabel 
+          ? `${organizationInfo.relationshipLabel} • ${organizationInfo.name}`
+          : organizationInfo.name;
         toast.innerHTML = `
-          <div style="font-weight: bold; margin-bottom: 4px;">SOURCE - ${organizationInfo.name}</div>
-          <div style="font-size: 10px; color: #ccc;">BaT linked profile</div>
+          <div style="font-weight: bold; margin-bottom: 4px;">Source</div>
+          <div style="font-size: 11px; margin-bottom: 2px;">${organizationInfo.name}</div>
+          ${organizationInfo.relationshipLabel ? `<div style="font-size: 10px; color: #ccc;">${organizationInfo.relationshipLabel}</div>` : ''}
           <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: transparent; color: #fff; border: none; padding: 2px 6px; font-size: 14px; cursor: pointer; font-weight: bold;">×</button>
         `;
         document.body.appendChild(toast);
@@ -1505,10 +1529,15 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         {/* Organization (for BAT images) or Uploader (person who ran the import/uploaded to system) */}
                         {attribution.organization ? (
                           <div>
-                            <div className="text-xs text-gray-500">SOURCE</div>
+                            <div className="text-xs text-gray-500">Source</div>
                             <div className="text-white font-semibold">
-                              {attribution.organization.name} BaT linked profile
+                              {attribution.organization.name}
                             </div>
+                            {attribution.organization.relationshipLabel && (
+                              <div className="text-xs text-gray-400">
+                                {attribution.organization.relationshipLabel}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div>
