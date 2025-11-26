@@ -8,7 +8,7 @@
 CREATE TABLE IF NOT EXISTS user_ai_providers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  provider TEXT NOT NULL, -- 'openai', 'anthropic', 'google', etc.
+  provider TEXT NOT NULL CHECK (provider IN ('openai', 'anthropic', 'google', 'gemini')), -- 'openai', 'anthropic', 'google', 'gemini'
   api_key_encrypted TEXT, -- Encrypted API key
   is_active BOOLEAN DEFAULT true,
   is_default BOOLEAN DEFAULT false,

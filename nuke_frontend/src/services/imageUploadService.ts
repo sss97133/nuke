@@ -398,11 +398,14 @@ export class ImageUploadService {
         }
 
         // Use tier1 function (more reliable than analyze-image)
+        // Pass user_id so function can use user's API key if available
+        const { data: { user } } = await supabase.auth.getUser()
         supabase.functions.invoke('analyze-image-tier1', {
           body: {
             image_url: urlData.publicUrl,
             vehicle_id: vehicleId,
-            image_id: dbResult.id
+            image_id: dbResult.id,
+            user_id: user?.id || null
           }
         }).then(({ data, error }) => {
           if (error) {
@@ -480,11 +483,13 @@ export class ImageUploadService {
     });
 
     // Second: General AI analysis (tagging, quality, etc.)
+    const { data: { user } } = await supabase.auth.getUser()
     supabase.functions.invoke('analyze-image', {
       body: {
         image_url: imageUrl,
         vehicle_id: vehicleId,
-        timeline_event_id: null
+        timeline_event_id: null,
+        user_id: user?.id || null
       }
     }).then(({ data, error }) => {
       if (error) {

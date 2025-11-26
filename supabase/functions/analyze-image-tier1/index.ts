@@ -30,13 +30,28 @@ serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { image_url, image_id, vehicle_id, estimated_resolution } = await req.json()
+    const { image_url, image_id, vehicle_id, estimated_resolution, user_id } = await req.json()
     if (!image_url) throw new Error('Missing image_url')
 
     console.log(`Tier 1 analysis: ${image_id}`)
 
-    // Quick analysis with gpt-4o-mini
-    const analysis = await runTier1Analysis(image_url, estimated_resolution || 'medium')
+    // Get user API key or fallback to system key
+    const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
+    const apiKeyResult = await getUserApiKey(
+      supabase,
+      user_id || null,
+      'anthropic',
+      'ANTHROPIC_API_KEY'
+    )
+
+    if (!apiKeyResult.apiKey) {
+      throw new Error('No API key available (neither user nor system key configured)')
+    }
+
+    console.log(`Using ${apiKeyResult.source} API key for analysis`)
+
+    // Quick analysis with Claude (using user's key if available)
+    const analysis = await runTier1Analysis(image_url, estimated_resolution || 'medium', apiKeyResult.apiKey)
     
     // Save to database
     if (image_id) {
@@ -84,9 +99,8 @@ serve(async (req) => {
   }
 })
 
-async function runTier1Analysis(imageUrl: string, estimatedResolution: string) {
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
-  if (!anthropicKey) throw new Error('Anthropic API key not configured')
+async function runTier1Analysis(imageUrl: string, estimatedResolution: string, anthropicKey: string) {
+  if (!anthropicKey) throw new Error('Anthropic API key not provided')
 
   const prompt = `Analyze this vehicle image and provide basic organization data.
 
