@@ -20,7 +20,7 @@ serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { image_url, timeline_event_id, vehicle_id } = await req.json()
+    const { image_url, timeline_event_id, vehicle_id, user_id } = await req.json()
     if (!image_url) throw new Error('Missing image_url')
 
     // 1. Run Rekognition (Label Detection)
@@ -32,14 +32,14 @@ serve(async (req) => {
     // 3. Run OpenAI Vision "Appraiser Brain" if context is found
     let appraiserResult = null
     if (context) {
-      appraiserResult = await runAppraiserBrain(image_url, context)
+      appraiserResult = await runAppraiserBrain(image_url, context, supabase, user_id)
     }
 
     // 3.5. Check for SPID sheet and extract data if found
     let spidData = null
     let spidResponse = null
     try {
-      spidResponse = await detectSPIDSheet(image_url, vehicle_id)
+      spidResponse = await detectSPIDSheet(image_url, vehicle_id, supabase, user_id)
       if (spidResponse?.is_spid_sheet && spidResponse.confidence > 70) {
         spidData = spidResponse.extracted_data
         console.log('SPID sheet detected:', spidData)
@@ -166,8 +166,23 @@ function determineAppraiserContext(rekognitionData: any): string | null {
   return null
 }
 
-async function detectSPIDSheet(imageUrl: string, vehicleId?: string) {
-  const openAiKey = Deno.env.get('OPENAI_API_KEY')
+async function detectSPIDSheet(imageUrl: string, vehicleId?: string, supabaseClient?: any, userId?: string) {
+  // Get user API key or fallback to system key
+  let openAiKey: string | null = null;
+  
+  if (userId && supabaseClient) {
+    const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
+    const apiKeyResult = await getUserApiKey(
+      supabaseClient,
+      userId,
+      'openai',
+      'OPENAI_API_KEY'
+    )
+    openAiKey = apiKeyResult.apiKey;
+  } else {
+    openAiKey = Deno.env.get('OPENAI_API_KEY') || null;
+  }
+  
   if (!openAiKey) return null
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -251,8 +266,23 @@ Extract ALL RPO codes you see, including engine (LS4, L31) and transmission (M40
   }
 }
 
-async function runAppraiserBrain(imageUrl: string, context: string) {
-  const openAiKey = Deno.env.get('OPENAI_API_KEY')
+async function runAppraiserBrain(imageUrl: string, context: string, supabaseClient?: any, userId?: string) {
+  // Get user API key or fallback to system key
+  let openAiKey: string | null = null;
+  
+  if (userId && supabaseClient) {
+    const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
+    const apiKeyResult = await getUserApiKey(
+      supabaseClient,
+      userId,
+      'openai',
+      'OPENAI_API_KEY'
+    )
+    openAiKey = apiKeyResult.apiKey;
+  } else {
+    openAiKey = Deno.env.get('OPENAI_API_KEY') || null;
+  }
+  
   if (!openAiKey) return null
 
   const prompts = {

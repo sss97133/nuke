@@ -483,20 +483,23 @@ export class ImageUploadService {
     });
 
     // Second: General AI analysis (tagging, quality, etc.)
-    const { data: { user } } = await supabase.auth.getUser()
-    supabase.functions.invoke('analyze-image', {
-      body: {
-        image_url: imageUrl,
-        vehicle_id: vehicleId,
-        timeline_event_id: null,
-        user_id: user?.id || null
-      }
-    }).then(({ data, error }) => {
-      if (error) {
-        console.warn('Background AI analysis trigger failed:', error);
-      }
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      supabase.functions.invoke('analyze-image', {
+        body: {
+          image_url: imageUrl,
+          vehicle_id: vehicleId,
+          timeline_event_id: null,
+          user_id: user?.id || null
+        }
+      }).then(({ data, error }) => {
+        if (error) {
+          console.warn('Background AI analysis trigger failed:', error);
+        }
+      }).catch(err => {
+        console.warn('Background AI analysis request failed:', err);
+      });
     }).catch(err => {
-      console.warn('Background AI analysis request failed:', err);
+      console.warn('Failed to get user for AI analysis:', err);
     });
   }
 

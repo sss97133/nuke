@@ -62,7 +62,7 @@ const AIProviderSettings: React.FC = () => {
     }
   };
 
-  const handleSave = async (provider: AIProvider) => {
+  const handleSave = async (provider: AIProvider, apiKey?: string) => {
     if (!session?.user) {
       showToast('Not authenticated', 'error');
       return;
@@ -74,16 +74,16 @@ const AIProviderSettings: React.FC = () => {
     }
 
     try {
-      // Encrypt API key via Edge Function
-      const { data: encryptData, error: encryptError } = await supabase.functions.invoke('encrypt-api-key', {
-        body: { api_key: provider.api_key_encrypted || '' }
-      });
-
-      if (encryptError) {
-        console.warn('Encryption failed, storing as-is:', encryptError);
+      // Store API key as base64 encoded (simple obfuscation)
+      // In production, use proper encryption
+      let encryptedKey = provider.api_key_encrypted || '';
+      if (apiKey && apiKey.trim()) {
+        // Only update key if a new one was provided
+        encryptedKey = btoa(apiKey.trim());
+      } else if (!encryptedKey) {
+        showToast('API key is required', 'warning');
+        return;
       }
-
-      const encryptedKey = encryptData?.encrypted_key || provider.api_key_encrypted || '';
 
       // If setting as default, unset other defaults first
       if (provider.is_default) {
@@ -182,8 +182,8 @@ const AIProviderSettings: React.FC = () => {
                 is_active: true,
                 cost_per_request_cents: 0
               }}
-              onSave={(p) => {
-                handleSave(p);
+              onSave={(p, key) => {
+                handleSave(p, key);
                 setShowAddForm(false);
               }}
               onCancel={() => setShowAddForm(false)}
@@ -294,6 +294,8 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ provider, onSave, onCancel,
         >
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic</option>
+          <option value="google">Google (Gemini)</option>
+          <option value="gemini">Gemini (alias)</option>
           <option value="custom">Custom</option>
         </select>
       </div>
