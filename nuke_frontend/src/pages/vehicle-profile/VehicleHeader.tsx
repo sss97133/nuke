@@ -521,15 +521,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const priceText = primaryAmount !== null ? formatCurrency(primaryAmount) : 'Set a price';
   const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
   
-  // Build full vehicle identity with series/submodel and body style
-  // Example: "1973 GMC K5 JIMMY" instead of just "1973 GMC K5"
+  // Build full vehicle identity: Year, Make, Model, Series, Trim
+  // Example: "1985 GMC K10 Wagon" -> "1985 GMC K10" (no body style, include series/trim if available)
   const identityParts = vehicle ? [
     vehicle.year,
     vehicle.make,
-    (vehicle as any).series || vehicle.model, // Prefer series (C10/K10/K5) over model
-    (vehicle as any).body_style && (vehicle as any).body_style !== vehicle.model 
-      ? (vehicle as any).body_style 
-      : null // Only show body_style if it's different from model
+    vehicle.model, // Always include model
+    (vehicle as any).series && (vehicle as any).series !== vehicle.model 
+      ? (vehicle as any).series 
+      : null, // Include series if different from model
+    (vehicle as any).trim 
+      ? (vehicle as any).trim 
+      : null // Include trim if available
   ].filter(Boolean) : [];
   
   const identityLabel = identityParts.join(' ').trim() || 'Vehicle';
