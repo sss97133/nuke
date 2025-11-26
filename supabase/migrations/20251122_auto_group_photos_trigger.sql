@@ -11,12 +11,14 @@ DECLARE
   event_id_existing UUID;
   photo_date DATE;
 BEGIN
-  -- Only process if image has a taken_at date
-  IF NEW.taken_at IS NULL THEN
-    RETURN NEW;
+  -- Use taken_at if available, otherwise use created_at
+  IF NEW.taken_at IS NOT NULL THEN
+    photo_date := DATE(NEW.taken_at);
+  ELSIF NEW.created_at IS NOT NULL THEN
+    photo_date := DATE(NEW.created_at);
+  ELSE
+    photo_date := CURRENT_DATE;
   END IF;
-  
-  photo_date := DATE(NEW.taken_at);
   
   -- Check if timeline event already exists for this date
   SELECT id INTO event_id_existing
