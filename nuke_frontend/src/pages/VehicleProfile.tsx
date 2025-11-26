@@ -29,6 +29,7 @@ import VehicleShareHolders from '../components/vehicle/VehicleShareHolders';
 import FinancialProducts from '../components/financial/FinancialProducts';
 import ExternalListingCard from '../components/vehicle/ExternalListingCard';
 import LinkedOrganizations, { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
+import AddOrganizationRelationship from '../components/vehicle/AddOrganizationRelationship';
 import ValuationCitations from '../components/vehicle/ValuationCitations';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
@@ -42,6 +43,7 @@ import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type F
 import type { Session } from '@supabase/supabase-js';
 import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
 import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
+import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -102,6 +104,8 @@ const VehicleProfile: React.FC = () => {
   const expertAnalysisRunningRef = React.useRef(false);
   const [linkedOrganizations, setLinkedOrganizations] = useState<LinkedOrg[]>([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
+  const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
 
 
   // MOBILE DETECTION
@@ -1330,6 +1334,7 @@ const VehicleProfile: React.FC = () => {
             initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
             initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
             organizationLinks={linkedOrganizations}
+            onClaimClick={() => setShowOwnershipClaim(true)}
           />
         </React.Suspense>
 
@@ -1352,6 +1357,33 @@ const VehicleProfile: React.FC = () => {
         <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
           <VehicleHeroImage leadImageUrl={leadImageUrl} />
         </React.Suspense>
+
+        {/* Linked Organizations Section */}
+        {vehicle && (
+          <section className="section">
+            <LinkedOrganizations
+              vehicleId={vehicle.id}
+              vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              userId={session?.user?.id}
+              initialOrganizations={linkedOrganizations}
+              onAddRelationship={() => setShowAddOrgRelationship(true)}
+            />
+          </section>
+        )}
+
+        {/* Add Organization Relationship Modal */}
+        {showAddOrgRelationship && vehicle && session?.user?.id && (
+          <AddOrganizationRelationship
+            vehicleId={vehicle.id}
+            vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+            userId={session.user.id}
+            onSuccess={() => {
+              loadLinkedOrgs(vehicle.id);
+              setShowAddOrgRelationship(false);
+            }}
+            onClose={() => setShowAddOrgRelationship(false)}
+          />
+        )}
 
         {/* Main Content - Tabs disabled until backend processing is ready */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
@@ -1435,6 +1467,66 @@ const VehicleProfile: React.FC = () => {
             loadVehicle();
           }}
         />
+      )}
+
+      {/* Ownership Claim Modal */}
+      {showOwnershipClaim && vehicle && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowOwnershipClaim(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '16px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Claim Vehicle Ownership</h3>
+              <button
+                onClick={() => setShowOwnershipClaim(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  padding: '0',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '16px' }}>
+              <VehicleOwnershipPanel
+                vehicle={vehicle}
+                session={session}
+                isOwner={isRowOwner || isVerifiedOwner}
+                hasContributorAccess={hasContributorAccess}
+                contributorRole={contributorRole}
+              />
+            </div>
+          </div>
+        </div>
       )}
       </div>
   );
