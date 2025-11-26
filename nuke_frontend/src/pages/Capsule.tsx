@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
 import ShopFinancials from './ShopFinancials';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
@@ -55,11 +54,9 @@ const Capsule: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div style={{ padding: '40px', textAlign: 'center' }}>
-          <div className="text text-muted">Loading...</div>
-        </div>
-      </AppLayout>
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <div className="text text-muted">Loading...</div>
+      </div>
     );
   }
 
@@ -80,7 +77,6 @@ const Capsule: React.FC = () => {
   ];
 
   return (
-    <AppLayout>
       <div style={{ display: 'flex', gap: 'var(--space-4)', minHeight: '600px' }}>
         {/* Sidebar Navigation */}
         <div style={{
@@ -196,7 +192,6 @@ const Capsule: React.FC = () => {
           )}
         </div>
       </div>
-    </AppLayout>
   );
 };
 
