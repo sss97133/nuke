@@ -138,7 +138,40 @@ const EnhancedImageViewer: React.FC<EnhancedImageViewerProps> = ({
     }
   };
 
-  const loadImageUploader = async (userId: string) => {
+  const loadImageUploader = async (userId: string, imageSource?: string, vehicleId?: string) => {
+    // For BAT images, get organization instead of user
+    if (imageSource === 'bat_listing' && vehicleId) {
+      try {
+        const { data: orgData } = await supabase
+          .from('organization_vehicles')
+          .select(`
+            organization_id,
+            businesses!inner (
+              id,
+              business_name
+            )
+          `)
+          .eq('vehicle_id', vehicleId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (orgData?.businesses && !Array.isArray(orgData.businesses)) {
+          const org = orgData.businesses as any;
+          setImageUploader({
+            id: org.id,
+            full_name: `${org.business_name || 'Viva! Las Vegas Autos'} BaT linked profile`,
+            email: null
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error loading organization:', error);
+      }
+    }
+    
+    // Fallback to user profile
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -217,7 +250,7 @@ const EnhancedImageViewer: React.FC<EnhancedImageViewerProps> = ({
 
     // Load additional data
     if (image.user_id) {
-      loadImageUploader(image.user_id);
+      loadImageUploader(image.user_id, image.source, vehicleId);
     }
     loadImageComments(image.id);
   };
@@ -460,7 +493,9 @@ const EnhancedImageViewer: React.FC<EnhancedImageViewerProps> = ({
 
                     {imageUploader && (
                       <div>
-                        <span className="font-medium text-gray-600">Uploaded by:</span>
+                        <span className="font-medium text-gray-600">
+                          {imageUploader.email ? 'Uploaded by:' : 'SOURCE'}
+                        </span>
                         <div className="text-gray-900">{imageUploader.full_name || imageUploader.email}</div>
                       </div>
                     )}

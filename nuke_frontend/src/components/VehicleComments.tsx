@@ -480,6 +480,55 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         }
       }
 
+      // Create timeline event for BAT auction week
+      if (vinMatch && scrapedData) {
+        try {
+          // Extract auction date from scraped data or use vehicle year
+          let auctionDate = scrapedData.sale_date || scrapedData.auction_end_date;
+          if (!auctionDate && vehicle.year) {
+            // Use January 1st of vehicle year as fallback
+            auctionDate = `${vehicle.year}-01-01`;
+          } else if (!auctionDate) {
+            // Use current date as last resort
+            auctionDate = new Date().toISOString().split('T')[0];
+          }
+
+          // Create timeline event for the auction
+          const { error: eventError } = await supabase
+            .from('timeline_events')
+            .insert({
+              vehicle_id: vehicleId,
+              user_id: userId,
+              event_type: 'sale',
+              event_date: auctionDate,
+              title: scrapedData.sale_price 
+                ? `Sold on Bring a Trailer for $${scrapedData.sale_price.toLocaleString()}`
+                : 'Listed on Bring a Trailer',
+              description: scrapedData.title 
+                ? `${scrapedData.title} - ${scrapedData.seller ? `Seller: ${scrapedData.seller}` : ''}`
+                : `Vehicle auction on Bring a Trailer${scrapedData.seller ? ` - Seller: ${scrapedData.seller}` : ''}`,
+              cost_amount: scrapedData.sale_price || null,
+              metadata: {
+                source: 'bat_import',
+                bat_url: batUrl,
+                bat_listing_title: scrapedData.title,
+                seller: scrapedData.seller,
+                buyer: scrapedData.buyer,
+                auction_date: auctionDate,
+                processed_from_comment: true
+              }
+            });
+
+          if (eventError) {
+            console.warn('[VehicleComments] Failed to create timeline event:', eventError);
+          } else {
+            console.log('[VehicleComments] Created timeline event for BAT auction');
+          }
+        } catch (eventErr) {
+          console.warn('[VehicleComments] Error creating timeline event:', eventErr);
+        }
+      }
+
       setScrapingStatus('Complete!');
       setTimeout(() => setScrapingStatus(null), 3000);
     } catch (error: any) {
