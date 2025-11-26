@@ -40,29 +40,75 @@ async function testExtraction() {
         }
       }
       
-      // Test comment extraction
+      // Test comment extraction - check what's actually on the page
+      data.commentInfo = {
+        usernameDivs: document.querySelectorAll('div.comment-user-name').length,
+        commentContainers: document.querySelectorAll('[class*="comment"]').length,
+        memberLinks: document.querySelectorAll('a[href*="/member/"]').length,
+        commentDatetime: document.querySelectorAll('div.comment-datetime').length
+      };
+      
       data.comments = [];
       const usernameDivs = document.querySelectorAll('div.comment-user-name');
       
+      console.log(`Found ${usernameDivs.length} comment username divs`);
+      
       usernameDivs.forEach((usernameDiv, index) => {
-        const commentContainer = usernameDiv.closest('div[class*="comment"], article, li') || usernameDiv.parentElement;
+        // Try multiple ways to find the comment container
+        let commentContainer = usernameDiv.closest('div[class*="comment"]');
+        if (!commentContainer) commentContainer = usernameDiv.parentElement;
+        if (!commentContainer) commentContainer = usernameDiv.closest('article, li, div');
+        
         const usernameLink = usernameDiv.querySelector('a[href*="/member/"]');
         
         if (usernameLink) {
           const userUrl = usernameLink.getAttribute('href');
-          const username = userUrl?.match(/\/member\/([^\/\?]+)/)?.[1] || usernameLink.textContent?.trim();
+          const username = userUrl?.match(/\/member\/([^\/\?]+)/)?.[1] || 
+                         usernameLink.textContent?.trim().replace(/@/g, '').replace(/\s*\(The\s+Seller\)/i, '');
           
-          const textEl = commentContainer.querySelector('div[class*="comment-text"], p');
-          const commentText = textEl?.textContent?.trim() || '';
+          // Try multiple selectors for comment text
+          let commentText = '';
+          const textSelectors = [
+            'div[class*="comment-text"]',
+            'div[class*="comment-content"]',
+            'div[class*="comment-body"]',
+            'p',
+            'div:not(.comment-user-name):not(.comment-datetime)'
+          ];
+          
+          for (const selector of textSelectors) {
+            const textEl = commentContainer.querySelector(selector);
+            if (textEl && textEl !== usernameDiv) {
+              const text = textEl.textContent?.trim();
+              if (text && text.length > 10 && !text.includes('@') && !text.match(/[A-Za-z]{3}\s+\d{1,2}\s+at/)) {
+                commentText = text;
+                break;
+              }
+            }
+          }
+          
+          // Fallback: get all text from container
+          if (!commentText || commentText.length < 10) {
+            const allText = commentContainer.textContent || '';
+            // Remove username and timestamp
+            let cleanText = allText.replace(new RegExp(username || '', 'gi'), '');
+            cleanText = cleanText.replace(/@/g, '');
+            cleanText = cleanText.replace(/[A-Za-z]{3}\s+\d{1,2}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/gi, '');
+            cleanText = cleanText.trim();
+            if (cleanText.length > 10) {
+              commentText = cleanText;
+            }
+          }
           
           const timeDiv = commentContainer.querySelector('div.comment-datetime');
           const timeText = timeDiv?.textContent?.trim() || '';
           
-          if (commentText && username) {
+          if (username) {
             data.comments.push({
               username,
-              text: commentText.substring(0, 100),
-              timestamp: timeText
+              text: commentText.substring(0, 150),
+              timestamp: timeText,
+              hasText: commentText.length > 10
             });
           }
         }

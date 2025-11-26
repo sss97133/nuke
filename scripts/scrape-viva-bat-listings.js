@@ -362,11 +362,29 @@ async function scrapeVivaListings() {
                 
                 // Extract comment text - look for comment body/content
                 let commentText = '';
-                const textEl = commentContainer.querySelector('div[class*="comment-text"], div[class*="comment-content"], div[class*="comment-body"], p');
-                if (textEl) {
-                  commentText = textEl.textContent?.trim();
-                } else {
-                  // Fallback: get all text from container, remove username and timestamp
+                
+                // BaT comment text is usually in a p tag or specific div
+                // Try to find elements that contain actual comment text (not author info)
+                const allElements = commentContainer.querySelectorAll('p, div');
+                for (const el of allElements) {
+                  const text = el.textContent?.trim() || '';
+                  // Skip if it's author likes, timestamp, or username
+                  if (text.includes("This author's likes") || 
+                      text.match(/[A-Za-z]{3}\s+\d{1,2}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/) ||
+                      text === username ||
+                      text.length < 15 ||
+                      text.match(/^\d+$/)) {
+                    continue;
+                  }
+                  // Found substantial text that looks like a comment
+                  if (text.length > 20) {
+                    commentText = text;
+                    break;
+                  }
+                }
+                
+                // Fallback: clean all text from container
+                if (!commentText || commentText.length < 10) {
                   const allText = commentContainer.textContent || '';
                   let cleanText = allText;
                   // Remove username
@@ -374,10 +392,15 @@ async function scrapeVivaListings() {
                     cleanText = cleanText.replace(new RegExp(username, 'gi'), '').trim();
                     cleanText = cleanText.replace(/@/g, '').trim();
                   }
+                  // Remove author likes pattern
+                  cleanText = cleanText.replace(/This author's likes:[\d,]+/gi, '').trim();
                   // Remove timestamp patterns
                   cleanText = cleanText.replace(/[A-Za-z]{3}\s+\d{1,2}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/gi, '').trim();
+                  cleanText = cleanText.replace(/\(The\s+Seller\)/gi, '').trim();
                   cleanText = cleanText.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, '').trim();
-                  if (cleanText.length > 5) {
+                  // Remove multiple newlines
+                  cleanText = cleanText.replace(/\n\s*\n+/g, '\n').trim();
+                  if (cleanText.length > 10) {
                     commentText = cleanText;
                   }
                 }
