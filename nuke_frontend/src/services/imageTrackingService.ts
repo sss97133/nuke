@@ -209,7 +209,7 @@ export class ImageTrackingService {
       const uploadDateOnly = uploadDate.split('T')[0];
       
       const { data, error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .select('id')
         .eq('vehicle_id', vehicleId)
         .eq('event_date', uploadDateOnly)
@@ -259,7 +259,7 @@ export class ImageTrackingService {
       };
 
       const { error } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .insert([timelineEvent]);
 
       if (error) {
@@ -286,7 +286,7 @@ export class ImageTrackingService {
 
       // Get images with timeline events (approximate)
       const { data: timelineEvents } = await supabase
-        .from('vehicle_timeline_events')
+        .from('timeline_events')
         .select('metadata')
         .eq('event_type', 'image_upload')
         .not('metadata->uploadedUrls', 'is', null);
