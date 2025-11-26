@@ -588,10 +588,44 @@ function scrapeBringATrailer(doc: any, url: string): any {
       data.color = colorMatch[1]
     }
 
-    // Extract sale price
-    const priceMatch = bodyText.match(/Sold\s+for\s+(?:USD\s+)?\$?([\d,]+)/i)
-    if (priceMatch) {
-      data.sale_price = parseInt(priceMatch[1].replace(/,/g, ''))
+    // Extract sale price - multiple patterns to catch different formats
+    const pricePatterns = [
+      /Sold\s+for\s+(?:USD\s+)?\$?([\d,]+)/i,
+      /sold\s+for\s+\$?([\d,]+)\s+on/i,  // "sold for $11,000 on April 15"
+      /for\s+\$?([\d,]+)\s+on\s+[A-Za-z]+\s+\d+/i  // "for $11,000 on April 15"
+    ]
+    for (const pattern of pricePatterns) {
+      const priceMatch = bodyText.match(pattern)
+      if (priceMatch) {
+        data.sale_price = parseInt(priceMatch[1].replace(/,/g, ''), 10)
+        break
+      }
+    }
+
+    // Extract sale date - look for "sold for $X on [Month] [Day], [Year]"
+    const saleDatePatterns = [
+      /sold\s+for[^0-9]*on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+      /([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*\(Lot/i,
+      /Sold\s+on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i
+    ]
+    for (const pattern of saleDatePatterns) {
+      const dateMatch = bodyText.match(pattern)
+      if (dateMatch) {
+        try {
+          const date = new Date(dateMatch[1])
+          if (!isNaN(date.getTime())) {
+            data.sale_date = date.toISOString().split('T')[0]
+            data.auction_end_date = data.sale_date
+          }
+        } catch {}
+        break
+      }
+    }
+
+    // Extract lot number
+    const lotMatch = bodyText.match(/Lot\s+#?(\d{1,3}(?:,\d{3})*)/i)
+    if (lotMatch) {
+      data.lot_number = lotMatch[1].replace(/,/g, '')
     }
 
     // Extract seller - look for "Sold by [seller]" or "by [seller] on"
