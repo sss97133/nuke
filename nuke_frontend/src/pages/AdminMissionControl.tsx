@@ -313,6 +313,7 @@ const AdminMissionControl: React.FC = () => {
             { label: 'SCRIPT CONTROL', sublabel: 'Batch operations', path: '/admin/scripts' },
             { label: 'IMAGE PROCESSING', sublabel: 'Monitor pipeline', path: '/admin/image-processing' },
             { label: 'BATCH ANALYSIS', sublabel: 'AI vehicle analysis', path: '/admin/batch-analysis', primary: true },
+            { label: 'EXTRACTION MONITOR', sublabel: 'Image extraction progress', path: '/admin/extraction-monitor', primary: true },
             { label: 'VERIFICATIONS', sublabel: 'Review pending', path: '/admin/verifications' },
             { label: 'MERGE PROPOSALS', sublabel: 'Duplicate vehicles', path: '/admin/merge-proposals' },
             { label: 'PRICE EDITOR', sublabel: 'Bulk price edits', path: '/admin/price-editor' }

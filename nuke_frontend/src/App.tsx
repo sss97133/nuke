@@ -86,7 +86,9 @@ import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import SignDocument from './pages/SignDocument';
 import ShippingSettings from './pages/admin/ShippingSettings';
+import X402Settings from './pages/admin/X402Settings';
 import BatchImageAnalysis from './pages/admin/BatchImageAnalysis';
+import ExtractionMonitor from './pages/admin/ExtractionMonitor';
 import InvestorDashboardPage from './pages/InvestorDashboard';
 import MergeProposalsDashboard from './pages/MergeProposalsDashboard';
 import Library from './pages/Library';
@@ -95,6 +97,7 @@ import InvestmentOpportunities from './pages/InvestmentOpportunities';
 import AdminMissionControl from './pages/AdminMissionControl';
 import { PersonalPhotoLibrary } from './pages/PersonalPhotoLibrary';
 import Capsule from './pages/Capsule';
+import Watchlists from './pages/Watchlists';
 
 // Financial & Accounting components
 import InvoiceManager from './pages/InvoiceManager';
@@ -262,6 +265,7 @@ function App() {
             <Route path="/vehicles" element={<Vehicles />} />
             <Route path="/all-vehicles" element={<AllVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
+            <Route path="/watchlists" element={<Watchlists />} />
             <Route path="/make-model-demo" element={<VehicleMakeModelDemo />} />
             <Route path="/vehicle-data-normalization" element={<VehicleDataNormalization />} />
             <Route path="/viewer-dashboard" element={<ViewerDashboard />} />
@@ -346,12 +350,14 @@ function App() {
             <Route path="/admin/scripts" element={<ScriptControlCenter />} />
             <Route path="/admin/image-processing" element={<ImageProcessingDashboard />} />
             <Route path="/admin/batch-analysis" element={<BatchImageAnalysis />} />
+            <Route path="/admin/extraction-monitor" element={<ExtractionMonitor />} />
             <Route path="/admin/verifications" element={<AdminVerifications />} />
             <Route path="/admin/ownership-verifications" element={<OwnershipVerificationDashboard />} />
             <Route path="/admin/merge-proposals" element={<MergeProposalsDashboard />} />
             <Route path="/admin/price-editor" element={<BulkPriceEditor />} />
             <Route path="/admin/price-import" element={<PriceCsvImport />} />
             <Route path="/admin/shipping-settings" element={<ShippingSettings />} />
+            <Route path="/admin/x402-settings" element={<X402Settings />} />
             <Route path="/admin/extraction-review" element={<ExtractionReview />} />
             
             {/* Transaction & Signature Routes */}

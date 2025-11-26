@@ -56,7 +56,8 @@ export class VehicleSearchService {
       let query = supabase
         .from('vehicles')
         .select('*')
-        .eq('is_public', true);
+        .eq('is_public', true)
+        .neq('status', 'pending');
 
       // Apply filters
       if (filters.yearFrom) {

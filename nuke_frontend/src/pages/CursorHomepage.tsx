@@ -373,6 +373,7 @@ const CursorHomepage: React.FC = () => {
           id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, view_count, created_at, updated_at, mileage, vin
         `)
         .eq('is_public', true)
+        .neq('status', 'pending')
         .order('updated_at', { ascending: false })
         .limit(timePeriod === 'ALL' ? 500 : 100);
 

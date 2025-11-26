@@ -82,3 +82,4 @@ CREATE POLICY "create_own_sync_logs" ON listing_sync_log
 
 COMMENT ON TABLE listing_sync_log IS 'Tracks sync status and history for listings across all platforms';
 
+

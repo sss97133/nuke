@@ -44,6 +44,7 @@ import type { Session } from '@supabase/supabase-js';
 import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
 import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
 import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel';
+import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -518,6 +519,27 @@ const VehicleProfile: React.FC = () => {
 
   const loadResponsible = async () => {
     try {
+      // For automated bulk imports, show organization instead of user
+      const isAutomatedImport = vehicle?.profile_origin === 'dropbox_import' && 
+                                (vehicle?.origin_metadata?.automated_import === true || 
+                                 vehicle?.origin_metadata?.no_user_uploader === true ||
+                                 !vehicle?.uploaded_by);
+      
+      if (isAutomatedImport && vehicle?.origin_organization_id) {
+        // Load organization name for automated imports
+        const { data: orgData, error: orgError } = await supabase
+          .from('businesses')
+          .select('business_name')
+          .eq('id', vehicle.origin_organization_id)
+          .maybeSingle();
+        
+        if (!orgError && orgData?.business_name) {
+          setResponsibleName(orgData.business_name);
+          return;
+        }
+      }
+      
+      // For regular user uploads, show user name
       if (!vehicle?.uploaded_by) return;
       const { data, error } = await supabase
         .from('profiles')
@@ -710,23 +732,51 @@ const VehicleProfile: React.FC = () => {
       let vehicleData;
       
       if (rpcError || !rpcData || !rpcData.vehicle) {
-        console.warn('RPC load failed, using fallback query:', rpcError?.message);
+        console.warn('[VehicleProfile] RPC load failed, using fallback query:', rpcError?.message || 'RPC returned null');
+        console.warn('[VehicleProfile] RPC error details:', rpcError);
+        console.warn('[VehicleProfile] RPC data:', rpcData);
         
         // Fallback to direct query
-        const { data, error } = await supabase
-          .from('vehicles')
-          .select('*')
-          .eq('id', vehicleId)
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('vehicles')
+            .select('*')
+            .eq('id', vehicleId)
+            .single();
 
-        if (error || !data) {
-          console.error('Vehicle not found:', error);
+          console.log('[VehicleProfile] Fallback query executed, result:', { hasData: !!data, hasError: !!error, errorCode: error?.code });
+
+          if (error) {
+            console.error('[VehicleProfile] Fallback query ERROR:', error);
+            console.error('[VehicleProfile] Error details:', { code: error.code, message: error.message, details: error.details, hint: error.hint });
+            setVehicle(null);
+            setLoading(false);
+            return;
+          }
+
+          if (!data) {
+            console.error('[VehicleProfile] Fallback query returned no data (null/undefined)');
+            setVehicle(null);
+            setLoading(false);
+            return;
+          }
+          
+          console.log('[VehicleProfile] ✅ Fallback query succeeded, vehicle loaded:', { 
+            id: data.id, 
+            year: data.year,
+            make: data.make,
+            model: data.model,
+            profile_origin: data.profile_origin, 
+            is_public: data.is_public,
+            status: data.status
+          });
+          vehicleData = data;
+        } catch (fallbackError) {
+          console.error('[VehicleProfile] Fallback query exception:', fallbackError);
           setVehicle(null);
           setLoading(false);
           return;
         }
-        
-        vehicleData = data;
       } else {
         vehicleData = rpcData.vehicle;
         
@@ -1337,6 +1387,15 @@ const VehicleProfile: React.FC = () => {
             onClaimClick={() => setShowOwnershipClaim(true)}
           />
         </React.Suspense>
+
+        {/* Orphaned Vehicle Banner - Visible to all users */}
+        {vehicle && (
+          <OrphanedVehicleBanner
+            vehicle={vehicle}
+            session={session}
+            permissions={permissions}
+          />
+        )}
 
         {/* Merge Proposals Panel - Only visible to verified owners */}
         {isVerifiedOwner && (

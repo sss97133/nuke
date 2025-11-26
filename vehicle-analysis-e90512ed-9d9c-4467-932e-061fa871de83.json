@@ -1,0 +1,663 @@
+{
+  "vehicle_id": "e90512ed-9d9c-4467-932e-061fa871de83",
+  "vehicle_info": {
+    "id": "e90512ed-9d9c-4467-932e-061fa871de83",
+    "make": "Chevrolet",
+    "model": "Camaro",
+    "year": 1967,
+    "vin": null
+  },
+  "timestamp": "2025-11-26T19:27:32.432Z",
+  "total_images": 10,
+  "successful": 10,
+  "results": [
+    {
+      "success": true,
+      "imageId": "58a0fe76-50e3-4a24-89a4-9bc144b53475",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/01890822-e9fe-47e1-b84f-3411fe1c5318.jpg",
+      "extracted_data": {
+        "angle": "exterior_front",
+        "environment": "garage",
+        "context": {
+          "background_objects": [
+            "tools",
+            "boxes",
+            "bicycle"
+          ],
+          "surrounding_area": "cluttered garage",
+          "time_of_day": "indoor",
+          "weather_visible": false,
+          "other_vehicles_visible": false
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "rust",
+            "missing parts"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "documentation",
+          "confidence_indicators": [],
+          "transparency_level": "high"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/01890822-e9fe-47e1-b84f-3411fe1c5318.jpg",
+        "tokens": {
+          "input": 1649,
+          "output": 225,
+          "total": 1874
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 1874,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 533,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "c88feff4-bf25-4ca0-a84c-a0f06a7ef871",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/7a8e0808-3610-4bcf-9ac6-ec50a926fc44.jpg",
+      "extracted_data": {
+        "angle": "interior_front_seats",
+        "environment": "other",
+        "context": {
+          "background_objects": [],
+          "surrounding_area": "Interior of a vehicle under restoration or in poor condition",
+          "time_of_day": "indoor",
+          "weather_visible": false,
+          "other_vehicles_visible": false
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "rust",
+            "damage"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "documentation",
+          "confidence_indicators": [],
+          "transparency_level": "high"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/7a8e0808-3610-4bcf-9ac6-ec50a926fc44.jpg",
+        "tokens": {
+          "input": 1649,
+          "output": 228,
+          "total": 1877
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 1877,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 532,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "aa971161-40e1-4ee1-a7fe-e6f24d29555b",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/9ff1b8a5-8bc6-4cb2-8695-a2d68a3c1674.jpg",
+      "extracted_data": {
+        "angle": "interior_front_seats",
+        "environment": "garage",
+        "context": {
+          "background_objects": [],
+          "surrounding_area": "Interior of a vehicle, possibly in a state of restoration",
+          "time_of_day": "indoor",
+          "weather_visible": false,
+          "other_vehicles_visible": false
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "dirty interior",
+            "worn seats"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "documentation",
+          "confidence_indicators": [],
+          "transparency_level": "medium"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/9ff1b8a5-8bc6-4cb2-8695-a2d68a3c1674.jpg",
+        "tokens": {
+          "input": 1649,
+          "output": 231,
+          "total": 1880
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 1880,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 531,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "aff3f7d4-d48c-4805-aead-3a3bd34ab143",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/cde065f9-193c-429c-96fd-e0dd9fa38ebb.jpg",
+      "extracted_data": {
+        "angle": "interior_front_seats",
+        "environment": "garage",
+        "context": {
+          "background_objects": [],
+          "surrounding_area": "Interior of a car under restoration",
+          "time_of_day": "indoor",
+          "weather_visible": false,
+          "other_vehicles_visible": false
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "documentation",
+          "confidence_indicators": [],
+          "transparency_level": "high"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/cde065f9-193c-429c-96fd-e0dd9fa38ebb.jpg",
+        "tokens": {
+          "input": 1649,
+          "output": 235,
+          "total": 1884
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 1884,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 530,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "b73e3d97-7bf9-4445-93ad-ad08d843d92e",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/e7bcff2e-2ab8-4af4-818a-624079d4c020.jpg",
+      "extracted_data": {
+        "angle": "exterior_three_quarter",
+        "environment": "garage",
+        "context": {
+          "background_objects": [
+            "van",
+            "shelves"
+          ],
+          "surrounding_area": "cluttered garage floor",
+          "time_of_day": "day",
+          "weather_visible": false,
+          "other_vehicles_visible": true
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "rust",
+            "missing parts"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "selling",
+          "confidence_indicators": [],
+          "transparency_level": "medium"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/e7bcff2e-2ab8-4af4-818a-624079d4c020.jpg",
+        "tokens": {
+          "input": 2165,
+          "output": 227,
+          "total": 2392
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 2392,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 418,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "f92e4600-a4ad-4f04-9ff2-d9b6e1baade7",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/edd98426-d852-4e2e-87c9-49fda68f6087.jpg",
+      "extracted_data": {
+        "angle": "exterior_rear",
+        "environment": "garage",
+        "context": {
+          "background_objects": [
+            "boxes",
+            "other vehicles"
+          ],
+          "surrounding_area": "cluttered garage",
+          "time_of_day": "day",
+          "weather_visible": false,
+          "other_vehicles_visible": true
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "rust",
+            "missing parts"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "documentation",
+          "confidence_indicators": [],
+          "transparency_level": "medium"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/edd98426-d852-4e2e-87c9-49fda68f6087.jpg",
+        "tokens": {
+          "input": 2165,
+          "output": 224,
+          "total": 2389
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 2389,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 418,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "3d69e6e0-6a57-4da4-ac52-90f9d5d0ef0f",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/94ab685e-4ee1-40b1-8588-cfd6e16d91e5.jpg",
+      "extracted_data": {
+        "angle": "exterior_three_quarter",
+        "environment": "garage",
+        "context": {
+          "background_objects": [
+            "boxes",
+            "truck"
+          ],
+          "surrounding_area": "garage floor",
+          "time_of_day": "indoor",
+          "weather_visible": false,
+          "other_vehicles_visible": true
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "rust",
+            "missing parts"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "documentation",
+          "confidence_indicators": [],
+          "transparency_level": "high"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/94ab685e-4ee1-40b1-8588-cfd6e16d91e5.jpg",
+        "tokens": {
+          "input": 2165,
+          "output": 224,
+          "total": 2389
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 2389,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 418,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "5250a5ec-566a-4ef7-8b2c-070d31cb3b86",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/0fe6522e-1f18-4281-9a14-2386983f68f2.jpg",
+      "extracted_data": {
+        "angle": "exterior_front",
+        "environment": "garage",
+        "context": {
+          "background_objects": [
+            "tools",
+            "boxes"
+          ],
+          "surrounding_area": "cluttered garage",
+          "time_of_day": "indoor",
+          "weather_visible": false,
+          "other_vehicles_visible": false
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "rust",
+            "damage"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "selling",
+          "confidence_indicators": [],
+          "transparency_level": "high"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/0fe6522e-1f18-4281-9a14-2386983f68f2.jpg",
+        "tokens": {
+          "input": 2165,
+          "output": 222,
+          "total": 2387
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 2387,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 418,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "b01f1834-9725-409f-824a-a8e73b86fade",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/04d815b0-ad2b-428c-9416-1c257922f767.jpg",
+      "extracted_data": {
+        "angle": "exterior_three_quarter",
+        "environment": "garage",
+        "context": {
+          "background_objects": [
+            "tools",
+            "boxes",
+            "tv"
+          ],
+          "surrounding_area": "cluttered garage",
+          "time_of_day": "indoor",
+          "weather_visible": false,
+          "other_vehicles_visible": false
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "rust",
+            "missing parts",
+            "dirt"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "selling",
+          "confidence_indicators": [],
+          "transparency_level": "medium"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/04d815b0-ad2b-428c-9416-1c257922f767.jpg",
+        "tokens": {
+          "input": 2165,
+          "output": 229,
+          "total": 2394
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 2394,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 417,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    },
+    {
+      "success": true,
+      "imageId": "704415bb-cee8-4242-9e13-31de86b30cc0",
+      "imageUrl": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/be267c7f-a06d-4785-8ca0-2368068db2e2.jpg",
+      "extracted_data": {
+        "angle": "engine_bay",
+        "environment": "outdoor_natural",
+        "context": {
+          "background_objects": [],
+          "surrounding_area": "Outdoor, possibly a yard or driveway.",
+          "time_of_day": "day",
+          "weather_visible": false,
+          "other_vehicles_visible": false
+        },
+        "presentation": {
+          "is_positioned": false,
+          "is_natural": true,
+          "staging_indicators": [],
+          "photo_quality": "amateur"
+        },
+        "care_assessment": {
+          "owner_cares": false,
+          "evidence": [
+            "dirt",
+            "rust"
+          ],
+          "condition_indicators": [
+            "dirty",
+            "neglected"
+          ],
+          "care_level": "low"
+        },
+        "seller_psychology": {
+          "is_staged": false,
+          "intent": "documentation",
+          "confidence_indicators": [],
+          "transparency_level": "medium"
+        }
+      },
+      "metadata": {
+        "model": "gemini-2.0-flash",
+        "model_tier": "free",
+        "image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-images/e90512ed-9d9c-4467-932e-061fa871de83/be267c7f-a06d-4785-8ca0-2368068db2e2.jpg",
+        "tokens": {
+          "input": 1649,
+          "output": 225,
+          "total": 1874
+        },
+        "cost": {
+          "input_cost": 0,
+          "output_cost": 0,
+          "total_cost": 0,
+          "currency": "USD"
+        },
+        "efficiency": {
+          "tokens_per_image": 1874,
+          "images_per_1k_tokens": 0,
+          "images_per_1m_tokens": 533,
+          "estimated_images_per_day_free_tier": 0
+        },
+        "finish_reason": "STOP"
+      }
+    }
+  ]
+}

@@ -110,7 +110,8 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
             vehicle_images(
               image_url
             )
-          `);
+          `)
+          .neq('status', 'pending');
 
         // Add search filtering if query exists
         if (searchQuery && searchQuery.trim()) {

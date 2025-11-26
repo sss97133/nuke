@@ -61,3 +61,4 @@ CREATE POLICY "delete_own_preferences" ON user_organization_preferences
 
 COMMENT ON TABLE user_organization_preferences IS 'User-specific preferences for organizations: pin status, display order, notifications';
 
+

@@ -96,3 +96,4 @@ $$ LANGUAGE plpgsql;
 COMMENT ON MATERIALIZED VIEW unified_listings_view IS 'Unified view of all listings from native, external, and export sources';
 COMMENT ON FUNCTION refresh_unified_listings_view IS 'Refresh the unified listings materialized view';
 
+
