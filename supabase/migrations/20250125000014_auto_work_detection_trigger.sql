@@ -15,14 +15,14 @@ DECLARE
   v_vehicle_id UUID;
 BEGIN
   -- Only process if image has vehicle_id and is not already processed
-  IF NEW.vehicle_id IS NOT NULL AND (NEW.metadata->>'work_detection_triggered' IS NULL OR NEW.metadata->>'work_detection_triggered' = 'false') THEN
+  -- Check ai_processing_status instead of metadata (which doesn't exist)
+  IF NEW.vehicle_id IS NOT NULL AND (NEW.ai_processing_status IS NULL OR NEW.ai_processing_status = 'pending') THEN
     
     v_vehicle_id := NEW.vehicle_id;
     
-    -- Mark as triggered to prevent duplicate processing
-    UPDATE vehicle_images
-    SET metadata = COALESCE(metadata, '{}'::JSONB) || '{"work_detection_triggered": "true"}'::JSONB
-    WHERE id = NEW.id;
+    -- Mark as processing to prevent duplicate processing
+    -- Note: We don't update metadata (it doesn't exist), but we can check ai_processing_status
+    -- The status will be updated by the processing job
     
     -- Call edge function asynchronously (using pg_net if available, or log for processing)
     -- Note: Direct HTTP calls from triggers are not recommended, so we'll use a queue approach
