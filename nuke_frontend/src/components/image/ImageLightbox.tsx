@@ -1097,27 +1097,30 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden relative" style={{ minHeight: 0 }}>
-        {/* Image Canvas */}
-      <div
-        ref={containerRef}
-          className="flex-1 flex items-center justify-center p-4 relative"
-          style={{ minWidth: 0, minHeight: 0 }}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+      <div 
+        className="flex-1 flex overflow-hidden relative" 
+        style={{ 
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'row'
+        }}
       >
+        {/* Image Canvas - Takes remaining space */}
         <div
-          style={{
-            position: 'relative',
-            maxWidth: '100%',
-            maxHeight: '100%',
-            width: '100%',
-            height: '100%',
+          ref={containerRef}
+          className="flex-1 flex items-center justify-center p-4 relative"
+          style={{ 
+            minWidth: 0, 
+            minHeight: 0,
+            flex: '1 1 auto',
+            overflow: 'hidden',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           <img
             ref={imageRef}
@@ -1135,11 +1138,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               maxWidth: '100%',
               maxHeight: '100%',
               width: 'auto',
-              height: 'auto'
+              height: 'auto',
+              objectFit: 'contain'
             }}
           />
 
-          {/* Markers */}
+          {/* Markers - Positioned absolutely over image */}
           {imageLoaded && tags.map(tag => (
             <SpatialTagMarker
               key={tag.id}
@@ -1160,11 +1164,18 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             />
           ))}
         </div>
-      </div>
 
-        {/* Sidebar - Cursor Style - Narrower to keep image visible */}
+        {/* Sidebar - Cursor Style - Fixed width, doesn't shrink */}
         {showSidebar && (
-          <div className="w-64 sm:w-64 w-full bg-[#111] border-l-2 border-white/20 flex flex-col overflow-hidden">
+          <div 
+            className="bg-[#111] border-l-2 border-white/20 flex flex-col overflow-hidden"
+            style={{
+              width: '256px',
+              flexShrink: 0,
+              minWidth: '256px',
+              maxWidth: '256px'
+            }}
+          >
             {/* Tabs - Cursor Style */}
             <div className="flex border-b-2 border-white/20">
               {canEdit && (
