@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DropboxService } from '../services/dropboxService';
 import type { VehicleImportPipeline } from '../services/vehicleImportPipeline';
-import AppLayout from '../components/layout/AppLayout';
 import '../design-system.css';
 
 interface VehicleFolder {
@@ -200,15 +199,7 @@ const DropboxImport: React.FC = () => {
   };
 
   return (
-    <AppLayout
-      title="Import from Dropbox"
-      showBackButton={true}
-      breadcrumbs={[
-        { label: "Dashboard", path: "/dashboard" },
-        { label: "Import from Dropbox" }
-      ]}
-    >
-      <div className="fade-in">
+    <div className="fade-in">
         {!isConnected ? (
           <section className="section">
             <div className="card">
@@ -491,7 +482,6 @@ const DropboxImport: React.FC = () => {
           </div>
         )}
       </div>
-    </AppLayout>
   );
 };
 

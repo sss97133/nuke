@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 import '../design-system.css';
 
 interface VehicleData {
@@ -311,16 +310,7 @@ const DropboxAIProcess: React.FC = () => {
   };
 
   return (
-    <AppLayout
-      title="AI Vehicle Analysis"
-      showBackButton={true}
-      breadcrumbs={[
-        { label: "Dashboard", path: "/dashboard" },
-        { label: "Import from Dropbox", path: "/dropbox-import" },
-        { label: "AI Analysis" }
-      ]}
-    >
-      <div className="fade-in">
+    <div className="fade-in">
         {/* Processing Status */}
         {processing && (
           <section className="section">
@@ -479,7 +469,6 @@ const DropboxAIProcess: React.FC = () => {
           </>
         )}
       </div>
-    </AppLayout>
   );
 };
 

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 
 interface ThreadRow { id: string; subject?: string | null; created_at: string }
 interface Participant { id: string; user_id: string }
@@ -75,8 +74,7 @@ const Inbox: React.FC = () => {
   };
 
   return (
-    <AppLayout title="Inbox">
-      <div className="container compact">
+    <div className="container compact">
         <div className="main" style={{ display:'grid', gridTemplateColumns:'280px 1fr', gap:12 }}>
           <div className="card" style={{ maxHeight:'70vh', overflowY:'auto' }}>
             <div className="card-header">Threads</div>
@@ -125,7 +123,6 @@ const Inbox: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
   );
 };
 

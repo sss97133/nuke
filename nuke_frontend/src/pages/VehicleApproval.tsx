@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 import '../design-system.css';
 
 interface ExtractedVehicleData {
@@ -214,38 +213,33 @@ const VehicleApproval: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout title="Loading Extraction...">
-        <div className="container">
-          <div className="loading">Loading vehicle extraction data...</div>
-        </div>
-      </AppLayout>
+      <div className="container">
+        <div className="loading">Loading vehicle extraction data...</div>
+      </div>
     );
   }
 
   if (!extractedData) {
     return (
-      <AppLayout title="Extraction Not Found">
-        <div className="container">
-          <div className="card">
-            <div className="card-body">
-              <p className="text">Vehicle extraction not found or already processed.</p>
-              <button 
-                className="button button-primary"
-                onClick={() => navigate('/dashboard')}
-              >
-                Back to Dashboard
-              </button>
-            </div>
+      <div className="container">
+        <div className="card">
+          <div className="card-body">
+            <p className="text">Vehicle extraction not found or already processed.</p>
+            <button 
+              className="button button-primary"
+              onClick={() => navigate('/dashboard')}
+            >
+              Back to Dashboard
+            </button>
           </div>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
   const approvedCount = fieldApprovals.filter(f => f.isApproved).length;
 
   return (
-    <AppLayout title="Review AI Extraction">
       <div className="container">
         <div className="page-header">
           <h1 className="heading-1">Review AI Vehicle Extraction</h1>
@@ -384,7 +378,6 @@ const VehicleApproval: React.FC = () => {
           </button>
         </div>
       </div>
-    </AppLayout>
   );
 };
 
