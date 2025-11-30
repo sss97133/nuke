@@ -1,488 +1,716 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { DashboardService, DashboardNotification, PendingWorkApproval, PendingVehicleAssignment, ConnectedProfilesSummary } from '../services/dashboardService';
+import { MessageCard } from '../components/dashboard/MessageCard';
+import { Sidebar } from '../components/dashboard/Sidebar';
+import { CommandPalette } from '../components/dashboard/CommandPalette';
+import { Terminal } from '../components/dashboard/Terminal';
 import '../design-system.css';
 
-interface Vehicle {
-  id: string;
-  year: number;
-  make: string;
-  model: string;
-  vin: string | null;
-  created_at: string;
-  image_count: number;
-  primary_image_url: string | null;
+interface PendingCounts {
+  work_approvals: number;
+  vehicle_assignments: number;
+  photo_reviews: number;
+  document_reviews: number;
+  user_requests: number;
+  interaction_requests: number;
+  ownership_verifications: number;
+  unread_notifications: number;
 }
 
-interface RecentActivity {
+interface TerminalLog {
   id: string;
-  vehicle_id: string;
-  event_type: string;
-  title: string;
-  event_date: string;
-  created_at: string;
-  vehicle_year: number;
-  vehicle_make: string;
-  vehicle_model: string;
-}
-
-interface Stats {
-  totalVehicles: number;
-  totalImages: number;
-  totalEvents: number;
-  recentActivity: number; // Activity in last 7 days
+  message: string;
+  timestamp: string;
+  type?: 'info' | 'success' | 'error' | 'warning';
 }
 
 export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
-  const [stats, setStats] = useState<Stats>({
-    totalVehicles: 0,
-    totalImages: 0,
-    totalEvents: 0,
-    recentActivity: 0
-  });
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [pendingCounts, setPendingCounts] = useState<PendingCounts | null>(null);
+  const [notifications, setNotifications] = useState<DashboardNotification[]>([]);
+  const [pendingWorkApprovals, setPendingWorkApprovals] = useState<PendingWorkApproval[]>([]);
+  const [pendingVehicleAssignments, setPendingVehicleAssignments] = useState<PendingVehicleAssignment[]>([]);
+  const [connectedProfiles, setConnectedProfiles] = useState<ConnectedProfilesSummary | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('actions');
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState<TerminalLog[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['actions']));
+  const [loadingSections, setLoadingSections] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadDashboard();
+    // Get session first
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user) {
+        loadCriticalData(session.user.id);
+      }
     });
+
+    // Keyboard shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const loadDashboard = async () => {
-    try {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
+  useEffect(() => {
+    if (!session?.user) return;
 
-      // Load user's vehicles - try both uploaded_by and user_id for compatibility
-      const { data: vehiclesData, error: vehiclesError } = await supabase
-        .from('vehicles')
-        .select(`
-          id,
-          year,
-          make,
-          model,
-          vin,
-          created_at,
-          image_count,
-          primary_image_url
-        `)
-        .or(`uploaded_by.eq.${session.user.id},user_id.eq.${session.user.id}`)
-        .order('created_at', { ascending: false });
+    // Real-time subscription for notifications
+    const notificationChannel = supabase
+      .channel(`user_notifications_${session.user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `user_id=eq.${session.user.id}`
+        },
+        (payload) => {
+          const newNotification = payload.new as DashboardNotification;
+          setNotifications((prev) => [newNotification, ...prev]);
+          setPendingCounts((prev) =>
+            prev
+              ? { ...prev, unread_notifications: prev.unread_notifications + 1 }
+              : null
+          );
+          addTerminalLog(`New notification: ${newNotification.title}`, 'info');
+        }
+      )
+      .subscribe();
 
-      if (vehiclesError) {
-        console.error('Error loading vehicles:', vehiclesError);
-        throw vehiclesError;
+    return () => {
+      supabase.removeChannel(notificationChannel);
+    };
+  }, [session]);
+
+  const addTerminalLog = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
+    setTerminalLogs((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        message,
+        timestamp: new Date().toISOString(),
+        type
       }
+    ]);
+  };
+
+  // Load critical data first (counts + notifications)
+  const loadCriticalData = async (userId: string) => {
+    try {
+      setLoadingSections(new Set(['counts', 'notifications']));
       
-      console.log('Loaded vehicles:', vehiclesData?.length || 0, vehiclesData);
-      setVehicles(vehiclesData || []);
+      // Load counts and notifications in parallel (fast)
+      const [counts, recentNotifs] = await Promise.all([
+        DashboardService.getPendingCounts(userId).catch(() => null),
+        DashboardService.getRecentNotifications(userId, 10).catch(() => [])
+      ]);
 
-      // Load recent activity from timeline_events
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      setPendingCounts(counts);
+      setNotifications(recentNotifs as DashboardNotification[]);
+      setLoadingSections(new Set());
+      setInitialLoad(false);
+      addTerminalLog('Dashboard ready', 'success');
 
-      const { data: activityData } = await supabase
-        .from('vehicle_timeline_events')
-        .select(`
-          id,
-          vehicle_id,
-          event_type,
-          title,
-          event_date,
-          created_at,
-          vehicles!inner(
-            year,
-            make,
-            model
-          )
-        `)
-        .eq('vehicles.uploaded_by', session.user.id)
-        .gte('created_at', sevenDaysAgo.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(10);
+      // Auto-select category with most items
+      if (counts) {
+        const totalActions = counts.work_approvals + counts.vehicle_assignments;
+        if (totalActions > 0) {
+          setSelectedCategory('actions');
+        } else if (counts.unread_notifications > 0) {
+          setSelectedCategory('notifications');
+        }
+      }
 
-      // Transform the nested data
-      const transformedActivity = (activityData || []).map((item: any) => ({
-        id: item.id,
-        vehicle_id: item.vehicle_id,
-        event_type: item.event_type,
-        title: item.title,
-        event_date: item.event_date,
-        created_at: item.created_at,
-        vehicle_year: item.vehicles?.year,
-        vehicle_make: item.vehicles?.make,
-        vehicle_model: item.vehicles?.model
-      }));
-
-      setRecentActivity(transformedActivity);
-
-      // Calculate stats
-      const totalImages = vehiclesData?.reduce((sum, v) => sum + (v.image_count || 0), 0) || 0;
-
-      const { count: eventCount } = await supabase
-        .from('vehicle_timeline_events')
-        .select('*', { count: 'exact', head: true })
-        .in('vehicle_id', (vehiclesData || []).map(v => v.id));
-
-      setStats({
-        totalVehicles: vehiclesData?.length || 0,
-        totalImages,
-        totalEvents: eventCount || 0,
-        recentActivity: transformedActivity.length
-      });
-
-    } catch (error) {
-      console.error('Error loading dashboard:', error);
-    } finally {
-      setLoading(false);
+      // Load detailed data in background (lazy)
+      loadDetailedData(userId);
+    } catch (error: any) {
+      console.error('Error loading critical data:', error);
+      addTerminalLog(`Error: ${error.message}`, 'error');
+      setLoadingSections(new Set());
+      setInitialLoad(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  // Load detailed data after critical data is shown
+  const loadDetailedData = async (userId: string) => {
+    try {
+      setLoadingSections(new Set(['work', 'assignments', 'profiles']));
+      
+      const [workApprovals, vehicleAssignments, profiles] = await Promise.all([
+        DashboardService.getPendingWorkApprovals(userId).catch(() => []),
+        DashboardService.getPendingVehicleAssignments(userId).catch(() => []),
+        DashboardService.getConnectedProfilesSummary(userId).catch(() => null)
+      ]);
 
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+      setPendingWorkApprovals(workApprovals);
+      setPendingVehicleAssignments(vehicleAssignments);
+      setConnectedProfiles(profiles);
+      setLoadingSections(new Set());
+    } catch (error: any) {
+      console.error('Error loading detailed data:', error);
+      setLoadingSections(new Set());
+    }
   };
 
-  const getEventTypeLabel = (eventType: string) => {
-    const labels: Record<string, string> = {
-      'maintenance': 'MAINT',
-      'repair': 'REPAIR',
-      'modification': 'MOD',
-      'purchase': 'BOUGHT',
-      'sale': 'SOLD',
-      'inspection': 'INSPECT',
-      'registration': 'REG',
-      'insurance': 'INS',
-      'note': 'NOTE',
-      'image_upload': 'PHOTO'
+  const handleMarkRead = async (notificationId: string) => {
+    if (!session?.user) return;
+
+    try {
+      await DashboardService.markNotificationRead(session.user.id, notificationId);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+      );
+      setPendingCounts((prev) =>
+        prev
+          ? {
+              ...prev,
+              unread_notifications: Math.max(0, prev.unread_notifications - 1)
+            }
+          : null
+      );
+    } catch (error: any) {
+      console.error('Error marking notification as read:', error);
+      addTerminalLog(`Error: ${error.message}`, 'error');
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!session?.user) return;
+
+    try {
+      const count = await DashboardService.markAllNotificationsRead(session.user.id);
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setPendingCounts((prev) =>
+        prev ? { ...prev, unread_notifications: 0 } : null
+      );
+      addTerminalLog(`Marked ${count} notifications as read`, 'success');
+    } catch (error: any) {
+      console.error('Error marking all as read:', error);
+      addTerminalLog(`Error: ${error.message}`, 'error');
+    }
+  };
+
+  const handleApproveWork = async (notificationId: string) => {
+    try {
+      await DashboardService.approveWorkNotification(notificationId);
+      addTerminalLog('Work approved', 'success');
+      setPendingWorkApprovals((prev) => prev.filter((w) => w.id !== notificationId));
+      setPendingCounts((prev) =>
+        prev
+          ? { ...prev, work_approvals: Math.max(0, prev.work_approvals - 1) }
+          : null
+      );
+    } catch (error: any) {
+      console.error('Error approving work:', error);
+      addTerminalLog(`Error: ${error.message}`, 'error');
+    }
+  };
+
+  const handleRejectWork = async (notificationId: string) => {
+    try {
+      await DashboardService.rejectWorkNotification(notificationId);
+      addTerminalLog('Work rejected', 'info');
+      setPendingWorkApprovals((prev) => prev.filter((w) => w.id !== notificationId));
+      setPendingCounts((prev) =>
+        prev
+          ? { ...prev, work_approvals: Math.max(0, prev.work_approvals - 1) }
+          : null
+      );
+    } catch (error: any) {
+      console.error('Error rejecting work:', error);
+      addTerminalLog(`Error: ${error.message}`, 'error');
+    }
+  };
+
+  const handleApproveAssignment = async (assignmentId: string) => {
+    try {
+      await DashboardService.approveVehicleAssignment(assignmentId);
+      addTerminalLog('Assignment approved', 'success');
+      setPendingVehicleAssignments((prev) => prev.filter((v) => v.id !== assignmentId));
+      setPendingCounts((prev) =>
+        prev
+          ? {
+              ...prev,
+              vehicle_assignments: Math.max(0, prev.vehicle_assignments - 1)
+            }
+          : null
+      );
+    } catch (error: any) {
+      console.error('Error approving assignment:', error);
+      addTerminalLog(`Error: ${error.message}`, 'error');
+    }
+  };
+
+  const handleRejectAssignment = async (assignmentId: string) => {
+    try {
+      await DashboardService.rejectVehicleAssignment(assignmentId);
+      addTerminalLog('Assignment rejected', 'info');
+      setPendingVehicleAssignments((prev) => prev.filter((v) => v.id !== assignmentId));
+      setPendingCounts((prev) =>
+        prev
+          ? {
+              ...prev,
+              vehicle_assignments: Math.max(0, prev.vehicle_assignments - 1)
+            }
+          : null
+      );
+    } catch (error: any) {
+      console.error('Error rejecting assignment:', error);
+      addTerminalLog(`Error: ${error.message}`, 'error');
+    }
+  };
+
+  const getCategories = () => {
+    const counts = pendingCounts || {
+      work_approvals: 0,
+      vehicle_assignments: 0,
+      photo_reviews: 0,
+      document_reviews: 0,
+      user_requests: 0,
+      interaction_requests: 0,
+      ownership_verifications: 0,
+      unread_notifications: 0
     };
-    return labels[eventType] || eventType.toUpperCase().slice(0, 6);
+
+    const totalActions = counts.work_approvals + counts.vehicle_assignments + counts.photo_reviews + counts.document_reviews;
+
+    return [
+      {
+        id: 'actions',
+        label: 'Actions',
+        count: totalActions,
+        icon: '>',
+        expanded: expandedCategories.has('actions'),
+        children: [
+          {
+            id: 'work_approvals',
+            label: 'work',
+            count: counts.work_approvals,
+            icon: 'WRENCH'
+          },
+          {
+            id: 'vehicle_assignments',
+            label: 'assignments',
+            count: counts.vehicle_assignments,
+            icon: 'LINK'
+          },
+          {
+            id: 'photo_reviews',
+            label: 'photos',
+            count: counts.photo_reviews,
+            icon: 'IMAGE'
+          },
+          {
+            id: 'document_reviews',
+            label: 'documents',
+            count: counts.document_reviews,
+            icon: 'DOCUMENT'
+          }
+        ]
+      },
+      {
+        id: 'notifications',
+        label: 'Notifications',
+        count: counts.unread_notifications,
+        icon: 'BELL',
+        expanded: false
+      },
+      {
+        id: 'connected',
+        label: 'Connected',
+        count: connectedProfiles ? connectedProfiles.vehicles + connectedProfiles.organizations : 0,
+        icon: 'LINK',
+        expanded: expandedCategories.has('connected'),
+        children: [
+          {
+            id: 'vehicles',
+            label: 'vehicles',
+            count: connectedProfiles?.vehicles || 0,
+            icon: 'CAR'
+          },
+          {
+            id: 'organizations',
+            label: 'organizations',
+            count: connectedProfiles?.organizations || 0,
+            icon: 'ORG'
+          }
+        ]
+      }
+    ];
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-        <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Loading...</div>
-      </div>
-    );
-  }
+  const getCommands = () => {
+    return [
+      {
+        id: 'mark_all_read',
+        category: 'notification',
+        label: 'Mark All Notifications Read',
+        handler: handleMarkAllRead
+      },
+      {
+        id: 'view_vehicles',
+        category: 'navigate',
+        label: 'View All Vehicles',
+        handler: () => navigate('/vehicles')
+      },
+      {
+        id: 'view_notifications',
+        category: 'navigate',
+        label: 'View All Notifications',
+        handler: () => navigate('/notifications')
+      },
+      {
+        id: 'add_vehicle',
+        category: 'action',
+        label: 'Add Vehicle',
+        handler: () => navigate('/add-vehicle')
+      }
+    ];
+  };
+
+  const formatNotificationForCard = (notification: DashboardNotification) => {
+    const metadata = notification.metadata || {};
+    const vehicleName = metadata.vehicle_name || 
+      (notification.vehicle_id ? 'Vehicle' : null);
+    const orgName = metadata.organization_name || 
+      (notification.organization_id ? 'Organization' : null);
+
+    return {
+      id: notification.id,
+      type: notification.type,
+      priority: notification.priority || 3,
+      title: notification.title,
+      message: notification.message,
+      metadata: {
+        ...metadata,
+        vehicle_id: notification.vehicle_id,
+        vehicle_name: vehicleName,
+        organization_id: notification.organization_id,
+        organization_name: orgName,
+        action_url: metadata.action_url || metadata.link_url
+      },
+      is_read: notification.is_read,
+      created_at: notification.created_at,
+      actions: getNotificationActions(notification)
+    };
+  };
+
+  const getNotificationActions = (notification: DashboardNotification) => {
+    const actions: Array<{
+      id: string;
+      label: string;
+      type: 'primary' | 'secondary' | 'danger' | 'link';
+      handler: () => void;
+    }> = [];
+
+    if (notification.vehicle_id) {
+      actions.push({
+        id: 'view_vehicle',
+        label: 'View Vehicle',
+        type: 'link',
+        handler: () => navigate(`/vehicle/${notification.vehicle_id}`)
+      });
+    }
+
+    const metadata = notification.metadata || {};
+    if (metadata.action_url) {
+      actions.push({
+        id: 'view',
+        label: 'View',
+        type: 'link',
+        handler: () => navigate(metadata.action_url)
+      });
+    }
+
+    return actions;
+  };
+
+  const getFilteredNotifications = () => {
+    if (selectedCategory === 'notifications') {
+      return notifications.map(formatNotificationForCard);
+    } else if (selectedCategory === 'work_approvals') {
+      if (loadingSections.has('work')) {
+        return [{ id: 'loading', type: 'loading', priority: 3, title: 'Loading...', message: '', is_read: false, created_at: new Date().toISOString() }];
+      }
+      return pendingWorkApprovals.map((wa) => ({
+        id: wa.id,
+        type: 'work_approval_request',
+        priority: 1 as const,
+        title: 'Work Approval Required',
+        message: `${wa.work_type || 'Work'} detected on ${wa.vehicle_name}. Match confidence: ${wa.match_confidence}%`,
+        metadata: {
+          vehicle_id: wa.vehicle_id,
+          vehicle_name: wa.vehicle_name,
+          organization_id: wa.organization_id,
+          organization_name: wa.organization_name,
+          confidence: wa.match_confidence
+        },
+        is_read: false,
+        created_at: wa.created_at,
+        actions: [
+          {
+            id: 'approve',
+            label: 'Approve',
+            type: 'primary' as const,
+            handler: () => handleApproveWork(wa.id)
+          },
+          {
+            id: 'reject',
+            label: 'Reject',
+            type: 'danger' as const,
+            handler: () => handleRejectWork(wa.id)
+          },
+          {
+            id: 'view',
+            label: 'View Details',
+            type: 'link' as const,
+            handler: () => navigate(`/vehicle/${wa.vehicle_id}`)
+          }
+        ]
+      }));
+    } else if (selectedCategory === 'vehicle_assignments') {
+      if (loadingSections.has('assignments')) {
+        return [{ id: 'loading', type: 'loading', priority: 3, title: 'Loading...', message: '', is_read: false, created_at: new Date().toISOString() }];
+      }
+      return pendingVehicleAssignments.map((va) => ({
+        id: va.id,
+        type: 'pending_vehicle_assignment',
+        priority: 2 as const,
+        title: 'Vehicle Assignment Suggested',
+        message: `${va.vehicle_name} suggested for ${va.organization_name}. Confidence: ${va.confidence}%`,
+        metadata: {
+          vehicle_id: va.vehicle_id,
+          vehicle_name: va.vehicle_name,
+          organization_id: va.organization_id,
+          organization_name: va.organization_name,
+          confidence: va.confidence,
+          evidence_sources: va.evidence_sources
+        },
+        is_read: false,
+        created_at: va.created_at,
+        actions: [
+          {
+            id: 'approve',
+            label: 'Approve',
+            type: 'primary' as const,
+            handler: () => handleApproveAssignment(va.id)
+          },
+          {
+            id: 'reject',
+            label: 'Reject',
+            type: 'danger' as const,
+            handler: () => handleRejectAssignment(va.id)
+          },
+          {
+            id: 'view',
+            label: 'View Evidence',
+            type: 'link' as const,
+            handler: () => navigate(`/vehicle/${va.vehicle_id}`)
+          }
+        ]
+      }));
+    }
+    return [];
+  };
+
+  const handleToggleExpand = (categoryId: string) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
 
   if (!session?.user) {
     return (
-      <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-        <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+      <div
+        style={{
+          padding: '16px',
+          textAlign: 'center',
+          fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+          fontSize: '8pt'
+        }}
+      >
+        <div style={{ marginBottom: '16px', color: '#424242' }}>
           Please log in to view your dashboard
         </div>
         <button
           onClick={() => navigate('/auth')}
           style={{
-            background: 'var(--text)',
-            color: 'var(--white)',
-            border: '2px outset var(--border)',
+            fontSize: '8pt',
+            fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
             padding: '8px 16px',
-            fontSize: '9pt',
+            border: '1px solid #bdbdbd',
+            background: '#ffffff',
             cursor: 'pointer',
-            fontWeight: 'bold'
+            color: '#000000'
           }}
         >
-          Log In
+          [Log In]
         </button>
       </div>
     );
   }
 
+  const filteredNotifications = getFilteredNotifications();
+  const categories = getCategories();
+  const isLoading = initialLoad || loadingSections.has('counts') || loadingSections.has('notifications');
+
   return (
-    <div style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div
+      style={{
+        display: 'flex',
+        height: '100vh',
+        fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+        fontSize: '8pt',
+        background: '#ffffff'
+      }}
+    >
+      {/* Sidebar */}
+      <Sidebar
+        categories={categories}
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+        onToggleExpand={handleToggleExpand}
+      />
+
+      {/* Main Area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '14pt', fontWeight: 'bold', marginBottom: '4px' }}>
-            Dashboard
-          </h1>
-          <p style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-          Welcome back, {session.user.email?.split('@')[0]}
-          </p>
-        </div>
-
-      {/* Stats Bar */}
-        <div style={{
-          display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-        gap: '12px',
-        marginBottom: '24px'
-        }}>
-          <div style={{
-            background: 'var(--white)',
-            border: '2px solid var(--border)',
-          padding: '12px'
-          }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-            MY VEHICLES
-            </div>
-            <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>
-            {stats.totalVehicles}
-            </div>
+        <div
+          style={{
+            height: '32px',
+            borderBottom: '1px solid #bdbdbd',
+            padding: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#ffffff'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#000000', fontWeight: '600' }}>Dashboard</span>
+            {pendingCounts && pendingCounts.unread_notifications > 0 && (
+              <span
+                style={{
+                  fontSize: '7pt',
+                  color: '#757575',
+                  background: '#f5f5f5',
+                  padding: '2px 6px',
+                  border: '1px solid #bdbdbd'
+                }}
+              >
+                {pendingCounts.unread_notifications} unread
+              </span>
+            )}
+            {isLoading && (
+              <span style={{ fontSize: '7pt', color: '#757575' }}>Loading...</span>
+            )}
           </div>
-
-          <div style={{
-            background: 'var(--white)',
-            border: '2px solid var(--border)',
-          padding: '12px'
-          }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-            TOTAL PHOTOS
-            </div>
-            <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>
-            {stats.totalImages}
-            </div>
-          </div>
-
-          <div style={{
-            background: 'var(--white)',
-            border: '2px solid var(--border)',
-          padding: '12px'
-          }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-            TIMELINE EVENTS
-            </div>
-            <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>
-            {stats.totalEvents}
-            </div>
-          </div>
-
-          <div style={{
-            background: 'var(--white)',
-            border: '2px solid var(--border)',
-          padding: '12px'
-          }}>
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-            RECENT ACTIVITY
-            </div>
-            <div style={{ fontSize: '18pt', fontWeight: 'bold' }}>
-            {stats.recentActivity}
-            </div>
-          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Last 7 days
-            </div>
-          </div>
-        </div>
-
-      {/* Quick Actions */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
-          Quick Actions
-          </h2>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => navigate('/add-vehicle')}
-            style={{
-              background: 'var(--text)',
-              color: 'var(--white)',
-              border: '2px outset var(--border)',
-              padding: '8px 12px',
-              fontSize: '9pt',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
-            ADD VEHICLE
-          </button>
-          <button
-            onClick={() => navigate('/vehicles')}
-            style={{
-                background: 'var(--white)',
-              color: 'var(--text)',
-                border: '2px solid var(--border)',
-              padding: '8px 12px',
-              fontSize: '9pt',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
-            VIEW ALL VEHICLES
-          </button>
-          <button
-            onClick={() => navigate('/')}
-                    style={{
-                      background: 'var(--white)',
-              color: 'var(--text)',
-              border: '2px solid var(--border)',
-              padding: '8px 12px',
-              fontSize: '9pt',
-                      cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
-            EXPLORE PLATFORM
-          </button>
-                    </div>
-          </div>
-
-      {/* Main Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        {/* My Vehicles */}
-          <div>
-          <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
-            My Vehicles
-            </h2>
-            <div style={{
-              background: 'var(--white)',
-              border: '2px solid var(--border)',
-            maxHeight: '400px',
-            overflowY: 'auto'
-            }}>
-            {vehicles.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center' }}>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  No vehicles yet
-                </div>
-                  <button
-                    onClick={() => navigate('/add-vehicle')}
-                    style={{
-                      background: 'var(--text)',
-                      color: 'var(--white)',
-                      border: '2px outset var(--border)',
-                    padding: '6px 12px',
-                    fontSize: '8pt',
-                      cursor: 'pointer',
-                    fontWeight: 'bold'
-                    }}
-                  >
-                  ADD YOUR FIRST VEHICLE
-                  </button>
-                </div>
-              ) : (
-              vehicles.map(vehicle => (
-                    <div
-                  key={vehicle.id}
-                  onClick={() => navigate(`/vehicle/${vehicle.id}`)}
-                      style={{
-                        padding: '12px',
-                    borderBottom: '1px solid var(--border)',
-                        cursor: 'pointer',
-                    display: 'flex',
-                    gap: '12px',
-                    alignItems: 'center'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-100)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                  {vehicle.primary_image_url ? (
-                    <div style={{
-                      width: '60px',
-                      height: '45px',
-                      background: `url(${vehicle.primary_image_url}) center/cover`,
-                      border: '1px solid var(--border)',
-                      flexShrink: 0
-                    }} />
-                  ) : (
-                    <div style={{
-                      width: '60px',
-                      height: '45px',
-                      background: 'var(--grey-100)',
-                      border: '1px solid var(--border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '8pt',
-                      color: 'var(--text-muted)',
-                      flexShrink: 0
-                    }}>
-                      NO IMAGE
-                      </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>
-                      {vehicle.year} {vehicle.make} {vehicle.model}
-                      </div>
-                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {vehicle.image_count || 0} photos
-                      {vehicle.vin && ` • VIN: ${vehicle.vin.slice(-6)}`}
-                    </div>
-                  </div>
-                </div>
-              ))
-              )}
-          </div>
-            </div>
-
-        {/* Recent Activity */}
-        <div>
-          <h2 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px' }}>
-            Recent Activity
-                </h2>
-                <div style={{
-                  background: 'var(--white)',
-                  border: '2px solid var(--border)',
-            maxHeight: '400px',
-            overflowY: 'auto'
-          }}>
-            {recentActivity.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center' }}>
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                  No recent activity
-                </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '8px' }}>
-                  Add events to your vehicle timelines to see them here
-                </div>
-              </div>
-            ) : (
-              recentActivity.map(activity => (
-                    <div
-                  key={activity.id}
-                  onClick={() => navigate(`/vehicle/${activity.vehicle_id}`)}
-                      style={{
-                        padding: '12px',
-                    borderBottom: '1px solid var(--border)',
-                    cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-100)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                    <div style={{
-                      background: 'var(--text)',
-                      color: 'var(--white)',
-                      padding: '2px 4px',
-                      fontSize: '7pt',
-                      fontWeight: 'bold',
-                      border: '1px solid var(--border)',
-                      flexShrink: 0
-                    }}>
-                      {getEventTypeLabel(activity.event_type)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '2px' }}>
-                        {activity.title}
-                      </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                        {activity.vehicle_year} {activity.vehicle_make} {activity.vehicle_model}
-                      </div>
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        {formatDate(activity.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => setShowCommandPalette(true)}
+              style={{
+                fontSize: '8pt',
+                fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                padding: '4px 8px',
+                border: '1px solid #bdbdbd',
+                background: '#ffffff',
+                cursor: 'pointer',
+                color: '#757575'
+              }}
+            >
+              [⌘K]
+            </button>
+            {pendingCounts && pendingCounts.unread_notifications > 0 && (
+              <button
+                onClick={handleMarkAllRead}
+                style={{
+                  fontSize: '8pt',
+                  fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                  padding: '4px 8px',
+                  border: '1px solid #bdbdbd',
+                  background: '#ffffff',
+                  cursor: 'pointer',
+                  color: '#000000'
+                }}
+              >
+                [Mark All Read]
+              </button>
             )}
           </div>
         </div>
+
+        {/* Message List */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '8px',
+            background: '#ffffff'
+          }}
+        >
+          {isLoading ? (
+            <div
+              style={{
+                padding: '32px',
+                textAlign: 'center',
+                color: '#757575',
+                fontSize: '8pt'
+              }}
+            >
+              Loading dashboard...
+            </div>
+          ) : filteredNotifications.length === 0 ? (
+            <div
+              style={{
+                padding: '32px',
+                textAlign: 'center',
+                color: '#757575',
+                fontSize: '8pt'
+              }}
+            >
+              {selectedCategory === 'notifications'
+                ? 'No notifications'
+                : 'No pending items'}
+            </div>
+          ) : (
+            filteredNotifications.map((notification) => (
+              <MessageCard
+                key={notification.id}
+                {...notification}
+                onMarkRead={handleMarkRead}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Terminal */}
+        <Terminal logs={terminalLogs} />
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        commands={getCommands()}
+      />
     </div>
   );
 }

@@ -581,7 +581,8 @@ serve(async (req) => {
                     origin_metadata: {
                       listing_url: listingUrl,
                       asking_price: scrapeData.data.asking_price || scrapeData.data.price,
-                      imported_at: new Date().toISOString()
+                      imported_at: new Date().toISOString(),
+                      image_urls: scrapeData.data.images || [] // Store image URLs for future backfill
                     },
                     notes: scrapeData.data.description || null,
                     is_public: true,
@@ -637,12 +638,61 @@ serve(async (req) => {
                     stats.created++
                     console.log(`  ✅ Created new vehicle: ${vehicleId}`)
                     
+                    // Create timeline event based on listing posted date (not import date)
+                    if (scrapeData.data.posted_date) {
+                      try {
+                        // Parse posted_date (format: "2025-10-31 13:15" or similar)
+                        let eventDate = new Date().toISOString().split('T')[0] // Default to today
+                        const postedDateStr = scrapeData.data.posted_date
+                        
+                        // Try to parse the date
+                        const dateMatch = postedDateStr.match(/(\d{4})-(\d{2})-(\d{2})/)
+                        if (dateMatch) {
+                          eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
+                        } else {
+                          // Try other formats
+                          const parsedDate = new Date(postedDateStr)
+                          if (!isNaN(parsedDate.getTime())) {
+                            eventDate = parsedDate.toISOString().split('T')[0]
+                          }
+                        }
+
+                        const { error: timelineError } = await supabase
+                          .from('timeline_events')
+                          .insert({
+                            vehicle_id: vehicleId,
+                            user_id: importUserId,
+                            event_type: 'discovery', // Use 'discovery' which is always allowed
+                            source: 'craigslist',
+                            title: `Listed on Craigslist`,
+                            event_date: eventDate,
+                            description: `Vehicle listed for sale on Craigslist${scrapeData.data.asking_price ? ` for $${scrapeData.data.asking_price.toLocaleString()}` : ''}`,
+                            metadata: {
+                              listing_url: listingUrl,
+                              asking_price: scrapeData.data.asking_price || scrapeData.data.price,
+                              location: scrapeData.data.location,
+                              posted_date: scrapeData.data.posted_date,
+                              updated_date: scrapeData.data.updated_date,
+                              discovery: true // Mark as discovery event
+                            }
+                          })
+
+                        if (timelineError) {
+                          console.warn(`  ⚠️ Failed to create timeline event:`, timelineError.message)
+                        } else {
+                          console.log(`  ✅ Created timeline event for listing date: ${eventDate}`)
+                        }
+                      } catch (timelineErr: any) {
+                        console.warn(`  ⚠️ Timeline event creation error:`, timelineErr.message)
+                      }
+                    }
+                    
                     // Download and upload images if available
                     if (scrapeData.data.images && scrapeData.data.images.length > 0) {
                       console.log(`  📸 Downloading ${scrapeData.data.images.length} images...`)
                       let imagesUploaded = 0
                       
-                      for (let i = 0; i < Math.min(scrapeData.data.images.length, 20); i++) {
+                      for (let i = 0; i < scrapeData.data.images.length; i++) {
                         const imageUrl = scrapeData.data.images[i]
                         try {
                           // Download image
@@ -683,21 +733,74 @@ serve(async (req) => {
                             .from('vehicle-images')
                             .getPublicUrl(storagePath)
                           
-                          // Create vehicle_images record
-                          const { error: imageInsertError } = await supabase
+                          // Create ghost user for Craigslist photographer (unknown)
+                          const photographerFingerprint = `CL-Photographer-${listingUrl}`;
+                          let ghostUserId: string | null = null;
+                          
+                          // Check if ghost user exists
+                          const { data: existingGhost } = await supabase
+                            .from('ghost_users')
+                            .select('id')
+                            .eq('device_fingerprint', photographerFingerprint)
+                            .maybeSingle();
+                          
+                          if (existingGhost?.id) {
+                            ghostUserId = existingGhost.id;
+                          } else {
+                            // Create new ghost user for CL photographer
+                            const { data: newGhost, error: ghostError } = await supabase
+                              .from('ghost_users')
+                              .insert({
+                                device_fingerprint: photographerFingerprint,
+                                camera_make: 'Unknown',
+                                camera_model: 'Craigslist Listing',
+                                display_name: `Craigslist Photographer`,
+                                total_contributions: 0
+                              })
+                              .select('id')
+                              .single();
+                            
+                            if (!ghostError && newGhost?.id) {
+                              ghostUserId = newGhost.id;
+                            }
+                          }
+
+                          // Create vehicle_images record with proper attribution
+                          const { data: imageData, error: imageInsertError } = await supabase
                             .from('vehicle_images')
                             .insert({
                               vehicle_id: vehicleId,
                               image_url: publicUrl,
-                              uploaded_by: importUserId,
+                              user_id: ghostUserId || importUserId, // Photographer (ghost user), fallback to importer
                               is_primary: i === 0, // First image is primary
                               source: 'craigslist_scrape',
-                              metadata: {
-                                original_url: imageUrl,
+                              taken_at: scrapeData.data.posted_date || new Date().toISOString(),
+                              exif_data: {
+                                source_url: imageUrl,
                                 discovery_url: listingUrl,
-                                imported_at: new Date().toISOString()
+                                imported_by_user_id: importUserId,
+                                imported_at: new Date().toISOString(),
+                                attribution_note: 'Photographer unknown - images from Craigslist listing. Original photographer can claim with proof.',
+                                claimable: true,
+                                device_fingerprint: photographerFingerprint
                               }
                             })
+                            .select('id')
+                            .single();
+                          
+                          // Create device attribution if ghost user exists
+                          if (!imageInsertError && imageData?.id && ghostUserId) {
+                            await supabase
+                              .from('device_attributions')
+                              .insert({
+                                image_id: imageData.id,
+                                device_fingerprint: photographerFingerprint,
+                                ghost_user_id: ghostUserId,
+                                uploaded_by_user_id: importUserId,
+                                attribution_source: 'craigslist_listing_unknown_photographer',
+                                confidence_score: 50
+                              });
+                          }
                           
                           if (imageInsertError) {
                             console.warn(`    ⚠️ Failed to create image record ${i + 1}: ${imageInsertError.message}`)
@@ -705,7 +808,7 @@ serve(async (req) => {
                           }
                           
                           imagesUploaded++
-                          console.log(`    ✅ Uploaded image ${i + 1}/${Math.min(scrapeData.data.images.length, 20)}`)
+                          console.log(`    ✅ Uploaded image ${i + 1}/${scrapeData.data.images.length}`)
                           
                           // Small delay to avoid rate limiting
                           await new Promise(resolve => setTimeout(resolve, 500))

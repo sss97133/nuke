@@ -18,9 +18,12 @@
       "args": [
         "-y",
         "@supabase/mcp-server-supabase@latest",
-        "--read-only",
-        "--project-ref=qkgaybvrernstplzjaam"
-      ]
+        "--project-ref=qkgaybvrernstplzjaam",
+        "--access-token=sb_secret_VM-i60R01Gp-wpyKZUTwmw_zPM_gvui"
+      ],
+      "env": {
+        "supabase_access_token": "sb_secret_VM-i60R01Gp-wpyKZUTwmw_zPM_gvui"
+      }
     },
     "playwright": {
       "command": "npx",
@@ -35,6 +38,20 @@
         "-y",
         "@modelcontextprotocol/server-browser"
       ]
+    },
+    "firecrawl-mcp": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "fc-12e25be3d7664da4984cd499adff7dc4"
+      }
+    },
+    "mendable-mcp": {
+      "command": "npx",
+      "args": ["-y", "mendable-mcp"],
+      "env": {
+        "MENDABLE_API_KEY": "458e3dc5-e3a6-487c-bd8e-3c7f297b6020"
+      }
     }
   }
 }

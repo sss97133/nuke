@@ -31,6 +31,7 @@ import ExternalListingCard from '../components/vehicle/ExternalListingCard';
 import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 import AddOrganizationRelationship from '../components/vehicle/AddOrganizationRelationship';
 import ValuationCitations from '../components/vehicle/ValuationCitations';
+import LiveAuctionBanner from '../components/auction/LiveAuctionBanner';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
 import { BATListingManager } from '../components/vehicle/BATListingManager';
@@ -1387,6 +1388,11 @@ const VehicleProfile: React.FC = () => {
             onClaimClick={() => setShowOwnershipClaim(true)}
           />
         </React.Suspense>
+
+        {/* Live Auction Banner - Show if vehicle has active auction */}
+        {vehicle && (
+          <LiveAuctionBanner vehicleId={vehicle.id} />
+        )}
 
         {/* Orphaned Vehicle Banner - Visible to all users */}
         {vehicle && (

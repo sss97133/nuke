@@ -483,6 +483,28 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       // Create timeline event and ownership transfer for BAT auction
       if (vinMatch && scrapedData) {
         try {
+          // Check if there's an active auction listing first
+          const { data: activeListing } = await supabase
+            .from('vehicle_listings')
+            .select('id, status, sale_type, auction_end_time')
+            .eq('vehicle_id', vehicleId)
+            .eq('status', 'active')
+            .in('sale_type', ['auction', 'live_auction'])
+            .gt('auction_end_time', new Date().toISOString())
+            .maybeSingle();
+
+          // Also check external_listings for BAT auctions
+          const { data: externalListing } = await supabase
+            .from('external_listings')
+            .select('id, listing_status, end_date')
+            .eq('vehicle_id', vehicleId)
+            .eq('platform', 'bat')
+            .eq('listing_status', 'active')
+            .gt('end_date', new Date().toISOString())
+            .maybeSingle();
+
+          const isActiveAuction = activeListing || externalListing;
+
           // Extract auction date from scraped data or use vehicle year
           let auctionDate = scrapedData.sale_date || scrapedData.auction_end_date;
           if (!auctionDate && vehicle.year) {
@@ -493,17 +515,33 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
             auctionDate = new Date().toISOString().split('T')[0];
           }
 
+          // Determine event type and title based on auction status
+          let eventType = 'sale';
+          let eventTitle = '';
+          
+          if (isActiveAuction) {
+            // Vehicle is currently on auction - create "listed" or "started" event
+            eventType = 'auction_listed';
+            eventTitle = 'Listed for Auction';
+          } else if (scrapedData.sale_price) {
+            // Auction completed with sale
+            eventType = 'sale';
+            eventTitle = `Sold on Bring a Trailer for $${scrapedData.sale_price.toLocaleString()}`;
+          } else {
+            // Listed but no sale price yet
+            eventType = 'auction_listed';
+            eventTitle = 'Listed on Bring a Trailer';
+          }
+
           // Create timeline event for the auction
           const { data: timelineEvent, error: eventError } = await supabase
             .from('timeline_events')
             .insert({
               vehicle_id: vehicleId,
               user_id: userId,
-              event_type: 'sale',
+              event_type: eventType,
               event_date: auctionDate,
-              title: scrapedData.sale_price 
-                ? `Sold on Bring a Trailer for $${scrapedData.sale_price.toLocaleString()}`
-                : 'Listed on Bring a Trailer',
+              title: eventTitle,
               description: scrapedData.title 
                 ? `${scrapedData.title} - ${scrapedData.seller ? `Seller: ${scrapedData.seller}` : ''}${scrapedData.buyer ? `, Buyer: ${scrapedData.buyer}` : ''}`
                 : `Vehicle auction on Bring a Trailer${scrapedData.seller ? ` - Seller: ${scrapedData.seller}` : ''}${scrapedData.buyer ? `, Buyer: ${scrapedData.buyer}` : ''}`,
@@ -515,6 +553,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                 seller: scrapedData.seller,
                 buyer: scrapedData.buyer,
                 auction_date: auctionDate,
+                is_active_auction: !!isActiveAuction,
                 processed_from_comment: true
               }
             })

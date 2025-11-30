@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Auction Banner Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .vehicle-header {
+            padding: 12px;
+            border-bottom: 1px solid #e5e5e5;
+            margin-bottom: 16px;
+        }
+        
+        .vehicle-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        /* Live Auction Banner */
+        .live-auction-banner {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: white;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+            border: 2px solid #991b1b;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .pulse-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.1);
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            pointer-events: none;
+        }
+        
+        .banner-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .banner-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .live-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #fef2f2;
+            box-shadow: 0 0 8px rgba(254, 242, 242, 0.8);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        .banner-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .time-remaining {
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0.95;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-primary {
+            flex: 1;
+            min-width: 140px;
+            padding: 12px 24px;
+            background: white;
+            color: #dc2626;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.12s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-secondary {
+            flex: 1;
+            min-width: 140px;
+            padding: 12px 24px;
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        .info-box {
+            background: #f5f5f5;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .info-box h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1f2937;
+        }
+        
+        .info-box p {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+        
+        .code-block {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="vehicle-header">
+            <div class="vehicle-title">1964 Jaguar XKE Series I 3.8 Roadster</div>
+        </div>
+        
+        <!-- Live Auction Banner -->
+        <div class="live-auction-banner">
+            <div class="pulse-overlay"></div>
+            <div class="banner-content">
+                <!-- Header -->
+                <div class="banner-header">
+                    <div class="live-indicator">
+                        <div class="live-dot"></div>
+                        <h3 class="banner-title">LIVE AUCTION</h3>
+                    </div>
+                    <div class="time-remaining" id="timer">6d 14h 23m</div>
+                </div>
+                
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Current Bid</div>
+                        <div class="stat-value">$20,000</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Total Bids</div>
+                        <div class="stat-value">5</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Reserve</div>
+                        <div class="stat-value">$25,000</div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn-primary">BID NOW</button>
+                    <button class="btn-secondary">View Auction Details</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Box -->
+        <div class="info-box">
+            <h3>How It Works</h3>
+            <p>
+                The Live Auction Banner automatically appears when a vehicle has an active auction listing. 
+                It shows real-time information including current bid, bid count, time remaining, and reserve price.
+            </p>
+            <p style="margin-top: 8px;">
+                <strong>To see this banner on the live site:</strong> Create an active auction listing in the 
+                <code>vehicle_listings</code> table with <code>status = 'active'</code> and 
+                <code>sale_type IN ('auction', 'live_auction')</code>.
+            </p>
+            <div class="code-block">
+INSERT INTO vehicle_listings (
+  vehicle_id,
+  seller_id,
+  sale_type,
+  status,
+  auction_end_time,
+  current_high_bid_cents,
+  bid_count,
+  reserve_price_cents
+) VALUES (
+  'c1b04f00-7abf-4e1c-afd2-43fba17a6a1b',
+  '[your-user-id]',
+  'auction',
+  'active',
+  NOW() + INTERVAL '7 days',
+  2000000,  -- $20,000
+  5,
+  2500000   -- $25,000 reserve
+);
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Simulate timer countdown
+        let seconds = 576000; // 6 days, 14 hours, 23 minutes in seconds
+        
+        function updateTimer() {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            document.getElementById('timer').textContent = `${days}d ${hours}h ${minutes}m`;
+            seconds--;
+            
+            if (seconds < 0) {
+                clearInterval(timerInterval);
+                document.getElementById('timer').textContent = 'Ended';
+            }
+        }
+        
+        const timerInterval = setInterval(updateTimer, 1000);
+        updateTimer();
+    </script>
+</body>
+</html>
+

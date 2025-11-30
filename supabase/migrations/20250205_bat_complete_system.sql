@@ -338,3 +338,4 @@ CREATE POLICY "Service role can manage bat_listings" ON bat_listings FOR ALL USI
 CREATE POLICY "Service role can manage bat_comments" ON bat_comments FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role can manage bat_scrape_jobs" ON bat_scrape_jobs FOR ALL USING (auth.role() = 'service_role');
 
+

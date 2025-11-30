@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import '../../design-system.css';
+import { InputDialog } from '../common/InputDialog';
 
 interface Tag {
   id: string;
@@ -43,6 +44,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
   const [showAITags, setShowAITags] = useState(true);
   const [showManualTags, setShowManualTags] = useState(true);
+  const [correctionDialog, setCorrectionDialog] = useState<{ isOpen: boolean; tag: Tag | null }>({ isOpen: false, tag: null });
 
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -185,45 +187,9 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
         if (error) throw error;
 
       } else if (action === 'correct') {
-        // For correction, we'll show a correction dialog
-        const correctedName = prompt('Correct tag name:', tag.tag_name);
-        if (!correctedName) return;
-
-        // Create corrected version
-        const correctedTag = {
-          image_url: imageUrl,
-          vehicle_id: vehicleId,
-          timeline_event_id: timelineEventId,
-          tag_name: correctedName,
-          tag_type: tag.tag_type,
-          source_type: 'manual' as const,
-          x_position: tag.x_position,
-          y_position: tag.y_position,
-          width: tag.width,
-          height: tag.height,
-          confidence: 100,
-          verified: true,
-          validation_status: 'approved',
-          parent_tag_id: tag.id,
-          created_by: userId
-        };
-
-        const { error: insertError } = await supabase
-          .from('image_tags')
-          .insert([correctedTag]);
-
-        if (insertError) throw insertError;
-
-        // Mark original as disputed
-        const { error: updateError } = await supabase
-          .from('image_tags')
-          .update({
-            validation_status: 'disputed',
-            manual_override: true
-          })
-          .eq('id', tag.id);
-
-        if (updateError) throw updateError;
+        // Open correction dialog
+        setCorrectionDialog({ isOpen: true, tag });
+        return;
       }
 
       await loadTags();
@@ -615,6 +581,59 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
     </div>
   );
 
+  const handleCorrectionConfirm = async (correctedName: string) => {
+    if (!correctedName.trim() || !correctionDialog.tag) return;
+    
+    const tag = correctionDialog.tag;
+    setCorrectionDialog({ isOpen: false, tag: null });
+    
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session.session?.user?.id;
+
+      // Create corrected version
+      const correctedTag = {
+        image_url: imageUrl,
+        vehicle_id: vehicleId,
+        timeline_event_id: timelineEventId,
+        tag_name: correctedName.trim(),
+        tag_type: tag.tag_type,
+        source_type: 'manual' as const,
+        x_position: tag.x_position,
+        y_position: tag.y_position,
+        width: tag.width,
+        height: tag.height,
+        confidence: 100,
+        verified: true,
+        validation_status: 'approved',
+        parent_tag_id: tag.id,
+        created_by: userId
+      };
+
+      const { error: insertError } = await supabase
+        .from('image_tags')
+        .insert([correctedTag]);
+
+      if (insertError) throw insertError;
+
+      // Mark original as disputed
+      const { error: updateError } = await supabase
+        .from('image_tags')
+        .update({
+          validation_status: 'disputed',
+          manual_override: true
+        })
+        .eq('id', tag.id);
+
+      if (updateError) throw updateError;
+
+      await loadTags();
+    } catch (error) {
+      console.error('Error correcting tag:', error);
+      alert('Error correcting tag: ' + (error as any).message);
+    }
+  };
+
   async function triggerAutoAnalysis() {
     try {
       const { data, error } = await supabase.functions.invoke('auto-analyze-upload', {
@@ -640,6 +659,365 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
       console.error('Error triggering auto-analysis:', error);
     }
   }
+
+  return (
+    <>
+      <div style={{
+        position: 'relative',
+        border: '2px inset #c0c0c0',
+        background: '#ffffff',
+        fontFamily: 'MS Sans Serif, sans-serif',
+        fontSize: '11px'
+      }}>
+
+        {/* Controls */}
+        <div style={{
+          background: '#c0c0c0',
+          padding: '8px',
+          borderBottom: '1px solid #808080',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}>
+
+          {/* Tagging Mode Toggle */}
+          {!readonly && (
+            <button
+              onClick={() => setIsTagging(!isTagging)}
+              style={{
+                background: isTagging ? '#0066cc' : '#e0e0e0',
+                color: isTagging ? 'white' : 'black',
+                border: '2px outset #c0c0c0',
+                padding: '4px 8px',
+                fontSize: '11px',
+                cursor: 'pointer'
+              }}
+            >
+              {isTagging ? '✏️ Stop Tagging' : '🏷️ Add Tag'}
+            </button>
+          )}
+
+          {/* Tag Type Filters */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>Show:</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <input
+                type="checkbox"
+                checked={showAITags}
+                onChange={e => setShowAITags(e.target.checked)}
+              />
+              <span style={{ color: '#ff9900' }}>AI Tags</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <input
+                type="checkbox"
+                checked={showManualTags}
+                onChange={e => setShowManualTags(e.target.checked)}
+              />
+              <span style={{ color: '#00aa00' }}>Manual Tags</span>
+            </label>
+          </div>
+
+          {/* Tag Count */}
+          <div style={{ marginLeft: 'auto', fontSize: '10px', color: '#666' }}>
+            {tags.filter(t => t.source_type === 'ai').length} AI •
+            {tags.filter(t => t.source_type === 'manual').length} Manual •
+            {tags.filter(t => t.verified).length} Verified
+          </div>
+        </div>
+
+        {/* Image Container */}
+        <div
+          ref={containerRef}
+          style={{
+            position: 'relative',
+            cursor: isTagging ? 'crosshair' : 'default',
+            overflow: 'hidden'
+          }}
+          onClick={handleImageClick}
+        >
+          <img
+            ref={imageRef}
+            src={imageUrl}
+            alt="Taggable content"
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block'
+            }}
+            onLoad={() => {
+              // Auto-trigger analysis on first load if no tags exist
+              if (tags.length === 0 && !readonly) {
+                triggerAutoAnalysis();
+              }
+            }}
+          />
+
+          {/* Existing Tags */}
+          {filteredTags.map((tag) => (
+            <div
+              key={tag.id}
+              style={{
+                position: 'absolute',
+                left: `${tag.x_position}%`,
+                top: `${tag.y_position}%`,
+                width: `${tag.width}%`,
+                height: `${tag.height}%`,
+                border: `2px solid ${getTagColor(tag)}`,
+                background: `${getTagColor(tag)}20`,
+                cursor: 'pointer',
+                minWidth: '20px',
+                minHeight: '20px'
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedTag(tag);
+              }}
+            />
+          ))}
+
+          {/* Pending Tag */}
+          {pendingPosition && (
+            <div
+              style={{
+                position: 'absolute',
+                left: `${pendingPosition.x}%`,
+                top: `${pendingPosition.y}%`,
+                width: `${pendingPosition.width}%`,
+                height: `${pendingPosition.height}%`,
+                border: '2px dashed #0066cc',
+                background: '#0066cc20',
+                minWidth: '20px',
+                minHeight: '20px'
+              }}
+            />
+          )}
+
+          {/* Tag Labels */}
+          {filteredTags.map((tag) => (
+            <div
+              key={`label-${tag.id}`}
+              style={{
+                position: 'absolute',
+                left: `${tag.x_position}%`,
+                top: `${Math.max(tag.y_position - 5, 0)}%`,
+                background: getTagColor(tag),
+                color: 'white',
+                padding: '2px 4px',
+                fontSize: '9px',
+                whiteSpace: 'nowrap',
+                borderRadius: '2px',
+                pointerEvents: 'none',
+                maxWidth: '150px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {tag.tag_name}
+              {tag.source_type === 'ai' && ` (${tag.confidence}%)`}
+            </div>
+          ))}
+        </div>
+
+        {/* Add Tag Form */}
+        {pendingPosition && isTagging && !readonly && (
+          <div style={{
+            background: '#f0f0f0',
+            border: '2px inset #c0c0c0',
+            padding: '8px',
+            margin: '8px'
+          }}>
+            <div style={{ marginBottom: '6px', fontWeight: 'bold' }}>Add New Tag</div>
+
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' }}>
+              <input
+                type="text"
+                value={newTagText}
+                onChange={(e) => setNewTagText(e.target.value)}
+                placeholder="Tag name (e.g., Engine, Brake Disc)"
+                style={{
+                  flex: 1,
+                  padding: '2px 4px',
+                  border: '2px inset #c0c0c0',
+                  fontSize: '11px'
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddTag();
+                  }
+                }}
+              />
+
+              <select
+                value={newTagType}
+                onChange={(e) => setNewTagType(e.target.value as Tag['tag_type'])}
+                style={{
+                  padding: '2px',
+                  border: '2px inset #c0c0c0',
+                  fontSize: '11px'
+                }}
+              >
+                <option value="part">Part</option>
+                <option value="tool">Tool</option>
+                <option value="issue">Issue</option>
+                <option value="process">Process</option>
+                <option value="brand">Brand</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                onClick={handleAddTag}
+                disabled={!newTagText.trim()}
+                style={{
+                  background: '#0066cc',
+                  color: 'white',
+                  border: '2px outset #c0c0c0',
+                  padding: '4px 12px',
+                  fontSize: '11px',
+                  cursor: newTagText.trim() ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Add Tag
+              </button>
+
+              <button
+                onClick={() => {
+                  setPendingPosition(null);
+                  setNewTagText('');
+                }}
+                style={{
+                  background: '#e0e0e0',
+                  color: 'black',
+                  border: '2px outset #c0c0c0',
+                  padding: '4px 12px',
+                  fontSize: '11px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Selected Tag Details */}
+        {selectedTag && (
+          <div style={{
+            background: '#f9f9f9',
+            border: '2px inset #c0c0c0',
+            padding: '8px',
+            margin: '8px'
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
+              Tag Details: {selectedTag.tag_name}
+            </div>
+
+            <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+              Type: {selectedTag.tag_type} •
+              Source: {selectedTag.source_type} •
+              Confidence: {selectedTag.confidence}%
+              {selectedTag.automated_confidence && ` (AI: ${selectedTag.automated_confidence}%)`} •
+              Status: {selectedTag.validation_status}
+            </div>
+
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+
+              {selectedTag.source_type === 'ai' && !selectedTag.verified && !readonly && (
+                <>
+                  <button
+                    onClick={() => handleValidateAITag(selectedTag, 'approve')}
+                    style={{
+                      background: '#00aa00',
+                      color: 'white',
+                      border: '2px outset #c0c0c0',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✓ Approve
+                  </button>
+
+                  <button
+                    onClick={() => handleValidateAITag(selectedTag, 'reject')}
+                    style={{
+                      background: '#cc0000',
+                      color: 'white',
+                      border: '2px outset #c0c0c0',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✗ Reject
+                  </button>
+
+                  <button
+                    onClick={() => handleValidateAITag(selectedTag, 'correct')}
+                    style={{
+                      background: '#ff9900',
+                      color: 'white',
+                      border: '2px outset #c0c0c0',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✏️ Correct
+                  </button>
+                </>
+              )}
+
+              {!readonly && (
+                <button
+                  onClick={() => handleDeleteTag(selectedTag.id)}
+                  style={{
+                    background: '#cc0000',
+                    color: 'white',
+                    border: '2px outset #c0c0c0',
+                    padding: '2px 6px',
+                    fontSize: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🗑️ Delete
+                </button>
+              )}
+
+              <button
+                onClick={() => setSelectedTag(null)}
+                style={{
+                  background: '#e0e0e0',
+                  color: 'black',
+                  border: '2px outset #c0c0c0',
+                  padding: '2px 6px',
+                  fontSize: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Correction Dialog */}
+      <InputDialog
+        isOpen={correctionDialog.isOpen}
+        title="Correct Tag Name"
+        message="Enter the correct label for this tag:"
+        defaultValue={correctionDialog.tag?.tag_name || ''}
+        onConfirm={handleCorrectionConfirm}
+        onCancel={() => setCorrectionDialog({ isOpen: false, tag: null })}
+        confirmLabel="Correct"
+        required
+      />
+    </>
+  );
 };
 
 export default EnhancedImageTagger;

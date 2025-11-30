@@ -5,7 +5,7 @@ import '../../design-system.css';
 
 interface SearchResult {
   id: string;
-  type: 'vehicle' | 'shop' | 'part' | 'user' | 'timeline_event' | 'status';
+  type: 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'status';
   title: string;
   description: string;
   metadata: any;
@@ -17,6 +17,11 @@ interface SearchResult {
   };
   image_url?: string;
   created_at: string;
+  related_entities?: {
+    vehicles?: any[];
+    organizations?: any[];
+    users?: any[];
+  };
 }
 
 interface SearchResultsProps {
@@ -28,7 +33,7 @@ interface SearchResultsProps {
 const SearchResults = ({ results, searchSummary, loading = false }: SearchResultsProps) => {
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'map'>('cards');
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location'>('relevance');
-  const [filterBy, setFilterBy] = useState<'all' | 'vehicle' | 'shop' | 'part' | 'timeline_event'>('all');
+  const [filterBy, setFilterBy] = useState<'all' | 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference'>('all');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -42,12 +47,17 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'vehicle': return '🚗';
-      case 'shop': return '🏪';
-      case 'part': return '🔧';
-      case 'timeline_event': return '📅';
-      case 'user': return '👤';
-      default: return '📄';
+      case 'vehicle': return 'V';
+      case 'organization': return 'O';
+      case 'shop': return 'S';
+      case 'part': return 'P';
+      case 'timeline_event': return 'E';
+      case 'user': return 'U';
+      case 'image': return 'IMG';
+      case 'document': return 'DOC';
+      case 'auction': return 'A';
+      case 'reference': return 'REF';
+      default: return '';
     }
   };
 
@@ -87,12 +97,13 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: '60px',
+        padding: '24px',
         flexDirection: 'column',
-        gap: '16px'
+        gap: '8px',
+        fontSize: '8pt'
       }}>
-        <div className="spinner" style={{ width: '40px', height: '40px' }}></div>
-        <p className="text text-muted">Searching across all content...</p>
+        <div className="spinner" style={{ width: '20px', height: '20px' }}></div>
+        <p className="text text-muted">Searching...</p>
       </div>
     );
   }
@@ -101,14 +112,14 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
     <div className="search-results">
       {/* Search Summary */}
       <div style={{
-        background: '#f8fafc',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        padding: '16px',
-        marginBottom: '20px'
+        background: 'var(--grey-50)',
+        border: '1px solid var(--border)',
+        borderRadius: '0px',
+        padding: '8px 12px',
+        marginBottom: '12px',
+        fontSize: '8pt'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '18px' }}>🔍</span>
           <h3 className="heading-3" style={{ margin: 0 }}>Search Results</h3>
         </div>
         <p className="text" style={{ margin: '0 0 12px 0', color: '#374151' }}>
@@ -122,7 +133,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
           flexWrap: 'wrap',
           alignItems: 'center'
         }}>
-          {['vehicle', 'shop', 'part', 'timeline_event'].map(type => {
+          {['vehicle', 'organization', 'shop', 'part', 'user', 'timeline_event', 'image', 'document', 'auction', 'reference'].map(type => {
             const count = results.filter(r => r.type === type).length;
             if (count === 0) return null;
 
@@ -133,10 +144,12 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
-                  background: 'white',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: '12px'
+                  background: 'var(--white)',
+                  border: '1px solid var(--border)',
+                  padding: '2px 6px',
+                  borderRadius: '0px',
+                  fontSize: '8pt',
+                  fontFamily: '"MS Sans Serif", sans-serif'
                 }}
               >
                 <span>{getTypeIcon(type)}</span>
@@ -153,52 +166,60 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '20px',
+        marginBottom: '12px',
         flexWrap: 'wrap',
-        gap: '12px'
+        gap: '8px',
+        fontSize: '8pt'
       }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span className="text text-bold" style={{ fontSize: '12px' }}>View:</span>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <span className="text text-bold" style={{ fontSize: '8pt' }}>View:</span>
           {(['cards', 'list'] as const).map(mode => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className={`button ${viewMode === mode ? 'button-primary' : 'button-secondary'}`}
+              className="button-win95"
               style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                textTransform: 'capitalize'
+                padding: '2px 6px',
+                fontSize: '8pt',
+                textTransform: 'capitalize',
+                height: '20px'
               }}
             >
-              {mode === 'cards' ? '🃏' : '📋'} {mode}
+              {mode}
             </button>
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <span className="text text-bold" style={{ fontSize: '12px' }}>Filter:</span>
+            <span className="text text-bold" style={{ fontSize: '8pt' }}>Filter:</span>
             <select
               value={filterBy}
               onChange={(e) => setFilterBy(e.target.value as any)}
               className="input"
-              style={{ fontSize: '12px', padding: '4px 8px' }}
+              style={{ fontSize: '8pt', padding: '2px 4px', height: '20px' }}
             >
               <option value="all">All Types</option>
               <option value="vehicle">Vehicles</option>
+              <option value="organization">Organizations</option>
               <option value="shop">Shops</option>
+              <option value="user">Users</option>
               <option value="part">Parts/Tools</option>
               <option value="timeline_event">Events</option>
+              <option value="image">Images</option>
+              <option value="document">Documents</option>
+              <option value="auction">Auctions</option>
+              <option value="reference">References</option>
             </select>
           </div>
 
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <span className="text text-bold" style={{ fontSize: '12px' }}>Sort:</span>
+            <span className="text text-bold" style={{ fontSize: '8pt' }}>Sort:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
               className="input"
-              style={{ fontSize: '12px', padding: '4px 8px' }}
+              style={{ fontSize: '8pt', padding: '2px 4px', height: '20px' }}
             >
               <option value="relevance">Relevance</option>
               <option value="date">Date</option>
@@ -212,14 +233,14 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
       {filteredAndSortedResults.length === 0 ? (
         <div style={{
           textAlign: 'center',
-          padding: '60px',
-          background: '#f8fafc',
-          borderRadius: '12px',
-          border: '2px dashed #d1d5db'
+          padding: '24px',
+          background: 'var(--grey-50)',
+          border: '1px solid var(--border)',
+          borderRadius: '0px',
+          fontSize: '8pt'
         }}>
-          <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🔍</span>
-          <h3 className="heading-3">No Results Found</h3>
-          <p className="text text-muted">
+          <h3 className="heading-3" style={{ fontSize: '9pt', marginBottom: '8px' }}>No Results Found</h3>
+          <p className="text text-muted" style={{ fontSize: '8pt' }}>
             Try adjusting your search terms or filters
           </p>
         </div>

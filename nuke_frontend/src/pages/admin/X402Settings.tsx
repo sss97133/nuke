@@ -455,3 +455,4 @@ Or use Supabase CLI:
 
 export default X402Settings;
 
+

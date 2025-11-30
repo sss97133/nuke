@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 
 const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -73,11 +72,7 @@ const ResetPassword: React.FC = () => {
   };
 
   return (
-    <AppLayout
-      title="Reset Password"
-      showBackButton={false}
-    >
-      <div className="container" style={{ maxWidth: '400px', margin: '0 auto', paddingTop: '40px' }}>
+    <div className="container" style={{ maxWidth: '400px', margin: '0 auto', paddingTop: '40px' }}>
         <div className="card">
           <div className="card-header">Set New Password</div>
           <div className="card-body">
@@ -144,7 +139,6 @@ const ResetPassword: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
   );
 };
 

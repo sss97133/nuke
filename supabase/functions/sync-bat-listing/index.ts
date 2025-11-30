@@ -40,13 +40,39 @@ serve(async (req) => {
     const response = await fetch(listing.listing_url);
     const html = await response.text();
 
-    // Extract current bid
-    const bidMatch = html.match(/(?:Current Bid|Bid to|High Bid).*?USD \$([\\d,]+)/);
-    const currentBid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, '')) : listing.current_bid;
+    // Extract current bid - multiple patterns to handle different HTML structures
+    let currentBid = listing.current_bid;
+    const bidPatterns = [
+      /Current Bid[^>]*>.*?USD\s*\$?([\d,]+)/i,
+      /<strong[^>]*class="info-value"[^>]*>USD\s*\$?([\d,]+)<\/strong>/i,
+      /Current Bid[^>]*>.*?\$([\d,]+)/i,
+      /"price":\s*(\d+)/i,  // JSON-LD schema
+      /data-listing-currently[^>]*>.*?\$([\d,]+)/i
+    ];
+    
+    for (const pattern of bidPatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        currentBid = parseInt(match[1].replace(/,/g, ''));
+        break;
+      }
+    }
 
-    // Extract bid count
-    const bidCountMatch = html.match(/(\d+)\s+Bids?/i);
-    const bidCount = bidCountMatch ? parseInt(bidCountMatch[1]) : listing.bid_count;
+    // Extract bid count - multiple patterns
+    let bidCount = listing.bid_count;
+    const bidCountPatterns = [
+      /(\d+)\s+bids?/i,
+      /number-bids-value[^>]*>(\d+)/i,
+      /"bidCount":\s*(\d+)/i
+    ];
+    
+    for (const pattern of bidCountPatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        bidCount = parseInt(match[1]);
+        break;
+      }
+    }
 
     // Extract watcher count
     const watcherMatch = html.match(/(\d+)\s+watchers?/i);
@@ -83,8 +109,35 @@ serve(async (req) => {
 
     if (updateError) throw updateError;
 
-    // If bid increased significantly, create notification event
+    // If bid increased significantly, create timeline event and notification
     if (listing.current_bid && currentBid && currentBid > listing.current_bid) {
+      const bidIncrease = currentBid - listing.current_bid;
+      // Create timeline event for significant bid increases (every $5k or milestone)
+      const isMilestone = bidIncrease >= 5000 || (currentBid % 10000) < bidIncrease;
+      
+      if (isMilestone && listing.vehicle_id) {
+        try {
+          await supabase.rpc('create_auction_timeline_event', {
+            p_vehicle_id: listing.vehicle_id,
+            p_event_type: 'auction_bid_placed',
+            p_listing_id: listing.id,
+            p_metadata: {
+              bid_amount: currentBid,
+              bid_count: bidCount,
+              previous_bid: listing.current_bid,
+              increase: bidIncrease,
+              watcher_count: watcherCount,
+              view_count: viewCount
+            }
+          });
+          console.log(`Created timeline event for bid increase: $${bidIncrease}`);
+        } catch (error) {
+          console.error('Failed to create timeline event:', error);
+          // Don't fail the sync if timeline event creation fails
+        }
+      }
+      
+      // Create notification event
       await supabase
         .from('notification_events')
         .insert({
@@ -95,7 +148,7 @@ serve(async (req) => {
             platform: 'bat',
             old_bid: listing.current_bid,
             new_bid: currentBid,
-            bid_increase: currentBid - listing.current_bid,
+            bid_increase: bidIncrease,
             listing_url: listing.listing_url
           }
         });

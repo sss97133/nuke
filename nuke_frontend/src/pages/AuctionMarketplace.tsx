@@ -78,7 +78,8 @@ export default function AuctionMarketplace() {
         )
       `)
       .eq('status', 'active')
-      .in('sale_type', ['auction', 'live_auction']);
+      .in('sale_type', ['auction', 'live_auction'])
+      .gt('auction_end_time', new Date().toISOString()); // Only show auctions that haven't ended
 
     // Apply filters
     if (filter === 'ending_soon') {
@@ -114,8 +115,15 @@ export default function AuctionMarketplace() {
 
     if (error) {
       console.error('Error loading listings:', error);
+      setListings([]);
     } else {
-      setListings(data || []);
+      // Filter out any listings with null auction_end_time or past end times (safety check)
+      const validListings = (data || []).filter(listing => {
+        if (!listing.auction_end_time) return false;
+        return new Date(listing.auction_end_time) > new Date();
+      });
+      setListings(validListings);
+      console.log(`Loaded ${validListings.length} active auction listings`);
     }
 
     setLoading(false);

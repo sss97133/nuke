@@ -239,16 +239,18 @@ async function scrapeVivaListings() {
               }
             }
             
-            // Auction end date / Sale date - improved patterns
-            const endDatePatterns = [
-              /Auction\s+ended\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
-              /sold\s+for[^0-9]*on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
-              /([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*\(Lot/i,
-              /Sold\s+on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
-              /Auction\s+Date[:\s]*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
-              /Ended\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
-              /Closed\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i
-            ];
+            // Auction end date / Sale date - improved patterns (reuse existing patterns if already defined)
+            if (!endDatePatterns || endDatePatterns.length === 0) {
+              const endDatePatterns = [
+                /Auction\s+ended\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+                /sold\s+for[^0-9]*on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+                /([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*\(Lot/i,
+                /Sold\s+on\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+                /Auction\s+Date[:\s]*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+                /Ended\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i,
+                /Closed\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i
+              ];
+            }
             
             for (const pattern of endDatePatterns) {
               const match = bodyText.match(pattern);

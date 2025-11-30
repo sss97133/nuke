@@ -1,0 +1,44 @@
+name: Process All Images
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    # Run every hour
+    - cron: '0 * * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/process-all-3000-images.js'
+
+jobs:
+  process-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 2 hour timeout
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Process all images
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          node scripts/process-all-3000-images.js
+
+      - name: Report results
+        if: always()
+        run: |
+          echo "## Image Processing Results" >> $GITHUB_STEP_SUMMARY
+          echo "Check logs above for details" >> $GITHUB_STEP_SUMMARY
+

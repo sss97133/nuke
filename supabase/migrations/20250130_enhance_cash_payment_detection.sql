@@ -179,3 +179,4 @@ CREATE TRIGGER trg_mark_owner_operator
 COMMENT ON FUNCTION mark_owner_operator_work IS 'Automatically marks timeline events as owner operator work when user owns the vehicle or organization';
 
 
+

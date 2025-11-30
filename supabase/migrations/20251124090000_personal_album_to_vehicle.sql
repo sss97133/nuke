@@ -19,30 +19,39 @@ DECLARE
   v_user_id UUID;
   v_new_vehicle_id UUID;
   v_image_ids UUID[];
+  v_current_user_id UUID;
 BEGIN
+  -- Get current user ID
+  v_current_user_id := auth.uid();
+  
+  IF v_current_user_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+
   -- Verify album exists, is personal, and belongs to current user
   SELECT user_id INTO v_user_id
   FROM image_sets
   WHERE id = p_image_set_id
     AND is_personal = true
     AND vehicle_id IS NULL
-    AND user_id = auth.uid();
+    AND user_id = v_current_user_id;
 
   IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Album not found or permission denied';
+    RAISE EXCEPTION 'Album not found or permission denied. Album ID: %, User ID: %', p_image_set_id, v_current_user_id;
   END IF;
 
   -- Create vehicle profile
+  -- user_id is a GENERATED column (always = uploaded_by), so we set uploaded_by instead
   INSERT INTO vehicles (
-    user_id,
+    uploaded_by,
     year,
     make,
     model,
     trim,
     vin,
     is_draft,
-    is_private,
-    created_by
+    status,
+    is_public
   )
   VALUES (
     v_user_id,
@@ -52,8 +61,8 @@ BEGIN
     p_trim,
     p_vin,
     false,
-    true,
-    v_user_id
+    'active',
+    false
   )
   RETURNING id INTO v_new_vehicle_id;
 
@@ -71,7 +80,7 @@ BEGIN
       organized_at = NOW(),
       updated_at = NOW()
     WHERE id = ANY(v_image_ids)
-      AND (user_id = v_user_id OR user_id = auth.uid());
+      AND user_id = v_user_id;
   END IF;
 
   -- Flip album from personal to vehicle-linked set
@@ -84,7 +93,16 @@ BEGIN
 
   RETURN v_new_vehicle_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+SET row_security = off;
+
+-- Grant execute to authenticated users
+GRANT EXECUTE ON FUNCTION public.convert_personal_album_to_vehicle(UUID, INTEGER, TEXT, TEXT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.convert_personal_album_to_vehicle(UUID, INTEGER, TEXT, TEXT, TEXT, TEXT) TO anon;
+
+COMMENT ON FUNCTION public.convert_personal_album_to_vehicle IS 
+'Converts a personal image_set album into a full vehicle profile. Creates vehicle, links all album images, and updates the album to be vehicle-linked.';
 
 COMMIT;
 

@@ -5,6 +5,7 @@ import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import { ProfileBalancePill } from './ProfileBalancePill';
 import { UploadStatusBar } from './UploadStatusBar';
 import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
+import { AppLayoutProvider, usePreventDoubleLayout } from './AppLayoutContext';
 import '../../design-system.css';
 
 interface AppLayoutProps {
@@ -22,13 +23,15 @@ interface AppLayoutProps {
   }>;
 }
 
-const AppLayout: React.FC<AppLayoutProps> = ({
+const AppLayoutInner: React.FC<AppLayoutProps> = ({
   children,
   title,
   showBackButton = false,
   primaryAction,
   breadcrumbs
 }) => {
+  // Prevent double wrapping - this will throw in development if AppLayout is nested
+  usePreventDoubleLayout();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -246,6 +249,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         </div>
       </footer>
     </div>
+  );
+};
+
+/**
+ * AppLayout Component
+ * 
+ * ⚠️ IMPORTANT: AppLayout is already provided at the route level in App.tsx.
+ * Pages should NOT import and wrap themselves in AppLayout - this will cause double headers/footers.
+ * 
+ * If you see this error, remove the AppLayout wrapper from your page component.
+ */
+const AppLayout: React.FC<AppLayoutProps> = (props) => {
+  return (
+    <AppLayoutProvider>
+      <AppLayoutInner {...props} />
+    </AppLayoutProvider>
   );
 };
 

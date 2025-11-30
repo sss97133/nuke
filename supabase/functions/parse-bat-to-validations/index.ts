@@ -75,17 +75,64 @@ serve(async (req) => {
     const lotMatch = html.match(/Lot.*?#(\d+)/);
     const lotNumber = lotMatch ? lotMatch[1] : '';
 
-    // Extract images
-    const imageMatches = html.matchAll(/https:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*/gi);
+    // Extract images - improved extraction with multiple methods
     const images: string[] = [];
-    for (const match of imageMatches) {
-      const url = match[0];
-      if (url.includes('bringatrailer.com') && 
-          !url.includes('logo') && 
-          !url.includes('icon') &&
-          !url.includes('/wp-content/themes/') &&
-          images.length < 50) {  // Limit to 50 images
-        images.push(url);
+    
+    // Method 1: Extract from data-gallery-items JSON (best method)
+    const galleryMatch = html.match(/data-gallery-items=["']([^"']+)["']/i);
+    if (galleryMatch) {
+      try {
+        const galleryJson = JSON.parse(galleryMatch[1].replace(/&quot;/g, '"'));
+        if (Array.isArray(galleryJson)) {
+          for (const item of galleryJson) {
+            const url = item?.large?.url || item?.small?.url || item?.url;
+            if (url && url.includes('bringatrailer.com') && !images.includes(url)) {
+              // Remove query params and size constraints for full-res
+              const cleanUrl = url.split('?')[0];
+              images.push(cleanUrl);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse gallery JSON:', e);
+      }
+    }
+    
+    // Method 2: Extract from img tags with better filtering
+    if (images.length === 0) {
+      const imgTagPattern = /<img[^>]+(?:src|data-src|data-lazy-src)=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
+      let match;
+      while ((match = imgTagPattern.exec(html)) !== null && images.length < 50) {
+        const url = match[1];
+        // Filter for actual vehicle images
+        if (url.includes('wp-content/uploads') && 
+            url.includes('bringatrailer.com') && 
+            !url.includes('logo') && 
+            !url.includes('icon') &&
+            !url.includes('avatar') &&
+            !url.includes('gravatar') &&
+            !url.match(/-(\d+)x\d+\./) && // Skip thumbnails like -150x150
+            !images.includes(url)) {
+          // Remove query params for full resolution
+          const cleanUrl = url.split('?')[0];
+          images.push(cleanUrl);
+        }
+      }
+    }
+    
+    // Method 3: Fallback - simple pattern matching
+    if (images.length === 0) {
+      const fallbackPattern = /https:\/\/[^"']*bringatrailer\.com[^"']*wp-content[^"']*uploads[^"']*\.(?:jpg|jpeg|png|webp)/gi;
+      let match;
+      while ((match = fallbackPattern.exec(html)) !== null && images.length < 50) {
+        const url = match[0];
+        if (!url.includes('logo') && 
+            !url.includes('icon') &&
+            !url.includes('avatar') &&
+            !images.includes(url)) {
+          const cleanUrl = url.split('?')[0];
+          images.push(cleanUrl);
+        }
       }
     }
 
@@ -260,12 +307,52 @@ serve(async (req) => {
       console.error('Error inserting validations:', validationError);
     }
 
-    // Download and save images from BaT
+    // Download and save images from BaT with proper ghost user attribution
     let savedImages = 0;
+    
+    // Create/get ghost user for BaT photographer (unknown photographer)
+    const photographerFingerprint = `BaT-Photographer-${batUrl}`;
+    let ghostUserId: string | null = null;
+    
+    // Check if ghost user exists
+    const { data: existingGhost } = await supabase
+      .from('ghost_users')
+      .select('id')
+      .eq('device_fingerprint', photographerFingerprint)
+      .maybeSingle();
+    
+    if (existingGhost?.id) {
+      ghostUserId = existingGhost.id;
+    } else {
+      // Create new ghost user for BaT photographer
+      const { data: newGhost, error: ghostError } = await supabase
+        .from('ghost_users')
+        .insert({
+          device_fingerprint: photographerFingerprint,
+          camera_make: 'Unknown',
+          camera_model: 'BaT Listing',
+          display_name: `BaT Photographer (Lot #${lotNumber})`,
+          total_contributions: 0
+        })
+        .select('id')
+        .single();
+      
+      if (!ghostError && newGhost?.id) {
+        ghostUserId = newGhost.id;
+      }
+    }
+    
+    const takenAt = salePrice ? (new Date().toISOString()) : null; // Use sale date if available
+    
     for (const imageUrl of images.slice(0, 20)) {  // Limit to 20 best images
       try {
         // Download image
         const imgResponse = await fetch(imageUrl);
+        if (!imgResponse.ok) {
+          console.error(`Failed to download image: ${imgResponse.statusText}`);
+          continue;
+        }
+        
         const imgBlob = await imgResponse.arrayBuffer();
         
         // Generate filename
@@ -290,28 +377,47 @@ serve(async (req) => {
           .from('vehicle-images')
           .getPublicUrl(storagePath);
 
-        // Create vehicle_images entry
-        // user_id = NULL (photographer unknown, awaiting claim)
-        // source = 'bat_listing'
-        const { error: imageError } = await supabase
+        // Create vehicle_images entry with ghost user as photographer
+        // Use ghost user (photographer), fallback to userId if ghost creation failed
+        const { data: imageData, error: imageError } = await supabase
           .from('vehicle_images')
           .insert({
             vehicle_id: vehicleId,
             image_url: publicUrl,
-            user_id: null,  // Unknown photographer - can be claimed later
+            user_id: ghostUserId || userId, // Photographer (ghost user), fallback to importer
             source: 'bat_listing',
             category: 'exterior',
-            imported_by: userId,
-            metadata: {
-              original_bat_url: imageUrl,
-              bat_lot_number: lotNumber,
+            taken_at: takenAt,
+            exif_data: {
+              source_url: imageUrl,
               bat_listing_url: batUrl,
-              photographer_unknown: true,
-              claimable: true
+              bat_lot_number: lotNumber,
+              imported_by_user_id: userId,
+              imported_at: new Date().toISOString(),
+              attribution_note: 'Photographer unknown - images from BaT listing. Original photographer can claim with proof.',
+              claimable: true,
+              device_fingerprint: photographerFingerprint
             }
-          });
+          })
+          .select('id')
+          .single();
 
-        if (!imageError) {
+        if (!imageError && imageData?.id && ghostUserId) {
+          // Create device attribution linking image to ghost user
+          await supabase
+            .from('device_attributions')
+            .insert({
+              image_id: imageData.id,
+              device_fingerprint: photographerFingerprint,
+              ghost_user_id: ghostUserId,
+              uploaded_by_user_id: userId, // Who ran the import
+              attribution_source: 'bat_listing_unknown_photographer',
+              confidence_score: 50 // Low confidence - we don't know who took it
+            });
+          
+          savedImages++;
+        } else if (!imageError && imageData) {
+          // Image inserted but ghost user attribution failed - still count as success
           savedImages++;
         }
       } catch (imgError) {

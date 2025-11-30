@@ -1,0 +1,52 @@
+# Automated BAT Scraping via GitHub Actions
+# Runs every 6 hours, can also be triggered manually
+# Runs on GitHub's servers (free, no local resources used)
+
+name: BAT Scrape
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours (12 AM, 6 AM, 12 PM, 6 PM UTC)
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Trigger BAT Scrape
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "🔍 Starting BAT scrape for VivaLasVegasAutos..."
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "${SUPABASE_URL}/functions/v1/monitor-bat-seller" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"sellerUsername":"VivaLasVegasAutos","organizationId":"c433d27e-2159-4f8c-b4ae-32a5e44a77cf"}')
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 202 ]; then
+            echo "✅ Scrape triggered successfully (HTTP $HTTP_CODE)"
+            echo "Response: $BODY"
+          else
+            echo "❌ Scrape failed (HTTP $HTTP_CODE)"
+            echo "Response: $BODY"
+            exit 1
+          fi
+      
+      - name: Check Results
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "📊 Checking recent scrape results..."
+          # Optional: Query Supabase to verify results
+          # This could check bat_scrape_jobs table or similar
+

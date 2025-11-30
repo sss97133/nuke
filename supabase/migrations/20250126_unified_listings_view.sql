@@ -97,3 +97,4 @@ COMMENT ON MATERIALIZED VIEW unified_listings_view IS 'Unified view of all listi
 COMMENT ON FUNCTION refresh_unified_listings_view IS 'Refresh the unified listings materialized view';
 
 
+
