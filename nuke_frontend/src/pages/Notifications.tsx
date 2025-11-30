@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 import '../design-system.css';
 
 interface NotifRow {
@@ -83,8 +82,7 @@ const Notifications: React.FC = () => {
   };
 
   return (
-    <AppLayout title="Notifications">
-      <div className="container compact">
+    <div className="container compact">
         <div className="main">
           <div className="card">
             <div className="card-body">
@@ -114,7 +112,6 @@ const Notifications: React.FC = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
   );
 };
 

@@ -8,11 +8,11 @@ import ErrorBoundary from './components/util/ErrorBoundary'
 console.log('[main] starting application bootstrap');
 
 createRoot(document.getElementById('root')!).render(
-  // StrictMode disabled to prevent double-rendering in development
-  // Re-enable if needed for catching side effects
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
+  <StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </StrictMode>,
 )
 
 console.log('[main] React root render invoked');

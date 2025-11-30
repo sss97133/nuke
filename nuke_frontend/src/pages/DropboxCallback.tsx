@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 import '../design-system.css';
 
 const DropboxCallback: React.FC = () => {
@@ -81,16 +80,7 @@ const DropboxCallback: React.FC = () => {
   }, [navigate]);
 
   return (
-    <AppLayout
-      title="Connecting to Dropbox"
-      showBackButton={true}
-      breadcrumbs={[
-        { label: "Dashboard", path: "/dashboard" },
-        { label: "Import from Dropbox", path: "/dropbox-import" },
-        { label: "Connecting..." }
-      ]}
-    >
-      <div className="fade-in">
+    <div className="fade-in">
         <section className="section">
           <div className="card">
             <div className="card-body text-center">
@@ -142,7 +132,6 @@ const DropboxCallback: React.FC = () => {
           </div>
         </section>
       </div>
-    </AppLayout>
   );
 };
 

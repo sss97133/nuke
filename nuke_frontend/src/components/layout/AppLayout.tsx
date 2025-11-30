@@ -30,10 +30,10 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   primaryAction,
   breadcrumbs
 }) => {
-  // Prevent double wrapping - this will throw in development if AppLayout is nested
+  // Prevent double wrapping - returns null if already inside AppLayout to prevent duplicate rendering
   const isAlreadyWrapped = usePreventDoubleLayout();
   
-  // If already wrapped, don't render anything (prevent duplicate)
+  // If already wrapped, return null to prevent duplicate headers/footers (works in production too)
   if (isAlreadyWrapped) {
     console.error('🚨 AppLayout double-wrap prevented - returning null to avoid duplicate headers/footers');
     return null;

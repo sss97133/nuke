@@ -21,7 +21,8 @@ export const useAppLayoutContext = () => useContext(AppLayoutContext);
 /**
  * Hook to check if we're already inside an AppLayout
  * Returns true if already wrapped, false otherwise
- * Logs error/warning but doesn't throw to prevent breaking the app
+ * 
+ * CRITICAL: If already wrapped, this prevents duplicate headers/footers in production
  */
 export const usePreventDoubleLayout = () => {
   const { isInsideAppLayout } = useAppLayoutContext();
@@ -40,7 +41,7 @@ export const usePreventDoubleLayout = () => {
       '  return <div>Content</div>;';
     
     console.error('⚠️', errorMsg);
-    // Don't throw - instead return true so the component can handle it
+    // Return true so AppLayoutInner can return null and prevent duplicate rendering
   }
   
   return isInsideAppLayout;

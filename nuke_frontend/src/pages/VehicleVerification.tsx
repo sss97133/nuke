@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 import VerificationBadges from '../components/VerificationBadges';
 import type { VerificationSystem } from '../services/verificationSystem';
 import type { VerificationRecord, VehicleVerificationStatus } from '../services/verificationSystem';
@@ -173,32 +172,28 @@ const VehicleVerification: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout title="Loading Vehicle...">
-        <div className="section">
-          <div className="loading-spinner"></div>
-        </div>
-      </AppLayout>
+      <div className="section">
+        <div className="loading-spinner"></div>
+      </div>
     );
   }
 
   if (!vehicle) {
     return (
-      <AppLayout title="Vehicle Not Found">
-        <div className="section">
-          <div className="card">
-            <div className="card-body text-center">
-              <h2 className="text font-bold mb-2">Vehicle Not Found</h2>
-              <p className="text-muted mb-4">The requested vehicle could not be found.</p>
-              <button 
-                className="button button-primary"
-                onClick={() => navigate('/vehicles')}
-              >
-                Back to Vehicles
-              </button>
-            </div>
+      <div className="section">
+        <div className="card">
+          <div className="card-body text-center">
+            <h2 className="text font-bold mb-2">Vehicle Not Found</h2>
+            <p className="text-muted mb-4">The requested vehicle could not be found.</p>
+            <button 
+              className="button button-primary"
+              onClick={() => navigate('/vehicles')}
+            >
+              Back to Vehicles
+            </button>
           </div>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
@@ -218,16 +213,7 @@ const VehicleVerification: React.FC = () => {
     null;
 
   return (
-    <AppLayout
-      title="Vehicle Verification"
-      showBackButton={true}
-      breadcrumbs={[
-        { label: "Vehicles", path: "/vehicles" },
-        { label: `${vehicle.year} ${vehicle.make} ${vehicle.model}`, path: `/vehicles/${vehicle.id}` },
-        { label: "Verification" }
-      ]}
-    >
-      <div className="fade-in">
+    <div className="fade-in">
         {/* Vehicle Summary */}
         <section className="section">
           <div className="card">
@@ -417,7 +403,6 @@ const VehicleVerification: React.FC = () => {
           </section>
         )}
       </div>
-    </AppLayout>
   );
 };
 

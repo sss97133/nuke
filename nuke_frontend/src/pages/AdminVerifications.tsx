@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AppLayout from '../components/layout/AppLayout';
 import { supabase } from '../lib/supabase';
 import { secureDocumentService, type SecureDocument, type PIIAuditLog } from '../services/secureDocumentService';
 
@@ -315,8 +314,7 @@ const AdminVerifications: React.FC = () => {
   };
 
   return (
-    <AppLayout title="Admin Verifications">
-      <div className="container">
+    <div className="container">
         <div className="main">
           <div className="card">
             <div className="card-body">
@@ -490,7 +488,6 @@ const AdminVerifications: React.FC = () => {
         </div>
       </div>
     </div>
-    </AppLayout>
   );
 };
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import AppLayout from '../components/layout/AppLayout';
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import { FeedService, type FeedItem } from '../services/feedService';
 import '../design-system.css';
@@ -141,20 +140,17 @@ const LiveFeed: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout title="Loading...">
-        <div className="section">
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="text text-muted">Loading your feed...</div>
-            </div>
+      <div className="section">
+        <div className="card">
+          <div className="card-body text-center">
+            <div className="text text-muted">Loading your feed...</div>
           </div>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
   return (
-    <AppLayout title="Nuke Live Feed">
       <div className="fade-in">
         {/* Discovery Welcome for Non-Authenticated Users */}
         {!session && (
@@ -343,7 +339,6 @@ const LiveFeed: React.FC = () => {
           )}
         </section>
       </div>
-    </AppLayout>
   );
 };
 
