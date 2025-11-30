@@ -1,10 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { advancedSearchService } from '../../services/advancedSearchService';
+import { fullTextSearchService } from '../../services/fullTextSearchService';
 import '../../design-system.css';
 
 interface SearchResult {
   id: string;
-  type: 'vehicle' | 'shop' | 'part' | 'user' | 'timeline_event' | 'status';
+  type: 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'status';
   title: string;
   description: string;
   metadata: any;
@@ -16,6 +18,11 @@ interface SearchResult {
   };
   image_url?: string;
   created_at: string;
+  related_entities?: {
+    vehicles?: any[];
+    organizations?: any[];
+    users?: any[];
+  };
 }
 
 interface SearchResponse {
@@ -45,6 +52,8 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [hasInitialSearched, setHasInitialSearched] = useState(false);
+  const lastSearchedRef = useRef<string>('');
 
   // Common search patterns and their translations
   const searchPatterns = [
@@ -141,28 +150,19 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         parts_available: 0
       };
 
-      // Multi-table search strategy
-      const searches = [];
-
-      // 1. Vehicle search
-      if (analysis.vehicle_specific || analysis.marketplace_query || !analysis.shop_query) {
-        searches.push(searchVehicles(searchQuery, analysis));
-      }
-
-      // 2. Timeline events (for build status)
-      if (analysis.build_status_query || analysis.vehicle_specific) {
-        searches.push(searchTimelineEvents(searchQuery, analysis));
-      }
-
-      // 3. Parts/Tools search
-      if (analysis.parts_query) {
-        searches.push(searchParts(searchQuery, analysis));
-      }
-
-      // 4. Shop search
-      if (analysis.shop_query || analysis.location_requested) {
-        searches.push(searchShops(searchQuery, analysis));
-      }
+      // Comprehensive multi-table search - search everything
+      const searches = [
+        searchVehicles(searchQuery, analysis),
+        searchOrganizations(searchQuery, analysis),
+        searchUsers(searchQuery, analysis),
+        searchTimelineEvents(searchQuery, analysis),
+        searchImages(searchQuery, analysis),
+        searchDocuments(searchQuery, analysis),
+        searchAuctions(searchQuery, analysis),
+        searchParts(searchQuery, analysis),
+        searchShops(searchQuery, analysis),
+        searchReferences(searchQuery, analysis)
+      ];
 
       // Execute all searches in parallel
       const searchResults = await Promise.all(searches);
@@ -174,10 +174,34 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         }
       });
 
+      // Re-rank all results using advanced search service
+      if (results.length > 0) {
+        const searchDocs = results.map(result => ({
+          id: result.id,
+          type: result.type,
+          title: result.title,
+          description: result.description,
+          content: `${result.title} ${result.description} ${JSON.stringify(result.metadata || {})}`,
+          fields: result.metadata || {},
+          created_at: result.created_at
+        }));
+
+        const reranked = advancedSearchService.rankDocuments(searchQuery, searchDocs);
+        
+        // Merge reranked scores with original results
+        const scoreMap = new Map(reranked.map(r => [r.id, r.relevance_score]));
+        results.forEach(result => {
+          const newScore = scoreMap.get(result.id);
+          if (newScore !== undefined) {
+            result.relevance_score = newScore;
+          }
+        });
+      }
+
       // Sort by relevance and recency
       results.sort((a, b) => {
         const relevanceDiff = b.relevance_score - a.relevance_score;
-        if (Math.abs(relevanceDiff) < 0.1) {
+        if (Math.abs(relevanceDiff) < 0.05) {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         }
         return relevanceDiff;
@@ -216,152 +240,600 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     }
   }, [userLocation, onSearchResults]);
 
+  // Update query when initialQuery changes
+  useEffect(() => {
+    if (initialQuery !== query) {
+      setQuery(initialQuery);
+    }
+  }, [initialQuery, query]);
+
+  // Auto-trigger search when initialQuery is provided
+  useEffect(() => {
+    if (initialQuery && initialQuery.trim() && lastSearchedRef.current !== initialQuery) {
+      lastSearchedRef.current = initialQuery;
+      setHasInitialSearched(true);
+      setIsSearching(true);
+      // Use setTimeout to ensure executeSearch is defined
+      setTimeout(() => {
+        executeSearch(initialQuery);
+      }, 100);
+    }
+  }, [initialQuery, executeSearch]);
+
   const searchVehicles = async (query: string, analysis: any): Promise<SearchResult[]> => {
-    let vehicleQuery = supabase
-      .from('vehicles')
-      .select(`
-        id,
-        year,
-        make,
-        model,
-        color,
-        description,
-        created_at,
-        created_by,
-        metadata,
-        profiles(username, full_name),
-        vehicle_images(image_url)
-      `);
+    try {
+      const searchTerm = query.replace(/near me|for sale|buy/gi, '').trim();
+      
+      if (!searchTerm) {
+        return [];
+      }
 
-    // Apply filters based on analysis
-    if (analysis.vehicle_specific) {
-      vehicleQuery = vehicleQuery.ilike('model', `%${analysis.vehicle_specific}%`);
+      // Try hybrid full-text search (PostgreSQL + BM25)
+      let vehicles: any[] = [];
+      try {
+        vehicles = await fullTextSearchService.searchVehiclesHybrid(searchTerm, {
+          limit: 20
+        });
+      } catch (ftError) {
+        // Full-text search RPC might not exist, fall through to simple search
+        console.log('Full-text search unavailable, using simple search');
+      }
+
+      // If full-text search returned no results, use simple search
+      if (vehicles.length === 0) {
+        let vehicleQuery = supabase
+          .from('vehicles')
+          .select('id, year, make, model, color, description, created_at, uploaded_by')
+          .eq('is_public', true);
+
+        // Apply filters based on analysis
+        if (analysis.vehicle_specific) {
+          vehicleQuery = vehicleQuery.ilike('model', `%${analysis.vehicle_specific}%`);
+        }
+
+        // Check if search term is a number (year)
+        const yearMatch = searchTerm.match(/^\d{4}$/);
+        if (yearMatch) {
+          const year = parseInt(yearMatch[0]);
+          vehicleQuery = vehicleQuery.or(`year.eq.${year},make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+        } else {
+          // Text search across multiple fields
+          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+        }
+
+        const { data: simpleResults, error } = await vehicleQuery.limit(20);
+        
+        if (error) {
+          console.error('Simple search error:', error);
+          return [];
+        }
+
+        vehicles = (simpleResults || []).map((v: any) => ({
+          id: v.id,
+          year: v.year,
+          make: v.make,
+          model: v.model,
+          color: v.color,
+          description: v.description,
+          created_at: v.created_at,
+          relevance: 0.5
+        }));
+      }
+
+      // Fetch images separately
+      const vehicleIds = vehicles.map(v => v.id);
+      const { data: images } = vehicleIds.length > 0 ? await supabase
+        .from('vehicle_images')
+        .select('vehicle_id, image_url')
+        .in('vehicle_id', vehicleIds)
+        .limit(vehicleIds.length * 3) : { data: [] };
+
+      const imagesByVehicle = (images || []).reduce((acc: any, img: any) => {
+        if (!acc[img.vehicle_id]) acc[img.vehicle_id] = [];
+        acc[img.vehicle_id].push(img.image_url);
+        return acc;
+      }, {});
+
+      return vehicles.map(vehicle => ({
+        id: vehicle.id,
+        type: 'vehicle' as const,
+        title: `${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Unknown Vehicle',
+        description: vehicle.description || `${vehicle.color || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'No description',
+        metadata: {
+          year: vehicle.year,
+          make: vehicle.make,
+          model: vehicle.model,
+          color: vehicle.color
+        },
+        relevance_score: vehicle.relevance || 0.5,
+        image_url: imagesByVehicle[vehicle.id]?.[0],
+        created_at: vehicle.created_at
+      }));
+    } catch (error) {
+      console.error('Vehicle search exception:', error);
+      return [];
     }
-
-    // General text search
-    const searchTerm = query.replace(/near me|for sale|buy/gi, '').trim();
-    if (searchTerm) {
-      vehicleQuery = vehicleQuery.or(`
-        year::text.ilike.%${searchTerm}%,
-        make.ilike.%${searchTerm}%,
-        model.ilike.%${searchTerm}%,
-        description.ilike.%${searchTerm}%
-      `);
-    }
-
-    const { data: vehicles } = await vehicleQuery.limit(20);
-
-    return (vehicles || []).map(vehicle => ({
-      id: vehicle.id,
-      type: 'vehicle' as const,
-      title: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-      description: vehicle.description || `${vehicle.color} ${vehicle.make} ${vehicle.model}`,
-      metadata: {
-        ...vehicle.metadata,
-        year: vehicle.year,
-        make: vehicle.make,
-        model: vehicle.model,
-        color: vehicle.color,
-        owner: vehicle.profiles?.full_name || vehicle.profiles?.username
-      },
-      relevance_score: calculateVehicleRelevance(vehicle, query, analysis),
-      image_url: vehicle.vehicle_images?.[0]?.image_url,
-      created_at: vehicle.created_at
-    }));
   };
 
   const searchTimelineEvents = async (query: string, analysis: any): Promise<SearchResult[]> => {
-    let eventQuery = supabase
-      .from('vehicle_timeline_events')
-      .select(`
-        id,
-        title,
-        description,
-        event_type,
-        metadata,
-        created_at,
-        vehicles(year, make, model)
-      `);
+    try {
+      const searchTerm = query.replace(/near me|for sale|buy/gi, '').trim();
+      
+      if (!searchTerm) {
+        return [];
+      }
 
-    if (analysis.build_status_query) {
-      eventQuery = eventQuery.or(`
-        event_type.eq.build_update,
-        event_type.eq.progress_update,
-        event_type.eq.completion
-      `);
+      // Use full-text search
+      const events = await fullTextSearchService.searchTimelineEvents(searchTerm, { limit: 15 });
+
+      // Fetch vehicle info separately
+      const vehicleIds = [...new Set(events.map(e => e.vehicle_id).filter(Boolean))];
+      const { data: relatedVehicles } = vehicleIds.length > 0 ? await supabase
+        .from('vehicles')
+        .select('id, year, make, model')
+        .in('id', vehicleIds) : { data: [] };
+
+      const vehiclesMap = (relatedVehicles || []).reduce((acc: any, v: any) => {
+        acc[v.id] = v;
+        return acc;
+      }, {});
+
+      return events.map(event => ({
+        id: event.id,
+        type: 'timeline_event' as const,
+        title: event.title || `${event.event_type || 'Event'}`,
+        description: event.description || '',
+        metadata: {
+          event_type: event.event_type,
+          vehicle: event.vehicle_id ? vehiclesMap[event.vehicle_id] : null,
+          build_status: determineBuildStatus(event)
+        },
+        relevance_score: event.relevance || 0.5,
+        created_at: event.created_at
+      }));
+    } catch (error) {
+      console.error('Timeline events search exception:', error);
+      return [];
     }
-
-    const { data: events } = await eventQuery.limit(15);
-
-    return (events || []).map(event => ({
-      id: event.id,
-      type: 'timeline_event' as const,
-      title: event.title || `${event.event_type} Event`,
-      description: event.description || '',
-      metadata: {
-        ...event.metadata,
-        event_type: event.event_type,
-        vehicle: event.vehicles,
-        build_status: determineBuildStatus(event)
-      },
-      relevance_score: calculateEventRelevance(event, query, analysis),
-      created_at: event.created_at
-    }));
   };
 
   const searchParts = async (query: string, analysis: any): Promise<SearchResult[]> => {
-    // For now, search in vehicle descriptions and timeline events for parts/tools
-    const searchTerm = query.toLowerCase();
-    const { data: vehicles } = await supabase
-      .from('vehicles')
-      .select('*')
-      .or(`description.ilike.%${searchTerm}%,metadata->>'parts'.ilike.%${searchTerm}%`)
-      .limit(10);
+    try {
+      const searchTerm = query.toLowerCase().trim();
+      if (!searchTerm) {
+        return [];
+      }
 
-    return (vehicles || []).map(vehicle => ({
-      id: vehicle.id,
-      type: 'part' as const,
-      title: `Parts/Tools in ${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-      description: vehicle.description || '',
-      metadata: vehicle.metadata,
-      relevance_score: calculatePartsRelevance(vehicle, query),
-      created_at: vehicle.created_at
-    }));
+      // Search in vehicle descriptions for parts/tools
+      const { data: vehicles, error } = await supabase
+        .from('vehicles')
+        .select('id, year, make, model, description, created_at')
+        .eq('is_public', true)
+        .ilike('description', `%${searchTerm}%`)
+        .limit(10);
+
+      if (error) {
+        console.error('Parts search error:', error);
+        return [];
+      }
+
+      return (vehicles || []).map(vehicle => ({
+        id: vehicle.id,
+        type: 'part' as const,
+        title: `Parts/Tools in ${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle',
+        description: vehicle.description || '',
+        metadata: {
+          year: vehicle.year,
+          make: vehicle.make,
+          model: vehicle.model
+        },
+        relevance_score: calculatePartsRelevance(vehicle, query),
+        created_at: vehicle.created_at
+      }));
+    } catch (error) {
+      console.error('Parts search exception:', error);
+      return [];
+    }
   };
 
   const searchShops = async (query: string, analysis: any): Promise<SearchResult[]> => {
-    const { data: shops } = await supabase
-      .from('shops')
-      .select('*')
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%,services.ilike.%${query}%`)
-      .limit(10);
+    try {
+      const searchTerm = query.trim();
+      if (!searchTerm) {
+        return [];
+      }
 
-    return (shops || []).map(shop => ({
-      id: shop.id,
-      type: 'shop' as const,
-      title: shop.name,
-      description: shop.description || '',
-      metadata: shop,
-      relevance_score: 0.8,
-      location: shop.latitude && shop.longitude ? {
-        lat: shop.latitude,
-        lng: shop.longitude,
-        address: shop.address
-      } : undefined,
-      created_at: shop.created_at
-    }));
+      const { data: shops, error } = await supabase
+        .from('shops')
+        .select('id, name, description, location_city, location_state, created_at')
+        .eq('is_verified', true) // Only show verified shops
+        .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+        .limit(10);
+
+      if (error) {
+        console.error('Shops search error:', error);
+        return [];
+      }
+
+      return (shops || []).map(shop => ({
+        id: shop.id,
+        type: 'shop' as const,
+        title: shop.name || 'Unnamed Shop',
+        description: shop.description || '',
+        metadata: shop,
+        relevance_score: 0.8,
+        location: shop.location_city && shop.location_state ? {
+          lat: 0, // Shops table doesn't have lat/lng directly
+          lng: 0,
+          address: `${shop.location_city}, ${shop.location_state}`
+        } : undefined,
+        created_at: shop.created_at
+      }));
+    } catch (error) {
+      console.error('Shops search exception:', error);
+      return [];
+    }
+  };
+
+  const searchOrganizations = async (query: string, analysis: any): Promise<SearchResult[]> => {
+    try {
+      const searchTerm = query.trim();
+      if (!searchTerm) {
+        return [];
+      }
+
+      // Use full-text search
+      const orgs = await fullTextSearchService.searchBusinesses(searchTerm, { limit: 15 });
+
+      // Also search through related vehicles
+      const yearMatch = searchTerm.match(/^\d{4}$/);
+      let relatedVehiclesQuery = supabase
+        .from('vehicles')
+        .select('id, year, make, model')
+        .eq('is_public', true);
+      
+      if (yearMatch) {
+        const year = parseInt(yearMatch[0]);
+        relatedVehiclesQuery = relatedVehiclesQuery.or(`year.eq.${year},make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+      } else {
+        relatedVehiclesQuery = relatedVehiclesQuery.or(`make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+      }
+      
+      const { data: relatedVehicles } = await relatedVehiclesQuery.limit(5);
+
+      // Fetch full org details for location data
+      const orgIds = orgs.map(o => o.id);
+      const { data: orgDetails } = orgIds.length > 0 ? await supabase
+        .from('businesses')
+        .select('id, latitude, longitude, address, business_type, specializations, services_offered')
+        .in('id', orgIds) : { data: [] };
+
+      const orgDetailsMap = (orgDetails || []).reduce((acc: any, org: any) => {
+        acc[org.id] = org;
+        return acc;
+      }, {});
+
+      return orgs.map(org => {
+        const details = orgDetailsMap[org.id] || {};
+        return {
+          id: org.id,
+          type: 'organization' as const,
+          title: org.business_name || org.legal_name || 'Unnamed Organization',
+          description: org.description || `${details.business_type || ''} ${org.city ? `in ${org.city}, ${org.state || ''}` : ''}`.trim(),
+          metadata: {
+            business_name: org.business_name,
+            legal_name: org.legal_name,
+            business_type: details.business_type,
+            specializations: details.specializations,
+            services: details.services_offered
+          },
+          relevance_score: org.relevance || 0.85,
+          location: details.latitude && details.longitude ? {
+            lat: parseFloat(details.latitude),
+            lng: parseFloat(details.longitude),
+            address: `${details.address || ''}, ${org.city || ''}, ${org.state || ''}`.trim()
+          } : undefined,
+          related_entities: relatedVehicles ? { vehicles: relatedVehicles } : undefined,
+          created_at: org.created_at
+        };
+      });
+    } catch (error) {
+      console.error('Organizations search exception:', error);
+      return [];
+    }
+  };
+
+  const searchUsers = async (query: string, analysis: any): Promise<SearchResult[]> => {
+    try {
+      const searchTerm = query.trim();
+      if (!searchTerm) {
+        return [];
+      }
+
+      // Use full-text search
+      const users = await fullTextSearchService.searchProfiles(searchTerm, { limit: 10 });
+
+      return users.map(user => ({
+        id: user.id,
+        type: 'user' as const,
+        title: user.full_name || user.username || 'Unknown User',
+        description: user.bio || `User: ${user.username || ''}`,
+        metadata: {
+          username: user.username,
+          full_name: user.full_name,
+          avatar_url: user.avatar_url
+        },
+        relevance_score: user.relevance || 0.75,
+        image_url: user.avatar_url,
+        created_at: user.created_at
+      }));
+    } catch (error) {
+      console.error('Users search exception:', error);
+      return [];
+    }
+  };
+
+  const searchImages = async (query: string, analysis: any): Promise<SearchResult[]> => {
+    try {
+      const searchTerm = query.trim();
+      if (!searchTerm) {
+        return [];
+      }
+
+      // Search images through their captions
+      const { data: images, error } = await supabase
+        .from('vehicle_images')
+        .select(`
+          id,
+          image_url,
+          caption,
+          created_at,
+          vehicle_id
+        `)
+        .ilike('caption', `%${searchTerm}%`)
+        .limit(15);
+
+      if (error) {
+        console.error('Images search error:', error);
+        return [];
+      }
+
+      // Fetch vehicle info separately
+      const vehicleIds = [...new Set((images || []).map((img: any) => img.vehicle_id).filter(Boolean))];
+      const { data: relatedVehicles } = vehicleIds.length > 0 ? await supabase
+        .from('vehicles')
+        .select('id, year, make, model')
+        .in('id', vehicleIds) : { data: [] };
+
+      const vehiclesMap = (relatedVehicles || []).reduce((acc: any, v: any) => {
+        acc[v.id] = v;
+        return acc;
+      }, {});
+
+      return (images || []).map((image: any) => {
+        const vehicle = image.vehicle_id ? vehiclesMap[image.vehicle_id] : null;
+        return {
+          id: image.id,
+          type: 'image' as const,
+          title: vehicle ? `${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle Image' : 'Image',
+          description: image.caption || 'Vehicle image',
+          metadata: {
+            vehicle: vehicle
+          },
+          relevance_score: 0.7,
+          image_url: image.image_url,
+          created_at: image.created_at
+        };
+      });
+    } catch (error) {
+      console.error('Images search exception:', error);
+      return [];
+    }
+  };
+
+  const searchDocuments = async (query: string, analysis: any): Promise<SearchResult[]> => {
+    try {
+      const searchTerm = query.trim();
+      if (!searchTerm) {
+        return [];
+      }
+
+      const { data: docs, error } = await supabase
+        .from('vehicle_documents')
+        .select(`
+          id,
+          document_type,
+          title,
+          description,
+          file_url,
+          created_at,
+          vehicle_id
+        `)
+        .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,document_type.ilike.%${searchTerm}%`)
+        .limit(10);
+
+      if (error) {
+        console.error('Documents search error:', error);
+        return [];
+      }
+
+      // Fetch vehicle info separately
+      const vehicleIds = [...new Set((docs || []).map((d: any) => d.vehicle_id).filter(Boolean))];
+      const { data: relatedVehicles } = vehicleIds.length > 0 ? await supabase
+        .from('vehicles')
+        .select('id, year, make, model')
+        .in('id', vehicleIds) : { data: [] };
+
+      const vehiclesMap = (relatedVehicles || []).reduce((acc: any, v: any) => {
+        acc[v.id] = v;
+        return acc;
+      }, {});
+
+      return (docs || []).map((doc: any) => {
+        const vehicle = doc.vehicle_id ? vehiclesMap[doc.vehicle_id] : null;
+        return {
+          id: doc.id,
+          type: 'document' as const,
+          title: doc.title || `${doc.document_type || 'Document'}${vehicle ? ` - ${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() : ''}`,
+          description: doc.description || doc.document_type || 'Document',
+          metadata: {
+            document_type: doc.document_type,
+            file_url: doc.file_url,
+            vehicle: vehicle
+          },
+          relevance_score: 0.8,
+          created_at: doc.created_at
+        };
+      });
+    } catch (error) {
+      console.error('Documents search exception:', error);
+      return [];
+    }
+  };
+
+  const searchAuctions = async (query: string, analysis: any): Promise<SearchResult[]> => {
+    try {
+      const searchTerm = query.trim();
+      if (!searchTerm) {
+        return [];
+      }
+
+      // Search in external_listings (BAT, etc.) for auction listings
+      const { data: listings, error } = await supabase
+        .from('external_listings')
+        .select(`
+          id,
+          listing_url,
+          listing_status,
+          current_bid,
+          bid_count,
+          created_at,
+          vehicle_id,
+          vehicles!inner(
+            id,
+            year,
+            make,
+            model
+          )
+        `)
+        .eq('listing_status', 'active')
+        .or(`vehicles.make.ilike.%${searchTerm}%,vehicles.model.ilike.%${searchTerm}%`)
+        .limit(10);
+
+      if (error) {
+        // Silently fail if table doesn't exist or query fails
+        if (error.code !== 'PGRST116' && error.code !== 'PGRST200' && error.code !== '42P01') {
+          console.error('Auctions search error:', error);
+        }
+        return [];
+      }
+
+      return (listings || []).map((listing: any) => {
+        const vehicle = listing.vehicles;
+        const vehicleName = vehicle ? `${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() : 'Vehicle';
+        return {
+          id: listing.id,
+          type: 'auction' as const,
+          title: `${vehicleName} - Auction`,
+          description: `Current bid: $${(listing.current_bid || 0).toLocaleString()} • ${listing.bid_count || 0} bids`,
+          metadata: {
+            status: listing.listing_status,
+            current_bid: listing.current_bid,
+            bid_count: listing.bid_count,
+            listing_url: listing.listing_url,
+            vehicle: vehicle
+          },
+          relevance_score: 0.85,
+          created_at: listing.created_at
+        };
+      });
+    } catch (error) {
+      // Silently fail - auctions search is optional
+      return [];
+    }
+  };
+
+  const searchReferences = async (query: string, analysis: any): Promise<SearchResult[]> => {
+    try {
+      const searchTerm = query.trim();
+      if (!searchTerm) {
+        return [];
+      }
+
+      // Search reference libraries and documents
+      // Try to find the correct table name - might be reference_libraries or library_documents
+      let refs: any[] = [];
+      let error: any = null;
+
+      // Try reference_libraries first
+      const { data: libs, error: libError } = await supabase
+        .from('reference_libraries')
+        .select('id, title, description, created_at')
+        .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+        .limit(10);
+
+      if (!libError && libs) {
+        refs = libs;
+      } else {
+        // Try library_documents as fallback
+        const { data: docs, error: docError } = await supabase
+          .from('library_documents')
+          .select('id, title, description, created_at')
+          .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+          .limit(10);
+        
+        if (!docError && docs) {
+          refs = docs;
+        } else {
+          error = docError || libError;
+        }
+      }
+
+      if (error) {
+        // Table might not exist, that's okay
+        if (error.code !== 'PGRST116' && error.code !== '42703') {
+          console.error('References search error:', error);
+        }
+        return [];
+      }
+
+      return (refs || []).map((ref: any) => ({
+        id: ref.id,
+        type: 'reference' as const,
+        title: ref.title || 'Reference',
+        description: ref.description || 'Reference material',
+        metadata: ref,
+        relevance_score: 0.75,
+        created_at: ref.created_at
+      }));
+    } catch (error) {
+      console.error('References search exception:', error);
+      return [];
+    }
   };
 
   const calculateVehicleRelevance = (vehicle: any, query: string, analysis: any): number => {
-    let score = 0.5;
+    // Use advanced search service for better ranking
+    const searchDoc = {
+      id: vehicle.id,
+      type: 'vehicle',
+      title: `${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim(),
+      description: vehicle.description || '',
+      content: `${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''} ${vehicle.color || ''} ${vehicle.description || ''}`.trim(),
+      fields: {
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        color: vehicle.color
+      },
+      created_at: vehicle.created_at
+    };
 
-    // Exact model match
-    if (analysis.vehicle_specific && vehicle.model.toLowerCase().includes(analysis.vehicle_specific.toLowerCase())) {
-      score += 0.3;
-    }
+    const results = advancedSearchService.rankDocuments(query, [searchDoc]);
+    let score = results[0]?.relevance_score || 0.5;
 
-    // Description relevance
-    if (vehicle.description && vehicle.description.toLowerCase().includes(query.toLowerCase())) {
+    // Exact model match boost
+    if (analysis.vehicle_specific && vehicle.model?.toLowerCase().includes(analysis.vehicle_specific.toLowerCase())) {
       score += 0.2;
     }
 
@@ -480,31 +952,32 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
             style={{
-              fontSize: '16px',
-              padding: '12px 60px 12px 16px',
-              background: 'white',
-              border: '2px solid #e5e7eb',
-              borderRadius: '12px',
-              boxShadow: isSearching ? '0 0 20px rgba(59, 130, 246, 0.3)' : '0 2px 8px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              fontSize: '9pt',
+              padding: '4px 50px 4px 8px',
+              background: 'var(--white)',
+              border: '2px solid var(--border)',
+              borderRadius: '0px',
+              fontFamily: '"MS Sans Serif", sans-serif',
+              transition: 'all 0.12s ease'
             }}
           />
 
           <button
             type="submit"
             disabled={isSearching || !query.trim()}
-            className="button button-primary"
+            className="button-win95"
             style={{
               position: 'absolute',
               right: '8px',
               top: '50%',
               transform: 'translateY(-50%)',
-              padding: '8px 12px',
-              fontSize: '14px',
-              minWidth: '50px'
+              padding: '2px 8px',
+              fontSize: '8pt',
+              height: '20px',
+              minWidth: '40px'
             }}
           >
-            {isSearching ? '⏳' : '🔍'}
+            {isSearching ? '...' : 'GO'}
           </button>
         </div>
       </form>
@@ -543,7 +1016,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                 >
-                  🔍 {suggestion}
+                  {suggestion}
                 </div>
               ))}
             </div>
@@ -567,7 +1040,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                 >
-                  🕒 {historyQuery}
+                  {historyQuery}
                 </div>
               ))}
             </div>

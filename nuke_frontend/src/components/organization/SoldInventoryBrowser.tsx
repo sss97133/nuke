@@ -38,16 +38,21 @@ interface Props {
 }
 
 type ViewMode = 'gallery' | 'grid' | 'technical';
+type SortBy = 'date' | 'price' | 'year' | 'make' | 'model';
+type SortDirection = 'asc' | 'desc';
 
 export default function SoldInventoryBrowser({ organizationId }: Props) {
   const navigate = useNavigate();
   
   const [soldVehicles, setSoldVehicles] = useState<SoldVehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('gallery');
+  const [viewMode, setViewMode] = useState<ViewMode>('technical'); // Default to technical
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'date' | 'price' | 'year'>('date');
+  const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedProof, setSelectedProof] = useState<SoldVehicle | null>(null);
+  const [isExpanded, setIsExpanded] = useState(true); // Collapsible state
+  const [hoveredVehicle, setHoveredVehicle] = useState<SoldVehicle | null>(null); // For hover preview
 
   useEffect(() => {
     loadSoldVehicles();
@@ -205,20 +210,55 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
       );
     })
     .sort((a, b) => {
-      if (sortBy === 'date') {
-        return new Date(b.sale_date || 0).getTime() - new Date(a.sale_date || 0).getTime();
-      } else if (sortBy === 'price') {
-        return (b.sale_price || b.final_price || 0) - (a.sale_price || a.final_price || 0);
-      } else if (sortBy === 'year') {
-        return b.year - a.year;
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.sale_date || 0).getTime() - new Date(b.sale_date || 0).getTime();
+          break;
+        case 'price':
+          comparison = (a.sale_price || a.final_price || 0) - (b.sale_price || b.final_price || 0);
+          break;
+        case 'year':
+          comparison = a.year - b.year;
+          break;
+        case 'make':
+          comparison = (a.make || '').localeCompare(b.make || '');
+          break;
+        case 'model':
+          comparison = (a.model || '').localeCompare(b.model || '');
+          break;
       }
-      return 0;
+      
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
+
+  const handleSort = (column: SortBy) => {
+    if (sortBy === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDirection('desc'); // Default to descending
+    }
+  };
+
+  const getSortIcon = (column: SortBy) => {
+    if (sortBy !== column) return '↕';
+    return sortDirection === 'asc' ? '↑' : '↓';
+  };
 
   const formatPrice = (vehicle: SoldVehicle) => {
     const price = vehicle.sale_price || vehicle.final_price;
     if (!price || price === 0) return 'Price not disclosed';
     return `$${price.toLocaleString()}`;
+  };
+
+  const formatProofType = (proofType: string | null | undefined): string => {
+    if (!proofType) return 'Manual Mark';
+    return proofType
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (l: string) => l.toUpperCase());
   };
 
   const formatPlatform = (vehicle: SoldVehicle) => {
@@ -257,94 +297,133 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
 
   if (soldVehicles.length === 0) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
-        No sold vehicles yet
+      <div className="card">
+        <div 
+          className="card-header" 
+          style={{ fontSize: '11pt', fontWeight: 700, cursor: 'pointer' }}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          Sold Inventory Archive
+          <span style={{ float: 'right', fontSize: '9pt' }}>{isExpanded ? '▼' : '▶'}</span>
+        </div>
+        {isExpanded && (
+          <div className="card-body" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
+            No sold vehicles yet
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div style={{ marginBottom: '16px' }}>
-      {/* Header with search, sort, and view controls */}
-      <div style={{
-        display: 'flex',
-        gap: '12px',
-        marginBottom: '16px',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        {/* Search */}
-        <input
-          type="text"
-          placeholder="Search sold inventory..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            flex: '1 1 250px',
-            padding: '6px 10px',
-            border: '1px solid var(--border)',
-            borderRadius: '3px',
-            fontSize: '9pt'
-          }}
-        />
+    <div className="card" style={{ marginBottom: '16px' }}>
+      {/* Collapsible Header */}
+      <div 
+        className="card-header" 
+        style={{ fontSize: '11pt', fontWeight: 700, cursor: 'pointer' }}
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        Sold Inventory Archive
+        <span style={{ float: 'right', fontSize: '9pt' }}>{isExpanded ? '▼' : '▶'}</span>
+      </div>
 
-        {/* Controls */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'date' | 'price' | 'year')}
-            style={{
-              padding: '6px 8px',
-              border: '1px solid var(--border)',
-              borderRadius: '3px',
-              fontSize: '8pt',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="date">Sort by Date</option>
-            <option value="price">Sort by Price</option>
-            <option value="year">Sort by Year</option>
-          </select>
+      {isExpanded && (
+        <div className="card-body">
+          {/* All controls on one line */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '16px',
+            flexWrap: 'wrap',
+            alignItems: 'center'
+          }}>
+            {/* Search */}
+            <input
+              type="text"
+              placeholder="Search sold inventory..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                flex: '1 1 250px',
+                padding: '6px 10px',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                fontSize: '9pt'
+              }}
+            />
 
-          {/* View mode buttons */}
-          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-            {(['gallery', 'grid', 'technical'] as ViewMode[]).map(mode => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                style={{
-                  padding: '6px 12px',
-                  border: 'none',
-                  background: viewMode === mode ? 'var(--accent)' : 'transparent',
-                  color: viewMode === mode ? 'white' : 'var(--text)',
-                  fontSize: '8pt',
-                  cursor: 'pointer',
-                  fontWeight: viewMode === mode ? 600 : 400,
-                  textTransform: 'capitalize',
-                  borderRight: mode !== 'technical' ? '1px solid var(--border)' : 'none'
-                }}
-              >
-                {mode}
-              </button>
-            ))}
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
+              style={{
+                padding: '6px 8px',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                fontSize: '8pt',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="date">Sort by Date</option>
+              <option value="price">Sort by Price</option>
+              <option value="year">Sort by Year</option>
+              <option value="make">Sort by Make</option>
+              <option value="model">Sort by Model</option>
+            </select>
+
+            {/* Sort Direction Toggle */}
+            <button
+              onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+              style={{
+                padding: '6px 8px',
+                border: '1px solid var(--border)',
+                borderRadius: '3px',
+                fontSize: '8pt',
+                cursor: 'pointer',
+                background: 'var(--white)',
+                minWidth: '40px'
+              }}
+              title={`Sort ${sortDirection === 'asc' ? 'Ascending' : 'Descending'}`}
+            >
+              {sortDirection === 'asc' ? '↑' : '↓'}
+            </button>
+
+            {/* View mode buttons */}
+            <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+              {(['gallery', 'grid', 'technical'] as ViewMode[]).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  style={{
+                    padding: '6px 12px',
+                    border: 'none',
+                    background: viewMode === mode ? 'var(--accent)' : 'transparent',
+                    color: viewMode === mode ? 'white' : 'var(--text)',
+                    fontSize: '8pt',
+                    cursor: 'pointer',
+                    fontWeight: viewMode === mode ? 600 : 400,
+                    textTransform: 'capitalize',
+                    borderRight: mode !== 'technical' ? '1px solid var(--border)' : 'none'
+                  }}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Results count */}
-      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
-        Showing {filteredVehicles.length} of {soldVehicles.length} sold vehicles
-      </div>
+          {/* Results count */}
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+            Showing {filteredVehicles.length} of {soldVehicles.length} sold vehicles
+          </div>
 
-      {/* GALLERY VIEW */}
-      {viewMode === 'gallery' && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '16px'
-        }}>
+          {/* GALLERY VIEW - More compact */}
+          {viewMode === 'gallery' && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '12px'
+            }}>
           {filteredVehicles.map(vehicle => (
             <div
               key={vehicle.id}
@@ -412,61 +491,35 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
                 )}
               </div>
 
-              {/* Info */}
-              <div style={{ padding: '12px' }}>
-                <div style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '4px' }}>
+              {/* Compact Info */}
+              <div style={{ padding: '10px' }}>
+                <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '4px' }}>
                   {vehicle.year} {vehicle.make} {vehicle.model}
                 </div>
                 {vehicle.trim && (
-                  <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                     {vehicle.trim}
                   </div>
                 )}
-
-                {/* Price */}
                 <div style={{
-                  fontSize: '13pt',
+                  fontSize: '12pt',
                   fontWeight: 700,
                   color: 'var(--accent)',
-                  marginBottom: '8px'
+                  marginBottom: '6px'
                 }}>
                   {formatPrice(vehicle)}
                 </div>
-
-                {/* Sale info */}
                 <div style={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  paddingTop: '8px',
+                  justifyContent: 'space-between',
+                  fontSize: '7pt',
+                  color: 'var(--text-muted)',
+                  paddingTop: '6px',
                   borderTop: '1px solid var(--border-light)'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', color: 'var(--text-muted)' }}>
-                    <span>Sold on:</span>
-                    <span style={{ fontWeight: 600 }}>{formatPlatform(vehicle)}</span>
-                  </div>
+                  <span>{formatPlatform(vehicle)}</span>
                   {vehicle.sale_date && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '7pt', color: 'var(--text-muted)' }}>
-                      <span>Date:</span>
-                      <span style={{ fontWeight: 600 }}>{new Date(vehicle.sale_date).toLocaleDateString()}</span>
-                    </div>
-                  )}
-                  {(vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url) && (
-                    <a
-                      href={vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        fontSize: '7pt',
-                        color: 'var(--accent)',
-                        textDecoration: 'none',
-                        marginTop: '4px'
-                      }}
-                      className="hover:underline"
-                    >
-                      View original listing →
-                    </a>
+                    <span>{new Date(vehicle.sale_date).toLocaleDateString()}</span>
                   )}
                 </div>
               </div>
@@ -475,13 +528,13 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
         </div>
       )}
 
-      {/* GRID VIEW */}
-      {viewMode === 'grid' && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          gap: '12px'
-        }}>
+          {/* GRID VIEW - More compact */}
+          {viewMode === 'grid' && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+              gap: '10px'
+            }}>
           {filteredVehicles.map(vehicle => (
             <div
               key={vehicle.id}
@@ -528,14 +581,14 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
                   SOLD
                 </div>
               </div>
-              <div style={{ padding: '8px' }}>
-                <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '2px' }}>
+              <div style={{ padding: '6px' }}>
+                <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '2px' }}>
                   {vehicle.year} {vehicle.make}
                 </div>
-                <div style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                <div style={{ fontSize: '6pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                   {vehicle.model}
                 </div>
-                <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--accent)' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--accent)' }}>
                   {formatPrice(vehicle)}
                 </div>
               </div>
@@ -544,93 +597,166 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
         </div>
       )}
 
-      {/* TECHNICAL VIEW */}
-      {viewMode === 'technical' && (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: '8pt',
-            background: 'var(--white)',
-            border: '1px solid var(--border)'
-          }}>
-            <thead>
-              <tr style={{ background: 'var(--grey-100)', borderBottom: '2px solid var(--border)' }}>
-                <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Vehicle</th>
-                <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Engine</th>
-                <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Trans</th>
-                <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Drive</th>
-                <th style={{ padding: '8px', textAlign: 'right', fontWeight: 700 }}>Miles</th>
-                <th style={{ padding: '8px', textAlign: 'right', fontWeight: 700 }}>Sale Price</th>
-                <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Platform</th>
-                <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Sale Date</th>
-                <th style={{ padding: '8px', textAlign: 'center', fontWeight: 700 }}>Photos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredVehicles.map(vehicle => (
-                <tr
-                  key={vehicle.id}
-                  onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+          {/* TECHNICAL VIEW - Default, with hover preview and sortable columns */}
+          {viewMode === 'technical' && (
+            <div style={{ position: 'relative' }}>
+              {/* Hover Preview Card */}
+              {hoveredVehicle && (
+                <div
                   style={{
-                    borderBottom: '1px solid var(--border-light)',
-                    cursor: 'pointer',
-                    transition: 'background 0.12s'
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'white',
+                    border: '2px solid var(--border)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                    zIndex: 1000,
+                    maxWidth: '400px',
+                    pointerEvents: 'none'
                   }}
-                  className="hover:bg-gray-50"
                 >
-                  <td style={{ padding: '10px' }}>
-                    <div style={{ fontWeight: 700 }}>
-                      {vehicle.year} {vehicle.make} {vehicle.model}
+                  {hoveredVehicle.primary_image && (
+                    <img 
+                      src={hoveredVehicle.primary_image}
+                      alt={`${hoveredVehicle.year} ${hoveredVehicle.make} ${hoveredVehicle.model}`}
+                      style={{
+                        width: '100%',
+                        aspectRatio: '4/3',
+                        objectFit: 'cover',
+                        borderRadius: '4px',
+                        marginBottom: '12px'
+                      }}
+                    />
+                  )}
+                  <div style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '4px' }}>
+                    {hoveredVehicle.year} {hoveredVehicle.make} {hoveredVehicle.model}
+                  </div>
+                  {hoveredVehicle.trim && (
+                    <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      {hoveredVehicle.trim}
                     </div>
-                    {vehicle.trim && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                        {vehicle.trim}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    {vehicle.engine_size || 'N/A'}
-                    {vehicle.displacement && (
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                        ({vehicle.displacement}ci)
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px' }}>{vehicle.transmission || 'N/A'}</td>
-                  <td style={{ padding: '10px' }}>{vehicle.drivetrain || 'N/A'}</td>
-                  <td style={{ padding: '10px', textAlign: 'right' }}>
-                    {vehicle.mileage ? vehicle.mileage.toLocaleString() : 'N/A'}
-                  </td>
-                  <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700, color: 'var(--accent)' }}>
-                    {formatPrice(vehicle)}
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    {(vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url) ? (
-                      <a
-                        href={vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ color: 'var(--accent)', textDecoration: 'none' }}
-                        className="hover:underline"
+                  )}
+                  <div style={{ fontSize: '14pt', fontWeight: 700, color: 'var(--accent)', marginBottom: '8px' }}>
+                    {formatPrice(hoveredVehicle)}
+                  </div>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    Sold on {formatPlatform(hoveredVehicle)}
+                    {hoveredVehicle.sale_date && ` • ${new Date(hoveredVehicle.sale_date).toLocaleDateString()}`}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '8pt',
+                  background: 'var(--white)',
+                  border: '1px solid var(--border)'
+                }}>
+                  <thead>
+                    <tr style={{ background: 'var(--grey-100)', borderBottom: '2px solid var(--border)' }}>
+                      <th 
+                        style={{ padding: '8px', textAlign: 'left', fontWeight: 700, cursor: 'pointer' }}
+                        onClick={() => handleSort('year')}
                       >
-                        {formatPlatform(vehicle)}
-                      </a>
-                    ) : (
-                      formatPlatform(vehicle)
-                    )}
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    {vehicle.sale_date ? new Date(vehicle.sale_date).toLocaleDateString() : 'N/A'}
-                  </td>
-                  <td style={{ padding: '10px', textAlign: 'center' }}>
-                    {vehicle.image_count || 0}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        Year {getSortIcon('year')}
+                      </th>
+                      <th 
+                        style={{ padding: '8px', textAlign: 'left', fontWeight: 700, cursor: 'pointer' }}
+                        onClick={() => handleSort('make')}
+                      >
+                        Make {getSortIcon('make')}
+                      </th>
+                      <th 
+                        style={{ padding: '8px', textAlign: 'left', fontWeight: 700, cursor: 'pointer' }}
+                        onClick={() => handleSort('model')}
+                      >
+                        Model {getSortIcon('model')}
+                      </th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Trim</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Engine</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Drive</th>
+                      <th style={{ padding: '8px', textAlign: 'right', fontWeight: 700 }}>Miles</th>
+                      <th 
+                        style={{ padding: '8px', textAlign: 'right', fontWeight: 700, cursor: 'pointer' }}
+                        onClick={() => handleSort('price')}
+                      >
+                        Sale Price {getSortIcon('price')}
+                      </th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 700 }}>Platform</th>
+                      <th 
+                        style={{ padding: '8px', textAlign: 'left', fontWeight: 700, cursor: 'pointer' }}
+                        onClick={() => handleSort('date')}
+                      >
+                        Sale Date {getSortIcon('date')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredVehicles.map(vehicle => (
+                      <tr
+                        key={vehicle.id}
+                        onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+                        onMouseEnter={() => setHoveredVehicle(vehicle)}
+                        onMouseLeave={() => setHoveredVehicle(null)}
+                        style={{
+                          borderBottom: '1px solid var(--border-light)',
+                          cursor: 'pointer',
+                          transition: 'background 0.12s'
+                        }}
+                        className="hover:bg-gray-50"
+                      >
+                        <td style={{ padding: '10px', fontWeight: 600 }}>{vehicle.year}</td>
+                        <td style={{ padding: '10px' }}>{vehicle.make}</td>
+                        <td style={{ padding: '10px' }}>{vehicle.model}</td>
+                        <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>
+                          {vehicle.trim || '—'}
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          {vehicle.engine_size || '—'}
+                          {vehicle.displacement && (
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                              ({vehicle.displacement}ci)
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px' }}>{vehicle.drivetrain || '—'}</td>
+                        <td style={{ padding: '10px', textAlign: 'right' }}>
+                          {vehicle.mileage ? vehicle.mileage.toLocaleString() : '—'}
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700, color: 'var(--accent)' }}>
+                          {formatPrice(vehicle)}
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          {(vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url) ? (
+                            <a
+                              href={vehicle.proof_url || vehicle.listing_url || vehicle.bat_auction_url || vehicle.timeline_bat_url || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ color: 'var(--accent)', textDecoration: 'none' }}
+                              className="hover:underline"
+                            >
+                              {formatPlatform(vehicle)}
+                            </a>
+                          ) : (
+                            formatPlatform(vehicle)
+                          )}
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          {vehicle.sale_date ? new Date(vehicle.sale_date).toLocaleDateString() : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -697,7 +823,7 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
                   display: 'inline-block',
                   fontWeight: 600
                 }}>
-                  {selectedProof.proof_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Manual Mark'}
+                  {formatProofType(selectedProof.proof_type)}
                   {selectedProof.proof_confidence && (
                     <span style={{ marginLeft: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
                       ({selectedProof.proof_confidence}% confidence)

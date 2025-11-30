@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { InputDialog } from '../common/InputDialog';
 
 interface EnhancedImageTaggerProps {
   imageUrl: string;
@@ -97,6 +98,8 @@ export default function EnhancedImageTagger({
   const [filteredSuggestions, setFilteredSuggestions] = useState<TagSuggestion[]>([]);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [currentBbox, setCurrentBbox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [correctionDialog, setCorrectionDialog] = useState<{ isOpen: boolean; tagId: string; currentLabel: string }>({ isOpen: false, tagId: '', currentLabel: '' });
+  const [validationDialog, setValidationDialog] = useState<{ isOpen: boolean; tagId: string }>({ isOpen: false, tagId: '' });
 
   // Load existing tags
   useEffect(() => {
@@ -323,6 +326,14 @@ export default function EnhancedImageTagger({
 
   const handleValidateTag = async (tagId: string, action: 'approve' | 'reject' | 'correct') => {
     try {
+      if (action === 'correct') {
+        const tag = tags.find(t => t.id === tagId);
+        if (tag) {
+          setCorrectionDialog({ isOpen: true, tagId, currentLabel: tag.tag_name });
+        }
+        return;
+      }
+
       const updates: any = {};
 
       switch (action) {
@@ -333,16 +344,6 @@ export default function EnhancedImageTagger({
         case 'reject':
           updates.verified = false;
           updates.validation_status = 'rejected';
-          break;
-        case 'correct':
-          // This would open a correction dialog
-          const correctedLabel = prompt('Enter correct label:');
-          if (correctedLabel) {
-            updates.tag_name = correctedLabel;
-            updates.verified = true;
-            updates.validation_status = 'approved';
-            updates.manual_override = true;
-          }
           break;
       }
 
@@ -364,6 +365,38 @@ export default function EnhancedImageTagger({
     } catch (err) {
       console.error('Error validating tag:', err);
       alert('Failed to validate tag. Please try again.');
+    }
+  };
+
+  const handleCorrectionConfirm = async (correctedLabel: string) => {
+    if (!correctedLabel.trim()) return;
+    
+    setCorrectionDialog({ isOpen: false, tagId: '', currentLabel: '' });
+    
+    try {
+      const updates: any = {
+        tag_name: correctedLabel.trim(),
+        verified: true,
+        validation_status: 'approved',
+        manual_override: true
+      };
+
+      const { error } = await supabase
+        .from('image_tags')
+        .update(updates)
+        .eq('id', correctionDialog.tagId);
+
+      if (error) throw error;
+
+      // Update local state
+      setTags(prev => prev.map(tag =>
+        tag.id === correctionDialog.tagId ? { ...tag, ...updates } : tag
+      ));
+
+      onTagValidated?.(correctionDialog.tagId, 'correct');
+    } catch (err) {
+      console.error('Error correcting tag:', err);
+      alert('Failed to correct tag. Please try again.');
     }
   };
 
@@ -462,12 +495,7 @@ export default function EnhancedImageTagger({
                   if (action) {
                     handleValidateTag(tag.id, 'approve');
                   } else {
-                    const choice = window.prompt('Enter: "reject" to reject, "correct" to correct, or cancel');
-                    if (choice === 'reject') {
-                      handleValidateTag(tag.id, 'reject');
-                    } else if (choice === 'correct') {
-                      handleValidateTag(tag.id, 'correct');
-                    }
+                    setValidationDialog({ isOpen: true, tagId: tag.id });
                   }
                 } else if (tag.source_type === 'manual') {
                   if (window.confirm(`Remove manual tag "${tag.tag_name}"?`)) {
@@ -620,6 +648,35 @@ export default function EnhancedImageTagger({
           color: #ffc107;
         }
       `}</style>
+
+      {/* Correction Dialog */}
+      <InputDialog
+        isOpen={correctionDialog.isOpen}
+        title="Correct Tag Name"
+        message="Enter the correct label for this tag:"
+        defaultValue={correctionDialog.currentLabel}
+        onConfirm={handleCorrectionConfirm}
+        onCancel={() => setCorrectionDialog({ isOpen: false, tagId: '', currentLabel: '' })}
+        confirmLabel="Correct"
+        required
+      />
+
+      {/* Validation Options Dialog */}
+      <InputDialog
+        isOpen={validationDialog.isOpen}
+        title="Tag Validation"
+        message='Enter: "reject" to reject, "correct" to correct, or cancel'
+        onConfirm={(value) => {
+          setValidationDialog({ isOpen: false, tagId: '' });
+          if (value.trim().toLowerCase() === 'reject') {
+            handleValidateTag(validationDialog.tagId, 'reject');
+          } else if (value.trim().toLowerCase() === 'correct') {
+            handleValidateTag(validationDialog.tagId, 'correct');
+          }
+        }}
+        onCancel={() => setValidationDialog({ isOpen: false, tagId: '' })}
+        confirmLabel="OK"
+      />
     </div>
   );
 }

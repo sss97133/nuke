@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 // AppLayout now provided globally by App.tsx
 import VehicleMakeModelInput from '../components/forms/VehicleMakeModelInput';
+import SeriesSelector from '../components/forms/SeriesSelector';
+import TrimSelector from '../components/forms/TrimSelector';
 import { TimelineEventService } from '../services/timelineEventService';
 import '../design-system.css';
 
@@ -187,6 +189,7 @@ const EditVehicle: React.FC = () => {
         seat_material_primary: data.seat_material_primary,
         seat_material_secondary: data.seat_material_secondary,
         interior_material_details: data.interior_material_details,
+        received_in_trade: data.received_in_trade || false,
         has_molding: data.has_molding,
         has_pinstriping: data.has_pinstriping,
         has_racing_stripes: data.has_racing_stripes,
@@ -541,8 +544,9 @@ const EditVehicle: React.FC = () => {
                     <h3 className="text font-bold">Core Identity</h3>
                   </div>
                   <div className="card-body">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="form-group col-span-1">
+                    <div className="space-y-6">
+                      {/* Make & Model - Full Width */}
+                      <div className="form-group">
                         <label className="form-label">Make & Model</label>
                         <VehicleMakeModelInput
                           make={formData.make}
@@ -552,72 +556,70 @@ const EditVehicle: React.FC = () => {
                         />
                       </div>
 
-                      <div className="form-group">
-                        <label htmlFor="year" className="form-label">Year</label>
-                        <input
-                          type="number"
-                          id="year"
-                          name="year"
-                          value={formData.year || ''}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          min="1900"
-                          max={new Date().getFullYear() + 1}
-                        />
+                      {/* Year, Series, Trim - Grouped together */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="form-group">
+                          <label htmlFor="year" className="form-label">Year</label>
+                          <input
+                            type="number"
+                            id="year"
+                            name="year"
+                            value={formData.year || ''}
+                            onChange={handleInputChange}
+                            className="form-input"
+                            min="1900"
+                            max={new Date().getFullYear() + 1}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <SeriesSelector
+                            make={formData.make}
+                            model={formData.model}
+                            series={formData.series || ''}
+                            onSeriesChange={(series) => handleInputChange({ target: { name: 'series', value: series } } as any)}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <TrimSelector
+                            make={formData.make}
+                            model={formData.model}
+                            series={formData.series || ''}
+                            trim={formData.trim || ''}
+                            onTrimChange={(trim) => handleInputChange({ target: { name: 'trim', value: trim } } as any)}
+                          />
+                        </div>
                       </div>
 
-                      <div className="form-group">
-                        <label htmlFor="series" className="form-label">Series</label>
-                        <input
-                          type="text"
-                          id="series"
-                          name="series"
-                          value={formData.series || ''}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          placeholder="e.g., K5, C10, K10, K1500"
-                        />
-                      </div>
+                      {/* VIN & License Plate - Grouped together */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="form-group">
+                          <label htmlFor="vin" className="form-label">VIN</label>
+                          <input
+                            type="text"
+                            id="vin"
+                            name="vin"
+                            value={formData.vin || ''}
+                            onChange={handleInputChange}
+                            className="form-input"
+                            placeholder="Vehicle Identification Number"
+                            maxLength={17}
+                          />
+                        </div>
 
-                      <div className="form-group">
-                        <label htmlFor="trim" className="form-label">Trim</label>
-                        <input
-                          type="text"
-                          id="trim"
-                          name="trim"
-                          value={formData.trim || ''}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          placeholder="e.g., Silverado, Cheyenne, Scottsdale"
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label htmlFor="vin" className="form-label">VIN</label>
-                        <input
-                          type="text"
-                          id="vin"
-                          name="vin"
-                          value={formData.vin || ''}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          placeholder="Vehicle Identification Number"
-                          maxLength={17}
-                        />
-                      </div>
-
-
-                      <div className="form-group">
-                        <label htmlFor="license_plate" className="form-label">License Plate</label>
-                        <input
-                          type="text"
-                          id="license_plate"
-                          name="license_plate"
-                          value={formData.license_plate || ''}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          placeholder="Current license plate"
-                        />
+                        <div className="form-group">
+                          <label htmlFor="license_plate" className="form-label">License Plate</label>
+                          <input
+                            type="text"
+                            id="license_plate"
+                            name="license_plate"
+                            value={formData.license_plate || ''}
+                            onChange={handleInputChange}
+                            className="form-input"
+                            placeholder="Current license plate"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

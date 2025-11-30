@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { listingURLParser } from '../../services/listingURLParser';
+import { UnifiedImageImportService } from '../../services/unifiedImageImportService';
 
 interface BaTURLDropProps {
   vehicleId: string;
@@ -37,29 +38,42 @@ export const BaTURLDrop: React.FC<BaTURLDropProps> = ({
     setParsing(true);
     setError('');
     setPreview(null);
-    setProgress('Importing complete BaT data with AI...');
+    setProgress('Scraping BaT listing data...');
 
     try {
-      // Use complete import function (GPT-4 powered)
-      const { data, error } = await supabase.functions.invoke('complete-bat-import', {
-        body: { bat_url: url, vehicle_id: vehicleId }
+      // Use scrape-vehicle function to extract data and images
+      const { data: scrapeData, error: scrapeError } = await supabase.functions.invoke('scrape-vehicle', {
+        body: { url: url }
       });
       
-      if (error) throw error;
-      if (!data?.success) throw new Error('Import failed');
+      if (scrapeError) throw scrapeError;
+      if (!scrapeData?.success || !scrapeData?.data) {
+        throw new Error(scrapeData?.error || 'Failed to scrape listing');
+      }
       
-      // Show success summary
-      setProgress(`✅ Imported: ${data.imported.timeline_events} events, ${data.imported.modifications} mods, ${data.imported.specs_updated} specs`);
+      const listingData = scrapeData.data;
       
-      // Refresh page after 2 seconds to show new data
-      setTimeout(() => {
-        if (onDataImported) onDataImported();
-        window.location.reload();
-      }, 2000);
+      // Build preview object
+      const previewData: any = {
+        year: listingData.year,
+        make: listingData.make,
+        model: listingData.model,
+        vin: listingData.vin,
+        mileage: listingData.mileage,
+        sold_price: listingData.sale_price,
+        seller: listingData.seller,
+        images: listingData.images || [],
+        sold_date: listingData.sale_date || listingData.auction_end_date,
+        location: listingData.location,
+        description: listingData.description
+      };
+      
+      setPreview(previewData);
+      setProgress(`Found ${previewData.images?.length || 0} images, ${previewData.vin ? 'VIN: ' + previewData.vin : 'no VIN'}`);
       
     } catch (err: any) {
-      console.error('Import error:', err);
-      setError(err.message || 'Failed to import listing');
+      console.error('Parse error:', err);
+      setError(err.message || 'Failed to parse listing');
       setProgress('');
     } finally {
       setParsing(false);
@@ -118,118 +132,54 @@ export const BaTURLDrop: React.FC<BaTURLDropProps> = ({
           });
       }
 
-      // Step 3: Download and import images
+      // Step 3: Download and import images using UnifiedImageImportService
       if (preview.images && preview.images.length > 0) {
-        setProgress(`Downloading ${preview.images.length} images from BaT...`);
+        setProgress(`Importing ${preview.images.length} images using unified service...`);
         
+        const takenAt = preview.sold_date ? new Date(preview.sold_date) : undefined;
         let successCount = 0;
+        
         for (let i = 0; i < preview.images.length; i++) {
           const imageUrl = preview.images[i];
-          setProgress(`Downloading image ${i + 1}/${preview.images.length}...`);
+          setProgress(`Importing image ${i + 1}/${preview.images.length}...`);
           
           try {
             // Download image
             const response = await fetch(imageUrl);
-            if (!response.ok) continue;
+            if (!response.ok) {
+              console.warn(`Failed to download image ${i + 1}: ${response.statusText}`);
+              continue;
+            }
             
             const blob = await response.blob();
             
-            // Upload to Supabase storage
-            const fileExt = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
-            const fileName = `bat_${Date.now()}_${i}.${fileExt}`;
-            const storagePath = `vehicles/${vehicleId}/bat/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-              .from('vehicle-data')
-              .upload(storagePath, blob);
-
-            if (uploadError) {
-              console.error(`Upload error for image ${i}:`, uploadError);
-              continue;
-            }
-
-            // Get public URL
-            const publicUrl = supabase.storage
-              .from('vehicle-data')
-              .getPublicUrl(storagePath).data.publicUrl;
-
-            // Insert into vehicle_images
-            // Use auction end date as taken_at (best guess until photographer claims)
-            const takenAt = preview.sold_date || new Date().toISOString();
+            // Use UnifiedImageImportService for proper attribution
+            const result = await UnifiedImageImportService.importImage({
+              file: blob,
+              vehicleId: vehicleId,
+              source: 'bat_listing',
+              sourceUrl: imageUrl,
+              importedBy: user.id, // Track who ran the import
+              takenAt: takenAt,
+              category: 'exterior',
+              makePrimary: i === 0 // First image is primary
+            });
             
-            const { data: imageData, error: insertError } = await supabase
-              .from('vehicle_images')
-              .insert({
-                vehicle_id: vehicleId,
-                user_id: user.id, // Importer (Skylar)
-                image_url: publicUrl,
-                category: 'exterior',
-                source: 'bat_listing',
-                taken_at: takenAt,
-                exif_data: {
-                  source_url: imageUrl,
-                  bat_listing: url,
-                  imported_by_user_id: user.id,
-                  imported_by_name: 'Skylar Williams',
-                  imported_at: new Date().toISOString(),
-                  bat_seller: preview.seller,
-                  attribution_note: 'Photographer unknown - images from BaT listing. Original photographer can claim with proof.',
-                  claimable: true
-                }
-              })
-              .select('id')
-              .single();
-
-            if (!insertError && imageData) {
-              // Create ghost user for unknown BaT photographer
-              // This allows future claiming when photographer shows up with proof
-              const photographerFingerprint = `BaT-Photographer-${preview.seller || 'Unknown'}-${url}`;
-              
-              // Get or create ghost user for the photographer
-              const { data: ghostUser } = await supabase
-                .from('ghost_users')
-                .select('id')
-                .eq('device_fingerprint', photographerFingerprint)
-                .single();
-
-              let ghostUserId = ghostUser?.id;
-
-              if (!ghostUserId) {
-                const { data: newGhost } = await supabase
-                  .from('ghost_users')
-                  .insert({
-                    device_fingerprint: photographerFingerprint,
-                    camera_make: 'Unknown',
-                    camera_model: 'BaT Listing',
-                    display_name: `BaT Photographer (${preview.seller || 'Unknown'})`,
-                    total_contributions: 0
-                  })
-                  .select('id')
-                  .single();
-                
-                ghostUserId = newGhost?.id;
-              }
-
-              // Create device attribution
-              await supabase
-                .from('device_attributions')
-                .insert({
-                  image_id: imageData.id,
-                  device_fingerprint: photographerFingerprint,
-                  ghost_user_id: ghostUserId,
-                  uploaded_by_user_id: user.id, // Skylar = importer
-                  attribution_source: 'bat_listing_unknown_photographer',
-                  confidence_score: 50 // Low confidence - we don't know who took it
-                });
-
+            if (result.success) {
               successCount++;
+            } else {
+              console.error(`Failed to import image ${i + 1}:`, result.error);
             }
-          } catch (imgErr) {
-            console.error(`Error importing image ${i}:`, imgErr);
+            
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+          } catch (imgErr: any) {
+            console.error(`Error importing image ${i + 1}:`, imgErr);
           }
         }
 
-        setProgress(`Imported ${successCount}/${preview.images.length} images`);
+        setProgress(`✅ Imported ${successCount}/${preview.images.length} images`);
       }
 
       // Step 4: Create timeline event

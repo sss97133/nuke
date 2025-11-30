@@ -23,12 +23,16 @@ export async function getUserApiKey(
     };
   }
 
-  // Check if user has active subscription
-  const { data: hasAccess, error: accessError } = await supabase
-    .rpc('has_active_api_access', { p_user_id: userId });
-
-  // If no subscription, still try to use user's key (they might have added it)
-  // But we'll prefer system key if user doesn't have their own
+  // Check if user has active subscription (ignore errors - not critical)
+  try {
+    const { data: hasAccess, error: accessError } = await supabase
+      .rpc('has_active_api_access', { p_user_id: userId });
+    // We don't actually use hasAccess - just checking if RPC exists
+    // If it fails, we'll still try to get user's key
+  } catch (rpcError) {
+    // RPC might not exist or might fail - that's okay, continue
+    console.warn('RPC has_active_api_access failed (non-critical):', rpcError);
+  }
 
   // Get user's API key directly from table (service role can access)
   const { data: userKeyInfo, error: keyError } = await supabase

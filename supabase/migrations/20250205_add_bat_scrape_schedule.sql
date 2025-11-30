@@ -132,3 +132,4 @@ COMMENT ON TABLE bat_scrape_jobs IS 'Tracks BaT scraping job execution and resul
 COMMENT ON FUNCTION notify_admin_bat_scrape_error IS 'Creates admin notification for BaT scraping errors';
 COMMENT ON FUNCTION notify_admin_bat_scrape_complete IS 'Creates admin notification for successful BaT scraping';
 
+

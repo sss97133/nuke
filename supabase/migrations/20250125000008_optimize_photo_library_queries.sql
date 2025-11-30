@@ -21,60 +21,62 @@ DECLARE
 BEGIN
   SELECT json_build_object(
     'photos', (
-      SELECT COALESCE(json_agg(
-        json_build_object(
-          'id', vi.id,
-          'user_id', vi.user_id,
-          'image_url', vi.image_url,
-          'thumbnail_url', vi.thumbnail_url,
-          'variants', vi.variants,
-          'file_name', vi.file_name,
-          'file_size', vi.file_size,
-          'mime_type', vi.mime_type,
-          'vehicle_id', vi.vehicle_id,
-          'organization_status', COALESCE(vi.organization_status, 'unorganized'),
-          'organized_at', vi.organized_at,
-          'album_count', COALESCE(album_counts.count, 0),
-          'ai_processing_status', COALESCE(vi.ai_processing_status, 'pending'),
-          'ai_processing_started_at', vi.ai_processing_started_at,
-          'ai_processing_completed_at', vi.ai_processing_completed_at,
-          'ai_suggestions', vi.ai_suggestions,
-          'ai_detected_vehicle', vi.ai_detected_vehicle,
-          'ai_detected_angle', vi.ai_detected_angle,
-          'ai_detected_angle_confidence', vi.ai_detected_angle_confidence,
-          'suggested_vehicle_id', vi.suggested_vehicle_id,
-          'exif_data', vi.exif_data,
-          'taken_at', vi.taken_at,
-          'latitude', vi.latitude,
-          'longitude', vi.longitude,
-          'created_at', vi.created_at,
-          'updated_at', vi.updated_at
-        )
+      SELECT COALESCE(json_agg(photo_data ORDER BY created_at DESC), '[]'::json)
+      FROM (
+        SELECT 
+          json_build_object(
+            'id', vi.id,
+            'user_id', vi.user_id,
+            'image_url', vi.image_url,
+            'thumbnail_url', vi.thumbnail_url,
+            'variants', vi.variants,
+            'file_name', vi.file_name,
+            'file_size', vi.file_size,
+            'mime_type', vi.mime_type,
+            'vehicle_id', vi.vehicle_id,
+            'organization_status', COALESCE(vi.organization_status, 'unorganized'),
+            'organized_at', vi.organized_at,
+            'album_count', COALESCE(album_counts.count, 0),
+            'ai_processing_status', COALESCE(vi.ai_processing_status, 'pending'),
+            'ai_processing_started_at', vi.ai_processing_started_at,
+            'ai_processing_completed_at', vi.ai_processing_completed_at,
+            'ai_suggestions', vi.ai_suggestions,
+            'ai_detected_vehicle', vi.ai_detected_vehicle,
+            'ai_detected_angle', vi.ai_detected_angle,
+            'ai_detected_angle_confidence', vi.ai_detected_angle_confidence,
+            'suggested_vehicle_id', vi.suggested_vehicle_id,
+            'exif_data', vi.exif_data,
+            'taken_at', vi.taken_at,
+            'latitude', vi.latitude,
+            'longitude', vi.longitude,
+            'created_at', vi.created_at,
+            'updated_at', vi.updated_at
+          ) as photo_data,
+          vi.created_at
+        FROM vehicle_images vi
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::INTEGER as count
+          FROM image_set_members ism
+          WHERE ism.image_id = vi.id
+        ) album_counts ON true
+        WHERE vi.user_id = p_user_id
+          AND vi.vehicle_id IS NULL
+          AND (
+            COALESCE(vi.organization_status, 'unorganized') = 'unorganized'
+            OR vi.organization_status IS NULL
+          )
+          AND (
+            p_filter_status IS NULL 
+            OR vi.ai_processing_status = p_filter_status
+          )
+          AND (
+            p_filter_angle IS NULL
+            OR vi.ai_detected_angle ILIKE '%' || p_filter_angle || '%'
+          )
         ORDER BY vi.created_at DESC
-      ), '[]'::json)
-      FROM vehicle_images vi
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*)::INTEGER as count
-        FROM image_set_members ism
-        WHERE ism.image_id = vi.id
-      ) album_counts ON true
-      WHERE vi.user_id = p_user_id
-        AND vi.vehicle_id IS NULL
-        AND (
-          COALESCE(vi.organization_status, 'unorganized') = 'unorganized'
-          OR vi.organization_status IS NULL
-        )
-        AND (
-          p_filter_status IS NULL 
-          OR vi.ai_processing_status = p_filter_status
-        )
-        AND (
-          p_filter_angle IS NULL
-          OR vi.ai_detected_angle ILIKE '%' || p_filter_angle || '%'
-        )
-      ORDER BY vi.created_at DESC
-      LIMIT p_limit
-      OFFSET p_offset
+        LIMIT p_limit
+        OFFSET p_offset
+      ) subq
     ),
     'total_count', (
       SELECT COUNT(*)::INTEGER

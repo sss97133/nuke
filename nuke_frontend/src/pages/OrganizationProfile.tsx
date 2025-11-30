@@ -19,6 +19,7 @@ import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowse
 import MarketplaceComplianceForm from '../components/organization/MarketplaceComplianceForm';
 import OrganizationNotifications from '../components/organization/OrganizationNotifications';
 import VehicleInquiryModal from '../components/organization/VehicleInquiryModal';
+import { extractImageMetadata } from '../utils/imageMetadata';
 import '../design-system.css';
 
 interface Organization {
@@ -79,12 +80,23 @@ interface OrgVehicle {
   id: string;
   vehicle_id: string;
   relationship_type: string;
+  status?: string;
   vehicle_year?: number;
   vehicle_make?: string;
   vehicle_model?: string;
   vehicle_vin?: string;
   vehicle_current_value?: number;
   vehicle_image_url?: string;
+  sale_date?: string;
+  sale_price?: number;
+  vehicle_sale_status?: string;
+  listing_status?: string;
+  has_active_auction?: boolean;
+  auction_end_time?: string | null;
+  auction_current_bid?: number | null;
+  auction_bid_count?: number;
+  auction_reserve_price?: number | null;
+  vehicles?: any;
 }
 
 interface Offering {
@@ -153,7 +165,197 @@ export default function OrganizationProfile() {
   const [showVehicleInquiry, setShowVehicleInquiry] = useState(false);
   const [selectedInquiryVehicle, setSelectedInquiryVehicle] = useState<{id: string, name: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const ownershipUploadId = `org-ownership-${organizationId}`;
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (!session?.user?.id) {
+      alert('Please log in to upload images');
+      return;
+    }
+
+    setUploadingImages(true);
+    try {
+      const uploadedImages: string[] = [];
+      let earliestDate: Date | null = null;
+
+      for (const file of files) {
+        // Extract EXIF metadata
+        const metadata = await extractImageMetadata(file);
+        
+        // Track earliest date for timeline event
+        if (metadata.dateTaken) {
+          if (!earliestDate || metadata.dateTaken < earliestDate) {
+            earliestDate = metadata.dateTaken;
+          }
+        }
+
+        // Upload to Supabase Storage
+        const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('vehicle-data')
+          .upload(`organization-data/${organizationId}/images/${fileName}`, file);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('vehicle-data')
+          .getPublicUrl(uploadData.path);
+
+        uploadedImages.push(publicUrl);
+
+        // Insert image record
+        const { error: insertError } = await supabase
+          .from('organization_images')
+          .insert({
+            organization_id: organizationId,
+            user_id: session.user.id,
+            image_url: publicUrl,
+            category: 'facility',
+            taken_at: metadata.dateTaken?.toISOString(),
+            latitude: metadata.location?.latitude,
+            longitude: metadata.location?.longitude,
+            exif_data: {
+              camera: metadata.camera,
+              technical: metadata.technical,
+              location: metadata.location
+            }
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      // Create timeline event for the image upload
+      const eventDate = earliestDate || new Date();
+      const { error: timelineError } = await supabase
+        .from('business_timeline_events')
+        .insert({
+          business_id: organizationId,
+          created_by: session.user.id,
+          event_type: 'other', // Using 'other' since 'image_upload' is not in allowed types
+          event_category: 'operational', // Must be one of: legal, operational, personnel, financial, recognition, growth, other
+          title: `${uploadedImages.length} image${uploadedImages.length === 1 ? '' : 's'} uploaded`,
+          description: `Location/facility images added to organization profile`,
+          event_date: eventDate.toISOString().split('T')[0],
+          image_urls: uploadedImages, // Use image_urls field (added in migration 20251101000009)
+          metadata: {
+            image_count: uploadedImages.length,
+            submitted_by: session.user.id,
+            exif_extracted: !!earliestDate,
+            earliest_date: earliestDate?.toISOString(),
+            actual_event_type: 'image_upload' // Store actual type in metadata for filtering
+          }
+        });
+
+      if (timelineError) {
+        console.error('Failed to create timeline event:', timelineError);
+        console.error('Timeline event data:', {
+          business_id: organizationId,
+          created_by: session.user.id,
+          event_type: 'other',
+          event_category: 'operational',
+          event_date: eventDate.toISOString().split('T')[0],
+          image_count: uploadedImages.length
+        });
+        // Don't fail the upload if timeline event creation fails, but log it
+      } else {
+        console.log('Successfully created timeline event for image upload');
+      }
+
+      // Update contributor count
+      await supabase.from('organization_contributors').upsert({
+        organization_id: organizationId,
+        user_id: session.user.id,
+        role: 'photographer',
+        contribution_count: uploadedImages.length
+      }, {
+        onConflict: 'organization_id,user_id',
+        ignoreDuplicates: false
+      });
+
+      // Reload images with all fields
+      const { data: orgImages, error: imagesError } = await supabase
+        .from('organization_images')
+        .select(`
+          id,
+          organization_id,
+          user_id,
+          image_url,
+          thumbnail_url,
+          medium_url,
+          large_url,
+          category,
+          caption,
+          is_primary,
+          taken_at,
+          latitude,
+          longitude,
+          uploaded_at,
+          created_at,
+          is_sensitive,
+          blur_preview,
+          contains_financial_data,
+          location_name,
+          exif_data
+        `)
+        .eq('organization_id', organizationId)
+        .order('taken_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
+      
+      if (!imagesError && orgImages) {
+        console.log(`Reloaded ${orgImages.length} images after upload`);
+        setImages(orgImages);
+        if (orgImages.length > 0) {
+          loadImageTags(orgImages.map(img => img.id)).catch(() => {});
+        }
+      } else if (imagesError) {
+        console.error('Error reloading images:', imagesError);
+      }
+
+      // Reload timeline events
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('business_timeline_events')
+        .select('id, event_type, title, description, event_date, created_by, metadata')
+        .eq('business_id', organizationId)
+        .order('event_date', { ascending: false })
+        .limit(50);
+      
+      if (eventsError) {
+        console.error('Error reloading timeline events:', eventsError);
+      } else if (eventsData) {
+        console.log(`Reloaded ${eventsData.length} timeline events after upload`);
+        const enriched = await Promise.allSettled(
+          eventsData.map(async (e: any) => {
+            if (!e.created_by) {
+              return { ...e, profiles: null };
+            }
+            const { data: profile } = await supabase.from('profiles').select('full_name, username, avatar_url').eq('id', e.created_by).maybeSingle();
+            return { ...e, profiles: profile || null };
+          })
+        );
+        const validEvents = enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value);
+        console.log(`Enriched ${validEvents.length} timeline events with profiles`);
+        setTimelineEvents(validEvents);
+      } else {
+        console.log('No timeline events returned after reload');
+      }
+
+      alert(`Uploaded ${files.length} image(s) successfully!`);
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      alert('Upload failed: ' + error.message);
+    } finally {
+      setUploadingImages(false);
+      if (imageInputRef.current) {
+        imageInputRef.current.value = '';
+      }
+    }
+  };
 
   useEffect(() => {
     console.log('[OrgProfile] useEffect triggered - organizationId:', organizationId);
@@ -255,24 +457,49 @@ export default function OrganizationProfile() {
       setLoading(false);
 
       // STEP 2: Load everything else in background (non-blocking)
-      // Images
+      // Images - Load ALL fields needed for display
       (async () => {
         try {
           const { data: orgImages, error: imagesError } = await supabase
             .from('organization_images')
-            .select('*')
+            .select(`
+              id,
+              organization_id,
+              user_id,
+              image_url,
+              thumbnail_url,
+              medium_url,
+              large_url,
+              category,
+              caption,
+              is_primary,
+              taken_at,
+              latitude,
+              longitude,
+              uploaded_at,
+              created_at,
+              is_sensitive,
+              blur_preview,
+              contains_financial_data,
+              location_name,
+              exif_data
+            `)
             .eq('organization_id', organizationId)
-            .order('uploaded_at', { ascending: false });
+            .order('taken_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false });
           
           if (imagesError) {
+            console.error('Error loading images:', imagesError);
             setImages([]);
           } else {
+            console.log(`Loaded ${orgImages?.length || 0} images for organization`);
             setImages(orgImages || []);
             if (orgImages && orgImages.length > 0) {
               loadImageTags(orgImages.map(img => img.id)).catch(() => {});
             }
           }
-        } catch {
+        } catch (error) {
+          console.error('Exception loading images:', error);
           setImages([]);
         }
       })();
@@ -292,14 +519,26 @@ export default function OrganizationProfile() {
             return;
           }
           
-          // Enrich vehicles in background
+                  // Enrich vehicles in background
           const enriched = await Promise.allSettled(
             (orgVehicles || []).map(async (ov: any) => {
               try {
-                const [vehicleResult, imageResult] = await Promise.all([
-                  supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status').eq('id', ov.vehicle_id).single(),
-                  supabase.from('vehicle_images').select('image_url').eq('vehicle_id', ov.vehicle_id).eq('is_primary', true).maybeSingle()
+                const [vehicleResult, imageResult, auctionListing] = await Promise.all([
+                  supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date').eq('id', ov.vehicle_id).single(),
+                  supabase.from('vehicle_images').select('image_url').eq('vehicle_id', ov.vehicle_id).eq('is_primary', true).maybeSingle(),
+                  // Check for active auction listing
+                  supabase.from('vehicle_listings')
+                    .select('id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents')
+                    .eq('vehicle_id', ov.vehicle_id)
+                    .eq('status', 'active')
+                    .in('sale_type', ['auction', 'live_auction'])
+                    .gt('auction_end_time', new Date().toISOString())
+                    .maybeSingle()
                 ]);
+                
+                // Use vehicle's sale data if org_vehicle doesn't have it
+                const finalSaleDate = ov.sale_date || vehicleResult.data?.sale_date;
+                const finalSalePrice = ov.sale_price || vehicleResult.data?.sale_price;
                 
                 return {
                   id: ov.id,
@@ -308,8 +547,8 @@ export default function OrganizationProfile() {
                   status: ov.status,
                   start_date: ov.start_date,
                   end_date: ov.end_date,
-                  sale_date: ov.sale_date,
-                  sale_price: ov.sale_price,
+                  sale_date: finalSaleDate,
+                  sale_price: finalSalePrice,
                   vehicle_year: vehicleResult.data?.year,
                   vehicle_make: vehicleResult.data?.make,
                   vehicle_model: vehicleResult.data?.model,
@@ -321,6 +560,11 @@ export default function OrganizationProfile() {
                   listing_status: ov.listing_status,
                   cost_basis: ov.cost_basis,
                   days_on_lot: ov.days_on_lot,
+                  has_active_auction: !!auctionListing.data, // Flag for sorting
+                  auction_end_time: auctionListing.data?.auction_end_time,
+                  auction_current_bid: auctionListing.data?.current_high_bid_cents,
+                  auction_bid_count: auctionListing.data?.bid_count || 0,
+                  auction_reserve_price: auctionListing.data?.reserve_price_cents,
                   vehicles: vehicleResult.data || {}
                 };
               } catch {
@@ -404,6 +648,13 @@ export default function OrganizationProfile() {
       // Timeline (background)
       (async () => {
         try {
+          if (!organizationId) {
+            console.warn('No organizationId, skipping timeline events load');
+            setTimelineEvents([]);
+            return;
+          }
+
+          console.log(`Loading timeline events for organization: ${organizationId}`);
           const { data: eventsData, error: eventsError } = await supabase
             .from('business_timeline_events')
             .select('id, event_type, title, description, event_date, created_by, metadata')
@@ -411,7 +662,23 @@ export default function OrganizationProfile() {
             .order('event_date', { ascending: false })
             .limit(50);
           
-          if (eventsError || !eventsData) {
+          if (eventsError) {
+            console.error('Error loading timeline events:', eventsError);
+            console.error('Error details:', JSON.stringify(eventsError, null, 2));
+            setTimelineEvents([]);
+            return;
+          }
+          
+          if (!eventsData) {
+            console.log('No timeline events data returned (null/undefined)');
+            setTimelineEvents([]);
+            return;
+          }
+          
+          console.log(`✅ Loaded ${eventsData.length} timeline events for organization ${organizationId}`);
+          
+          if (eventsData.length === 0) {
+            console.log('⚠️ Query returned 0 events (but query succeeded)');
             setTimelineEvents([]);
             return;
           }
@@ -426,8 +693,13 @@ export default function OrganizationProfile() {
             })
           );
           
-          setTimelineEvents(enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value));
-        } catch {
+          const validEvents = enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value);
+          console.log(`✅ Enriched ${validEvents.length} timeline events with profiles`);
+          console.log('Sample event:', validEvents[0]);
+          setTimelineEvents(validEvents);
+        } catch (error) {
+          console.error('❌ Exception loading timeline events:', error);
+          console.error('Exception stack:', error instanceof Error ? error.stack : 'No stack');
           setTimelineEvents([]);
         }
       })();
@@ -656,31 +928,49 @@ export default function OrganizationProfile() {
 
   return (
     <div style={{ background: '#f5f5f5', minHeight: '100vh' }}>
-      {/* HEADER: Price, Stock Symbol, Trade Button, Owner Badge */}
+      {/* HEADER: Organization Name - Top Focus */}
       <div style={{
         background: 'var(--white)',
-        borderBottom: '1px solid #e5e5e5',
-        padding: '12px 16px',
+        borderBottom: '2px solid var(--border)',
+        padding: '20px 16px',
         position: 'sticky',
         top: 48,
         zIndex: 10,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        boxShadow: '0 2px 4px rgba(0,0,0,0.08)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          {/* Organization name - PRIMARY FOCUS */}
+          <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+            <h1 style={{ 
+              fontSize: '20pt', 
+              fontWeight: 700, 
+              color: 'var(--text)', 
+              margin: 0,
+              lineHeight: '1.2',
+              wordBreak: 'break-word'
+            }}>
+              {displayName}
+            </h1>
+            {organization.business_type && (
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                {organization.business_type}
+              </div>
+            )}
+          </div>
 
-          {/* Stock price (if tradable) */}
+          {/* Stock price (if tradable) - Secondary */}
           {organization.is_tradable && offering && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text)' }}>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)' }}>
                   ${offering.current_share_price.toFixed(2)}
                 </div>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>per share</span>
+                <span style={{ fontSize: '9pt', color: 'var(--color-text-muted)' }}>per share</span>
               </div>
               <span style={{
                 background: '#f3f4f6',
                 border: '1px solid #c0c0c0',
-                padding: '1px 4px',
+                padding: '2px 6px',
                 borderRadius: '2px',
                 fontSize: '8pt',
                 color: '#006400',
@@ -688,20 +978,15 @@ export default function OrganizationProfile() {
               }}>
                 {organization.stock_symbol || 'ORG'}
               </span>
-          <button
+              <button
                 onClick={() => setShowTrade(true)}
                 className="button button-primary button-small"
                 style={{ fontSize: '8pt', fontFamily: '"MS Sans Serif", sans-serif', borderRadius: 0 }}
-          >
+              >
                 Trade Shares
-          </button>
+              </button>
             </div>
           )}
-
-          {/* Organization name */}
-          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text)' }}>
-            {displayName}
-              </div>
 
           {/* Creator badge with actual username - hide if creator is current user and only a contractor */}
           {organization.discovered_by && (() => {
@@ -818,23 +1103,257 @@ export default function OrganizationProfile() {
               <OrganizationTimelineHeatmap organizationId={organizationId!} />
             </div>
 
-            {/* Products for Sale */}
+            {/* Live Auctions - Separate section at top */}
+            {(() => {
+              // Filter for vehicles with active auctions
+              const liveAuctions = vehicles.filter(v => {
+                // Must be active
+                if (v.status !== 'active') return false;
+                
+                // Must have active auction
+                if (!v.has_active_auction) return false;
+                
+                // Exclude service/work vehicles
+                if (v.relationship_type === 'service_provider' || 
+                    v.relationship_type === 'work_location' ||
+                    v.relationship_type === 'transport' ||
+                    v.relationship_type === 'storage') {
+                  return false;
+                }
+                
+                // Must be inventory type
+                const isInventoryType = 
+                  v.relationship_type === 'in_stock' ||
+                  v.relationship_type === 'consigner' ||
+                  v.relationship_type === 'owner' ||
+                  v.relationship_type === 'current_consignment' ||
+                  v.relationship_type === 'seller' ||
+                  v.relationship_type === 'buyer';
+                
+                if (!isInventoryType && v.relationship_type) {
+                  return false;
+                }
+                
+                // Check all sold indicators
+                const isSold = 
+                  v.sale_date || 
+                  v.sale_price || 
+                  v.vehicle_sale_status === 'sold' ||
+                  v.listing_status === 'sold' ||
+                  (v.vehicles && (v.vehicles as any).sale_price) ||
+                  (v.vehicles && (v.vehicles as any).sale_date);
+                
+                return !isSold;
+              });
+              
+              // Sort by auction end time (ending soon first)
+              const sortedAuctions = [...liveAuctions].sort((a, b) => {
+                const aEnd = a.auction_end_time ? new Date(a.auction_end_time).getTime() : 0;
+                const bEnd = b.auction_end_time ? new Date(b.auction_end_time).getTime() : 0;
+                return aEnd - bEnd;
+              });
+              
+              if (sortedAuctions.length > 0) {
+                return (
+                  <div className="card" style={{ marginBottom: '16px', border: '2px solid #dc2626' }}>
+                    <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700, color: '#dc2626' }}>
+                      LIVE AUCTIONS
+                    </div>
+                    <div className="card-body">
+                      {sortedAuctions.map((vehicle) => {
+                        const formatTimeRemaining = (endTime: string | null) => {
+                          if (!endTime) return 'N/A';
+                          const now = new Date();
+                          const end = new Date(endTime);
+                          const diff = end.getTime() - now.getTime();
+                          if (diff <= 0) return 'Ended';
+                          const hours = Math.floor(diff / (60 * 60 * 1000));
+                          const days = Math.floor(hours / 24);
+                          if (days > 0) return `${days}d ${hours % 24}h`;
+                          return `${hours}h`;
+                        };
+                        
+                        return (
+                        <div
+                          key={vehicle.id}
+                          style={{
+                            padding: '12px',
+                            marginBottom: '8px',
+                            border: '2px solid #dc2626',
+                            borderRadius: '4px',
+                            background: 'var(--white)',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <div style={{ flex: 1 }}>
+                              <a 
+                                href={`/vehicle/${vehicle.vehicle_id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ 
+                                  fontSize: '10pt', 
+                                  fontWeight: 700, 
+                                  color: '#dc2626', 
+                                  marginBottom: '2px',
+                                  display: 'block',
+                                  textDecoration: 'none'
+                                }}
+                                className="hover:underline"
+                              >
+                                {vehicle.vehicle_year} {vehicle.vehicle_make} {vehicle.vehicle_model}
+                              </a>
+                              {vehicle.vehicle_vin && (
+                                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                  VIN: {vehicle.vehicle_vin}
+                                </div>
+                              )}
+                              {/* Auction bid info */}
+                              <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '8pt' }}>
+                                {vehicle.auction_current_bid ? (
+                                  <div>
+                                    <span style={{ color: 'var(--text-muted)' }}>Current Bid: </span>
+                                    <span style={{ fontWeight: 700, color: '#1d4ed8' }}>
+                                      ${(vehicle.auction_current_bid / 100).toLocaleString()}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div style={{ color: 'var(--text-muted)' }}>No bids yet</div>
+                                )}
+                                {vehicle.auction_bid_count > 0 && (
+                                  <div style={{ color: 'var(--text-secondary)' }}>
+                                    {vehicle.auction_bid_count} {vehicle.auction_bid_count === 1 ? 'bid' : 'bids'}
+                                  </div>
+                                )}
+                                {!vehicle.auction_reserve_price && (
+                                  <div style={{ color: '#ea580c', fontWeight: 600 }}>NO RESERVE</div>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', marginLeft: '12px' }}>
+                              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                                Time Left
+                              </div>
+                              <div style={{ fontSize: '9pt', fontWeight: 700, color: '#dc2626', whiteSpace: 'nowrap' }}>
+                                {formatTimeRemaining(vehicle.auction_end_time)}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <div style={{
+                                fontSize: '7pt',
+                                padding: '2px 6px',
+                                borderRadius: '2px',
+                                background: '#dc2626',
+                                color: 'white',
+                                fontWeight: 700
+                              }}>
+                                LIVE AUCTION
+                              </div>
+                              {vehicle.relationship_type && (
+                                <div style={{
+                                  fontSize: '7pt',
+                                  padding: '2px 6px',
+                                  borderRadius: '2px',
+                                  background: 'var(--surface)',
+                                  color: 'var(--text-secondary)',
+                                  border: '1px solid var(--border)'
+                                }}>
+                                  {vehicle.relationship_type.replace(/_/g, ' ')}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {vehicle.vehicle_image_url && (
+                                <img 
+                                  src={vehicle.vehicle_image_url} 
+                                  alt={`${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`}
+                                  style={{
+                                    width: '60px',
+                                    height: '40px',
+                                    objectFit: 'cover',
+                                    borderRadius: '4px'
+                                  }}
+                                />
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/vehicle/${vehicle.vehicle_id}`);
+                                }}
+                                className="button button-primary button-small"
+                                style={{ fontSize: '8pt', padding: '4px 8px', whiteSpace: 'nowrap', background: '#dc2626', borderColor: '#dc2626' }}
+                              >
+                                View Auction
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )})}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Vehicles for Sale */}
             <div className="card" style={{ marginBottom: '16px' }}>
               <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
-                Products for Sale
+                Vehicles for Sale
               </div>
               <div className="card-body">
                 {(() => {
                   // Filter vehicles that are current inventory (not sold, active)
                   // Show vehicles that are:
-                  // 1. Not sold (listing_status != 'sold' AND sale_date IS NULL)
+                  // 1. Not sold - check multiple indicators: sale_date, sale_price, vehicle_sale_status, status
                   // 2. Active status
-                  // 3. Preferably listing_status = 'for_sale' but include all active non-sold vehicles
-                  const productsForSale = vehicles.filter(v => 
-                    v.status === 'active' &&
-                    v.listing_status !== 'sold' &&
-                    !v.sale_date
-                  );
+                  // 3. Relationship type indicates inventory/for sale (not service/work vehicles)
+                  // 4. EXCLUDE vehicles with active auctions (those are shown above)
+                  // 5. Preferably listing_status = 'for_sale' but include all active non-sold inventory vehicles
+                  const productsForSale = vehicles.filter(v => {
+                    // Must be active
+                    if (v.status !== 'active') return false;
+                    
+                    // EXCLUDE vehicles with active auctions - they're shown in separate section above
+                    if (v.has_active_auction) return false;
+                    
+                    // Exclude service/work vehicles - these are not for sale
+                    if (v.relationship_type === 'service_provider' || 
+                        v.relationship_type === 'work_location' ||
+                        v.relationship_type === 'transport' ||
+                        v.relationship_type === 'storage') {
+                      return false;
+                    }
+                    
+                    // Only show inventory/sale-related relationship types
+                    // Include: in_stock, consigner, owner, current_consignment, seller, buyer (as inventory)
+                    const isInventoryType = 
+                      v.relationship_type === 'in_stock' ||
+                      v.relationship_type === 'consigner' ||
+                      v.relationship_type === 'owner' ||
+                      v.relationship_type === 'current_consignment' ||
+                      v.relationship_type === 'seller' ||
+                      v.relationship_type === 'buyer';
+                    
+                    // If relationship_type is not an inventory type, exclude it
+                    if (!isInventoryType && v.relationship_type) {
+                      return false;
+                    }
+                    
+                    // Check all sold indicators
+                    const isSold = 
+                      v.sale_date || // Has sale date
+                      v.sale_price || // Has sale price
+                      v.vehicle_sale_status === 'sold' || // Vehicle marked as sold
+                      v.listing_status === 'sold' || // Listing status says sold
+                      (v.vehicles && (v.vehicles as any).sale_price) || // Vehicle has sale_price
+                      (v.vehicles && (v.vehicles as any).sale_date); // Vehicle has sale_date
+                    
+                    return !isSold;
+                  });
                   
                   if (productsForSale.length === 0) {
                     return (
@@ -844,9 +1363,17 @@ export default function OrganizationProfile() {
                     );
                   }
                   
+                  // Sort by value (highest first) or date
+                  const sorted = [...productsForSale].sort((a, b) => {
+                    const aValue = a.vehicle_current_value || 0;
+                    const bValue = b.vehicle_current_value || 0;
+                    if (aValue !== bValue) return bValue - aValue;
+                    return 0;
+                  });
+                  
                   return (
                     <div>
-                      {productsForSale.slice(0, 10).map((vehicle) => (
+                      {sorted.slice(0, 10).map((vehicle) => (
                         <div
                           key={vehicle.id}
                           style={{
@@ -891,17 +1418,61 @@ export default function OrganizationProfile() {
                           
                           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                              {vehicle.listing_status && (
-                                <div style={{
-                                  fontSize: '7pt',
-                                  padding: '2px 6px',
-                                  borderRadius: '2px',
-                                  background: vehicle.listing_status === 'for_sale' ? 'var(--success-dim)' : 'var(--accent-dim)',
-                                  color: vehicle.listing_status === 'for_sale' ? 'var(--success)' : 'var(--accent)'
-                                }}>
-                                  {vehicle.listing_status === 'for_sale' ? 'For Sale' : vehicle.listing_status === 'reserved' ? 'Reserved' : vehicle.listing_status || 'Active'}
-                                </div>
-                              )}
+                              {(() => {
+                                // Show "LIVE AUCTION" badge first if vehicle has active auction
+                                if (vehicle.has_active_auction) {
+                                  return (
+                                    <div style={{
+                                      fontSize: '7pt',
+                                      padding: '2px 6px',
+                                      borderRadius: '2px',
+                                      background: '#dc2626',
+                                      color: 'white',
+                                      fontWeight: 700
+                                    }}>
+                                      LIVE AUCTION
+                                    </div>
+                                  );
+                                }
+                                
+                                // Determine actual sale status - check all indicators
+                                const isSold = 
+                                  vehicle.sale_date || 
+                                  vehicle.sale_price || 
+                                  vehicle.vehicle_sale_status === 'sold' ||
+                                  (vehicle.vehicles && ((vehicle.vehicles as any).sale_price || (vehicle.vehicles as any).sale_date));
+                                
+                                if (isSold) {
+                                  return (
+                                    <div style={{
+                                      fontSize: '7pt',
+                                      padding: '2px 6px',
+                                      borderRadius: '2px',
+                                      background: 'var(--grey-200)',
+                                      color: 'var(--text-muted)'
+                                    }}>
+                                      Sold
+                                    </div>
+                                  );
+                                }
+                                
+                                // Show listing status only if not sold
+                                if (vehicle.listing_status && vehicle.listing_status !== 'sold') {
+                                  return (
+                                    <div style={{
+                                      fontSize: '7pt',
+                                      padding: '2px 6px',
+                                      borderRadius: '2px',
+                                      background: vehicle.listing_status === 'for_sale' ? 'var(--success-dim)' : 'var(--accent-dim)',
+                                      color: vehicle.listing_status === 'for_sale' ? 'var(--success)' : 'var(--accent)'
+                                    }}>
+                                      {vehicle.listing_status === 'for_sale' ? 'For Sale' : vehicle.listing_status === 'reserved' ? 'Reserved' : vehicle.listing_status || 'Active'}
+                                    </div>
+                                  );
+                                }
+                                
+                                return null;
+                              })()}
                               {vehicle.relationship_type && (
                                 <div style={{
                                   fontSize: '7pt',
@@ -953,17 +1524,7 @@ export default function OrganizationProfile() {
             </div>
 
             {/* SOLD INVENTORY BROWSER - Reference for buyers */}
-            <div className="card" style={{ marginBottom: '16px' }}>
-              <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
-                Sold Inventory Archive
-              </div>
-              <div className="card-body" style={{ padding: '16px' }}>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                  Browse previously sold vehicles with sale prices and platform information. Perfect for market research and value references.
-                </div>
-                <SoldInventoryBrowser organizationId={organizationId!} />
-              </div>
-            </div>
+            <SoldInventoryBrowser organizationId={organizationId!} />
 
             {/* Basic Info */}
             <div className="card" style={{ marginBottom: '16px' }}>
@@ -1161,11 +1722,49 @@ export default function OrganizationProfile() {
 
         {activeTab === 'images' && (
           <div className="card">
-            <div className="card-header">Images ({images.length})</div>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Images ({images.length})</span>
+              {(canEdit || isOwner) && (
+                <button
+                  onClick={() => imageInputRef.current?.click()}
+                  className="button button-primary button-small"
+                  style={{ fontSize: '8pt', padding: '6px 12px' }}
+                  disabled={uploadingImages}
+                >
+                  {uploadingImages ? 'Uploading...' : 'Upload Images'}
+                </button>
+              )}
+            </div>
             <div className="card-body">
               {images.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)', fontSize: '9pt' }}>
-                  No images yet
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '60px 20px', 
+                  color: 'var(--text-muted)',
+                  border: '2px dashed var(--border)',
+                  borderRadius: '8px',
+                  background: 'var(--surface)'
+                }}>
+                  <div style={{ fontSize: '11pt', marginBottom: '12px', fontWeight: 600 }}>
+                    No images yet
+                  </div>
+                  <div style={{ fontSize: '9pt', marginBottom: '20px' }}>
+                    Upload the first image to get started
+                  </div>
+                  {(canEdit || isOwner) ? (
+                    <button
+                      onClick={() => imageInputRef.current?.click()}
+                      className="button button-primary"
+                      style={{ fontSize: '10pt', padding: '10px 24px' }}
+                      disabled={uploadingImages}
+                    >
+                      {uploadingImages ? 'Uploading...' : 'Upload Images'}
+                    </button>
+                  ) : (
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      Contact the organization owner to add images
+                    </div>
+                  )}
                 </div>
               ) : (
             <div style={{
@@ -1718,7 +2317,7 @@ export default function OrganizationProfile() {
                 <div style={{ marginBottom: '8px' }}>
                   <div style={{ marginBottom: '4px', fontSize: '9pt' }}>Upload Document:</div>
                   
-                  {/* Hidden file input */}
+                  {/* Hidden file input for ownership documents */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1806,6 +2405,16 @@ export default function OrganizationProfile() {
         </div>,
         document.body
       )}
+
+      {/* Hidden file input for image uploads */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleImageUpload}
+        style={{ display: 'none' }}
+      />
 
       {/* Lightbox */}
       {lightboxImage && ReactDOM.createPortal(

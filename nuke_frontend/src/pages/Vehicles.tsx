@@ -99,11 +99,17 @@ const VehiclesInner: React.FC = () => {
   }>>(new Map());
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const urlSearchQuery = searchParams.get('search') || '';
 
   useEffect(() => {
     checkAuth();
     
     // URL params for tab selection removed - categorize tab no longer exists
+    
+    // Handle search query from URL
+    if (urlSearchQuery) {
+      setSearchTerm(urlSearchQuery);
+    }
     
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -115,7 +121,7 @@ const VehiclesInner: React.FC = () => {
     );
 
     return () => subscription.unsubscribe();
-  }, [searchParams]);
+  }, [searchParams, urlSearchQuery]);
 
   useEffect(() => {
     loadVehicleRelationships();

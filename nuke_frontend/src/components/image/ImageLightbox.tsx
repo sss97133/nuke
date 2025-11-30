@@ -1674,9 +1674,33 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                             <span className="text-white">{angleData.primary_label}</span>
                           </div>
                         ) : (
-                          <div className="flex justify-between border-t border-white/10 pt-2 mt-2">
-                            <span>What:</span>
-                            <span className="text-yellow-400">Pending AI analysis</span>
+                          <div className="flex justify-between items-center border-t border-white/10 pt-2 mt-2">
+                            <div className="flex items-center gap-2">
+                              <span>What:</span>
+                              <span className="text-yellow-400">Pending AI analysis</span>
+                            </div>
+                            {vehicleId && imageUrl && !analyzing && (
+                              <button
+                                onClick={async () => {
+                                  if (!vehicleId || !imageUrl) return;
+                                  const result = await triggerAIAnalysis(imageUrl, timelineEventId, vehicleId);
+                                  if (result.success) {
+                                    // Reload image metadata after analysis
+                                    setTimeout(() => {
+                                      loadImageMetadata();
+                                      loadTags();
+                                    }, 3000);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors"
+                                style={{ fontSize: '8pt', padding: '4px 8px', cursor: 'pointer' }}
+                              >
+                                Analyze Now
+                              </button>
+                            )}
+                            {analyzing && (
+                              <span className="text-yellow-400 text-xs">Analyzing...</span>
+                            )}
                           </div>
                         )}
                         

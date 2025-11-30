@@ -92,6 +92,21 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
     return () => document.removeEventListener('mousedown', handler);
   }, [showMenu]);
 
+  // Calculate dropdown position when menu opens
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
+  
+  useEffect(() => {
+    if (showMenu && menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right
+      });
+    } else {
+      setDropdownPosition(null);
+    }
+  }, [showMenu]);
+
   // Always show balance, default to 0.00 if no balance
   const availableCents = balance?.available_cents ?? 0;
   const amount = (availableCents / 100).toFixed(2);
@@ -201,19 +216,33 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
       </div>
 
       {/* Dropdown Menu */}
-      {showMenu && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            right: 0,
-            minWidth: '200px',
-            backgroundColor: '#fff',
-            border: '2px solid #000',
-            boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
-            zIndex: 9999
-          }}
-        >
+      {showMenu && dropdownPosition && (
+        <>
+          {/* Backdrop to prevent clicks and ensure dropdown is on top */}
+          <div
+            onClick={() => setShowMenu(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9998,
+              backgroundColor: 'transparent'
+            }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: `${dropdownPosition.top}px`,
+              right: `${dropdownPosition.right}px`,
+              minWidth: '200px',
+              backgroundColor: '#fff',
+              border: '2px solid #000',
+              boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
+              zIndex: 9999
+            }}
+          >
           {/* Menu items - consolidated navigation */}
           {[
             { label: 'Capsule', action: '/capsule' },
@@ -246,7 +275,8 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
               {item.label}
             </button>
           ))}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

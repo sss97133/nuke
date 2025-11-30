@@ -736,6 +736,8 @@ body {
   align-items: center;
   justify-content: space-between;
   height: 40px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .header-left {
@@ -743,6 +745,8 @@ body {
   align-items: center;
   gap: var(--space-6);
   padding-left: 5px; /* ensure min inset from left edge */
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .logo {
@@ -794,8 +798,11 @@ body {
 .header-right {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   padding-right: 5px; /* ensure min inset from right edge */
+  flex: 0 0 auto;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 /* Mobile Navigation Styles */
@@ -3138,7 +3145,7 @@ body {
   .header-right {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-4);
     padding-right: 5px;
   }
   
@@ -3199,7 +3206,7 @@ body {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-4);
     min-width: 0;
   }
 

@@ -381,10 +381,10 @@ export class ImageUploadService {
       // Images are evidence/documentation that attach to real work events
       // They are displayed in image gallery, not as timeline events
 
-      // 🤖 TRIGGER AI ANALYSIS AUTOMATICALLY
-      // Analyze image in background - don't wait for result
+      // 🤖 TRIGGER AI ANALYSIS AUTOMATICALLY ON UPLOAD
+      // This MUST trigger for every image upload - no exceptions
       if (isImage && dbResult?.id) {
-        console.log('Triggering AI analysis for image:', dbResult.id);
+        console.log('🚀 Triggering AI analysis for uploaded image:', dbResult.id);
         
         // Emit event for UI to track
         if (typeof window !== 'undefined') {
@@ -397,9 +397,11 @@ export class ImageUploadService {
           }));
         }
 
-        // Use tier1 function (more reliable than analyze-image)
-        // Pass user_id so function can use user's API key if available
-        const { data: { user } } = await supabase.auth.getUser()
+        // Get user for API key
+        const { data: { user } } = await supabase.auth.getUser();
+
+        // PRIMARY: Tier 1 analysis (basic organization - angle, category, quality)
+        // This is the main analysis that MUST run on every upload
         supabase.functions.invoke('analyze-image-tier1', {
           body: {
             image_url: urlData.publicUrl,
@@ -409,14 +411,14 @@ export class ImageUploadService {
           }
         }).then(({ data, error }) => {
           if (error) {
-            console.warn('AI analysis failed:', error);
+            console.error('❌ Tier 1 AI analysis failed:', error);
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('image_processing_failed', {
                 detail: { imageId: dbResult.id, error: error.message }
               }));
             }
           } else {
-            console.log('AI analysis succeeded:', data);
+            console.log('✅ Tier 1 AI analysis succeeded:', data);
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('image_processing_complete', {
                 detail: { imageId: dbResult.id, result: data }
@@ -424,13 +426,75 @@ export class ImageUploadService {
             }
           }
         }).catch(err => {
-          console.warn('AI analysis error:', err);
+          console.error('❌ Tier 1 AI analysis error:', err);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('image_processing_failed', {
+              detail: { imageId: dbResult.id, error: err.message || 'Unknown error' }
+            }));
+          }
         });
-      }
 
-      // Trigger sensitive document detection (titles, etc)
-      if (isImage) {
-        this.triggerBackgroundAIAnalysis(urlData.publicUrl, vehicleId, dbResult.id);
+        // SECONDARY: Sensitive document detection (titles, registrations)
+        // This runs in parallel and doesn't block the main analysis
+        supabase.functions.invoke('detect-sensitive-document', {
+          body: {
+            image_url: urlData.publicUrl,
+            vehicle_id: vehicleId,
+            image_id: dbResult.id
+          }
+        }).then(({ data, error }) => {
+          if (error) {
+            console.warn('⚠️ Sensitive document detection failed:', error);
+          } else if (data?.is_sensitive) {
+            console.log(`🔒 Sensitive ${data.document_type} detected - access restricted`);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('sensitive_document_detected', {
+                detail: {
+                  imageId: dbResult.id,
+                  vehicleId,
+                  documentType: data.document_type,
+                  extractedFields: data.extracted_fields || [],
+                  isPrivatized: true
+                }
+              }));
+            }
+          }
+        }).catch(err => {
+          console.warn('⚠️ Sensitive document detection error:', err);
+        });
+
+        // TERTIARY: Full analysis (tagging, parts detection, etc.)
+        // This provides additional detailed analysis beyond tier 1
+        supabase.functions.invoke('analyze-image', {
+          body: {
+            image_url: urlData.publicUrl,
+            vehicle_id: vehicleId,
+            timeline_event_id: null,
+            user_id: user?.id || null
+          }
+        }).then(({ data, error }) => {
+          if (error) {
+            console.warn('⚠️ Full AI analysis failed (non-critical):', error);
+          } else {
+            console.log('✅ Full AI analysis completed:', data);
+          }
+        }).catch(err => {
+          console.warn('⚠️ Full AI analysis error (non-critical):', err);
+        });
+      } else if (isImage && !dbResult?.id) {
+        // Fallback: If database insert failed but image was uploaded, still try analysis
+        console.warn('⚠️ Database insert failed but image uploaded, attempting analysis anyway');
+        const { data: { user } } = await supabase.auth.getUser();
+        supabase.functions.invoke('analyze-image-tier1', {
+          body: {
+            image_url: urlData.publicUrl,
+            vehicle_id: vehicleId,
+            image_id: null, // No image_id available
+            user_id: user?.id || null
+          }
+        }).catch(err => {
+          console.error('❌ Fallback analysis failed:', err);
+        });
       }
 
       return {
@@ -444,64 +508,6 @@ export class ImageUploadService {
     }
   }
 
-  /**
-   * Trigger background AI analysis (non-blocking)
-   * This runs async so upload feels fast
-   * Now includes:
-   * 1. Sensitive document detection (titles, registrations)
-   * 2. Rekognition + Appraiser Brain + SPID extraction
-   */
-  private static triggerBackgroundAIAnalysis(imageUrl: string, vehicleId: string, imageId: string): void {
-    // First: Check for sensitive documents (IMMEDIATE - blocks unauthorized access)
-    supabase.functions.invoke('detect-sensitive-document', {
-      body: {
-        image_url: imageUrl,
-        vehicle_id: vehicleId,
-        image_id: imageId
-      }
-    }).then(({ data, error }) => {
-      if (error) {
-        console.warn('Sensitive document detection failed:', error);
-      } else if (data?.is_sensitive) {
-        console.log(`🔒 Sensitive ${data.document_type} detected - access restricted`);
-        
-        // EMIT EVENT FOR UI
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('sensitive_document_detected', {
-            detail: {
-              imageId,
-              vehicleId,
-              documentType: data.document_type,
-              extractedFields: data.extracted_fields || [],
-              isPrivatized: true
-            }
-          }));
-        }
-      }
-    }).catch(err => {
-      console.warn('Sensitive document detection request failed:', err);
-    });
-
-    // Second: General AI analysis (tagging, quality, etc.)
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      supabase.functions.invoke('analyze-image', {
-        body: {
-          image_url: imageUrl,
-          vehicle_id: vehicleId,
-          timeline_event_id: null,
-          user_id: user?.id || null
-        }
-      }).then(({ data, error }) => {
-        if (error) {
-          console.warn('Background AI analysis trigger failed:', error);
-        }
-      }).catch(err => {
-        console.warn('Background AI analysis request failed:', err);
-      });
-    }).catch(err => {
-      console.warn('Failed to get user for AI analysis:', err);
-    });
-  }
 
   /**
    * Map DocumentType to database category

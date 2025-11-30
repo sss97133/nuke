@@ -39,3 +39,4 @@ COMMENT ON MATERIALIZED VIEW organization_activity_summary IS 'Aggregated stats 
 COMMENT ON FUNCTION refresh_organization_activity_summary IS 'Refresh the organization activity summary materialized view';
 
 
+

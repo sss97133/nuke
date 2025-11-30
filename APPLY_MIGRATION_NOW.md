@@ -1,36 +1,41 @@
-# Apply Database Migration - URGENT
+# Apply Migration: received_in_trade Column
 
-## Error
+## Quick Apply (Supabase Dashboard)
 
-The `user_vehicle_preferences` table doesn't exist, causing errors. You need to apply the migration.
+1. Go to: https://supabase.com/dashboard/project/qkgaybvrernstplzjaam/sql/new
+2. Copy and paste this SQL:
 
-## Quick Fix
+```sql
+ALTER TABLE vehicles 
+  ADD COLUMN IF NOT EXISTS received_in_trade BOOLEAN DEFAULT FALSE;
 
-Run this command in your terminal:
+CREATE INDEX IF NOT EXISTS idx_vehicles_received_in_trade 
+  ON vehicles(received_in_trade) 
+  WHERE received_in_trade = true;
 
-```bash
-cd /Users/skylar/nuke
-supabase migration up
+COMMENT ON COLUMN vehicles.received_in_trade IS 
+  'Indicates if this vehicle was received as part of a trade transaction (including partial trades)';
 ```
 
-Or apply the migration manually via Supabase Dashboard:
+3. Click "Run" to execute
 
-1. Go to https://supabase.com/dashboard
-2. Select your project
-3. Go to **Database** → **Migrations**
-4. Click **New Migration**
-5. Copy the contents of `supabase/migrations/20250127_user_vehicle_preferences.sql`
-6. Paste and apply
+## Verification
 
-## What This Migration Creates
+After applying, verify the column exists:
 
-- `user_vehicle_preferences` table for:
-  - Favorites
-  - Collections
-  - Hidden vehicles
-  - Personal notes
+```sql
+SELECT column_name, data_type, column_default 
+FROM information_schema.columns 
+WHERE table_name = 'vehicles' 
+AND column_name = 'received_in_trade';
+```
 
-## After Applying
+You should see:
+- column_name: `received_in_trade`
+- data_type: `boolean`
+- column_default: `false`
 
-The errors will stop and all organization tools will work properly.
+## Migration File
 
+The migration file is located at:
+`supabase/migrations/20250128_add_received_in_trade_column.sql`

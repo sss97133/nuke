@@ -28,6 +28,8 @@
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.5.3",
     "@supabase/supabase-js": "^2.75.0",
     "@types/leaflet": "^1.9.21",
     "@use-gesture/react": "^10.3.1",

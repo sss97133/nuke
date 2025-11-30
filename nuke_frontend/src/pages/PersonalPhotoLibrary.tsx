@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabase';
 import { ImageSetService } from '../services/imageSetService';
 import type { ImageSet } from '../services/imageSetService';
 import { useToast } from '../hooks/useToast';
+import { InputDialog } from '../components/common/InputDialog';
 
 type GridDensity = 'small' | 'medium' | 'large';
 
@@ -48,6 +49,8 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const [submitVehicleId, setSubmitVehicleId] = useState<string | null>(null);
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null);
   const [editingAlbumName, setEditingAlbumName] = useState('');
+  const [albumNameDialog, setAlbumNameDialog] = useState<{ isOpen: boolean; defaultName: string }>({ isOpen: false, defaultName: '' });
+  const [vehicleConversionDialog, setVehicleConversionDialog] = useState<{ isOpen: boolean; album: ImageSet | null; step: 'year' | 'make' | 'model' | 'trim' | 'vin'; values: { year?: string; make?: string; model?: string; trim?: string; vin?: string } }>({ isOpen: false, album: null, step: 'year', values: {} });
   
   // Computed counts for sidebar
   const [counts, setCounts] = useState({
@@ -279,35 +282,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
 
     // Create new album
     const defaultName = `Album ${new Date().toLocaleDateString()}`;
-    const name = window.prompt('New album name:', defaultName);
-    if (!name || !name.trim()) return;
-
-    try {
-      const album = await ImageSetService.createPersonalAlbum({ name: name.trim() });
-      if (!album) {
-        showToast('Failed to create album: No data returned', 'error');
-        return;
-      }
-
-      const added = await ImageSetService.addImagesToSet(album.id, Array.from(selectedPhotos));
-      if (added === 0) {
-        showToast('Album created but no new photos were added.', 'info');
-      } else {
-        showToast(`Created album "${name}" and added ${added} photo${added > 1 ? 's' : ''}.`, 'success');
-        setSelectedPhotos(new Set());
-      }
-
-      await loadData();
-    } catch (error: any) {
-      console.error('Failed to create album:', error);
-      const message = error?.message || error?.toString() || 'Failed to create album. Check console for details.';
-      showToast(message, 'error');
-      
-      // If it's a database constraint error, suggest running migration
-      if (message.includes('violates') || message.includes('constraint') || message.includes('null')) {
-        console.error('Database schema issue detected. Make sure migration 20250125000000_fix_personal_albums_schema.sql has been applied.');
-      }
-    }
+    setAlbumNameDialog({ isOpen: true, defaultName });
   };
 
   const handleRestartAIProcessing = async () => {
@@ -397,46 +372,118 @@ export const PersonalPhotoLibrary: React.FC = () => {
       if (nameParts.length > 2) suggestedModel = nameParts.slice(2).join(' ');
     }
 
-    const yearInput = window.prompt('Year (e.g. 1996):', suggestedYear || '');
-    if (!yearInput) return;
-    const year = parseInt(yearInput, 10);
-    if (Number.isNaN(year)) {
-      showToast('Year must be a number.', 'error');
+    setVehicleConversionDialog({
+      isOpen: true,
+      album,
+      step: 'year',
+      values: {
+        year: suggestedYear || undefined,
+        make: suggestedMake || undefined,
+        model: suggestedModel || undefined
+      }
+    });
+  };
+
+  const handleVehicleConversionStep = async (value: string) => {
+    const { album, step, values } = vehicleConversionDialog;
+    if (!album) return;
+
+    const newValues = { ...values };
+
+    if (step === 'year') {
+      const year = parseInt(value, 10);
+      if (Number.isNaN(year)) {
+        showToast('Year must be a number.', 'error');
+        return;
+      }
+      newValues.year = value;
+      setVehicleConversionDialog({ ...vehicleConversionDialog, step: 'make', values: newValues });
+    } else if (step === 'make') {
+      if (!value.trim()) {
+        showToast('Make is required.', 'error');
+        return;
+      }
+      newValues.make = value.trim();
+      setVehicleConversionDialog({ ...vehicleConversionDialog, step: 'model', values: newValues });
+    } else if (step === 'model') {
+      if (!value.trim()) {
+        showToast('Model is required.', 'error');
+        return;
+      }
+      newValues.model = value.trim();
+      setVehicleConversionDialog({ ...vehicleConversionDialog, step: 'trim', values: newValues });
+    } else if (step === 'trim') {
+      newValues.trim = value.trim() || undefined;
+      setVehicleConversionDialog({ ...vehicleConversionDialog, step: 'vin', values: newValues });
+    } else if (step === 'vin') {
+      newValues.vin = value.trim() || undefined;
+      
+      // All steps complete, create vehicle
+      try {
+        const vehicleId = await ImageSetService.convertPersonalAlbumToVehicle({
+          imageSetId: album.id,
+          year: parseInt(newValues.year!, 10),
+          make: newValues.make!,
+          model: newValues.model!,
+          trim: newValues.trim,
+          vin: newValues.vin
+        });
+
+        // Update album name to match vehicle profile name
+        const vehicleName = `${newValues.year} ${newValues.make} ${newValues.model}`.trim();
+        try {
+          await ImageSetService.updateImageSet(album.id, { name: vehicleName });
+        } catch (e) {
+          console.warn('Failed to update album name:', e);
+        }
+
+        // Reload data so inbox updates, then navigate to new profile
+        setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} });
+        await loadData();
+        showToast(`Album converted to vehicle profile: ${vehicleName}`, 'success');
+        navigate(`/vehicle/${vehicleId}`);
+      } catch (error) {
+        console.error('Failed to convert album to vehicle:', error);
+        showToast('Failed to convert album to vehicle profile.', 'error');
+        setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} });
+      }
+    }
+  };
+
+  const handleAlbumNameConfirm = async (name: string) => {
+    if (!name || !name.trim()) {
+      setAlbumNameDialog({ isOpen: false, defaultName: '' });
       return;
     }
 
-    const make = window.prompt('Make (e.g. Ford):', suggestedMake || '') || '';
-    if (!make.trim()) return;
-    const model = window.prompt('Model (e.g. Bronco):', suggestedModel || '') || '';
-    if (!model.trim()) return;
-    const trim = window.prompt('Trim (optional):', '') || undefined;
-    const vin = window.prompt('VIN (recommended):', '') || undefined;
-
     try {
-      const vehicleId = await ImageSetService.convertPersonalAlbumToVehicle({
-        imageSetId: album.id,
-        year,
-        make: make.trim(),
-        model: model.trim(),
-        trim: trim?.trim() || undefined,
-        vin: vin?.trim() || undefined
-      });
-
-      // Update album name to match vehicle profile name
-      const vehicleName = `${year} ${make.trim()} ${model.trim()}`.trim();
-      try {
-        await ImageSetService.updateImageSet(album.id, { name: vehicleName });
-      } catch (e) {
-        console.warn('Failed to update album name:', e);
+      const album = await ImageSetService.createPersonalAlbum({ name: name.trim() });
+      if (!album) {
+        showToast('Failed to create album: No data returned', 'error');
+        setAlbumNameDialog({ isOpen: false, defaultName: '' });
+        return;
       }
 
-      // Reload data so inbox updates, then navigate to new profile
+      const added = await ImageSetService.addImagesToSet(album.id, Array.from(selectedPhotos));
+      if (added === 0) {
+        showToast('Album created but no new photos were added.', 'info');
+      } else {
+        showToast(`Created album "${name}" and added ${added} photo${added > 1 ? 's' : ''}.`, 'success');
+        setSelectedPhotos(new Set());
+      }
+
+      setAlbumNameDialog({ isOpen: false, defaultName: '' });
       await loadData();
-      showToast(`Album converted to vehicle profile: ${vehicleName}`, 'success');
-      navigate(`/vehicle/${vehicleId}`);
-    } catch (error) {
-      console.error('Failed to convert album to vehicle:', error);
-      showToast('Failed to convert album to vehicle profile.', 'error');
+    } catch (error: any) {
+      console.error('Failed to create album:', error);
+      const message = error?.message || error?.toString() || 'Failed to create album. Check console for details.';
+      showToast(message, 'error');
+      setAlbumNameDialog({ isOpen: false, defaultName: '' });
+      
+      // If it's a database constraint error, suggest running migration
+      if (message.includes('violates') || message.includes('constraint') || message.includes('null')) {
+        console.error('Database schema issue detected. Make sure migration 20250125000000_fix_personal_albums_schema.sql has been applied.');
+      }
     }
   };
 
@@ -1390,6 +1437,87 @@ export const PersonalPhotoLibrary: React.FC = () => {
             })()}
           </div>
         </div>
+      )}
+
+      {/* Album Name Dialog */}
+      <InputDialog
+        isOpen={albumNameDialog.isOpen}
+        title="New Album"
+        message="Enter a name for the new album:"
+        defaultValue={albumNameDialog.defaultName}
+        onConfirm={handleAlbumNameConfirm}
+        onCancel={() => setAlbumNameDialog({ isOpen: false, defaultName: '' })}
+        confirmLabel="Create"
+        required
+      />
+
+      {/* Vehicle Conversion Dialogs */}
+      {vehicleConversionDialog.isOpen && vehicleConversionDialog.album && (
+        <>
+          {vehicleConversionDialog.step === 'year' && (
+            <InputDialog
+              isOpen={true}
+              title="Convert Album to Vehicle"
+              message="Enter the vehicle year:"
+              defaultValue={vehicleConversionDialog.values.year || ''}
+              placeholder="e.g. 1996"
+              onConfirm={handleVehicleConversionStep}
+              onCancel={() => setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} })}
+              confirmLabel="Next"
+              required
+            />
+          )}
+          {vehicleConversionDialog.step === 'make' && (
+            <InputDialog
+              isOpen={true}
+              title="Convert Album to Vehicle"
+              message="Enter the vehicle make:"
+              defaultValue={vehicleConversionDialog.values.make || ''}
+              placeholder="e.g. Ford"
+              onConfirm={handleVehicleConversionStep}
+              onCancel={() => setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} })}
+              confirmLabel="Next"
+              required
+            />
+          )}
+          {vehicleConversionDialog.step === 'model' && (
+            <InputDialog
+              isOpen={true}
+              title="Convert Album to Vehicle"
+              message="Enter the vehicle model:"
+              defaultValue={vehicleConversionDialog.values.model || ''}
+              placeholder="e.g. Bronco"
+              onConfirm={handleVehicleConversionStep}
+              onCancel={() => setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} })}
+              confirmLabel="Next"
+              required
+            />
+          )}
+          {vehicleConversionDialog.step === 'trim' && (
+            <InputDialog
+              isOpen={true}
+              title="Convert Album to Vehicle"
+              message="Enter the vehicle trim (optional):"
+              defaultValue={vehicleConversionDialog.values.trim || ''}
+              placeholder="Optional"
+              onConfirm={handleVehicleConversionStep}
+              onCancel={() => setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} })}
+              confirmLabel="Next"
+            />
+          )}
+          {vehicleConversionDialog.step === 'vin' && (
+            <InputDialog
+              isOpen={true}
+              title="Convert Album to Vehicle"
+              message="Enter the VIN (optional but recommended):"
+              defaultValue={vehicleConversionDialog.values.vin || ''}
+              placeholder="17-character VIN"
+              onConfirm={handleVehicleConversionStep}
+              onCancel={() => setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} })}
+              confirmLabel="Create Vehicle"
+            />
+          )}
+        </>
       )}
     </div>
   );

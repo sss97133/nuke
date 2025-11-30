@@ -31,6 +31,12 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Declare variables outside try block for error handling
+  let html: string = ''
+  let fetchSuccess = false
+  let firecrawlAttempted = false
+  let firecrawlError: string | null = null
+  
   try {
     const { url } = await req.json()
     
@@ -51,11 +57,11 @@ serve(async (req) => {
     const isKSL = url.includes('cars.ksl.com')
 
     // Try Firecrawl first (bypasses 403/Cloudflare), then fallback to direct fetch
-    let html: string
-    let fetchSuccess = false
     
     const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY')
+    console.log('🔍 Firecrawl API key present:', firecrawlApiKey ? 'YES' : 'NO')
     if (firecrawlApiKey) {
+      firecrawlAttempted = true
       try {
         console.log('🔥 Attempting Firecrawl fetch for:', url)
         const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
@@ -75,6 +81,14 @@ serve(async (req) => {
 
         if (firecrawlResponse.ok) {
           const firecrawlData = await firecrawlResponse.json()
+          console.log('🔥 Firecrawl response:', JSON.stringify({
+            success: firecrawlData.success,
+            hasData: !!firecrawlData.data,
+            hasHtml: !!firecrawlData.data?.html,
+            hasMarkdown: !!firecrawlData.data?.markdown,
+            status: firecrawlResponse.status
+          }))
+          
           if (firecrawlData.success && firecrawlData.data) {
             // Firecrawl returns html in data.html or we can use markdown
             html = firecrawlData.data.html || 
@@ -82,18 +96,22 @@ serve(async (req) => {
             
             if (html) {
               fetchSuccess = true
-              console.log('✅ Firecrawl fetch successful')
+              console.log('✅ Firecrawl fetch successful, HTML length:', html.length)
             } else {
               console.warn('⚠️ Firecrawl returned no HTML content')
+              firecrawlError = 'No HTML content in response'
             }
           } else {
-            console.warn('⚠️ Firecrawl response not successful:', firecrawlData)
+            console.warn('⚠️ Firecrawl response not successful:', JSON.stringify(firecrawlData).substring(0, 200))
+            firecrawlError = `Response not successful: ${firecrawlData.success === false ? 'success=false' : 'no data'}`
           }
         } else {
           const errorText = await firecrawlResponse.text()
-          console.warn('⚠️ Firecrawl API error:', firecrawlResponse.status, errorText)
+          console.warn('⚠️ Firecrawl API error:', firecrawlResponse.status, errorText.substring(0, 200))
+          firecrawlError = `API error ${firecrawlResponse.status}: ${errorText.substring(0, 100)}`
         }
-      } catch (error) {
+      } catch (error: any) {
+        firecrawlError = error?.message || String(error)
         console.warn('⚠️ Firecrawl failed, using direct fetch:', error)
       }
     }
@@ -232,15 +250,35 @@ serve(async (req) => {
     // Image URLs are returned, frontend can handle downloading
     console.log(`Found ${data.images?.length || 0} image URLs`)
     
+    // Add metadata about fetch method used
+    const responseData = {
+      success: true,
+      data: {
+        ...data,
+        _metadata: {
+          fetchMethod: fetchSuccess ? 'firecrawl' : 'direct',
+          firecrawlUsed: fetchSuccess
+        }
+      }
+    }
+    
     return new Response(
-      JSON.stringify({ success: true, data }),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in scrape-vehicle:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        error: error?.message || String(error),
+        _debug: {
+          firecrawlAttempted,
+          firecrawlError,
+          firecrawlApiKeyPresent: !!Deno.env.get('FIRECRAWL_API_KEY')
+        }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
@@ -379,14 +417,37 @@ function scrapeCraigslist(doc: any, url: string): any {
     // Parse year/make/model from title
     const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
     if (yearMatch) {
-      data.year = yearMatch[0]
+      data.year = parseInt(yearMatch[0])
     }
     
-    // Extract make/model (e.g., "1972 GMC Suburban")
-    const vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s+-|\()/i)
+    // Extract make/model (e.g., "1972 GMC Suburban" or "1974 Chevy shortbed truck")
+    // Try multiple patterns
+    let vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s+-|\()/i)
+    if (!vehicleMatch) {
+      // Try pattern without price/location: "1974 Chevy shortbed truck"
+      vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s*$|\s*\*\*)/i)
+    }
+    
     if (vehicleMatch) {
-      data.make = vehicleMatch[2]
-      data.model = vehicleMatch[3].trim()
+      let make = vehicleMatch[2]
+      // Normalize make
+      if (make.toLowerCase() === 'chevy') make = 'Chevrolet'
+      data.make = make
+      let model = vehicleMatch[3].trim()
+      
+      // Normalize model: "pickup"/"truck" → "Truck" (GM's model name)
+      // Note: C/K was the series designation (C10, K10, etc.), not the model name
+      if (model.toLowerCase().includes('pickup') || model.toLowerCase().includes('truck') || model.toLowerCase() === 'c/k') {
+        data.model = 'Truck'
+      } else {
+        data.model = model
+      }
+    }
+    
+    // Extract trim from title if present (Cheyenne, Silverado, etc.)
+    const trimMatch = data.title.match(/\b(Cheyenne|Silverado|Scottsdale|Custom Deluxe|Big 10)\b/i)
+    if (trimMatch) {
+      data.trim = trimMatch[1]
     }
     
     // Extract price from title (supports "- $5,500" or "$5,500")
@@ -420,12 +481,26 @@ function scrapeCraigslist(doc: any, url: string): any {
         const cylMatch = text.match(/(\d+)\s+cylinders/)
         if (cylMatch) data.cylinders = parseInt(cylMatch[1])
       } else if (text.includes('drive:')) {
-        data.drivetrain = text.replace('drive:', '').trim()
+        const driveValue = text.replace('drive:', '').trim().toLowerCase()
+        // Normalize drivetrain values
+        if (driveValue === 'rwd' || driveValue === 'rear wheel drive') {
+          data.drivetrain = 'RWD'
+        } else if (driveValue === 'fwd' || driveValue === 'front wheel drive') {
+          data.drivetrain = 'FWD'
+        } else if (driveValue === '4wd' || driveValue === 'four wheel drive' || driveValue === 'awd' || driveValue === 'all wheel drive') {
+          data.drivetrain = '4WD'
+        } else {
+          data.drivetrain = driveValue.toUpperCase()
+        }
       } else if (text.includes('fuel:')) {
         data.fuel_type = text.replace('fuel:', '').trim()
       } else if (text.includes('odometer:')) {
         const odoMatch = text.match(/odometer:\s*([\d,]+)/)
-        if (odoMatch) data.mileage = parseInt(odoMatch[1].replace(/,/g, ''))
+        if (odoMatch) {
+          data.mileage = parseInt(odoMatch[1].replace(/,/g, ''))
+        } else if (text.toLowerCase().includes('broken')) {
+          data.odometer_status = 'Broken'
+        }
       } else if (text.includes('paint color:')) {
         data.color = text.replace('paint color:', '').trim()
       } else if (text.includes('title status:')) {
@@ -450,8 +525,35 @@ function scrapeCraigslist(doc: any, url: string): any {
   }
   
   if (!data.drivetrain) {
-    const driveMatch = fullText.match(/drive:\s*([\w\d]+)/i)
-    if (driveMatch) data.drivetrain = driveMatch[1]
+    const driveMatch = fullText.match(/drive:\s*([\w\d\s]+)/i)
+    if (driveMatch) {
+      const driveValue = driveMatch[1].trim().toLowerCase()
+      // Normalize drivetrain values
+      if (driveValue === 'rwd' || driveValue === 'rear wheel drive') {
+        data.drivetrain = 'RWD'
+      } else if (driveValue === 'fwd' || driveValue === 'front wheel drive') {
+        data.drivetrain = 'FWD'
+      } else if (driveValue === '4wd' || driveValue === 'four wheel drive' || driveValue === 'awd' || driveValue === 'all wheel drive') {
+        data.drivetrain = '4WD'
+      } else {
+        data.drivetrain = driveValue.toUpperCase()
+      }
+    }
+  }
+  
+  // Ensure drivetrain is normalized and cleaned if it was set earlier
+  if (data.drivetrain) {
+    // Clean whitespace and newlines
+    const driveClean = data.drivetrain.trim().split(/\s+/)[0].toLowerCase()
+    if (driveClean === 'rwd' || driveClean.includes('rear')) {
+      data.drivetrain = 'RWD'
+    } else if (driveClean === 'fwd' || driveClean.includes('front')) {
+      data.drivetrain = 'FWD'
+    } else if (driveClean === '4wd' || driveClean.includes('4') || driveClean === 'awd' || driveClean.includes('all')) {
+      data.drivetrain = '4WD'
+    } else {
+      data.drivetrain = driveClean.toUpperCase()
+    }
   }
   
   if (!data.fuel_type) {
@@ -495,9 +597,36 @@ function scrapeCraigslist(doc: any, url: string): any {
     // Parse additional details from description
     const descText = data.description.toUpperCase();
     
-    // Extract trim/series (K1500, K20, C10, etc.)
-    const trimMatch = descText.match(/\b(K1500|K10|K20|K30|C1500|C10|C20|C30|K5)\b/);
-    if (trimMatch) data.trim = trimMatch[1];
+    // Extract trim/series (K1500, K10, K20, C10, etc.)
+    const seriesMatch = descText.match(/\b(K1500|K10|K20|K30|C1500|C10|C20|C30|K5|C5)\b/);
+    if (seriesMatch) {
+      data.series = seriesMatch[1];
+    }
+    
+    // Extract trim (Cheyenne, Silverado, etc.) from description if not in title
+    // Handle common typos: "Cheyene" → "Cheyenne"
+    if (!data.trim) {
+      const trimMatch = descText.match(/\b(CHEYENNE|CHEYENE|SILVERADO|SCOTTSDALE|CUSTOM DELUXE|BIG 10)\b/);
+      if (trimMatch) {
+        let trim = trimMatch[1]
+        // Fix common typos
+        if (trim === 'CHEYENE') trim = 'CHEYENNE'
+        data.trim = trim.charAt(0) + trim.slice(1).toLowerCase();
+      }
+    }
+    
+    // Infer series from bed length and drivetrain if not found
+    // This runs after drivetrain is normalized, so check for RWD/4WD
+    if (!data.series && data.bed_length && (data.model === 'Truck' || data.model === 'C/K')) {
+      const drivetrainClean = (data.drivetrain || '').trim().toLowerCase()
+      const is4WD = drivetrainClean === '4wd' || drivetrainClean.includes('4') || drivetrainClean === 'awd'
+      if (is4WD) {
+        data.series = data.bed_length === 'SWB' ? 'K10' : 'K20';
+      } else {
+        // Default to C10 for RWD shortbed, C20 for RWD longbed
+        data.series = data.bed_length === 'SWB' ? 'C10' : 'C20';
+      }
+    }
     
     // Extract displacement from engine code (350 = 5.7L, 454 = 7.4L, etc.)
     const engineMap: Record<string, number> = {
@@ -536,6 +665,34 @@ function scrapeCraigslist(doc: any, url: string): any {
     if (descText.includes('NEEDS WORK') || descText.includes('NOT PERFECT')) knownIssues.push('needs_work');
     if (descText.includes('SALVAGE')) knownIssues.push('salvage_title');
     if (knownIssues.length > 0) data.known_issues = knownIssues;
+    
+    // Extract bed length (SWB/LWB)
+    if (descText.includes('SHORTBED') || descText.includes('SHORT BED') || descText.includes('SWB') || 
+        data.title?.toUpperCase().includes('SHORTBED') || data.title?.toUpperCase().includes('SHORT BED')) {
+      data.bed_length = 'SWB';
+    } else if (descText.includes('LONGBED') || descText.includes('LONG BED') || descText.includes('LWB')) {
+      data.bed_length = 'LWB';
+    }
+    
+    // Detect engine status
+    if (descText.includes('NO MOTOR') || descText.includes('NO ENGINE') || descText.includes('MISSING ENGINE') ||
+        descText.includes('NO MOTOR OR TRANSMISSION')) {
+      data.engine_status = 'No Motor';
+      data.engine = null;
+      data.engine_size = null;
+    }
+    
+    // Detect transmission status
+    if (descText.includes('NO TRANSMISSION') || descText.includes('NO MOTOR OR TRANSMISSION')) {
+      data.transmission_status = 'No Transmission';
+      data.transmission = null;
+    }
+    
+    // Detect odometer status
+    if (descText.includes('ODOMETER BROKEN') || descText.includes('ODO BROKEN') || descText.includes('SPEEDO BROKEN') ||
+        fullText.match(/odometer:\s*broken/i)) {
+      data.odometer_status = 'Broken';
+    }
     
     // Extract paint history
     if (descText.includes('PAINTED') || descText.includes('REPAINT')) {
@@ -627,6 +784,18 @@ function scrapeCraigslist(doc: any, url: string): any {
     data.images = uniqueImages.slice(0, 50)
   }
 
+  // Final series inference after all parsing is complete
+  if (!data.series && data.bed_length && (data.model === 'Truck' || data.model === 'C/K')) {
+    const drivetrainClean = (data.drivetrain || '').trim().toLowerCase()
+    const is4WD = drivetrainClean === '4wd' || drivetrainClean.includes('4') || drivetrainClean === 'awd'
+    if (is4WD) {
+      data.series = data.bed_length === 'SWB' ? 'K10' : 'K20';
+    } else {
+      // Default to C10 for RWD shortbed, C20 for RWD longbed
+      data.series = data.bed_length === 'SWB' ? 'C10' : 'C20';
+    }
+  }
+
   return data
 }
 
@@ -683,14 +852,39 @@ function scrapeBringATrailer(doc: any, url: string): any {
       }
     }
 
-    // Extract VIN (support 17-char and legacy shorter chassis numbers)
-    let vinMatch = bodyText.match(/(?:VIN|Chassis|Chassis Number|Serial)[:\s]*([A-HJ-NPR-Z0-9]{17})/i)
-    if (!vinMatch) {
-      // Fallback: match 8-13 char alphanumeric chassis-like tokens following VIN/Chassis labels
-      vinMatch = bodyText.match(/(?:VIN|Chassis|Chassis Number|Serial)[:\s]*([A-HJ-NPR-Z0-9]{8,13})/i)
+    // Extract VIN - check multiple locations
+    // Method 1: Look for VIN in attrgroup/auto_vin divs (Craigslist specific)
+    const vinElement = doc.querySelector('.auto_vin, .attr.auto_vin, [class*="vin"]')
+    if (vinElement) {
+      const vinText = vinElement.textContent || ''
+      const vinMatch = vinText.match(/([A-HJ-NPR-Z0-9]{17})/i)
+      if (vinMatch) {
+        data.vin = vinMatch[1].toUpperCase()
+      }
     }
-    if (vinMatch) {
-      data.vin = vinMatch[1]
+    
+    // Method 2: Extract from body text (support 17-char and legacy shorter chassis numbers)
+    if (!data.vin) {
+      let vinMatch = bodyText.match(/(?:VIN|Chassis|Chassis Number|Serial)[:\s]*([A-HJ-NPR-Z0-9]{17})/i)
+      if (!vinMatch) {
+        // Fallback: match 8-13 char alphanumeric chassis-like tokens following VIN/Chassis labels
+        vinMatch = bodyText.match(/(?:VIN|Chassis|Chassis Number|Serial)[:\s]*([A-HJ-NPR-Z0-9]{8,13})/i)
+      }
+      if (vinMatch) {
+        data.vin = vinMatch[1].toUpperCase()
+      }
+    }
+    
+    // Method 3: Look for standalone 17-char VIN pattern in mapAndAttrs or similar sections
+    if (!data.vin) {
+      const mapAttrs = doc.querySelector('.mapAndAttrs, .attrgroup')
+      if (mapAttrs) {
+        const mapText = mapAttrs.textContent || ''
+        const vinMatch = mapText.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i)
+        if (vinMatch) {
+          data.vin = vinMatch[1].toUpperCase()
+        }
+      }
     }
 
     // Extract engine

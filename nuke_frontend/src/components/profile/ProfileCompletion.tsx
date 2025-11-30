@@ -119,7 +119,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
                   justifyContent: 'center'
                 }}>
                   {item.completed && (
-                    <span style={{ color: 'white', fontSize: '10px' }}>✓</span>
+                    <span style={{ color: 'white', fontSize: '8pt' }}>✓</span>
                   )}
                 </div>
                 <div>
@@ -131,7 +131,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
               {!item.completed && (
                 <button 
                   className="button button-primary"
-                  style={{ fontSize: '12px', padding: '4px 8px' }}
+                  style={{ fontSize: '8pt', padding: '4px 8px' }}
                   onClick={() => onActionClick(item.action)}
                 >
                   Complete
@@ -149,10 +149,10 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
             borderRadius: '4px',
             border: '1px solid #22c55e'
           }}>
-            <div className="text-small font-bold" style={{ color: '#16a34a' }}>
-              🎉 Profile Complete!
+            <div className="text-small font-bold" style={{ color: '#16a34a', fontSize: '8pt' }}>
+              Profile Complete
             </div>
-            <div className="text-small" style={{ color: '#16a34a' }}>
+            <div className="text-small" style={{ color: '#16a34a', fontSize: '8pt' }}>
               Your profile is fully set up and ready to showcase your vehicles.
             </div>
           </div>

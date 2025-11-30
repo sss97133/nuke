@@ -275,7 +275,7 @@ const Profile: React.FC = () => {
         <div className="main">
           <div className="card">
             <div className="card-body text-center">
-              <h2 className="text font-bold">Loading...</h2>
+              <h2 className="text font-bold" style={{ fontSize: '8pt' }}>Loading...</h2>
             </div>
           </div>
         </div>
@@ -289,7 +289,7 @@ const Profile: React.FC = () => {
         <div className="main">
           <div className="card">
             <div className="card-body text-center">
-              <h2 className="text font-bold">Error</h2>
+              <h2 className="text font-bold" style={{ fontSize: '8pt' }}>Error</h2>
               <p className="text-small text-muted">{error}</p>
               <button className="button button-primary" onClick={() => loadProfileData()}>
                 Retry
@@ -307,7 +307,7 @@ const Profile: React.FC = () => {
         <div className="main">
           <div className="card">
             <div className="card-body text-center">
-              <h2 className="text font-bold">Profile Not Found</h2>
+              <h2 className="text font-bold" style={{ fontSize: '8pt' }}>Profile Not Found</h2>
               <p className="text-small text-muted" style={{ marginBottom: '16px' }}>
                 Unable to load profile data. You may need to sign out and try again.
               </p>
@@ -414,7 +414,7 @@ const Profile: React.FC = () => {
                     alignItems: 'center', 
                     justifyContent: 'center',
                     background: 'var(--grey-200)',
-                    fontSize: '18px',
+                    fontSize: '8pt',
                     fontWeight: 'bold'
                   }}>
                     {(profile.full_name || profile.username || 'U').charAt(0).toUpperCase()}
@@ -425,7 +425,7 @@ const Profile: React.FC = () => {
             
               {/* Username */}
               <div style={{ flex: 1 }}>
-                <h2 className="text font-bold" style={{ margin: 0 }}>
+                <h2 className="text font-bold" style={{ margin: 0, fontSize: '8pt' }}>
                   @{profile.username || 'username'}
                 </h2>
               </div>
@@ -630,10 +630,10 @@ const Profile: React.FC = () => {
             {activeTab === 'duplicates' && isOwnProfile && (
               <div>
                 <div className="card" style={{ marginBottom: '16px' }}>
-                  <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
+                  <div className="card-header" style={{ fontSize: '8pt', fontWeight: 700 }}>
                     Duplicate Vehicle Detection
                   </div>
-                  <div className="card-body" style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  <div className="card-body" style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                     When potential duplicate vehicles are detected in your profile, they'll appear below for review. 
                     You can merge duplicates to consolidate all images, events, and data into a single vehicle profile.
                   </div>
@@ -647,7 +647,7 @@ const Profile: React.FC = () => {
                 {/* Verification Section */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="text font-bold">Identity Verification</h3>
+                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Identity Verification</h3>
                   </div>
                   <div className="card-body">
                     <ProfileVerification />
@@ -657,7 +657,7 @@ const Profile: React.FC = () => {
                 {/* Password Change */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="text font-bold">Change Password</h3>
+                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Change Password</h3>
                   </div>
                   <div className="card-body">
                     <div className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>
@@ -677,7 +677,7 @@ const Profile: React.FC = () => {
                 {/* Email Management */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="text font-bold">Email Settings</h3>
+                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>Email Settings</h3>
                   </div>
                   <div className="card-body">
                     <div className="text-small text-muted" style={{ marginBottom: 'var(--space-3)' }}>

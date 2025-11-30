@@ -7,7 +7,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ... (Interfaces remain same)
+interface AutomatedTag {
+  tag_name: string
+  tag_type: 'part' | 'tool' | 'process' | 'issue' | 'custom'
+  confidence: number
+  x_position: number
+  y_position: number
+  width: number
+  height: number
+  ai_detection_data: any
+}
+
+interface RekognitionLabel {
+  Name: string
+  Confidence: number
+  Instances?: Array<{
+    Confidence: number
+    BoundingBox: {
+      Left: number
+      Top: number
+      Width: number
+      Height: number
+    }
+  }>
+  Categories?: any[]
+}
 
 serve(async (req) => {
   // ... (CORS and Setup remain same)
@@ -24,7 +48,13 @@ serve(async (req) => {
     if (!image_url) throw new Error('Missing image_url')
 
     // 1. Run Rekognition (Label Detection)
-    const rekognitionData = await analyzeImageWithRekognition(image_url)
+    let rekognitionData: any = {}
+    try {
+      rekognitionData = await analyzeImageWithRekognition(image_url)
+    } catch (rekError) {
+      console.warn('Rekognition failed, continuing without labels:', rekError)
+      // Continue without Rekognition data - not critical
+    }
 
     // 2. Determine "Appraiser Context" from labels
     const context = determineAppraiserContext(rekognitionData)
@@ -49,11 +79,56 @@ serve(async (req) => {
       // Don't fail the whole analysis if SPID detection fails
     }
 
+    // 3.6. Check for VIN tag/plate and extract VIN for verification
+    let vinTagData = null
+    let vinTagResponse = null
+    try {
+      vinTagResponse = await detectAndExtractVINTag(image_url, vehicle_id, supabase, user_id)
+      if (vinTagResponse?.is_vin_tag && vinTagResponse.confidence > 70) {
+        vinTagData = vinTagResponse.extracted_data
+        console.log('VIN tag detected:', vinTagData)
+        
+        // Verify extracted VIN against vehicle's VIN if available
+        if (vinTagData.vin && vehicle_id) {
+          const { data: vehicle } = await supabase
+            .from('vehicles')
+            .select('vin')
+            .eq('id', vehicle_id)
+            .maybeSingle()
+          
+          if (vehicle) {
+            if (vehicle.vin && vehicle.vin.toUpperCase() === vinTagData.vin.toUpperCase()) {
+              vinTagData.verification_status = 'verified'
+              vinTagData.verification_confidence = 1.0
+              console.log('✅ VIN verified: matches vehicle record')
+            } else if (vehicle.vin) {
+              vinTagData.verification_status = 'mismatch'
+              vinTagData.verification_confidence = 0.0
+              console.warn('⚠️ VIN mismatch: extracted VIN does not match vehicle record')
+            } else {
+              vinTagData.verification_status = 'new'
+              vinTagData.verification_confidence = vinTagResponse.confidence / 100
+              console.log('📝 New VIN extracted from tag')
+              
+              // Auto-update vehicle VIN if vehicle doesn't have one
+              await supabase
+                .from('vehicles')
+                .update({ vin: vinTagData.vin })
+                .eq('id', vehicle_id)
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('VIN tag detection failed:', err)
+      // Don't fail the whole analysis if VIN tag detection fails
+    }
+
     // 4. Generate Tags
     const automatedTags = generateAutomatedTags(rekognitionData)
 
     // 5. Save Everything
-    // Update image metadata with appraiser result and SPID data
+    // Update image metadata with appraiser result, SPID data, and VIN tag data
     const metadataUpdate: any = {
       rekognition: rekognitionData,
       scanned_at: new Date().toISOString()
@@ -63,6 +138,9 @@ serve(async (req) => {
     }
     if (spidData) {
       metadataUpdate.spid = spidData
+    }
+    if (vinTagData) {
+      metadataUpdate.vin_tag = vinTagData
     }
     
     // Update image record
@@ -145,9 +223,15 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error in analyze-image function:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Error details:', { message: errorMessage, stack: errorStack })
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: errorMessage,
+        success: false 
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
@@ -170,16 +254,21 @@ async function detectSPIDSheet(imageUrl: string, vehicleId?: string, supabaseCli
   // Get user API key or fallback to system key
   let openAiKey: string | null = null;
   
-  if (userId && supabaseClient) {
-    const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
-    const apiKeyResult = await getUserApiKey(
-      supabaseClient,
-      userId,
-      'openai',
-      'OPENAI_API_KEY'
-    )
-    openAiKey = apiKeyResult.apiKey;
-  } else {
+  try {
+    if (userId && supabaseClient) {
+      const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
+      const apiKeyResult = await getUserApiKey(
+        supabaseClient,
+        userId,
+        'openai',
+        'OPENAI_API_KEY'
+      )
+      openAiKey = apiKeyResult.apiKey;
+    } else {
+      openAiKey = Deno.env.get('OPENAI_API_KEY') || null;
+    }
+  } catch (err) {
+    console.warn('Failed to get API key, using system key:', err)
     openAiKey = Deno.env.get('OPENAI_API_KEY') || null;
   }
   
@@ -266,20 +355,126 @@ Extract ALL RPO codes you see, including engine (LS4, L31) and transmission (M40
   }
 }
 
+async function detectAndExtractVINTag(imageUrl: string, vehicleId?: string, supabaseClient?: any, userId?: string) {
+  // Get user API key or fallback to system key
+  let openAiKey: string | null = null;
+  
+  try {
+    if (userId && supabaseClient) {
+      const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
+      const apiKeyResult = await getUserApiKey(
+        supabaseClient,
+        userId,
+        'openai',
+        'OPENAI_API_KEY'
+      )
+      openAiKey = apiKeyResult.apiKey;
+    } else {
+      openAiKey = Deno.env.get('OPENAI_API_KEY') || null;
+    }
+  } catch (err) {
+    console.warn('Failed to get API key, using system key:', err)
+    openAiKey = Deno.env.get('OPENAI_API_KEY') || null;
+  }
+  
+  if (!openAiKey) return null
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openAiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert at identifying and reading VIN (Vehicle Identification Number) tags and plates on vehicles.
+
+VIN tags/plates are metal or plastic plates typically found:
+- On the driver's side dashboard (visible through windshield)
+- On the driver's side door jamb
+- On the firewall/engine bay
+- On the frame/chassis
+
+A VIN is EXACTLY 17 characters, alphanumeric (no I, O, or Q), and follows ISO 3779 format.
+
+Your task:
+1. Determine if this image shows a VIN tag/plate
+2. If yes, extract the complete 17-character VIN
+3. Assess the condition/legibility of the VIN tag
+4. Note any concerns about authenticity (rivets, tampering, etc.)
+
+Return a JSON object with:
+{
+  "is_vin_tag": boolean,
+  "confidence": number (0-100),
+  "extracted_data": {
+    "vin": string | null (17-character VIN if found),
+    "vin_location": string | null ("dashboard", "door_jamb", "firewall", "frame", "unknown"),
+    "condition": string | null ("excellent", "good", "fair", "poor", "illegible"),
+    "authenticity_concerns": string[] (empty if none, e.g. ["replacement_rivets", "paint_over", "tampering"]),
+    "readability": string | null ("clear", "partial", "difficult", "illegible")
+  },
+  "raw_text": string (any visible text in the image)
+}
+
+Be very careful to extract the EXACT VIN - check each character carefully. VINs are critical for vehicle identification.`
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Analyze this image. Is it a VIN tag or plate? If yes, extract the complete 17-character VIN and assess its condition.'
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: imageUrl,
+                detail: 'high'
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 1000,
+      response_format: { type: 'json_object' }
+    })
+  })
+
+  if (!response.ok) return null
+
+  const data = await response.json()
+  if (data.error) return null
+
+  try {
+    return JSON.parse(data.choices[0].message.content)
+  } catch {
+    return null
+  }
+}
+
 async function runAppraiserBrain(imageUrl: string, context: string, supabaseClient?: any, userId?: string) {
   // Get user API key or fallback to system key
   let openAiKey: string | null = null;
   
-  if (userId && supabaseClient) {
-    const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
-    const apiKeyResult = await getUserApiKey(
-      supabaseClient,
-      userId,
-      'openai',
-      'OPENAI_API_KEY'
-    )
-    openAiKey = apiKeyResult.apiKey;
-  } else {
+  try {
+    if (userId && supabaseClient) {
+      const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
+      const apiKeyResult = await getUserApiKey(
+        supabaseClient,
+        userId,
+        'openai',
+        'OPENAI_API_KEY'
+      )
+      openAiKey = apiKeyResult.apiKey;
+    } else {
+      openAiKey = Deno.env.get('OPENAI_API_KEY') || null;
+    }
+  } catch (err) {
+    console.warn('Failed to get API key, using system key:', err)
     openAiKey = Deno.env.get('OPENAI_API_KEY') || null;
   }
   
@@ -519,33 +714,39 @@ async function insertAutomatedTags(
 ) {
   if (tags.length === 0) return
 
-  const tagData = tags.map(tag => ({
-    image_url: imageUrl,
-    timeline_event_id: timelineEventId,
-    vehicle_id: vehicleId,
-    tag_name: tag.tag_name,
-    tag_type: tag.tag_type,
-    x_position: tag.x_position,
-    y_position: tag.y_position,
-    width: tag.width,
-    height: tag.height,
-    confidence: tag.confidence,
-    created_by: '00000000-0000-0000-0000-000000000000', // System user
-    verified: false, // AI tags need verification
-    ai_detection_data: tag.ai_detection_data,
-    manual_override: false
-  }))
+  try {
+    const tagData = tags.map(tag => ({
+      image_url: imageUrl,
+      timeline_event_id: timelineEventId,
+      vehicle_id: vehicleId,
+      tag_name: tag.tag_name,
+      tag_type: tag.tag_type,
+      x_position: tag.x_position,
+      y_position: tag.y_position,
+      width: tag.width,
+      height: tag.height,
+      confidence: tag.confidence,
+      created_by: '00000000-0000-0000-0000-000000000000', // System user
+      verified: false, // AI tags need verification
+      ai_detection_data: tag.ai_detection_data,
+      manual_override: false
+    }))
 
-  // Insert tags, ignore conflicts (don't overwrite existing manual tags)
-  const { error } = await supabase
-    .from('image_tags')
-    .upsert(tagData, {
-      onConflict: 'image_url,tag_name,x_position,y_position',
-      ignoreDuplicates: true
-    })
+    // Insert tags, ignore conflicts (don't overwrite existing manual tags)
+    const { error } = await supabase
+      .from('image_tags')
+      .upsert(tagData, {
+        onConflict: 'image_url,tag_name,x_position,y_position',
+        ignoreDuplicates: true
+      })
 
-  if (error) {
-    console.error('Error inserting automated tags:', error)
-    throw error
+    if (error) {
+      console.error('Error inserting automated tags:', error)
+      // Don't throw - tag insertion failure shouldn't break the whole analysis
+      console.warn('Continuing without tags due to insertion error')
+    }
+  } catch (err) {
+    console.error('Exception inserting automated tags:', err)
+    // Don't throw - tag insertion failure shouldn't break the whole analysis
   }
 }

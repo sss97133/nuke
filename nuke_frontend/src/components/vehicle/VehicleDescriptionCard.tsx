@@ -20,6 +20,11 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
   const [saving, setSaving] = useState(false);
   const [isAIGenerated, setIsAIGenerated] = useState(false);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const [sourceInfo, setSourceInfo] = useState<{
+    url?: string;
+    source?: string;
+    date?: string;
+  } | null>(null);
 
   useEffect(() => {
     loadDescriptionMetadata();
@@ -29,14 +34,23 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
     try {
       const { data } = await supabase
         .from('vehicles')
-        .select('description, description_source, description_generated_at')
+        .select('description, description_source, description_generated_at, discovery_url, origin_metadata')
         .eq('id', vehicleId)
         .single();
 
       if (data) {
         setDescription(data.description || '');
-        setIsAIGenerated(data.description_source === 'ai_generated');
+        setIsAIGenerated(data.description_source === 'ai_generated' || data.description_source === 'craigslist_listing');
         setGeneratedAt(data.description_generated_at);
+        
+        // Store source info for display
+        if (data.discovery_url || data.origin_metadata?.listing_url) {
+          (window as any).__descriptionSource = {
+            url: data.discovery_url || data.origin_metadata?.listing_url,
+            source: data.description_source,
+            date: data.description_generated_at
+          };
+        }
       }
     } catch (err) {
       console.warn('Failed to load description metadata:', err);
@@ -155,7 +169,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
             <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
               {description}
             </div>
-            {isAIGenerated && (
+            {(isAIGenerated || sourceInfo) && (
               <div style={{
                 marginTop: '12px',
                 padding: '8px',
@@ -164,12 +178,40 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 fontSize: '7pt',
                 color: 'var(--text-muted)',
                 display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
+                flexDirection: 'column',
+                gap: '4px'
               }}>
-                <span>AI-generated from vehicle images</span>
-                {generatedAt && (
-                  <span>• {new Date(generatedAt).toLocaleDateString()}</span>
+                {isAIGenerated && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span>{sourceInfo?.source === 'craigslist_listing' ? 'Extracted from listing' : (generatedAt ? 'AI-generated from vehicle images' : 'AI-generated')}</span>
+                    {generatedAt && (
+                      <span>• {new Date(generatedAt).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                )}
+                {sourceInfo?.url && (
+                  <div style={{ marginTop: sourceInfo.url ? '4px' : '0', paddingTop: sourceInfo.url ? '4px' : '0', borderTop: sourceInfo.url ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontSize: '6pt', marginBottom: '2px', fontWeight: 500 }}>Source:</div>
+                    <a 
+                      href={sourceInfo.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: 'var(--link-color, #0066cc)',
+                        textDecoration: 'underline',
+                        fontSize: '6pt',
+                        wordBreak: 'break-all',
+                        display: 'inline-block'
+                      }}
+                    >
+                      {sourceInfo.url.includes('craigslist') ? 'View Craigslist Listing' : sourceInfo.url}
+                    </a>
+                    {sourceInfo.date && (
+                      <div style={{ fontSize: '6pt', marginTop: '2px', color: 'var(--text-muted)' }}>
+                        Extracted {new Date(sourceInfo.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}

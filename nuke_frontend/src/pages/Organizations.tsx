@@ -1,7 +1,8 @@
 // Organizations Directory - Browse all organizations
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { OrganizationSearchService } from '../services/organizationSearch';
 
 interface Organization {
   id: string;
@@ -27,6 +28,9 @@ interface Organization {
   followers?: number;
   current_viewers?: number;
   recent_work_orders?: number;
+  latitude?: number;
+  longitude?: number;
+  distance?: number;
 }
 
 interface OrgImage {
@@ -38,32 +42,142 @@ interface OrgImage {
 
 export default function Organizations() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlSearchQuery = searchParams.get('search') || '';
+  
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [orgImages, setOrgImages] = useState<Record<string, OrgImage | null>>({});
   const [session, setSession] = useState<any>(null);
   const [following, setFollowing] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
+    // Get user location if "near me" is in search
+    if (searchQuery.toLowerCase().includes('near me')) {
+      navigator.geolocation?.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        () => {
+          console.warn('Could not get user location');
+        }
+      );
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       loadOrganizations(session);
     });
-  }, []);
+  }, [searchQuery]);
 
   const loadOrganizations = async (userSession?: any) => {
     try {
       setLoading(true);
 
-      // Load organizations with their stat counters (from database triggers)
-      const { data: orgs, error } = await supabase
-        .from('businesses')
-        .select('id, business_name, business_type, description, logo_url, city, state, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
-        .eq('is_public', true)
-        .order('created_at', { ascending: false });
+      let orgs: any[] = [];
+      let error: any = null;
+
+      // If search query exists, use intelligent search
+      if (searchQuery.trim()) {
+        const searchLower = searchQuery.toLowerCase();
+        
+        // Check if searching for specific vehicle type (squarebody, etc.)
+        const isVehicleTypeSearch = /squarebody|square body|truck|suburban|blazer|gmc|chevrolet|chevy|1973|1974|1975|1976|1977|1978|1979|1980|1981|1982|1983|1984|1985|1986|1987|1988|1989|1990|1991/i.test(searchLower);
+        const isNearMe = searchLower.includes('near me') || searchLower.includes('close') || searchLower.includes('local');
+        
+        if (isVehicleTypeSearch) {
+          // Search organizations that have vehicles matching the type
+          // Squarebody = 1973-1991 GM trucks/SUVs (Chevrolet/GMC)
+          const squarebodyYears = [1973, 1974, 1975, 1976, 1977, 1978, 1979, 1980, 1981, 1982, 1983, 1984, 1985, 1986, 1987, 1988, 1989, 1990, 1991];
+          const squarebodyMakes = ['Chevrolet', 'Chevy', 'GMC'];
+          
+          // First, find vehicles matching squarebody criteria
+          const { data: matchingVehicles, error: vehError } = await supabase
+            .from('vehicles')
+            .select('id')
+            .in('year', squarebodyYears)
+            .in('make', squarebodyMakes);
+          
+          if (!vehError && matchingVehicles && matchingVehicles.length > 0) {
+            const vehicleIds = matchingVehicles.map(v => v.id);
+            
+            // Find organizations that have these vehicles
+            const { data: orgVehicles, error: ovError } = await supabase
+              .from('organization_vehicles')
+              .select('organization_id')
+              .eq('status', 'active')
+              .in('vehicle_id', vehicleIds);
+            
+            if (!ovError && orgVehicles) {
+              // Get unique organization IDs
+              const orgIds = [...new Set(orgVehicles.map(ov => ov.organization_id))];
+              
+              if (orgIds.length > 0) {
+                // Load those organizations
+                const { data, error: orgError } = await supabase
+                  .from('businesses')
+                  .select('id, business_name, business_type, description, logo_url, city, state, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+                  .eq('is_public', true)
+                  .in('id', orgIds);
+                
+                if (!orgError) {
+                  orgs = data || [];
+                  
+                  // If "near me", filter by distance
+                  if (isNearMe && userLocation) {
+                    orgs = orgs
+                      .filter(org => org.latitude && org.longitude)
+                      .map(org => {
+                        const distance = calculateDistance(
+                          userLocation.lat,
+                          userLocation.lng,
+                          org.latitude,
+                          org.longitude
+                        );
+                        return { ...org, distance };
+                      })
+                      .filter(org => org.distance <= 50) // Within 50 miles
+                      .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // Use OrganizationSearchService for general search
+          const searchResults = await OrganizationSearchService.search(searchQuery, 50);
+          const orgIds = searchResults.map(r => r.id);
+          
+          if (orgIds.length > 0) {
+            const { data, error: orgError } = await supabase
+              .from('businesses')
+              .select('id, business_name, business_type, description, logo_url, city, state, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+              .eq('is_public', true)
+              .in('id', orgIds);
+            
+            if (!orgError) {
+              orgs = data || [];
+            }
+          }
+        }
+      } else {
+        // No search - load all organizations
+        const { data, error: orgError } = await supabase
+          .from('businesses')
+          .select('id, business_name, business_type, description, logo_url, city, state, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+          .eq('is_public', true)
+          .order('created_at', { ascending: false });
+        
+        if (orgError) throw orgError;
+        orgs = data || [];
+      }
 
       if (error) throw error;
 
@@ -153,22 +267,25 @@ export default function Organizations() {
     }
   };
 
+  // Calculate distance between two coordinates (Haversine formula)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   // Get unique business types and locations
   const businessTypes = Array.from(new Set(organizations.map(o => o.business_type).filter(Boolean)));
   const locations = Array.from(new Set(organizations.map(o => o.state).filter(Boolean))).sort();
 
-  // Filter organizations
+  // Filter organizations (only apply type/location filters, search is already handled in loadOrganizations)
   const filteredOrgs = organizations.filter(org => {
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesName = org.business_name?.toLowerCase().includes(query);
-      const matchesLegal = org.legal_name?.toLowerCase().includes(query);
-      const matchesCity = org.city?.toLowerCase().includes(query);
-      const matchesType = org.business_type?.toLowerCase().includes(query);
-      if (!matchesName && !matchesLegal && !matchesCity && !matchesType) return false;
-    }
-
     // Type filter
     if (typeFilter !== 'all' && org.business_type !== typeFilter) return false;
 
