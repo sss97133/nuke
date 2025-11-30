@@ -36,7 +36,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   // If already wrapped, return null to prevent duplicate headers/footers (works in production too)
   if (isAlreadyWrapped) {
     // Only log in development - in production, silently prevent duplicates
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.error('🚨 AppLayout double-wrap prevented - returning null to avoid duplicate headers/footers');
     }
     return null;

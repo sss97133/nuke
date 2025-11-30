@@ -29,7 +29,7 @@ export const usePreventDoubleLayout = () => {
   
   if (isInsideAppLayout) {
     // Only log in development - in production, silently prevent duplicates
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       const errorMsg = 
         '🚨 DOUBLE APPLAYOUT DETECTED!\n\n' +
         'AppLayout is already provided at the route level in App.tsx.\n' +
