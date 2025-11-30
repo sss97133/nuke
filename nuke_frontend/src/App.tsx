@@ -20,10 +20,12 @@ import EditVehicle from './pages/EditVehicle';
 import VehicleForm from './components/vehicles/VehicleForm';
 // Lazy load VehicleProfile to avoid circular dependency issues
 const VehicleProfile = React.lazy(() => import('./pages/VehicleProfile'));
+const ImportClassicCars = React.lazy(() => import('./pages/ImportClassicCars'));
 // import VehicleEditForm from './pages/VehicleEditForm';
 // import VehicleDateImages from './pages/VehicleDateImages';
 import Dashboard from './pages/Dashboard';
 import ImageProcessingDashboard from './pages/ImageProcessingDashboard';
+import LiveImageAnalysisMonitor from './components/admin/LiveImageAnalysisMonitor';
 import ScriptControlCenter from './pages/ScriptControlCenter';
 import VehicleMakeModelDemo from './pages/VehicleMakeModelDemo';
 import VehicleDataNormalization from './pages/VehicleDataNormalization';
@@ -45,6 +47,7 @@ import VehicleContributionForm from './pages/VehicleContributionForm';
 const VehicleVerification = React.lazy(() => import('./pages/VehicleVerification'));
 import AllVehicles from './pages/AllVehicles';
 import CursorHomepage from './pages/CursorHomepage';
+import Search from './pages/Search';
 import ProjectManagement from './pages/ProjectManagement';
 import SimpleProjectManager from './pages/SimpleProjectManager';
 import VehicleTasks from './pages/VehicleTasks';
@@ -84,6 +87,7 @@ import Legal from './pages/Legal';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
+import About from './pages/About';
 import SignDocument from './pages/SignDocument';
 import ShippingSettings from './pages/admin/ShippingSettings';
 import X402Settings from './pages/admin/X402Settings';
@@ -98,6 +102,7 @@ import AdminMissionControl from './pages/AdminMissionControl';
 import { PersonalPhotoLibrary } from './pages/PersonalPhotoLibrary';
 import Capsule from './pages/Capsule';
 import Watchlists from './pages/Watchlists';
+import EventDetail from './pages/EventDetail';
 
 // Financial & Accounting components
 import InvoiceManager from './pages/InvoiceManager';
@@ -224,7 +229,8 @@ function App() {
                        window.location.pathname === '/legal' ||
                        window.location.pathname === '/privacy' ||
                        window.location.pathname === '/terms' ||
-                       window.location.pathname === '/data-deletion';
+                       window.location.pathname === '/data-deletion' ||
+                       window.location.pathname === '/about';
 
   // If not authenticated, show login for protected routes
   if (!session && !isPublicRoute) {
@@ -262,6 +268,8 @@ function App() {
             {/* Main routes */}
             <Route path="/discover" element={<Discovery />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/events/:id" element={<EventDetail />} />
             <Route path="/vehicles" element={<Vehicles />} />
             <Route path="/all-vehicles" element={<AllVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
@@ -284,6 +292,7 @@ function App() {
             <Route path="/photos" element={<PersonalPhotoLibrary />} />
             <Route path="/photo-categorizer" element={<PhotoLibraryCategorizer />} />
             <Route path="/dropbox-import" element={<DropboxImport />} />
+            <Route path="/import-classiccars" element={<React.Suspense fallback={<div className="p-4">Loading...</div>}><ImportClassicCars /></React.Suspense>} />
             <Route path="/dealer/:orgId/dropbox-import" element={<DealerDropboxImport />} />
           <Route path="/dealer/:orgId/bulk-editor" element={<DealerBulkEditor />} />
           <Route path="/dealer/:orgId/ai-assistant" element={<DealerAIAssistant />} />
@@ -297,6 +306,7 @@ function App() {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
+            <Route path="/about" element={<About />} />
             
             {/* Portfolio & Trading - Legacy routes redirect to Market */}
             <Route path="/portfolio/success" element={<CreditsSuccess />} />
@@ -349,6 +359,7 @@ function App() {
             <Route path="/admin/old" element={<AdminDashboard />} />
             <Route path="/admin/scripts" element={<ScriptControlCenter />} />
             <Route path="/admin/image-processing" element={<ImageProcessingDashboard />} />
+            <Route path="/admin/live-analysis" element={<LiveImageAnalysisMonitor />} />
             <Route path="/admin/batch-analysis" element={<BatchImageAnalysis />} />
             <Route path="/admin/extraction-monitor" element={<ExtractionMonitor />} />
             <Route path="/admin/verifications" element={<AdminVerifications />} />
