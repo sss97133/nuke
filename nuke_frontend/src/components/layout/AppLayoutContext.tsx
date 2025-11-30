@@ -20,7 +20,8 @@ export const useAppLayoutContext = () => useContext(AppLayoutContext);
 
 /**
  * Hook to check if we're already inside an AppLayout
- * Throws an error in development if AppLayout is nested
+ * Returns true if already wrapped, false otherwise
+ * Logs error/warning but doesn't throw to prevent breaking the app
  */
 export const usePreventDoubleLayout = () => {
   const { isInsideAppLayout } = useAppLayoutContext();
@@ -38,14 +39,8 @@ export const usePreventDoubleLayout = () => {
       '  // ✅ CORRECT:\n' +
       '  return <div>Content</div>;';
     
-    if (process.env.NODE_ENV === 'development') {
-      console.error('⚠️', errorMsg);
-      // In development, throw to stop the double wrap
-      throw new Error('Double AppLayout detected! See console for details.');
-    } else {
-      // In production, just warn but don't break
-      console.warn('⚠️', errorMsg);
-    }
+    console.error('⚠️', errorMsg);
+    // Don't throw - instead return true so the component can handle it
   }
   
   return isInsideAppLayout;

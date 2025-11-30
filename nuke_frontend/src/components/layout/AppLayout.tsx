@@ -31,7 +31,13 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   breadcrumbs
 }) => {
   // Prevent double wrapping - this will throw in development if AppLayout is nested
-  usePreventDoubleLayout();
+  const isAlreadyWrapped = usePreventDoubleLayout();
+  
+  // If already wrapped, don't render anything (prevent duplicate)
+  if (isAlreadyWrapped) {
+    console.error('🚨 AppLayout double-wrap prevented - returning null to avoid duplicate headers/footers');
+    return null;
+  }
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
