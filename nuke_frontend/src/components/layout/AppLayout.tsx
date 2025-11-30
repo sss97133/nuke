@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import { ProfileBalancePill } from './ProfileBalancePill';
 import { UploadStatusBar } from './UploadStatusBar';
-import VehicleSearch from '../VehicleSearch';
+import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
 import '../../design-system.css';
 
 interface AppLayoutProps {
@@ -33,7 +33,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [orgNavPath, setOrgNavPath] = useState<string>('/organizations');
-  const [navExpanded, setNavExpanded] = useState<boolean>(true);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -115,8 +114,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           <div className="header-left">
             <button
               type="button"
-              onClick={() => setNavExpanded(prev => !prev)}
-              onDoubleClick={() => navigate('/')}
+              onClick={() => navigate('/')}
               className="logo"
               style={{
                 border: 'none',
@@ -129,7 +127,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             </button>
             
             {/* Desktop Navigation */}
-            <nav className={`main-nav desktop-nav ${navExpanded ? '' : 'collapsed'}`}>
+            <nav className="main-nav desktop-nav">
               <Link 
                 to="/dashboard" 
                 className={`nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
@@ -158,22 +156,26 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           </div>
 
           <div className="header-right">
-            {/* Global Search - half width to fit in header */}
-            <div style={{ minWidth: '100px', maxWidth: '150px', flex: '0 0 auto' }}>
-              <VehicleSearch />
+            {/* Global Search - AI Data Ingestion */}
+            <div style={{ flex: '0 0 auto', minWidth: 0, maxWidth: '200px', marginRight: '8px' }}>
+              <AIDataIngestionSearch />
             </div>
 
             {/* Upload Indicator - Windows 95 style */}
-            <GlobalUploadIndicator />
+            <div style={{ flex: '0 0 auto', marginRight: '8px' }}>
+              <GlobalUploadIndicator />
+            </div>
 
             {/* Profile Balance Capsule - Combined balance + profile + navigation */}
-            {session ? (
-              <ProfileBalancePill session={session} userProfile={userProfile} />
-            ) : (
-              <Link to="/login" className="button button-primary" style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}>
-                Login
-              </Link>
-            )}
+            <div style={{ flex: '0 0 auto' }}>
+              {session ? (
+                <ProfileBalancePill session={session} userProfile={userProfile} />
+              ) : (
+                <Link to="/login" className="button button-primary" style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}>
+                  Login
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -237,6 +239,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       <footer className="app-footer">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'center', fontSize: '8pt' }}>
           <span>NUKE © 2025</span>
+          <a href="/about" style={{ color: 'inherit', textDecoration: 'underline' }}>About</a>
           <a href="/privacy" style={{ color: 'inherit', textDecoration: 'underline' }}>Privacy Policy</a>
           <a href="/terms" style={{ color: 'inherit', textDecoration: 'underline' }}>Terms of Service</a>
           <a href="/data-deletion" style={{ color: 'inherit', textDecoration: 'underline' }}>Data Deletion</a>

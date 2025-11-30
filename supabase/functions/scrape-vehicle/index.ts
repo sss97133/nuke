@@ -44,20 +44,78 @@ serve(async (req) => {
     // Detect platform
     const isCraigslist = url.includes('craigslist.org')
     const isBringATrailer = url.includes('bringatrailer.com')
+    const isClassicCars = url.includes('classiccars.com')
+    const isAffordableClassics = url.includes('affordableclassicsinc.com')
+    const isClassicCom = url.includes('classic.com/veh/')
+    const isGoxee = url.includes('goxeedealer.com')
+    const isKSL = url.includes('cars.ksl.com')
 
-    // Fetch HTML directly (server-side, no CORS issues)
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-    })
+    // Try Firecrawl first (bypasses 403/Cloudflare), then fallback to direct fetch
+    let html: string
+    let fetchSuccess = false
+    
+    const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY')
+    if (firecrawlApiKey) {
+      try {
+        console.log('🔥 Attempting Firecrawl fetch for:', url)
+        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${firecrawlApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url,
+            pageOptions: {
+              waitFor: 1000, // Wait 1 second for JS to load
+            },
+            formats: ['html', 'markdown']
+          })
+        })
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`)
+        if (firecrawlResponse.ok) {
+          const firecrawlData = await firecrawlResponse.json()
+          if (firecrawlData.success && firecrawlData.data) {
+            // Firecrawl returns html in data.html or we can use markdown
+            html = firecrawlData.data.html || 
+                   (firecrawlData.data.markdown ? `<!DOCTYPE html><html><body><pre>${firecrawlData.data.markdown}</pre></body></html>` : '')
+            
+            if (html) {
+              fetchSuccess = true
+              console.log('✅ Firecrawl fetch successful')
+            } else {
+              console.warn('⚠️ Firecrawl returned no HTML content')
+            }
+          } else {
+            console.warn('⚠️ Firecrawl response not successful:', firecrawlData)
+          }
+        } else {
+          const errorText = await firecrawlResponse.text()
+          console.warn('⚠️ Firecrawl API error:', firecrawlResponse.status, errorText)
+        }
+      } catch (error) {
+        console.warn('⚠️ Firecrawl failed, using direct fetch:', error)
+      }
     }
 
-    const html = await response.text()
+    // Fallback to direct fetch if Firecrawl not configured or failed
+    if (!fetchSuccess) {
+      console.log('📡 Using direct fetch')
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`)
+      }
+      
+      html = await response.text()
+    }
+
     const doc = new DOMParser().parseFromString(html, 'text/html')
     
     if (!doc) {
@@ -70,11 +128,103 @@ serve(async (req) => {
       data = scrapeCraigslist(doc, url)
     } else if (isBringATrailer) {
       data = scrapeBringATrailer(doc, url)
+    } else if (isClassicCars) {
+      data = scrapeClassicCars(doc, url)
+    } else if (isAffordableClassics) {
+      data = scrapeAffordableClassics(doc, url)
+    } else if (isClassicCom) {
+      data = scrapeClassicCom(doc, url)
+    } else if (isGoxee) {
+      data = scrapeGoxee(doc, url)
+    } else if (isKSL) {
+      data = scrapeKSL(doc, url)
     } else {
-      // Generic scraper
-      data = {
-        source: 'Unknown',
-        listing_url: url
+      // Unknown source - use AI extraction if available, otherwise basic pattern extraction
+      console.log('Unknown source, attempting AI extraction...')
+      
+      // Helper functions for extraction
+      const extractVINFromText = (text: string): string | null => {
+        const vinPattern = /\b([A-HJ-NPR-Z0-9]{17})\b/gi
+        const matches = text.match(vinPattern)
+        if (matches) {
+          for (const match of matches) {
+            const vin = match.toUpperCase()
+            if (!/[IOQ]/.test(vin)) {
+              return vin
+            }
+          }
+        }
+        return null
+      }
+
+      const extractImageURLs = (html: string): string[] => {
+        const imageUrls: string[] = []
+        const imgMatches = html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)
+        for (const match of imgMatches) {
+          const url = match[1]
+          if (url.startsWith('http') && !url.includes('logo') && !url.includes('icon')) {
+            imageUrls.push(url)
+          }
+        }
+        return imageUrls.slice(0, 20) // Limit to 20 images
+      }
+
+      try {
+        // Try AI extraction if function exists
+        // Use fetch to call AI extraction function
+        const aiResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/extract-vehicle-data-ai`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify({
+            url,
+            html: html.substring(0, 200000), // Limit HTML size
+            source: 'unknown'
+          })
+        })
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json()
+
+          if (aiData?.data) {
+            data = {
+              ...aiData.data,
+              source: 'Unknown (AI Extracted)',
+              listing_url: url,
+              images: aiData.data.images || extractImageURLs(html)
+            }
+            console.log('✅ AI extraction successful')
+          } else {
+            // Fallback: basic pattern extraction
+            data = {
+              source: 'Unknown',
+              listing_url: url,
+              vin: extractVINFromText(html),
+              images: extractImageURLs(html)
+            }
+            console.log('⚠️ AI extraction returned no data, using pattern fallback')
+          }
+        } else {
+          // AI function returned error, use fallback
+          data = {
+            source: 'Unknown',
+            listing_url: url,
+            vin: extractVINFromText(html),
+            images: extractImageURLs(html)
+          }
+          console.log('⚠️ AI extraction failed, using pattern fallback')
+        }
+      } catch (error: any) {
+        console.error('AI extraction error:', error)
+        // Fallback to basic extraction
+        data = {
+          source: 'Unknown',
+          listing_url: url,
+          vin: extractVINFromText(html),
+          images: extractImageURLs(html)
+        }
       }
     }
 
@@ -707,6 +857,392 @@ function scrapeBringATrailer(doc: any, url: string): any {
   const descElement = doc.querySelector('.post-content, .listing-description, article')
   if (descElement) {
     data.description = descElement.textContent.trim().substring(0, 5000)
+  }
+
+  return data
+}
+
+function scrapeClassicCars(doc: any, url: string): any {
+  const data: any = {
+    source: 'ClassicCars.com',
+    listing_url: url
+  }
+
+  // Extract title
+  const titleElement = doc.querySelector('h1')
+  if (titleElement) {
+    data.title = titleElement.textContent.trim()
+    
+    // Parse year/make/model from title
+    const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
+    if (yearMatch) {
+      data.year = parseInt(yearMatch[0])
+    }
+    
+    const cleanTitle = data.title.replace(/For Sale:\s*/i, '').trim()
+    const parts = cleanTitle.split(/\s+/)
+    let startIndex = 0
+    if (parts[0]?.match(/\b(19|20)\d{2}\b/)) {
+      startIndex = 1
+    }
+    if (parts.length > startIndex) {
+      data.make = parts[startIndex]
+      data.model = parts.slice(startIndex + 1).join(' ')
+    }
+  }
+
+  // Get body text for extraction
+  const bodyText = doc.body?.textContent || ''
+  
+  // Extract listing ID
+  const listingIdMatch = url.match(/\/view\/(\d+)\//) || bodyText.match(/\(CC-(\d+)\)/i)
+  if (listingIdMatch) {
+    data.listing_id = listingIdMatch[1]
+  }
+
+  // Extract price
+  const pricePatterns = [
+    /Price:\s*\$?([\d,]+)/i,
+    /\$([\d,]+)\s*\(OBO\)/i,
+    /\$([\d,]+)\s*\(Or Best Offer\)/i
+  ]
+  for (const pattern of pricePatterns) {
+    const match = bodyText.match(pattern)
+    if (match) {
+      data.asking_price = parseInt(match[1].replace(/,/g, ''), 10)
+      break
+    }
+  }
+
+  // Extract mileage
+  const mileageMatch = bodyText.match(/Odometer:\s*([\d,]+)/i)
+  if (mileageMatch) {
+    data.mileage = parseInt(mileageMatch[1].replace(/,/g, ''), 10)
+  }
+
+  // Extract VIN
+  const vinMatch = bodyText.match(/(?:VIN|Chassis)[:\s]*([A-HJ-NPR-Z0-9]{17})/i)
+  if (vinMatch) {
+    data.vin = vinMatch[1]
+  }
+
+  // Extract colors
+  const extColorMatch = bodyText.match(/Exterior Color:\s*([A-Za-z]+)/i)
+  if (extColorMatch) {
+    data.color = extColorMatch[1].trim()
+    data.exterior_color = extColorMatch[1].trim()
+  }
+
+  const intColorMatch = bodyText.match(/Interior Color:\s*([A-Za-z]+)/i)
+  if (intColorMatch) {
+    data.interior_color = intColorMatch[1].trim()
+  }
+
+  // Extract transmission
+  const transMatch = bodyText.match(/Transmission:\s*([A-Za-z]+)/i)
+  if (transMatch) {
+    data.transmission = transMatch[1].trim().toLowerCase()
+  }
+
+  // Extract drivetrain
+  const drivetrainMatch = bodyText.match(/Drive Train:\s*([A-Za-z0-9\s-]+)/i)
+  if (drivetrainMatch) {
+    data.drivetrain = drivetrainMatch[1].trim()
+  }
+
+  // Extract engine
+  const engineMatch = bodyText.match(/Engine History:\s*([A-Za-z]+)/i) || 
+                      bodyText.match(/Engine:\s*([A-Za-z0-9\s.]+)/i)
+  if (engineMatch) {
+    data.engine = engineMatch[1].trim()
+  }
+
+  // Extract title status
+  const titleStatusMatch = bodyText.match(/Title Status:\s*([A-Za-z]+)/i)
+  if (titleStatusMatch) {
+    data.title_status = titleStatusMatch[1].trim()
+  }
+
+  // Extract convertible
+  const convertibleMatch = bodyText.match(/Convertible:\s*(Yes|No)/i)
+  if (convertibleMatch) {
+    data.convertible = convertibleMatch[1].toLowerCase() === 'yes'
+  }
+
+  // Extract location
+  const locationMatch = bodyText.match(/Location:\s*([^<\n]+)/i) || 
+                        bodyText.match(/in\s+([^<,]+),?\s+([A-Z]{2})/i)
+  if (locationMatch) {
+    data.location = locationMatch[1] ? 
+      (locationMatch[2] ? `${locationMatch[1].trim()}, ${locationMatch[2]}` : locationMatch[1].trim()) :
+      locationMatch[0].trim()
+  }
+
+  // Extract seller information
+  const sellerMatch = bodyText.match(/Listed By:[\s\S]*?Private Seller/i) || 
+                      bodyText.match(/Private Seller/i)
+  if (sellerMatch) {
+    data.seller = 'Private Seller'
+  }
+
+  // Extract phone
+  const phoneMatch = bodyText.match(/Phone:\s*([\d\-\(\)\s]+)/i) || 
+                    bodyText.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/)
+  if (phoneMatch) {
+    data.seller_phone = phoneMatch[1].trim()
+  }
+
+  // Extract email
+  const emailMatch = bodyText.match(/Email:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i)
+  if (emailMatch) {
+    data.seller_email = emailMatch[1].trim()
+  }
+
+  // Extract address
+  const addressMatch = bodyText.match(/Address:\s*([^<\n]+)/i)
+  if (addressMatch) {
+    data.seller_address = addressMatch[1].trim()
+  }
+
+  // Extract description
+  const descElement = doc.querySelector('.vehicle-description, .description, article')
+  if (descElement) {
+    data.description = descElement.textContent.trim().substring(0, 5000)
+  }
+
+  // Extract images
+  const images: string[] = []
+  
+  // Method 1: Look for gallery images
+  const imgElements = doc.querySelectorAll('img')
+  imgElements.forEach((img: any) => {
+    const src = img.getAttribute('src') || img.getAttribute('data-src')
+    if (src && src.includes('classiccars.com') && 
+        (src.match(/\.(jpg|jpeg|png|webp)/i)) &&
+        !src.includes('logo') && !src.includes('icon')) {
+      // Convert to full-size if it's a thumbnail
+      const fullUrl = src.replace(/\/thumbs?\//, '/').replace(/thumb_/, '').replace(/_thumb/, '')
+      if (!images.includes(fullUrl)) {
+        images.push(fullUrl)
+      }
+    }
+  })
+
+  // Method 2: Look for data attributes
+  const dataImageElements = doc.querySelectorAll('[data-image], [data-src], [data-lazy-src]')
+  dataImageElements.forEach((el: any) => {
+    const imgUrl = el.getAttribute('data-image') || 
+                   el.getAttribute('data-src') || 
+                   el.getAttribute('data-lazy-src')
+    if (imgUrl && imgUrl.includes('classiccars.com') && 
+        imgUrl.match(/\.(jpg|jpeg|png|webp)/i) &&
+        !images.includes(imgUrl)) {
+      images.push(imgUrl)
+    }
+  })
+
+  if (images.length > 0) {
+    data.images = Array.from(new Set(images)).slice(0, 50)
+  }
+
+  return data
+}
+
+function scrapeAffordableClassics(doc: any, url: string): any {
+  const data: any = {
+    source: 'Affordable Classics Inc',
+    listing_url: url
+  }
+
+  // Extract from URL: /vehicle/ID/YEAR-MAKE-MODEL/
+  const urlMatch = url.match(/\/(\d{4})-(.+?)\/$/)
+  if (urlMatch) {
+    data.year = parseInt(urlMatch[1])
+    const titleParts = urlMatch[2].split('-')
+    if (titleParts.length >= 2) {
+      data.make = titleParts[0]
+      data.model = titleParts.slice(1).join(' ')
+    }
+  }
+
+  // Extract title
+  const titleEl = doc.querySelector('h1, .vehicle-title')
+  if (titleEl) {
+    data.title = titleEl.textContent?.trim()
+  }
+
+  // Extract price
+  const priceEl = doc.querySelector('.price, [class*="price"]')
+  if (priceEl) {
+    const priceText = priceEl.textContent || ''
+    const priceMatch = priceText.match(/\$?([\d,]+)/)
+    if (priceMatch) {
+      data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+    }
+  }
+
+  // Extract VIN
+  const bodyText = doc.body?.textContent || ''
+  const vinMatch = bodyText.match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
+  if (vinMatch && !/[IOQ]/.test(vinMatch[1])) {
+    data.vin = vinMatch[1].toUpperCase()
+  }
+
+  // Extract mileage
+  const mileageMatch = bodyText.match(/(?:mileage|odometer|miles)[:\s]*([\d,]+)/i)
+  if (mileageMatch) {
+    data.mileage = parseInt(mileageMatch[1].replace(/,/g, ''))
+  }
+
+  // Extract images
+  const images: string[] = []
+  const imgElements = doc.querySelectorAll('img[src*="vehicle"], img[src*="inventory"], .gallery img')
+  imgElements.forEach((img: any) => {
+    const src = img.getAttribute('src') || img.getAttribute('data-src')
+    if (src && !src.includes('logo')) {
+      const fullUrl = src.startsWith('http') ? src : `https://www.affordableclassicsinc.com${src}`
+      if (!images.includes(fullUrl)) {
+        images.push(fullUrl)
+      }
+    }
+  })
+  data.images = images.slice(0, 50)
+
+  // Extract description
+  const descEl = doc.querySelector('.description, .vehicle-description')
+  if (descEl) {
+    data.description = descEl.textContent?.trim().substring(0, 5000)
+  }
+
+  return data
+}
+
+function scrapeClassicCom(doc: any, url: string): any {
+  const data: any = {
+    source: 'Classic.com',
+    listing_url: url
+  }
+
+  // Extract from URL: /veh/YEAR-MAKE-MODEL-VIN-/
+  const urlMatch = url.match(/\/veh\/(\d{4})-([^-]+)-([^-]+)-([^-]+)-/)
+  if (urlMatch) {
+    data.year = parseInt(urlMatch[1])
+    data.make = urlMatch[2].replace(/-/g, ' ')
+    data.model = urlMatch[3].replace(/-/g, ' ')
+    data.vin = urlMatch[4].toUpperCase()
+  }
+
+  // Extract title
+  const titleEl = doc.querySelector('h1')
+  if (titleEl) {
+    data.title = titleEl.textContent?.trim()
+  }
+
+  // Extract price
+  const bodyText = doc.body?.textContent || ''
+  const priceMatch = bodyText.match(/\$([\d,]+)/g)
+  if (priceMatch) {
+    const prices = priceMatch.map((m: string) => parseInt(m.replace(/[$,]/g, '')))
+    data.asking_price = Math.max(...prices)
+  }
+
+  // Extract images
+  const images: string[] = []
+  const imgElements = doc.querySelectorAll('img[src*="classic.com"]')
+  imgElements.forEach((img: any) => {
+    const src = img.getAttribute('src')
+    if (src && !src.includes('logo')) {
+      images.push(src)
+    }
+  })
+  data.images = images.slice(0, 50)
+
+  return data
+}
+
+function scrapeGoxee(doc: any, url: string): any {
+  const data: any = {
+    source: 'Goxee Dealer',
+    listing_url: url
+  }
+
+  // Generic extraction
+  const titleEl = doc.querySelector('h1, .title')
+  if (titleEl) {
+    data.title = titleEl.textContent?.trim()
+    const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
+    if (yearMatch) {
+      data.year = parseInt(yearMatch[0])
+    }
+  }
+
+  const bodyText = doc.body?.textContent || ''
+  const vinMatch = bodyText.match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
+  if (vinMatch && !/[IOQ]/.test(vinMatch[1])) {
+    data.vin = vinMatch[1].toUpperCase()
+  }
+
+  return data
+}
+
+function scrapeKSL(doc: any, url: string): any {
+  const data: any = {
+    source: 'KSL Cars',
+    listing_url: url
+  }
+
+  // Extract title
+  const titleEl = doc.querySelector('h1, .title')
+  if (titleEl) {
+    data.title = titleEl.textContent?.trim()
+    
+    // Parse year/make/model from title
+    const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
+    if (yearMatch) {
+      data.year = parseInt(yearMatch[0])
+    }
+    
+    const afterYear = data.title.replace(/\b(19|20)\d{2}\b/, '').trim()
+    const parts = afterYear.split(/\s+/)
+    if (parts.length >= 2) {
+      data.make = parts[0]
+      data.model = parts.slice(1, 3).join(' ')
+    }
+  }
+
+  // Extract price
+  const bodyText = doc.body?.textContent || ''
+  const priceMatch = bodyText.match(/\$[\d,]+/g)
+  if (priceMatch) {
+    data.asking_price = parseInt(priceMatch[0].replace(/[$,]/g, ''))
+  }
+
+  // Extract VIN
+  const vinMatch = bodyText.match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
+  if (vinMatch && !/[IOQ]/.test(vinMatch[1])) {
+    data.vin = vinMatch[1].toUpperCase()
+  }
+
+  // Extract mileage
+  const mileageMatch = bodyText.match(/(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)/i)
+  if (mileageMatch) {
+    data.mileage = parseInt(mileageMatch[1].replace(/,/g, ''))
+  }
+
+  // Extract images
+  const images: string[] = []
+  const imgMatches = bodyText.matchAll(/<img[^>]+src="([^"]+)"[^>]*>/gi)
+  for (const match of imgMatches) {
+    if (match[1] && !match[1].includes('logo') && !match[1].includes('icon')) {
+      images.push(match[1])
+    }
+  }
+  data.images = images.slice(0, 20)
+
+  // Extract description
+  const descEl = doc.querySelector('.description, [class*="description"]')
+  if (descEl) {
+    data.description = descEl.textContent?.trim().substring(0, 5000)
   }
 
   return data
