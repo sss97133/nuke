@@ -30,17 +30,6 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   primaryAction,
   breadcrumbs
 }) => {
-  // Prevent double wrapping - returns null if already inside AppLayout to prevent duplicate rendering
-  const isAlreadyWrapped = usePreventDoubleLayout();
-  
-  // If already wrapped, return null to prevent duplicate headers/footers (works in production too)
-  if (isAlreadyWrapped) {
-    // Only log in development - in production, silently prevent duplicates
-    if (import.meta.env.DEV) {
-      console.error('🚨 AppLayout double-wrap prevented - returning null to avoid duplicate headers/footers');
-    }
-    return null;
-  }
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -270,6 +259,17 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
  * If you see this error, remove the AppLayout wrapper from your page component.
  */
 const AppLayout: React.FC<AppLayoutProps> = (props) => {
+  // Check if we're already inside an AppLayout (nested)
+  const isAlreadyWrapped = usePreventDoubleLayout();
+  
+  // If already wrapped, return null to prevent duplicate headers/footers
+  if (isAlreadyWrapped) {
+    if (import.meta.env.DEV) {
+      console.error('🚨 AppLayout double-wrap prevented - returning null to avoid duplicate headers/footers');
+    }
+    return null;
+  }
+  
   return (
     <AppLayoutProvider>
       <AppLayoutInner {...props} />
