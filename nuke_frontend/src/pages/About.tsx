@@ -1,12 +1,10 @@
 import React from 'react';
-import AppLayout from '../components/layout/AppLayout';
 import '../design-system.css';
 
 const About: React.FC = () => {
   return (
-    <AppLayout>
-      <div style={{ padding: 'var(--space-6)', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ background: 'var(--white)', border: '2px solid var(--border-medium)', padding: 'var(--space-6)' }}>
+    <div style={{ padding: 'var(--space-6)', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ background: 'var(--white)', border: '2px solid var(--border-medium)', padding: 'var(--space-6)' }}>
           
           {/* Header */}
           <h1 style={{ fontSize: '16pt', fontWeight: 'bold', marginBottom: 'var(--space-4)', borderBottom: '2px solid var(--border-medium)', paddingBottom: 'var(--space-2)' }}>
@@ -1602,7 +1600,6 @@ SHIPPING SYSTEM:
           </div>
         </div>
       </div>
-    </AppLayout>
   );
 };
 
