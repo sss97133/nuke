@@ -498,11 +498,11 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                       currentDate.setDate(currentDate.getDate() - 1);
                       handleDayClick(currentDate);
                     }}
-                    style={{ fontSize: '9px', fontWeight: 700 }}
+                    style={{ fontSize: '8pt', fontWeight: 700 }}
                   >
                     PREV DAY
                   </button>
-                  <h4 style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+                  <h4 style={{ fontSize: '8pt', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
                     {new Date(selectedDayContributions[0].contribution_date).toLocaleDateString('en-US', {
                       month: 'numeric',
                       day: 'numeric',
@@ -517,7 +517,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                       currentDate.setDate(currentDate.getDate() + 1);
                       handleDayClick(currentDate);
                     }}
-                    style={{ fontSize: '9px', fontWeight: 700 }}
+                    style={{ fontSize: '8pt', fontWeight: 700 }}
                   >
                     NEXT DAY
                   </button>
@@ -528,7 +528,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                     e.stopPropagation();
                     setShowDayPopup(false);
                   }}
-                  style={{ fontSize: '9px', fontWeight: 700 }}
+                  style={{ fontSize: '8pt', fontWeight: 700 }}
                 >
                   CLOSE
                 </button>
@@ -596,24 +596,24 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                               {metadata.title || metadata.event_type?.replace('_', ' ') || contribution.contribution_type.replace('_', ' ')}
                             </div>
                             {metadata.description && (
-                              <div className="text text-muted" style={{ fontSize: '11px', marginBottom: '4px' }}>
+                              <div className="text text-muted" style={{ fontSize: '8pt', marginBottom: '4px' }}>
                                 {metadata.description}
                               </div>
                             )}
                             {/* Show intelligent analysis if available */}
                             {metadata.ai_analysis && (
                               <div style={{
-                                fontSize: '10px',
+                                fontSize: '8pt',
                                 padding: '6px',
                                 backgroundColor: '#e8f4f8',
                                 border: '1px solid #4a90e2',
                                 borderRadius: '3px',
                                 marginTop: '4px'
                               }}>
-                                <div style={{ fontWeight: 'bold', color: '#1a5490', marginBottom: '2px' }}>
+                                <div style={{ fontWeight: 'bold', color: '#1a5490', marginBottom: '2px', fontSize: '8pt' }}>
                                   AI Analysis
                                 </div>
-                                <div style={{ color: '#475569', fontSize: '9px' }}>
+                                <div style={{ color: '#475569', fontSize: '8pt' }}>
                                   {metadata.ai_analysis.summary}
                                 </div>
                               </div>
