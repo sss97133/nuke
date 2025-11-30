@@ -28,19 +28,22 @@ export const usePreventDoubleLayout = () => {
   const { isInsideAppLayout } = useAppLayoutContext();
   
   if (isInsideAppLayout) {
-    const errorMsg = 
-      '🚨 DOUBLE APPLAYOUT DETECTED!\n\n' +
-      'AppLayout is already provided at the route level in App.tsx.\n' +
-      'Pages should NOT wrap themselves in AppLayout.\n\n' +
-      'Fix: Remove the AppLayout wrapper from your page component.\n' +
-      'Just return your content directly.\n\n' +
-      'Example:\n' +
-      '  // ❌ WRONG:\n' +
-      '  return <AppLayout><div>Content</div></AppLayout>;\n\n' +
-      '  // ✅ CORRECT:\n' +
-      '  return <div>Content</div>;';
-    
-    console.error('⚠️', errorMsg);
+    // Only log in development - in production, silently prevent duplicates
+    if (process.env.NODE_ENV === 'development') {
+      const errorMsg = 
+        '🚨 DOUBLE APPLAYOUT DETECTED!\n\n' +
+        'AppLayout is already provided at the route level in App.tsx.\n' +
+        'Pages should NOT wrap themselves in AppLayout.\n\n' +
+        'Fix: Remove the AppLayout wrapper from your page component.\n' +
+        'Just return your content directly.\n\n' +
+        'Example:\n' +
+        '  // ❌ WRONG:\n' +
+        '  return <AppLayout><div>Content</div></AppLayout>;\n\n' +
+        '  // ✅ CORRECT:\n' +
+        '  return <div>Content</div>;';
+      
+      console.error('⚠️', errorMsg);
+    }
     // Return true so AppLayoutInner can return null and prevent duplicate rendering
   }
   

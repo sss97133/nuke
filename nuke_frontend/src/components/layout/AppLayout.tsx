@@ -35,7 +35,10 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   
   // If already wrapped, return null to prevent duplicate headers/footers (works in production too)
   if (isAlreadyWrapped) {
-    console.error('🚨 AppLayout double-wrap prevented - returning null to avoid duplicate headers/footers');
+    // Only log in development - in production, silently prevent duplicates
+    if (process.env.NODE_ENV === 'development') {
+      console.error('🚨 AppLayout double-wrap prevented - returning null to avoid duplicate headers/footers');
+    }
     return null;
   }
   const [session, setSession] = useState<any>(null);
