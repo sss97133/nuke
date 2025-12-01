@@ -1450,8 +1450,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Camera & EXIF */}
                   {imageMetadata?.exif_data?.camera && (
                     <div>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Camera & EXIF</h4>
-                      <div className="text-sm text-gray-200 space-y-1">
+                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Camera & EXIF</h4>
+                      <div style={{ fontSize: '8pt', color: '#fff' }}>
                         <div>
                           {typeof imageMetadata.exif_data.camera === 'string' 
                             ? imageMetadata.exif_data.camera 
