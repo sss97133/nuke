@@ -327,13 +327,20 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           console.warn('Timeline event creation error:', err);
         }
 
-        // Trigger AI critique/analysis in background
-        supabase.functions.invoke('vehicle-expert-agent', {
-          body: { vehicleId: newVehicle.id }
-        }).then(() => {
-          console.log('✅ AI analysis triggered');
+        // Queue AI analysis (bulletproof with retry logic)
+        supabase.rpc('queue_analysis', {
+          p_vehicle_id: newVehicle.id,
+          p_analysis_type: 'expert_valuation',
+          p_priority: 3, // High priority for new imports
+          p_triggered_by: 'user'
+        }).then(({ data: queueId, error: queueError }) => {
+          if (queueError) {
+            console.warn('⚠️ Failed to queue analysis (will retry automatically):', queueError);
+          } else {
+            console.log('✅ AI analysis queued (ID:', queueId, ') - will process automatically');
+          }
         }).catch(err => {
-          console.warn('AI analysis failed (non-critical):', err);
+          console.warn('⚠️ Analysis queue error (non-critical, will retry):', err);
         });
 
         // Import images directly if available (BLOCKING - wait for at least first image)

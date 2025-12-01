@@ -128,25 +128,29 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const triggerAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      console.log('🤖 Triggering vehicle-expert-agent for vehicle:', vehicleId);
+      console.log('🤖 Queueing analysis for vehicle:', vehicleId);
       
-      // Import supabase to call the edge function
+      // Import supabase to queue the analysis
       const { supabase } = await import('../lib/supabase');
       
-      // Call vehicle-expert-agent edge function
-      const { error: agentError } = await supabase.functions.invoke('vehicle-expert-agent', {
-        body: { vehicleId }
+      // Queue analysis (bulletproof with retry logic)
+      const { data: queueId, error: queueError } = await supabase.rpc('queue_analysis', {
+        p_vehicle_id: vehicleId,
+        p_analysis_type: 'expert_valuation',
+        p_priority: 2, // High priority for manual trigger
+        p_triggered_by: 'user'
       });
       
-      if (agentError) {
-        throw agentError;
+      if (queueError) {
+        throw new Error(queueError.message || 'Failed to queue analysis');
       }
       
-      console.log('✅ Analysis triggered, waiting for results...');
+      console.log('✅ Analysis queued (ID:', queueId, ') - processing automatically...');
+      setToast({ message: 'Analysis queued! Processing in background...', type: 'info' });
       
-      // Poll for updated status (analysis takes 30-60 seconds)
+      // Poll for updated status (analysis takes 30-60 seconds, but queue processes every 5 min)
       let attempts = 0;
-      const maxAttempts = 12; // 60 seconds total
+      const maxAttempts = 24; // 2 minutes total (5 second intervals)
       const pollInterval = setInterval(async () => {
         attempts++;
         await loadPricingStatus();
@@ -161,15 +165,15 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         } else if (attempts >= maxAttempts) {
           clearInterval(pollInterval);
           setIsAnalyzing(false);
-          setToast({ message: 'Analysis is taking longer than expected. Check back in a few minutes.', type: 'info' });
+          setToast({ message: 'Analysis is processing. Check back in a few minutes - it will complete automatically.', type: 'info' });
         }
       }, 5000);
       
     } catch (err: any) {
-      console.error('❌ Failed to trigger analysis:', err);
+      console.error('❌ Failed to queue analysis:', err);
       setIsAnalyzing(false);
-      setError(err.message || 'Failed to trigger analysis');
-      setToast({ message: 'Failed to trigger analysis. Please try again.', type: 'error' });
+      setError(err.message || 'Failed to queue analysis');
+      setToast({ message: 'Failed to queue analysis. Please try again.', type: 'error' });
     }
   };
   
