@@ -1623,14 +1623,62 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         )}
                         
                         {/* Action type */}
-                        {attribution.source && (
-                          <div style={{ marginBottom: '6px' }}>
-                            <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Action:</div>
-                            <div style={{ fontSize: '7pt', textTransform: 'uppercase' }}>
-                              {attribution.source.replace(/_/g, ' ')}
+                        {attribution.source && (() => {
+                          const sourceUrl = imageMetadata?.exif_data?.source_url || 
+                                          imageMetadata?.exif_data?.discovery_url ||
+                                          imageMetadata?.source_url;
+                          const actionUrl = (attribution.source === 'craigslist_scrape' || attribution.source === 'scraper') 
+                            ? (sourceUrl || 'https://craigslist.org')
+                            : sourceUrl;
+                          
+                          return (
+                            <div style={{ marginBottom: '6px' }}>
+                              <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Action:</div>
+                              {actionUrl ? (
+                                <a
+                                  href={actionUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '7pt',
+                                    color: 'var(--text-muted)',
+                                    padding: '1px 6px',
+                                    background: 'var(--grey-100)',
+                                    borderRadius: '3px',
+                                    whiteSpace: 'nowrap',
+                                    textDecoration: 'none',
+                                    textTransform: 'uppercase',
+                                    cursor: 'pointer'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--grey-200)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'var(--grey-100)';
+                                  }}
+                                >
+                                  <FaviconIcon url={actionUrl} matchTextSize={true} textSize={7} />
+                                  {attribution.source.replace(/_/g, ' ')}
+                                </a>
+                              ) : (
+                                <div style={{
+                                  fontSize: '7pt',
+                                  color: 'var(--text-muted)',
+                                  padding: '1px 6px',
+                                  background: 'var(--grey-100)',
+                                  borderRadius: '3px',
+                                  whiteSpace: 'nowrap',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {attribution.source.replace(/_/g, ' ')}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                         
                         {/* Photographer (if known) */}
                         {attribution.photographer && (
