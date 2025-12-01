@@ -116,9 +116,26 @@ Deno.serve(async (req) => {
   }
   
   try {
-    const { vehicleId } = await req.json();
+    const { vehicleId, queueId } = await req.json();
     
-    console.log(`🤖 Vehicle Expert Agent starting analysis for: ${vehicleId}`);
+    if (!vehicleId) {
+      throw new Error('vehicleId is required');
+    }
+    
+    console.log(`🤖 Vehicle Expert Agent starting analysis for: ${vehicleId}${queueId ? ` (queue: ${queueId})` : ''}`);
+    
+    // Health check: Verify vehicle exists
+    const { data: vehicle, error: vehicleError } = await supabase
+      .from('vehicles')
+      .select('id, year, make, model')
+      .eq('id', vehicleId)
+      .single();
+    
+    if (vehicleError || !vehicle) {
+      throw new Error(`Vehicle not found: ${vehicleId}`);
+    }
+    
+    console.log(`✅ Vehicle verified: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
     
     // STEP 1: Research Vehicle & Become Expert
     const vehicleContext = await researchVehicle(vehicleId);
@@ -147,6 +164,8 @@ Deno.serve(async (req) => {
     // STEP 5: Save to database
     await saveValuation(vehicleId, valuation);
     
+    console.log(`✅ Analysis complete for ${vehicleId}: $${valuation.estimatedTotalValue} (confidence: ${valuation.confidence}%)`);
+    
     return new Response(JSON.stringify(valuation), {
       headers: { 
         'Content-Type': 'application/json',
@@ -155,8 +174,16 @@ Deno.serve(async (req) => {
     });
     
   } catch (error: any) {
-    console.error('Expert agent error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('❌ Expert agent error:', error);
+    console.error('Stack:', error.stack);
+    
+    // Enhanced error response with details for debugging
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      errorType: error.name,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    }), {
       status: 500,
       headers: { 
         'Content-Type': 'application/json',
