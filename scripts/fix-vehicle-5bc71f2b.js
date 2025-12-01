@@ -31,9 +31,24 @@ async function fixVehicle() {
   // Get vehicle
   const { data: vehicle, error: vehicleError } = await supabase
     .from('vehicles')
-    .select('id, discovery_url, origin_metadata')
+    .select('id, discovery_url, origin_metadata, description')
     .eq('id', VEHICLE_ID)
     .single();
+  
+  // Update description if missing
+  if (vehicle && !vehicle.description && scrapedData?.description) {
+    console.log('📝 Updating vehicle description...');
+    const { error: updateError } = await supabase
+      .from('vehicles')
+      .update({ description: scrapedData.description })
+      .eq('id', VEHICLE_ID);
+    
+    if (updateError) {
+      console.error('❌ Failed to update description:', updateError);
+    } else {
+      console.log('✅ Description updated');
+    }
+  }
   
   if (vehicleError || !vehicle) {
     console.error('❌ Vehicle not found:', vehicleError);
@@ -64,8 +79,24 @@ async function fixVehicle() {
     year: scrapedData.year,
     make: scrapedData.make,
     model: scrapedData.model,
-    images: scrapedData.images?.length || 0
+    images: scrapedData.images?.length || 0,
+    description: scrapedData.description ? scrapedData.description.substring(0, 100) + '...' : 'None'
   });
+  
+  // Update vehicle description if missing
+  if (!vehicle.description && scrapedData?.description) {
+    console.log('📝 Updating vehicle description...');
+    const { error: updateError } = await supabase
+      .from('vehicles')
+      .update({ description: scrapedData.description })
+      .eq('id', VEHICLE_ID);
+    
+    if (updateError) {
+      console.error('❌ Failed to update description:', updateError);
+    } else {
+      console.log('✅ Description updated');
+    }
+  }
   
   // Create timeline event if missing
   const { data: existingEvents } = await supabase
