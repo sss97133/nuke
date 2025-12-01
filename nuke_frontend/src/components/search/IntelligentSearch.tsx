@@ -240,14 +240,17 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           return;
         }
         
-        console.log('✅ Scraping successful:', {
-          year: scrapeResult.data?.year,
-          make: scrapeResult.data?.make,
-          model: scrapeResult.data?.model,
-          images: scrapeResult.data?.images?.length
-        });
-
         const scrapedData = scrapeResult.data;
+        
+        console.log('✅ Scraping successful:', {
+          year: scrapedData?.year,
+          make: scrapedData?.make,
+          model: scrapedData?.model,
+          images: scrapedData?.images?.length,
+          imagesArray: scrapedData?.images,
+          hasImages: !!scrapedData?.images,
+          isArray: Array.isArray(scrapedData?.images)
+        });
         
         // Create vehicle immediately
         const vehicleData: any = {
@@ -329,7 +332,16 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         });
 
         // Import images directly if available (BLOCKING - wait for at least first image)
-        if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id) {
+        console.log('🔍 Checking images for import:', {
+          hasImages: !!scrapedData?.images,
+          isArray: Array.isArray(scrapedData?.images),
+          imagesLength: scrapedData?.images?.length,
+          hasVehicleId: !!newVehicle.id,
+          vehicleId: newVehicle.id,
+          imagesValue: scrapedData?.images
+        });
+        
+        if (scrapedData?.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id) {
           console.log(`📸 Importing ${scrapedData.images.length} images...`);
           
           let successCount = 0;
