@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { FaviconIcon } from '../common/FaviconIcon';
 
 interface VehicleDescriptionCardProps {
   vehicleId: string;
@@ -211,9 +212,14 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                         textDecoration: 'underline',
                         fontSize: '6pt',
                         wordBreak: 'break-all',
-                        display: 'inline-block'
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
                       }}
                     >
+                      {sourceInfo.url.includes('craigslist') && (
+                        <FaviconIcon url={sourceInfo.url} matchTextSize={true} textSize={6} />
+                      )}
                       {sourceInfo.url.includes('craigslist') ? 'View Craigslist Listing' : sourceInfo.url}
                     </a>
                     {sourceInfo.date && (

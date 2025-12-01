@@ -4,6 +4,7 @@ import VehicleDataQualityRating from '../../components/VehicleDataQualityRating'
 import URLDataDrop from '../../components/vehicle/URLDataDrop';
 import InlineVINEditor from '../../components/vehicle/InlineVINEditor';
 import { BATListingManager } from '../../components/vehicle/BATListingManager';
+import { FaviconIcon } from '../../components/common/FaviconIcon';
 import type { VehicleBasicInfoProps} from './types';
 import { useToast } from '../../components/ui/Toast';
 
@@ -133,20 +134,19 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '14px',
-                    height: '14px',
                     border: 'none',
                     background: 'transparent',
                     padding: 0,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    marginLeft: '2px'
                   }}
+                  title="Craigslist verified"
                 >
-                  <svg width="12" height="12" viewBox="0 0 20 20" fill="none" role="img">
-                    <circle cx="10" cy="10" r="8.5" fill="#ede9fe" stroke="#7c3aed" strokeWidth="1.2" />
-                    <path d="M12.3 6.4C11.6 5.8 10.8 5.5 9.9 5.5C8 5.5 6.5 7 6.5 8.9C6.5 10.8 8 12.3 9.9 12.3C10.8 12.3 11.6 12 12.3 11.4" stroke="#7c3aed" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M12.8 11.5L14.6 13.3" stroke="#22c55e" strokeWidth="1.2" strokeLinecap="round" />
-                    <path d="M14.6 11.5L12.8 13.3" stroke="#22c55e" strokeWidth="1.2" strokeLinecap="round" />
-                  </svg>
+                  <FaviconIcon 
+                    url={vehicle?.discovery_url || 'https://craigslist.org'} 
+                    matchTextSize={true} 
+                    textSize={8}
+                  />
                 </button>
               )}
             </span>
@@ -331,7 +331,16 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                   style={{ color: 'var(--primary)', textDecoration: 'underline' }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {listingSourceLabel || listingHost || 'External Listing'}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    {isCraigslistListing && vehicle?.discovery_url && (
+                      <FaviconIcon 
+                        url={vehicle.discovery_url} 
+                        matchTextSize={true} 
+                        textSize={8}
+                      />
+                    )}
+                    {listingSourceLabel || listingHost || 'External Listing'}
+                  </span>
                 </a>
                 {listingCapturedDate && (
                   <span style={{ fontSize: '7pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
