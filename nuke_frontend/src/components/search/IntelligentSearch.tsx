@@ -4,6 +4,7 @@ import { advancedSearchService } from '../../services/advancedSearchService';
 import { fullTextSearchService } from '../../services/fullTextSearchService';
 import { UnifiedImageImportService } from '../../services/unifiedImageImportService';
 import { FaviconIcon } from '../common/FaviconIcon';
+import { extractAndCacheFavicon, detectSourceType } from '../../services/sourceFaviconService';
 import '../../design-system.css';
 
 interface SearchResult {
@@ -301,6 +302,16 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         }
         
         console.log('✅ Vehicle created:', newVehicle.id);
+
+        // Extract and cache favicon for this source (non-blocking)
+        const sourceInfo = detectSourceType(searchQuery.trim());
+        extractAndCacheFavicon(
+          searchQuery.trim(),
+          sourceInfo?.type || 'classified',
+          sourceInfo?.name || 'Craigslist'
+        ).catch(err => {
+          console.warn('Failed to cache favicon (non-critical):', err);
+        });
 
         // Create timeline event for discovery (blocking to ensure it's created)
         try {

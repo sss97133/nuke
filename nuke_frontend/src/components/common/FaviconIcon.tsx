@@ -1,9 +1,11 @@
 /**
  * Favicon Icon Component
  * Fetches and displays favicons from URLs (like browser search bars)
+ * Checks database cache first, then falls back to external services
  */
 
 import React, { useState, useEffect } from 'react';
+import { getCachedFavicon, extractAndCacheFavicon, detectSourceType } from '../../services/sourceFaviconService';
 
 interface FaviconIconProps {
   url: string;
@@ -31,29 +33,47 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
   useEffect(() => {
     if (!url) return;
 
-    try {
-      // Extract domain from URL
-      const domain = new URL(url).hostname;
-      
-      // Try multiple favicon services (fallback chain)
-      const faviconServices = [
-        // Google's favicon service (most reliable)
-        `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`,
-        // Icon Horse (alternative)
-        `https://icon.horse/icon/${domain}`,
-        // Direct favicon.ico
-        `https://${domain}/favicon.ico`,
-        // Fallback to domain root
-        `https://${domain}/favicon.png`
-      ];
+    let cancelled = false;
 
-      // Try first service (Google's is most reliable)
-      setFaviconUrl(faviconServices[0]);
-      setError(false);
-    } catch (err) {
-      setError(true);
-    }
-  }, [url, size]);
+    // First, try to get from database cache
+    getCachedFavicon(url).then((cachedUrl) => {
+      if (cancelled) return;
+      
+      if (cachedUrl) {
+        setFaviconUrl(cachedUrl);
+        setError(false);
+      } else {
+        // Not in cache, extract and cache it
+        const sourceInfo = detectSourceType(url);
+        extractAndCacheFavicon(
+          url,
+          sourceInfo?.type,
+          sourceInfo?.name
+        ).then((extractedUrl) => {
+          if (cancelled) return;
+          
+          if (extractedUrl) {
+            setFaviconUrl(extractedUrl);
+            setError(false);
+          } else {
+            // Fallback to direct extraction
+            try {
+              const domain = new URL(url).hostname;
+              const fallbackUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=${iconSize}`;
+              setFaviconUrl(fallbackUrl);
+              setError(false);
+            } catch (err) {
+              setError(true);
+            }
+          }
+        });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url, iconSize]);
 
   if (error || !faviconUrl) {
       // Fallback: show first letter of domain
