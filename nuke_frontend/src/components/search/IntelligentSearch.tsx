@@ -875,6 +875,19 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       }
 
       // Search in external_listings (BAT, etc.) for auction listings
+      // First get vehicles matching the search term
+      const { data: matchingVehicles } = await supabase
+        .from('vehicles')
+        .select('id')
+        .or(`make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`)
+        .limit(50);
+
+      if (!matchingVehicles || matchingVehicles.length === 0) {
+        return [];
+      }
+
+      const vehicleIds = matchingVehicles.map(v => v.id);
+      
       const { data: listings, error } = await supabase
         .from('external_listings')
         .select(`
@@ -893,7 +906,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           )
         `)
         .eq('listing_status', 'active')
-        .or(`vehicles.make.ilike.%${searchTerm}%,vehicles.model.ilike.%${searchTerm}%`)
+        .in('vehicle_id', vehicleIds)
         .limit(10);
 
       if (error) {
@@ -942,11 +955,25 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       let error: any = null;
 
       // Try reference_libraries first
-      const { data: libs, error: libError } = await supabase
+      // Use separate queries to avoid .or() syntax issues
+      const { data: libsByTitle } = await supabase
         .from('reference_libraries')
         .select('id, title, description, created_at')
-        .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+        .ilike('title', `%${searchTerm}%`)
         .limit(10);
+
+      const { data: libsByDesc } = await supabase
+        .from('reference_libraries')
+        .select('id, title, description, created_at')
+        .ilike('description', `%${searchTerm}%`)
+        .limit(10);
+
+      // Combine and deduplicate
+      const allLibs = [...(libsByTitle || []), ...(libsByDesc || [])];
+      const uniqueLibs = Array.from(new Map(allLibs.map(l => [l.id, l])).values()).slice(0, 10);
+      
+      const libs = uniqueLibs;
+      const libError = null;
 
       if (!libError && libs) {
         refs = libs;

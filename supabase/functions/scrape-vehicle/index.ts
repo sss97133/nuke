@@ -410,9 +410,23 @@ function scrapeCraigslist(doc: any, url: string): any {
   }
 
   // Extract title (e.g. "1972 GMC Suburban - $5,500 (El Centro)")
-  const titleElement = doc.querySelector('h1, .postingtitletext #titletextonly')
+  // Try multiple selectors for different Craigslist layouts
+  const titleElement = doc.querySelector('h1, .postingtitletext #titletextonly, #titletextonly, .postingtitletext h1, h1.postingtitle')
+  let titleText = ''
+  
   if (titleElement) {
-    data.title = titleElement.textContent.trim()
+    titleText = titleElement.textContent?.trim() || ''
+  } else {
+    // Fallback: try to find title in body text
+    const bodyText = doc.body?.textContent || ''
+    const titleMatch = bodyText.match(/(?:^|\n)([^\n]{10,100})\s*-\s*\$\s*\d+/i)
+    if (titleMatch) {
+      titleText = titleMatch[1].trim()
+    }
+  }
+  
+  if (titleText) {
+    data.title = titleText
     
     // Parse year/make/model from title
     const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
@@ -420,27 +434,50 @@ function scrapeCraigslist(doc: any, url: string): any {
       data.year = parseInt(yearMatch[0])
     }
     
-    // Extract make/model (e.g., "1972 GMC Suburban" or "1974 Chevy shortbed truck")
-    // Try multiple patterns
-    let vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s+-|\()/i)
+    // Extract make/model (e.g., "1972 GMC Suburban" or "1974 Chevy shortbed truck" or "1961 International Scout 80")
+    // Try multiple patterns - be more flexible
+    let vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s+-|\s*\$|\(|$)/i)
     if (!vehicleMatch) {
       // Try pattern without price/location: "1974 Chevy shortbed truck"
       vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s*$|\s*\*\*)/i)
     }
+    if (!vehicleMatch) {
+      // Try even more flexible: "1961 International Scout 80"
+      vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+([A-Za-z0-9\s]+?)(?:\s|$)/i)
+    }
     
-    if (vehicleMatch) {
-      let make = vehicleMatch[2]
+    if (vehicleMatch && vehicleMatch[2] && vehicleMatch[3]) {
+      let make = vehicleMatch[2].trim()
       // Normalize make
-      if (make.toLowerCase() === 'chevy') make = 'Chevrolet'
+      if (make.toLowerCase() === 'chevy' || make.toLowerCase() === 'chev') make = 'Chevrolet'
+      if (make.toLowerCase() === 'gm' || make.toLowerCase() === 'gmc') make = 'GMC'
       data.make = make
       let model = vehicleMatch[3].trim()
+      
+      // Clean up model - remove common suffixes
+      model = model.replace(/\s*-\s*\$.*$/, '').replace(/\s*\(.*$/, '').trim()
       
       // Normalize model: "pickup"/"truck" → "Truck" (GM's model name)
       // Note: C/K was the series designation (C10, K10, etc.), not the model name
       if (model.toLowerCase().includes('pickup') || model.toLowerCase().includes('truck') || model.toLowerCase() === 'c/k') {
         data.model = 'Truck'
-      } else {
+      } else if (model) {
         data.model = model
+      }
+    }
+    
+    // If still no make/model, try extracting from full page text as fallback
+    if (!data.make || !data.model) {
+      const fullText = doc.body?.textContent || ''
+      // Look for patterns like "1961 International" or "International Scout"
+      const makeModelPattern = fullText.match(/\b(International|Chevrolet|Chevy|GMC|Ford|Dodge|Jeep|Toyota|Nissan)\s+([A-Za-z0-9\s]{3,30}?)(?:\s|$|,|\.)/i)
+      if (makeModelPattern && !data.make) {
+        let make = makeModelPattern[1]
+        if (make.toLowerCase() === 'chevy') make = 'Chevrolet'
+        data.make = make
+        if (makeModelPattern[2] && !data.model) {
+          data.model = makeModelPattern[2].trim()
+        }
       }
     }
     
