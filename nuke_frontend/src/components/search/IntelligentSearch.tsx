@@ -1147,9 +1147,15 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (query.trim()) {
-      executeSearch(query);
+    e?.stopPropagation();
+    const searchTerm = query.trim();
+    console.log('🔘 GO button clicked, query:', searchTerm);
+    if (searchTerm) {
+      console.log('✅ Executing search...');
+      executeSearch(searchTerm);
       setShowSuggestions(false);
+    } else {
+      console.log('⚠️ Empty query, not searching');
     }
   };
 
@@ -1194,7 +1200,12 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
           <button
             type="submit"
-            disabled={isSearching || !query.trim()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSubmit(e);
+            }}
+            disabled={isSearching}
             className="button-win95"
             style={{
               position: 'absolute',
@@ -1204,7 +1215,8 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
               padding: '2px 8px',
               fontSize: '8pt',
               height: '20px',
-              minWidth: '40px'
+              minWidth: '40px',
+              cursor: isSearching ? 'not-allowed' : 'pointer'
             }}
           >
             {isSearching ? '...' : 'GO'}
