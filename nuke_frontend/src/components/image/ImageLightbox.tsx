@@ -1624,10 +1624,17 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         
                         {/* Action type */}
                         {attribution.source && (() => {
+                          // Try multiple sources for the URL
                           const sourceUrl = imageMetadata?.exif_data?.source_url || 
                                           imageMetadata?.exif_data?.discovery_url ||
-                                          imageMetadata?.source_url;
-                          const actionUrl = (attribution.source === 'craigslist_scrape' || attribution.source === 'scraper') 
+                                          imageMetadata?.source_url ||
+                                          (imageMetadata?.exif_data?.metadata?.discovery_url) ||
+                                          (imageMetadata?.exif_data?.metadata?.listing_url);
+                          
+                          // For Craigslist sources, always show a clickable badge with favicon
+                          // Use the source URL if available, otherwise use generic Craigslist URL
+                          const isCraigslistSource = attribution.source === 'craigslist_scrape' || attribution.source === 'scraper';
+                          const actionUrl = isCraigslistSource 
                             ? (sourceUrl || 'https://craigslist.org')
                             : sourceUrl;
                           
@@ -1665,6 +1672,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                 </a>
                               ) : (
                                 <div style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
                                   fontSize: '7pt',
                                   color: 'var(--text-muted)',
                                   padding: '1px 6px',
@@ -1673,6 +1683,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                   whiteSpace: 'nowrap',
                                   textTransform: 'uppercase'
                                 }}>
+                                  {isCraigslistSource && (
+                                    <FaviconIcon url="https://craigslist.org" matchTextSize={true} textSize={7} />
+                                  )}
                                   {attribution.source.replace(/_/g, ' ')}
                                 </div>
                               )}
