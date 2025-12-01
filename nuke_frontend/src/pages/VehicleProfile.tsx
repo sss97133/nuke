@@ -1260,6 +1260,15 @@ const VehicleProfile: React.FC = () => {
               />
             </section>
 
+        {/* Pricing & Analysis Section - Full width */}
+            <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading pricing analysis...</div>}>
+              <VehiclePricingSection
+                vehicle={vehicle}
+                permissions={permissions}
+                initialValuation={latestExpertValuation}
+              />
+            </React.Suspense>
+
         {/* Two column layout: Info on left, Images on right */}
             <section className="section">
           <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: '320px 1fr' }}>
