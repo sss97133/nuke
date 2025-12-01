@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { extractAndCacheFavicon } from '../_shared/extractFavicon.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -370,6 +371,16 @@ serve(async (req) => {
             vehicleId = newVehicle.id
             isNew = true
             stats.created++
+
+            // Extract and cache favicon for this source (non-blocking)
+            extractAndCacheFavicon(
+              supabase,
+              queueItem.listing_url,
+              'classified',
+              'Craigslist'
+            ).catch(err => {
+              console.warn('Failed to cache favicon (non-critical):', err)
+            })
 
             // Create timeline event
             if (data.posted_date) {
