@@ -1551,6 +1551,11 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                            attribution.source === 'bat_listing' ? 'Bring a Trailer' :
                                            attribution.source || 'Unknown';
                           
+                          // Get Craigslist URL for favicon if it's a Craigslist source
+                          const craigslistUrl = (attribution.source === 'craigslist_scrape' || attribution.source === 'scraper') 
+                            ? (sourceUrl || 'https://craigslist.org')
+                            : sourceUrl;
+                          
                           return sourceUrl ? (
                             <div style={{ marginBottom: '6px' }}>
                               <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Source:</div>
@@ -1565,10 +1570,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                   fontSize: '7pt',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '4px'
+                                  gap: '3px'
                                 }}
                               >
-                                <FaviconIcon url={sourceUrl} size={12} />
+                                <FaviconIcon url={craigslistUrl} matchTextSize={true} textSize={7} />
                                 {sourceName}
                               </a>
                             </div>

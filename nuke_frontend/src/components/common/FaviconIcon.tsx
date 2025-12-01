@@ -10,14 +10,21 @@ interface FaviconIconProps {
   size?: number;
   className?: string;
   style?: React.CSSProperties;
+  // For text-adjacent icons (matches font size)
+  matchTextSize?: boolean;
+  textSize?: number; // Font size in pt (e.g., 8pt)
 }
 
 export const FaviconIcon: React.FC<FaviconIconProps> = ({
   url,
   size = 16,
   className = '',
-  style = {}
+  style = {},
+  matchTextSize = false,
+  textSize = 8
 }) => {
+  // If matching text size, calculate icon size from font size
+  const iconSize = matchTextSize ? Math.round(textSize * 1.2) : size; // Slightly larger than text for visibility
   const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -49,58 +56,58 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
   }, [url, size]);
 
   if (error || !faviconUrl) {
-    // Fallback: show first letter of domain
-    try {
-      const domain = new URL(url).hostname;
-      const letter = domain.charAt(0).toUpperCase();
-      return (
-        <span
-          className={className}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: `${size}px`,
-            height: `${size}px`,
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            color: '#fff',
-            fontSize: `${size * 0.6}px`,
-            fontWeight: 'bold',
-            borderRadius: '2px',
-            ...style
-          }}
-        >
-          {letter}
-        </span>
-      );
-    } catch {
-      return null;
+      // Fallback: show first letter of domain
+      try {
+        const domain = new URL(url).hostname;
+        const letter = domain.charAt(0).toUpperCase();
+        return (
+          <span
+            className={className}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: `${iconSize}px`,
+              height: `${iconSize}px`,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              color: '#fff',
+              fontSize: `${iconSize * 0.6}px`,
+              fontWeight: 'bold',
+              borderRadius: '2px',
+              ...style
+            }}
+          >
+            {letter}
+          </span>
+        );
+      } catch {
+        return null;
+      }
     }
-  }
 
-  return (
-    <img
-      src={faviconUrl}
-      alt=""
-      className={className}
-      style={{
-        width: `${size}px`,
-        height: `${size}px`,
-        display: 'inline-block',
-        verticalAlign: 'middle',
-        marginRight: '4px',
-        ...style
-      }}
-      onError={() => {
-        // Try next fallback
-        try {
-          const domain = new URL(url).hostname;
-          setFaviconUrl(`https://icon.horse/icon/${domain}`);
-        } catch {
-          setError(true);
-        }
-      }}
-    />
-  );
+    return (
+      <img
+        src={faviconUrl}
+        alt=""
+        className={className}
+        style={{
+          width: `${iconSize}px`,
+          height: `${iconSize}px`,
+          display: 'inline-block',
+          verticalAlign: 'middle',
+          marginRight: matchTextSize ? '3px' : '4px',
+          ...style
+        }}
+        onError={() => {
+          // Try next fallback
+          try {
+            const domain = new URL(url).hostname;
+            setFaviconUrl(`https://icon.horse/icon/${domain}`);
+          } catch {
+            setError(true);
+          }
+        }}
+      />
+    );
 };
 
