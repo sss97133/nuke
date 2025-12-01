@@ -294,8 +294,8 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         
         console.log('✅ Vehicle created:', newVehicle.id);
 
-        // Create timeline event for discovery
-        await supabase.from('timeline_events').insert({
+        // Create timeline event for discovery (non-blocking)
+        supabase.from('timeline_events').insert({
           vehicle_id: newVehicle.id,
           event_type: 'discovery',
           event_date: new Date().toISOString(),
@@ -307,7 +307,11 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             asking_price: scrapedData.asking_price || scrapedData.price,
             listing_title: scrapedData.title
           }
-        }).catch(err => console.warn('Timeline event creation failed (non-critical):', err));
+        }).then(() => {
+          console.log('✅ Timeline event created');
+        }).catch(err => {
+          console.warn('Timeline event creation failed (non-critical):', err);
+        });
 
         // Trigger AI critique/analysis in background
         supabase.functions.invoke('vehicle-expert-agent', {
@@ -317,20 +321,27 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         // Import images if available (in background, non-blocking)
         if (scrapedData.images && scrapedData.images.length > 0 && newVehicle.id) {
           // Queue images for import via the existing process-cl-queue system
-          const { error: queueError } = await supabase
+          supabase
             .from('craigslist_listing_queue')
             .insert({
               listing_url: searchQuery.trim(),
               status: 'pending',
               vehicle_id: newVehicle.id
+            })
+            .then(({ error: queueError }) => {
+              if (!queueError) {
+                console.log('✅ Queued for image processing');
+                // Trigger queue processing
+                supabase.functions.invoke('process-cl-queue', {
+                  body: { max_listings_to_process: 1 }
+                }).catch(err => console.warn('Queue processing failed (non-critical):', err));
+              } else {
+                console.warn('Queue insertion failed (non-critical):', queueError);
+              }
+            })
+            .catch(err => {
+              console.warn('Queue insertion error (non-critical, table may not exist):', err);
             });
-          
-          if (!queueError) {
-            // Trigger queue processing
-            supabase.functions.invoke('process-cl-queue', {
-              body: { max_listings_to_process: 1 }
-            }).catch(err => console.warn('Queue processing failed (non-critical):', err));
-          }
         }
 
         // Navigate to vehicle profile
