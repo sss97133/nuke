@@ -136,12 +136,17 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   const executeSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
 
+    const trimmedQuery = searchQuery.trim();
+    console.log('🔍 executeSearch called with:', trimmedQuery);
+    console.log('🔍 Query length:', trimmedQuery.length);
+
     // Check if query is a Craigslist URL - check DB first, then import if needed
     const craigslistUrlPattern = /https?:\/\/([^.]+)\.craigslist\.org\/[^/]+\/d\/[^/]+\/[^/]+\.html/i;
-    const isCraigslistUrl = craigslistUrlPattern.test(searchQuery.trim());
+    const isCraigslistUrl = craigslistUrlPattern.test(trimmedQuery);
     
-    console.log('🔍 Search query:', searchQuery);
     console.log('🔍 Is Craigslist URL?', isCraigslistUrl);
+    console.log('🔍 Pattern test result:', craigslistUrlPattern.test(trimmedQuery));
+    console.log('🔍 Pattern matches:', trimmedQuery.match(craigslistUrlPattern));
     
     if (isCraigslistUrl) {
       console.log('🚀 Detected Craigslist URL, starting import...');
@@ -448,15 +453,18 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
   // Auto-trigger search when initialQuery is provided
   useEffect(() => {
-    if (initialQuery && initialQuery.trim() && lastSearchedRef.current !== initialQuery) {
-      console.log('🔄 Auto-triggering search for initialQuery:', initialQuery);
-      lastSearchedRef.current = initialQuery;
+    const trimmed = initialQuery?.trim();
+    if (trimmed && lastSearchedRef.current !== trimmed) {
+      console.log('🔄 Auto-triggering search for initialQuery:', trimmed);
+      console.log('🔄 initialQuery type:', typeof trimmed);
+      console.log('🔄 initialQuery value:', JSON.stringify(trimmed));
+      lastSearchedRef.current = trimmed;
       setHasInitialSearched(true);
       setIsSearching(true);
       // Use setTimeout to ensure executeSearch is defined
       setTimeout(() => {
-        console.log('🚀 Calling executeSearch from auto-trigger...');
-        executeSearch(initialQuery);
+        console.log('🚀 Calling executeSearch from auto-trigger with:', trimmed);
+        executeSearch(trimmed);
       }, 100);
     }
   }, [initialQuery, executeSearch]);
