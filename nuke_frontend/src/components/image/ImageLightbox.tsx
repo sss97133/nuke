@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useImageTags } from '../../hooks/useImageTags';
 import { ImageAIChat } from './ImageAIChat';
+import { FaviconIcon } from '../common/FaviconIcon';
 import { useImageAnalysis } from '../../hooks/useImageAnalysis';
 import { useAutoTagging } from '../../hooks/useAutoTagging';
 import SpatialPartPopup from '../parts/SpatialPartPopup';
@@ -1561,9 +1562,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                   color: '#4A9EFF', 
                                   textDecoration: 'underline',
                                   wordBreak: 'break-all',
-                                  fontSize: '7pt'
+                                  fontSize: '7pt',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
                                 }}
                               >
+                                <FaviconIcon url={sourceUrl} size={12} />
                                 {sourceName}
                               </a>
                             </div>
