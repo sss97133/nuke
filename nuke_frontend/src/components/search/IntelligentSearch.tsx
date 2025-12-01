@@ -328,69 +328,73 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           console.warn('AI analysis failed (non-critical):', err);
         });
 
-        // Import images directly if available (in background, non-blocking)
+        // Import images directly if available (BLOCKING - wait for at least first image)
         if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id) {
           console.log(`📸 Importing ${scrapedData.images.length} images...`);
           
-          // Import images in background (don't block navigation)
-          (async () => {
-            let successCount = 0;
-            for (let i = 0; i < scrapedData.images.length; i++) {
-              const imageUrl = scrapedData.images[i];
-              if (!imageUrl || typeof imageUrl !== 'string') continue;
-              
-              try {
-                // Upgrade to high-res if it's a Craigslist thumbnail
-                const fullSizeUrl = imageUrl.replace('_600x450.jpg', '_1200x900.jpg').replace('_300x300.jpg', '_1200x900.jpg');
-                
-                // Download image
-                const response = await fetch(fullSizeUrl);
-                if (!response.ok) {
-                  console.warn(`Failed to download image ${i + 1}: ${response.statusText}`);
-                  continue;
-                }
-                
-                const blob = await response.blob();
-                
-                // Use UnifiedImageImportService for proper attribution
-                const result = await UnifiedImageImportService.importImage({
-                  file: blob,
-                  vehicleId: newVehicle.id,
-                  source: 'craigslist_scrape',
-                  sourceUrl: imageUrl,
-                  importedBy: user.id,
-                  takenAt: scrapedData.posted_date ? new Date(scrapedData.posted_date) : undefined,
-                  category: 'exterior',
-                  makePrimary: i === 0, // First image is primary
-                  exifData: {
-                    source_url: imageUrl,
-                    discovery_url: searchQuery.trim(),
-                    imported_by_user_id: user.id,
-                    imported_at: new Date().toISOString(),
-                    attribution_note: 'Photographer unknown - images from Craigslist listing. Original photographer can claim with proof.',
-                    claimable: true
-                  }
-                });
-                
-                if (result.success) {
-                  successCount++;
-                  console.log(`✅ Imported image ${i + 1}/${scrapedData.images.length}`);
-                } else {
-                  console.error(`Failed to import image ${i + 1}:`, result.error);
-                }
-                
-                // Small delay to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 200));
-                
-              } catch (imgErr: any) {
-                console.error(`Error importing image ${i + 1}:`, imgErr);
-              }
-            }
+          let successCount = 0;
+          const imagesToImport = scrapedData.images.slice(0, 10); // Limit to first 10 to avoid timeout
+          
+          for (let i = 0; i < imagesToImport.length; i++) {
+            const imageUrl = imagesToImport[i];
+            if (!imageUrl || typeof imageUrl !== 'string') continue;
             
-            console.log(`✅ Image import complete: ${successCount}/${scrapedData.images.length} imported`);
-          })();
+            try {
+              // Upgrade to high-res if it's a Craigslist thumbnail
+              const fullSizeUrl = imageUrl.replace('_600x450.jpg', '_1200x900.jpg').replace('_300x300.jpg', '_1200x900.jpg');
+              
+              console.log(`📥 Downloading image ${i + 1}/${imagesToImport.length}: ${fullSizeUrl.substring(0, 80)}...`);
+              
+              // Download image
+              const response = await fetch(fullSizeUrl);
+              if (!response.ok) {
+                console.warn(`⚠️ Failed to download image ${i + 1}: ${response.statusText}`);
+                continue;
+              }
+              
+              const blob = await response.blob();
+              console.log(`✅ Downloaded image ${i + 1}, size: ${(blob.size / 1024).toFixed(1)}KB`);
+              
+              // Use UnifiedImageImportService for proper attribution
+              // Note: source should be 'scraper' not 'craigslist_scrape' based on the service definition
+              const result = await UnifiedImageImportService.importImage({
+                file: blob,
+                vehicleId: newVehicle.id,
+                source: 'scraper', // Use 'scraper' as defined in the service
+                sourceUrl: imageUrl,
+                importedBy: user.id,
+                takenAt: scrapedData.posted_date ? new Date(scrapedData.posted_date) : undefined,
+                category: 'exterior',
+                makePrimary: i === 0, // First image is primary
+                createTimelineEvent: i === 0, // Create timeline event for first image
+                exifData: {
+                  source_url: imageUrl,
+                  discovery_url: searchQuery.trim(),
+                  imported_by_user_id: user.id,
+                  imported_at: new Date().toISOString(),
+                  attribution_note: 'Photographer unknown - images from Craigslist listing. Original photographer can claim with proof.',
+                  claimable: true
+                }
+              });
+              
+              if (result.success) {
+                successCount++;
+                console.log(`✅ Imported image ${i + 1}/${imagesToImport.length} (ID: ${result.imageId})`);
+              } else {
+                console.error(`❌ Failed to import image ${i + 1}:`, result.error);
+              }
+              
+              // Small delay to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+            } catch (imgErr: any) {
+              console.error(`❌ Error importing image ${i + 1}:`, imgErr);
+            }
+          }
+          
+          console.log(`✅ Image import complete: ${successCount}/${imagesToImport.length} imported`);
         } else {
-          console.log('⚠️ No images to import');
+          console.log('⚠️ No images to import - scrapedData.images:', scrapedData.images);
         }
 
         // Navigate to vehicle profile
