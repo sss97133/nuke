@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { advancedSearchService } from '../../services/advancedSearchService';
 import { fullTextSearchService } from '../../services/fullTextSearchService';
+import { UnifiedImageImportService } from '../../services/unifiedImageImportService';
 import '../../design-system.css';
 
 interface SearchResult {
@@ -294,54 +295,102 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         
         console.log('✅ Vehicle created:', newVehicle.id);
 
-        // Create timeline event for discovery (non-blocking)
-        supabase.from('timeline_events').insert({
-          vehicle_id: newVehicle.id,
-          event_type: 'discovery',
-          event_date: new Date().toISOString(),
-          description: `Discovered via Craigslist listing`,
-          metadata: {
-            discovery_url: searchQuery.trim(),
-            discovery_source: 'craigslist_scrape',
-            automated: true,
-            asking_price: scrapedData.asking_price || scrapedData.price,
-            listing_title: scrapedData.title
+        // Create timeline event for discovery (blocking to ensure it's created)
+        try {
+          const { error: timelineError } = await supabase.from('timeline_events').insert({
+            vehicle_id: newVehicle.id,
+            event_type: 'discovery',
+            event_date: new Date().toISOString(),
+            description: `Discovered via Craigslist listing`,
+            metadata: {
+              discovery_url: searchQuery.trim(),
+              discovery_source: 'craigslist_scrape',
+              automated: true,
+              asking_price: scrapedData.asking_price || scrapedData.price,
+              listing_title: scrapedData.title
+            }
+          });
+          if (timelineError) {
+            console.warn('Timeline event creation failed:', timelineError);
+          } else {
+            console.log('✅ Timeline event created');
           }
-        }).then(() => {
-          console.log('✅ Timeline event created');
-        }).catch(err => {
-          console.warn('Timeline event creation failed (non-critical):', err);
-        });
+        } catch (err) {
+          console.warn('Timeline event creation error:', err);
+        }
 
         // Trigger AI critique/analysis in background
         supabase.functions.invoke('vehicle-expert-agent', {
           body: { vehicleId: newVehicle.id }
-        }).catch(err => console.warn('AI analysis failed (non-critical):', err));
+        }).then(() => {
+          console.log('✅ AI analysis triggered');
+        }).catch(err => {
+          console.warn('AI analysis failed (non-critical):', err);
+        });
 
-        // Import images if available (in background, non-blocking)
-        if (scrapedData.images && scrapedData.images.length > 0 && newVehicle.id) {
-          // Queue images for import via the existing process-cl-queue system
-          supabase
-            .from('craigslist_listing_queue')
-            .insert({
-              listing_url: searchQuery.trim(),
-              status: 'pending',
-              vehicle_id: newVehicle.id
-            })
-            .then(({ error: queueError }) => {
-              if (!queueError) {
-                console.log('✅ Queued for image processing');
-                // Trigger queue processing
-                supabase.functions.invoke('process-cl-queue', {
-                  body: { max_listings_to_process: 1 }
-                }).catch(err => console.warn('Queue processing failed (non-critical):', err));
-              } else {
-                console.warn('Queue insertion failed (non-critical):', queueError);
+        // Import images directly if available (in background, non-blocking)
+        if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id) {
+          console.log(`📸 Importing ${scrapedData.images.length} images...`);
+          
+          // Import images in background (don't block navigation)
+          (async () => {
+            let successCount = 0;
+            for (let i = 0; i < scrapedData.images.length; i++) {
+              const imageUrl = scrapedData.images[i];
+              if (!imageUrl || typeof imageUrl !== 'string') continue;
+              
+              try {
+                // Upgrade to high-res if it's a Craigslist thumbnail
+                const fullSizeUrl = imageUrl.replace('_600x450.jpg', '_1200x900.jpg').replace('_300x300.jpg', '_1200x900.jpg');
+                
+                // Download image
+                const response = await fetch(fullSizeUrl);
+                if (!response.ok) {
+                  console.warn(`Failed to download image ${i + 1}: ${response.statusText}`);
+                  continue;
+                }
+                
+                const blob = await response.blob();
+                
+                // Use UnifiedImageImportService for proper attribution
+                const result = await UnifiedImageImportService.importImage({
+                  file: blob,
+                  vehicleId: newVehicle.id,
+                  source: 'craigslist_scrape',
+                  sourceUrl: imageUrl,
+                  importedBy: user.id,
+                  takenAt: scrapedData.posted_date ? new Date(scrapedData.posted_date) : undefined,
+                  category: 'exterior',
+                  makePrimary: i === 0, // First image is primary
+                  exifData: {
+                    source_url: imageUrl,
+                    discovery_url: searchQuery.trim(),
+                    imported_by_user_id: user.id,
+                    imported_at: new Date().toISOString(),
+                    attribution_note: 'Photographer unknown - images from Craigslist listing. Original photographer can claim with proof.',
+                    claimable: true
+                  }
+                });
+                
+                if (result.success) {
+                  successCount++;
+                  console.log(`✅ Imported image ${i + 1}/${scrapedData.images.length}`);
+                } else {
+                  console.error(`Failed to import image ${i + 1}:`, result.error);
+                }
+                
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+              } catch (imgErr: any) {
+                console.error(`Error importing image ${i + 1}:`, imgErr);
               }
-            })
-            .catch(err => {
-              console.warn('Queue insertion error (non-critical, table may not exist):', err);
-            });
+            }
+            
+            console.log(`✅ Image import complete: ${successCount}/${scrapedData.images.length} imported`);
+          })();
+        } else {
+          console.log('⚠️ No images to import');
         }
 
         // Navigate to vehicle profile
