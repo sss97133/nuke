@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { advancedSearchService } from '../../services/advancedSearchService';
 import { fullTextSearchService } from '../../services/fullTextSearchService';
 import { UnifiedImageImportService } from '../../services/unifiedImageImportService';
+import { FaviconIcon } from '../common/FaviconIcon';
 import '../../design-system.css';
 
 interface SearchResult {
@@ -1278,10 +1279,37 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     executeSearch(suggestion);
   };
 
+  // Check if query is a URL
+  const isUrl = (str: string): boolean => {
+    try {
+      const url = new URL(str);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      // Check if it looks like a URL (starts with http:// or https:// or common domains)
+      return /^(https?:\/\/|www\.|[a-z0-9-]+\.(com|org|net|edu|gov|io|co|us|uk|ca|au|de|fr|it|es|nl|be|se|no|dk|fi|pl|cz|at|ch|ie|pt|gr|ru|jp|cn|kr|in|br|mx|ar|cl|za|nz|ae|sa|il|tr|eg|ma|ng|ke|gh|tz|ug|zm|bw|zw|mw|mz|ao|sn|ci|cm|td|ne|ml|bf|bj|tg|gw|gn|sl|lr|mr|dj|so|et|sd|er|ss|cf|cd|cg|ga|gq|st|km|mu|sc|mg|re|yt|bi|rw|ug|tz|zm|bw|zw|mw|mz|ao|sn|ci|cm|td|ne|ml|bf|bj|tg|gw|gn|sl|lr|mr|dj|so|et|sd|er|ss|cf|cd|cg|ga|gq|st|km|mu|sc|mg|re|yt))/i.test(str.trim());
+    }
+  };
+
+  const queryIsUrl = isUrl(query.trim());
+
   return (
     <div className="intelligent-search" style={{ position: 'relative' }}>
       <form onSubmit={handleSubmit}>
         <div style={{ position: 'relative' }}>
+          {/* Favicon icon inside input (left side) - like browser address bar */}
+          {queryIsUrl && (
+            <div style={{
+              position: 'absolute',
+              left: '6px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              pointerEvents: 'none'
+            }}>
+              <FaviconIcon url={query.trim()} size={14} />
+            </div>
+          )}
+          
           <input
             ref={searchInputRef}
             type="text"
@@ -1294,7 +1322,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
             style={{
               fontSize: '9pt',
-              padding: '4px 50px 4px 8px',
+              padding: queryIsUrl ? '4px 50px 4px 24px' : '4px 50px 4px 8px', // Extra left padding when URL detected
               background: 'var(--white)',
               border: '2px solid var(--border)',
               borderRadius: '0px',
