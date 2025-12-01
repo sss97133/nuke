@@ -349,10 +349,10 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         console.log('═══════════════════════════════════════════════════════');
         
         if (scrapedData?.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id) {
-          console.log(`📸 Importing ${scrapedData.images.length} images...`);
+          console.log(`📸 Importing ALL ${scrapedData.images.length} images...`);
           
           let successCount = 0;
-          const imagesToImport = scrapedData.images.slice(0, 10); // Limit to first 10 to avoid timeout
+          const imagesToImport = scrapedData.images; // Import ALL images
           
           for (let i = 0; i < imagesToImport.length; i++) {
             const imageUrl = imagesToImport[i];

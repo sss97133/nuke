@@ -115,9 +115,9 @@ async function fixVehicle() {
   
   // Import images
   if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0) {
-    console.log(`📸 Importing ${scrapedData.images.length} images...`);
+    console.log(`📸 Importing ALL ${scrapedData.images.length} images...`);
     
-    for (let i = 0; i < Math.min(scrapedData.images.length, 10); i++) {
+    for (let i = 0; i < scrapedData.images.length; i++) {
       const imageUrl = scrapedData.images[i];
       if (!imageUrl || typeof imageUrl !== 'string') continue;
       
