@@ -10,16 +10,12 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import OpenAI from 'https://esm.sh/openai@4.20.1';
+import { getLLMConfig, callLLM, type LLMProvider, type AnalysisTier } from '../_shared/llmProvider.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
-
-const openai = new OpenAI({
-  apiKey: Deno.env.get('OPENAI_API_KEY')!
-});
 
 interface VehicleContext {
   year: number;
@@ -116,13 +112,32 @@ Deno.serve(async (req) => {
   }
   
   try {
-    const { vehicleId, queueId } = await req.json();
+    const { 
+      vehicleId, 
+      queueId,
+      llmProvider,      // Optional: 'openai' | 'anthropic' | 'google'
+      llmModel,         // Optional: specific model name
+      analysisTier,    // Optional: 'tier1' | 'tier2' | 'tier3' | 'expert'
+      userId            // Optional: for user API keys
+    } = await req.json();
     
     if (!vehicleId) {
       throw new Error('vehicleId is required');
     }
     
     console.log(`🤖 Vehicle Expert Agent starting analysis for: ${vehicleId}${queueId ? ` (queue: ${queueId})` : ''}`);
+    console.log(`📊 Analysis config: tier=${analysisTier || 'expert'}, provider=${llmProvider || 'auto'}, model=${llmModel || 'auto'}`);
+    
+    // Get LLM configuration
+    const llmConfig = await getLLMConfig(
+      supabase,
+      userId || null,
+      llmProvider,
+      llmModel,
+      analysisTier || 'expert'
+    );
+    
+    console.log(`✅ Using LLM: ${llmConfig.provider}/${llmConfig.model} (${llmConfig.source} key)`);
     
     // Health check: Verify vehicle exists
     const { data: vehicle, error: vehicleError } = await supabase
@@ -138,27 +153,32 @@ Deno.serve(async (req) => {
     console.log(`✅ Vehicle verified: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
     
     // STEP 1: Research Vehicle & Become Expert
-    const vehicleContext = await researchVehicle(vehicleId);
-    console.log(`📚 Research complete: ${vehicleContext.year} ${vehicleContext.make} ${vehicleContext.model}`);
+    console.log(`📚 STEP 1: Researching vehicle context...`);
+    const vehicleContext = await researchVehicle(vehicleId, llmConfig);
+    console.log(`✅ Research complete: ${vehicleContext.year} ${vehicleContext.make} ${vehicleContext.model}`);
     console.log(`   - Market data: ${vehicleContext.marketSales.length} sales found`);
     console.log(`   - Photo timeline: ${vehicleContext.totalImages} images`);
     
     // STEP 2: Assess Images & Tally Value
-    const components = await assessImagesAndTallyValue(vehicleId, vehicleContext);
-    console.log(`💰 Value assessment complete: ${components.length} components identified`);
+    console.log(`💰 STEP 2: Assessing images and tallying value...`);
+    const components = await assessImagesAndTallyValue(vehicleId, vehicleContext, llmConfig);
+    console.log(`✅ Value assessment complete: ${components.length} components identified`);
     
     // STEP 3: Extract Environmental Data (5 W's)
-    const environmental = await extractEnvironmentalContext(vehicleId);
-    console.log(`🌍 Environmental analysis complete`);
+    console.log(`🌍 STEP 3: Extracting environmental context...`);
+    const environmental = await extractEnvironmentalContext(vehicleId, llmConfig);
+    console.log(`✅ Environmental analysis complete`);
     console.log(`   - Work environment: ${environmental.workEnvironment}`);
     console.log(`   - Locations: ${environmental.gpsLocations.length} unique places`);
     
     // STEP 4: Generate Expert Valuation
+    console.log(`📊 STEP 4: Generating expert valuation...`);
     const valuation = await generateExpertValuation(
       vehicleId,
       vehicleContext,
       components,
-      environmental
+      environmental,
+      llmConfig
     );
     
     // STEP 5: Save to database
@@ -196,7 +216,7 @@ Deno.serve(async (req) => {
 /**
  * STEP 1: Research Vehicle & Become Instant Expert
  */
-async function researchVehicle(vehicleId: string): Promise<VehicleContext> {
+async function researchVehicle(vehicleId: string, llmConfig: any): Promise<VehicleContext> {
   // Get basic vehicle data
   const { data: vehicle } = await supabase
     .from('vehicles')
@@ -262,15 +282,17 @@ Be specific to THIS exact year/make/model. Return as JSON:
   "forumKnowledge": ["fact1", "fact2"]
 }`;
 
-  const litResponse = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: literaturePrompt }],
-    temperature: 0.3
-  });
+  console.log(`  🔍 Researching vehicle literature using ${llmConfig.provider}/${llmConfig.model}...`);
+  const litResponse = await callLLM(
+    llmConfig,
+    [{ role: 'user', content: literaturePrompt }],
+    { temperature: 0.3 }
+  );
   
   const literature = JSON.parse(
-    litResponse.choices[0]?.message?.content?.match(/\{[\s\S]*\}/)?.[0] || '{}'
+    litResponse.content?.match(/\{[\s\S]*\}/)?.[0] || '{}'
   );
+  console.log(`  ✅ Literature research complete (${litResponse.duration_ms}ms)`);
   
   return {
     year: vehicle.year,
@@ -292,7 +314,8 @@ Be specific to THIS exact year/make/model. Return as JSON:
  */
 async function assessImagesAndTallyValue(
   vehicleId: string,
-  context: VehicleContext
+  context: VehicleContext,
+  llmConfig: any
 ): Promise<ValuedComponent[]> {
   // Get all images
   const { data: images } = await supabase
@@ -347,20 +370,21 @@ Focus on SUBSTANTIVE parts worth >$50. Ignore minor items.`;
     }
   }));
   
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{
+  console.log(`  🔍 Analyzing ${sampledImages.length} images using ${llmConfig.provider}/${llmConfig.model}...`);
+  const response = await callLLM(
+    llmConfig,
+    [{
       role: 'user',
       content: [
         { type: 'text', text: analysisPrompt },
         ...imageContent
       ]
     }],
-    max_tokens: 4000,
-    temperature: 0.3
-  });
+    { maxTokens: 4000, temperature: 0.3, vision: true }
+  );
   
-  const content = response.choices[0]?.message?.content || '';
+  console.log(`  ✅ Image analysis complete (${response.duration_ms}ms, ${response.usage?.total_tokens || 'unknown'} tokens)`);
+  const content = response.content || '';
   const jsonMatch = content.match(/\[[\s\S]*\]/);
   
   if (jsonMatch) {
@@ -398,7 +422,7 @@ Focus on SUBSTANTIVE parts worth >$50. Ignore minor items.`;
 /**
  * STEP 3: Extract Environmental Context (5 W's)
  */
-async function extractEnvironmentalContext(vehicleId: string): Promise<EnvironmentalContext> {
+async function extractEnvironmentalContext(vehicleId: string, llmConfig: any): Promise<EnvironmentalContext> {
   const { data: images } = await supabase
     .from('vehicle_images')
     .select('taken_at, latitude, longitude, exif_data, image_url, variants')
@@ -487,21 +511,22 @@ Return JSON:
     }
   }));
   
-  const envResponse = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{
+  console.log(`  🔍 Extracting environmental context using ${llmConfig.provider}/${llmConfig.model}...`);
+  const envResponse = await callLLM(
+    llmConfig,
+    [{
       role: 'user',
       content: [
         { type: 'text', text: envPrompt },
         ...envImages
       ]
     }],
-    max_tokens: 1000,
-    temperature: 0.3
-  });
+    { maxTokens: 1000, temperature: 0.3, vision: true }
+  );
   
+  console.log(`  ✅ Environmental extraction complete (${envResponse.duration_ms}ms)`);
   const envData = JSON.parse(
-    envResponse.choices[0]?.message?.content?.match(/\{[\s\S]*\}/)?.[0] || '{}'
+    envResponse.content?.match(/\{[\s\S]*\}/)?.[0] || '{}'
   );
   
   return {
@@ -528,7 +553,8 @@ async function generateExpertValuation(
   vehicleId: string,
   context: VehicleContext,
   components: ValuedComponent[],
-  environmental: EnvironmentalContext
+  environmental: EnvironmentalContext,
+  llmConfig: any
 ): Promise<ExpertValuation> {
   // Get purchase price from database
   const { data: vehicle } = await supabase
