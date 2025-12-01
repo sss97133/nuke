@@ -611,14 +611,10 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         <div className="card-body" style={{ padding: '16px' }}>
           {showConfigSelector && (
             <div style={{ marginBottom: '12px' }}>
-              {/* Import AnalysisConfigSelector */}
-              {React.createElement(
-                (await import('./analysis/AnalysisConfigSelector')).AnalysisConfigSelector,
-                {
-                  onConfigChange: setAnalysisConfig,
-                  defaultTier: 'expert'
-                }
-              )}
+              <AnalysisConfigSelector
+                onConfigChange={setAnalysisConfig}
+                defaultTier="expert"
+              />
             </div>
           )}
           
