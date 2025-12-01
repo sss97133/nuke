@@ -1025,10 +1025,6 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       }
 
       // No error logging - tables might not exist, that's okay
-        }
-        return [];
-      }
-
       return (refs || []).map((ref: any) => ({
         id: ref.id,
         type: 'reference' as const,
