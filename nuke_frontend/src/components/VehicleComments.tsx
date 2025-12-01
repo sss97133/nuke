@@ -439,10 +439,12 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         return; // STOP - don't import anything
       }
 
-      setScrapingStatus('Saving images...');
+      setScrapingStatus('Saving and validating images...');
 
-      // Save images from BAT listing (only if VIN matches)
-      if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0) {
+      // Save and validate ALL images from BAT listing (only if VIN matches)
+      // AI validation will catch images that don't belong
+      if (scrapedData.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && vinMatch) {
+        // Save ALL images - validation happens synchronously during save
         await saveBATImages(scrapedData.images, batUrl, vinMatch, confidenceScore);
       }
 
@@ -505,60 +507,101 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
 
           const isActiveAuction = activeListing || externalListing;
 
-          // Extract auction date from scraped data or use vehicle year
-          let auctionDate = scrapedData.sale_date || scrapedData.auction_end_date;
-          if (!auctionDate && vehicle.year) {
-            // Use January 1st of vehicle year as fallback
-            auctionDate = `${vehicle.year}-01-01`;
-          } else if (!auctionDate) {
-            // Use current date as last resort
-            auctionDate = new Date().toISOString().split('T')[0];
+          // Extract auction START date (this is the base date for all auction events)
+          // BAT auctions typically run for 7 days, so start_date = sale_date - 7 days
+          let auctionStartDate = scrapedData.auction_start_date || scrapedData.listed_date;
+          
+          // If we have sale_date but no start_date, calculate it (BAT auctions are typically 7 days)
+          if (!auctionStartDate && scrapedData.sale_date) {
+            const saleDate = new Date(scrapedData.sale_date);
+            saleDate.setDate(saleDate.getDate() - 7); // Subtract 7 days for typical BAT auction duration
+            auctionStartDate = saleDate.toISOString().split('T')[0];
+          }
+          
+          // Fallback: use sale_date - 7 days if available
+          if (!auctionStartDate && scrapedData.auction_end_date) {
+            const endDate = new Date(scrapedData.auction_end_date);
+            endDate.setDate(endDate.getDate() - 7);
+            auctionStartDate = endDate.toISOString().split('T')[0];
+          }
+          
+          // Last resort fallbacks
+          if (!auctionStartDate && vehicle.year) {
+            auctionStartDate = `${vehicle.year}-01-01`;
+          } else if (!auctionStartDate) {
+            auctionStartDate = new Date().toISOString().split('T')[0];
           }
 
           // Determine event type and title based on auction status
-          let eventType = 'sale';
-          let eventTitle = '';
+          let eventType = 'auction_started';
+          let eventTitle = 'Auction Started';
           
           if (isActiveAuction) {
-            // Vehicle is currently on auction - create "listed" or "started" event
-            eventType = 'auction_listed';
-            eventTitle = 'Listed for Auction';
+            // Vehicle is currently on auction - create "started" event
+            eventType = 'auction_started';
+            eventTitle = 'Auction Started';
           } else if (scrapedData.sale_price) {
-            // Auction completed with sale
-            eventType = 'sale';
-            eventTitle = `Sold on Bring a Trailer for $${scrapedData.sale_price.toLocaleString()}`;
+            // Auction completed with sale - create START event first, then sale event separately
+            eventType = 'auction_started';
+            eventTitle = 'Auction Started';
           } else {
             // Listed but no sale price yet
-            eventType = 'auction_listed';
-            eventTitle = 'Listed on Bring a Trailer';
+            eventType = 'auction_started';
+            eventTitle = 'Auction Started';
           }
 
-          // Create timeline event for the auction
+          // Create timeline event for the auction START (base event)
           const { data: timelineEvent, error: eventError } = await supabase
             .from('timeline_events')
             .insert({
               vehicle_id: vehicleId,
               user_id: userId,
               event_type: eventType,
-              event_date: auctionDate,
+              event_date: auctionStartDate, // Use START date, not sale date
               title: eventTitle,
               description: scrapedData.title 
-                ? `${scrapedData.title} - ${scrapedData.seller ? `Seller: ${scrapedData.seller}` : ''}${scrapedData.buyer ? `, Buyer: ${scrapedData.buyer}` : ''}`
-                : `Vehicle auction on Bring a Trailer${scrapedData.seller ? ` - Seller: ${scrapedData.seller}` : ''}${scrapedData.buyer ? `, Buyer: ${scrapedData.buyer}` : ''}`,
-              cost_amount: scrapedData.sale_price || null,
+                ? `${scrapedData.title} - Auction started on Bring a Trailer${scrapedData.seller ? ` - Seller: ${scrapedData.seller}` : ''}`
+                : `Auction started on Bring a Trailer${scrapedData.seller ? ` - Seller: ${scrapedData.seller}` : ''}`,
+              cost_amount: null, // No sale price on start event
               metadata: {
                 source: 'bat_import',
                 bat_url: batUrl,
                 bat_listing_title: scrapedData.title,
                 seller: scrapedData.seller,
-                buyer: scrapedData.buyer,
-                auction_date: auctionDate,
+                auction_start_date: auctionStartDate,
+                auction_end_date: scrapedData.sale_date || scrapedData.auction_end_date,
                 is_active_auction: !!isActiveAuction,
                 processed_from_comment: true
               }
             })
             .select('id')
             .single();
+
+          // If auction is completed with sale, create a separate SALE event
+          if (!isActiveAuction && scrapedData.sale_price && scrapedData.sale_date) {
+            await supabase
+              .from('timeline_events')
+              .insert({
+                vehicle_id: vehicleId,
+                user_id: userId,
+                event_type: 'sale',
+                event_date: scrapedData.sale_date, // Sale event uses actual sale date
+                title: `Sold on Bring a Trailer for $${scrapedData.sale_price.toLocaleString()}`,
+                description: scrapedData.title 
+                  ? `${scrapedData.title} - ${scrapedData.buyer ? `Buyer: ${scrapedData.buyer}` : ''}`
+                  : `Vehicle sold on Bring a Trailer${scrapedData.buyer ? ` - Buyer: ${scrapedData.buyer}` : ''}`,
+                cost_amount: scrapedData.sale_price,
+                metadata: {
+                  source: 'bat_import',
+                  bat_url: batUrl,
+                  bat_listing_title: scrapedData.title,
+                  buyer: scrapedData.buyer,
+                  sale_date: scrapedData.sale_date,
+                  auction_start_date: auctionStartDate,
+                  processed_from_comment: true
+                }
+              });
+          }
 
           if (eventError) {
             console.warn('[VehicleComments] Failed to create timeline event:', eventError);
@@ -718,17 +761,21 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) return;
 
-    // Get vehicle for storage path
+    // Get vehicle for validation
     const { data: vehicle } = await supabase
       .from('vehicles')
-      .select('id')
+      .select('id, year, make, model')
       .eq('id', vehicleId)
       .single();
 
     if (!vehicle) return;
 
-    // Process images (limit to 20 to avoid overwhelming)
-    const imagesToSave = imageUrls.slice(0, 20);
+    // Process ALL images (not just first 15) - AI validation will filter out incorrect ones
+    const imagesToSave = imageUrls;
+    
+    let savedCount = 0;
+    let validatedCount = 0;
+    let mismatchCount = 0;
     
     for (let i = 0; i < imagesToSave.length; i++) {
       const imageUrl = imagesToSave[i];
@@ -746,32 +793,134 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           continue; // Skip if already exists
         }
 
+        // Basic validation: filter out obvious non-vehicle images
+        // Skip images that look like ads, logos, or thumbnails
+        const urlLower = imageUrl.toLowerCase();
+        if (urlLower.includes('logo') || 
+            urlLower.includes('icon') ||
+            urlLower.includes('avatar') ||
+            urlLower.includes('gravatar') ||
+            urlLower.match(/-(\d+)x\d+\./)) { // Skip thumbnails like -150x150
+          console.log(`Skipping non-vehicle image: ${imageUrl}`);
+          continue;
+        }
+
         // Insert image record (direct link to BAT image)
-        const { error: insertError } = await supabase
+        const insertData: any = {
+          vehicle_id: vehicleId,
+          image_url: imageUrl,
+          user_id: session.user.id,
+          category: 'bat_listing',
+          is_primary: i === 0,
+          source: 'bat_listing',
+          // Store BAT metadata in ai_scan_metadata since metadata column doesn't exist
+          ai_scan_metadata: {
+            source: 'bat_scraper',
+            bat_url: batUrl,
+            scraped_at: new Date().toISOString(),
+            vin_match: vinMatch,
+            confidence_score: confidence,
+            original_listing: batUrl,
+            vehicle_expected: `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+          }
+        };
+
+        // Save image to database
+        const { data: insertedImage, error: insertError } = await supabase
           .from('vehicle_images')
-          .insert({
-            vehicle_id: vehicleId,
-            image_url: imageUrl,
-            user_id: session.user.id,
-            category: 'bat_listing',
-            is_primary: i === 0,
-            metadata: {
-              source: 'bat_scraper',
-              bat_url: batUrl,
-              scraped_at: new Date().toISOString(),
-              vin_match: vinMatch,
-              confidence_score: confidence,
-              original_listing: batUrl
-            }
-          });
+          .insert(insertData)
+          .select('id')
+          .single();
 
         if (insertError) {
           console.error(`Error saving image ${i + 1}:`, insertError);
+          continue;
+        }
+
+        if (!insertedImage?.id) {
+          continue;
+        }
+
+        savedCount++;
+
+        // Validate image IMMEDIATELY (synchronously) as it's being saved
+        // Add rate limiting: 1.5s delay between validations to avoid hitting API limits
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+
+        try {
+          // Add timeout protection (30 seconds max per validation)
+          const validationPromise = supabase.functions.invoke('validate-bat-image', {
+            body: {
+              image_id: insertedImage.id,
+              image_url: imageUrl,
+              vehicle_id: vehicleId,
+              expected_vehicle: {
+                year: vehicle.year,
+                make: vehicle.make,
+                model: vehicle.model
+              }
+            }
+          });
+
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Validation timeout after 30s')), 30000)
+          );
+
+          const { data: validationResult, error: validationError } = await Promise.race([
+            validationPromise,
+            timeoutPromise
+          ]) as any;
+
+          if (validationError) {
+            console.warn(`Validation failed for image ${i + 1}:`, validationError);
+            // Mark for retry later (store in metadata)
+            await supabase
+              .from('vehicle_images')
+              .update({
+                ai_scan_metadata: {
+                  ...insertData.ai_scan_metadata,
+                  validation: {
+                    status: 'failed',
+                    error: validationError.message,
+                    retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // Retry in 5 min
+                  }
+                }
+              })
+              .eq('id', insertedImage.id);
+          } else if (validationResult?.validation) {
+            validatedCount++;
+            if (!validationResult.validation.matches) {
+              mismatchCount++;
+              console.log(`  ⚠️  Image ${i + 1} MISMATCH: ${validationResult.validation.mismatch_reason || 'Does not match vehicle'}`);
+            }
+          }
+        } catch (validationErr: any) {
+          console.warn(`Validation error for image ${i + 1}:`, validationErr);
+          // Mark for retry if it's a timeout or rate limit
+          if (validationErr?.message?.includes('timeout') || validationErr?.message?.includes('429')) {
+            await supabase
+              .from('vehicle_images')
+              .update({
+                ai_scan_metadata: {
+                  ...insertData.ai_scan_metadata,
+                  validation: {
+                    status: 'pending_retry',
+                    error: validationErr.message,
+                    retry_at: new Date(Date.now() + 2 * 60 * 1000).toISOString() // Retry in 2 min
+                  }
+                }
+              })
+              .eq('id', insertedImage.id);
+          }
         }
       } catch (error) {
         console.error(`Error processing image ${i + 1}:`, error);
       }
     }
+
+    console.log(`[VehicleComments] Saved ${savedCount} images, validated ${validatedCount}, ${mismatchCount} mismatches detected`);
   };
 
   const submitGeneralComment = async () => {

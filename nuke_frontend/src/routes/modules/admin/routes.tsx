@@ -9,6 +9,7 @@ import BulkPriceEditor from '../../../pages/admin/BulkPriceEditor';
 import PriceCsvImport from '../../../pages/admin/PriceCsvImport';
 import ShippingSettings from '../../../pages/admin/ShippingSettings';
 import X402Settings from '../../../pages/admin/X402Settings';
+import KSLScraper from '../../../pages/admin/KSLScraper';
 
 const AdminModuleRoutes = () => {
   return (
@@ -21,6 +22,7 @@ const AdminModuleRoutes = () => {
       <Route path="/price-import" element={<PriceCsvImport />} />
       <Route path="/shipping-settings" element={<ShippingSettings />} />
       <Route path="/x402-settings" element={<X402Settings />} />
+      <Route path="/ksl-scraper" element={<KSLScraper />} />
     </Routes>
   );
 };

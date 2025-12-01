@@ -136,6 +136,182 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   const executeSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
 
+    // Check if query is a Craigslist URL - check DB first, then import if needed
+    const craigslistUrlPattern = /https?:\/\/([^.]+)\.craigslist\.org\/[^/]+\/d\/[^/]+\/[^/]+\.html/i;
+    if (craigslistUrlPattern.test(searchQuery.trim())) {
+      setIsSearching(true);
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          onSearchResults([], 'Please log in to import vehicles from Craigslist.');
+          setIsSearching(false);
+          return;
+        }
+
+        // FIRST: Check if vehicle already exists in database
+        const { data: existingVehicle } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, discovery_url')
+          .eq('discovery_url', searchQuery.trim())
+          .maybeSingle();
+
+        if (existingVehicle) {
+          // Vehicle already exists - navigate to it immediately
+          window.location.href = `/vehicle/${existingVehicle.id}`;
+          return;
+        }
+
+        // SECOND: Check if it's in the queue (pending/processing)
+        const { data: queueItem } = await supabase
+          .from('craigslist_listing_queue')
+          .select('id, status, vehicle_id, processed_at')
+          .eq('listing_url', searchQuery.trim())
+          .maybeSingle();
+
+        if (queueItem) {
+          if (queueItem.vehicle_id) {
+            // Already processed - navigate to vehicle
+            window.location.href = `/vehicle/${queueItem.vehicle_id}`;
+            return;
+          } else if (queueItem.status === 'processing') {
+            // Currently processing - show message and wait
+            onSearchResults([], 'This listing is currently being processed. Please wait a moment and try again.');
+            setIsSearching(false);
+            return;
+          } else if (queueItem.status === 'pending') {
+            // In queue but not processed - trigger immediate processing
+            const { error: processError } = await supabase.functions.invoke('process-cl-queue', {
+              body: { max_listings_to_process: 1, listing_url: searchQuery.trim() }
+            });
+
+            if (!processError) {
+              // Wait a moment for processing, then check again
+              setTimeout(async () => {
+                const { data: updatedQueueItem } = await supabase
+                  .from('craigslist_listing_queue')
+                  .select('vehicle_id')
+                  .eq('listing_url', searchQuery.trim())
+                  .maybeSingle();
+
+                if (updatedQueueItem?.vehicle_id) {
+                  window.location.href = `/vehicle/${updatedQueueItem.vehicle_id}`;
+                } else {
+                  onSearchResults([], 'Processing started. Please refresh in a moment.');
+                  setIsSearching(false);
+                }
+              }, 2000);
+              return;
+            }
+          }
+        }
+
+        // Scrape the listing
+        const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-vehicle', {
+          body: { url: searchQuery.trim() }
+        });
+
+        if (scrapeError || !scrapeResult?.success) {
+          onSearchResults([], `Failed to import listing: ${scrapeError?.message || 'Unknown error'}`);
+          setIsSearching(false);
+          return;
+        }
+
+        const scrapedData = scrapeResult.data;
+        
+        // Create vehicle immediately
+        const vehicleData: any = {
+          year: parseInt(scrapedData.year) || null,
+          make: scrapedData.make || null,
+          model: scrapedData.model || null,
+          vin: scrapedData.vin || null,
+          color: scrapedData.color || scrapedData.exterior_color || null,
+          mileage: scrapedData.mileage ? parseInt(String(scrapedData.mileage).replace(/,/g, '')) : null,
+          transmission: scrapedData.transmission || null,
+          drivetrain: scrapedData.drivetrain || null,
+          engine_size: scrapedData.engine_size || scrapedData.engine || null,
+          asking_price: scrapedData.asking_price || scrapedData.price || null,
+          discovery_source: 'craigslist_scrape',
+          discovery_url: searchQuery.trim(),
+          profile_origin: 'craigslist_scrape',
+          origin_metadata: {
+            listing_url: searchQuery.trim(),
+            asking_price: scrapedData.asking_price || scrapedData.price,
+            imported_at: new Date().toISOString(),
+            image_urls: scrapedData.images || []
+          },
+          notes: scrapedData.description || null,
+          is_public: true,
+          status: 'active',
+          uploaded_by: user.id
+        };
+
+        if (scrapedData.trim) vehicleData.trim = scrapedData.trim;
+        if (scrapedData.series) vehicleData.series = scrapedData.series;
+
+        const { data: newVehicle, error: vehicleError } = await supabase
+          .from('vehicles')
+          .insert(vehicleData)
+          .select('id, year, make, model')
+          .single();
+
+        if (vehicleError) {
+          onSearchResults([], `Failed to create vehicle: ${vehicleError.message}`);
+          setIsSearching(false);
+          return;
+        }
+
+        // Create timeline event for discovery
+        await supabase.from('timeline_events').insert({
+          vehicle_id: newVehicle.id,
+          event_type: 'discovery',
+          event_date: new Date().toISOString(),
+          description: `Discovered via Craigslist listing`,
+          metadata: {
+            discovery_url: searchQuery.trim(),
+            discovery_source: 'craigslist_scrape',
+            automated: true,
+            asking_price: scrapedData.asking_price || scrapedData.price,
+            listing_title: scrapedData.title
+          }
+        }).catch(err => console.warn('Timeline event creation failed (non-critical):', err));
+
+        // Trigger AI critique/analysis in background
+        supabase.functions.invoke('vehicle-expert-agent', {
+          body: { vehicleId: newVehicle.id }
+        }).catch(err => console.warn('AI analysis failed (non-critical):', err));
+
+        // Import images if available (in background, non-blocking)
+        if (scrapedData.images && scrapedData.images.length > 0 && newVehicle.id) {
+          // Queue images for import via the existing process-cl-queue system
+          const { error: queueError } = await supabase
+            .from('craigslist_listing_queue')
+            .insert({
+              listing_url: searchQuery.trim(),
+              status: 'pending',
+              vehicle_id: newVehicle.id
+            });
+          
+          if (!queueError) {
+            // Trigger queue processing
+            supabase.functions.invoke('process-cl-queue', {
+              body: { max_listings_to_process: 1 }
+            }).catch(err => console.warn('Queue processing failed (non-critical):', err));
+          }
+        }
+
+        // Navigate to vehicle profile
+        window.location.href = `/vehicle/${newVehicle.id}`;
+        return;
+
+      } catch (err: any) {
+        console.error('Craigslist import error:', err);
+        onSearchResults([], `Import failed: ${err.message || 'Unknown error'}`);
+        setIsSearching(false);
+        return;
+      }
+    }
+
     setIsSearching(true);
     try {
       const analysis = parseSearchQuery(searchQuery);

@@ -881,16 +881,32 @@ Redirecting to vehicle profile...`);
           );
           // Record discovery event when created from URL without EXIF time
           if (formData.import_url) {
+            // Determine source and title based on URL
+            let source = 'external_listing';
+            let title = 'Vehicle Discovered';
+            if (formData.import_url.includes('craigslist.org')) {
+              source = 'craigslist';
+              title = 'Listed on Craigslist';
+            } else if (formData.import_url.includes('bringatrailer.com')) {
+              source = 'bring_a_trailer';
+              title = 'Listed on Bring a Trailer';
+            } else if (formData.import_url.includes('classiccars.com')) {
+              source = 'classiccars';
+              title = 'Listed on ClassicCars.com';
+            }
+
             await supabase.from('timeline_events').insert({
               vehicle_id: vehicleId,
               user_id: user.id,
-              event_type: 'discovery',
-              source: 'external_listing',
-              title: 'Vehicle Discovered',
+              event_type: 'other', // Use 'other' which is always allowed
+              source: source, // Required field
+              title: title,
               event_date: new Date().toISOString().split('T')[0],
-              description: `Discovered on ${formData.import_url.includes('craigslist.org') ? 'Craigslist' : 'External site'}`,
+              description: `Discovered on ${formData.import_url.includes('craigslist.org') ? 'Craigslist' : formData.import_url.includes('bringatrailer.com') ? 'Bring a Trailer' : formData.import_url.includes('classiccars.com') ? 'ClassicCars.com' : 'External site'}`,
               metadata: {
+                listing_url: formData.import_url,
                 source_type: 'external_listing',
+                discovery: true,
                 confidence_score: 70
               }
             });

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import OwnershipVerificationDashboard from '../components/admin/OwnershipVerificationDashboard';
 import AdminAnalytics from './AdminAnalytics';
+import CraigslistQueueDashboard from '../components/admin/CraigslistQueueDashboard';
 import '../design-system.css';
 
 interface PendingApproval {
@@ -23,7 +24,7 @@ interface PendingApproval {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'reviews' | 'ownership' | 'todo' | 'analytics' | 'users' | 'processing' | 'tables'>('reviews');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'ownership' | 'todo' | 'analytics' | 'users' | 'processing' | 'tables' | 'cl-scraping'>('reviews');
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -181,7 +182,7 @@ const AdminDashboard: React.FC = () => {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--border-light)', marginBottom: '24px' }}>
-        {(['reviews', 'ownership', 'todo', 'analytics', 'users', 'tables'] as const).map((tab) => (
+        {(['reviews', 'ownership', 'todo', 'analytics', 'users', 'tables', 'cl-scraping'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -203,6 +204,7 @@ const AdminDashboard: React.FC = () => {
           >
             {tab === 'ownership' ? 'OWNERSHIP VERIFICATIONS' : 
              tab === 'tables' ? 'TABLE STATUS' :
+             tab === 'cl-scraping' ? 'CL SCRAPING' :
              tab.toUpperCase()}
             {tab === 'reviews' && approvals.length > 0 && (
               <span style={{
@@ -336,6 +338,11 @@ const AdminDashboard: React.FC = () => {
         <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
           <div style={{ fontSize: '8pt' }}>User management coming soon</div>
         </div>
+      )}
+
+      {/* CL Scraping Tab */}
+      {activeTab === 'cl-scraping' && (
+        <CraigslistQueueDashboard />
       )}
     </div>
   );

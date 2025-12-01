@@ -902,6 +902,28 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={async (e) => {
+                  // Submit on Enter (but allow Shift+Enter for new lines)
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!newComment.trim() || submittingComment || !currentUser) return;
+                    
+                    setSubmittingComment(true);
+                    const { CommentService } = await import('../services/CommentService');
+                    const result = await CommentService.addComment(eventId, newComment, currentUser.id);
+                    
+                    if (result.success) {
+                      setNewComment('');
+                      const commentsResult = await CommentService.getEventComments(eventId);
+                      if (commentsResult.success && commentsResult.data) {
+                        setComments(commentsResult.data);
+                      }
+                    } else {
+                      alert(result.error || 'Failed to add comment');
+                    }
+                    setSubmittingComment(false);
+                  }
+                }}
                 placeholder="Add a comment or note..."
                 disabled={submittingComment}
                 style={{

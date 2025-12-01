@@ -65,6 +65,7 @@ import ViewerDashboard from './pages/ViewerDashboard';
 import VehicleInteractionManager from './pages/VehicleInteractionManager';
 import AdminDashboard from './pages/AdminDashboard';
 import OwnershipVerificationDashboard from './components/admin/OwnershipVerificationDashboard';
+import SquarebodyMarketDashboard from './pages/SquarebodyMarketDashboard';
 import Shops from './pages/Shops';
 import ShopOnboarding from './pages/ShopOnboarding';
 import Organizations from './pages/Organizations';
@@ -269,6 +270,7 @@ function App() {
             <Route path="/discover" element={<Discovery />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/market/squarebodies" element={<SquarebodyMarketDashboard />} />
             <Route path="/events/:id" element={<EventDetail />} />
             <Route path="/vehicles" element={<Vehicles />} />
             <Route path="/all-vehicles" element={<AllVehicles />} />

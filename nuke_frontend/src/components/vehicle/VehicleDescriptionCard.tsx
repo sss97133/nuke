@@ -40,16 +40,21 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
 
       if (data) {
         setDescription(data.description || '');
-        setIsAIGenerated(data.description_source === 'ai_generated' || data.description_source === 'craigslist_listing');
+        setIsAIGenerated(data.description_source === 'ai_generated');
         setGeneratedAt(data.description_generated_at);
         
         // Store source info for display
         if (data.discovery_url || data.origin_metadata?.listing_url) {
-          (window as any).__descriptionSource = {
+          setSourceInfo({
             url: data.discovery_url || data.origin_metadata?.listing_url,
             source: data.description_source,
             date: data.description_generated_at
-          };
+          });
+        } else if (data.description_source === 'craigslist_listing') {
+          setSourceInfo({
+            source: data.description_source,
+            date: data.description_generated_at
+          });
         }
       }
     } catch (err) {
@@ -181,9 +186,14 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 flexDirection: 'column',
                 gap: '4px'
               }}>
-                {isAIGenerated && (
+                {(isAIGenerated || sourceInfo?.source === 'craigslist_listing') && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span>{sourceInfo?.source === 'craigslist_listing' ? 'Extracted from listing' : (generatedAt ? 'AI-generated from vehicle images' : 'AI-generated')}</span>
+                    <span>
+                      {sourceInfo?.source === 'craigslist_listing' 
+                        ? 'Extracted from listing' 
+                        : (generatedAt ? 'AI-generated from vehicle images' : 'AI-generated')
+                      }
+                    </span>
                     {generatedAt && (
                       <span>• {new Date(generatedAt).toLocaleDateString()}</span>
                     )}
