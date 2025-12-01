@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS public.analysis_queue (
   analysis_type TEXT NOT NULL DEFAULT 'expert_valuation' CHECK (analysis_type IN ('expert_valuation', 'image_analysis', 'condition_assessment')),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'retrying')),
   priority INTEGER DEFAULT 5 CHECK (priority BETWEEN 1 AND 10), -- 1 = highest, 10 = lowest
+  llm_provider TEXT CHECK (llm_provider IN ('openai', 'anthropic', 'google')),
+  llm_model TEXT,
+  analysis_tier TEXT CHECK (analysis_tier IN ('tier1', 'tier2', 'tier3', 'expert')),
+  analysis_config JSONB, -- Store full config for transparency
   retry_count INTEGER DEFAULT 0,
   max_retries INTEGER DEFAULT 3,
   last_attempt_at TIMESTAMPTZ,
@@ -32,7 +36,11 @@ CREATE OR REPLACE FUNCTION queue_analysis(
   p_vehicle_id UUID,
   p_analysis_type TEXT DEFAULT 'expert_valuation',
   p_priority INTEGER DEFAULT 5,
-  p_triggered_by TEXT DEFAULT 'auto'
+  p_triggered_by TEXT DEFAULT 'auto',
+  p_llm_provider TEXT DEFAULT NULL,
+  p_llm_model TEXT DEFAULT NULL,
+  p_analysis_tier TEXT DEFAULT NULL,
+  p_analysis_config JSONB DEFAULT NULL
 )
 RETURNS UUID AS $$
 DECLARE
@@ -59,13 +67,21 @@ BEGIN
     analysis_type,
     priority,
     triggered_by,
-    status
+    status,
+    llm_provider,
+    llm_model,
+    analysis_tier,
+    analysis_config
   ) VALUES (
     p_vehicle_id,
     p_analysis_type,
     p_priority,
     p_triggered_by,
-    'pending'
+    'pending',
+    p_llm_provider,
+    p_llm_model,
+    p_analysis_tier,
+    p_analysis_config
   ) RETURNING id INTO v_queue_id;
   
   RETURN v_queue_id;

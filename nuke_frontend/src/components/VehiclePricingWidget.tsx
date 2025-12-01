@@ -125,10 +125,14 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     }
   };
 
+  const [analysisConfig, setAnalysisConfig] = useState<any>(null);
+  const [showConfigSelector, setShowConfigSelector] = useState(false);
+
   const triggerAnalysis = async () => {
     setIsAnalyzing(true);
     try {
       console.log('🤖 Queueing analysis for vehicle:', vehicleId);
+      console.log('📊 Analysis config:', analysisConfig);
       
       // Import supabase to queue the analysis
       const { supabase } = await import('../lib/supabase');
@@ -138,7 +142,11 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         p_vehicle_id: vehicleId,
         p_analysis_type: 'expert_valuation',
         p_priority: 2, // High priority for manual trigger
-        p_triggered_by: 'user'
+        p_triggered_by: 'user',
+        p_llm_provider: analysisConfig?.provider,
+        p_llm_model: analysisConfig?.model,
+        p_analysis_tier: analysisConfig?.tier,
+        p_analysis_config: analysisConfig || null
       });
       
       if (queueError) {
@@ -601,15 +609,37 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
 
         {/* Actions */}
         <div className="card-body" style={{ padding: '16px' }}>
+          {showConfigSelector && (
+            <div style={{ marginBottom: '12px' }}>
+              {/* Import AnalysisConfigSelector */}
+              {React.createElement(
+                (await import('./analysis/AnalysisConfigSelector')).AnalysisConfigSelector,
+                {
+                  onConfigChange: setAnalysisConfig,
+                  defaultTier: 'expert'
+                }
+              )}
+            </div>
+          )}
+          
           {!pricingStatus || pricingStatus.status === 'not_analyzed' ? (
-            <button
-              onClick={triggerAnalysis}
-              disabled={isAnalyzing}
-              className="button button-primary"
-              style={{ width: '100%' }}
-            >
-              {isAnalyzing ? 'Refreshing...' : 'Refresh'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+              <button
+                onClick={() => setShowConfigSelector(!showConfigSelector)}
+                className="button button-secondary button-small"
+                style={{ width: '100%' }}
+              >
+                {showConfigSelector ? 'Hide Config' : 'Configure Analysis'}
+              </button>
+              <button
+                onClick={triggerAnalysis}
+                disabled={isAnalyzing}
+                className="button button-primary"
+                style={{ width: '100%' }}
+              >
+                {isAnalyzing ? 'Queueing...' : 'Queue Analysis'}
+              </button>
+            </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: '8px' }}>

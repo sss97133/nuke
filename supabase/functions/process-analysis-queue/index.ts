@@ -72,10 +72,26 @@ Deno.serve(async (req) => {
         let resultId: string | null = null;
         
         if (item.analysis_type === 'expert_valuation') {
-          // Call vehicle-expert-agent
+          // Get queue item details for config
+          const { data: queueItem } = await supabase
+            .from('analysis_queue')
+            .select('llm_provider, llm_model, analysis_tier, analysis_config')
+            .eq('id', item.id)
+            .single();
+          
+          // Call vehicle-expert-agent with user preferences
           const { data: expertData, error: expertError } = await supabase.functions.invoke(
             'vehicle-expert-agent',
-            { body: { vehicleId: item.vehicle_id } }
+            { 
+              body: { 
+                vehicleId: item.vehicle_id,
+                queueId: item.id,
+                llmProvider: queueItem?.llm_provider,
+                llmModel: queueItem?.llm_model,
+                analysisTier: queueItem?.analysis_tier,
+                ...(queueItem?.analysis_config || {})
+              } 
+            }
           );
           
           if (expertError) {
