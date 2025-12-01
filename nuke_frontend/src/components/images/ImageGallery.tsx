@@ -408,27 +408,48 @@ const ImageGallery = ({
       console.log('🔄 Image processing complete, refreshing gallery:', imageId);
       
       // Wait a moment for database to update, then refresh
-      setTimeout(async () => {
-        try {
-          const { data: refreshedImages, error } = await supabase
-            .from('vehicle_images')
-            .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
-            .eq('vehicle_id', vehicleId)
-            .eq('is_document', false)
-            .order('is_primary', { ascending: false });
-          
-          if (!error && refreshedImages) {
-            setAllImages(refreshedImages);
-            // Re-sort and update displayed images
-            const sorted = getSortedImages();
-            setDisplayedImages(sorted.slice(0, Math.max(displayedImages.length, 50)));
-            onImagesUpdated?.();
-            console.log('✅ Gallery refreshed with updated analysis data');
+      // Try multiple times with increasing delays (analysis might take 3-5 seconds)
+      const refreshAttempts = [2000, 5000, 8000];
+      
+      refreshAttempts.forEach((delay, index) => {
+        setTimeout(async () => {
+          try {
+            console.log(`🔄 Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
+            const { data: refreshedImages, error } = await supabase
+              .from('vehicle_images')
+              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
+              .eq('vehicle_id', vehicleId)
+              .eq('is_document', false)
+              .order('is_primary', { ascending: false });
+            
+            if (!error && refreshedImages) {
+              // Check if the specific image was updated
+              const updatedImage = refreshedImages.find(img => img.id === imageId);
+              if (updatedImage) {
+                const hasNewAnalysis = updatedImage.ai_scan_metadata?.tier_1_analysis || 
+                                      updatedImage.angle || 
+                                      updatedImage.category;
+                
+                if (hasNewAnalysis || index === refreshAttempts.length - 1) {
+                  // Analysis is complete or this is the last attempt
+                  setAllImages(refreshedImages);
+                  const sorted = getSortedImages();
+                  setDisplayedImages(sorted.slice(0, Math.max(displayedImages.length, 50)));
+                  onImagesUpdated?.();
+                  console.log('✅ Gallery refreshed with updated analysis data', {
+                    imageId,
+                    hasTier1: !!updatedImage.ai_scan_metadata?.tier_1_analysis,
+                    angle: updatedImage.angle,
+                    category: updatedImage.category
+                  });
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error refreshing gallery:', err);
           }
-        } catch (err) {
-          console.error('Error refreshing gallery:', err);
-        }
-      }, 2000); // Wait 2 seconds for DB to update
+        }, delay);
+      });
     };
     
     window.addEventListener('image_processing_complete', handleImageProcessingComplete as EventListener);
