@@ -138,16 +138,25 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
     // Check if query is a Craigslist URL - check DB first, then import if needed
     const craigslistUrlPattern = /https?:\/\/([^.]+)\.craigslist\.org\/[^/]+\/d\/[^/]+\/[^/]+\.html/i;
-    if (craigslistUrlPattern.test(searchQuery.trim())) {
+    const isCraigslistUrl = craigslistUrlPattern.test(searchQuery.trim());
+    
+    console.log('🔍 Search query:', searchQuery);
+    console.log('🔍 Is Craigslist URL?', isCraigslistUrl);
+    
+    if (isCraigslistUrl) {
+      console.log('🚀 Detected Craigslist URL, starting import...');
       setIsSearching(true);
       try {
         // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
+          console.log('❌ User not logged in');
           onSearchResults([], 'Please log in to import vehicles from Craigslist.');
           setIsSearching(false);
           return;
         }
+        
+        console.log('✅ User logged in:', user.id);
 
         // FIRST: Check if vehicle already exists in database
         const { data: existingVehicle } = await supabase
@@ -207,15 +216,24 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         }
 
         // Scrape the listing
+        console.log('📡 Calling scrape-vehicle function...');
         const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-vehicle', {
           body: { url: searchQuery.trim() }
         });
 
         if (scrapeError || !scrapeResult?.success) {
-          onSearchResults([], `Failed to import listing: ${scrapeError?.message || 'Unknown error'}`);
+          console.error('❌ Scraping failed:', scrapeError || scrapeResult);
+          onSearchResults([], `Failed to import listing: ${scrapeError?.message || scrapeResult?.error || 'Unknown error'}`);
           setIsSearching(false);
           return;
         }
+        
+        console.log('✅ Scraping successful:', {
+          year: scrapeResult.data?.year,
+          make: scrapeResult.data?.make,
+          model: scrapeResult.data?.model,
+          images: scrapeResult.data?.images?.length
+        });
 
         const scrapedData = scrapeResult.data;
         
@@ -249,6 +267,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         if (scrapedData.trim) vehicleData.trim = scrapedData.trim;
         if (scrapedData.series) vehicleData.series = scrapedData.series;
 
+        console.log('💾 Creating vehicle in database...');
         const { data: newVehicle, error: vehicleError } = await supabase
           .from('vehicles')
           .insert(vehicleData)
@@ -256,10 +275,13 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           .single();
 
         if (vehicleError) {
+          console.error('❌ Vehicle creation failed:', vehicleError);
           onSearchResults([], `Failed to create vehicle: ${vehicleError.message}`);
           setIsSearching(false);
           return;
         }
+        
+        console.log('✅ Vehicle created:', newVehicle.id);
 
         // Create timeline event for discovery
         await supabase.from('timeline_events').insert({
@@ -301,6 +323,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         }
 
         // Navigate to vehicle profile
+        console.log('🚀 Navigating to vehicle:', newVehicle.id);
         window.location.href = `/vehicle/${newVehicle.id}`;
         return;
 
