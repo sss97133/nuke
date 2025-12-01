@@ -275,7 +275,8 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             imported_at: new Date().toISOString(),
             image_urls: scrapedData.images || []
           },
-          notes: scrapedData.description || null,
+          description: scrapedData.description || null, // Save to description field (not notes)
+          notes: scrapedData.description || null, // Also save to notes for backwards compatibility
           is_public: true,
           status: 'active',
           uploaded_by: user.id

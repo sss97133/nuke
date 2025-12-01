@@ -128,29 +128,48 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const triggerAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      // TODO: Implement triggerManualAnalysis in pricingService
-      // For now, just reload the status after a delay
-      console.log('Triggering analysis for vehicle:', vehicleId);
-
-      // Poll for updated status
-      setTimeout(() => {
-        loadPricingStatus();
-        setIsAnalyzing(false);
+      console.log('🤖 Triggering vehicle-expert-agent for vehicle:', vehicleId);
+      
+      // Import supabase to call the edge function
+      const { supabase } = await import('../lib/supabase');
+      
+      // Call vehicle-expert-agent edge function
+      const { error: agentError } = await supabase.functions.invoke('vehicle-expert-agent', {
+        body: { vehicleId }
+      });
+      
+      if (agentError) {
+        throw agentError;
+      }
+      
+      console.log('✅ Analysis triggered, waiting for results...');
+      
+      // Poll for updated status (analysis takes 30-60 seconds)
+      let attempts = 0;
+      const maxAttempts = 12; // 60 seconds total
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        await loadPricingStatus();
+        
+        // Check if we have results
+        if (pricingStatus && pricingStatus.status !== 'not_analyzed' && pricingStatus.confidence_score > 0) {
+          clearInterval(pollInterval);
+          setIsAnalyzing(false);
+          setToast({ message: 'Analysis complete!', type: 'success' });
+          // Dispatch event to refresh other components
+          window.dispatchEvent(new Event('vehicle_valuation_updated'));
+        } else if (attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          setIsAnalyzing(false);
+          setToast({ message: 'Analysis is taking longer than expected. Check back in a few minutes.', type: 'info' });
+        }
       }, 5000);
+      
     } catch (err: any) {
-      console.error('Failed to trigger analysis:', err);
-      // Generate an enhanced estimate when backend isn't available
-      setTimeout(async () => {
-        const enhancedValue = await calculateEnhancedEstimate();
-        setPricingStatus({
-          status: 'medium_confidence',
-          estimated_value: enhancedValue.estimate,
-          confidence_score: enhancedValue.confidence,
-          last_analyzed: new Date().toISOString(),
-          message: enhancedValue.message
-        });
-        setIsAnalyzing(false);
-      }, 2000);
+      console.error('❌ Failed to trigger analysis:', err);
+      setIsAnalyzing(false);
+      setError(err.message || 'Failed to trigger analysis');
+      setToast({ message: 'Failed to trigger analysis. Please try again.', type: 'error' });
     }
   };
   

@@ -67,7 +67,44 @@ export class VehicleValuationService {
     // Deterministic valuation using receipts, labor, and market data
 
     try {
-      // Initialize valuation object
+      // FIRST: Check for expert agent valuation (most authoritative)
+      const { data: expertValuation } = await supabase
+        .from('vehicle_valuations')
+        .select('id, estimated_value, documented_components, confidence_score, components, environmental_context, value_justification, valuation_date')
+        .eq('vehicle_id', vehicleId)
+        .order('valuation_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (expertValuation && expertValuation.estimated_value) {
+        // Use expert valuation as primary source
+        const valuation: VehicleValuation = {
+          totalInvested: 0,
+          buildBudget: 0,
+          estimatedValue: expertValuation.estimated_value || 0,
+          marketLow: (expertValuation.estimated_value || 0) * 0.85,
+          marketHigh: (expertValuation.estimated_value || 0) * 1.15,
+          confidence: expertValuation.confidence_score || 0,
+          dataSources: ['AI Expert Analysis'],
+          partsInvestment: 0,
+          laborHours: 0,
+          installedParts: expertValuation.documented_components?.length || 0,
+          pendingParts: 0,
+          topParts: (expertValuation.components || []).map((comp: any) => ({
+            name: comp.name || comp.component || 'Unknown',
+            price: comp.value || comp.estimated_value || 0,
+            images: comp.images || []
+          })),
+          lastUpdated: expertValuation.valuation_date || new Date().toISOString(),
+          hasRealData: true
+        };
+        
+        // Cache and return
+        this.cache.set(vehicleId, { data: valuation, timestamp: Date.now() });
+        return valuation;
+      }
+
+      // Initialize valuation object (fallback to receipts/labor)
       const valuation: VehicleValuation = {
         totalInvested: 0,
         buildBudget: 0,
