@@ -242,15 +242,17 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         
         const scrapedData = scrapeResult.data;
         
-        console.log('✅ Scraping successful:', {
-          year: scrapedData?.year,
-          make: scrapedData?.make,
-          model: scrapedData?.model,
-          images: scrapedData?.images?.length,
-          imagesArray: scrapedData?.images,
-          hasImages: !!scrapedData?.images,
-          isArray: Array.isArray(scrapedData?.images)
-        });
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('✅ SCRAPING RESULT:');
+        console.log('Year:', scrapedData?.year);
+        console.log('Make:', scrapedData?.make);
+        console.log('Model:', scrapedData?.model);
+        console.log('Images count:', scrapedData?.images?.length || 0);
+        console.log('Images type:', typeof scrapedData?.images);
+        console.log('Is array:', Array.isArray(scrapedData?.images));
+        console.log('Images value:', scrapedData?.images);
+        console.log('Full scrapedData:', JSON.stringify(scrapedData, null, 2).substring(0, 500));
+        console.log('═══════════════════════════════════════════════════════');
         
         // Create vehicle immediately
         const vehicleData: any = {
@@ -332,14 +334,17 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         });
 
         // Import images directly if available (BLOCKING - wait for at least first image)
-        console.log('🔍 Checking images for import:', {
-          hasImages: !!scrapedData?.images,
-          isArray: Array.isArray(scrapedData?.images),
-          imagesLength: scrapedData?.images?.length,
-          hasVehicleId: !!newVehicle.id,
-          vehicleId: newVehicle.id,
-          imagesValue: scrapedData?.images
-        });
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('🔍 IMAGE IMPORT CHECK:');
+        console.log('scrapedData exists:', !!scrapedData);
+        console.log('scrapedData.images exists:', !!scrapedData?.images);
+        console.log('scrapedData.images type:', typeof scrapedData?.images);
+        console.log('Is array:', Array.isArray(scrapedData?.images));
+        console.log('Images length:', scrapedData?.images?.length);
+        console.log('Vehicle ID exists:', !!newVehicle.id);
+        console.log('Vehicle ID:', newVehicle.id);
+        console.log('Condition result:', !!(scrapedData?.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id));
+        console.log('═══════════════════════════════════════════════════════');
         
         if (scrapedData?.images && Array.isArray(scrapedData.images) && scrapedData.images.length > 0 && newVehicle.id) {
           console.log(`📸 Importing ${scrapedData.images.length} images...`);
