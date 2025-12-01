@@ -975,27 +975,31 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       const libs = uniqueLibs;
       const libError = null;
 
-      if (!libError && libs) {
+      if (libs && libs.length > 0) {
         refs = libs;
       } else {
-        // Try library_documents as fallback
-        const { data: docs, error: docError } = await supabase
+        // Try library_documents as fallback - use separate queries
+        const { data: docsByTitle } = await supabase
           .from('library_documents')
           .select('id, title, description, created_at')
-          .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+          .ilike('title', `%${searchTerm}%`)
           .limit(10);
+
+        const { data: docsByDesc } = await supabase
+          .from('library_documents')
+          .select('id, title, description, created_at')
+          .ilike('description', `%${searchTerm}%`)
+          .limit(10);
+
+        const allDocs = [...(docsByTitle || []), ...(docsByDesc || [])];
+        const uniqueDocs = Array.from(new Map(allDocs.map(d => [d.id, d])).values()).slice(0, 10);
         
-        if (!docError && docs) {
-          refs = docs;
-        } else {
-          error = docError || libError;
+        if (uniqueDocs.length > 0) {
+          refs = uniqueDocs;
         }
       }
 
-      if (error) {
-        // Table might not exist, that's okay
-        if (error.code !== 'PGRST116' && error.code !== '42703') {
-          console.error('References search error:', error);
+      // No error logging - tables might not exist, that's okay
         }
         return [];
       }
