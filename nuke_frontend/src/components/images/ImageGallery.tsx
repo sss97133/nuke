@@ -397,6 +397,47 @@ const ImageGallery = ({
     fetchImages();
   }, [vehicleId]);
 
+  // Listen for image processing completion events to refresh gallery
+  useEffect(() => {
+    const handleImageProcessingComplete = async (event: CustomEvent) => {
+      const { imageId, result, vehicleId: eventVehicleId } = event.detail;
+      
+      // Only refresh if this event is for our vehicle
+      if (eventVehicleId && eventVehicleId !== vehicleId) return;
+      
+      console.log('🔄 Image processing complete, refreshing gallery:', imageId);
+      
+      // Wait a moment for database to update, then refresh
+      setTimeout(async () => {
+        try {
+          const { data: refreshedImages, error } = await supabase
+            .from('vehicle_images')
+            .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
+            .eq('vehicle_id', vehicleId)
+            .eq('is_document', false)
+            .order('is_primary', { ascending: false });
+          
+          if (!error && refreshedImages) {
+            setAllImages(refreshedImages);
+            // Re-sort and update displayed images
+            const sorted = getSortedImages();
+            setDisplayedImages(sorted.slice(0, Math.max(displayedImages.length, 50)));
+            onImagesUpdated?.();
+            console.log('✅ Gallery refreshed with updated analysis data');
+          }
+        } catch (err) {
+          console.error('Error refreshing gallery:', err);
+        }
+      }, 2000); // Wait 2 seconds for DB to update
+    };
+    
+    window.addEventListener('image_processing_complete', handleImageProcessingComplete as EventListener);
+    
+    return () => {
+      window.removeEventListener('image_processing_complete', handleImageProcessingComplete as EventListener);
+    };
+  }, [vehicleId, displayedImages.length, onImagesUpdated]);
+
   // Re-sort displayed images when sort option changes
   useEffect(() => {
     if (showImages && displayedImages.length > 0) {
