@@ -621,7 +621,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       }
       
       // 3. Load uploader profile (person who ran the import) - only if not BAT
-      if (!organizationInfo && imgData.user_id) {
+      // For imported images (Craigslist, etc.), user_id is the importer, not the photographer
+      // Only show uploader if it's a direct upload (not imported/scraped)
+      if (!organizationInfo && imgData.user_id && imgData.source !== 'scraper' && imgData.source !== 'craigslist_scrape' && imgData.source !== 'bat_listing') {
         const { data: profileData } = await supabase
           .from('profiles')
           .select('id, full_name, username')
@@ -1581,7 +1583,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         ) : (
                           <div>
                             <div className="text-xs text-gray-500">
-                              {attribution.source === 'dropbox_import' ? 'Imported by:' : 'Uploaded by:'}
+                              {attribution.source === 'dropbox_import' ? 'Imported by:' : 
+                               attribution.source === 'scraper' || attribution.source === 'craigslist_scrape' ? 'Source:' :
+                               'Uploaded by:'}
                             </div>
                             {attribution.uploader ? (
                               <button
