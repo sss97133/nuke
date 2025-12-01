@@ -1705,6 +1705,18 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                       alert(`Analysis failed: ${error.message}`);
                                     } else {
                                       console.log('✅ Analysis started:', data);
+                                      
+                                      // Dispatch event to refresh gallery
+                                      if (typeof window !== 'undefined') {
+                                        window.dispatchEvent(new CustomEvent('image_processing_complete', {
+                                          detail: { 
+                                            imageId: imageId, 
+                                            result: data,
+                                            vehicleId: vehicleId
+                                          }
+                                        }));
+                                      }
+                                      
                                       // Reload image metadata after analysis (wait a bit for processing)
                                       setTimeout(() => {
                                         loadImageMetadata();
