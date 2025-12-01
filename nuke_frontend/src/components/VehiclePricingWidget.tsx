@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { AnalysisConfigSelector } from './analysis/AnalysisConfigSelector';
 import { supabase } from '../lib/supabase';
 import { VehicleValuationService } from '../services/vehicleValuationService';
 import type { VehicleValuation } from '../services/vehicleValuationService';
@@ -47,6 +48,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const [showPartViewer, setShowPartViewer] = useState(false);
   const [selectedPart, setSelectedPart] = useState<any>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
+  const [analysisConfig, setAnalysisConfig] = useState<any>(null);
+  const [showConfigSelector, setShowConfigSelector] = useState(false);
 
   // Use initialValuation if provided (eliminates duplicate query)
   useEffect(() => {
@@ -124,9 +127,6 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
       setError(null);
     }
   };
-
-  const [analysisConfig, setAnalysisConfig] = useState<any>(null);
-  const [showConfigSelector, setShowConfigSelector] = useState(false);
 
   const triggerAnalysis = async () => {
     setIsAnalyzing(true);
