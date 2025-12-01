@@ -73,6 +73,10 @@ export class FullTextSearchService {
       });
 
       if (error) {
+        // Function doesn't exist - gracefully return empty array instead of logging error
+        if (error.code === 'PGRST202' || error.message?.includes('Could not find the function')) {
+          return [];
+        }
         console.error('Full-text search error:', error);
         return [];
       }
@@ -119,6 +123,10 @@ export class FullTextSearchService {
       });
 
       if (error) {
+        // Function doesn't exist - gracefully return empty array
+        if (error.code === 'PGRST202' || error.message?.includes('Could not find the function')) {
+          return [];
+        }
         console.error('Timeline events full-text search error:', error);
         return [];
       }
@@ -156,6 +164,10 @@ export class FullTextSearchService {
       });
 
       if (error) {
+        // Function doesn't exist - gracefully return empty array
+        if (error.code === 'PGRST202' || error.message?.includes('Could not find the function')) {
+          return [];
+        }
         console.error('Businesses full-text search error:', error);
         return [];
       }
@@ -193,6 +205,10 @@ export class FullTextSearchService {
       });
 
       if (error) {
+        // Function doesn't exist - gracefully return empty array
+        if (error.code === 'PGRST202' || error.message?.includes('Could not find the function')) {
+          return [];
+        }
         console.error('Profiles full-text search error:', error);
         return [];
       }
