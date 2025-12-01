@@ -451,6 +451,11 @@ function scrapeCraigslist(doc: any, url: string): any {
       // Normalize make
       if (make.toLowerCase() === 'chevy' || make.toLowerCase() === 'chev') make = 'Chevrolet'
       if (make.toLowerCase() === 'gm' || make.toLowerCase() === 'gmc') make = 'GMC'
+      if (make.toLowerCase() === 'international') make = 'International'
+      // Capitalize first letter of make
+      if (make && make.length > 0) {
+        make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase()
+      }
       data.make = make
       let model = vehicleMatch[3].trim()
       
