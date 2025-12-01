@@ -157,6 +157,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [rotation, setRotation] = useState(0);
   const [isSensitive, setIsSensitive] = useState(false);
   const [showTagger, setShowTagger] = useState(false);
+  const [analyzingImage, setAnalyzingImage] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -1679,26 +1680,52 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               <span>What:</span>
                               <span className="text-yellow-400">Pending AI analysis</span>
                             </div>
-                            {vehicleId && imageUrl && !analyzing && (
+                            {vehicleId && imageUrl && !analyzingImage && (
                               <button
                                 onClick={async () => {
                                   if (!vehicleId || !imageUrl) return;
-                                  const result = await triggerAIAnalysis(imageUrl, timelineEventId, vehicleId);
-                                  if (result.success) {
-                                    // Reload image metadata after analysis
-                                    setTimeout(() => {
-                                      loadImageMetadata();
-                                      loadTags();
-                                    }, 3000);
+                                  
+                                  setAnalyzingImage(true);
+                                  try {
+                                    // Get current user
+                                    const { data: { user } } = await supabase.auth.getUser();
+                                    
+                                    // Call tier 1 analysis (the main analysis function)
+                                    const { data, error } = await supabase.functions.invoke('analyze-image-tier1', {
+                                      body: {
+                                        image_url: imageUrl,
+                                        vehicle_id: vehicleId,
+                                        image_id: imageId || null,
+                                        user_id: user?.id || null
+                                      }
+                                    });
+
+                                    if (error) {
+                                      console.error('Analysis error:', error);
+                                      alert(`Analysis failed: ${error.message}`);
+                                    } else {
+                                      console.log('✅ Analysis started:', data);
+                                      // Reload image metadata after analysis (wait a bit for processing)
+                                      setTimeout(() => {
+                                        loadImageMetadata();
+                                        loadTags();
+                                      }, 3000);
+                                    }
+                                  } catch (err) {
+                                    console.error('Analysis failed:', err);
+                                    alert(`Analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                                  } finally {
+                                    setAnalyzingImage(false);
                                   }
                                 }}
-                                className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors"
+                                className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 style={{ fontSize: '8pt', padding: '4px 8px', cursor: 'pointer' }}
+                                disabled={analyzingImage}
                               >
                                 Analyze Now
                               </button>
                             )}
-                            {analyzing && (
+                            {analyzingImage && (
                               <span className="text-yellow-400 text-xs">Analyzing...</span>
                             )}
                           </div>

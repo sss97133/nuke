@@ -363,7 +363,7 @@ const ImageGallery = ({
         setLoading(true);
         const { data: rawImages, error } = await supabase
           .from('vehicle_images')
-          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category')
+          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
           .eq('vehicle_id', vehicleId)
           .eq('is_document', false) // Filter out documents - they should be in a separate section
           .order('is_primary', { ascending: false });
@@ -451,8 +451,11 @@ const ImageGallery = ({
       return;
     }
     
-    // If logged in, trigger file input
-    document.getElementById(`gallery-upload-${vehicleId}`)?.click();
+    // If logged in, trigger file input - check both possible IDs
+    const inputId = allImages.length === 0 
+      ? `image-upload-${vehicleId}` 
+      : `gallery-upload-${vehicleId}`;
+    document.getElementById(inputId)?.click();
   };
 
   const handleFileUpload = async (files: FileList) => {
@@ -1133,6 +1136,49 @@ const ImageGallery = ({
                 />
               </div>
 
+              {/* Analysis Badge - Shows if image has been analyzed */}
+              {(() => {
+                const metadata = image.ai_scan_metadata;
+                const hasAnalysis = metadata && (
+                  metadata.appraiser?.primary_label ||
+                  metadata.tier_1_analysis ||
+                  metadata.appraiser ||
+                  image.ai_last_scanned ||
+                  image.angle
+                );
+                
+                if (!hasAnalysis) return null;
+                
+                const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
+                const analysisType = metadata?.tier_1_analysis ? 'TIER1' : metadata?.appraiser ? 'AI' : 'SCANNED';
+                
+                return (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'var(--space-1)',
+                    right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
+                    backgroundColor: '#10b981',
+                    color: '#fff',
+                    borderRadius: '0px',
+                    border: '1px solid #fff',
+                    padding: '2px 6px',
+                    fontSize: '7pt',
+                    fontWeight: 'bold',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    zIndex: 10,
+                    cursor: 'help',
+                    maxWidth: '60px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title={angle ? `${analysisType}: ${angle}` : `${analysisType} analyzed`}
+                  >
+                    {angle ? angle.substring(0, 6).toUpperCase() : analysisType}
+                  </div>
+                );
+              })()}
+
               {/* Tag Count Badge */}
               {imageTagCounts[image.id] && (
                 <div style={{
@@ -1211,6 +1257,16 @@ const ImageGallery = ({
                   {getDisplayDate(image)}
                   {imageTagCounts[image.id] && ` • ${imageTagCounts[image.id]} tags`}
                   {showSetCount && imageSetCounts[image.id] && ` • ${imageSetCounts[image.id]} sets`}
+                  {(() => {
+                    const metadata = image.ai_scan_metadata;
+                    const hasAnalysis = metadata && (
+                      metadata.appraiser?.primary_label ||
+                      metadata.tier_1_analysis ||
+                      metadata.appraiser ||
+                      image.ai_last_scanned
+                    );
+                    return hasAnalysis ? ' • Analyzed' : '';
+                  })()}
                 </p>
               </div>
             </div>
@@ -1254,6 +1310,43 @@ const ImageGallery = ({
                 loading="lazy"
               />
 
+              {/* Analysis Badge */}
+              {(() => {
+                const metadata = image.ai_scan_metadata;
+                const hasAnalysis = metadata && (
+                  metadata.appraiser?.primary_label ||
+                  metadata.tier_1_analysis ||
+                  metadata.appraiser ||
+                  image.ai_last_scanned ||
+                  image.angle
+                );
+                
+                if (!hasAnalysis) return null;
+                
+                const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
+                
+                return (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'var(--space-1)',
+                    right: 'var(--space-1)',
+                    backgroundColor: '#10b981',
+                    color: '#fff',
+                    borderRadius: '0px',
+                    border: '1px solid #fff',
+                    padding: '2px 6px',
+                    fontSize: '7pt',
+                    fontWeight: 'bold',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    zIndex: 10
+                  }}
+                  title={angle ? `Analyzed: ${angle}` : 'AI analyzed'}
+                  >
+                    {angle ? angle.substring(0, 8).toUpperCase() : 'AI'}
+                  </div>
+                );
+              })()}
+
               {/* Image Info Overlay */}
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', padding: 'var(--space-2)' }}>
                 {image.is_primary && (
@@ -1266,6 +1359,16 @@ const ImageGallery = ({
                 )}
                 <p className="text" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '6pt', marginTop: '2px' }}>
                   {getDisplayDate(image)}
+                  {(() => {
+                    const metadata = image.ai_scan_metadata;
+                    const hasAnalysis = metadata && (
+                      metadata.appraiser?.primary_label ||
+                      metadata.tier_1_analysis ||
+                      metadata.appraiser ||
+                      image.ai_last_scanned
+                    );
+                    return hasAnalysis ? ' • Analyzed' : '';
+                  })()}
                 </p>
               </div>
             </div>
@@ -1315,6 +1418,19 @@ const ImageGallery = ({
                   {getDisplayDate(image)}
                   {getTimeOfDayLabel(image.taken_at || image.created_at) && ` • ${getTimeOfDayLabel(image.taken_at || image.created_at)}`}
                   {image.user_id && ` • ${uploaderOrgNames[image.user_id] || imageUploaderNames[image.user_id] || 'user'}`}
+                  {(() => {
+                    const metadata = image.ai_scan_metadata;
+                    const hasAnalysis = metadata && (
+                      metadata.appraiser?.primary_label ||
+                      metadata.tier_1_analysis ||
+                      metadata.appraiser ||
+                      image.ai_last_scanned ||
+                      image.angle
+                    );
+                    if (!hasAnalysis) return null;
+                    const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
+                    return angle ? ` • ${angle}` : ' • Analyzed';
+                  })()}
                 </div>
                 {/* Everything else on one line */}
                 <div style={{ fontSize: '6pt', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

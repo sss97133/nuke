@@ -304,21 +304,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   </>
                 )}
 
-                {typeof vehicle.roi_pct === 'number' && (
-                  <>
-                    <span>•</span>
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color: vehicle.roi_pct > 0 ? '#10b981' : '#ef4444',
-                      }}
-                    >
-                      ROI {vehicle.roi_pct > 0 ? '+' : ''}
-                      {vehicle.roi_pct.toFixed(0)}%
-                    </span>
-                  </>
-                )}
-
                 {vehicle.condition_rating && (
                   <>
                     <span>•</span>
@@ -535,21 +520,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               <>
                 <span>•</span>
                 <span>{vehicle.image_count} images</span>
-              </>
-            )}
-
-            {typeof vehicle.roi_pct === 'number' && (
-              <>
-                <span>•</span>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    color: vehicle.roi_pct > 0 ? '#10b981' : '#ef4444',
-                  }}
-                >
-                  ROI {vehicle.roi_pct > 0 ? '+' : ''}
-                  {vehicle.roi_pct.toFixed(0)}%
-                </span>
               </>
             )}
 

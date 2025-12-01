@@ -436,6 +436,21 @@ const CursorHomepage: React.FC = () => {
         imagesByVehicle.get(img.vehicle_id)!.push(img);
       });
 
+      // Fetch event counts for all vehicles
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentEvents } = await supabase
+        .from('timeline_events')
+        .select('vehicle_id')
+        .in('vehicle_id', vehicleIds)
+        .gte('created_at', sevenDaysAgo);
+
+      // Group events by vehicle_id
+      const eventsByVehicle = new Map<string, number>();
+      (recentEvents || []).forEach((event: any) => {
+        const count = eventsByVehicle.get(event.vehicle_id) || 0;
+        eventsByVehicle.set(event.vehicle_id, count + 1);
+      });
+
       // Process vehicles with their images
       const enriched = vehicles.map((v: any) => {
         // Get images for this vehicle
@@ -468,12 +483,8 @@ const CursorHomepage: React.FC = () => {
             ? askingPrice
             : currentValue;
 
-          const roi = displayPrice && v.purchase_price
-            ? ((displayPrice - v.purchase_price) / v.purchase_price) * 100
-            : 0;
-
-          const activity7d = 0; // Removed for performance
-          const totalImages = all_images.length;
+          const activity7d = eventsByVehicle.get(v.id) || 0;
+          const totalImages = images.length; // Use actual total, not limited all_images
           const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
           const update_hours = (Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60);
           const is_new = age_hours < 24;
@@ -497,12 +508,6 @@ const CursorHomepage: React.FC = () => {
             hypeReason = hypeReason || 'ACTIVE BUILD';
           }
 
-          if (roi > 100) {
-            const periodMultiplier = timePeriod === 'D' ? 2 : timePeriod === 'W' ? 1.5 : 1;
-            hypeScore += 40 * periodMultiplier;
-            hypeReason = hypeReason || `${roi.toFixed(0)}% GAIN`;
-          }
-
           if (totalImages > 100) {
             hypeScore += 20;
           }
@@ -515,10 +520,9 @@ const CursorHomepage: React.FC = () => {
           // Primary image is already sorted first
           const primaryImageUrl = all_images[0]?.url || null;
 
-          return {
+            return {
             ...v,
             display_price: displayPrice, // Add smart price for display
-            roi_pct: roi,
             image_count: totalImages,
             event_count: activity7d,
             activity_7d: activity7d,
@@ -596,7 +600,7 @@ const CursorHomepage: React.FC = () => {
     }
     
     // Apply sorting with direction
-    const dir = sortDirection === 'asc' ? 1 : -1;
+    const dir = sortDirection === 'desc' ? 1 : -1;
     switch (sortBy) {
       case 'year':
         result.sort((a, b) => dir * ((b.year || 0) - (a.year || 0)));

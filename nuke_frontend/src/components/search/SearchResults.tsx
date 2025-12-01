@@ -97,39 +97,70 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: '24px',
+        padding: '48px 24px',
         flexDirection: 'column',
-        gap: '8px',
-        fontSize: '8pt'
+        gap: '16px',
+        background: '#ffffff',
+        border: '2px solid #e5e7eb',
+        borderRadius: '8px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
       }}>
-        <div className="spinner" style={{ width: '20px', height: '20px' }}></div>
-        <p className="text text-muted">Searching...</p>
+        <div className="spinner" style={{ width: '32px', height: '32px', borderWidth: '3px' }}></div>
+        <p style={{ 
+          fontSize: '14px',
+          color: '#6b7280',
+          margin: 0,
+          fontWeight: 500,
+          fontFamily: 'system-ui, -apple-system, sans-serif'
+        }}>
+          Searching...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="search-results">
+    <div className="search-results" style={{ padding: '0' }}>
       {/* Search Summary */}
       <div style={{
-        background: 'var(--grey-50)',
-        border: '1px solid var(--border)',
+        background: '#fff',
+        border: '2px solid #000',
         borderRadius: '0px',
-        padding: '8px 12px',
-        marginBottom: '12px',
-        fontSize: '8pt'
+        padding: '12px 16px',
+        marginBottom: '16px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <h3 className="heading-3" style={{ margin: 0 }}>Search Results</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: '10pt', 
+            fontWeight: 700, 
+            color: '#000',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            Search Results
+          </h2>
+          <div style={{
+            fontSize: '8pt',
+            color: '#666',
+            fontWeight: 600
+          }}>
+            {filteredAndSortedResults.length} {filteredAndSortedResults.length === 1 ? 'result' : 'results'}
+          </div>
         </div>
-        <p className="text" style={{ margin: '0 0 12px 0', color: '#374151' }}>
+        <p style={{ 
+          margin: '0 0 12px 0', 
+          color: '#666',
+          fontSize: '8pt',
+          lineHeight: '1.4'
+        }}>
           {searchSummary}
         </p>
 
         {/* Quick Stats */}
         <div style={{
           display: 'flex',
-          gap: '16px',
+          gap: '12px',
           flexWrap: 'wrap',
           alignItems: 'center'
         }}>
@@ -143,18 +174,33 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  background: 'var(--white)',
-                  border: '1px solid var(--border)',
-                  padding: '2px 6px',
+                  gap: '6px',
+                  background: '#ffffff',
+                  border: '2px solid #e5e7eb',
+                  padding: '4px 8px',
                   borderRadius: '0px',
                   fontSize: '8pt',
-                  fontFamily: '"MS Sans Serif", sans-serif'
+                  fontWeight: 600,
+                  color: '#000',
+                  transition: 'all 0.12s ease',
+                  cursor: 'default'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.background = '#eff6ff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.background = '#ffffff';
                 }}
               >
-                <span>{getTypeIcon(type)}</span>
-                <span className="text text-bold">{count}</span>
-                <span className="text text-muted">{type}s</span>
+                <span style={{ 
+                  fontSize: '8pt',
+                  fontWeight: 700,
+                  color: '#000'
+                }}>{getTypeIcon(type)}</span>
+                <span style={{ fontWeight: 600 }}>{count}</span>
+                <span style={{ color: '#6b7280', textTransform: 'capitalize' }}>{type.replace('_', ' ')}</span>
               </div>
             );
           })}
@@ -166,23 +212,44 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '12px',
+        marginBottom: '20px',
         flexWrap: 'wrap',
-        gap: '8px',
-        fontSize: '8pt'
+        gap: '16px',
+        padding: '8px 12px',
+        background: '#fff',
+        border: '2px solid #000',
+        borderRadius: '0px'
       }}>
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-          <span className="text text-bold" style={{ fontSize: '8pt' }}>View:</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '8pt', fontWeight: 700, color: '#000' }}>View:</span>
           {(['cards', 'list'] as const).map(mode => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className="button-win95"
               style={{
-                padding: '2px 6px',
+                padding: '4px 12px',
                 fontSize: '8pt',
-                textTransform: 'capitalize',
-                height: '20px'
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                height: '24px',
+                border: '2px solid #000',
+                borderRadius: '0px',
+                background: viewMode === mode ? '#000' : '#fff',
+                color: viewMode === mode ? '#fff' : '#000',
+                cursor: 'pointer',
+                transition: 'all 0.12s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (viewMode !== mode) {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.background = '#eff6ff';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (viewMode !== mode) {
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                  e.currentTarget.style.background = '#ffffff';
+                }
               }}
             >
               {mode}
@@ -190,14 +257,26 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <span className="text text-bold" style={{ fontSize: '8pt' }}>Filter:</span>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span style={{ fontSize: '8pt', fontWeight: 700, color: '#000' }}>Filter:</span>
             <select
               value={filterBy}
               onChange={(e) => setFilterBy(e.target.value as any)}
-              className="input"
-              style={{ fontSize: '8pt', padding: '2px 4px', height: '20px' }}
+              style={{ 
+                fontSize: '8pt', 
+                padding: '4px 8px', 
+                height: '24px',
+                border: '2px solid #000',
+                borderRadius: '0px',
+                background: '#fff',
+                color: '#000',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'border-color 0.12s ease'
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
             >
               <option value="all">All Types</option>
               <option value="vehicle">Vehicles</option>
@@ -213,13 +292,25 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
             </select>
           </div>
 
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <span className="text text-bold" style={{ fontSize: '8pt' }}>Sort:</span>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span style={{ fontSize: '8pt', fontWeight: 700, color: '#000' }}>Sort:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="input"
-              style={{ fontSize: '8pt', padding: '2px 4px', height: '20px' }}
+              style={{ 
+                fontSize: '8pt', 
+                padding: '4px 8px', 
+                height: '24px',
+                border: '2px solid #000',
+                borderRadius: '0px',
+                background: '#fff',
+                color: '#000',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'border-color 0.12s ease'
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
             >
               <option value="relevance">Relevance</option>
               <option value="date">Date</option>
@@ -233,14 +324,27 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
       {filteredAndSortedResults.length === 0 ? (
         <div style={{
           textAlign: 'center',
-          padding: '24px',
-          background: 'var(--grey-50)',
-          border: '1px solid var(--border)',
-          borderRadius: '0px',
-          fontSize: '8pt'
+          padding: '32px 16px',
+          background: '#fff',
+          border: '2px solid #000',
+          borderRadius: '0px'
         }}>
-          <h3 className="heading-3" style={{ fontSize: '9pt', marginBottom: '8px' }}>No Results Found</h3>
-          <p className="text text-muted" style={{ fontSize: '8pt' }}>
+          <div style={{ fontSize: '24pt', marginBottom: '12px' }}>🔍</div>
+          <h3 style={{ 
+            fontSize: '10pt', 
+            fontWeight: 700,
+            marginBottom: '6px',
+            color: '#000',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            No Results Found
+          </h3>
+          <p style={{ 
+            fontSize: '8pt',
+            color: '#666',
+            margin: 0
+          }}>
             Try adjusting your search terms or filters
           </p>
         </div>
@@ -249,22 +353,38 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
           {viewMode === 'cards' && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: '20px'
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '16px'
             }}>
               {filteredAndSortedResults.map(result => (
-                <div key={result.id} style={{ position: 'relative' }}>
+                <div 
+                  key={result.id} 
+                  style={{ 
+                    position: 'relative',
+                    transition: 'transform 0.12s ease, box-shadow 0.12s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
                   {/* Relevance Score Badge */}
                   <div style={{
                     position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    background: 'rgba(0, 0, 0, 0.7)',
+                    top: '12px',
+                    right: '12px',
+                    background: 'rgba(59, 130, 246, 0.95)',
                     color: 'white',
-                    padding: '2px 6px',
+                    padding: '4px 10px',
                     borderRadius: '12px',
-                    fontSize: '10px',
-                    zIndex: 10
+                    fontSize: '7pt',
+                    fontWeight: 700,
+                    zIndex: 10,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                   }}>
                     {Math.round(result.relevance_score * 100)}% match
                   </div>
@@ -277,59 +397,78 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
 
           {viewMode === 'list' && (
             <div style={{
-              background: 'white',
-              border: '1px solid #e5e7eb',
-              borderRadius: '12px',
+              background: '#fff',
+              border: '2px solid #000',
+              borderRadius: '0px',
               overflow: 'hidden'
             }}>
               {filteredAndSortedResults.map((result, index) => (
                 <div
                   key={result.id}
+                  onClick={() => {
+                    if (result.type === 'vehicle') {
+                      window.location.href = `/vehicle/${result.id}`;
+                    }
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '16px',
-                    borderBottom: index < filteredAndSortedResults.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    padding: '12px',
+                    borderBottom: index < filteredAndSortedResults.length - 1 ? '1px solid #000' : 'none',
                     cursor: 'pointer',
-                    transition: 'background 0.2s'
+                    transition: 'background 0.12s ease',
+                    background: '#fff'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
                 >
                   <div style={{
                     width: '60px',
                     height: '60px',
-                    borderRadius: '8px',
-                    background: result.image_url ? `url(${result.image_url}) center/cover` : '#f3f4f6',
+                    borderRadius: '0px',
+                    background: result.image_url ? `url(${result.image_url}) center/cover` : '#f0f0f0',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '24px',
-                    marginRight: '16px'
+                    fontSize: '12pt',
+                    marginRight: '12px',
+                    border: '2px solid #000',
+                    flexShrink: 0
                   }}>
-                    {!result.image_url && getTypeIcon(result.type)}
+                    {!result.image_url && (
+                      <span style={{ color: '#9ca3af' }}>{getTypeIcon(result.type)}</span>
+                    )}
                   </div>
 
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <h4 className="heading-4" style={{ margin: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                      <h4 style={{ 
+                        margin: 0,
+                        fontSize: '9pt',
+                        fontWeight: 700,
+                        color: '#000'
+                      }}>
                         {result.title}
                       </h4>
                       <div style={{
-                        background: '#f3f4f6',
-                        color: '#6b7280',
+                        background: '#000',
+                        color: '#fff',
                         padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '10px',
-                        textTransform: 'uppercase'
+                        borderRadius: '0px',
+                        fontSize: '7pt',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
                       }}>
-                        {result.type}
+                        {result.type.replace('_', ' ')}
                       </div>
                     </div>
 
-                    <p className="text text-muted" style={{
+                    <p style={{
                       margin: '0 0 8px 0',
-                      fontSize: '14px',
+                      fontSize: '8pt',
+                      color: '#666',
+                      lineHeight: '1.4',
                       overflow: 'hidden',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
@@ -338,13 +477,14 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                       {result.description}
                     </p>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <div style={{
-                        background: `${getStatusColor(result.metadata?.build_status || 'default')}20`,
-                        color: getStatusColor(result.metadata?.build_status || 'default'),
+                        background: '#000',
+                        color: '#fff',
                         padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '10px'
+                        borderRadius: '0px',
+                        fontSize: '7pt',
+                        fontWeight: 700
                       }}>
                         {Math.round(result.relevance_score * 100)}% match
                       </div>
@@ -354,20 +494,23 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
-                          fontSize: '12px',
-                          color: '#6b7280'
+                          fontSize: '8pt',
+                          color: '#666'
                         }}>
-                          📍 {result.location.address || 'Location available'}
+                          <span>📍</span>
+                          <span>{result.location.address || 'Location available'}</span>
                         </div>
                       )}
 
                       {result.metadata?.build_status && (
                         <div style={{
-                          background: `${getStatusColor(result.metadata.build_status)}20`,
-                          color: getStatusColor(result.metadata.build_status),
+                          background: getStatusColor(result.metadata.build_status),
+                          color: '#fff',
                           padding: '2px 6px',
-                          borderRadius: '4px',
-                          fontSize: '10px'
+                          borderRadius: '0px',
+                          fontSize: '7pt',
+                          fontWeight: 700,
+                          textTransform: 'uppercase'
                         }}>
                           {result.metadata.build_status}
                         </div>
@@ -379,11 +522,23 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'flex-end',
-                    fontSize: '12px',
-                    color: '#9ca3af'
+                    fontSize: '8pt',
+                    color: '#666',
+                    marginLeft: '12px',
+                    flexShrink: 0
                   }}>
-                    <div>{new Date(result.created_at).toLocaleDateString()}</div>
-                    <div style={{ marginTop: '4px' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '2px' }}>
+                      {new Date(result.created_at).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
+                    </div>
+                    <div style={{
+                      fontSize: '12pt',
+                      color: '#000',
+                      fontWeight: 700
+                    }}>
                       {getTypeIcon(result.type)}
                     </div>
                   </div>
