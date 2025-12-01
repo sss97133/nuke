@@ -449,11 +449,13 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   // Auto-trigger search when initialQuery is provided
   useEffect(() => {
     if (initialQuery && initialQuery.trim() && lastSearchedRef.current !== initialQuery) {
+      console.log('🔄 Auto-triggering search for initialQuery:', initialQuery);
       lastSearchedRef.current = initialQuery;
       setHasInitialSearched(true);
       setIsSearching(true);
       // Use setTimeout to ensure executeSearch is defined
       setTimeout(() => {
+        console.log('🚀 Calling executeSearch from auto-trigger...');
         executeSearch(initialQuery);
       }, 100);
     }
