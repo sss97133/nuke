@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { PROVIDER_MODELS, TIER_CONFIGS, type LLMProvider, type AnalysisTier } from '../../../supabase/functions/_shared/llmProvider';
+import { PROVIDER_MODELS, TIER_CONFIGS, type LLMProvider, type AnalysisTier } from '../../services/llmProviderConstants';
 
 interface AnalysisConfigSelectorProps {
   onConfigChange?: (config: AnalysisConfig) => void;
