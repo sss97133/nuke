@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useImageTags } from '../../hooks/useImageTags';
+import { ImageAIChat } from './ImageAIChat';
 import { useImageAnalysis } from '../../hooks/useImageAnalysis';
 import { useAutoTagging } from '../../hooks/useAutoTagging';
 import SpatialPartPopup from '../parts/SpatialPartPopup';
@@ -1424,12 +1425,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
               {/* Info Tab */}
               {activeTab === 'info' && (
-                <div className="space-y-6">
+                <div className="space-y-4" style={{ fontSize: '8pt' }}>
                   {/* Date/Time */}
                   {imageMetadata && (
                     <div>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Date & Time</h4>
-                      <div className="text-sm text-gray-200">
+                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Date & Time</h4>
+                      <div style={{ fontSize: '8pt', color: '#fff' }}>
                         {(() => {
                           const date = imageMetadata.taken_at || imageMetadata.created_at;
                           if (!date) return 'Unknown';
@@ -1483,12 +1484,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                             parts.push(`ISO ${exif.iso || exif.technical?.iso}`);
                           }
                           if (parts.length > 0) {
-                            return <div className="text-xs text-gray-400">{parts.join(' • ')}</div>;
+                            return <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)' }}>{parts.join(' • ')}</div>;
                           }
                           return null;
                         })()}
                         {imageMetadata.exif_data.dimensions && (
-                          <div className="text-xs text-gray-400">
+                          <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)' }}>
                             {imageMetadata.exif_data.dimensions.width} × {imageMetadata.exif_data.dimensions.height}
                           </div>
                         )}
@@ -1499,8 +1500,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Location */}
                   {imageMetadata?.exif_data?.location && (imageMetadata.exif_data.location.city || imageMetadata.exif_data.location.latitude) && (
                     <div>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Location</h4>
-                      <div className="text-sm text-gray-200">
+                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Location</h4>
+                      <div style={{ fontSize: '8pt', color: '#fff' }}>
                         {imageMetadata.exif_data.location.city && imageMetadata.exif_data.location.state
                           ? `${imageMetadata.exif_data.location.city}, ${imageMetadata.exif_data.location.state}`
                           : imageMetadata.exif_data.location.latitude
@@ -1514,8 +1515,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Stats */}
                   {(imageMetadata?.view_count || imageMetadata?.comment_count || comments.length > 0) && (
                     <div>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Stats</h4>
-                      <div className="text-sm text-gray-200">
+                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Stats</h4>
+                      <div style={{ fontSize: '8pt', color: '#fff' }}>
                         {[
                           imageMetadata?.view_count ? `${imageMetadata.view_count} ${imageMetadata.view_count === 1 ? 'view' : 'views'}` : null,
                           comments.length > 0 ? `${comments.length} ${comments.length === 1 ? 'comment' : 'comments'}` : null
@@ -1527,104 +1528,117 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {/* Tags Preview */}
                   {tags.length > 0 && (
                     <div>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Tags</h4>
-                      <div className="text-sm text-gray-200">
+                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Tags</h4>
+                      <div style={{ fontSize: '8pt', color: '#fff' }}>
                         {tags.slice(0, 5).map(tag => tag.tag_text || tag.tag_name || tag.text || 'tag').filter(Boolean).join(' • ')}
-                        {tags.length > 5 && <span className="text-gray-400"> • +{tags.length - 5} more</span>}
+                        {tags.length > 5 && <span style={{ color: 'rgba(255,255,255,0.5)' }}> • +{tags.length - 5} more</span>}
                       </div>
                     </div>
                   )}
 
-          {/* AI Event Description */}
-          {imageMetadata?.ai_scan_metadata?.appraiser?.description && (
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Event Context</h4>
-                      <p className="text-sm text-gray-200 leading-relaxed">{imageMetadata.ai_scan_metadata.appraiser.description}</p>
-                    </div>
-          )}
-
                   {attribution && (
                     <div>
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Source</h4>
-                      <div className="text-sm text-gray-300">
-                        {/* Photographer (actual person who took the photo) */}
-                        {attribution.photographer ? (
-                          <div className="mb-2">
-                            <div className="text-xs text-gray-500">Photographer:</div>
-                            <div className="text-white">
+                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Source</h4>
+                      <div style={{ fontSize: '8pt', color: '#fff' }}>
+                        {/* Source URL (clickable link to original) */}
+                        {(() => {
+                          const sourceUrl = imageMetadata?.exif_data?.source_url || 
+                                          imageMetadata?.exif_data?.discovery_url ||
+                                          imageMetadata?.source_url;
+                          const sourceName = attribution.source === 'craigslist_scrape' ? 'Craigslist' :
+                                           attribution.source === 'scraper' ? 'Craigslist' :
+                                           attribution.source === 'bat_listing' ? 'Bring a Trailer' :
+                                           attribution.source || 'Unknown';
+                          
+                          return sourceUrl ? (
+                            <div style={{ marginBottom: '6px' }}>
+                              <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Source:</div>
+                              <a 
+                                href={sourceUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                style={{ 
+                                  color: '#4A9EFF', 
+                                  textDecoration: 'underline',
+                                  wordBreak: 'break-all',
+                                  fontSize: '7pt'
+                                }}
+                              >
+                                {sourceName}
+                              </a>
+                            </div>
+                          ) : null;
+                        })()}
+                        
+                        {/* Triggered by (who ran the extraction) */}
+                        {attribution.uploader && (attribution.source === 'craigslist_scrape' || attribution.source === 'scraper') && (
+                          <div style={{ marginBottom: '6px' }}>
+                            <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Triggered by:</div>
+                            <button
+                              onClick={() => {
+                                const profileCard = document.createElement('div');
+                                profileCard.className = 'profile-toast';
+                                profileCard.innerHTML = `
+                                  <div style="position: fixed; top: 20px; right: 20px; z-index: 10000; background: #000; border: 2px solid #fff; padding: 12px; max-width: 280px; font-size: 8pt;">
+                                    <div style="color: #fff; font-weight: bold; margin-bottom: 6px;">
+                                      ${attribution.uploader.full_name || attribution.uploader.username || 'User'}
+                                    </div>
+                                    <div style="color: #bbb; font-size: 7pt; margin-bottom: 6px;">
+                                      @${attribution.uploader.username || 'user'}
+                                    </div>
+                                    <a href="/profile/${attribution.uploader.id}" style="color: #4A9EFF; font-size: 7pt; text-decoration: underline;">
+                                      View Profile →
+                                    </a>
+                                    <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: #fff; color: #000; border: none; padding: 2px 6px; font-size: 8pt; cursor: pointer;">
+                                      ✕
+                                    </button>
+                                  </div>
+                                `;
+                                document.body.appendChild(profileCard);
+                                setTimeout(() => profileCard.remove(), 5000);
+                              }}
+                              style={{ 
+                                color: '#4A9EFF', 
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                fontSize: '7pt',
+                                background: 'none',
+                                border: 'none',
+                                padding: 0
+                              }}
+                            >
+                              {attribution.uploader.full_name || attribution.uploader.username}
+                            </button>
+                          </div>
+                        )}
+                        
+                        {/* Action type */}
+                        {attribution.source && (
+                          <div style={{ marginBottom: '6px' }}>
+                            <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Action:</div>
+                            <div style={{ fontSize: '7pt', textTransform: 'uppercase' }}>
+                              {attribution.source.replace(/_/g, ' ')}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Photographer (if known) */}
+                        {attribution.photographer && (
+                          <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                            <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Photographer:</div>
+                            <div style={{ fontSize: '7pt' }}>
                               {attribution.photographer.name}
                               {attribution.photographer.camera && (
-                                <span className="text-gray-500 text-xs ml-2">
+                                <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '4px', fontSize: '6pt' }}>
                                   ({attribution.photographer.camera})
                                 </span>
                               )}
                             </div>
                           </div>
-                        ) : attribution.source === 'dropbox_import' ? (
-                          <div className="mb-2">
-                            <div className="text-xs text-gray-500">Photographer:</div>
-                            <div className="text-gray-400 italic">Unknown (imported from Dropbox)</div>
-                          </div>
-                        ) : null}
-                        
-                        {/* Organization (for BAT images) or Uploader (person who ran the import/uploaded to system) */}
-                        {attribution.organization ? (
-                          <div>
-                            <div className="text-xs text-gray-500">Source</div>
-                            <div className="text-white font-semibold">
-                              {attribution.organization.name}
-                            </div>
-                            {attribution.organization.relationshipLabel && (
-                              <div className="text-xs text-gray-400">
-                                {attribution.organization.relationshipLabel}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="text-xs text-gray-500">
-                              {attribution.source === 'dropbox_import' ? 'Imported by:' : 
-                               attribution.source === 'scraper' || attribution.source === 'craigslist_scrape' ? 'Source:' :
-                               'Uploaded by:'}
-                            </div>
-                            {attribution.uploader ? (
-                              <button
-                                onClick={() => {
-                                  // Show user profile card in toast
-                                  const profileCard = document.createElement('div');
-                                  profileCard.className = 'profile-toast';
-                                  profileCard.innerHTML = `
-                                    <div style="position: fixed; top: 20px; right: 20px; z-index: 10000; background: #000; border: 2px solid #fff; padding: 16px; max-width: 300px;">
-                                      <div style="color: #fff; font-size: 12px; font-weight: bold; margin-bottom: 8px;">
-                                        ${attribution.uploader.full_name || attribution.uploader.username || 'User'}
-                                      </div>
-                                      <div style="color: #bbb; font-size: 10px; margin-bottom: 8px;">
-                                        @${attribution.uploader.username || 'user'}
-                                      </div>
-                                      <a href="/profile/${attribution.uploader.id}" style="color: #0066cc; font-size: 10px; text-decoration: underline;">
-                                        View Full Profile →
-                                      </a>
-                                      <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: #fff; color: #000; border: none; padding: 2px 6px; font-size: 10px; cursor: pointer;">
-                                        ✕
-                                      </button>
-                                    </div>
-                                  `;
-                                  document.body.appendChild(profileCard);
-                                  setTimeout(() => profileCard.remove(), 5000);
-                                }}
-                                className="text-blue-400 hover:text-blue-300 underline cursor-pointer"
-                              >
-                                {attribution.uploader.full_name}
-                              </button>
-                            ) : (
-                              <span className="text-gray-400">Unknown</span>
-                            )}
-                          </div>
                         )}
-                        {attribution.source && <div className="mt-2 text-xs">Source: {attribution.source}</div>}
                       </div>
-            </div>
-          )}
+                    </div>
+                  )}
 
                   {/* AI Analysis Section - Always show if we have any metadata */}
                   {/* AI Analysis Section - Show if we have ANY metadata */}
