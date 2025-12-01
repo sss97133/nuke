@@ -1683,10 +1683,14 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                   whiteSpace: 'nowrap',
                                   textTransform: 'uppercase'
                                 }}>
-                                  {isCraigslistSource && (
-                                    <FaviconIcon url="https://craigslist.org" matchTextSize={true} textSize={7} />
+                                  {isCraigslistSource ? (
+                                    <>
+                                      <FaviconIcon url="https://craigslist.org" matchTextSize={true} textSize={7} />
+                                      {attribution.source.replace(/_/g, ' ')}
+                                    </>
+                                  ) : (
+                                    attribution.source.replace(/_/g, ' ')
                                   )}
-                                  {attribution.source.replace(/_/g, ' ')}
                                 </div>
                               )}
                             </div>
