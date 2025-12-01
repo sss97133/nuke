@@ -137,8 +137,13 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     if (!searchQuery.trim()) return;
 
     const trimmedQuery = searchQuery.trim();
-    console.log('🔍 executeSearch called with:', trimmedQuery);
+    
+    // VISIBLE DEBUG - ALERT TO CONFIRM CODE IS RUNNING
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('🔍 EXECUTESEARCH CALLED - NEW CODE VERSION');
+    console.log('🔍 Query:', trimmedQuery);
     console.log('🔍 Query length:', trimmedQuery.length);
+    console.log('═══════════════════════════════════════════════════════');
 
     // Check if query is a Craigslist URL - check DB first, then import if needed
     const craigslistUrlPattern = /https?:\/\/([^.]+)\.craigslist\.org\/[^/]+\/d\/[^/]+\/[^/]+\.html/i;
@@ -149,7 +154,8 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     console.log('🔍 Pattern matches:', trimmedQuery.match(craigslistUrlPattern));
     
     if (isCraigslistUrl) {
-      console.log('🚀 Detected Craigslist URL, starting import...');
+      console.log('🚀🚀🚀 DETECTED CRAIGSLIST URL - STARTING IMPORT 🚀🚀🚀');
+      alert('CRAIGSLIST URL DETECTED - Starting import...');
       setIsSearching(true);
       try {
         // Get current user
@@ -455,15 +461,17 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   useEffect(() => {
     const trimmed = initialQuery?.trim();
     if (trimmed && lastSearchedRef.current !== trimmed) {
-      console.log('🔄 Auto-triggering search for initialQuery:', trimmed);
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('🔄 AUTO-TRIGGER FIRING - NEW CODE VERSION');
+      console.log('🔄 initialQuery:', trimmed);
       console.log('🔄 initialQuery type:', typeof trimmed);
-      console.log('🔄 initialQuery value:', JSON.stringify(trimmed));
+      console.log('═══════════════════════════════════════════════════════');
       lastSearchedRef.current = trimmed;
       setHasInitialSearched(true);
       setIsSearching(true);
       // Use setTimeout to ensure executeSearch is defined
       setTimeout(() => {
-        console.log('🚀 Calling executeSearch from auto-trigger with:', trimmed);
+        console.log('🚀🚀🚀 CALLING EXECUTESEARCH FROM AUTO-TRIGGER 🚀🚀🚀');
         executeSearch(trimmed);
       }, 100);
     }
