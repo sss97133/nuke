@@ -306,7 +306,9 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             vehicle_id: newVehicle.id,
             event_type: 'discovery',
             event_date: new Date().toISOString(),
+            title: `Discovered via Craigslist listing`,
             description: `Discovered via Craigslist listing`,
+            source: 'craigslist_scrape',
             metadata: {
               discovery_url: searchQuery.trim(),
               discovery_source: 'craigslist_scrape',
