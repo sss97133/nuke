@@ -367,6 +367,7 @@ const CursorHomepage: React.FC = () => {
       }
 
       // Query vehicles first (without embedded images to avoid relationship ambiguity)
+      // NO LIMIT - infinite scroll
       let query = supabase
         .from('vehicles')
         .select(`
@@ -375,7 +376,7 @@ const CursorHomepage: React.FC = () => {
         .eq('is_public', true)
         .neq('status', 'pending')
         .order('updated_at', { ascending: false })
-        .limit(timePeriod === 'ALL' ? 500 : 100);
+        .limit(1000); // Increased from 100/500 to 1000
 
       if (timeFilter) {
         query = query.gte('updated_at', timeFilter);

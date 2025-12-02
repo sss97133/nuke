@@ -213,6 +213,21 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       {/* Vehicle Details */}
       <div style={{ padding: '8px' }}>
         <div>
+          {/* Primary Fields: VIN, Year, Make, Model, Engine, Trans, Mileage */}
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+            <span>VIN</span>
+            <span
+              className="commentable"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'vin', vehicle.vin || '', 'VIN');
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              {vehicle.vin || 'Not provided'}
+            </span>
+          </div>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -224,7 +239,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           }}>
             <span>Year</span>
             <span
-              style={{ cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ cursor: 'pointer' }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -262,110 +277,6 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               {vehicle.model}
             </span>
           </div>
-          {(vehicle as any).series && (
-            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
-              <span>Series</span>
-              <span
-                className="commentable"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleDataPointClick(e, 'series', (vehicle as any).series || '', 'Series');
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                {(vehicle as any).series}
-              </span>
-            </div>
-          )}
-          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
-            <span>VIN</span>
-            <span
-              className="commentable"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDataPointClick(e, 'vin', vehicle.vin || '', 'VIN');
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              {vehicle.vin || 'Not provided'}
-            </span>
-          </div>
-          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
-            <span>Color</span>
-            <span
-              className="commentable"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDataPointClick(e, 'color', vehicle.color || '', 'Color');
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              {vehicle.color || 'Not specified'}
-            </span>
-          </div>
-          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
-            <span>Mileage</span>
-            <span
-              className="commentable"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDataPointClick(e, 'mileage', vehicle.mileage?.toString() || '', 'Mileage');
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              {vehicle.mileage ? `${vehicle.mileage.toLocaleString()} miles` : 'Not specified'}
-            </span>
-          </div>
-          {listingUrl && (
-            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
-              <span>Source</span>
-              <span>
-                <a 
-                  href={listingUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: 'var(--primary)', textDecoration: 'underline' }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                    {isCraigslistListing && vehicle?.discovery_url && (
-                      <FaviconIcon 
-                        url={vehicle.discovery_url} 
-                        matchTextSize={true} 
-                        textSize={8}
-                      />
-                    )}
-                    {listingSourceLabel || listingHost || 'External Listing'}
-                  </span>
-                </a>
-                {listingCapturedDate && (
-                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
-                    ({new Date(listingCapturedDate).toLocaleDateString()})
-                  </span>
-                )}
-              </span>
-            </div>
-          )}
-          {vehicle.trim && (
-            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
-              <span>Trim</span>
-              <span
-                className="commentable"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleDataPointClick(e, 'trim', vehicle.trim || '', 'Trim');
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                {vehicle.trim}
-              </span>
-            </div>
-          )}
           {vehicle.engine && (
             <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
               <span>Engine</span>
@@ -398,8 +309,117 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               </span>
             </div>
           )}
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+            <span>Mileage</span>
+            <span
+              className="commentable"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'mileage', vehicle.mileage?.toString() || '', 'Mileage');
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              {vehicle.mileage ? `${vehicle.mileage.toLocaleString()} miles` : 'Not specified'}
+            </span>
+          </div>
+
+          {/* Secondary Fields */}
+          {(vehicle as any).series && (
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+              <span>Series</span>
+              <span
+                className="commentable"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDataPointClick(e, 'series', (vehicle as any).series || '', 'Series');
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {(vehicle as any).series}
+              </span>
+            </div>
+          )}
+          {vehicle.trim && (
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+              <span>Trim</span>
+              <span
+                className="commentable"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDataPointClick(e, 'trim', vehicle.trim || '', 'Trim');
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {vehicle.trim}
+              </span>
+            </div>
+          )}
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+            <span>Color</span>
+            <span
+              className="commentable"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'color', vehicle.color || '', 'Color');
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              {vehicle.color || 'Not specified'}
+            </span>
+          </div>
+
           {/* Additional details */}
           {renderVehicleDetails()}
+
+          {/* Sources Section - At the end, supports multiple sources */}
+          {listingUrl && (
+            <div style={{ 
+              marginTop: '8px', 
+              paddingTop: '8px', 
+              borderTop: '1px solid var(--border)' 
+            }}>
+              <div style={{ 
+                fontSize: '7pt', 
+                color: 'var(--text-muted)', 
+                marginBottom: '4px',
+                fontWeight: 600
+              }}>
+                Sources
+              </div>
+              <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+                <span style={{ fontSize: '7pt' }}>Last Info</span>
+                <span>
+                  <a 
+                    href={listingUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--primary)', textDecoration: 'underline', fontSize: '7pt' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      {isCraigslistListing && vehicle?.discovery_url && (
+                        <FaviconIcon 
+                          url={vehicle.discovery_url} 
+                          matchTextSize={true} 
+                          textSize={7}
+                        />
+                      )}
+                      {listingSourceLabel || listingHost || 'External Listing'}
+                    </span>
+                  </a>
+                  {listingCapturedDate && (
+                    <span style={{ fontSize: '6pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
+                      ({new Date(listingCapturedDate).toLocaleDateString()})
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

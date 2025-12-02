@@ -53,6 +53,52 @@ serve(async (req) => {
     // Quick analysis with Claude (using user's key if available)
     const analysis = await runTier1Analysis(image_url, estimated_resolution || 'medium', apiKeyResult.apiKey)
     
+    // Check for SPID sheet if vehicle_id is provided
+    let spidData = null
+    if (vehicle_id && image_url) {
+      try {
+        const { detectSPIDSheet } = await import('../_shared/detectSPIDSheet.ts')
+        const spidResponse = await detectSPIDSheet(image_url, vehicle_id, supabase, user_id)
+        if (spidResponse?.is_spid_sheet && spidResponse.confidence > 70) {
+          spidData = spidResponse.extracted_data
+          console.log('✅ SPID sheet detected in tier1 analysis:', spidData)
+          
+          // Save SPID data to dedicated table (triggers auto-verification)
+          const { error: spidSaveError } = await supabase
+            .from('vehicle_spid_data')
+            .upsert({
+              vehicle_id: vehicle_id,
+              image_id: image_id,
+              vin: spidData.vin || null,
+              model_code: spidData.model_code || null,
+              build_date: spidData.build_date || null,
+              sequence_number: spidData.sequence_number || null,
+              paint_code_exterior: spidData.paint_code_exterior || null,
+              paint_code_interior: spidData.paint_code_interior || null,
+              engine_code: spidData.engine_code || null,
+              transmission_code: spidData.transmission_code || null,
+              axle_ratio: spidData.axle_ratio || null,
+              rpo_codes: spidData.rpo_codes || [],
+              extraction_confidence: spidResponse.confidence,
+              raw_text: spidResponse.raw_text || null,
+              extraction_model: 'gpt-4o'
+            }, {
+              onConflict: 'vehicle_id',
+              ignoreDuplicates: false
+            })
+          
+          if (spidSaveError) {
+            console.error('Failed to save SPID data:', spidSaveError)
+          } else {
+            console.log('✅ SPID data saved - auto-verification triggered')
+          }
+        }
+      } catch (err) {
+        console.warn('SPID detection failed in tier1:', err)
+        // Don't fail the whole analysis if SPID detection fails
+      }
+    }
+    
     // Save to database
     if (image_id) {
       const { data: currentImage } = await supabase
@@ -63,22 +109,46 @@ serve(async (req) => {
       
       const metadata = currentImage?.ai_scan_metadata || {}
       
-      await supabase
+      const updateData: any = {
+        ai_scan_metadata: {
+          ...metadata,
+          tier_1_analysis: analysis,
+          processing_tier_reached: 1,
+          scanned_at: new Date().toISOString(),
+          ...(spidData ? { spid: spidData } : {})
+        },
+        image_category: analysis.category || 'exterior',
+        category: analysis.category || 'general'
+      }
+      
+      if (estimated_resolution) {
+        updateData.estimated_resolution = estimated_resolution
+      }
+      
+      const { data: updatedImage, error: updateError } = await supabase
         .from('vehicle_images')
-        .update({
-          ai_scan_metadata: {
-            ...metadata,
-            tier_1_analysis: analysis,
-            processing_tier_reached: 1,
-            scanned_at: new Date().toISOString()
-          },
-          category: analysis.category,
-          angle: analysis.angle,
-          image_quality_score: analysis.image_quality?.overall_score || 5,
-          estimated_resolution,
-          suitable_for_expert_analysis: analysis.image_quality?.suitable_for_expert || false
-        })
+        .update(updateData)
         .eq('id', image_id)
+        .select()
+        .single()
+      
+      if (updateError) {
+        console.error('Failed to update image with analysis results:', updateError)
+        throw new Error(`Database update failed: ${updateError.message}`)
+      }
+      
+      if (!updatedImage) {
+        console.error('Image update returned no data')
+        throw new Error('Image update returned no data')
+      }
+      
+      console.log('✅ Analysis results saved to database:', {
+        image_id,
+        has_tier1: !!updatedImage.ai_scan_metadata?.tier_1_analysis,
+        angle: updatedImage.angle,
+        category: updatedImage.category,
+        has_spid: !!spidData
+      })
     }
 
     return new Response(
@@ -134,7 +204,25 @@ Be fast and accurate. This is for organization only.`
   }
   const base64Image = btoa(binary)
   
-  const mediaType = imageResponse.headers.get('content-type') || 'image/jpeg'
+  // Get media type and normalize it to valid values for Claude
+  let mediaType = imageResponse.headers.get('content-type') || 'image/jpeg'
+  
+  // Claude only accepts: image/jpeg, image/png, image/gif, image/webp
+  // Normalize any variations
+  if (mediaType.includes('jpeg') || mediaType.includes('jpg')) {
+    mediaType = 'image/jpeg'
+  } else if (mediaType.includes('png')) {
+    mediaType = 'image/png'
+  } else if (mediaType.includes('gif')) {
+    mediaType = 'image/gif'
+  } else if (mediaType.includes('webp')) {
+    mediaType = 'image/webp'
+  } else {
+    // Default to jpeg for unknown types
+    mediaType = 'image/jpeg'
+  }
+  
+  console.log('Image media type:', mediaType)
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',

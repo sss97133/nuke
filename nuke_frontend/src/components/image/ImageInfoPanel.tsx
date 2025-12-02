@@ -311,17 +311,91 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         </div>
       )}
 
-      {/* AI Analysis if available */}
-      {imageMetadata?.ai_scan_metadata?.appraiser && (
+      {/* AI Analysis if available - supports both appraiser and tier_1_analysis formats */}
+      {(imageMetadata?.ai_scan_metadata?.appraiser || imageMetadata?.ai_scan_metadata?.tier_1_analysis) && (
         <>
           <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
-          {imageMetadata.ai_scan_metadata.appraiser.angle && (
-            <div>{imageMetadata.ai_scan_metadata.appraiser.angle}</div>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '8pt', marginBottom: '4px' }}>AI ANALYSIS</div>
+          
+          {/* Tier 1 Analysis (new format) */}
+          {imageMetadata?.ai_scan_metadata?.tier_1_analysis && (
+            <>
+              {/* Angle and Category */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                {imageMetadata.ai_scan_metadata.tier_1_analysis.angle && (
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: 'rgba(255,255,255,0.1)', 
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    fontSize: '8pt'
+                  }}>
+                    {imageMetadata.ai_scan_metadata.tier_1_analysis.angle.replace(/_/g, ' ')}
+                  </span>
+                )}
+                {imageMetadata.ai_scan_metadata.tier_1_analysis.category && (
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: 'rgba(255,255,255,0.1)', 
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    fontSize: '8pt'
+                  }}>
+                    {imageMetadata.ai_scan_metadata.tier_1_analysis.category.replace(/_/g, ' ')}
+                  </span>
+                )}
+                {imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance && (
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('excellent') ? 'rgba(34,197,94,0.2)' :
+                                     imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('good') ? 'rgba(59,130,246,0.2)' :
+                                     imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.includes('poor') ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    fontSize: '8pt'
+                  }}>
+                    {imageMetadata.ai_scan_metadata.tier_1_analysis.condition_glance.replace(/_/g, ' ')}
+                  </span>
+                )}
+              </div>
+              
+              {/* Components visible */}
+              {imageMetadata.ai_scan_metadata.tier_1_analysis.components_visible?.length > 0 && (
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '7pt', marginBottom: '2px' }}>COMPONENTS</div>
+                  <div style={{ fontSize: '8pt', color: 'rgba(255,255,255,0.7)' }}>
+                    {imageMetadata.ai_scan_metadata.tier_1_analysis.components_visible.map((c: string) => c.replace(/_/g, ' ')).join(' • ')}
+                  </div>
+                </div>
+              )}
+              
+              {/* Basic observations - the key insight */}
+              {imageMetadata.ai_scan_metadata.tier_1_analysis.basic_observations && (
+                <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '9pt', lineHeight: '1.4' }}>
+                  {imageMetadata.ai_scan_metadata.tier_1_analysis.basic_observations}
+                </div>
+              )}
+              
+              {/* Image quality score */}
+              {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality && (
+                <div style={{ marginTop: '8px', display: 'flex', gap: '8px', fontSize: '7pt', color: 'rgba(255,255,255,0.5)' }}>
+                  <span>Quality: {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality.overall_score}/10</span>
+                  <span>Focus: {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality.focus}</span>
+                  <span>Lighting: {imageMetadata.ai_scan_metadata.tier_1_analysis.image_quality.lighting}</span>
+                </div>
+              )}
+            </>
           )}
-          {imageMetadata.ai_scan_metadata.appraiser.description && (
-            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '9pt', marginTop: '4px' }}>
-              {imageMetadata.ai_scan_metadata.appraiser.description}
-            </div>
+          
+          {/* Legacy appraiser format */}
+          {imageMetadata?.ai_scan_metadata?.appraiser && !imageMetadata?.ai_scan_metadata?.tier_1_analysis && (
+            <>
+              {imageMetadata.ai_scan_metadata.appraiser.angle && (
+                <div>{imageMetadata.ai_scan_metadata.appraiser.angle}</div>
+              )}
+              {imageMetadata.ai_scan_metadata.appraiser.description && (
+                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '9pt', marginTop: '4px' }}>
+                  {imageMetadata.ai_scan_metadata.appraiser.description}
+                </div>
+              )}
+            </>
           )}
         </>
       )}

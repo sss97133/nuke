@@ -1558,7 +1558,6 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           
                           return sourceUrl ? (
                             <div style={{ marginBottom: '6px' }}>
-                              <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Source:</div>
                               <a 
                                 href={sourceUrl} 
                                 target="_blank" 
@@ -1638,6 +1637,14 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                             ? (sourceUrl || 'https://craigslist.org')
                             : sourceUrl;
                           
+                          // Format action label - replace "scrape" with "automation v.0"
+                          const formatActionLabel = (source: string) => {
+                            if (source === 'craigslist_scrape' || source === 'scraper') {
+                              return 'automation v.0';
+                            }
+                            return source.replace(/_/g, ' ');
+                          };
+                          
                           return (
                             <div style={{ marginBottom: '6px' }}>
                               <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Action:</div>
@@ -1653,7 +1660,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                     fontSize: '7pt',
                                     color: 'var(--text-muted)',
                                     padding: '1px 6px',
-                                    background: 'var(--grey-100)',
+                                    background: 'rgba(255,255,255,0.05)',
                                     borderRadius: '3px',
                                     whiteSpace: 'nowrap',
                                     textDecoration: 'none',
@@ -1661,14 +1668,14 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                     cursor: 'pointer'
                                   }}
                                   onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'var(--grey-200)';
+                                    e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'var(--grey-100)';
+                                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
                                   }}
                                 >
                                   <FaviconIcon url={actionUrl} matchTextSize={true} textSize={7} />
-                                  {attribution.source.replace(/_/g, ' ')}
+                                  {formatActionLabel(attribution.source)}
                                 </a>
                               ) : (
                                 <div style={{
@@ -1678,7 +1685,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                   fontSize: '7pt',
                                   color: 'var(--text-muted)',
                                   padding: '1px 6px',
-                                  background: 'var(--grey-100)',
+                                  background: 'rgba(255,255,255,0.05)',
                                   borderRadius: '3px',
                                   whiteSpace: 'nowrap',
                                   textTransform: 'uppercase'
@@ -1686,10 +1693,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                   {isCraigslistSource ? (
                                     <>
                                       <FaviconIcon url="https://craigslist.org" matchTextSize={true} textSize={7} />
-                                      {attribution.source.replace(/_/g, ' ')}
+                                      {formatActionLabel(attribution.source)}
                                     </>
                                   ) : (
-                                    attribution.source.replace(/_/g, ' ')
+                                    formatActionLabel(attribution.source)
                                   )}
                                 </div>
                               )}
@@ -1715,182 +1722,293 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                     </div>
                   )}
 
-                  {/* AI Analysis Section - Always show if we have any metadata */}
-                  {/* AI Analysis Section - Show if we have ANY metadata */}
-                  {(angleData || imageMetadata || attribution) && (
-                    <div className="mb-4">
-                      <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">AI Analysis</h4>
-                      <div className="text-sm text-gray-300 space-y-2">
-                        {angleData && (
-                          <>
-                            <div className="flex justify-between">
-                              <span>View:</span>
-                              <span className="text-white">{angleData.primary_label}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Confidence:</span>
-                              <span className="text-green-400">{angleData.confidence}%</span>
-                            </div>
-                          </>
-                        )}
-                        
-                        {/* What - AI-Generated Description */}
-                        {imageMetadata?.ai_scan_metadata?.appraiser?.description ? (
-                          <div className="flex flex-col border-t border-white/10 pt-2 mt-2">
-                            <span className="text-gray-500 mb-1">What:</span>
-                            <span className="text-white text-xs leading-relaxed">
-                              {imageMetadata.ai_scan_metadata.appraiser.description}
-                            </span>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[9px] text-gray-600">
-                                AI: {imageMetadata.ai_scan_metadata.appraiser.model || 'GPT-4o'}
-                              </span>
-                              <button
-                                onClick={() => {
-                                  const promptInfo = {
-                                    model: imageMetadata.ai_scan_metadata.appraiser.model || 'GPT-4o',
-                                    context: imageMetadata.ai_scan_metadata.appraiser.context || 'No context',
-                                    analyzedAt: imageMetadata.ai_scan_metadata.appraiser.analyzed_at || imageMetadata.created_at,
-                                    description: imageMetadata.ai_scan_metadata.appraiser.description
-                                  };
-                                  alert(JSON.stringify(promptInfo, null, 2));
-                                }}
-                                className="text-[9px] text-gray-500 hover:text-gray-300 underline"
-                                title="View how this description was generated"
-                              >
-                                ℹ How was this generated?
-                              </button>
-                            </div>
-                          </div>
-                        ) : angleData?.primary_label ? (
-                          <div className="flex justify-between border-t border-white/10 pt-2 mt-2">
-                            <span>What:</span>
-                            <span className="text-white">{angleData.primary_label}</span>
-                          </div>
-                        ) : (
-                          <div className="flex justify-between items-center border-t border-white/10 pt-2 mt-2">
-                            <div className="flex items-center gap-2">
-                              <span>What:</span>
-                              <span className="text-yellow-400">Pending AI analysis</span>
-                            </div>
-                            {vehicleId && imageUrl && !analyzingImage && (
-                              <button
-                                onClick={async () => {
-                                  if (!vehicleId || !imageUrl) return;
-                                  
-                                  setAnalyzingImage(true);
-                                  try {
-                                    // Get current user
-                                    const { data: { user } } = await supabase.auth.getUser();
-                                    
-                                    // Call tier 1 analysis (the main analysis function)
-                                    const { data, error } = await supabase.functions.invoke('analyze-image-tier1', {
-                                      body: {
-                                        image_url: imageUrl,
-                                        vehicle_id: vehicleId,
-                                        image_id: imageId || null,
-                                        user_id: user?.id || null
-                                      }
-                                    });
+                  {/* AI Analysis Section - Data Inspector View */}
+                  {(() => {
+                    const tier1Analysis = imageMetadata?.ai_scan_metadata?.tier_1_analysis;
+                    const appraiser = imageMetadata?.ai_scan_metadata?.appraiser;
+                    const hasAnalysis = tier1Analysis || appraiser || angleData?.primary_label;
+                    
+                    // Only show section if we have analysis OR if user can trigger it
+                    if (!hasAnalysis && (!vehicleId || !imageUrl)) {
+                      return null;
+                    }
 
-                                    if (error) {
-                                      console.error('Analysis error:', error);
-                                      alert(`Analysis failed: ${error.message}`);
-                                    } else {
-                                      console.log('✅ Analysis started:', data);
-                                      
-                                      // Dispatch event to refresh gallery
-                                      if (typeof window !== 'undefined') {
-                                        window.dispatchEvent(new CustomEvent('image_processing_complete', {
-                                          detail: { 
-                                            imageId: imageId, 
-                                            result: data,
-                                            vehicleId: vehicleId
-                                          }
-                                        }));
-                                      }
-                                      
-                                      // Reload image metadata after analysis (wait a bit for processing)
-                                      setTimeout(() => {
-                                        loadImageMetadata();
-                                        loadTags();
-                                      }, 3000);
+                    // Helper to render a data row
+                    const DataRow = ({ label, value, mono = false }: { label: string; value: any; mono?: boolean }) => {
+                      if (value === null || value === undefined || value === '') return null;
+                      const displayValue = typeof value === 'boolean' ? (value ? 'true' : 'false') : 
+                                          Array.isArray(value) ? value.join(', ') :
+                                          typeof value === 'object' ? JSON.stringify(value) : String(value);
+                      return (
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'flex-start',
+                          padding: '2px 0',
+                          borderBottom: '1px solid rgba(255,255,255,0.05)'
+                        }}>
+                          <span style={{ 
+                            fontSize: '7pt', 
+                            color: 'rgba(255,255,255,0.5)',
+                            minWidth: '100px',
+                            flexShrink: 0
+                          }}>{label}</span>
+                          <span style={{ 
+                            fontSize: '7pt', 
+                            color: mono ? '#4ade80' : 'white',
+                            fontFamily: mono ? 'monospace' : 'inherit',
+                            textAlign: 'right',
+                            wordBreak: 'break-word',
+                            maxWidth: '180px'
+                          }}>{displayValue}</span>
+                        </div>
+                      );
+                    };
+                    
+                    return (
+                      <div className="mb-4">
+                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">AI Analysis</h4>
+                        
+                        {/* Analyze button if no analysis */}
+                        {!hasAnalysis && vehicleId && imageUrl && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <button
+                              onClick={async () => {
+                                if (!vehicleId || !imageUrl) return;
+                                setAnalyzingImage(true);
+                                try {
+                                  const { data: { user } } = await supabase.auth.getUser();
+                                  const { data, error } = await supabase.functions.invoke('analyze-image-tier1', {
+                                    body: { image_url: imageUrl, vehicle_id: vehicleId, image_id: imageId || null, user_id: user?.id || null }
+                                  });
+                                  if (error) {
+                                    alert(`Analysis failed: ${error.message}`);
+                                  } else {
+                                    if (typeof window !== 'undefined') {
+                                      window.dispatchEvent(new CustomEvent('image_processing_complete', {
+                                        detail: { imageId, result: data, vehicleId }
+                                      }));
                                     }
-                                  } catch (err) {
-                                    console.error('Analysis failed:', err);
-                                    alert(`Analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-                                  } finally {
-                                    setAnalyzingImage(false);
+                                    setTimeout(() => { loadImageMetadata(); loadTags(); }, 5000);
                                   }
-                                }}
-                                className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                style={{ fontSize: '8pt', padding: '4px 8px', cursor: 'pointer' }}
-                                disabled={analyzingImage}
-                              >
-                                Analyze Now
-                              </button>
-                            )}
-                            {analyzingImage && (
-                              <span className="text-yellow-400 text-xs">Analyzing...</span>
-                            )}
+                                } catch (err) {
+                                  alert(`Analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                                } finally {
+                                  setAnalyzingImage(false);
+                                }
+                              }}
+                              disabled={analyzingImage}
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                fontSize: '8pt',
+                                fontWeight: 'bold',
+                                backgroundColor: analyzingImage ? '#4b5563' : '#ca8a04',
+                                color: 'white',
+                                border: 'none',
+                                cursor: analyzingImage ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              {analyzingImage ? 'ANALYZING...' : 'ANALYZE NOW'}
+                            </button>
                           </div>
                         )}
-                        
-                        
-                        {/* Why - Context */}
-                        {imageMetadata?.ai_scan_metadata?.appraiser?.context && (
-                          <div className="flex flex-col border-t border-white/10 pt-2 mt-2">
-                            <span className="mb-1">Why:</span>
-                            <span className="text-white text-xs">{imageMetadata.ai_scan_metadata.appraiser.context}</span>
+
+                        {/* DB Columns Section */}
+                        {imageMetadata && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ 
+                              fontSize: '6pt', 
+                              color: 'rgba(255,255,255,0.3)', 
+                              textTransform: 'uppercase',
+                              marginBottom: '4px',
+                              letterSpacing: '0.5px'
+                            }}>DB COLUMNS</div>
+                            <div style={{ 
+                              background: 'rgba(0,0,0,0.3)', 
+                              padding: '6px 8px',
+                              border: '1px solid rgba(255,255,255,0.1)'
+                            }}>
+                              <DataRow label="image_category" value={imageMetadata.image_category} mono />
+                              <DataRow label="category" value={imageMetadata.category} mono />
+                              <DataRow label="source" value={imageMetadata.source} mono />
+                              <DataRow label="taken_at" value={imageMetadata.taken_at ? new Date(imageMetadata.taken_at).toISOString() : null} mono />
+                              <DataRow label="is_primary" value={imageMetadata.is_primary} mono />
+                              <DataRow label="angle" value={imageMetadata.angle} mono />
+                            </div>
                           </div>
                         )}
-                        
-                        {/* SPID Sheet Detection */}
-                        {imageMetadata?.ai_scan_metadata?.spid_data?.is_spid_sheet && (
-                          <div className="border-t border-white/10 pt-2 mt-2">
-                            <div className="bg-green-900/30 border border-green-700/50 p-3 rounded">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-green-400 font-bold text-[10px] uppercase">
-                                  SPID Sheet Detected
-                                </span>
-                                <span className="text-green-400 text-[10px]">
-                                  {imageMetadata.ai_scan_metadata.spid_data.confidence}% confident
-                                </span>
-                              </div>
-                              
-                              {imageMetadata.ai_scan_metadata.spid_data.extracted_data && (
-                                <div className="space-y-1 text-[10px]">
-                                  {imageMetadata.ai_scan_metadata.spid_data.extracted_data.vin && (
-                                    <div className="text-gray-300">
-                                      VIN: {imageMetadata.ai_scan_metadata.spid_data.extracted_data.vin}
-                                    </div>
-                                  )}
-                                  {imageMetadata.ai_scan_metadata.spid_data.extracted_data.paint_code_exterior && (
-                                    <div className="text-gray-300">
-                                      Paint: {imageMetadata.ai_scan_metadata.spid_data.extracted_data.paint_code_exterior}
-                                    </div>
-                                  )}
-                                  {imageMetadata.ai_scan_metadata.spid_data.extracted_data.rpo_codes?.length > 0 && (
-                                    <div className="text-gray-300">
-                                      RPO Codes: {imageMetadata.ai_scan_metadata.spid_data.extracted_data.rpo_codes.length} extracted
-                                    </div>
-                                  )}
-                                  <button
-                                    onClick={() => {
-                                      alert(JSON.stringify(imageMetadata.ai_scan_metadata.spid_data.extracted_data, null, 2));
-                                    }}
-                                    className="text-green-400 underline mt-1 text-[9px]"
-                                  >
-                                    View All Extracted Data →
-                                  </button>
+
+                        {/* Tier 1 Analysis Section */}
+                        {tier1Analysis && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ 
+                              fontSize: '6pt', 
+                              color: 'rgba(255,255,255,0.3)', 
+                              textTransform: 'uppercase',
+                              marginBottom: '4px',
+                              letterSpacing: '0.5px'
+                            }}>TIER 1 ANALYSIS</div>
+                            <div style={{ 
+                              background: 'rgba(0,0,0,0.3)', 
+                              padding: '6px 8px',
+                              border: '1px solid rgba(255,255,255,0.1)'
+                            }}>
+                              <DataRow label="angle" value={tier1Analysis.angle} mono />
+                              <DataRow label="category" value={tier1Analysis.category} mono />
+                              <DataRow label="condition_glance" value={tier1Analysis.condition_glance} mono />
+                              <DataRow label="components_visible" value={tier1Analysis.components_visible} mono />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Image Quality Section */}
+                        {tier1Analysis?.image_quality && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ 
+                              fontSize: '6pt', 
+                              color: 'rgba(255,255,255,0.3)', 
+                              textTransform: 'uppercase',
+                              marginBottom: '4px',
+                              letterSpacing: '0.5px'
+                            }}>IMAGE QUALITY</div>
+                            <div style={{ 
+                              background: 'rgba(0,0,0,0.3)', 
+                              padding: '6px 8px',
+                              border: '1px solid rgba(255,255,255,0.1)'
+                            }}>
+                              <DataRow label="overall_score" value={`${tier1Analysis.image_quality.overall_score}/10`} mono />
+                              <DataRow label="focus" value={tier1Analysis.image_quality.focus} mono />
+                              <DataRow label="lighting" value={tier1Analysis.image_quality.lighting} mono />
+                              <DataRow label="resolution" value={tier1Analysis.image_quality.estimated_resolution} mono />
+                              <DataRow label="suitable_for_expert" value={tier1Analysis.image_quality.suitable_for_expert} mono />
+                              <DataRow label="sufficient_for_detail" value={tier1Analysis.image_quality.sufficient_for_detail} mono />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Basic Observations - Full Text */}
+                        {tier1Analysis?.basic_observations && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ 
+                              fontSize: '6pt', 
+                              color: 'rgba(255,255,255,0.3)', 
+                              textTransform: 'uppercase',
+                              marginBottom: '4px',
+                              letterSpacing: '0.5px'
+                            }}>BASIC OBSERVATIONS</div>
+                            <div style={{ 
+                              background: 'rgba(0,0,0,0.3)', 
+                              padding: '8px',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              fontSize: '8pt',
+                              color: 'white',
+                              lineHeight: '1.4'
+                            }}>
+                              {tier1Analysis.basic_observations}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Processing Metadata */}
+                        {imageMetadata?.ai_scan_metadata && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ 
+                              fontSize: '6pt', 
+                              color: 'rgba(255,255,255,0.3)', 
+                              textTransform: 'uppercase',
+                              marginBottom: '4px',
+                              letterSpacing: '0.5px'
+                            }}>PROCESSING</div>
+                            <div style={{ 
+                              background: 'rgba(0,0,0,0.3)', 
+                              padding: '6px 8px',
+                              border: '1px solid rgba(255,255,255,0.1)'
+                            }}>
+                              <DataRow label="scanned_at" value={imageMetadata.ai_scan_metadata.scanned_at} mono />
+                              <DataRow label="tier_reached" value={imageMetadata.ai_scan_metadata.processing_tier_reached} mono />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Legacy Appraiser Data */}
+                        {appraiser && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ 
+                              fontSize: '6pt', 
+                              color: 'rgba(255,255,255,0.3)', 
+                              textTransform: 'uppercase',
+                              marginBottom: '4px',
+                              letterSpacing: '0.5px'
+                            }}>APPRAISER (LEGACY)</div>
+                            <div style={{ 
+                              background: 'rgba(0,0,0,0.3)', 
+                              padding: '6px 8px',
+                              border: '1px solid rgba(255,255,255,0.1)'
+                            }}>
+                              <DataRow label="model" value={appraiser.model} mono />
+                              <DataRow label="angle" value={appraiser.angle} mono />
+                              {appraiser.description && (
+                                <div style={{ marginTop: '4px', fontSize: '8pt', color: 'white', lineHeight: '1.4' }}>
+                                  {appraiser.description}
                                 </div>
                               )}
                             </div>
                           </div>
                         )}
+                          
+                        {/* SPID Sheet Detection */}
+                        {imageMetadata?.ai_scan_metadata?.spid_data?.is_spid_sheet && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ 
+                              fontSize: '6pt', 
+                              color: '#4ade80', 
+                              textTransform: 'uppercase',
+                              marginBottom: '4px',
+                              letterSpacing: '0.5px'
+                            }}>SPID SHEET DETECTED</div>
+                            <div style={{ 
+                              background: 'rgba(34,197,94,0.1)', 
+                              padding: '6px 8px',
+                              border: '1px solid rgba(34,197,94,0.3)'
+                            }}>
+                              <DataRow label="confidence" value={`${imageMetadata.ai_scan_metadata.spid_data.confidence}%`} mono />
+                              {imageMetadata.ai_scan_metadata.spid_data.extracted_data && (
+                                <>
+                                  <DataRow label="vin" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.vin} mono />
+                                  <DataRow label="paint_code" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.paint_code_exterior} mono />
+                                  <DataRow label="rpo_codes" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.rpo_codes} mono />
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Raw JSON Button */}
+                        {imageMetadata?.ai_scan_metadata && (
+                          <button
+                            onClick={() => {
+                              const jsonStr = JSON.stringify(imageMetadata.ai_scan_metadata, null, 2);
+                              navigator.clipboard?.writeText(jsonStr);
+                              alert('Full ai_scan_metadata:\n\n' + jsonStr);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '6px',
+                              fontSize: '7pt',
+                              backgroundColor: 'rgba(255,255,255,0.05)',
+                              color: 'rgba(255,255,255,0.5)',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              cursor: 'pointer',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            VIEW RAW JSON
+                          </button>
+                        )}
                       </div>
-        </div>
-      )}
+                    );
+                  })()}
 
                   {/* Appraiser Brain Checklist */}
                   {imageMetadata?.ai_scan_metadata?.appraiser && (

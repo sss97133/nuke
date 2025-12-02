@@ -292,6 +292,43 @@ const AdminNotificationCenter: React.FC<AdminNotificationCenterProps> = ({ onNot
               <h3>{selectedNotification.title}</h3>
               <p>{selectedNotification.message}</p>
 
+              {/* Vehicle Import Notification */}
+              {selectedNotification.notification_type === 'new_vehicle_import' && selectedNotification.vehicle_id && (
+                <div style={{ marginTop: '20px' }}>
+                  <h4>Vehicle Import Details</h4>
+                  <div style={{ marginBottom: '20px', padding: '12px', background: '#f5f5f5', borderRadius: '4px' }}>
+                    <p><strong>Year:</strong> {selectedNotification.metadata?.year || 'N/A'}</p>
+                    <p><strong>Make:</strong> {selectedNotification.metadata?.make || 'N/A'}</p>
+                    <p><strong>Model:</strong> {selectedNotification.metadata?.model || 'N/A'}</p>
+                    {selectedNotification.metadata?.discovery_url && (
+                      <p><strong>Source:</strong> <a href={selectedNotification.metadata.discovery_url} target="_blank" rel="noopener noreferrer">{selectedNotification.metadata.discovery_url}</a></p>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="button button-primary"
+                      onClick={() => {
+                        window.open(`/vehicle/${selectedNotification.vehicle_id}`, '_blank');
+                      }}
+                    >
+                      View Vehicle
+                    </button>
+                    <button
+                      className="button button-secondary"
+                      onClick={async () => {
+                        await AdminNotificationService.dismissNotification(selectedNotification.id, 'Reviewed');
+                        setSelectedNotification(null);
+                        loadNotifications();
+                        loadStats();
+                        if (onNotificationUpdate) onNotificationUpdate();
+                      }}
+                    >
+                      Mark as Reviewed
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {verificationDetails && (
                 <div style={{ marginTop: '20px' }}>
                   <h4>Verification Details</h4>

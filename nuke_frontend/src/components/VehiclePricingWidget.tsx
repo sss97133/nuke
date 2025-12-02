@@ -443,6 +443,16 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   // Breakdown is now loaded as part of loadPricingStatus
   // No separate loadBreakdown function needed
 
+  // Don't show widget if there's no value and no analysis status
+  if (!pricingStatus && !initialValuation) {
+    return null;
+  }
+
+  // Don't show widget if value is 0 or null and confidence is 0
+  if (pricingStatus && !pricingStatus.estimated_value && pricingStatus.confidence_score === 0) {
+    return null;
+  }
+
   return (
     <>
       <div className={`card ${className}`}>
@@ -821,10 +831,6 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             </div>
           )}
 
-          {/* Payments: Buy Credits CTA (desktop) */}
-          <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
-            <BuyCreditsButton presetAmounts={[3, 10, 25]} />
-          </div>
         </div>
       </div>
 
