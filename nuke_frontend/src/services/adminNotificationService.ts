@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 
 export interface AdminNotification {
   id: string;
-  notification_type: 'ownership_verification_pending' | 'vehicle_verification_pending' | 'user_verification_pending' | 'fraud_alert' | 'system_alert';
+  notification_type: 'ownership_verification_pending' | 'vehicle_verification_pending' | 'user_verification_pending' | 'fraud_alert' | 'system_alert' | 'new_vehicle_import';
   ownership_verification_id?: string;
   vehicle_verification_id?: string;
   user_id?: string;
@@ -10,7 +10,7 @@ export interface AdminNotification {
   title: string;
   message: string;
   priority: number; // 1-5, 5 being critical
-  action_required: 'approve_ownership' | 'reject_ownership' | 'approve_vehicle' | 'reject_vehicle' | 'review_fraud' | 'system_action';
+  action_required: 'approve_ownership' | 'reject_ownership' | 'approve_vehicle' | 'reject_vehicle' | 'review_fraud' | 'system_action' | 'review_import';
   status: 'pending' | 'in_review' | 'approved' | 'rejected' | 'dismissed';
   reviewed_by_admin_id?: string;
   admin_notes?: string;

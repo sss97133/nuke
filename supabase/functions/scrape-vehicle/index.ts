@@ -33,6 +33,7 @@ serve(async (req) => {
 
   // Declare variables outside try block for error handling
   let html: string = ''
+  let markdown: string = ''  // Store markdown from Firecrawl
   let fetchSuccess = false
   let firecrawlAttempted = false
   let firecrawlError: string | null = null
@@ -72,9 +73,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             url,
-            pageOptions: {
-              waitFor: 1000, // Wait 1 second for JS to load
-            },
+            waitFor: 2000, // Wait 2 seconds for JS to load
             formats: ['html', 'markdown']
           })
         })
@@ -90,13 +89,16 @@ serve(async (req) => {
           }))
           
           if (firecrawlData.success && firecrawlData.data) {
-            // Firecrawl returns html in data.html or we can use markdown
-            html = firecrawlData.data.html || 
-                   (firecrawlData.data.markdown ? `<!DOCTYPE html><html><body><pre>${firecrawlData.data.markdown}</pre></body></html>` : '')
+            // Firecrawl returns html and markdown - store both
+            html = firecrawlData.data.html || ''
+            markdown = firecrawlData.data.markdown || ''
             
-            if (html) {
+            if (html || markdown) {
+              if (!html && markdown) {
+                html = `<!DOCTYPE html><html><body><pre>${markdown}</pre></body></html>`
+              }
               fetchSuccess = true
-              console.log('✅ Firecrawl fetch successful, HTML length:', html.length)
+              console.log('✅ Firecrawl fetch successful, HTML length:', html.length, 'MD length:', markdown.length)
             } else {
               console.warn('⚠️ Firecrawl returned no HTML content')
               firecrawlError = 'No HTML content in response'
@@ -155,7 +157,7 @@ serve(async (req) => {
     } else if (isGoxee) {
       data = scrapeGoxee(doc, url)
     } else if (isKSL) {
-      data = scrapeKSL(doc, url)
+      data = scrapeKSL(doc, url, markdown)
     } else {
       // Unknown source - use AI extraction if available, otherwise basic pattern extraction
       console.log('Unknown source, attempting AI extraction...')
@@ -257,7 +259,9 @@ serve(async (req) => {
         ...data,
         _metadata: {
           fetchMethod: fetchSuccess ? 'firecrawl' : 'direct',
-          firecrawlUsed: fetchSuccess
+          firecrawlUsed: fetchSuccess,
+          htmlLength: html.length,
+          imageCount: data.images?.length || 0
         }
       }
     }
@@ -1421,65 +1425,430 @@ function scrapeGoxee(doc: any, url: string): any {
   return data
 }
 
-function scrapeKSL(doc: any, url: string): any {
+function scrapeKSL(doc: any, url: string, markdown: string = ''): any {
   const data: any = {
     source: 'KSL Cars',
-    listing_url: url
+    listing_url: url,
+    discovery_url: url  // Store the source URL
   }
 
-  // Extract title
-  const titleEl = doc.querySelector('h1, .title')
-  if (titleEl) {
-    data.title = titleEl.textContent?.trim()
-    
-    // Parse year/make/model from title
-    const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
-    if (yearMatch) {
-      data.year = parseInt(yearMatch[0])
-    }
-    
-    const afterYear = data.title.replace(/\b(19|20)\d{2}\b/, '').trim()
-    const parts = afterYear.split(/\s+/)
-    if (parts.length >= 2) {
-      data.make = parts[0]
-      data.model = parts.slice(1, 3).join(' ')
-    }
-  }
-
-  // Extract price
+  // Get full HTML and body text for extraction
+  const html = doc.documentElement?.outerHTML || doc.body?.innerHTML || ''
   const bodyText = doc.body?.textContent || ''
-  const priceMatch = bodyText.match(/\$[\d,]+/g)
-  if (priceMatch) {
-    data.asking_price = parseInt(priceMatch[0].replace(/[$,]/g, ''))
-  }
+  const fullContent = markdown || bodyText
 
-  // Extract VIN
-  const vinMatch = bodyText.match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
-  if (vinMatch && !/[IOQ]/.test(vinMatch[1])) {
-    data.vin = vinMatch[1].toUpperCase()
-  }
+  // ========================================
+  // 1. EXTRACT FROM MARKDOWN (primary source - cleaner than HTML)
+  // ========================================
+  if (markdown) {
+    // Title with Year Make Model Trim - look for pattern like "1984 Chevrolet Corvette Base"
+    const titleMatch = markdown.match(/^(\d{4})\s+([A-Za-z]+)\s+(.+?)$/m)
+    if (titleMatch) {
+      data.year = parseInt(titleMatch[1])
+      data.make = titleMatch[2]
+      // Model might include trim: "Corvette Base" -> model="Corvette", trim="Base"
+      const modelParts = titleMatch[3].trim().split(/\s+/)
+      if (modelParts.length > 1 && /^[A-Z][a-z]+$/.test(modelParts[modelParts.length - 1])) {
+        // Last word looks like a trim (capitalized single word like "Base", "Sport", etc.)
+        data.model = modelParts.slice(0, -1).join(' ')
+        data.trim = modelParts[modelParts.length - 1]
+      } else {
+        data.model = titleMatch[3].trim()
+      }
+    }
 
-  // Extract mileage
-  const mileageMatch = bodyText.match(/(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)/i)
-  if (mileageMatch) {
-    data.mileage = parseInt(mileageMatch[1].replace(/,/g, ''))
-  }
+    // Location (city, state) - pattern like "Ogden, UT" or "Midvale, UT"
+    const locationMatch = markdown.match(/^([A-Za-z\s]+,\s*[A-Z]{2})$/m)
+    if (locationMatch) {
+      data.location = locationMatch[1].trim()
+    }
 
-  // Extract images
-  const images: string[] = []
-  const imgMatches = bodyText.matchAll(/<img[^>]+src="([^"]+)"[^>]*>/gi)
-  for (const match of imgMatches) {
-    if (match[1] && !match[1].includes('logo') && !match[1].includes('icon')) {
-      images.push(match[1])
+    // Listing age -> listed_date
+    const ageMatch = markdown.match(/^(\d+)\s+(Days?|Hours?|Minutes?)$/im)
+    if (ageMatch) {
+      const value = parseInt(ageMatch[1])
+      const unit = ageMatch[2].toLowerCase()
+      let hoursAgo = 0
+      if (unit.startsWith('day')) hoursAgo = value * 24
+      else if (unit.startsWith('hour')) hoursAgo = value
+      else if (unit.startsWith('minute')) hoursAgo = value / 60
+      data.listed_date = new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString()
+    }
+
+    // Price - look for standalone price like "$15,000"
+    const priceMatch = markdown.match(/^\$(\d{1,3}(?:,\d{3})*)$/m)
+    if (priceMatch) {
+      data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+    }
+
+    // Mileage - "Mileage: 17,517" or "Mileage: 58,035"
+    const mileageMatch = markdown.match(/Mileage:\s*([\d,]+)/i)
+    if (mileageMatch) {
+      data.mileage = parseInt(mileageMatch[1].replace(/,/g, ''))
+    }
+
+    // Description - content after "## Description" header
+    const descMatch = markdown.match(/##\s*Description\s*\n\n(.+?)(?=\n\n##|\n\n\[|\n##|$)/is)
+    if (descMatch) {
+      let desc = descMatch[1].trim()
+      // Clean up any garbage (SVG paths, etc.)
+      if (desc.length > 20 && !desc.includes('svg') && !desc.match(/^[\d\s.clL<>]+$/) && !desc.includes(' l ')) {
+        data.description = desc.substring(0, 5000)
+      }
+    }
+
+    // Dealer info - "Seller Type: Dealership" followed by license
+    const dealerMatch = markdown.match(/Seller Type:\s*Dealership/i)
+    if (dealerMatch) {
+      data.is_dealer = true
+      data.seller_type = 'dealership'
+      
+      // Dealer license - "License # 7142"
+      const licenseMatch = markdown.match(/License\s*#\s*(\d+)/i)
+      if (licenseMatch) {
+        data.dealer_license = licenseMatch[1]
+      }
+      
+      // Dealer name - ## heading before "Seller Type: Dealership"
+      const dealerNameMatch = markdown.match(/##\s+([A-Za-z0-9\s&']+)\s*\n[^#]*?Seller Type:\s*Dealership/i)
+      if (dealerNameMatch) {
+        data.dealer_name = dealerNameMatch[1].trim()
+      }
+      
+      // Dealer address - street address followed by city/state/zip
+      const addressMatch = markdown.match(/(\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Boulevard|Blvd))\s*\n\s*([A-Za-z]+,\s*[A-Z]{2}\s*\d{5})/i)
+      if (addressMatch) {
+        data.dealer_address = `${addressMatch[1].trim()}, ${addressMatch[2].trim()}`
+      }
+    } else {
+      data.is_dealer = false
+      data.seller_type = 'private'
+      
+      // Private seller name - "C Colby" pattern after "Seller Type: Private"
+      const sellerMatch = markdown.match(/##\s+([A-Za-z]+)\s*\n\s*City:/i)
+      if (sellerMatch) {
+        data.seller_name = sellerMatch[1].trim()
+      }
+    }
+
+    // Listing number - "Listing Number10224357"
+    const listingMatch = markdown.match(/Listing Number\s*(\d+)/i)
+    if (listingMatch) {
+      data.ksl_listing_id = listingMatch[1]
+    }
+
+    // Page views - "Page Views1,014"
+    const viewsMatch = markdown.match(/Page Views\s*([\d,]+)/i)
+    if (viewsMatch) {
+      data.page_views = parseInt(viewsMatch[1].replace(/,/g, ''))
+    }
+
+    // Favorites - "Favorited25"
+    const favoritesMatch = markdown.match(/Favorited\s*(\d+)/i)
+    if (favoritesMatch) {
+      data.favorites_count = parseInt(favoritesMatch[1])
+    }
+
+    // Expiration date - "Expiration DateDec 26, 2025"
+    const expirationMatch = markdown.match(/Expiration Date\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})/i)
+    if (expirationMatch) {
+      try {
+        data.listing_expiration = new Date(expirationMatch[1]).toISOString()
+      } catch {}
     }
   }
-  data.images = images.slice(0, 20)
 
-  // Extract description
-  const descEl = doc.querySelector('.description, [class*="description"]')
-  if (descEl) {
-    data.description = descEl.textContent?.trim().substring(0, 5000)
+  // ========================================
+  // 2. FALLBACK TO HTML/BODY TEXT (if markdown parsing missed anything)
+  // ========================================
+  
+  // Title fallback
+  if (!data.year || !data.make || !data.model) {
+    const titleEl = doc.querySelector('h1, .title')
+    if (titleEl) {
+      data.title = titleEl.textContent?.trim()
+      
+      const yearMatch = data.title?.match(/\b(19|20)\d{2}\b/)
+      if (yearMatch && !data.year) {
+        data.year = parseInt(yearMatch[0])
+      }
+      
+      if (!data.make || !data.model) {
+        const afterYear = data.title?.replace(/\b(19|20)\d{2}\b/, '').trim() || ''
+        const parts = afterYear.split(/\s+/)
+        if (parts.length >= 2) {
+          if (!data.make) data.make = parts[0]
+          if (!data.model) data.model = parts.slice(1, 3).join(' ')
+        }
+      }
+    }
   }
+
+  // Price fallback
+  if (!data.asking_price) {
+    const priceMatch = bodyText.match(/\$(\d{1,3}(?:,\d{3})*)/g)
+    if (priceMatch) {
+      data.asking_price = parseInt(priceMatch[0].replace(/[$,]/g, ''))
+    }
+  }
+
+  // Mileage fallback
+  if (!data.mileage) {
+    const mileagePatterns = [
+      /Mileage:?\s*(\d{1,3}(?:,\d{3})*)/i,
+      /(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)\b/i,
+      /odometer[:\s]+(\d{1,3}(?:,\d{3})*)/i
+    ]
+    for (const pattern of mileagePatterns) {
+      const match = bodyText.match(pattern)
+      if (match) {
+        data.mileage = parseInt(match[1].replace(/,/g, ''))
+        break
+      }
+    }
+  }
+
+  // Location fallback
+  if (!data.location) {
+    const cityMatch = bodyText.match(/City:\s*([A-Za-z\s]+)/i)
+    if (cityMatch) {
+      data.location = cityMatch[1].trim()
+    }
+  }
+
+  // ========================================
+  // 3. EXTRACT VIN FROM CARFAX LINK (critical!)
+  // ========================================
+  // VINs are embedded in CARFAX URLs, not in body text
+  const vinFromCarfax = html.match(/VIN=([A-HJ-NPR-Z0-9]{17})/i) || 
+                        markdown.match(/VIN=([A-HJ-NPR-Z0-9]{17})/i)
+  if (vinFromCarfax) {
+    data.vin = vinFromCarfax[1].toUpperCase()
+  }
+  
+  // Also try legacy shorter VINs (pre-1981)
+  if (!data.vin) {
+    const legacyVin = html.match(/VIN=([A-HJ-NPR-Z0-9]{8,13})/i) ||
+                      markdown.match(/VIN=([A-HJ-NPR-Z0-9]{8,13})/i)
+    if (legacyVin) {
+      data.vin = legacyVin[1].toUpperCase()
+    }
+  }
+
+  // Fallback: try to find 17-char VIN in body text
+  if (!data.vin) {
+    const vinMatch = bodyText.match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
+    if (vinMatch && !/[IOQ]/.test(vinMatch[1])) {
+      data.vin = vinMatch[1].toUpperCase()
+    }
+  }
+
+  // ========================================
+  // 4. EXTRACT ALL IMAGES (no limits)
+  // ========================================
+  const images: string[] = []
+  
+  // Primary: Extract from HTML/markdown using regex
+  const imagePattern = /image\.ksldigital\.com\/([a-f0-9\-]+)\.jpg/gi
+  let match
+  const searchContent = html + markdown
+  while ((match = imagePattern.exec(searchContent)) !== null) {
+    const fullUrl = `https://image.ksldigital.com/${match[1]}.jpg`
+    if (!images.includes(fullUrl)) {
+      images.push(fullUrl)
+    }
+  }
+  
+  // Fallback: DOM query
+  const imgElements = doc.querySelectorAll('img[src]')
+  imgElements.forEach((img: any) => {
+    const src = img.getAttribute('src')
+    if (src && src.includes('image.ksldigital.com')) {
+      // Extract the UUID from the URL
+      const uuidMatch = src.match(/([a-f0-9\-]{36})\.jpg/i)
+      if (uuidMatch) {
+        const fullUrl = `https://image.ksldigital.com/${uuidMatch[1]}.jpg`
+        if (!images.includes(fullUrl)) {
+          images.push(fullUrl)
+        }
+      }
+    }
+  })
+  
+  data.images = images  // NO LIMIT
+
+  // ========================================
+  // 5. EXTRACT CARFAX METADATA
+  // ========================================
+  const accidentMatch = fullContent.match(/Accident reported/i)
+  if (accidentMatch) {
+    data.accident_history = true
+  }
+
+  const serviceMatch = fullContent.match(/\*\*(\d+)\*\*\s+Service history records/i) ||
+                       fullContent.match(/(\d+)\s+Service history records/i)
+  if (serviceMatch) {
+    data.service_records_count = parseInt(serviceMatch[1])
+  }
+
+  const detailedRecordsMatch = fullContent.match(/\*\*(\d+)\*\*\s+Detailed records/i) ||
+                               fullContent.match(/(\d+)\s+Detailed records/i)
+  if (detailedRecordsMatch) {
+    data.detailed_records_count = parseInt(detailedRecordsMatch[1])
+  }
+
+  // ========================================
+  // 6. GM NOMENCLATURE NORMALIZATION
+  // ========================================
+  // For GM vehicles, normalize series/model/trim using domain knowledge
+  const makeUpper = (data.make || '').toUpperCase()
+  if (makeUpper === 'CHEVROLET' || makeUpper === 'GMC' || makeUpper === 'CHEVY') {
+    const allText = [data.title, data.model, data.trim, data.description].join(' ').toLowerCase()
+    
+    // Detect drivetrain
+    let drivetrain = null
+    if (allText.match(/\b(4wd|4x4|four wheel drive|k10|k20|k30|k1500|k2500|k3500)\b/i)) {
+      drivetrain = '4WD'
+      data.drivetrain = '4WD'
+    } else if (allText.match(/\b(2wd|2x4|rwd|c10|c20|c30|c1500|c2500|c3500)\b/i)) {
+      drivetrain = '2WD'
+      data.drivetrain = '2WD'
+    }
+    
+    // Extract or derive series (C10, K10, etc.)
+    const seriesMatch = allText.match(/\b(c|k)(10|20|30|1500|2500|3500)\b/i)
+    if (seriesMatch) {
+      data.series = seriesMatch[0].toUpperCase()
+    } else {
+      // Derive from weight class
+      const weightMap: Record<string, { '2WD': string, '4WD': string }> = {
+        '1/2 ton': { '2WD': 'C10', '4WD': 'K10' },
+        'half ton': { '2WD': 'C10', '4WD': 'K10' },
+        '3/4 ton': { '2WD': 'C20', '4WD': 'K20' },
+        '1 ton': { '2WD': 'C30', '4WD': 'K30' },
+        'one ton': { '2WD': 'C30', '4WD': 'K30' }
+      }
+      for (const [weight, series] of Object.entries(weightMap)) {
+        if (allText.includes(weight)) {
+          data.series = series[drivetrain || '2WD']
+          data.data_corrections = data.data_corrections || []
+          data.data_corrections.push(`Derived series ${data.series} from "${weight}"`)
+          break
+        }
+      }
+    }
+    
+    // Extract trim level
+    const trimIndicators = [
+      'custom deluxe', 'scottsdale', 'silverado', 'cheyenne', 'cheyenne super',
+      'big 10', 'big ten', 'cst', 'custom sport truck'
+    ]
+    for (const trim of trimIndicators) {
+      if (allText.includes(trim)) {
+        data.trim = trim.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+        break
+      }
+    }
+    
+    // Normalize model - "1/2 ton", "1/2", "Ton" should be "Pickup"
+    const modelLower = (data.model || '').toLowerCase()
+    const trimLower = (data.trim || '').toLowerCase()
+    
+    // Check if model+trim together form a weight class
+    const combinedModelTrim = (modelLower + ' ' + trimLower).trim()
+    const isWeightClass = combinedModelTrim.match(/^(1\/2|half|3\/4|1|one)?\s*(ton)?$/i) ||
+                          modelLower === '1/2' || modelLower === 'ton' || trimLower === 'ton'
+    
+    if (isWeightClass || modelLower.includes('1/2 ton') || modelLower.includes('half ton') ||
+        modelLower.includes('3/4 ton') || modelLower.includes('1 ton')) {
+      // If model is just a weight class, normalize to Pickup
+      if (!allText.includes('suburban') && !allText.includes('blazer')) {
+        data.model = 'Pickup'
+        data.body_style = 'Truck'
+        // Clear trim if it was just "Ton"
+        if (trimLower === 'ton') {
+          data.trim = null
+        }
+      }
+    }
+    
+    // Check for year conflicts between title and description
+    if (data.year && data.description) {
+      const descYearMatch = data.description.match(/\b(19[6-9]\d|20[0-2]\d)\b/)
+      if (descYearMatch) {
+        const descYear = parseInt(descYearMatch[0])
+        if (descYear !== data.year && Math.abs(descYear - data.year) <= 5) {
+          data.year_conflict = {
+            title_year: data.year,
+            description_year: descYear,
+            message: `Title says ${data.year} but description mentions ${descYear}`
+          }
+          data.data_corrections = data.data_corrections || []
+          data.data_corrections.push(`Year conflict: title=${data.year}, description=${descYear}`)
+        }
+      }
+    }
+    
+    // Detect engine from text
+    if (allText.match(/\bdiesel\b/i)) {
+      data.engine_type = 'Diesel'
+    } else {
+      const engineMatch = allText.match(/\b(350|305|327|396|402|454|502|big block|small block)\b/i)
+      if (engineMatch) {
+        const disp = engineMatch[1]
+        if (disp.match(/\d+/)) {
+          data.engine_displacement = disp
+          data.engine_type = parseInt(disp) >= 396 ? 'Big Block V8' : 'Small Block V8'
+        } else {
+          data.engine_type = disp.includes('big') ? 'Big Block V8' : 'Small Block V8'
+        }
+      }
+    }
+  }
+  
+  // ========================================
+  // 7. SET BODY STYLE (fallback)
+  // ========================================
+  if (!data.body_style) {
+    const modelLower = (data.model || '').toLowerCase()
+    if (modelLower.includes('c10') || modelLower.includes('c20') || modelLower.includes('c30') ||
+        modelLower.includes('k10') || modelLower.includes('k20') || modelLower.includes('k30') ||
+        modelLower.includes('c/k') || modelLower.includes('silverado') || modelLower.includes('s-10') ||
+        modelLower.includes('pickup') || modelLower.includes('c-series')) {
+      data.body_style = 'Truck'
+    } else if (modelLower.includes('corvette')) {
+      data.body_style = 'Coupe'
+    } else if (modelLower.includes('camaro')) {
+      data.body_style = 'Coupe'
+    } else if (modelLower.includes('chevelle')) {
+      data.body_style = 'Coupe'
+    } else if (modelLower.includes('nova')) {
+      data.body_style = 'Sedan'
+    } else if (modelLower.includes('astro') || modelLower.includes('van')) {
+      data.body_style = 'Van'
+    } else if (modelLower.includes('suburban')) {
+      data.body_style = 'SUV'
+    }
+  }
+
+  console.log('KSL Extraction complete:', JSON.stringify({
+    year: data.year,
+    make: data.make,
+    model: data.model,
+    series: data.series,
+    trim: data.trim,
+    vin: data.vin,
+    mileage: data.mileage,
+    price: data.asking_price,
+    location: data.location,
+    drivetrain: data.drivetrain,
+    engine_type: data.engine_type,
+    year_conflict: data.year_conflict,
+    images: data.images?.length,
+    description: data.description?.substring(0, 50),
+    is_dealer: data.is_dealer,
+    data_corrections: data.data_corrections
+  }))
 
   return data
 }

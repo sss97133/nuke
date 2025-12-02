@@ -408,8 +408,8 @@ const ImageGallery = ({
       console.log('🔄 Image processing complete, refreshing gallery:', imageId);
       
       // Wait a moment for database to update, then refresh
-      // Try multiple times with increasing delays (analysis might take 3-5 seconds)
-      const refreshAttempts = [2000, 5000, 8000];
+      // Try multiple times with increasing delays (analysis might take 5-10 seconds, SPID detection adds time)
+      const refreshAttempts = [3000, 6000, 10000, 15000];
       
       refreshAttempts.forEach((delay, index) => {
         setTimeout(async () => {

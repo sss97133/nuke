@@ -561,11 +561,15 @@ class ListingURLParserService {
         body: { url }
       });
       
-      if (error || !data) {
-        throw new Error(`Failed to fetch listing: ${error?.message || 'Unknown error'}`);
+      if (error || !data || !data.success) {
+        throw new Error(`Failed to fetch listing: ${error?.message || data?.error || 'Unknown error'}`);
       }
       
-      const html = data.html || data.content || '';
+      // The scrape-vehicle function returns: { success: true, data: { ...parsedData, html: ... } }
+      const scrapedData = data.data || {};
+      
+      // Extract HTML from response (could be in data.html or data.data.html)
+      const html = scrapedData.html || data.html || data.content || '';
 
       let parsed: Partial<ParsedListing> = {
         source,
@@ -600,9 +604,30 @@ class ListingURLParserService {
           parsed.vin = this.extractVIN(html);
           break;
         
+        case 'craigslist':
+          // Use parsed data from scrape-vehicle function (already extracted make/model/year)
+          // The scrape-vehicle function returns structured data, so we use that
+          if (scrapedData.year) parsed.year = scrapedData.year;
+          if (scrapedData.make) parsed.make = scrapedData.make;
+          if (scrapedData.model) parsed.model = scrapedData.model;
+          if (scrapedData.trim) parsed.trim = scrapedData.trim;
+          if (scrapedData.asking_price) parsed.price = scrapedData.asking_price;
+          if (scrapedData.mileage) parsed.mileage = scrapedData.mileage;
+          if (scrapedData.location) parsed.location = scrapedData.location;
+          if (scrapedData.description) parsed.description = scrapedData.description;
+          if (scrapedData.images) parsed.images = scrapedData.images;
+          if (scrapedData.color) parsed.exterior_color = scrapedData.color;
+          if (scrapedData.transmission) parsed.transmission = scrapedData.transmission;
+          if (scrapedData.drivetrain) parsed.drivetrain = scrapedData.drivetrain;
+          if (scrapedData.title_status) parsed.title_status = scrapedData.title_status;
+          // Extract VIN from HTML if not in parsed data
+          if (!parsed.vin) {
+            parsed.vin = this.extractVIN(html) || scrapedData.vin || null;
+          }
+          break;
+        
         // TODO: Add parsers for other sources
         case 'ebay':
-        case 'craigslist':
         case 'carscom':
         default:
           // Generic parser - try to extract VIN at minimum

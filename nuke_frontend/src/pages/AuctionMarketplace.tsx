@@ -7,14 +7,17 @@ import '../design-system.css';
 interface AuctionListing {
   id: string;
   vehicle_id: string;
-  seller_id: string;
-  sale_type: string;
+  seller_id?: string;
+  sale_type?: string;
+  source: 'native' | 'external' | 'bat';
+  platform?: string;
+  listing_url?: string;
   current_high_bid_cents: number | null;
   reserve_price_cents: number | null;
   bid_count: number;
   auction_end_time: string | null;
   status: string;
-  description: string;
+  description?: string;
   created_at: string;
   vehicle: {
     id: string;
@@ -62,68 +65,183 @@ export default function AuctionMarketplace() {
 
   const loadListings = async () => {
     setLoading(true);
-    
-    let query = supabase
-      .from('vehicle_listings')
-      .select(`
-        *,
-        vehicle:vehicles (
-          id,
-          year,
-          make,
-          model,
-          trim,
-          mileage,
-          primary_image_url
-        )
-      `)
-      .eq('status', 'active')
-      .in('sale_type', ['auction', 'live_auction'])
-      .gt('auction_end_time', new Date().toISOString()); // Only show auctions that haven't ended
+    const now = new Date().toISOString();
+    const allListings: AuctionListing[] = [];
 
-    // Apply filters
-    if (filter === 'ending_soon') {
-      const next24Hours = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      query = query.lte('auction_end_time', next24Hours);
-    } else if (filter === 'no_reserve') {
-      query = query.is('reserve_price_cents', null);
-    } else if (filter === 'new_listings') {
-      const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      query = query.gte('created_at', last7Days);
-    }
+    try {
+      // 1. Load native vehicle_listings (N-Zero auctions)
+      let nativeQuery = supabase
+        .from('vehicle_listings')
+        .select(`
+          *,
+          vehicle:vehicles (
+            id,
+            year,
+            make,
+            model,
+            trim,
+            mileage,
+            primary_image_url
+          )
+        `)
+        .eq('status', 'active')
+        .in('sale_type', ['auction', 'live_auction'])
+        .gt('auction_end_time', now);
 
-    // Apply sorting
-    switch (sort) {
-      case 'ending_soon':
-        query = query.order('auction_end_time', { ascending: true });
-        break;
-      case 'bid_count':
-        query = query.order('bid_count', { ascending: false });
-        break;
-      case 'price_low':
-        query = query.order('current_high_bid_cents', { ascending: true, nullsFirst: true });
-        break;
-      case 'price_high':
-        query = query.order('current_high_bid_cents', { ascending: false });
-        break;
-      case 'newest':
-        query = query.order('created_at', { ascending: false });
-        break;
-    }
+      const { data: nativeListings, error: nativeError } = await nativeQuery;
 
-    const { data, error } = await query.limit(50);
+      if (!nativeError && nativeListings) {
+        for (const listing of nativeListings) {
+          if (listing.auction_end_time && new Date(listing.auction_end_time) > new Date()) {
+            allListings.push({
+              id: listing.id,
+              vehicle_id: listing.vehicle_id,
+              seller_id: listing.seller_id,
+              sale_type: listing.sale_type,
+              source: 'native',
+              current_high_bid_cents: listing.current_high_bid_cents,
+              reserve_price_cents: listing.reserve_price_cents,
+              bid_count: listing.bid_count || 0,
+              auction_end_time: listing.auction_end_time,
+              status: listing.status,
+              description: listing.description,
+              created_at: listing.created_at,
+              vehicle: listing.vehicle
+            });
+          }
+        }
+      }
 
-    if (error) {
+      // 2. Load external_listings (BaT, Cars & Bids, eBay Motors, etc.)
+      let externalQuery = supabase
+        .from('external_listings')
+        .select(`
+          *,
+          vehicle:vehicles (
+            id,
+            year,
+            make,
+            model,
+            trim,
+            mileage,
+            primary_image_url
+          )
+        `)
+        .eq('listing_status', 'active')
+        .gt('end_date', now);
+
+      const { data: externalListings, error: externalError } = await externalQuery;
+
+      if (!externalError && externalListings) {
+        for (const listing of externalListings) {
+          if (listing.end_date && new Date(listing.end_date) > new Date() && listing.vehicle) {
+            allListings.push({
+              id: listing.id,
+              vehicle_id: listing.vehicle_id,
+              source: 'external',
+              platform: listing.platform,
+              listing_url: listing.listing_url,
+              current_high_bid_cents: listing.current_bid ? Math.round(Number(listing.current_bid) * 100) : null,
+              reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
+              bid_count: listing.bid_count || 0,
+              auction_end_time: listing.end_date,
+              status: listing.listing_status,
+              created_at: listing.created_at,
+              vehicle: listing.vehicle
+            });
+          }
+        }
+      }
+
+      // 3. Load bat_listings (BaT-specific listings)
+      let batQuery = supabase
+        .from('bat_listings')
+        .select(`
+          *,
+          vehicle:vehicles (
+            id,
+            year,
+            make,
+            model,
+            trim,
+            mileage,
+            primary_image_url
+          )
+        `)
+        .eq('listing_status', 'active')
+        .gt('auction_end_date', now.split('T')[0]); // BaT uses DATE, not TIMESTAMPTZ
+
+      const { data: batListings, error: batError } = await batQuery;
+
+      if (!batError && batListings) {
+        for (const listing of batListings) {
+          if (listing.auction_end_date && listing.vehicle) {
+            // Convert DATE to TIMESTAMPTZ for end of day
+            const endDate = new Date(listing.auction_end_date);
+            endDate.setHours(23, 59, 59, 999);
+            const endDateTime = endDate.toISOString();
+
+            if (new Date(endDateTime) > new Date()) {
+              allListings.push({
+                id: listing.id,
+                vehicle_id: listing.vehicle_id,
+                source: 'bat',
+                platform: 'bat',
+                listing_url: listing.bat_listing_url,
+                current_high_bid_cents: listing.final_bid ? listing.final_bid * 100 : null,
+                reserve_price_cents: listing.reserve_price ? listing.reserve_price * 100 : null,
+                bid_count: listing.bid_count || 0,
+                auction_end_time: endDateTime,
+                status: listing.listing_status,
+                created_at: listing.created_at,
+                vehicle: listing.vehicle
+              });
+            }
+          }
+        }
+      }
+
+      // Apply filters
+      let filtered = allListings;
+      if (filter === 'ending_soon') {
+        const next24Hours = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        filtered = filtered.filter(l => l.auction_end_time && new Date(l.auction_end_time) <= new Date(next24Hours));
+      } else if (filter === 'no_reserve') {
+        filtered = filtered.filter(l => !l.reserve_price_cents);
+      } else if (filter === 'new_listings') {
+        const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        filtered = filtered.filter(l => l.created_at >= last7Days);
+      }
+
+      // Apply sorting
+      filtered.sort((a, b) => {
+        switch (sort) {
+          case 'ending_soon':
+            if (!a.auction_end_time) return 1;
+            if (!b.auction_end_time) return -1;
+            return new Date(a.auction_end_time).getTime() - new Date(b.auction_end_time).getTime();
+          case 'bid_count':
+            return (b.bid_count || 0) - (a.bid_count || 0);
+          case 'price_low':
+            const aPrice = a.current_high_bid_cents || 0;
+            const bPrice = b.current_high_bid_cents || 0;
+            return aPrice - bPrice;
+          case 'price_high':
+            const aPriceHigh = a.current_high_bid_cents || 0;
+            const bPriceHigh = b.current_high_bid_cents || 0;
+            return bPriceHigh - aPriceHigh;
+          case 'newest':
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          default:
+            return 0;
+        }
+      });
+
+      setListings(filtered.slice(0, 50));
+      console.log(`Loaded ${filtered.length} active auction listings (${nativeListings?.length || 0} native, ${externalListings?.length || 0} external, ${batListings?.length || 0} BaT)`);
+    } catch (error) {
       console.error('Error loading listings:', error);
       setListings([]);
-    } else {
-      // Filter out any listings with null auction_end_time or past end times (safety check)
-      const validListings = (data || []).filter(listing => {
-        if (!listing.auction_end_time) return false;
-        return new Date(listing.auction_end_time) > new Date();
-      });
-      setListings(validListings);
-      console.log(`Loaded ${validListings.length} active auction listings`);
     }
 
     setLoading(false);
@@ -333,10 +451,23 @@ interface AuctionCardProps {
 function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRemainingColor }: AuctionCardProps) {
   const vehicle = listing.vehicle;
   const hasReserve = listing.reserve_price_cents !== null;
+  const platformName = listing.platform === 'bat' ? 'BaT' : 
+                       listing.platform === 'cars_and_bids' ? 'Cars & Bids' :
+                       listing.platform === 'ebay_motors' ? 'eBay Motors' :
+                       listing.platform ? listing.platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : null;
+
+  const handleClick = (e: React.MouseEvent) => {
+    // If external listing, open in new tab
+    if (listing.source !== 'native' && listing.listing_url) {
+      e.preventDefault();
+      window.open(listing.listing_url, '_blank');
+    }
+  };
 
   return (
     <Link
-      to={`/vehicle/${vehicle.id}`}
+      to={listing.source === 'native' ? `/vehicle/${vehicle.id}` : '#'}
+      onClick={handleClick}
       style={{
         display: 'block',
         background: 'var(--white)',
@@ -394,8 +525,27 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           </div>
         )}
 
-        {/* NEW badge */}
-        {listing.bid_count === 0 && (
+        {/* Platform badge */}
+        {platformName && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '6px',
+              background: listing.platform === 'bat' ? '#1e40af' : '#dc2626',
+              color: '#fff',
+              padding: '3px 8px',
+              borderRadius: '3px',
+              fontSize: '7pt',
+              fontWeight: 700,
+            }}
+          >
+            {platformName}
+          </div>
+        )}
+
+        {/* NEW badge (only for native listings without platform badge) */}
+        {!platformName && listing.bid_count === 0 && (
           <div
             style={{
               position: 'absolute',

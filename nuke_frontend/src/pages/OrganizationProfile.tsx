@@ -96,6 +96,8 @@ interface OrgVehicle {
   auction_current_bid?: number | null;
   auction_bid_count?: number;
   auction_reserve_price?: number | null;
+  auction_platform?: string | null;
+  auction_url?: string | null;
   vehicles?: any;
 }
 
@@ -523,18 +525,70 @@ export default function OrganizationProfile() {
           const enriched = await Promise.allSettled(
             (orgVehicles || []).map(async (ov: any) => {
               try {
-                const [vehicleResult, imageResult, auctionListing] = await Promise.all([
+                const now = new Date().toISOString();
+                const [vehicleResult, imageResult, nativeAuction, externalAuction, batAuction] = await Promise.all([
                   supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date').eq('id', ov.vehicle_id).single(),
                   supabase.from('vehicle_images').select('image_url').eq('vehicle_id', ov.vehicle_id).eq('is_primary', true).maybeSingle(),
-                  // Check for active auction listing
+                  // Check for active native auction listing
                   supabase.from('vehicle_listings')
                     .select('id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents')
                     .eq('vehicle_id', ov.vehicle_id)
                     .eq('status', 'active')
                     .in('sale_type', ['auction', 'live_auction'])
-                    .gt('auction_end_time', new Date().toISOString())
+                    .gt('auction_end_time', now)
+                    .maybeSingle(),
+                  // Check for active external listing (BaT, Cars & Bids, etc.)
+                  supabase.from('external_listings')
+                    .select('id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url')
+                    .eq('vehicle_id', ov.vehicle_id)
+                    .eq('listing_status', 'active')
+                    .gt('end_date', now)
+                    .maybeSingle(),
+                  // Check for active BaT listing
+                  supabase.from('bat_listings')
+                    .select('id, listing_status, auction_end_date, final_bid, bid_count, reserve_price, bat_listing_url')
+                    .eq('vehicle_id', ov.vehicle_id)
+                    .eq('listing_status', 'active')
+                    .gt('auction_end_date', now.split('T')[0])
                     .maybeSingle()
                 ]);
+                
+                // Determine which auction is active (prioritize native, then external, then bat)
+                let auctionListing = nativeAuction.data || externalAuction.data || batAuction.data;
+                let auctionData: any = null;
+                
+                if (nativeAuction.data) {
+                  auctionData = {
+                    auction_end_time: nativeAuction.data.auction_end_time,
+                    auction_current_bid: nativeAuction.data.current_high_bid_cents,
+                    auction_bid_count: nativeAuction.data.bid_count || 0,
+                    auction_reserve_price: nativeAuction.data.reserve_price_cents,
+                    auction_platform: null,
+                    auction_url: null
+                  };
+                } else if (externalAuction.data) {
+                  const endDate = externalAuction.data.end_date;
+                  auctionData = {
+                    auction_end_time: endDate,
+                    auction_current_bid: externalAuction.data.current_bid ? Math.round(Number(externalAuction.data.current_bid) * 100) : null,
+                    auction_bid_count: externalAuction.data.bid_count || 0,
+                    auction_reserve_price: externalAuction.data.reserve_price ? Math.round(Number(externalAuction.data.reserve_price) * 100) : null,
+                    auction_platform: externalAuction.data.platform,
+                    auction_url: externalAuction.data.listing_url
+                  };
+                } else if (batAuction.data) {
+                  // Convert DATE to TIMESTAMPTZ for end of day
+                  const endDate = new Date(batAuction.data.auction_end_date);
+                  endDate.setHours(23, 59, 59, 999);
+                  auctionData = {
+                    auction_end_time: endDate.toISOString(),
+                    auction_current_bid: batAuction.data.final_bid ? batAuction.data.final_bid * 100 : null,
+                    auction_bid_count: batAuction.data.bid_count || 0,
+                    auction_reserve_price: batAuction.data.reserve_price ? batAuction.data.reserve_price * 100 : null,
+                    auction_platform: 'bat',
+                    auction_url: batAuction.data.bat_listing_url
+                  };
+                }
                 
                 // Use vehicle's sale data if org_vehicle doesn't have it
                 const finalSaleDate = ov.sale_date || vehicleResult.data?.sale_date;
@@ -560,11 +614,13 @@ export default function OrganizationProfile() {
                   listing_status: ov.listing_status,
                   cost_basis: ov.cost_basis,
                   days_on_lot: ov.days_on_lot,
-                  has_active_auction: !!auctionListing.data, // Flag for sorting
-                  auction_end_time: auctionListing.data?.auction_end_time,
-                  auction_current_bid: auctionListing.data?.current_high_bid_cents,
-                  auction_bid_count: auctionListing.data?.bid_count || 0,
-                  auction_reserve_price: auctionListing.data?.reserve_price_cents,
+                  has_active_auction: !!auctionListing, // Flag for sorting
+                  auction_end_time: auctionData?.auction_end_time || null,
+                  auction_current_bid: auctionData?.auction_current_bid || null,
+                  auction_bid_count: auctionData?.auction_bid_count || 0,
+                  auction_reserve_price: auctionData?.auction_reserve_price || null,
+                  auction_platform: auctionData?.auction_platform || null,
+                  auction_url: auctionData?.auction_url || null,
                   vehicles: vehicleResult.data || {}
                 };
               } catch {
@@ -1250,7 +1306,9 @@ export default function OrganizationProfile() {
                                 color: 'white',
                                 fontWeight: 700
                               }}>
-                                LIVE AUCTION
+                                {vehicle.auction_platform === 'bat' ? 'LIVE AUCTION (BaT)' :
+                                 vehicle.auction_platform ? `LIVE AUCTION (${vehicle.auction_platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())})` :
+                                 'LIVE AUCTION'}
                               </div>
                               {vehicle.relationship_type && (
                                 <div style={{
@@ -1281,12 +1339,17 @@ export default function OrganizationProfile() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate(`/vehicle/${vehicle.vehicle_id}`);
+                                  // If external auction, open in new tab
+                                  if (vehicle.auction_url) {
+                                    window.open(vehicle.auction_url, '_blank');
+                                  } else {
+                                    navigate(`/vehicle/${vehicle.vehicle_id}`);
+                                  }
                                 }}
                                 className="button button-primary button-small"
                                 style={{ fontSize: '8pt', padding: '4px 8px', whiteSpace: 'nowrap', background: '#dc2626', borderColor: '#dc2626' }}
                               >
-                                View Auction
+                                {vehicle.auction_url ? 'View on Platform' : 'View Auction'}
                               </button>
                             </div>
                           </div>
@@ -1430,7 +1493,9 @@ export default function OrganizationProfile() {
                                       color: 'white',
                                       fontWeight: 700
                                     }}>
-                                      LIVE AUCTION
+                                      {vehicle.auction_platform === 'bat' ? 'LIVE AUCTION (BaT)' :
+                                       vehicle.auction_platform ? `LIVE AUCTION (${vehicle.auction_platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())})` :
+                                       'LIVE AUCTION'}
                                     </div>
                                   );
                                 }
