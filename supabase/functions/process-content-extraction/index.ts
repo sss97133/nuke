@@ -1,0 +1,631 @@
+/**
+ * Process Content Extraction Queue
+ * Processes detected content from comments: scrapes listings, extracts data, handles merging
+ */
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface QueueItem {
+  id: string;
+  vehicle_id: string;
+  user_id: string;
+  content_type: string;
+  raw_content: string;
+  context: string;
+  confidence_score: number;
+  comment_id?: string;
+  comment_table?: string;
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get pending queue items (limit to 10 per invocation)
+    const { data: queueItems, error: queueError } = await supabase
+      .from('content_extraction_queue')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(10);
+
+    if (queueError) {
+      throw new Error(`Queue fetch error: ${queueError.message}`);
+    }
+
+    if (!queueItems || queueItems.length === 0) {
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'No items in queue' 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log(`Processing ${queueItems.length} queue items`);
+
+    const results = [];
+    
+    for (const item of queueItems) {
+      try {
+        // Mark as processing
+        await supabase
+          .from('content_extraction_queue')
+          .update({ 
+            status: 'processing',
+            processing_attempts: item.processing_attempts + 1,
+            last_attempt_at: new Date().toISOString()
+          })
+          .eq('id', item.id);
+
+        // Route to appropriate handler based on content type
+        let result;
+        switch (item.content_type) {
+          case 'listing_url':
+            result = await processListingURL(supabase, item);
+            break;
+          case 'youtube_video':
+            result = await processYouTubeVideo(supabase, item);
+            break;
+          case 'vin_data':
+            result = await processVIN(supabase, item);
+            break;
+          case 'specs_data':
+            result = await processSpecs(supabase, item);
+            break;
+          case 'price_data':
+            result = await processPriceData(supabase, item);
+            break;
+          case 'timeline_event':
+            result = await processTimelineEvent(supabase, item);
+            break;
+          case 'image_url':
+            result = await processImageURL(supabase, item);
+            break;
+          case 'document_url':
+            result = await processDocumentURL(supabase, item);
+            break;
+          default:
+            result = { success: false, error: 'Unknown content type' };
+        }
+
+        // Update queue item with result
+        if (result.success) {
+          await supabase
+            .from('content_extraction_queue')
+            .update({
+              status: 'completed',
+              processed_at: new Date().toISOString(),
+              extracted_data: result.data,
+              contribution_value: result.points || 0,
+              data_quality_score: result.quality_score || 0.5
+            })
+            .eq('id', item.id);
+
+          // Award contribution points
+          if (result.points && result.points > 0) {
+            await awardContributionPoints(supabase, item, result);
+          }
+
+          results.push({ id: item.id, success: true, type: item.content_type });
+        } else {
+          await supabase
+            .from('content_extraction_queue')
+            .update({
+              status: 'failed',
+              error_message: result.error
+            })
+            .eq('id', item.id);
+
+          results.push({ id: item.id, success: false, error: result.error });
+        }
+
+      } catch (error: any) {
+        console.error(`Error processing item ${item.id}:`, error);
+        
+        await supabase
+          .from('content_extraction_queue')
+          .update({
+            status: 'failed',
+            error_message: error.message
+          })
+          .eq('id', item.id);
+
+        results.push({ id: item.id, success: false, error: error.message });
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      processed: results.length,
+      results
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error: any) {
+    console.error('Function error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
+
+/**
+ * Process listing URL (BaT, Mecum, KSL, etc.)
+ */
+async function processListingURL(supabase: any, item: QueueItem) {
+  console.log(`Processing listing URL: ${item.raw_content}`);
+  
+  try {
+    // Call the existing scrape-vehicle function
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-vehicle`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
+      },
+      body: JSON.stringify({ url: item.raw_content })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Scrape failed: ${response.statusText}`);
+    }
+
+    const scrapeResult = await response.json();
+    
+    if (!scrapeResult.success) {
+      throw new Error(scrapeResult.error || 'Scrape failed');
+    }
+
+    const scrapedData = scrapeResult.data;
+
+    // Get vehicle for comparison
+    const { data: vehicle, error: vehicleError } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('id', item.vehicle_id)
+      .single();
+
+    if (vehicleError) {
+      throw new Error(`Vehicle fetch failed: ${vehicleError.message}`);
+    }
+
+    // Validate VIN match if both have VIN
+    let vinMatch = false;
+    let shouldMerge = false;
+    
+    if (vehicle.vin && scrapedData.vin) {
+      vinMatch = vehicle.vin.toLowerCase() === scrapedData.vin.toLowerCase();
+      shouldMerge = vinMatch;
+    } else if (!vehicle.vin && scrapedData.vin) {
+      // Vehicle missing VIN, scraped data has VIN - moderate confidence
+      shouldMerge = true;
+    } else {
+      // No VIN on either - compare year/make/model
+      const yearMatch = vehicle.year === scrapedData.year;
+      const makeMatch = vehicle.make?.toLowerCase() === scrapedData.make?.toLowerCase();
+      const modelMatch = vehicle.model?.toLowerCase() === scrapedData.model?.toLowerCase();
+      
+      shouldMerge = yearMatch && makeMatch && modelMatch;
+    }
+
+    if (!shouldMerge) {
+      return {
+        success: false,
+        error: 'Vehicle mismatch - VIN/Year/Make/Model does not match existing profile'
+      };
+    }
+
+    // Import images
+    let imageCount = 0;
+    if (scrapedData.images && scrapedData.images.length > 0) {
+      for (const imageUrl of scrapedData.images.slice(0, 50)) {
+        try {
+          const { error: imageError } = await supabase
+            .from('vehicle_images')
+            .insert({
+              vehicle_id: item.vehicle_id,
+              image_url: imageUrl,
+              user_id: item.user_id,
+              category: 'listing_import',
+              source: scrapeResult.source || 'unknown',
+              ai_scan_metadata: {
+                source: 'comment_extraction',
+                listing_url: item.raw_content,
+                scraped_at: new Date().toISOString(),
+                vin_match: vinMatch,
+                comment_id: item.comment_id
+              }
+            });
+
+          if (!imageError) {
+            imageCount++;
+          }
+        } catch (err) {
+          console.warn('Image import error:', err);
+        }
+      }
+    }
+
+    // Update vehicle data (merge intelligently)
+    const updates: any = {};
+    
+    if (!vehicle.vin && scrapedData.vin) {
+      updates.vin = scrapedData.vin;
+    }
+    if (!vehicle.mileage && scrapedData.mileage) {
+      updates.mileage = scrapedData.mileage;
+    }
+    if (!vehicle.exterior_color && scrapedData.exterior_color) {
+      updates.exterior_color = scrapedData.exterior_color;
+    }
+    if (!vehicle.interior_color && scrapedData.interior_color) {
+      updates.interior_color = scrapedData.interior_color;
+    }
+    if (!vehicle.transmission && scrapedData.transmission) {
+      updates.transmission = scrapedData.transmission;
+    }
+    if (!vehicle.engine && scrapedData.engine) {
+      updates.engine = scrapedData.engine;
+    }
+    
+    // Handle price data
+    if (scrapedData.sold_price && !vehicle.sale_price) {
+      updates.sale_price = scrapedData.sold_price;
+    }
+    if (scrapedData.sold_date && !vehicle.auction_end_date) {
+      updates.auction_end_date = scrapedData.sold_date;
+    }
+    if (scrapedData.listing_url) {
+      updates.listing_url = scrapedData.listing_url;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await supabase
+        .from('vehicles')
+        .update(updates)
+        .eq('id', item.vehicle_id);
+    }
+
+    // Create timeline event for the listing discovery
+    await supabase
+      .from('vehicle_timeline_events')
+      .insert({
+        vehicle_id: item.vehicle_id,
+        user_id: item.user_id,
+        event_type: 'listing_discovered',
+        event_date: scrapedData.sold_date || scrapedData.listing_date || new Date().toISOString(),
+        description: `Listing discovered: ${item.raw_content}`,
+        metadata: {
+          source: scrapeResult.source,
+          listing_url: item.raw_content,
+          images_imported: imageCount,
+          fields_updated: Object.keys(updates),
+          comment_id: item.comment_id
+        }
+      });
+
+    // Calculate points
+    let points = 10; // Base points for finding a listing
+    points += imageCount * 2; // 2 points per image
+    points += Object.keys(updates).length * 5; // 5 points per field updated
+    
+    const qualityScore = vinMatch ? 0.95 : (shouldMerge ? 0.75 : 0.5);
+
+    return {
+      success: true,
+      data: {
+        images_imported: imageCount,
+        fields_updated: Object.keys(updates),
+        vin_match: vinMatch
+      },
+      points,
+      quality_score: qualityScore
+    };
+
+  } catch (error: any) {
+    console.error('Listing processing error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Process YouTube video
+ */
+async function processYouTubeVideo(supabase: any, item: QueueItem) {
+  const videoIdMatch = item.raw_content.match(/(?:v=|\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  
+  if (!videoIdMatch) {
+    return { success: false, error: 'Invalid YouTube URL' };
+  }
+
+  const videoId = videoIdMatch[1];
+  
+  // Store video link in vehicle metadata
+  const { error } = await supabase
+    .from('vehicle_timeline_events')
+    .insert({
+      vehicle_id: item.vehicle_id,
+      user_id: item.user_id,
+      event_type: 'video_added',
+      event_date: new Date().toISOString(),
+      description: `Video link added: ${item.context}`,
+      metadata: {
+        video_url: item.raw_content,
+        video_id: videoId,
+        platform: 'youtube',
+        comment_id: item.comment_id
+      }
+    });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    data: { video_id: videoId },
+    points: 15, // Videos are valuable
+    quality_score: 0.8
+  };
+}
+
+/**
+ * Process VIN data
+ */
+async function processVIN(supabase: any, item: QueueItem) {
+  const vin = item.raw_content.trim().toUpperCase();
+
+  // Get current vehicle
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select('vin')
+    .eq('id', item.vehicle_id)
+    .single();
+
+  if (vehicle?.vin && vehicle.vin !== vin) {
+    // VIN conflict!
+    await supabase
+      .from('data_merge_conflicts')
+      .insert({
+        vehicle_id: item.vehicle_id,
+        field_name: 'vin',
+        existing_value: vehicle.vin,
+        proposed_value: vin,
+        proposed_by: item.user_id,
+        existing_confidence: 0.9,
+        proposed_confidence: item.confidence_score
+      });
+
+    return {
+      success: true,
+      data: { conflict_created: true },
+      points: 5,
+      quality_score: 0.5
+    };
+  }
+
+  // Update VIN
+  const { error } = await supabase
+    .from('vehicles')
+    .update({ vin })
+    .eq('id', item.vehicle_id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    data: { vin },
+    points: 25, // VINs are very valuable
+    quality_score: 0.9
+  };
+}
+
+/**
+ * Process specs data
+ */
+async function processSpecs(supabase: any, item: QueueItem) {
+  // Extract spec field and value from metadata
+  const field = item.raw_content; // e.g., "350 hp"
+  
+  // Create timeline event for specs
+  const { error } = await supabase
+    .from('vehicle_timeline_events')
+    .insert({
+      vehicle_id: item.vehicle_id,
+      user_id: item.user_id,
+      event_type: 'specs_added',
+      event_date: new Date().toISOString(),
+      description: `Specification added: ${field}`,
+      metadata: {
+        spec_field: field,
+        comment_id: item.comment_id
+      }
+    });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    data: { spec: field },
+    points: 5,
+    quality_score: 0.6
+  };
+}
+
+/**
+ * Process price data
+ */
+async function processPriceData(supabase: any, item: QueueItem) {
+  // Extract price from raw content
+  const priceMatch = item.raw_content.match(/\$?(\d{1,3}(?:,\d{3})*)/);
+  
+  if (!priceMatch) {
+    return { success: false, error: 'Could not parse price' };
+  }
+
+  const price = parseInt(priceMatch[1].replace(/,/g, ''));
+
+  // Determine if this is a sale price or asking price from context
+  const contextLower = item.context.toLowerCase();
+  const isSoldPrice = contextLower.includes('sold') || contextLower.includes('final');
+
+  const updates: any = {};
+  if (isSoldPrice) {
+    updates.sale_price = price;
+  }
+
+  const { error } = await supabase
+    .from('vehicles')
+    .update(updates)
+    .eq('id', item.vehicle_id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    data: { price, type: isSoldPrice ? 'sale' : 'asking' },
+    points: isSoldPrice ? 20 : 10,
+    quality_score: isSoldPrice ? 0.85 : 0.6
+  };
+}
+
+/**
+ * Process timeline event
+ */
+async function processTimelineEvent(supabase: any, item: QueueItem) {
+  const { error } = await supabase
+    .from('vehicle_timeline_events')
+    .insert({
+      vehicle_id: item.vehicle_id,
+      user_id: item.user_id,
+      event_type: 'maintenance',
+      event_date: new Date().toISOString(),
+      description: item.raw_content,
+      metadata: {
+        source: 'comment_extraction',
+        comment_id: item.comment_id
+      }
+    });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    data: { event: item.raw_content },
+    points: 10,
+    quality_score: 0.7
+  };
+}
+
+/**
+ * Process image URL
+ */
+async function processImageURL(supabase: any, item: QueueItem) {
+  const { error } = await supabase
+    .from('vehicle_images')
+    .insert({
+      vehicle_id: item.vehicle_id,
+      image_url: item.raw_content,
+      user_id: item.user_id,
+      category: 'user_link',
+      source: 'comment',
+      ai_scan_metadata: {
+        source: 'comment_extraction',
+        comment_id: item.comment_id
+      }
+    });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    data: { image_url: item.raw_content },
+    points: 5,
+    quality_score: 0.6
+  };
+}
+
+/**
+ * Process document URL
+ */
+async function processDocumentURL(supabase: any, item: QueueItem) {
+  // Store document reference in timeline
+  const { error } = await supabase
+    .from('vehicle_timeline_events')
+    .insert({
+      vehicle_id: item.vehicle_id,
+      user_id: item.user_id,
+      event_type: 'document_added',
+      event_date: new Date().toISOString(),
+      description: `Document added: ${item.context}`,
+      metadata: {
+        document_url: item.raw_content,
+        comment_id: item.comment_id
+      }
+    });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    data: { document_url: item.raw_content },
+    points: 15,
+    quality_score: 0.8
+  };
+}
+
+/**
+ * Award contribution points to user
+ */
+async function awardContributionPoints(supabase: any, item: QueueItem, result: any) {
+  try {
+    const { error } = await supabase.rpc('award_contribution_points', {
+      p_user_id: item.user_id,
+      p_vehicle_id: item.vehicle_id,
+      p_data_field: item.content_type,
+      p_data_type: item.content_type,
+      p_data_id: null,
+      p_source_comment_id: item.comment_id || null,
+      p_extraction_job_id: item.id,
+      p_source_url: item.raw_content,
+      p_contribution_value: result.points || 0,
+      p_data_quality_score: result.quality_score || 0.5
+    });
+
+    if (error) {
+      console.error('Error awarding points:', error);
+    } else {
+      console.log(`Awarded ${result.points} points to user ${item.user_id}`);
+    }
+  } catch (err) {
+    console.error('Error awarding points:', err);
+  }
+}
+

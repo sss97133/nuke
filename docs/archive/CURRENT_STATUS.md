@@ -1,121 +1,69 @@
-# Current System Status - What's Working
+# Current Status - Need to Debug Failures
 
-## ✅ **Completed Features**
+## What's Working
 
-### **1. AI-Powered Valuation**
-- System-based part detection (not per-part inflation)
-- 307 labor hours = $12,280 value
-- 10 systems detected = $9,135 parts value
-- 90% confidence with 4 data sources
-- **Result**: $23,215 (realistic, defensible)
+✅ **24 images processed successfully!**  
+- Proof the system works
+- Claude is responding
+- Data being saved
 
-### **2. Unified Tag System**
-- `TagService.ts` - Single source of truth
-- `useImageTags.ts` - React hook
-- `ImageLightbox.tsx` - Display component
-- Windows 95 styling (no emojis in final version)
-- Tag overlays on images (yellow = verified, red = unverified)
+## What's Not Working
 
-### **3. Mobile UX System**
-- Mobile detection (< 768px or mobile user agent)
-- `MobileVehicleProfile` component
-- Gesture controls (swipe, double tap, long press)
-- Haptic feedback
-- Touch-friendly UI (48px buttons)
+❌ **High failure rate** (~85% of requests failing)
 
-### **4. User Interaction Tracking**
-- `user_interactions` table
-- `user_saved_images` table
-- `user_preferences` table
-- Auto-learning preferences
-- Personalized feed algorithm
+Error: "Edge Function returned a non-2xx status code"
 
-### **5. Enhanced Tag Context**
-- Work session names
-- User notes from AI
-- Receipt connections
-- Vendor links
-- Tool usage tracking
+## Likely Causes
 
-## 🔧 **What Might Be "Buggin"**
+1. **Rate Limiting** - Claude API has rate limits
+   - Too many concurrent requests
+   - Need to slow down even more
 
-### **Possible Issues:**
+2. **Anthropic Key Issue** - Similar to OpenAI
+   - May need fresh key
+   - Could be hitting quota
 
-**1. Tags Not Showing?**
-- Check: Does `imageId` exist when opening lightbox?
-- Check browser console for "📸 Loaded X tags" message
+3. **Image URL Issues** - Some image URLs may be inaccessible
+   - Storage permissions
+   - Broken URLs
 
-**2. Mobile Profile Not Loading?**
-- Mobile detection might not trigger
-- Check window width and user agent
+## Next Steps to Debug
 
-**3. Emojis Still Showing?**
-- Old code might be cached
-- Need hard refresh (Cmd+Shift+R)
-
-**4. Sidebar Not Appearing?**
-- Sidebar only shows if `tags.length > 0`
-- Run AI analysis first if no tags exist
-
-**5. Type Errors?**
-- `ImageTag` interface vs `Tag` type mismatch
-- Database columns not matching interface
-
-## 🔍 **Debug Checklist**
-
-**Browser Console:**
-```javascript
-// Check if tags are loading
-// Should see: "📸 Loaded X tags for image"
-
-// Check mobile detection
-console.log(window.innerWidth, navigator.userAgent);
-
-// Check current page
-window.location.href
+### 1. Check Edge Function Logs
+```bash
+supabase functions logs analyze-image-tier1
 ```
 
-**Database Check:**
-```sql
--- Are tags actually in database?
-SELECT COUNT(*), source_type, metadata->>'ai_supervised' as ai_supervised
-FROM image_tags 
-WHERE vehicle_id = 'e08bf694-970f-4cbe-8a74-8715158a0f2e'
-GROUP BY source_type, metadata->>'ai_supervised';
+### 2. Test Anthropic Key Directly
+```bash
+curl https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{"model":"claude-3-haiku-20240307","max_tokens":10,"messages":[{"role":"user","content":"Hi"}]}'
 ```
 
-**Network Check:**
-- Open DevTools → Network tab
-- Look for failed API calls
-- Check for CORS errors
+### 3. Try Single Image with Full Error
+```bash
+# Get detailed error response
+```
 
-## 🎯 **What Should Work Right Now**
+## What We Know Works
 
-**Desktop:**
-1. Navigate to vehicle profile
-2. Click any image → Opens ImageLightbox
-3. Sidebar shows tags (if any exist)
-4. Tags have blue/teal squares (AI/manual)
-5. Vendor links are clickable
-6. Verify/Reject buttons work
+✅ 24 images successfully processed including:
+- Angle detection
+- Category assignment
+- Component identification  
+- Quality scoring
 
-**Mobile (< 768px):**
-1. Navigate to vehicle profile
-2. See tabbed interface
-3. Swipe between tabs
-4. Grid view for images
-5. Tap image → Fullscreen
-6. Swipe left/right → Navigate
-7. Double tap → Like
+**The system WORKS - just need to fix rate limiting or API key issue.**
 
-## 📝 **Tell Me Specifically**
+## To View Dashboard
 
-What's broken? I need to know:
-1. What page are you on?
-2. What did you click/tap?
-3. What happened vs what should happen?
-4. Desktop or mobile?
-5. Any console errors?
+You need to:
+1. Login at: https://n-zero.dev/login
+2. Navigate to: /admin/image-processing
+3. Or access admin panel and click "Image Processing"
 
-Then I can fix the exact issue!
+**Processing stopped to investigate the ~85% failure rate first.**
 
