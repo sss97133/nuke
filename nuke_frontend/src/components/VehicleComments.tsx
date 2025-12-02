@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { ContentDetector } from '../services/contentDetector';
+import UserReputationBadge from './UserReputationBadge';
+import ExtractionQueueStatus from './ExtractionQueueStatus';
 
 interface Comment {
   id: string;
@@ -934,17 +937,16 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         return;
       }
 
-      // Check for BAT URL in comment
-      const batUrl = detectBATUrl(newComment);
-      
       // Save comment first
-      const { error } = await supabase
+      const { data: insertedComment, error } = await supabase
         .from('vehicle_comments')
         .insert({
           vehicle_id: vehicleId,
           user_id: session?.user?.id,
           comment_text: newComment.trim()
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) {
         console.error('Error submitting comment:', error);
@@ -954,17 +956,68 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       setNewComment('');
       loadAllComments();
 
-      // Process BAT URL if found (async, don't block comment submission)
-      if (batUrl) {
-        console.log('[VehicleComments] Starting BAT URL processing:', batUrl);
-        processBATUrl(batUrl, session.user.id).catch(err => {
-          console.error('[VehicleComments] Error processing BAT URL:', err);
-          setScrapingStatus(`Error: ${err.message || 'Failed to scrape'}`);
+      // NEW: Intelligent content detection
+      console.log('[VehicleComments] Analyzing comment for extractable content...');
+      setScrapingStatus('Analyzing content...');
+
+      try {
+        // Detect all types of valuable content
+        const detected = await ContentDetector.analyzeComment(
+          newComment.trim(),
+          vehicleId,
+          insertedComment?.id,
+          'vehicle_comments'
+        );
+
+        if (detected.length > 0) {
+          console.log(`[VehicleComments] Detected ${detected.length} extractable items:`, detected);
+          setScrapingStatus(`Found ${detected.length} extractable item(s) - processing...`);
+
+          // Queue content for extraction
+          await ContentDetector.queueDetectedContent(
+            detected,
+            vehicleId,
+            session.user.id,
+            insertedComment?.id,
+            'vehicle_comments'
+          );
+
+          // Trigger immediate processing for high-confidence listings
+          const highConfidenceListings = detected.filter(
+            d => d.type === 'listing_url' && d.confidence >= 0.8
+          );
+
+          if (highConfidenceListings.length > 0) {
+            setScrapingStatus(`Processing ${highConfidenceListings.length} listing(s)...`);
+            
+            // Trigger processing edge function
+            const { error: processError } = await supabase.functions.invoke('process-content-extraction');
+            
+            if (processError) {
+              console.error('[VehicleComments] Processing error:', processError);
+              setScrapingStatus('Content queued for processing');
+            } else {
+              setScrapingStatus('Content processed successfully!');
+              // Reload to show new images/data
+              setTimeout(() => {
+                window.location.reload();
+              }, 2000);
+            }
+          } else {
+            setScrapingStatus('Content queued for processing');
+          }
+
+          // Clear status after 5 seconds
           setTimeout(() => setScrapingStatus(null), 5000);
-        });
-      } else {
-        console.log('[VehicleComments] No BAT URL found in comment');
+        } else {
+          console.log('[VehicleComments] No extractable content detected');
+          setScrapingStatus(null);
+        }
+      } catch (detectionError) {
+        console.error('[VehicleComments] Content detection error:', detectionError);
+        setScrapingStatus(null);
       }
+
     } catch (error) {
       console.error('Error submitting comment:', error);
     } finally {
@@ -974,6 +1027,9 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
 
   return (
     <div>
+      {/* Extraction Queue Status */}
+      <ExtractionQueueStatus vehicleId={vehicleId} />
+
       {/* Compact header only if there are comments */}
       {comments.length > 0 && (
         <div style={{ marginBottom: '12px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
@@ -988,7 +1044,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
             className="form-input"
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder={comments.length === 0 ? "Be the first to comment... (Paste BAT links to auto-scrape)" : "Add a comment... (Paste BAT links to auto-scrape)"}
+            placeholder={comments.length === 0 ? "Be the first to comment... (Paste listings, specs, VINs, videos - we'll extract the data automatically)" : "Add a comment... (Share listings, specs, prices, timeline events - we extract and credit you)"}
             rows={3}
             disabled={submitting}
             style={{ paddingBottom: '40px' }}
@@ -1034,6 +1090,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
                       <div className="comment-author" style={{ fontSize: 12, color: '#374151' }}>
                         {comment.user_name || comment.user_email?.split('@')[0] || 'User'}
                       </div>
+                      <UserReputationBadge userId={comment.user_id} inline={true} />
                       <span className="comment-date" style={{ fontSize: 11, color: '#6b7280' }}>{formatDate(comment.created_at)}</span>
                     </div>
                     {canDeleteComment(comment) && (
