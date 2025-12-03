@@ -78,7 +78,7 @@ const VehicleProfile: React.FC = () => {
   const [leadImageUrl, setLeadImageUrl] = useState<string | null>(null);
   const [recentCommentCount, setRecentCommentCount] = useState<number>(0);
   const [showAddEvent, setShowAddEvent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start true to show loading state until data loads
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
   const [showMap, setShowMap] = useState(false);

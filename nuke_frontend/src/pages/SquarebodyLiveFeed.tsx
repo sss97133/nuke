@@ -207,11 +207,10 @@ const SquarebodyLiveFeed: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">Loading squarebodies...</p>
+      <div style={{ background: 'var(--grey-100)', minHeight: '100vh', padding: 'var(--space-4)' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', paddingTop: 'var(--space-12)' }}>
+            <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Loading...</p>
           </div>
         </div>
       </div>
@@ -219,39 +218,45 @@ const SquarebodyLiveFeed: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+    <div style={{ background: 'var(--grey-100)', minHeight: '100vh', padding: 'var(--space-3)' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-              <h1 className="text-3xl font-bold text-gray-900">
-                LIVE: Squarebody Market
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div style={{ width: '6px', height: '6px', background: '#dc2626', animation: 'pulse 2s infinite' }} />
+              <h1 style={{ fontSize: '8pt', fontWeight: 'bold', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                LIVE: SQUAREBODY MARKET
               </h1>
             </div>
             <button
               onClick={() => navigate('/squarebody-market')}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition"
+              style={{ 
+                padding: '4px 8px',
+                background: 'var(--white)',
+                border: '1px solid var(--border-medium)',
+                fontSize: '8pt',
+                cursor: 'pointer'
+              }}
             >
-              Analytics →
+              ANALYTICS
             </button>
           </div>
           
           {/* Stats Bar */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-lg p-4 border-2 border-gray-200">
-              <div className="text-2xl font-bold text-blue-600">{stats.today}</div>
-              <div className="text-sm text-gray-600">Today</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+            <div style={{ background: 'var(--white)', padding: 'var(--space-2)', border: '1px solid var(--border-light)' }}>
+              <div style={{ fontSize: '8pt', fontWeight: 'bold', color: 'var(--text)' }}>{stats.today}</div>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>TODAY</div>
             </div>
-            <div className="bg-white rounded-lg p-4 border-2 border-gray-200">
-              <div className="text-2xl font-bold text-blue-600">{stats.week}</div>
-              <div className="text-sm text-gray-600">This Week</div>
+            <div style={{ background: 'var(--white)', padding: 'var(--space-2)', border: '1px solid var(--border-light)' }}>
+              <div style={{ fontSize: '8pt', fontWeight: 'bold', color: 'var(--text)' }}>{stats.week}</div>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>WEEK</div>
             </div>
-            <div className="bg-white rounded-lg p-4 border-2 border-gray-200">
-              <div className="text-2xl font-bold text-blue-600">{stats.month}</div>
-              <div className="text-sm text-gray-600">This Month</div>
+            <div style={{ background: 'var(--white)', padding: 'var(--space-2)', border: '1px solid var(--border-light)' }}>
+              <div style={{ fontSize: '8pt', fontWeight: 'bold', color: 'var(--text)' }}>{stats.month}</div>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>MONTH</div>
             </div>
           </div>
 
@@ -259,16 +264,19 @@ const SquarebodyLiveFeed: React.FC = () => {
           {showBanner && pendingCount > 0 && (
             <div 
               onClick={loadPendingSquarebodies}
-              className="mb-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-4 cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg animate-slide-down"
+              style={{
+                marginBottom: 'var(--space-3)',
+                background: 'var(--text)',
+                color: 'var(--white)',
+                padding: 'var(--space-2)',
+                cursor: 'pointer',
+                border: '2px solid var(--text)'
+              }}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                  <span className="font-bold">
-                    {pendingCount} new squarebody{pendingCount > 1 ? 's' : ''} just dropped!
-                  </span>
-                </div>
-                <span className="text-sm opacity-90">Click to view →</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '8pt', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                  {pendingCount} NEW SQUAREBODY{pendingCount > 1 ? 'S' : ''} - CLICK TO VIEW
+                </span>
               </div>
             </div>
           )}
@@ -276,60 +284,70 @@ const SquarebodyLiveFeed: React.FC = () => {
 
         {/* Feed Grid */}
         {vehicles.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-2xl text-gray-400">No squarebodies yet...</p>
-            <p className="text-gray-500 mt-2">Waiting for new trucks to arrive</p>
+          <div style={{ textAlign: 'center', paddingTop: 'var(--space-12)' }}>
+            <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>No squarebodies yet...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-3)' }}>
             {vehicles.map((vehicle) => (
               <div
                 key={vehicle.id}
                 onClick={() => navigate(`/vehicles/${vehicle.id}`)}
-                className="bg-white rounded-xl overflow-hidden border-2 border-gray-200 hover:border-blue-400 hover:shadow-xl transition-all cursor-pointer group"
+                style={{
+                  background: 'var(--white)',
+                  border: '1px solid var(--border-light)',
+                  cursor: 'pointer'
+                }}
+                className="hover-lift"
               >
                 {/* Image */}
                 {vehicle.image_url ? (
-                  <div className="aspect-video bg-gray-200 overflow-hidden">
+                  <div style={{ aspectRatio: '16/9', background: 'var(--grey-200)', overflow: 'hidden' }}>
                     <img
                       src={vehicle.image_url}
                       alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
                 ) : (
-                  <div className="aspect-video bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                    <span className="text-6xl">🚚</span>
+                  <div style={{ aspectRatio: '16/9', background: 'var(--grey-200)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '24pt' }}>🚚</span>
                   </div>
                 )}
 
                 {/* Content */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-bold text-lg text-gray-900 group-hover:text-blue-600 transition">
+                <div style={{ padding: 'var(--space-2)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)', minHeight: '20px' }}>
+                    <h3 style={{ fontSize: '8pt', fontWeight: 'bold', color: 'var(--text)', textTransform: 'uppercase', margin: 0, lineHeight: 1.2 }}>
                       {vehicle.year} {vehicle.make} {vehicle.model}
                     </h3>
                     {vehicle.series && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">
+                      <span style={{ 
+                        padding: '2px 4px',
+                        background: 'var(--grey-200)',
+                        fontSize: '7pt',
+                        fontWeight: 'bold',
+                        color: 'var(--text)'
+                      }}>
                         {vehicle.series}
                       </span>
                     )}
                   </div>
 
                   {vehicle.asking_price && (
-                    <div className="text-2xl font-bold text-green-600 mb-2">
+                    <div style={{ fontSize: '8pt', fontWeight: 'bold', color: 'var(--text)', marginBottom: 'var(--space-1)' }}>
                       ${vehicle.asking_price.toLocaleString()}
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between text-sm text-gray-600">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '7pt', color: 'var(--text-muted)' }}>
                     <span>{vehicle.location || 'Location unknown'}</span>
-                    <span className="font-medium">{formatTimeAgo(vehicle.created_at)}</span>
+                    <span>{formatTimeAgo(vehicle.created_at)}</span>
                   </div>
 
                   {vehicle.discovery_source === 'craigslist_scrape' && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <span className="text-xs text-gray-500">From Craigslist</span>
+                    <div style={{ marginTop: 'var(--space-1)', paddingTop: 'var(--space-1)', borderTop: '1px solid var(--border-light)' }}>
+                      <span style={{ fontSize: '6pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>CRAIGSLIST</span>
                     </div>
                   )}
                 </div>

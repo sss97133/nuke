@@ -202,6 +202,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     (async () => {
       try {
         if (!vehicle?.id) { setTrendPct(null); return; }
+        
+        // Don't show trend if price was auto-corrected (e.g., $15 -> $15,000)
+        // The "trend" would be the correction, not real market movement
+        if ((vehicle as any)?.origin_metadata?.price_corrected === true ||
+            (vehicle as any)?.origin_metadata?.price_was_corrected === true) {
+          setTrendPct(null);
+          return;
+        }
 
         // Calculate start date based on period
         const now = Date.now();
@@ -349,9 +357,21 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (typeof vehicle.asking_price === 'number') {
       return { amount: vehicle.asking_price, label: 'Asking' };
     }
-    // Sold
+    // Sold - respect auction outcome
     if (typeof vehicle.sale_price === 'number') {
-      return { amount: vehicle.sale_price, label: 'Sold for' };
+      const outcome = (vehicle as any).auction_outcome;
+      if (outcome === 'sold') {
+        return { amount: vehicle.sale_price, label: 'SOLD FOR' };
+      } else if (outcome === 'reserve_not_met') {
+        // Don't show price for RNM
+        return { amount: null, label: 'Reserve Not Met' };
+      } else {
+        return { amount: vehicle.sale_price, label: 'Sold for' };
+      }
+    }
+    // Reserve Not Met with no sale price
+    if ((vehicle as any).auction_outcome === 'reserve_not_met') {
+      return { amount: null, label: 'Reserve Not Met' };
     }
     // Estimate
     if (typeof vehicle.current_value === 'number') {
@@ -399,7 +419,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
     if (mode === 'auction') return { amount: typeof vehicle.current_bid === 'number' ? vehicle.current_bid : null, label: 'Current Bid' };
     if (mode === 'asking') return { amount: typeof vehicle.asking_price === 'number' ? vehicle.asking_price : null, label: 'Asking Price' };
-    if (mode === 'sale') return { amount: typeof vehicle.sale_price === 'number' ? vehicle.sale_price : null, label: 'Sold for' };
+    if (mode === 'sale') {
+      // Respect auction outcome for proper disclosure
+      if ((vehicle as any).auction_outcome === 'sold') {
+        return { amount: typeof vehicle.sale_price === 'number' ? vehicle.sale_price : null, label: 'SOLD FOR' };
+      } else if ((vehicle as any).auction_outcome === 'reserve_not_met') {
+        // Don't show high bid for RNM - user needs to click for details
+        return { amount: null, label: 'Reserve Not Met' };
+      } else if ((vehicle as any).auction_outcome === 'no_sale') {
+        return { amount: null, label: 'No Sale' };
+      } else if (typeof vehicle.sale_price === 'number') {
+        return { amount: vehicle.sale_price, label: 'Sold for' };
+      }
+      return { amount: null, label: '' };
+    }
     if (mode === 'purchase') return { amount: typeof vehicle.purchase_price === 'number' ? vehicle.purchase_price : null, label: 'Purchase Price' };
     if (mode === 'msrp') return { amount: typeof vehicle.msrp === 'number' ? vehicle.msrp : null, label: 'Original MSRP' };
     return getAutoDisplay();
@@ -601,13 +634,42 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const priceText = primaryAmount !== null ? formatCurrency(primaryAmount) : 'Set a price';
   const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
   
+  // Auction outcome badge and link
+  const getAuctionContext = () => {
+    const outcome = (vehicle as any)?.auction_outcome;
+    const batUrl = (vehicle as any)?.bat_auction_url || ((vehicle as any)?.discovery_url?.includes('bringatrailer') ? (vehicle as any)?.discovery_url : null);
+    const kslUrl = (vehicle as any)?.discovery_url?.includes('ksl.com') ? (vehicle as any)?.discovery_url : null;
+    const sourceUrl = batUrl || kslUrl || (vehicle as any)?.discovery_url;
+    
+    const badges: Record<string, any> = {
+      'sold': { text: 'SOLD', color: '#22c55e', bg: '#dcfce7' },
+      'reserve_not_met': { text: 'RNM', color: '#f59e0b', bg: '#fef3c7' },
+      'no_sale': { text: 'NO SALE', color: '#6b7280', bg: '#f3f4f6' },
+      'pending': { text: 'LIVE', color: '#3b82f6', bg: '#dbeafe' }
+    };
+    
+    return {
+      badge: outcome ? badges[outcome] : null,
+      link: sourceUrl,
+      outcome: outcome
+    };
+  };
+  
+  const auctionContext = getAuctionContext();
+  
+  // Check if price was auto-corrected (e.g., "15" -> "15000")
+  const priceWasCorrected = (vehicle as any)?.origin_metadata?.price_corrected === true ||
+                            (vehicle as any)?.origin_metadata?.price_was_corrected === true;
+  
   // Build full vehicle identity: Year, Make, Model, Series, Trim
   // Example: "1985 GMC K10 Wagon" -> "1985 GMC K10" (no body style, include series/trim if available)
+  // Prefer normalized_model over raw model
+  const displayModel = (vehicle as any)?.normalized_model || vehicle?.model;
   const identityParts = vehicle ? [
     vehicle.year,
     vehicle.make,
-    vehicle.model, // Always include model
-    (vehicle as any).series && (vehicle as any).series !== vehicle.model 
+    displayModel, // Use normalized model if available
+    (vehicle as any).series && (vehicle as any).series !== displayModel 
       ? (vehicle as any).series 
       : null, // Include series if different from model
     (vehicle as any).trim 
@@ -724,18 +786,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         maxWidth: '100vw',
         zIndex: 97,
         boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
-        height: '25px',
-        minHeight: '25px',
-        maxHeight: '25px',
+        height: '28px',
+        minHeight: '28px',
+        maxHeight: '28px',
         display: 'flex',
         alignItems: 'center',
-        lineHeight: '21px',
+        lineHeight: '28px',
         boxSizing: 'border-box'
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', gap: '6px', width: '100%', overflow: 'hidden' }}>
-        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'hidden' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', gap: '6px', width: '100%', overflow: 'hidden', height: '100%' }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'hidden', height: '100%' }}>
+          <div style={{ fontSize: '8pt', fontWeight: 700, lineHeight: '28px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}
           </div>
           {vehicle && (vehicle as any).profile_origin && (() => {
@@ -1148,7 +1210,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         <div ref={priceMenuRef} style={{ flex: '0 0 auto', textAlign: 'right', position: 'relative' }}>
           <button
             type="button"
-            onClick={() => setPriceMenuOpen((open) => !open)}
+            onClick={(e) => {
+              // If has auction link, open it instead of menu
+              if (auctionContext.link && e.metaKey) {
+                window.open(auctionContext.link, '_blank');
+              } else if (auctionContext.link && auctionContext.outcome !== 'estimate') {
+                window.open(auctionContext.link, '_blank');
+              } else {
+                setPriceMenuOpen((open) => !open);
+              }
+            }}
             style={{
               background: 'transparent',
               border: 'none',
@@ -1160,9 +1231,40 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               gap: 6
             }}
             className="vehicle-price-button"
+            title={auctionContext.link ? `Click to view on ${auctionContext.link.includes('bringatrailer') ? 'Bring a Trailer' : 'original listing'}` : undefined}
           >
-            <div style={{ fontSize: '9pt', fontWeight: 700, color: baseTextColor, lineHeight: 1 }}>
+            <div 
+              style={{ fontSize: '9pt', fontWeight: 700, color: baseTextColor, lineHeight: 1, display: 'flex', alignItems: 'center', gap: 6 }}
+              title={priceWasCorrected ? 'Price was auto-corrected from listing (e.g., $15 -> $15,000)' : undefined}
+            >
               {priceText}
+              {priceWasCorrected && (
+                <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 500 }}>*</span>
+              )}
+              
+              {/* Auction Outcome Badge */}
+              {auctionContext.badge && (
+                <span style={{
+                  fontSize: '6pt',
+                  fontWeight: 700,
+                  color: auctionContext.badge.color,
+                  background: auctionContext.badge.bg,
+                  padding: '2px 6px',
+                  borderRadius: '3px',
+                  letterSpacing: '0.5px',
+                  lineHeight: 1,
+                  whiteSpace: 'nowrap'
+                }}>
+                  {auctionContext.badge.text}
+                </span>
+              )}
+              
+              {/* External link icon if has listing URL */}
+              {auctionContext.link && (
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" opacity="0.4">
+                  <path d="M10.5 1.5h-3v1.5h1.94L4.72 7.72l1.06 1.06L10.5 4.06V6h1.5V1.5zM10.5 10.5h-9v-9H6V0H1.5C.67 0 0 .67 0 1.5v9c0 .83.67 1.5 1.5 1.5h9c.83 0 1.5-.67 1.5-1.5V6h-1.5v4.5z"/>
+                </svg>
+              )}
             </div>
               {trendIndicator}
           </button>

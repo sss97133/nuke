@@ -18,6 +18,8 @@ export interface VehicleSearchResult {
   year: number;
   make: string;
   model: string;
+  normalized_model?: string | null; // Canonical model name (e.g., "C10" instead of "Truck")
+  generation?: string | null;       // e.g., "Squarebody", "OBS"
   vin: string | null;
   color: string | null;
   mileage: number | null;
