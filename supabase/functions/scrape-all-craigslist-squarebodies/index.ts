@@ -29,6 +29,26 @@ const CRAIGSLIST_REGIONS = [
   'southdakota', 'northdakota', 'washington', 'oregon', 'california'
 ]
 
+// Price normalization - detect "15" should be "15000"
+function normalizeVehiclePrice(rawPrice: number | null | undefined): { price: number | null; corrected: boolean; original: number | null } {
+  if (rawPrice === null || rawPrice === undefined || rawPrice <= 0) {
+    return { price: null, corrected: false, original: null };
+  }
+  
+  // If price is under $500 for a vehicle, it's likely missing the "000"
+  // e.g., "15" should be "15000", "8" should be "8000"
+  if (rawPrice > 0 && rawPrice < 500) {
+    const correctedPrice = rawPrice * 1000;
+    console.log(`  💰 Price normalized: $${rawPrice} -> $${correctedPrice} (likely missing 000)`);
+    return { price: correctedPrice, corrected: true, original: rawPrice };
+  }
+  
+  // If price is between 500-999, could be either way - leave as is but flag for review
+  // e.g., "$500" could be real (project car) or "$500,000" (unlikely for most vehicles)
+  
+  return { price: rawPrice, corrected: false, original: rawPrice };
+}
+
 // Squarebody search terms
 const SQUAREBODY_SEARCH_TERMS = [
   'squarebody',
@@ -259,6 +279,7 @@ serve(async (req) => {
             // Fetch search results with timeout
             const controller = new AbortController()
             const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout per request
+            const startTime = Date.now()
 
             try {
               const response = await fetch(searchUrl, {
@@ -269,11 +290,43 @@ serve(async (req) => {
               })
 
               clearTimeout(timeoutId)
+              const responseTime = Date.now() - startTime
 
               if (!response.ok) {
+                // Track failure
+                await supabase.from('scraping_health').insert({
+                  source: 'craigslist',
+                  region: region,
+                  search_term: searchTerm,
+                  url: searchUrl,
+                  success: false,
+                  status_code: response.status,
+                  error_message: response.statusText,
+                  error_type: response.status === 403 ? 'bot_protection' : 
+                              response.status === 404 ? 'not_found' : 'network',
+                  response_time_ms: responseTime,
+                  function_name: 'scrape-all-craigslist-squarebodies'
+                }).then(({ error }) => {
+                  if (error) console.warn('Failed to log health:', error.message);
+                });
+                
                 console.warn(`    ⚠️ Failed to fetch ${searchUrl}: ${response.status}`)
                 continue
               }
+
+              // Track success
+              await supabase.from('scraping_health').insert({
+                source: 'craigslist',
+                region: region,
+                search_term: searchTerm,
+                url: searchUrl,
+                success: true,
+                status_code: 200,
+                response_time_ms: responseTime,
+                function_name: 'scrape-all-craigslist-squarebodies'
+              }).then(({ error }) => {
+                if (error) console.warn('Failed to log health:', error.message);
+              });
 
               const html = await response.text()
               const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -325,11 +378,32 @@ serve(async (req) => {
                 }
               }
 
+              // Update health tracking with data quality
+              await supabase.from('scraping_health').update({
+                data_extracted: { listings_found: foundInThisSearch },
+                images_found: foundInThisSearch
+              }).match({ url: searchUrl }).gte('created_at', new Date(Date.now() - 10000).toISOString());
+              
               console.log(`    ✅ Found ${foundInThisSearch} listings`)
               stats.listings_found += foundInThisSearch
 
             } catch (fetchError: any) {
               clearTimeout(timeoutId)
+              
+              // Track timeout/network errors
+              await supabase.from('scraping_health').insert({
+                source: 'craigslist',
+                region: region,
+                search_term: searchTerm,
+                url: searchUrl,
+                success: false,
+                error_message: fetchError.message,
+                error_type: fetchError.name === 'AbortError' ? 'timeout' : 'network',
+                function_name: 'scrape-all-craigslist-squarebodies'
+              }).then(({ error }) => {
+                if (error) console.warn('Failed to log health:', error.message);
+              });
+              
               if (fetchError.name === 'AbortError') {
                 console.warn(`    ⏱️ Timeout fetching ${searchTerm}`)
               } else {
@@ -520,7 +594,27 @@ serve(async (req) => {
                 let vehicleId: string | null = null
                 let isNew = false
 
-                // First: Try to find by VIN
+                // FIRST: Check by discovery_url - this is the most reliable deduplication
+                console.log(`  🔍 Checking for existing vehicle by URL: ${listingUrl}`)
+                const { data: existingByUrl, error: urlError } = await supabase
+                  .from('vehicles')
+                  .select('id')
+                  .eq('discovery_url', listingUrl)
+                  .maybeSingle()
+
+                if (urlError) {
+                  console.error(`  ❌ URL search error:`, urlError)
+                } else if (existingByUrl) {
+                  vehicleId = existingByUrl.id
+                  isNew = false
+                  console.log(`  🔄 SKIPPING - Vehicle already exists for this URL: ${existingByUrl.id}`)
+                  // Skip to next listing - this is a duplicate
+                  continue
+                } else {
+                  console.log(`  ℹ️ No existing vehicle for this URL - proceeding`)
+                }
+
+                // Second: Try to find by VIN (for linking to existing profiles)
                 if (scrapeData.data.vin) {
                   console.log(`  🔍 Searching by VIN: ${scrapeData.data.vin}`)
                   const { data: existing, error: vinError } = await supabase
@@ -540,7 +634,7 @@ serve(async (req) => {
                   }
                 }
 
-                // Second: Try to find by year/make/model if no VIN match
+                // Third: Try to find by year/make/model if no VIN match
                 if (!vehicleId && scrapeData.data.year && finalMake && finalModel) {
                   const { data: existing, error: searchError } = await supabase
                     .from('vehicles')
@@ -561,8 +655,12 @@ serve(async (req) => {
                   }
                 }
 
-                // Third: Create new vehicle if not found - EXACT COPY OF WORKING IMPLEMENTATION
+                // Fourth: Create new vehicle if not found
                 if (!vehicleId) {
+                  
+                  // Normalize price (detect "15" should be "15000")
+                  const rawPrice = scrapeData.data.asking_price || scrapeData.data.price || null;
+                  const normalizedPrice = normalizeVehiclePrice(rawPrice);
                   
                   // Build insert - service role should bypass RLS, but include user_id if provided
                   const vehicleInsert: any = {
@@ -575,12 +673,15 @@ serve(async (req) => {
                     transmission: scrapeData.data.transmission || null,
                     drivetrain: scrapeData.data.drivetrain || null,
                     engine_size: scrapeData.data.engine_size || scrapeData.data.engine || null,
+                    asking_price: normalizedPrice.price, // Use normalized price
                     discovery_source: 'craigslist_scrape',
                     discovery_url: listingUrl,
                     profile_origin: 'craigslist_scrape',
                     origin_metadata: {
                       listing_url: listingUrl,
-                      asking_price: scrapeData.data.asking_price || scrapeData.data.price,
+                      asking_price_raw: rawPrice, // Store raw scraped value
+                      asking_price_normalized: normalizedPrice.price,
+                      price_was_corrected: normalizedPrice.corrected,
                       imported_at: new Date().toISOString(),
                       image_urls: scrapeData.data.images || [] // Store image URLs for future backfill
                     },
@@ -666,10 +767,12 @@ serve(async (req) => {
                             source: 'craigslist',
                             title: `Listed on Craigslist`,
                             event_date: eventDate,
-                            description: `Vehicle listed for sale on Craigslist${scrapeData.data.asking_price ? ` for $${scrapeData.data.asking_price.toLocaleString()}` : ''}`,
+                            description: `Vehicle listed for sale on Craigslist${normalizedPrice.price ? ` for $${normalizedPrice.price.toLocaleString()}` : ''}${normalizedPrice.corrected ? ' *' : ''}`,
                             metadata: {
                               listing_url: listingUrl,
-                              asking_price: scrapeData.data.asking_price || scrapeData.data.price,
+                              asking_price: normalizedPrice.price,
+                              asking_price_raw: normalizedPrice.original,
+                              price_was_corrected: normalizedPrice.corrected,
                               location: scrapeData.data.location,
                               posted_date: scrapeData.data.posted_date,
                               updated_date: scrapeData.data.updated_date,
@@ -837,10 +940,14 @@ serve(async (req) => {
                   }
                 } else {
                   // Update existing vehicle
+                  // Normalize price for updates too
+                  const updateRawPrice = scrapeData.data.asking_price || scrapeData.data.price || null;
+                  const updateNormalizedPrice = normalizeVehiclePrice(updateRawPrice);
+                  
                   const { error: updateError } = await supabase
                     .from('vehicles')
                     .update({
-                      asking_price: scrapeData.data.asking_price || scrapeData.data.price || null,
+                      asking_price: updateNormalizedPrice.price,
                       mileage: scrapeData.data.mileage || null,
                       // Only update if current value is null
                       vin: scrapeData.data.vin || undefined,
@@ -921,6 +1028,30 @@ serve(async (req) => {
     const errorDetails: string[] = []
     if (stats.errors > 0) {
       errorDetails.push(`${stats.errors} listings had errors - check function logs for details`)
+    }
+
+    // Check scraper health and alert if degraded
+    const failureRate = stats.processed > 0 ? stats.errors / stats.processed : 0
+    const searchFailureRate = stats.searches_performed > 0 ? stats.errors / stats.searches_performed : 0
+    
+    if (failureRate > 0.15 || searchFailureRate > 0.15) {
+      // >15% failure rate = degraded
+      const severity = failureRate > 0.30 ? 'critical' : 'warning'
+      
+      await supabase.from('admin_notifications').insert({
+        type: severity === 'critical' ? 'scraper_critical' : 'scraper_degraded',
+        severity: severity,
+        title: `Craigslist Scraper ${severity === 'critical' ? 'Failing' : 'Degraded'}`,
+        message: `${stats.errors} of ${stats.processed} listings failed (${(failureRate * 100).toFixed(1)}%). Success rate: ${((1 - failureRate) * 100).toFixed(1)}%`,
+        metadata: {
+          stats: stats,
+          error_samples: allErrors.slice(0, 5),
+          run_timestamp: new Date().toISOString()
+        },
+        is_read: false
+      }).then(({ error }) => {
+        if (error) console.warn('Failed to create alert:', error.message);
+      });
     }
 
     return new Response(

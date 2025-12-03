@@ -40,8 +40,8 @@ serve(async (req) => {
     const apiKeyResult = await getUserApiKey(
       supabase,
       user_id || null,
-      'anthropic',
-      'ANTHROPIC_API_KEY'
+      'openai',
+      'OPENAI_API_KEY'
     )
 
     if (!apiKeyResult.apiKey) {
@@ -50,7 +50,7 @@ serve(async (req) => {
 
     console.log(`Using ${apiKeyResult.source} API key for analysis`)
 
-    // Quick analysis with Claude (using user's key if available)
+    // Quick analysis with OpenAI (using user's key if available)
     const analysis = await runTier1Analysis(image_url, estimated_resolution || 'medium', apiKeyResult.apiKey)
     
     // Check for SPID sheet if vehicle_id is provided
@@ -118,7 +118,9 @@ serve(async (req) => {
           ...(spidData ? { spid: spidData } : {})
         },
         image_category: analysis.category || 'exterior',
-        category: analysis.category || 'general'
+        category: analysis.category || 'general',
+        ai_processing_status: 'completed',
+        ai_processing_completed_at: new Date().toISOString()
       }
       
       if (estimated_resolution) {
@@ -169,8 +171,8 @@ serve(async (req) => {
   }
 })
 
-async function runTier1Analysis(imageUrl: string, estimatedResolution: string, anthropicKey: string) {
-  if (!anthropicKey) throw new Error('Anthropic API key not provided')
+async function runTier1Analysis(imageUrl: string, estimatedResolution: string, openaiKey: string) {
+  if (!openaiKey) throw new Error('OpenAI API key not provided')
 
   const prompt = `Analyze this vehicle image and provide basic organization data.
 
@@ -192,63 +194,26 @@ Return ONLY valid JSON with this structure:
 
 Be fast and accurate. This is for organization only.`
 
-  // Convert image to base64 for Claude (safe for large images)
-  const imageResponse = await fetch(imageUrl)
-  const imageBuffer = await imageResponse.arrayBuffer()
-  
-  // Fix: Don't use spread operator on large arrays (causes stack overflow)
-  const bytes = new Uint8Array(imageBuffer)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  const base64Image = btoa(binary)
-  
-  // Get media type and normalize it to valid values for Claude
-  let mediaType = imageResponse.headers.get('content-type') || 'image/jpeg'
-  
-  // Claude only accepts: image/jpeg, image/png, image/gif, image/webp
-  // Normalize any variations
-  if (mediaType.includes('jpeg') || mediaType.includes('jpg')) {
-    mediaType = 'image/jpeg'
-  } else if (mediaType.includes('png')) {
-    mediaType = 'image/png'
-  } else if (mediaType.includes('gif')) {
-    mediaType = 'image/gif'
-  } else if (mediaType.includes('webp')) {
-    mediaType = 'image/webp'
-  } else {
-    // Default to jpeg for unknown types
-    mediaType = 'image/jpeg'
-  }
-  
-  console.log('Image media type:', mediaType)
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01'
+      'Authorization': `Bearer ${openaiKey}`
     },
     body: JSON.stringify({
-      model: "claude-3-haiku-20240307",
-      max_tokens: 1024,
+      model: "gpt-4o-mini",
+      max_tokens: 500,
+      response_format: { type: "json_object" },
       messages: [
         {
           role: "user",
           content: [
+            { type: "text", text: prompt },
             {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: base64Image
+              type: "image_url",
+              image_url: {
+                url: imageUrl
               }
-            },
-            {
-              type: "text",
-              text: prompt
             }
           ]
         }
@@ -258,15 +223,20 @@ Be fast and accurate. This is for organization only.`
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`Anthropic API error: ${response.status} - ${errorText}`)
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`)
   }
 
   const data = await response.json()
-  const content = data.content[0].text
+  const content = data.choices[0].message.content
   
   // Extract JSON from response
-  const jsonMatch = content.match(/\{[\s\S]*\}/)
-  const result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
+  let result;
+  try {
+    result = JSON.parse(content)
+  } catch (e) {
+    console.error('Failed to parse JSON response:', content)
+    throw new Error('Invalid JSON response from AI')
+  }
   
   // Ensure image_quality exists
   if (!result.image_quality) {
@@ -291,4 +261,3 @@ Be fast and accurate. This is for organization only.`
   
   return result
 }
-

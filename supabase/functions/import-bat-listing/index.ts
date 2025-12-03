@@ -141,7 +141,9 @@ serve(async (req) => {
           sale_price: salePrice,
           sale_date: saleDate,
           trim: trim || undefined,
-          description: description
+          description: description,
+          auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
+          bat_auction_url: batUrl
         })
         .eq('id', vehicleId);
 
@@ -168,6 +170,8 @@ serve(async (req) => {
           sale_price: salePrice,
           sale_date: saleDate,
           description,
+          auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
+          bat_auction_url: batUrl,
           imported_by: null
         })
         .select()

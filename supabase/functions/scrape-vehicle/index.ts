@@ -147,7 +147,7 @@ serve(async (req) => {
     if (isCraigslist) {
       data = scrapeCraigslist(doc, url)
     } else if (isBringATrailer) {
-      data = scrapeBringATrailer(doc, url)
+      data = scrapeBringATrailer(doc, url, markdown)
     } else if (isClassicCars) {
       data = scrapeClassicCars(doc, url)
     } else if (isAffordableClassics) {
@@ -845,11 +845,13 @@ function scrapeCraigslist(doc: any, url: string): any {
   return data
 }
 
-function scrapeBringATrailer(doc: any, url: string): any {
+function scrapeBringATrailer(doc: any, url: string, markdown: string = ''): any {
   const data: any = {
     source: 'Bring a Trailer',
     listing_url: url
   }
+  
+  const bodyText = doc.body?.textContent || markdown || ''
 
     // Extract title
     const titleElement = doc.querySelector('h1')
@@ -870,14 +872,26 @@ function scrapeBringATrailer(doc: any, url: string): any {
       }
       if (parts.length > startIndex) {
         data.make = parts[startIndex]
-        data.model = parts.slice(startIndex + 1).join(' ')
+        let modelRaw = parts.slice(startIndex + 1).join(' ')
+        
+        // Clean model - extract base model before trim/drivetrain
+        // "K5 Blazer Silverado V1500 4×4" → "K5 Blazer"
+        // "Corvette Coupe L72 427/425 4-Speed" → "Corvette Coupe"
+        // Remove common trim levels and drivetrain indicators from model
+        modelRaw = modelRaw
+          .replace(/\s+(Silverado|Scottsdale|Cheyenne|Custom Deluxe|Big 10|CST|Sierra Classic|SLE|SLS)\s+.*$/i, '') // Trim + everything after
+          .replace(/\s+V?\d{4,5}\s+.*$/i, '') // V1500, 1500, etc. + everything after
+          .replace(/\s+[24]×[24]\s*$/i, '') // 4×4, 2×4 at end
+          .replace(/\s+4[Xx]4\s*$/i, '') // 4x4 at end
+          .replace(/\s+\d+-Speed\s*$/i, '') // 5-Speed at end
+          .replace(/\s+L\d{2}\s+\d+\/\d+.*$/i, '') // Engine codes like "L72 427/425"
+          .trim();
+        
+        data.model = modelRaw;
       }
     }
-
-    // Get body text for extraction
-    const bodyText = doc.body?.textContent || ''
     
-    // Extract mileage - multiple patterns
+    // Extract mileage - multiple patterns (bodyText already declared above)
     const mileagePatterns = [
       /(\d{1,3})k\s+Miles?\s+Shown/i,
       /(\d{1,3}(?:,\d{3})*)\s+Miles?\s+Shown/i,
@@ -1017,10 +1031,28 @@ function scrapeBringATrailer(doc: any, url: string): any {
       }
     }
 
-    // Extract lot number
-    const lotMatch = bodyText.match(/Lot\s+#?(\d{1,3}(?:,\d{3})*)/i)
+    // Extract lot number - multiple patterns
+    let lotMatch = bodyText.match(/Lot\s+#(\d{1,3}(?:,\d{3})*)/i)
+    if (!lotMatch) lotMatch = bodyText.match(/Lot\s+(\d{1,3}(?:,\d{3})*)/i)
+    if (!lotMatch) lotMatch = doc.querySelector('.item')?.textContent?.match(/Lot\s+#?(\d+)/i)
     if (lotMatch) {
       data.lot_number = lotMatch[1].replace(/,/g, '')
+    }
+    
+    // Extract auction date - check for date element or span.date
+    const dateEl = doc.querySelector('.date, .auction-date, span.date')
+    if (dateEl) {
+      const dateText = dateEl.textContent?.trim()
+      const dateMatch = dateText?.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i)
+      if (dateMatch) {
+        try {
+          const date = new Date(dateMatch[1])
+          if (!isNaN(date.getTime())) {
+            data.sale_date = date.toISOString().split('T')[0]
+            data.auction_end_date = data.sale_date
+          }
+        } catch {}
+      }
     }
 
     // Extract seller - look for "Sold by [seller]" or "by [seller] on"
@@ -1093,10 +1125,179 @@ function scrapeBringATrailer(doc: any, url: string): any {
       data.images = Array.from(new Set(normalized)).slice(0, 50)
     }
 
-  // Extract description
-  const descElement = doc.querySelector('.post-content, .listing-description, article')
+  // Extract description (HTML or markdown)
+  const descElement = doc.querySelector('.post-content, .listing-description, article, .column-left, .column.column-left')
   if (descElement) {
-    data.description = descElement.textContent.trim().substring(0, 5000)
+    let desc = descElement.textContent.trim()
+    // Remove navigation/UI text
+    desc = desc.replace(/^(Sign In to BaT|Username or Email|Password|Remember Me|Forgot Password).*$/gm, '')
+    desc = desc.trim()
+    if (desc.length > 50) {
+      data.description = desc.substring(0, 5000)
+    }
+  }
+  
+  // Fallback: Extract from markdown if Firecrawl was used
+  if (!data.description && markdown) {
+    // Look for description section in markdown
+    const descMatch = markdown.match(/This \d{4}[^\n]{50,500}/i) // "This 1991 Chevrolet..."
+    if (descMatch) {
+      data.description = descMatch[0].substring(0, 5000)
+    }
+  }
+  
+  // Another fallback: grab first substantial paragraph from bodyText
+  if (!data.description && bodyText) {
+    const paragraphs = bodyText.split(/\n\n+/).filter(p => p.length > 100 && !p.includes('Sign In'))
+    if (paragraphs.length > 0) {
+      data.description = paragraphs[0].substring(0, 5000)
+    }
+  }
+  
+  // Extract essentials data
+  const essentialsEl = doc.querySelector('.essentials, [class*="essential"]')
+  if (essentialsEl) {
+    const essText = essentialsEl.textContent || ''
+    
+    // Seller
+    const sellerMatch = essText.match(/Seller[:\s]+([^\n]+)/i)
+    if (sellerMatch && !data.seller) data.seller = sellerMatch[1].trim()
+    
+    // Location
+    const locMatch = essText.match(/Location[:\s]+([^\n]+)/i)
+    if (locMatch) data.location = locMatch[1].trim()
+    
+    // Chassis (alternative VIN field)
+    const chassisMatch = essText.match(/Chassis[:\s]+([A-HJ-NPR-Z0-9]+)/i)
+    if (chassisMatch && !data.vin) data.vin = chassisMatch[1].toUpperCase()
+    
+    // Mileage from essentials (handles kilometers)
+    const milesMatch = essText.match(/([\d,]+)k?\s*(?:Kilometers|km)\s*\(~([\d,]+)k?\s*Miles\)/i)
+    if (milesMatch && !data.mileage) {
+      data.mileage = parseInt(milesMatch[2].replace(/,/g, '').replace('k', '000'), 10)
+      data.mileage_km = parseInt(milesMatch[1].replace(/,/g, '').replace('k', '000'), 10)
+    }
+  }
+
+  // === AUCTION OUTCOME DETECTION ===
+  // Critical for market analysis - distinguish between sold, RNM, and active
+  
+  // Check for "Sold for" (completed sale) vs "bid to" (RNM)
+  const soldForMatch = bodyText.match(/Sold\s+for\s+(?:USD\s+)?\$?([\d,]+)/i)
+  const bidToMatch = bodyText.match(/bid\s+to\s+(?:USD\s+)?\$?([\d,]+)/i)
+  
+  // Extract high bid amount
+  const highBidMatch = bodyText.match(/USD\s+\$([\d,]+)\s+bid\s+placed\s+by\s+(\w+)/i)
+  if (highBidMatch) {
+    data.high_bid = parseInt(highBidMatch[1].replace(/,/g, ''), 10)
+    data.high_bidder = highBidMatch[2]
+  }
+  
+  // Determine auction outcome
+  if (soldForMatch) {
+    data.auction_outcome = 'sold'
+    data.sale_price = parseInt(soldForMatch[1].replace(/,/g, ''), 10)
+    data.winning_bid = data.sale_price
+  } else if (bidToMatch && !soldForMatch) {
+    // "bid to $X" without "Sold for" = Reserve Not Met
+    data.auction_outcome = 'reserve_not_met'
+    data.high_bid = parseInt(bidToMatch[1].replace(/,/g, ''), 10)
+    data.sale_price = null // Explicitly null - no sale
+  } else if (bodyText.match(/Auction\s+Ended/i) && !soldForMatch) {
+    // Auction ended but no sale
+    data.auction_outcome = 'no_sale'
+  } else if (bodyText.match(/Current\s+Bid|Place\s+Bid|Live\s+Now/i)) {
+    // Auction still active
+    data.auction_outcome = 'pending'
+  }
+  
+  // Extract bid count
+  const bidCountMatch = bodyText.match(/(\d+)\s+(?:bids?|comments?)/i)
+  if (bidCountMatch) {
+    data.bid_count = parseInt(bidCountMatch[1], 10)
+  }
+  
+  // === EXTRACT AUCTION TIMELINE EVENTS ===
+  // Parse comment thread for individual events with dates
+  const auctionEvents: any[] = []
+  
+  // Extract comment dates and content
+  // Pattern: "Nov 28 at 3:44 PM Username Text"
+  const commentPattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+at\s+(\d{1,2}):(\d{2})\s+(AM|PM)\s+([^\n]{10,200})/gi
+  let commentMatch
+  while ((commentMatch = commentPattern.exec(bodyText)) !== null) {
+    const [_, month, day, hour, minute, ampm, content] = commentMatch
+    const username = content.split(/\s+/)[0] // First word is usually username
+    const text = content.substring(username.length).trim()
+    
+    // Build date (use current year or auction year)
+    const year = data.year || new Date().getFullYear()
+    const dateStr = `${month} ${day}, ${year} ${hour}:${minute} ${ampm}`
+    
+    try {
+      const eventDate = new Date(dateStr)
+      if (!isNaN(eventDate.getTime())) {
+        auctionEvents.push({
+          event_type: 'auction_comment',
+          event_date: eventDate.toISOString(),
+          description: text.substring(0, 500),
+          metadata: {
+            username: username,
+            source: 'bring_a_trailer',
+            comment_type: 'auction_activity'
+          }
+        })
+      }
+    } catch {}
+  }
+  
+  // Extract "Sold on" event
+  const soldEventMatch = bodyText.match(/Sold on (\d{1,2}\/\d{1,2}\/\d{2,4}) for USD \$([\\d,]+) to ([^\n]+)/i)
+  if (soldEventMatch) {
+    const [_, dateStr, price, buyer] = soldEventMatch
+    try {
+      const eventDate = new Date(dateStr)
+      if (!isNaN(eventDate.getTime())) {
+        auctionEvents.push({
+          event_type: 'vehicle_sold',
+          event_date: eventDate.toISOString(),
+          description: `Sold at auction for $${price.replace(/,/g, ',')}` + (buyer ? ` to ${buyer}` : ''),
+          metadata: {
+            sale_price: parseInt(price.replace(/,/g, ''), 10),
+            buyer: buyer,
+            source: 'bring_a_trailer',
+            auction_outcome: 'sold'
+          }
+        })
+      }
+    } catch {}
+  }
+  
+  if (auctionEvents.length > 0) {
+    data.auction_timeline_events = auctionEvents
+  }
+  
+  // Extract estimate range if available
+  const estimateMatch = bodyText.match(/\$([\d,]+)\s*[-–]\s*\$([\d,]+)/g)
+  if (estimateMatch && estimateMatch.length > 0) {
+    // Find the range that looks like an estimate (usually larger numbers)
+    for (const range of estimateMatch) {
+      const nums = range.match(/\$([\d,]+)/g)
+      if (nums && nums.length === 2) {
+        const low = parseInt(nums[0].replace(/[$,]/g, ''), 10)
+        const high = parseInt(nums[1].replace(/[$,]/g, ''), 10)
+        if (low > 10000 && high > low) { // Sanity check for estimate-like values
+          data.estimate_low = low
+          data.estimate_high = high
+          break
+        }
+      }
+    }
+  }
+  
+  // Calculate reserve gap percentage for RNM auctions
+  if (data.auction_outcome === 'reserve_not_met' && data.high_bid && data.estimate_low) {
+    data.reserve_gap_pct = ((data.estimate_low - data.high_bid) / data.estimate_low * 100).toFixed(1)
   }
 
   return data
@@ -1640,6 +1841,22 @@ function scrapeKSL(doc: any, url: string, markdown: string = ''): any {
     const vinMatch = bodyText.match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
     if (vinMatch && !/[IOQ]/.test(vinMatch[1])) {
       data.vin = vinMatch[1].toUpperCase()
+    }
+  }
+  
+  // NEW: Fallback for legacy VINs (8-13 chars, pre-1981 vehicles) in body text
+  if (!data.vin) {
+    const legacyVinMatch = bodyText.match(/\b([A-HJ-NPR-Z0-9]{8,13})\b/)
+    if (legacyVinMatch && !/[IOQ]/.test(legacyVinMatch[1])) {
+      data.vin = legacyVinMatch[1].toUpperCase()
+    }
+  }
+  
+  // Also try markdown for legacy VINs (cleaner than HTML)
+  if (!data.vin && markdown) {
+    const legacyVinMatch = markdown.match(/\b([A-HJ-NPR-Z0-9]{8,13})\b/)
+    if (legacyVinMatch && !/[IOQ]/.test(legacyVinMatch[1])) {
+      data.vin = legacyVinMatch[1].toUpperCase()
     }
   }
 

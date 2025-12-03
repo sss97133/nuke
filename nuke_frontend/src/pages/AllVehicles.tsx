@@ -104,7 +104,7 @@ const AllVehicles: React.FC = () => {
     try {
       const { data: recentVehicles } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, created_at, updated_at, user_id')
+        .select('id, year, make, model, normalized_model, created_at, updated_at, user_id')
         .eq('is_public', true)
         .order('created_at', { ascending: false })
         .limit(10);
@@ -125,7 +125,7 @@ const AllVehicles: React.FC = () => {
         const activity: ActivityItem[] = recentVehicles.map((vehicle: any) => ({
           id: vehicle.id,
           type: 'vehicle_added' as const,
-          title: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+          title: `${vehicle.year} ${vehicle.make} ${vehicle.normalized_model || vehicle.model}`,
           subtitle: `Added by ${getUserDisplayFromProfile(profileMap.get(vehicle.user_id))}`,
           timestamp: vehicle.created_at,
           link: `/vehicle/${vehicle.id}`
@@ -384,9 +384,9 @@ const AllVehicles: React.FC = () => {
                           </Link>
 
                           <div className="vehicle-info-compact">
-                            {/* YMM - Year Make Model (core info) */}
+                            {/* YMM - Year Make Model (core info) - prefer normalized_model */}
                             <h3 className="vehicle-title-compact">
-                              {vehicle.year} {vehicle.make} {vehicle.model}
+                              {vehicle.year} {vehicle.make} {vehicle.normalized_model || vehicle.model}
                             </h3>
 
                             {/* Owner (clickable), Price, Hype */}

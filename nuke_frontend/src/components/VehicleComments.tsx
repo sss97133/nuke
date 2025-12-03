@@ -936,7 +936,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         console.error('Must be logged in to comment');
         return;
       }
-
+      
       // Save comment first
       const { data: insertedComment, error } = await supabase
         .from('vehicle_comments')
@@ -1009,10 +1009,10 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
 
           // Clear status after 5 seconds
           setTimeout(() => setScrapingStatus(null), 5000);
-        } else {
+      } else {
           console.log('[VehicleComments] No extractable content detected');
           setScrapingStatus(null);
-        }
+      }
       } catch (detectionError) {
         console.error('[VehicleComments] Content detection error:', detectionError);
         setScrapingStatus(null);

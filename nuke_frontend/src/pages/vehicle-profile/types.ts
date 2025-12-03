@@ -39,6 +39,8 @@ export interface Vehicle {
   origin_metadata?: any;
   bat_auction_url?: string;
   discovery_url?: string;
+  auction_outcome?: 'sold' | 'reserve_not_met' | 'no_sale' | 'pending' | 'ended' | null;
+  high_bid?: number | null;
   [key: string]: any;
 }
 
