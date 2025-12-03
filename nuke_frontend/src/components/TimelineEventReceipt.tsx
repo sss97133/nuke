@@ -557,6 +557,141 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
           </div>
         </div>
 
+        {/* CONTEXTUAL ANALYSIS STATUS */}
+        {event.metadata?.contextual_analysis && (
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: '#f0f9ff' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
+              Contextual Analysis:
+            </div>
+            <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
+              <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                {event.metadata.contextual_analysis.situation_summary}
+              </div>
+              {event.metadata.contextual_analysis.primary_activity && (
+                <div style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                  Activity: {event.metadata.contextual_analysis.primary_activity}
+                </div>
+              )}
+              {event.metadata.contextual_analysis.components_involved && event.metadata.contextual_analysis.components_involved.length > 0 && (
+                <div style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                  Components: {event.metadata.contextual_analysis.components_involved.join(', ')}
+                </div>
+              )}
+              {event.metadata.contextual_analysis.temporal_relationships && (
+                <div style={{ marginTop: '6px', padding: '4px', background: '#fff', borderRadius: '2px', fontSize: '7pt' }}>
+                  {event.metadata.contextual_analysis.temporal_relationships.is_continuation && (
+                    <div>Continuation of: {event.metadata.contextual_analysis.temporal_relationships.continuation_of || 'previous work'}</div>
+                  )}
+                  {event.metadata.contextual_analysis.temporal_relationships.is_preparation && (
+                    <div>Preparation for: {event.metadata.contextual_analysis.temporal_relationships.preparation_for || 'future work'}</div>
+                  )}
+                  {event.metadata.contextual_analysis.temporal_relationships.is_standalone && (
+                    <div>Standalone work session</div>
+                  )}
+                </div>
+              )}
+              {event.metadata.contextual_analysis.time_investment && (
+                <div style={{ marginTop: '4px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+                  Estimated: {event.metadata.contextual_analysis.time_investment.estimated_work_hours || 0} hours work, 
+                  {event.metadata.contextual_analysis.time_investment.estimated_session_duration_hours?.toFixed(1) || 0} hours session
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* USER COMMITMENT SCORE */}
+        {event.metadata?.user_commitment_score && (
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: '#fef3c7' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
+              User Commitment Level:
+            </div>
+            <div style={{ fontSize: '8pt' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '9pt' }}>
+                  {event.metadata.user_commitment_score.level}
+                </span>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  ({event.metadata.user_commitment_score.overall_commitment}/100)
+                </span>
+              </div>
+              {event.metadata.user_commitment_score.factors && event.metadata.user_commitment_score.factors.length > 0 && (
+                <div style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Factors: {event.metadata.user_commitment_score.factors.join(', ')}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* PENDING CONTEXTUAL ANALYSIS */}
+        {images.length > 0 && !event.metadata?.contextual_analysis && (
+          <div style={{
+            padding: '12px 16px',
+            background: '#fff3cd',
+            border: '1px solid #ffc107',
+            margin: '0',
+            fontSize: '8pt'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '2px', color: '#856404', textTransform: 'uppercase' }}>
+                  Evidence set ({images.length} {images.length === 1 ? 'photo' : 'photos'}) pending analysis
+                </div>
+                <div style={{ color: '#856404', fontSize: '7pt' }}>
+                  Contextual analysis will identify the complete situation, temporal relationships, and user commitment level
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (!session?.user) {
+                      alert('Please sign in to trigger analysis');
+                      return;
+                    }
+
+                    // Trigger contextual analysis
+                    const { error } = await supabase.functions.invoke('analyze-batch-contextual', {
+                      body: {
+                        event_id: eventId,
+                        vehicle_id: event.vehicle_id,
+                        user_id: event.user_id || session.user.id,
+                        image_ids: images.map(img => img.id)
+                      }
+                    });
+
+                    if (error) {
+                      console.error('Error triggering contextual analysis:', error);
+                      alert('Failed to trigger analysis. Please try again.');
+                    } else {
+                      // Reload event data after a delay
+                      setTimeout(() => {
+                        loadEventData();
+                      }, 3000);
+                    }
+                  } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to trigger analysis');
+                  }
+                }}
+                className="button cursor-button"
+                style={{
+                  padding: '6px 12px',
+                  border: '2px solid var(--warning)',
+                  background: 'var(--surface)',
+                  color: 'var(--warning-dark)',
+                  fontSize: '8pt',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                ANALYZE NOW
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* AI EXTRACTION STATUS */}
         {documentId && processingStatus === 'processing' && (
           <div style={{
