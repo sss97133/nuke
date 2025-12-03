@@ -148,40 +148,50 @@ serve(async (req) => {
           }
         }
 
-        // Create vehicle
-        const vehicleData = {
-          year: scrapeData.data.year || item.listing_year,
-          make: scrapeData.data.make || item.listing_make || 'Unknown',
-          model: scrapeData.data.model || item.listing_model || 'Unknown',
-          trim: scrapeData.data.trim,
-          series: scrapeData.data.series,
-          body_style: scrapeData.data.body_style,
-          drivetrain: scrapeData.data.drivetrain,
-          engine_type: scrapeData.data.engine_type,
-          vin: scrapeData.data.vin,
-          mileage: scrapeData.data.mileage,
-          asking_price: scrapeData.data.price || item.listing_price,
-          status: 'active',
-          is_public: true,
-          discovery_url: item.listing_url,
-          origin_metadata: {
-            ...scrapeData.data,
-            source_id: item.source_id,
-            queue_id: item.id,
-            imported_at: new Date().toISOString()
-          },
-          selling_organization_id: organizationId,
-          import_queue_id: item.id
-        };
-
-        const { data: newVehicle, error: vehicleError } = await supabase
+        // Create vehicle (minimal insert, forensic system will enrich)
+        const { data: newVehicle, error: vehicleError} = await supabase
           .from('vehicles')
-          .insert(vehicleData)
+          .insert({
+            year: scrapeData.data.year || item.listing_year,
+            make: scrapeData.data.make || item.listing_make || 'Unknown',
+            model: scrapeData.data.model || item.listing_model || 'Unknown',
+            status: 'active',
+            is_public: true,
+            discovery_url: item.listing_url,
+            origin_metadata: {
+              source_id: item.source_id,
+              queue_id: item.id,
+              imported_at: new Date().toISOString()
+            },
+            selling_organization_id: organizationId,
+            import_queue_id: item.id
+          })
           .select('id')
           .single();
 
         if (vehicleError) {
           throw new Error(`Vehicle insert failed: ${vehicleError.message}`);
+        }
+
+        // Process scraped data through forensic system (REPLACES manual field assignment)
+        await supabase.rpc('process_scraped_data_forensically', {
+          p_vehicle_id: newVehicle.id,
+          p_scraped_data: scrapeData.data,
+          p_source_url: item.listing_url,
+          p_scraper_name: 'import-queue',
+          p_context: { source_id: item.source_id, queue_id: item.id }
+        });
+
+        // Build consensus for critical fields
+        const criticalFields = ['vin', 'trim', 'series', 'drivetrain', 'engine_type', 'mileage'];
+        for (const field of criticalFields) {
+          if (scrapeData.data[field]) {
+            await supabase.rpc('build_field_consensus', {
+              p_vehicle_id: newVehicle.id,
+              p_field_name: field,
+              p_auto_assign: true
+            });
+          }
         }
 
         // Update queue item

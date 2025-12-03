@@ -27,6 +27,8 @@ import Dashboard from './pages/Dashboard';
 import ImageProcessingDashboard from './pages/ImageProcessingDashboard';
 import LiveImageAnalysisMonitor from './components/admin/LiveImageAnalysisMonitor';
 import ScriptControlCenter from './pages/ScriptControlCenter';
+import LiveProcessingMonitor from './pages/LiveProcessingMonitor';
+import SystemStatus from './pages/SystemStatus';
 import VehicleMakeModelDemo from './pages/VehicleMakeModelDemo';
 import VehicleDataNormalization from './pages/VehicleDataNormalization';
 import Profile from './pages/Profile';
@@ -359,11 +361,14 @@ function App() {
             <Route path="/review/ai-detections" element={<CurationQueue />} />
             
             {/* Admin & Development */}
-            <Route path="/admin" element={<AdminMissionControl />} />
+            <Route path="/admin" element={<SystemStatus />} />
             <Route path="/admin/old" element={<AdminDashboard />} />
+            <Route path="/admin/mission-control" element={<AdminMissionControl />} />
             <Route path="/admin/scripts" element={<ScriptControlCenter />} />
             <Route path="/admin/image-processing" element={<ImageProcessingDashboard />} />
             <Route path="/admin/live-analysis" element={<LiveImageAnalysisMonitor />} />
+            <Route path="/admin/live" element={<LiveProcessingMonitor />} />
+            <Route path="/admin/status" element={<SystemStatus />} />
             <Route path="/admin/batch-analysis" element={<BatchImageAnalysis />} />
             <Route path="/admin/extraction-monitor" element={<ExtractionMonitor />} />
             <Route path="/admin/verifications" element={<AdminVerifications />} />

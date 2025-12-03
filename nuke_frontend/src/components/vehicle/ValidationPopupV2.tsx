@@ -33,6 +33,9 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
   const [showConfidenceExplainer, setShowConfidenceExplainer] = useState(false);
   const [showValidatorExplainer, setShowValidatorExplainer] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedValue, setEditedValue] = useState(fieldValue);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadValidations();
@@ -42,6 +45,30 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
     try {
       setLoading(true);
       const allSources: ValidationSource[] = [];
+
+      // 0. Factory Reference Pages - SPECIFIC PAGES for this field (HIGHEST AUTHORITY)
+      const { data: manualPages, error: pagesError } = await supabase
+        .rpc('get_manual_pages_for_field', {
+          p_vehicle_id: vehicleId,
+          p_field_name: fieldName
+        });
+
+      if (!pagesError && manualPages && manualPages.length > 0) {
+        console.log(`Found ${manualPages.length} relevant manual pages for ${fieldName}`);
+        
+        manualPages.forEach((page: any) => {
+          allSources.push({
+            source_type: 'factory_manual_page',
+            document_type: 'manual_page',
+            document_state: `${page.catalog_name} - Page ${page.page_number}`,
+            confidence_score: page.relevance_score || 100,
+            image_url: page.image_url,
+            created_at: new Date().toISOString()
+          });
+        });
+      } else if (pagesError) {
+        console.warn('Failed to load manual pages:', pagesError);
+      }
 
       // 1. Ownership documents (title, registration)
       const { data: ownershipDocs } = await supabase
@@ -95,6 +122,36 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
     }
   };
 
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      
+      const updates: any = {};
+      
+      // Convert value to proper type
+      if (fieldName === 'year' || fieldName === 'mileage' || fieldName === 'horsepower') {
+        updates[fieldName] = editedValue ? parseInt(editedValue) : null;
+      } else {
+        updates[fieldName] = editedValue || null;
+      }
+      
+      const { error } = await supabase
+        .from('vehicles')
+        .update(updates)
+        .eq('id', vehicleId);
+      
+      if (error) throw error;
+      
+      // Success - close modal and trigger reload
+      setSaving(false);
+      window.location.reload(); // Force refresh to show updated data
+    } catch (err) {
+      console.error('Save failed:', err);
+      setSaving(false);
+      alert('Failed to save: ' + (err as any).message);
+    }
+  };
+
   const calculateConfidence = () => {
     if (sources.length === 0) return 50; // Manual entry
     const avg = sources.reduce((sum, s) => sum + s.confidence_score, 0) / sources.length;
@@ -111,6 +168,19 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
   const getSourceLabel = (source: ValidationSource) => {
     const type = source.document_type || 'document';
     const state = source.document_state;
+    
+    // Factory manual pages - show page context
+    if (source.source_type === 'factory_manual_page') {
+      return state || 'FACTORY MANUAL';  // state = "1987 Service Manual - Page 15"
+    }
+    
+    // Factory references
+    if (source.source_type === 'factory_reference') {
+      if (type === 'parts_catalog') return 'PARTS CATALOG';
+      if (type === 'repair_manual') return 'FACTORY MANUAL';
+      if (type === 'assembly_manual') return 'ASSEMBLY MANUAL';
+      return 'FACTORY REFERENCE';
+    }
     
     if (type === 'title' && state) return `${state} TITLE`;
     if (type === 'registration' && state) return `${state} REGISTRATION`;
@@ -176,28 +246,83 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           alignItems: 'center',
           background: 'var(--bg)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
             <span style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--text-muted)' }}>
               {fieldName.toUpperCase()}
             </span>
-            <span style={{ fontSize: '10pt', fontWeight: 700 }}>
-              {fieldValue}
-            </span>
+            {isEditing ? (
+              <input
+                type={fieldName === 'year' || fieldName === 'mileage' ? 'number' : 'text'}
+                value={editedValue}
+                onChange={(e) => setEditedValue(e.target.value)}
+                autoFocus
+                style={{
+                  fontSize: '10pt',
+                  fontWeight: 700,
+                  padding: '4px 8px',
+                  border: '2px solid var(--accent)',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  borderRadius: '4px',
+                  width: '200px'
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Escape') setIsEditing(false);
+                }}
+              />
+            ) : (
+              <span style={{ fontSize: '10pt', fontWeight: 700 }}>
+                {fieldValue}
+              </span>
+            )}
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: '16pt',
-              cursor: 'pointer',
-              padding: 0,
-              lineHeight: 1,
-              color: 'var(--text-muted)'
-            }}
-          >
-            ×
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {isEditing ? (
+              <>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="button button-primary"
+                  style={{ fontSize: '8pt', padding: '4px 12px' }}
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditedValue(fieldValue);
+                    setIsEditing(false);
+                  }}
+                  className="button"
+                  style={{ fontSize: '8pt', padding: '4px 12px' }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="button"
+                style={{ fontSize: '8pt', padding: '4px 12px' }}
+              >
+                Edit
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: '16pt',
+                cursor: 'pointer',
+                padding: 0,
+                lineHeight: 1,
+                color: 'var(--text-muted)'
+              }}
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {/* Document previews - main focus */}

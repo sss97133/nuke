@@ -1,0 +1,228 @@
+/**
+ * COMPREHENSIVE HEADER FIX
+ * Fixes sticky positioning, dropdown overlap, mobile responsive issues
+ */
+
+/* ============================================================================
+   HEADER WRAPPER - Clean sticky positioning
+   ============================================================================ */
+
+.header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 1000; /* Above content, below modals */
+  background: #eeeeee;
+  border-bottom: 2px solid #bdbdbd;
+  width: 100%;
+}
+
+.header-content {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  box-sizing: border-box;
+}
+
+/* ============================================================================
+   HEADER LEFT - Logo + Nav
+   ============================================================================ */
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.logo {
+  flex-shrink: 0;
+}
+
+.logo-text {
+  padding: 4px 8px;
+  background: #e0e0e0;
+  border: 2px outset #bdbdbd;
+  font-size: 9pt;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.main-nav {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nav-link {
+  padding: 4px 8px;
+  font-size: 9pt;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: #000;
+  flex-shrink: 1;
+}
+
+.nav-link:hover {
+  background: #e0e0e0;
+  border: 1px solid #999;
+}
+
+.nav-link.active {
+  background: #d0d0d0;
+  border: 2px inset #999;
+  font-weight: bold;
+}
+
+/* ============================================================================
+   HEADER RIGHT - Search + Upload + Profile
+   ============================================================================ */
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+/* ============================================================================
+   DROPDOWN MENU - Fixed positioning, no overlap
+   ============================================================================ */
+
+.profile-dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: transparent;
+}
+
+.profile-dropdown-menu {
+  position: fixed !important;
+  /* Will be positioned by JS */
+  min-width: 180px;
+  max-width: 220px;
+  background: #fff !important;
+  border: 2px solid #000 !important;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2) !important;
+  z-index: 10001 !important;
+  overflow: hidden;
+}
+
+.profile-dropdown-menu button {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid #eee;
+  background: transparent;
+  text-align: left;
+  font-size: 9pt;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.profile-dropdown-menu button:last-child {
+  border-bottom: none;
+}
+
+.profile-dropdown-menu button:hover {
+  background: #e5e5e5;
+}
+
+/* ============================================================================
+   MOBILE RESPONSIVE
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .header-content {
+    padding: 0 4px;
+    height: auto;
+    min-height: 40px;
+    flex-wrap: nowrap;
+  }
+
+  .header-left {
+    gap: 4px;
+    flex: 1 1 auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .main-nav {
+    gap: 2px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .main-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-link {
+    padding: 4px 6px;
+    font-size: 8pt;
+    flex-shrink: 0;
+  }
+
+  .header-right {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .header-right > div {
+    max-width: none !important;
+  }
+
+  /* Hide search on very small screens */
+  .header-right > div:first-child {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-content {
+    height: auto;
+    padding: 4px;
+  }
+
+  .logo-text {
+    padding: 2px 6px;
+    font-size: 8pt;
+  }
+
+  .nav-link {
+    padding: 2px 4px;
+    font-size: 7pt;
+  }
+
+  /* Stack header if needed */
+  .main-nav {
+    flex-wrap: nowrap;
+    overflow-x: scroll;
+  }
+}
+
+/* ============================================================================
+   Z-INDEX HIERARCHY (from highest to lowest)
+   ============================================================================ */
+
+/* 10001 - Profile dropdown menu */
+/* 10000 - Profile dropdown backdrop */
+/* 1000 - Sticky header */
+/* 200 - Upload status bar */
+/* 100 - Page content */
+/* 1 - Base content */
+

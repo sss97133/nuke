@@ -109,30 +109,100 @@ serve(async (req) => {
 
         const newData = scrapeResult.data;
 
-        // Compare old vs new data
+        // ============================================
+        // FORENSIC SYSTEM INTEGRATION
+        // ============================================
+        console.log(`  🔬 Processing through forensic system...`);
+
+        // 1. Process scraped data through forensic analysis
+        const { data: forensicResult, error: forensicError } = await supabase.rpc(
+          'process_scraped_data_forensically',
+          {
+            p_vehicle_id: job.vehicle_id,
+            p_scraped_data: newData,
+            p_source_url: job.source_url,
+            p_scraper_name: job.scraper_name || 'scrape-vehicle',
+            p_context: {}
+          }
+        );
+
+        if (forensicError) {
+          console.error(`  ⚠️  Forensic analysis error: ${forensicError.message}`);
+        }
+
+        // 2. Build consensus for critical fields
+        const criticalFields = ['vin', 'year', 'make', 'model', 'drivetrain', 'series', 'trim', 'transmission'];
+        const consensusResults = [];
+
+        for (const field of criticalFields) {
+          if (newData[field]) {
+            const { data: consensus, error: consensusError } = await supabase.rpc('build_field_consensus', {
+              p_vehicle_id: job.vehicle_id,
+              p_field_name: field,
+              p_auto_assign: true  // Auto-assign if confidence >= 80%
+            });
+            
+            if (!consensusError && consensus) {
+              consensusResults.push({ field, ...consensus });
+              if (consensus.auto_assigned) {
+                console.log(`  ✅ ${field}: "${consensus.consensus_value}" (${consensus.consensus_confidence}% confidence)`);
+              } else if (consensus.consensus_confidence < 70) {
+                console.log(`  ⚠️  ${field}: Low confidence (${consensus.consensus_confidence}%) - needs review`);
+              }
+            }
+          }
+        }
+
+        // 3. Detect anomalies
+        const { data: anomalies, error: anomalyError } = await supabase.rpc('detect_data_anomalies', {
+          p_vehicle_id: job.vehicle_id
+        });
+
+        if (!anomalyError && anomalies && anomalies.length > 0) {
+          console.log(`  🚨 ${anomalies.length} anomalies detected:`);
+          for (const anomaly of anomalies.slice(0, 3)) {  // Show first 3
+            console.log(`     - ${anomaly.field}: ${anomaly.anomaly} [${anomaly.severity}]`);
+          }
+        }
+
+        // 4. Get updated vehicle state (after forensic updates)
+        const { data: updatedVehicle, error: fetchError } = await supabase
+          .from('vehicles')
+          .select('*')
+          .eq('id', job.vehicle_id)
+          .single();
+
+        if (fetchError) {
+          throw new Error(`Failed to fetch updated vehicle: ${fetchError.message}`);
+        }
+
+        // 5. Track changes for logging
         const changes: Record<string, { old: any, new: any }> = {};
         const fieldsToCheck = job.field_names.length > 0 
           ? job.field_names 
-          : ['vin', 'mileage', 'transmission', 'engine', 'exterior_color', 'interior_color', 'drivetrain', 'seller_name'];
+          : ['vin', 'year', 'make', 'model', 'drivetrain', 'series', 'trim', 'transmission', 'mileage'];
 
         for (const field of fieldsToCheck) {
           const oldValue = oldVehicle[field];
-          const newValue = newData[field];
+          const newValue = updatedVehicle?.[field];
 
           if (!oldValue && newValue) {
-            // NEW DATA FOUND!
-            console.log(`  ✨ ${field}: (none) → "${newValue}"`);
             changes[field] = { old: null, new: newValue };
           } else if (oldValue && newValue && oldValue !== newValue) {
-            // DATA CHANGED
-            console.log(`  🔄 ${field}: "${oldValue}" → "${newValue}"`);
             changes[field] = { old: oldValue, new: newValue };
           }
         }
 
-        if (Object.keys(changes).length === 0) {
-          console.log('  ℹ️  No changes detected');
+        // 6. Log forensic summary
+        console.log(`\n  📊 FORENSIC SUMMARY:`);
+        console.log(`     Evidence collected: ${forensicResult?.evidence_collected || 0}`);
+        console.log(`     Consensus built: ${consensusResults.length}`);
+        console.log(`     Anomalies found: ${anomalies?.length || 0}`);
+        console.log(`     Fields updated: ${Object.keys(changes).length}`);
 
+        if (Object.keys(changes).length === 0) {
+          console.log('  ℹ️  No changes after forensic analysis');
+          
           await supabase
             .from('backfill_queue')
             .update({
@@ -142,48 +212,39 @@ serve(async (req) => {
               processed_at: new Date().toISOString()
             })
             .eq('id', job.id);
-
+            
           results.push({ 
             id: job.id, 
             vehicle_id: job.vehicle_id,
             success: true, 
-            changes: 0 
+            changes: 0,
+            forensic_summary: {
+              evidence: forensicResult?.evidence_collected || 0,
+              consensus: consensusResults.length,
+              anomalies: anomalies?.length || 0
+            }
           });
           continue;
         }
 
-        // Apply updates to vehicle
-        const updates = Object.fromEntries(
-          Object.entries(changes).map(([k, v]) => [k, v.new])
-        );
+        console.log(`  ✅ Forensic system updated ${Object.keys(changes).length} fields`);
 
-        const { error: updateError } = await supabase
-          .from('vehicles')
-          .update(updates)
-          .eq('id', job.vehicle_id);
-
-        if (updateError) {
-          throw new Error(`Failed to update vehicle: ${updateError.message}`);
-        }
-
-        console.log(`  ✅ Updated ${Object.keys(changes).length} fields`);
-
-        // Log extraction metadata for each changed field
+        // Log extraction metadata for audit trail
         for (const [field, { new: newVal }] of Object.entries(changes)) {
-          const confidenceScore = field === 'seller_name' && String(newVal).split(' ').length === 1 
-            ? 0.3  // Low confidence for first-name-only
-            : 0.9; // High confidence for everything else
-
           await supabase.from('extraction_metadata').insert({
             vehicle_id: job.vehicle_id,
             field_name: field,
             field_value: String(newVal),
-            extraction_method: 'automated_backfill',
+            extraction_method: 'forensic_backfill',
             scraper_version: job.scraper_version_id || 'backfill_v1',
             source_url: job.source_url,
-            confidence_score: confidenceScore,
-            validation_status: confidenceScore < 0.6 ? 'low_confidence' : 'unvalidated',
-            raw_extraction_data: { backfill_job_id: job.id, full_scrape: newData }
+            confidence_score: 0.9,  // High confidence after forensic validation
+            validation_status: 'forensic_validated',
+            raw_extraction_data: { 
+              backfill_job_id: job.id, 
+              forensic_evidence: forensicResult?.evidence_collected || 0,
+              anomalies: anomalies?.length || 0
+            }
           });
         }
 

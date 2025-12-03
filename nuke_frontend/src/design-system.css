@@ -718,33 +718,15 @@ body {
   padding-top: 0;
 }
 
-.header-wrapper {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: var(--grey-200);
-  border-bottom: 1px solid var(--border-medium);
-  left: 0;
-  right: 0;
-}
-
-.header-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 5px; /* slight side padding */
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 40px;
-  width: 100%;
-  box-sizing: border-box;
-}
+/* REMOVED - now in header-fix.css */
+/* .header-wrapper, .header-content, .header-left moved to header-fix.css for clean separation */
 
 .header-left {
+  /* Keeping this for backwards compatibility but header-fix.css takes precedence */
   display: flex;
   align-items: center;
   gap: var(--space-6);
-  padding-left: 5px; /* ensure min inset from left edge */
+  padding-left: 5px;
   flex: 0 0 auto;
   min-width: 0;
 }
@@ -1994,16 +1976,7 @@ body {
     display: flex;
   }
   
-  .header-wrapper {
-    background: var(--grey-200) !important;
-    border-bottom: 1px solid var(--border-medium) !important;
-  }
-  
-  .header-content {
-    padding: 0 5px !important; /* match desktop exactly */
-    height: 40px !important;
-    min-height: 40px !important;
-  }
+  /* REMOVED - header-wrapper and header-content now in header-fix.css */
   
   .profile-bubble {
     width: 40px;
@@ -3180,19 +3153,7 @@ body {
     padding: 0;
   }
 
-  /* Navigation adjustments - keep same as desktop */
-  .header-wrapper {
-    background: var(--grey-200) !important;
-    border-bottom: 1px solid var(--border-medium) !important;
-  }
-  
-  .header-content {
-    padding: 0 5px !important; /* match desktop exactly */
-    flex-wrap: nowrap;
-    height: 40px !important;
-    min-height: 40px !important;
-    overflow: hidden;
-  }
+  /* REMOVED - header rules now in header-fix.css for clean responsive design */
 
   .header-left {
     flex: 0 0 auto;
@@ -3433,12 +3394,8 @@ body {
     height: 16px !important;
   }
   
-  /* Ensure z-index hierarchy on mobile - keep same as desktop */
-  .header-wrapper {
-    z-index: 100 !important;
-    background: var(--grey-200) !important;
-    border-bottom: 1px solid var(--border-medium) !important;
-  }
+  /* REMOVED - header-wrapper now defined in header-fix.css with proper z-index: 1000 */
+  /* Old conflicting rule removed - was forcing z-index: 100 !important */
   
   /* Upload components should be above everything */
   .fixed.inset-0[style*="z-index: 9999"],

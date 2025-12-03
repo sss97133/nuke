@@ -572,14 +572,12 @@ const EditVehicle: React.FC = () => {
                           />
                         </div>
 
-                        <div className="form-group">
-                          <SeriesSelector
-                            make={formData.make}
-                            model={formData.model}
-                            series={formData.series || ''}
-                            onSeriesChange={(series) => handleInputChange({ target: { name: 'series', value: series } } as any)}
-                          />
-                        </div>
+                        <SeriesSelector
+                          make={formData.make}
+                          model={formData.model}
+                          series={formData.series || ''}
+                          onSeriesChange={(series) => handleInputChange({ target: { name: 'series', value: series } } as any)}
+                        />
 
                         <div className="form-group">
                           <TrimSelector
