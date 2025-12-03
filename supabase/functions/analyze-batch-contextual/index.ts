@@ -79,36 +79,75 @@ interface BatchContext {
 }
 
 interface SituationalAnalysis {
-  // Core understanding
-  situation_summary: string
-  work_type: string
-  work_category: 'maintenance' | 'repair' | 'restoration' | 'modification' | 'inspection' | 'documentation'
+  // THE 5 W's - Journalistic structure
+  who: {
+    primary_actor: string // Who did the work
+    skill_level: 'professional' | 'skilled_enthusiast' | 'diy_learner' | 'helper'
+    involvement_type: 'hands_on_work' | 'supervision' | 'documentation' | 'assistance'
+  }
   
-  // What's happening
-  primary_activity: string
-  components_involved: string[]
-  tools_equipment_visible: string[]
-  work_quality_indicator: 'professional' | 'skilled_diy' | 'amateur' | 'unknown'
+  what: {
+    work_performed: string // What was done (detailed)
+    work_category: 'maintenance' | 'repair' | 'restoration' | 'modification' | 'inspection' | 'documentation'
+    components_affected: string[]
+    tools_equipment_used: string[]
+    parts_materials: string[]
+  }
   
-  // Temporal understanding
-  is_continuation: boolean
-  continuation_of?: string
-  is_preparation: boolean
-  preparation_for?: string
-  is_standalone: boolean
+  when: {
+    session_date: string
+    estimated_duration_hours: number
+    time_of_day_indicator?: 'morning' | 'afternoon' | 'evening' | 'night' | 'unknown'
+    is_continuation: boolean
+    continuation_of?: string
+    is_preparation: boolean
+    preparation_for?: string
+  }
   
-  // Time investment
-  estimated_work_hours: number
-  estimated_session_duration_hours: number
-  commitment_level: number // 0-100
+  where: {
+    work_location: 'professional_shop' | 'home_garage' | 'driveway' | 'mobile' | 'unknown'
+    location_indicators: string[]
+    environment_quality: 'professional' | 'well_equipped' | 'basic' | 'minimal'
+  }
   
-  // User association
-  user_involvement_level: 'primary_worker' | 'documenting' | 'supervising' | 'observing'
-  user_skill_indicators: string[]
-  user_commitment_indicators: string[]
+  why: {
+    primary_motivation: string // Why this work was done
+    problem_being_solved?: string
+    goal_being_achieved?: string
+    preventive_vs_reactive: 'preventive' | 'reactive' | 'improvement' | 'emergency'
+    necessity_level: 'critical' | 'important' | 'beneficial' | 'optional'
+  }
   
-  // Contextual insights
-  relationship_to_previous_work: string
+  // VALUE CALCULATION
+  value_assessment: {
+    labor_value: {
+      estimated_hours: number
+      skill_rate_per_hour: number // Market rate for this skill level
+      total_labor_value: number
+    }
+    documentation_value: {
+      photo_quality: 'excellent' | 'good' | 'adequate' | 'poor'
+      documentation_completeness: number // 0-100
+      estimated_value: number // What this documentation adds to vehicle value
+    }
+    vehicle_impact: {
+      impact_type: 'increases_value' | 'maintains_value' | 'prevents_loss' | 'neutral'
+      estimated_impact_amount: number // Dollar amount impact on vehicle value
+      explanation: string
+    }
+    market_comparison: {
+      shop_cost_equivalent: number // What this would cost at a shop
+      savings_realized: number // If DIY, savings vs shop
+      parts_cost_estimate?: number
+    }
+    total_event_value: number // Combined value of this work session
+    value_confidence: number // 0-100 confidence in valuation
+  }
+  
+  // Narrative
+  narrative_summary: string // One paragraph story of what happened
+  
+  // Context
   relationship_to_vehicle_history: string
   patterns_detected: string[]
   
@@ -361,14 +400,32 @@ async function analyzeSituationalContext(context: BatchContext): Promise<Situati
   }
 
   // Build system prompt following Claude best practices
-  const systemPrompt = `You are an expert automotive analyst with deep understanding of vehicle restoration, maintenance, and documentation patterns. Your role is to understand the COMPLETE SITUATION surrounding a batch of vehicle images, not just what's visible in individual photos.
+  const systemPrompt = `You are an expert automotive analyst and appraiser with deep understanding of vehicle restoration, maintenance, market values, and labor rates. Your role is to understand the COMPLETE SITUATION surrounding a batch of vehicle images and CALCULATE THE VALUE of the work performed.
 
 CRITICAL ANALYSIS REQUIREMENTS:
-1. Understand the WHOLE SITUATION - what work is being performed, why, and how it fits into the vehicle's history
-2. Identify temporal relationships - is this a continuation of previous work, preparation for future work, or standalone?
-3. Recognize user patterns - what does this batch reveal about the user's involvement, skill level, and commitment?
-4. Calculate time investment - estimate actual work hours and session duration
-5. Assess commitment level - based on patterns, consistency, and time investment
+1. THE 5 W's - Structure your analysis journalistically:
+   - WHO: Who did the work? What skill level? What was their role?
+   - WHAT: What work was performed? What components? What tools/parts?
+   - WHEN: When did this happen? How long? Continuation or standalone?
+   - WHERE: Where was work done? Shop quality? Environment indicators?
+   - WHY: Why was this work done? Problem solving? Preventive? Goal?
+
+2. VALUE CALCULATION - Assign real dollar value to this event:
+   - Labor Value: Hours × Market Rate for skill level shown
+     * Professional shop: $100-150/hr
+     * Skilled enthusiast: $50-75/hr  
+     * DIY learner: $25-40/hr
+   - Documentation Value: Quality photos add resale value
+   - Vehicle Impact: Does this increase/maintain/prevent value loss?
+   - Market Comparison: What would shop charge for this work?
+   - Total Event Value: Real dollar worth of this session
+
+3. Deep Knowledge Application:
+   - Know typical labor times for specific jobs
+   - Understand part costs and quality tiers
+   - Recognize professional vs amateur workmanship
+   - Assess impact on vehicle market value
+   - Compare to industry-standard labor rates
 
 VEHICLE CONTEXT:
 - ${context.vehicle.year} ${context.vehicle.make} ${context.vehicle.model}${context.vehicle.trim ? ` ${context.vehicle.trim}` : ''}
@@ -391,7 +448,18 @@ CURRENT BATCH:
 - Time span: ${context.imageBatch.time_span_hours.toFixed(1)} hours
 - Date range: ${new Date(context.imageBatch.date_range.earliest).toLocaleDateString()} to ${new Date(context.imageBatch.date_range.latest).toLocaleDateString()}
 
-Analyze these images and provide a comprehensive situational understanding.`
+MARKET CONTEXT (for valuation):
+- Professional shop labor typically: $100-150/hr
+- Skilled DIY equivalent value: $50-75/hr
+- Well-documented work adds 5-10% to resale value
+- Preventive maintenance preserves value
+- Quality restoration increases value
+
+Analyze these images and provide:
+1. Complete 5 W's breakdown
+2. Detailed value calculation with real dollar amounts
+3. Market-rate comparison
+4. Impact on vehicle value`
 
   // Build user message with images
   const userMessage = {
@@ -399,16 +467,25 @@ Analyze these images and provide a comprehensive situational understanding.`
     content: [
       {
         type: 'text',
-        text: `Analyze this batch of ${context.imageBatch.count} images and provide a complete situational understanding. Consider:
-        
-1. What work is being performed? (be specific)
-2. How does this relate to previous work on this vehicle?
-3. Is this a continuation, preparation, or standalone work?
-4. What is the user's involvement level and skill indicators?
-5. What time investment does this represent?
-6. What patterns emerge about user commitment?
+        text: `Analyze this batch of ${context.imageBatch.count} images using the 5 W's framework and calculate the VALUE:
 
-Respond in JSON format with the structure defined in the system prompt.`
+THE 5 W's:
+1. WHO: Who did this work? What skill level do they demonstrate? Are they the primary worker or documenting?
+2. WHAT: What specific work was performed? What components? What tools/parts are visible?
+3. WHEN: When did this happen? How long did it take? Does it continue previous work or prepare for future work?
+4. WHERE: Where was this done? Professional shop? Home garage? What does environment tell us?
+5. WHY: Why was this work necessary? Fixing a problem? Preventive? Improvement? How critical was it?
+
+VALUE CALCULATION (use real dollar amounts):
+- Labor Value: Estimate hours × appropriate market rate for skill level shown
+- Documentation Value: How much does this photo documentation add to vehicle value?
+- Vehicle Impact: Does this work increase value? Maintain it? Prevent loss? By how much?
+- Market Comparison: What would a shop charge for this exact work?
+- Total Event Value: What is this work session worth in real dollars?
+
+Provide detailed reasoning for all value calculations. Use market knowledge of typical labor rates and times.
+
+Respond in JSON format matching the SituationalAnalysis interface.`
       },
       ...context.imageBatch.image_urls.slice(0, 20).map(url => ({
         type: 'image' as const,

@@ -539,155 +539,360 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
           </div>
         </div>
 
-        {/* WORK PERFORMED - COMPACT */}
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
-          <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '4px', color: '#666', textTransform: 'uppercase' }}>
-            Work Performed:
-          </div>
-          <div style={{ fontSize: '8pt', marginBottom: '4px', padding: '6px', background: '#f9f9f9', borderRadius: '2px' }}>
-            <div style={{ fontWeight: 700 }}>{event.title}</div>
-            {event.description && (
-              <div style={{ marginTop: '4px', color: 'var(--text-secondary)' }}>
-                {event.description}
+        {/* WORK NARRATIVE - 5 W's + VALUE */}
+        {event.metadata?.contextual_analysis ? (
+          // ANALYZED: Show the complete story with 5 W's and VALUE
+          <div style={{ borderBottom: '3px double #000' }}>
+            
+            {/* NARRATIVE SUMMARY */}
+            <div style={{ padding: '12px 16px', background: 'linear-gradient(to bottom, #fafafa, #fff)', borderBottom: '2px solid #e5e5e5' }}>
+              <div style={{ fontSize: '9pt', fontWeight: 700, lineHeight: 1.4, marginBottom: '6px' }}>
+                {event.metadata.contextual_analysis.narrative_summary || event.metadata.contextual_analysis.situation_summary || event.title}
+              </div>
+              {event.metadata.contextual_analysis.why?.primary_motivation && (
+                <div style={{ fontSize: '8pt', color: '#666', fontStyle: 'italic' }}>
+                  {event.metadata.contextual_analysis.why.primary_motivation}
+                </div>
+              )}
+            </div>
+
+            {/* THE 5 W's */}
+            <div style={{ padding: '12px 16px', background: '#f9f9f9', borderBottom: '2px solid #e5e5e5' }}>
+              <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '8px', letterSpacing: '0.5px', color: '#666' }}>
+                THE 5 W's
+              </div>
+              
+              <div style={{ display: 'grid', gap: '8px', fontSize: '8pt' }}>
+                {/* WHO */}
+                {event.metadata.contextual_analysis.who && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ fontWeight: 700, minWidth: '60px', color: '#333' }}>WHO:</div>
+                    <div>
+                      {event.metadata.contextual_analysis.who.primary_actor || uploaderName} 
+                      {event.metadata.contextual_analysis.who.skill_level && (
+                        <span style={{ color: '#666', marginLeft: '4px' }}>
+                          ({event.metadata.contextual_analysis.who.skill_level.replace(/_/g, ' ')})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* WHAT */}
+                {event.metadata.contextual_analysis.what && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ fontWeight: 700, minWidth: '60px', color: '#333' }}>WHAT:</div>
+                    <div>
+                      {event.metadata.contextual_analysis.what.work_performed}
+                      {event.metadata.contextual_analysis.what.components_affected?.length > 0 && (
+                        <div style={{ color: '#666', fontSize: '7pt', marginTop: '2px' }}>
+                          Components: {event.metadata.contextual_analysis.what.components_affected.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* WHEN */}
+                {event.metadata.contextual_analysis.when && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ fontWeight: 700, minWidth: '60px', color: '#333' }}>WHEN:</div>
+                    <div>
+                      {new Date(event.event_date).toLocaleDateString()} 
+                      {event.metadata.contextual_analysis.when.estimated_duration_hours && (
+                        <span> ({event.metadata.contextual_analysis.when.estimated_duration_hours.toFixed(1)}h session)</span>
+                      )}
+                      {event.metadata.contextual_analysis.when.is_continuation && event.metadata.contextual_analysis.when.continuation_of && (
+                        <div style={{ fontSize: '7pt', color: '#3b82f6', marginTop: '2px' }}>
+                          ↪ Continues: {event.metadata.contextual_analysis.when.continuation_of}
+                        </div>
+                      )}
+                      {event.metadata.contextual_analysis.when.is_preparation && event.metadata.contextual_analysis.when.preparation_for && (
+                        <div style={{ fontSize: '7pt', color: '#10b981', marginTop: '2px' }}>
+                          → Prepares: {event.metadata.contextual_analysis.when.preparation_for}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* WHERE */}
+                {event.metadata.contextual_analysis.where && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ fontWeight: 700, minWidth: '60px', color: '#333' }}>WHERE:</div>
+                    <div>
+                      {event.metadata.contextual_analysis.where.work_location?.replace(/_/g, ' ')}
+                      {event.metadata.contextual_analysis.where.environment_quality && (
+                        <span style={{ color: '#666', marginLeft: '4px' }}>
+                          ({event.metadata.contextual_analysis.where.environment_quality} setup)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* WHY */}
+                {event.metadata.contextual_analysis.why && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ fontWeight: 700, minWidth: '60px', color: '#333' }}>WHY:</div>
+                    <div>
+                      {event.metadata.contextual_analysis.why.problem_being_solved || event.metadata.contextual_analysis.why.goal_being_achieved}
+                      {event.metadata.contextual_analysis.why.preventive_vs_reactive && (
+                        <div style={{ 
+                          display: 'inline-block',
+                          marginLeft: '6px',
+                          padding: '1px 4px',
+                          fontSize: '6pt',
+                          fontWeight: 700,
+                          background: event.metadata.contextual_analysis.why.preventive_vs_reactive === 'emergency' ? '#fee' :
+                                     event.metadata.contextual_analysis.why.preventive_vs_reactive === 'preventive' ? '#efe' : '#fef9e7',
+                          border: '1px solid #ccc',
+                          textTransform: 'uppercase'
+                        }}>
+                          {event.metadata.contextual_analysis.why.preventive_vs_reactive}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* VALUE ASSESSMENT */}
+            {event.metadata.contextual_analysis.value_assessment && (
+              <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', borderBottom: '2px solid #f59e0b' }}>
+                <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '8px', letterSpacing: '0.5px', color: '#78350f' }}>
+                  VALUE ASSESSMENT
+                </div>
+
+                {/* Total Event Value - Hero */}
+                <div style={{ marginBottom: '12px', padding: '8px', background: '#fff', border: '2px solid #000' }}>
+                  <div style={{ fontSize: '6pt', fontWeight: 700, color: '#666', marginBottom: '2px', letterSpacing: '0.5px' }}>
+                    TOTAL EVENT VALUE
+                  </div>
+                  <div style={{ fontSize: '14pt', fontWeight: 700, color: '#000' }}>
+                    ${event.metadata.contextual_analysis.value_assessment.total_event_value?.toLocaleString() || '0'}
+                  </div>
+                  {event.metadata.contextual_analysis.value_assessment.value_confidence && (
+                    <div style={{ fontSize: '6pt', color: '#666', marginTop: '2px' }}>
+                      Confidence: {event.metadata.contextual_analysis.value_assessment.value_confidence}%
+                    </div>
+                  )}
+                </div>
+
+                {/* Value Breakdown */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '7pt' }}>
+                  {/* Labor Value */}
+                  {event.metadata.contextual_analysis.value_assessment.labor_value && (
+                    <div style={{ padding: '6px', background: '#fff', border: '1px solid #d1d5db' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '2px', color: '#666' }}>Labor Value</div>
+                      <div style={{ fontWeight: 700 }}>
+                        ${event.metadata.contextual_analysis.value_assessment.labor_value.total_labor_value?.toLocaleString() || '0'}
+                      </div>
+                      <div style={{ fontSize: '6pt', color: '#666', marginTop: '2px' }}>
+                        {event.metadata.contextual_analysis.value_assessment.labor_value.estimated_hours?.toFixed(1)}h × 
+                        ${event.metadata.contextual_analysis.value_assessment.labor_value.skill_rate_per_hour}/hr
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Market Comparison */}
+                  {event.metadata.contextual_analysis.value_assessment.market_comparison && (
+                    <div style={{ padding: '6px', background: '#fff', border: '1px solid #d1d5db' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '2px', color: '#666' }}>Shop Cost</div>
+                      <div style={{ fontWeight: 700 }}>
+                        ${event.metadata.contextual_analysis.value_assessment.market_comparison.shop_cost_equivalent?.toLocaleString() || '0'}
+                      </div>
+                      {event.metadata.contextual_analysis.value_assessment.market_comparison.savings_realized > 0 && (
+                        <div style={{ fontSize: '6pt', color: '#10b981', marginTop: '2px', fontWeight: 700 }}>
+                          Saved: ${event.metadata.contextual_analysis.value_assessment.market_comparison.savings_realized.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Vehicle Impact */}
+                  {event.metadata.contextual_analysis.value_assessment.vehicle_impact && (
+                    <div style={{ padding: '6px', background: '#fff', border: '1px solid #d1d5db' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '2px', color: '#666' }}>Vehicle Impact</div>
+                      <div style={{ 
+                        fontWeight: 700,
+                        color: event.metadata.contextual_analysis.value_assessment.vehicle_impact.impact_type === 'increases_value' ? '#10b981' :
+                               event.metadata.contextual_analysis.value_assessment.vehicle_impact.impact_type === 'prevents_loss' ? '#3b82f6' : '#666'
+                      }}>
+                        {event.metadata.contextual_analysis.value_assessment.vehicle_impact.impact_type === 'increases_value' ? '+' : ''}
+                        ${Math.abs(event.metadata.contextual_analysis.value_assessment.vehicle_impact.estimated_impact_amount || 0).toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: '6pt', color: '#666', marginTop: '2px', textTransform: 'capitalize' }}>
+                        {event.metadata.contextual_analysis.value_assessment.vehicle_impact.impact_type?.replace(/_/g, ' ')}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Documentation Value */}
+                  {event.metadata.contextual_analysis.value_assessment.documentation_value && (
+                    <div style={{ padding: '6px', background: '#fff', border: '1px solid #d1d5db' }}>
+                      <div style={{ fontWeight: 700, marginBottom: '2px', color: '#666' }}>Documentation</div>
+                      <div style={{ fontWeight: 700 }}>
+                        +${event.metadata.contextual_analysis.value_assessment.documentation_value.estimated_value?.toLocaleString() || '0'}
+                      </div>
+                      <div style={{ fontSize: '6pt', color: '#666', marginTop: '2px', textTransform: 'capitalize' }}>
+                        {event.metadata.contextual_analysis.value_assessment.documentation_value.photo_quality} quality
+                        ({event.metadata.contextual_analysis.value_assessment.documentation_value.documentation_completeness}% complete)
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Value Explanation */}
+                {event.metadata.contextual_analysis.value_assessment.vehicle_impact?.explanation && (
+                  <div style={{ marginTop: '8px', fontSize: '7pt', fontStyle: 'italic', color: '#78350f', lineHeight: 1.4 }}>
+                    {event.metadata.contextual_analysis.value_assessment.vehicle_impact.explanation}
+                  </div>
+                )}
               </div>
             )}
           </div>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-            Type: {event.event_type.replace('_', ' ')}
-          </div>
-        </div>
-
-        {/* CONTEXTUAL ANALYSIS STATUS */}
-        {event.metadata?.contextual_analysis && (
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: '#f0f9ff' }}>
-            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
-              Contextual Analysis:
-            </div>
-            <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
-              <div style={{ fontWeight: 600, marginBottom: '4px' }}>
-                {event.metadata.contextual_analysis.situation_summary}
-              </div>
-              {event.metadata.contextual_analysis.primary_activity && (
-                <div style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                  Activity: {event.metadata.contextual_analysis.primary_activity}
-                </div>
-              )}
-              {event.metadata.contextual_analysis.components_involved && event.metadata.contextual_analysis.components_involved.length > 0 && (
-                <div style={{ color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                  Components: {event.metadata.contextual_analysis.components_involved.join(', ')}
-                </div>
-              )}
-              {event.metadata.contextual_analysis.temporal_relationships && (
-                <div style={{ marginTop: '6px', padding: '4px', background: '#fff', borderRadius: '2px', fontSize: '7pt' }}>
-                  {event.metadata.contextual_analysis.temporal_relationships.is_continuation && (
-                    <div>Continuation of: {event.metadata.contextual_analysis.temporal_relationships.continuation_of || 'previous work'}</div>
-                  )}
-                  {event.metadata.contextual_analysis.temporal_relationships.is_preparation && (
-                    <div>Preparation for: {event.metadata.contextual_analysis.temporal_relationships.preparation_for || 'future work'}</div>
-                  )}
-                  {event.metadata.contextual_analysis.temporal_relationships.is_standalone && (
-                    <div>Standalone work session</div>
-                  )}
-                </div>
-              )}
-              {event.metadata.contextual_analysis.time_investment && (
-                <div style={{ marginTop: '4px', fontSize: '7pt', color: 'var(--text-muted)' }}>
-                  Estimated: {event.metadata.contextual_analysis.time_investment.estimated_work_hours || 0} hours work, 
-                  {event.metadata.contextual_analysis.time_investment.estimated_session_duration_hours?.toFixed(1) || 0} hours session
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* USER COMMITMENT SCORE */}
-        {event.metadata?.user_commitment_score && (
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: '#fef3c7' }}>
-            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
-              User Commitment Level:
-            </div>
-            <div style={{ fontSize: '8pt' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <span style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '9pt' }}>
-                  {event.metadata.user_commitment_score.level}
-                </span>
-                <span style={{ color: 'var(--text-muted)' }}>
-                  ({event.metadata.user_commitment_score.overall_commitment}/100)
-                </span>
-              </div>
-              {event.metadata.user_commitment_score.factors && event.metadata.user_commitment_score.factors.length > 0 && (
-                <div style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  Factors: {event.metadata.user_commitment_score.factors.join(', ')}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* PENDING CONTEXTUAL ANALYSIS */}
-        {images.length > 0 && !event.metadata?.contextual_analysis && (
-          <div style={{
-            padding: '12px 16px',
-            background: '#fff3cd',
-            border: '1px solid #ffc107',
-            margin: '0',
-            fontSize: '8pt'
+        ) : images.length > 0 ? (
+          // PENDING: Show what we're waiting to understand
+          <div style={{ 
+            padding: '16px', 
+            borderBottom: '3px double #000',
+            background: 'linear-gradient(135deg, #fff3cd 0%, #fef3c7 100%)',
+            position: 'relative'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: '2px', color: '#856404', textTransform: 'uppercase' }}>
-                  Evidence set ({images.length} {images.length === 1 ? 'photo' : 'photos'}) pending analysis
-                </div>
-                <div style={{ color: '#856404', fontSize: '7pt' }}>
-                  Contextual analysis will identify the complete situation, temporal relationships, and user commitment level
-                </div>
+            <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '8px', color: '#856404', letterSpacing: '0.5px' }}>
+              EVIDENCE SET ({images.length} {images.length === 1 ? 'PHOTO' : 'PHOTOS'})
+            </div>
+            
+            {/* Visual representation of pending analysis */}
+            <div style={{ marginBottom: '12px', fontSize: '8pt', color: '#856404', lineHeight: 1.6 }}>
+              <div style={{ marginBottom: '6px' }}>
+                📸 {images.length} images captured on {new Date(event.event_date).toLocaleDateString()}
               </div>
-              <button
-                onClick={async () => {
-                  try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (!session?.user) {
-                      alert('Please sign in to trigger analysis');
-                      return;
-                    }
+              <div style={{ marginBottom: '6px' }}>
+                🔍 <strong>Pending contextual analysis</strong> to determine:
+              </div>
+              <ul style={{ margin: '4px 0 0 20px', padding: 0, fontSize: '7pt' }}>
+                <li>What work was performed and why</li>
+                <li>How this connects to previous/future work</li>
+                <li>User involvement level and time investment</li>
+                <li>Patterns and insights from documentation</li>
+              </ul>
+            </div>
 
-                    // Trigger contextual analysis
-                    const { error } = await supabase.functions.invoke('analyze-batch-contextual', {
-                      body: {
-                        event_id: eventId,
-                        vehicle_id: event.vehicle_id,
-                        user_id: event.user_id || session.user.id,
-                        image_ids: images.map(img => img.id)
-                      }
-                    });
-
-                    if (error) {
-                      console.error('Error triggering contextual analysis:', error);
-                      alert('Failed to trigger analysis. Please try again.');
-                    } else {
-                      // Reload event data after a delay
-                      setTimeout(() => {
-                        loadEventData();
-                      }, 3000);
-                    }
-                  } catch (error) {
-                    console.error('Error:', error);
-                    alert('Failed to trigger analysis');
-                  }
-                }}
-                className="button cursor-button"
-                style={{
-                  padding: '6px 12px',
-                  border: '2px solid var(--warning)',
-                  background: 'var(--surface)',
-                  color: 'var(--warning-dark)',
-                  fontSize: '8pt',
+            {/* Thumbnail Preview */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '4px', 
+              marginBottom: '12px',
+              overflowX: 'auto',
+              padding: '4px 0'
+            }}>
+              {images.slice(0, 6).map((img, idx) => (
+                <img
+                  key={img.id}
+                  src={img.image_url}
+                  alt={`Evidence ${idx + 1}`}
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    objectFit: 'cover',
+                    border: '2px solid #000',
+                    opacity: 0.6,
+                    filter: 'grayscale(50%)'
+                  }}
+                />
+              ))}
+              {images.length > 6 && (
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#856404',
+                  color: '#fff',
+                  fontSize: '7pt',
                   fontWeight: 700,
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                ANALYZE NOW
-              </button>
+                  border: '2px solid #000'
+                }}>
+                  +{images.length - 6}
+                </div>
+              )}
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={async () => {
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session?.user) {
+                    alert('Please sign in to trigger analysis');
+                    return;
+                  }
+
+                  // Trigger contextual analysis
+                  const { error } = await supabase.functions.invoke('analyze-batch-contextual', {
+                    body: {
+                      event_id: eventId,
+                      vehicle_id: event.vehicle_id,
+                      user_id: event.user_id || session.user.id,
+                      image_ids: images.map(img => img.id)
+                    }
+                  });
+
+                  if (error) {
+                    console.error('Error triggering contextual analysis:', error);
+                    alert('Failed to trigger analysis. Please try again.');
+                  } else {
+                    alert('Analysis started! Reload in 10 seconds to see results.');
+                    setTimeout(() => {
+                      loadEventData();
+                    }, 10000);
+                  }
+                } catch (error) {
+                  console.error('Error:', error);
+                  alert('Failed to trigger analysis');
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '2px solid #000',
+                background: '#fff',
+                color: '#000',
+                fontSize: '8pt',
+                fontWeight: 700,
+                cursor: 'pointer',
+                letterSpacing: '0.5px',
+                transition: 'all 0.12s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#000';
+                e.currentTarget.style.color = '#fff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#fff';
+                e.currentTarget.style.color = '#000';
+              }}
+            >
+              UNDERSTAND THE COMPLETE SITUATION →
+            </button>
+          </div>
+        ) : (
+          // NO IMAGES: Standard work performed
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd' }}>
+            <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '4px', color: '#666', textTransform: 'uppercase' }}>
+              Work Performed:
+            </div>
+            <div style={{ fontSize: '8pt', marginBottom: '4px', padding: '6px', background: '#f9f9f9', borderRadius: '2px' }}>
+              <div style={{ fontWeight: 700 }}>{event.title}</div>
+              {event.description && (
+                <div style={{ marginTop: '4px', color: 'var(--text-secondary)' }}>
+                  {event.description}
+                </div>
+              )}
             </div>
           </div>
         )}
