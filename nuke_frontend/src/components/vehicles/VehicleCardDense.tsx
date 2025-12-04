@@ -94,7 +94,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   };
 
   const imageUrl = getImageUrl();
-  const displayPrice = vehicle.sale_price || vehicle.current_value;
+  // Price priority: sale_price (sold) > asking_price (listed) > current_value (estimated)
+  const displayPrice = vehicle.sale_price || vehicle.asking_price || vehicle.current_value;
   const timeAgo = formatTimeAgo(vehicle.updated_at || vehicle.created_at);
 
   // LIST VIEW: Cursor-style - compact, dense, single row

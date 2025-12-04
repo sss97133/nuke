@@ -113,8 +113,55 @@ serve(async (req) => {
               // Auto-update vehicle VIN if vehicle doesn't have one
               await supabase
                 .from('vehicles')
-                .update({ vin: vinTagData.vin })
+                .update({ 
+                  vin: vinTagData.vin,
+                  vin_source: 'Photo OCR'
+                })
                 .eq('id', vehicle_id)
+              
+              // Create field source attribution for the VIN
+              await supabase
+                .from('vehicle_field_sources')
+                .insert({
+                  vehicle_id: vehicle_id,
+                  field_name: 'vin',
+                  field_value: vinTagData.vin,
+                  source_type: 'ai_scraped',
+                  source_url: image_url,
+                  confidence_score: Math.round(vinTagResponse.confidence),
+                  user_id: user_id,
+                  extraction_method: 'ocr',
+                  metadata: { 
+                    extracted_via: 'vin_plate_ocr',
+                    detection_confidence: vinTagResponse.confidence,
+                    vin_condition: vinTagData.condition || 'unknown'
+                  }
+                })
+                .then(() => console.log('✅ VIN field source created'))
+                .catch(err => console.warn('Failed to create VIN field source:', err))
+              
+              // Create timeline event for VIN extraction
+              await supabase
+                .from('timeline_events')
+                .insert({
+                  vehicle_id: vehicle_id,
+                  user_id: user_id,
+                  event_type: 'auction_listed',
+                  event_date: new Date().toISOString(),
+                  title: 'VIN Extracted from Photo',
+                  description: `VIN ${vinTagData.vin} was extracted from a VIN plate photo via AI vision.`,
+                  source: 'AI Vision OCR',
+                  source_type: 'user_input',
+                  confidence_score: Math.round(vinTagResponse.confidence),
+                  image_urls: [image_url],
+                  metadata: {
+                    vin: vinTagData.vin,
+                    extraction_method: 'ocr',
+                    vin_condition: vinTagData.condition || 'unknown'
+                  }
+                })
+                .then(() => console.log('✅ VIN timeline event created'))
+                .catch(err => console.warn('Failed to create VIN timeline event:', err))
             }
           }
         }

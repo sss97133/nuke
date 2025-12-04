@@ -46,7 +46,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
   };
 
   const calculateEstimate = () => {
-    return vehicle.current_value || vehicle.sale_price || vehicle.purchase_price || vehicle.msrp || 0;
+    return vehicle.sale_price || vehicle.asking_price || vehicle.current_value || vehicle.purchase_price || vehicle.msrp || 0;
   };
 
   const calculateChange = () => {
