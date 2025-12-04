@@ -886,7 +886,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     'ksl_import': 'KSL',
                     'api_import': 'API'
                   };
-                  return originLabels[origin] || origin;
+                  // Map the origin to display label, fallback to origin itself if not in map
+                  const displayLabel = originLabels[origin] || origin?.replace(/_/g, ' ') || 'Unknown';
+                  return displayLabel;
                 })()}
               </span>
             );
