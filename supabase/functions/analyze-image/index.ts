@@ -162,6 +162,21 @@ serve(async (req) => {
                 })
                 .then(() => console.log('✅ VIN timeline event created'))
                 .catch(err => console.warn('Failed to create VIN timeline event:', err))
+              
+              // Trigger NHTSA VIN decode to auto-fill specs (non-blocking)
+              fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/decode-vin-and-update`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                },
+                body: JSON.stringify({
+                  vehicle_id: vehicle_id,
+                  vin: vinTagData.vin
+                })
+              })
+                .then(() => console.log('✅ VIN decode triggered'))
+                .catch(err => console.warn('VIN decode trigger failed:', err))
             }
           }
         }
