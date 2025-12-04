@@ -42,7 +42,19 @@ Deno.serve(async (req) => {
     
     // Basic info
     if (getValue(26)) decoded.make = getValue(26) // Make
-    if (getValue(28)) decoded.model = getValue(28) // Model
+    if (getValue(28)) {
+      let model = getValue(28)
+      // Normalize NHTSA's redundant model names
+      // "C/K 30 Series K30" → "K30"
+      // "C/K 10 Series C10" → "C10"
+      if (model?.includes('C/K') && model?.includes('Series')) {
+        const seriesMatch = model.match(/(C|K)\d{2,4}/)
+        if (seriesMatch) {
+          model = seriesMatch[0] // Extract just "K30", "C10", etc.
+        }
+      }
+      decoded.model = model
+    }
     if (getValue(29)) decoded.year = parseInt(getValue(29) || '') // Model Year
     if (getValue(109)) decoded.trim = getValue(109) // Trim
     
