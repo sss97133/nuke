@@ -65,17 +65,34 @@ serve(async (req) => {
       firecrawlAttempted = true
       try {
         console.log('🔥 Attempting Firecrawl fetch for:', url)
+        
+        // KSL needs more aggressive settings due to bot protection
+        const firecrawlOptions: any = {
+          url,
+          formats: ['html', 'markdown']
+        }
+        
+        if (isKSL) {
+          // KSL-specific: longer wait, scroll action, mobile UA
+          firecrawlOptions.waitFor = 8000 // Wait 8 seconds
+          firecrawlOptions.mobile = true // Use mobile user agent
+          firecrawlOptions.actions = [
+            { type: 'wait', milliseconds: 3000 },
+            { type: 'scroll', direction: 'down' },
+            { type: 'wait', milliseconds: 2000 }
+          ]
+          console.log('🔥 Using aggressive settings for KSL')
+        } else {
+          firecrawlOptions.waitFor = 2000
+        }
+        
         const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${firecrawlApiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            url,
-            waitFor: 2000, // Wait 2 seconds for JS to load
-            formats: ['html', 'markdown']
-          })
+          body: JSON.stringify(firecrawlOptions)
         })
 
         if (firecrawlResponse.ok) {
