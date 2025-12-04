@@ -1089,23 +1089,51 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                            !vehicle?.uploaded_by);
                 const isOrgName = isAutomatedImport && vehicle?.origin_organization_id;
                 
-                // Check if this is a discovered vehicle (scraped, not owned)
+                // For discovered vehicles, show "Claim this vehicle" button
                 const isDiscoveredVehicle = Boolean(
                   (vehicle as any)?.discovery_url || 
                   (vehicle as any)?.discovery_source ||
                   ['craigslist_scrape', 'ksl_import', 'bat_import', 'url_scraper'].includes((vehicle as any)?.profile_origin)
                 );
                 
-                const relationshipLabel = isDiscoveredVehicle ? 'Discovered by ' : '';
+                if (isDiscoveredVehicle) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // TODO: Open claim modal/flow
+                        alert('Claim vehicle flow - upload title document to verify ownership');
+                      }}
+                      style={{
+                        border: '2px solid var(--border)',
+                        background: 'var(--white)',
+                        color: 'var(--text)',
+                        fontWeight: 700,
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        fontSize: '8pt',
+                        borderRadius: '3px',
+                        transition: 'all 0.12s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--grey-100)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--white)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                      title="Upload title document to claim ownership"
+                    >
+                      Claim this vehicle
+                    </button>
+                  );
+                }
                 
                 return (
-                  <>
-                    {relationshipLabel && (
-                      <span style={{ fontSize: '8pt', color: mutedTextColor, marginRight: '4px' }}>
-                        {relationshipLabel}
-                      </span>
-                    )}
-                    <button
+                  <button
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
@@ -1136,7 +1164,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   >
                     {responsibleName}
                   </button>
-                  </>
                 );
               })()
             ) : (
