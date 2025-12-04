@@ -1200,6 +1200,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           <button
             type="button"
             onClick={(e) => {
+              // Check if clicking on the provenance span - if so, let that handler take over
+              const target = e.target as HTMLElement;
+              if (target.closest('.provenance-price-clickable')) {
+                return; // Let the span's onClick handle this
+              }
+              
               // If has auction link, open it instead of menu
               if (auctionContext.link && e.metaKey) {
                 window.open(auctionContext.link, '_blank');
@@ -1227,6 +1233,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               title={priceWasCorrected ? 'Price was auto-corrected from listing (e.g., $15 -> $15,000)' : undefined}
             >
               <span
+                className="provenance-price-clickable"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowProvenancePopup(true);
