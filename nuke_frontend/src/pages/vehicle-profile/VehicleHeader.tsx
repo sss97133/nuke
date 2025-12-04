@@ -633,7 +633,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const primaryPrice = getDisplayValue();
   const primaryAmount = typeof primaryPrice.amount === 'number' ? primaryPrice.amount : null;
   const primaryLabel = primaryPrice.label || 'Price pending';
-  const priceText = primaryAmount !== null ? formatCurrency(primaryAmount) : 'Set a price';
+  
+  // For RNM (Reserve Not Met), show blurred high bid instead of "Set a price"
+  const isRNM = (vehicle as any)?.auction_outcome === 'reserve_not_met';
+  const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
+  const priceText = primaryAmount !== null 
+    ? formatCurrency(primaryAmount) 
+    : (isRNM && highBid) 
+      ? formatCurrency(highBid)
+      : 'Set a price';
   const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
   
   // Auction outcome badge and link
@@ -804,14 +812,78 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             if (isOrgName) return null;
             
             return (
-              <span style={{ fontSize: '7pt', color: mutedTextColor, padding: '1px 6px', background: 'var(--grey-100)', borderRadius: '3px', whiteSpace: 'nowrap' }}>
+              <span 
+                style={{ 
+                  fontSize: '7pt', 
+                  color: mutedTextColor, 
+                  padding: '1px 6px', 
+                  background: 'var(--grey-100)', 
+                  borderRadius: '3px', 
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const origin = (vehicle as any).profile_origin;
+                  const discoveryUrl = (vehicle as any).discovery_url;
+                  if (discoveryUrl) {
+                    window.open(discoveryUrl, '_blank');
+                  } else {
+                    alert(`Imported via ${origin}\n\nClick the source badge on other vehicles to see their import stats.`);
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--border)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--grey-100)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+                title={(vehicle as any).discovery_url ? "Click to view original listing" : "Import source"}
+              >
                 {(() => {
                   const origin = (vehicle as any).profile_origin;
+                  const discoveryUrl = (vehicle as any).discovery_url;
+                  
+                  // Show favicon for known sources with URLs
+                  if (discoveryUrl) {
+                    try {
+                      const domain = new URL(discoveryUrl).hostname;
+                      return (
+                        <>
+                          <img 
+                            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
+                            alt=""
+                            style={{ width: '10px', height: '10px' }}
+                            onError={(e) => {
+                              // Fallback to text if favicon fails
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          {origin === 'bat_import' ? 'BaT' : 
+                           origin === 'ksl_import' ? 'KSL' :
+                           origin === 'craigslist_scrape' ? 'CL' :
+                           domain.split('.')[0].toUpperCase()}
+                        </>
+                      );
+                    } catch {
+                      // Invalid URL, fallback to text
+                    }
+                  }
+                  
+                  // Fallback: Just show text label
                   const originLabels: Record<string, string> = {
-                    'bat_import': 'BAT',
+                    'bat_import': 'BaT',
                     'dropbox_import': 'Dropbox',
                     'url_scraper': 'Scraped',
                     'manual_entry': 'Manual',
+                    'craigslist_scrape': 'CL',
+                    'ksl_import': 'KSL',
                     'api_import': 'API'
                   };
                   return originLabels[origin] || origin;
@@ -1232,9 +1304,24 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   cursor: 'pointer',
                   textDecoration: 'underline',
                   textDecorationStyle: 'dotted',
-                  textDecorationColor: 'rgba(0,0,0,0.3)'
+                  textDecorationColor: 'rgba(0,0,0,0.3)',
+                  // Blur effect for RNM auctions (reserve not met)
+                  filter: isRNM && highBid ? 'blur(4px)' : 'none',
+                  transition: 'filter 0.2s ease'
                 }}
-                title="Click to see data source and confidence"
+                title={isRNM ? "Reserve not met - high bid hidden (click to reveal)" : "Click to see data source and confidence"}
+                onMouseEnter={(e) => {
+                  // Un-blur on hover for RNM
+                  if (isRNM && highBid) {
+                    e.currentTarget.style.filter = 'blur(0px)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  // Re-blur on mouse leave for RNM
+                  if (isRNM && highBid) {
+                    e.currentTarget.style.filter = 'blur(4px)';
+                  }
+                }}
               >
                 {priceText}
               </span>
