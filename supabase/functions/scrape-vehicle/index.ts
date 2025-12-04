@@ -438,16 +438,17 @@ function scrapeCraigslist(doc: any, url: string): any {
       data.year = parseInt(yearMatch[0])
     }
     
-    // Extract make/model (e.g., "1972 GMC Suburban" or "1974 Chevy shortbed truck" or "1961 International Scout 80")
+    // Extract make/model (e.g., "1972 GMC Suburban" or "1974 Chevy shortbed truck" or "1986 Ford F-250")
     // Try multiple patterns - be more flexible
-    let vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s+-|\s*\$|\(|$)/i)
+    // Note: Model names can contain hyphens (F-250, F-150, C-10) and bullet points (•) are common separators
+    let vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s-]+?)(?:\s+[•·–—-]\s*|\s+-|\s*\$|\(|$)/i)
     if (!vehicleMatch) {
       // Try pattern without price/location: "1974 Chevy shortbed truck"
-      vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s]+?)(?:\s*$|\s*\*\*)/i)
+      vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+([A-Za-z0-9\s-]+?)(?:\s*$|\s*\*\*)/i)
     }
     if (!vehicleMatch) {
-      // Try even more flexible: "1961 International Scout 80"
-      vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+([A-Za-z0-9\s]+?)(?:\s|$)/i)
+      // Try even more flexible: "1961 International Scout 80" or "1986 Ford F-250"
+      vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+([A-Za-z0-9\s-]+?)(?:\s|$)/i)
     }
     
     if (vehicleMatch && vehicleMatch[2] && vehicleMatch[3]) {
@@ -478,8 +479,8 @@ function scrapeCraigslist(doc: any, url: string): any {
     // If still no make/model, try extracting from full page text as fallback
     if (!data.make || !data.model) {
       const fullText = doc.body?.textContent || ''
-      // Look for patterns like "1961 International" or "International Scout"
-      const makeModelPattern = fullText.match(/\b(International|Chevrolet|Chevy|GMC|Ford|Dodge|Jeep|Toyota|Nissan)\s+([A-Za-z0-9\s]{3,30}?)(?:\s|$|,|\.)/i)
+      // Look for patterns like "1961 International Scout" or "Ford F-250"
+      const makeModelPattern = fullText.match(/\b(International|Chevrolet|Chevy|GMC|Ford|Dodge|Jeep|Toyota|Nissan)\s+([A-Za-z0-9\s-]{2,30}?)(?:\s|$|,|\.)/i)
       if (makeModelPattern && !data.make) {
         let make = makeModelPattern[1]
         if (make.toLowerCase() === 'chevy') make = 'Chevrolet'

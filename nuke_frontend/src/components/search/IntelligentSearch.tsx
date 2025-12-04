@@ -314,19 +314,28 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         });
 
         // Create timeline event for discovery (blocking to ensure it's created)
+        const sourceName = 'Craigslist';
+        const askingPrice = scrapedData.asking_price || scrapedData.price;
         try {
           const { error: timelineError } = await supabase.from('timeline_events').insert({
             vehicle_id: newVehicle.id,
-            event_type: 'discovery',
+            user_id: user.id,
+            event_type: 'auction_listed', // Valid type
             event_date: new Date().toISOString(),
-            title: `Discovered via Craigslist listing`,
-            description: `Discovered via Craigslist listing`,
-            source: 'craigslist_scrape',
+            title: `Listed for Sale on ${sourceName}`,
+            description: askingPrice 
+              ? `${newVehicle.year} ${newVehicle.make} ${newVehicle.model} listed for $${askingPrice.toLocaleString()}`
+              : `${newVehicle.year} ${newVehicle.make} ${newVehicle.model} discovered on ${sourceName}`,
+            source: sourceName,
+            source_type: 'dealer_record',
+            data_source: searchQuery.trim(),
+            confidence_score: 90,
+            cost_amount: askingPrice || null,
             metadata: {
               discovery_url: searchQuery.trim(),
               discovery_source: 'craigslist_scrape',
               automated: true,
-              asking_price: scrapedData.asking_price || scrapedData.price,
+              asking_price: askingPrice,
               listing_title: scrapedData.title
             }
           });
@@ -337,6 +346,32 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           }
         } catch (err) {
           console.warn('Timeline event creation error:', err);
+        }
+        
+        // Create field sources for scraped data (non-blocking)
+        const scrapedFields = [
+          { field_name: 'asking_price', field_value: String(askingPrice || '') },
+          { field_name: 'year', field_value: String(scrapedData.year || '') },
+          { field_name: 'make', field_value: scrapedData.make || '' },
+          { field_name: 'model', field_value: scrapedData.model || '' },
+        ].filter(f => f.field_value);
+        
+        for (const field of scrapedFields) {
+          supabase.from('vehicle_field_sources').insert({
+            vehicle_id: newVehicle.id,
+            field_name: field.field_name,
+            field_value: field.field_value,
+            source_type: 'ai_scraped',
+            source_url: searchQuery.trim(),
+            confidence_score: 90,
+            user_id: user.id,
+            extraction_method: 'url_scraping',
+            metadata: { source: sourceName, scrape_date: new Date().toISOString() }
+          }).then(() => {
+            console.log(`✅ Field source created: ${field.field_name}`);
+          }).catch(err => {
+            console.warn(`Failed to create field source for ${field.field_name}:`, err);
+          });
         }
 
         // Queue AI analysis (bulletproof with retry logic)

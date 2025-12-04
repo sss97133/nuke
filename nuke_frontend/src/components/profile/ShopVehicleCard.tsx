@@ -70,9 +70,9 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
           <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
             {vehicle.year} {vehicle.make} {vehicle.model}
           </h3>
-          {(vehicle.sale_price || vehicle.current_value) && (
+          {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
             <div className="text" style={{ fontSize: '8pt', color: '#3b82f6', fontWeight: 'bold' }}>
-              {formatPrice(vehicle.sale_price || vehicle.current_value)}
+              {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
             </div>
           )}
         </div>
@@ -115,9 +115,9 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
           
           {/* Price and Status */}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {(vehicle.sale_price || vehicle.current_value) && (
+            {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
               <span className="badge" style={{ ...smallChipStyle, color: '#3b82f6', fontWeight: 'bold' }}>
-                {formatPrice(vehicle.sale_price || vehicle.current_value)}
+                {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
               </span>
             )}
             {vehicle.is_for_sale && (
@@ -176,9 +176,9 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
           
           {/* Badges */}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {(vehicle.sale_price || vehicle.current_value) && (
+            {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
               <span className="badge" style={{ ...smallChipStyle, color: '#3b82f6', fontWeight: 'bold' }}>
-                {formatPrice(vehicle.sale_price || vehicle.current_value)}
+                {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
               </span>
             )}
             {vehicle.is_for_sale && (
