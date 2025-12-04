@@ -991,6 +991,62 @@ const VehicleTimeline: React.FC<{
                   CLOSE
                 </button>
               </div>
+              
+              {/* Day Summary - Total Cost and Hours */}
+              {(() => {
+                const uniqueEvents = (selectedDayEvents || []).filter((ev, idx, arr) => 
+                  arr.findIndex(e => e.id === ev.id || (e.title === ev.title && e.event_date === ev.event_date)) === idx
+                );
+                
+                let totalCost = 0;
+                let totalHours = 0;
+                let photoCount = 0;
+                
+                uniqueEvents.forEach(ev => {
+                  const impact = calcEventImpact(ev);
+                  totalCost += impact.valueUSD || 0;
+                  totalHours += impact.hours || 0;
+                  const urls = Array.isArray(ev.image_urls) ? ev.image_urls : [];
+                  photoCount += urls.length;
+                });
+                
+                if (totalCost > 0 || totalHours > 0 || photoCount > 0) {
+                  return (
+                    <div style={{
+                      background: 'var(--grey-50)',
+                      border: '2px solid var(--border)',
+                      padding: '12px 16px',
+                      margin: '0 16px 12px 16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        {totalCost > 0 && (
+                          <div>
+                            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COST</div>
+                            <div style={{ fontSize: '16pt', fontWeight: 700 }}>${totalCost.toLocaleString()}</div>
+                          </div>
+                        )}
+                        {totalHours > 0 && (
+                          <div>
+                            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>LABOR</div>
+                            <div style={{ fontSize: '14pt', fontWeight: 700 }}>{totalHours.toFixed(1)}h</div>
+                          </div>
+                        )}
+                        {photoCount > 0 && (
+                          <div>
+                            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>DOCUMENTATION</div>
+                            <div style={{ fontSize: '14pt', fontWeight: 700 }}>{photoCount} photos</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              
               <div className="card-body">
               <div className="space-y-2">
                 {(() => {
