@@ -1202,8 +1202,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             onClick={(e) => {
               // Check if clicking on the provenance span - if so, let that handler take over
               const target = e.target as HTMLElement;
-              if (target.closest('.provenance-price-clickable')) {
-                return; // Let the span's onClick handle this
+              if (target.classList.contains('provenance-price-clickable') || target.closest('.provenance-price-clickable')) {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowProvenancePopup(true);
+                return;
               }
               
               // If has auction link, open it instead of menu
