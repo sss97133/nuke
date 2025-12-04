@@ -163,6 +163,26 @@ serve(async (req) => {
                 .then(() => console.log('✅ VIN timeline event created'))
                 .catch(err => console.warn('Failed to create VIN timeline event:', err))
               
+              // Create VIN validation record (multi-proof system)
+              // Use existing vin_validations table structure
+              await supabase
+                .from('vin_validations')
+                .insert({
+                  vehicle_id: vehicle_id,
+                  user_id: user_id,
+                  vin_photo_url: image_url,
+                  extracted_vin: vinTagData.vin,
+                  submitted_vin: vinTagData.vin,
+                  validation_status: vinTagResponse.confidence >= 85 ? 'approved' : 'pending',
+                  confidence_score: vinTagResponse.confidence / 100, // Decimal format
+                  validation_method: 'ai_vision'
+                })
+                .then(() => console.log('✅ VIN validation created'))
+                .catch(err => {
+                  // Might already exist - that's ok, multiple proofs are good
+                  console.log('VIN validation insert note:', err?.message || 'duplicate ok');
+                })
+              
               // Trigger NHTSA VIN decode to auto-fill specs (non-blocking)
               fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/decode-vin-and-update`, {
                 method: 'POST',
